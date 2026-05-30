@@ -8483,9 +8483,9 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false, accessDurationDays: "" });
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const { data: groupStudents = [], isLoading: groupStudentsLoading, refetch: refetchGroupStudents } = trpc.lmsAdmin.listCohortGroupStudents.useQuery({ cohortGroupId: selectedGroupId ?? 0 }, { enabled: !!selectedGroupId });
-  const { data: unassignedStudents = [] } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery({ courseId }, { enabled: activeTab === "groups" });
+  const { data: unassignedStudents = [], refetch: refetchUnassigned } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery({ courseId }, { enabled: activeTab === "groups" });
   const assignStudent = trpc.lmsAdmin.assignStudentToCohortGroup.useMutation({
-    onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student assigned"); },
+    onSuccess: () => { refetchGroupStudents(); refetchGroups(); refetchUnassigned(); toast.success("Student assigned"); },
     onError: (e) => toast.error(e.message),
   });
   const removeStudent = trpc.lmsAdmin.removeStudentFromCohortGroup.useMutation({
@@ -8495,11 +8495,11 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [bulkSelected, setBulkSelected] = useState<number[]>([]);
   const [movingStudentId, setMovingStudentId] = useState<number | null>(null);
   const moveStudent = trpc.lmsAdmin.assignStudentToCohortGroup.useMutation({
-    onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student moved to new group"); setMovingStudentId(null); },
+    onSuccess: () => { refetchGroupStudents(); refetchGroups(); refetchUnassigned(); toast.success("Student moved to new group"); setMovingStudentId(null); },
     onError: (e) => { toast.error(e.message); setMovingStudentId(null); },
   });
   const transferStudent = trpc.lmsAdmin.transferStudentToCohortGroup.useMutation({
-    onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student transferred"); setTransferDialog(null); },
+    onSuccess: () => { refetchGroupStudents(); refetchGroups(); refetchUnassigned(); toast.success("Student transferred"); setTransferDialog(null); },
     onError: (e) => toast.error(e.message),
   });
   const [transferDialog, setTransferDialog] = useState<{ userId: number; userName: string; fromGroupId: number } | null>(null);
@@ -8589,7 +8589,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     }
   };
   const bulkAssign = trpc.lmsAdmin.bulkAssignStudentsToCohortGroup.useMutation({
-    onSuccess: (r) => { refetchGroupStudents(); refetchGroups(); toast.success(`${r.assigned} students assigned`); setBulkSelected([]); },
+    onSuccess: (r) => { refetchGroupStudents(); refetchGroups(); refetchUnassigned(); toast.success(`${r.assigned} students assigned`); setBulkSelected([]); },
     onError: (e) => toast.error(e.message),
   });
   const openGroupDialog = (group?: any) => {
@@ -9548,12 +9548,12 @@ function CohortTab({ courseId }: { courseId: number }) {
           ) : (
             <div className="space-y-4">
             {/* ── Global Unassigned Students Panel ── */}
-            {unassignedStudents.length > 0 && cohortGroups.length > 1 && (
+            {unassignedStudents.length > 0 && cohortGroups.length > 0 && (
               <GlobalUnassignedPanel
                 unassignedStudents={unassignedStudents as any[]}
                 cohortGroups={cohortGroups as any[]}
                 courseId={courseId}
-                onAssigned={() => { refetchGroups(); }}
+                onAssigned={() => { refetchGroups(); refetchUnassigned(); }}
               />
             )}
             <div className="grid gap-3">
