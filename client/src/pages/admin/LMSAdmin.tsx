@@ -7181,12 +7181,28 @@ function EnrollStudentDialog({ open, courseId, onClose, onEnrolled }: { open: bo
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Enroll a Student</DialogTitle>
-          <DialogDescription>
-            {createMode
-              ? "Enter the new user's details. They can log in later via OAuth."
-              : "Search for an existing user to enroll them in this course."}
-          </DialogDescription>
+          <DialogDescription className="sr-only">Search for an existing user or create a new account and enroll them.</DialogDescription>
         </DialogHeader>
+
+        {/* Mode tabs */}
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-1">
+          <button
+            className={`flex-1 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+              !createMode ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+            onClick={() => setCreateMode(false)}
+          >
+            <User className="w-3.5 h-3.5" /> Search Existing
+          </button>
+          <button
+            className={`flex-1 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+              createMode ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+            onClick={() => { setCreateMode(true); if (debouncedQuery.includes("@")) setNewUserEmail(debouncedQuery); }}
+          >
+            <UserPlus className="w-3.5 h-3.5" /> Create New User
+          </button>
+        </div>
 
         {!createMode ? (
           <div className="space-y-4 py-2">
@@ -7230,20 +7246,7 @@ function EnrollStudentDialog({ open, courseId, onClose, onEnrolled }: { open: bo
             {showNoResults && (
               <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 text-center">
                 <p className="text-sm text-amber-700 font-medium">No users found for "{debouncedQuery}"</p>
-                <p className="text-xs text-amber-600 mt-1">This user doesn't have an account yet.</p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 border-amber-300 text-amber-700 hover:bg-amber-100"
-                  onClick={() => {
-                    setCreateMode(true);
-                    // Pre-fill email if the query looks like an email
-                    if (debouncedQuery.includes("@")) setNewUserEmail(debouncedQuery);
-                  }}
-                >
-                  <UserPlus className="w-3.5 h-3.5 mr-1.5" />
-                  Create & Enroll New User
-                </Button>
+                <p className="text-xs text-amber-600 mt-1">Switch to the <strong>Create New User</strong> tab to add them.</p>
               </div>
             )}
           </div>
@@ -7269,36 +7272,31 @@ function EnrollStudentDialog({ open, courseId, onClose, onEnrolled }: { open: bo
               />
             </div>
             <p className="text-xs text-gray-400">
-              A new account will be created. The user can sign in later using the same email address via OAuth.
+              If an account already exists with this email, the existing user will be enrolled instead of creating a duplicate. The user can sign in via OAuth using the same email.
             </p>
           </div>
         )}
 
         <DialogFooter className="gap-2">
-          {createMode ? (
-            <>
-              <Button variant="outline" onClick={() => setCreateMode(false)}>Back to Search</Button>
-              <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-                disabled={!newUserName.trim() || !newUserEmail.trim() || createAndEnroll.isPending}
-                onClick={handleCreateAndEnroll}
-              >
-                {createAndEnroll.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <UserPlus className="w-4 h-4 mr-1" />}
-                Create & Enroll
-              </Button>
-            </>
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          {!createMode ? (
+            <Button
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              disabled={!selectedUser || addEnrollment.isPending}
+              onClick={handleEnroll}
+            >
+              {addEnrollment.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              Enroll Student
+            </Button>
           ) : (
-            <>
-              <Button variant="outline" onClick={handleClose}>Cancel</Button>
-              <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-                disabled={!selectedUser || addEnrollment.isPending}
-                onClick={handleEnroll}
-              >
-                {addEnrollment.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                Enroll Student
-              </Button>
-            </>
+            <Button
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              disabled={!newUserName.trim() || !newUserEmail.trim() || createAndEnroll.isPending}
+              onClick={handleCreateAndEnroll}
+            >
+              {createAndEnroll.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <UserPlus className="w-4 h-4 mr-1" />}
+              Create & Enroll
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
