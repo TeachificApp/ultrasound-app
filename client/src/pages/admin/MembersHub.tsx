@@ -23,7 +23,7 @@ import {
   UserPlus, Settings, Award, ChevronRight, ChevronLeft,
   LayoutDashboard, UserCheck, Upload,
   MessageSquare, ArrowUpRight, ArrowDownRight,
-  RefreshCw,
+  RefreshCw, ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -1077,7 +1077,20 @@ export default function MembersHub() {
   }
 
   return (
-    <div className="flex h-full min-h-0 bg-slate-50">
+    <div className="flex flex-col h-full min-h-0 bg-slate-50">
+      {/* Platform Admin breadcrumb bar */}
+      <div className="flex-shrink-0 bg-[#0e1e2e] border-b border-white/10 px-4 py-2 flex items-center gap-3">
+        <a
+          href={getAdminUrl("/platform-admin")}
+          className="inline-flex items-center gap-1.5 text-xs text-white/60 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-3 h-3" />
+          Platform Admin
+        </a>
+        <span className="text-white/20 text-xs">/</span>
+        <span className="text-xs text-white/80 font-medium">Members Hub</span>
+      </div>
+      <div className="flex flex-1 min-h-0">
       {/* Sidebar */}
       <aside className={`flex-shrink-0 bg-white border-r border-slate-200 flex flex-col transition-all duration-200 ${sidebarCollapsed ? "w-14" : "w-56"}`}>
         {/* Sidebar Header */}
@@ -1155,6 +1168,7 @@ export default function MembersHub() {
         <div className="flex-1 overflow-y-auto p-6">
           {renderContent()}
         </div>
+      </div>
       </div>
     </div>
   );

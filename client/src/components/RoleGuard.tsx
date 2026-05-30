@@ -101,8 +101,9 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
   }
 
   // Check roles — appRoles is the array returned by auth.me
+  // Also treat user.role === "admin" (the base DB admin flag) as platform_admin for allowAdmin gates
   const userRoles: AppRole[] = (user as any).appRoles ?? [];
-  const isPlatformAdmin = userRoles.includes("platform_admin");
+  const isPlatformAdmin = userRoles.includes("platform_admin") || (user as any).role === "admin";
   const hasRequiredRole = roles.some(r => userRoles.includes(r));
   const isAuthorised = hasRequiredRole || (allowAdmin && isPlatformAdmin);
 
