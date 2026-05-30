@@ -3838,3 +3838,17 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add Admin/Moderator badges to community profile and feed posts
 - [ ] Make author name/avatar in community feed clickable (link to /community/members/:userId)
 - [ ] Add setCommunityRole procedure for platform admins
+
+## Profile Image & Display Name Fixes (2026-05-30)
+- [ ] Fix MembersLayout header to use displayName (fallback name) and avatarUrl from auth.me
+- [ ] Fix getCohortDiscussions to return userDisplayName and userAvatar fields
+- [ ] Fix cohort discussion frontend to show displayName and avatarUrl
+- [ ] Fix community member listing to use displayName
+- [ ] Auto-send welcome email when student is assigned to a cohort group (assignStudentToCohortGroup mutation)
+- [ ] Send welcome emails to Chris Layman and Stephanie Fleury for June 2026 cohort group
+
+## Recurring Sessions & Assignment Editor (2026-05-30)
+- [x] Fix recurring session expansion: done-flag breaks outer while loop when end date exceeded
+- [x] Fix recurring session expansion: inclusive end date (+24h) so sessions on end date are included
+- [x] Re-expand all 5 parent sessions in DB — now 34 total sessions
+- [ ] Upgrade assignment editor to full LessonBlockEditor (full-page, block-based like lessons/landing pages)

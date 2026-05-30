@@ -37,9 +37,10 @@ export interface LessonBlockEditorHandle {
 }
 
 interface LessonBlockEditorProps {
-  lessonId: number;
+  /** Required for lesson mode; omit when using onBlocksChange (assignment/standalone mode) */
+  lessonId?: number;
   courseId?: number;
-  courseSlug: string;
+  courseSlug?: string;
   initialBlocks: Block[];
   onClose: () => void;
   onSaved: () => void;
@@ -51,6 +52,13 @@ interface LessonBlockEditorProps {
   embedded?: boolean;
   /** Optional lesson title shown in the header instead of the generic hint text */
   lessonTitle?: string;
+  /**
+   * When provided, the editor operates in "controlled" mode:
+   * Save calls onBlocksChange(blocks) instead of the lesson API.
+   */
+  onBlocksChange?: (blocks: Block[]) => void;
+  /** Label shown in the header breadcrumb when in controlled/assignment mode */
+  editorLabel?: string;
 }
 
 // Picker tab type
@@ -69,6 +77,8 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   onNavigateLesson,
   embedded = false,
   lessonTitle,
+  onBlocksChange,
+  editorLabel,
 }: LessonBlockEditorProps, ref: React.Ref<LessonBlockEditorHandle>) {
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
@@ -435,10 +445,18 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   }));
 
   const handleSave = async (andClose = false) => {
+    // Controlled mode: call onBlocksChange instead of the lesson API
+    if (onBlocksChange) {
+      onBlocksChange(blocks);
+      toast.success("Content saved!");
+      if (andClose && onSavedAndClose) onSavedAndClose();
+      else onSaved();
+      return;
+    }
     setSaving(true);
     try {
       await updateLesson.mutateAsync({
-        id: lessonId,
+        id: lessonId!,
         contentBlocks: JSON.stringify(blocks),
       });
       toast.success("Lesson content saved!");
@@ -577,12 +595,12 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
         {/* Header — hidden when embedded inside LessonEditorPage (which has its own header) */}
         {!embedded && <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">Lesson Editor</span>
+            <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">{editorLabel ?? "Lesson Editor"}</span>
             {lessonTitle ? (
               <span className="text-gray-700 text-sm font-medium truncate max-w-xs" title={lessonTitle}>{lessonTitle}</span>
-            ) : (
+            ) : !onBlocksChange ? (
               <span className="text-gray-400 text-xs hidden sm:inline">Blocks appear below the video in the player</span>
-            )}
+            ) : null}
             {(prevLesson || nextLesson) && (
               <div className="flex items-center gap-1 ml-2">
                 <button

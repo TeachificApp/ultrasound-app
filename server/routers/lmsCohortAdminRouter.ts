@@ -485,9 +485,8 @@ export const lmsCohortAdminRouter = router({
       } else if (allowedDays.length >= 1) {
         // Weekly/biweekly with one or more days selected:
         // For each week cycle, emit one instance per selected day (sorted), preserving the
-        // parent's time-of-day. Start from the Monday of the parent's week.
+        // parent's time-of-day. Start from the Sunday of the parent's week.
         const parentDay = parentDate.getDay(); // 0=Sun
-        // Find the Sunday (start of week) of the parent date
         const weekStart = new Date(parentDate);
         weekStart.setDate(weekStart.getDate() - parentDay);
         weekStart.setHours(0, 0, 0, 0);
@@ -497,43 +496,41 @@ export const lmsCohortAdminRouter = router({
           s: parentDate.getSeconds(),
         };
         const sortedDays = [...allowedDays].sort((a, b) => a - b);
+        // Extend end date by 1 day to be inclusive (end date is typically set to midnight UTC
+        // but sessions are at a specific time, so we need to include the end date's day)
+        const inclusiveEndDate = endDate ? new Date(endDate.getTime() + 24 * 60 * 60 * 1000) : null;
         let weekOffset = 0;
-        while (occurrenceNum < maxCount) {
+        let done = false;
+        while (!done && occurrenceNum < maxCount) {
           for (const dayOfWeek of sortedDays) {
             const candidate = new Date(weekStart);
             candidate.setDate(candidate.getDate() + weekOffset * weekIntervalDays + dayOfWeek);
             candidate.setHours(parentTime.h, parentTime.m, parentTime.s, 0);
             // Skip dates on or before the parent session date
             if (candidate <= parentDate) continue;
-            if (endDate && candidate > endDate) break;
-            if (occurrenceNum >= maxCount) break;
+            if (inclusiveEndDate && candidate >= inclusiveEndDate) { done = true; break; }
+            if (occurrenceNum >= maxCount) { done = true; break; }
             occurrenceNum++;
             instances.push({
-            courseId: parent.courseId,
-            cohortGroupId: parent.cohortGroupId,
-            title: `${parent.title} (${occurrenceNum})`,
-            description: parent.description,
-            sessionDate: new Date(candidate),
-            durationMinutes: parent.durationMinutes,
-            meetingUrl: parent.meetingUrl,
-            recordingUrl: null,
-            status: parent.status,
-            timezone: parent.timezone ?? "America/New_York",
-            recurrenceRule: null,
-            recurrenceDaysOfWeek: null,
-            recurrenceInterval: null,
-            recurrenceEndDate: null,
-            recurrenceOccurrenceCount: null,
-            parentSessionId: parent.id,
-          });
+              courseId: parent.courseId,
+              cohortGroupId: parent.cohortGroupId,
+              title: `${parent.title} (${occurrenceNum})`,
+              description: parent.description,
+              sessionDate: new Date(candidate),
+              durationMinutes: parent.durationMinutes,
+              meetingUrl: parent.meetingUrl,
+              recordingUrl: null,
+              status: parent.status,
+              timezone: parent.timezone ?? "America/New_York",
+              recurrenceRule: null,
+              recurrenceDaysOfWeek: null,
+              recurrenceInterval: null,
+              recurrenceEndDate: null,
+              recurrenceOccurrenceCount: null,
+              parentSessionId: parent.id,
+            });
           }
           weekOffset++;
-          // Safety: stop if we've gone past end date even without filling maxCount
-          if (endDate) {
-            const weekCheck = new Date(weekStart);
-            weekCheck.setDate(weekCheck.getDate() + weekOffset * weekIntervalDays);
-            if (weekCheck > endDate) break;
-          }
           if (weekOffset > 520) break; // hard cap: 10 years of weekly
         }
       } else {

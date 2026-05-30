@@ -8825,6 +8825,7 @@ function CohortTab({ courseId }: { courseId: number }) {
   };
 
   // Assignment dialog state
+  const assignBlockEditorRef = React.useRef<import('@/components/LessonBlockEditor').LessonBlockEditorHandle>(null);
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; assignment?: CohortAssignment }>({ open: false });
   const [assignForm, setAssignForm] = useState({
     title: "", description: "", dueDate: "", maxPoints: 100,
