@@ -139,6 +139,11 @@ const DEFAULT_THEME = {
   cardBgOpacity: 100,
   // Dropdown accent
   dropdownAccentColor: "#1d6fa4",
+  // Welcome / Start page
+  welcomeBgColor: "#0e7490",
+  welcomeTextColor: "#ffffff",
+  welcomeButtonColor: "#ffffff",
+  welcomeButtonTextColor: "#0e7490",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -793,6 +798,12 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
   });
   const uploadPageMedia = trpc.auth.uploadPageMedia.useMutation();
 
+  const { data: globalThemeData } = trpc.generalForm.getGlobalTheme.useQuery();
+  const saveGlobalTheme = trpc.generalForm.saveGlobalTheme.useMutation({
+    onSuccess: () => toast.success("Default theme saved — new forms will use this theme"),
+    onError: (e) => toast.error(e.message),
+  });
+
   const set = (key: keyof typeof DEFAULT_THEME, val: any) => setTheme(t => ({ ...t, [key]: val }));
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -967,6 +978,18 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
           </CardContent>
         </Card>
 
+        {/* ── Welcome / Start Page Colors ──────────────────────────────── */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Welcome / Start Page Colors</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-gray-400">These colors apply only to the welcome/start screen shown before the form fields.</p>
+            <ColorField label="Start Page Background" field="welcomeBgColor" theme={theme} set={set} />
+            <ColorField label="Start Page Text Color" field="welcomeTextColor" theme={theme} set={set} />
+            <ColorField label="Start Button Color" field="welcomeButtonColor" theme={theme} set={set} />
+            <ColorField label="Start Button Text Color" field="welcomeButtonTextColor" theme={theme} set={set} />
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Typography & Layout</CardTitle></CardHeader>
           <CardContent className="space-y-3">
@@ -1037,10 +1060,40 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
           </CardContent>
         </Card>
 
-        <Button onClick={save} disabled={saving} className="w-full text-white gap-2" style={{ background: BRAND }}>
-          {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-          Save Theme
-        </Button>
+        <div className="space-y-2">
+          <Button onClick={save} disabled={saving} className="w-full text-white gap-2" style={{ background: BRAND }}>
+            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            Save Theme
+          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button" variant="outline" size="sm" className="flex-1 gap-1 text-xs"
+              onClick={() => saveGlobalTheme.mutate({ themeSettings: JSON.stringify(theme) })}
+              disabled={saveGlobalTheme.isPending}
+            >
+              {saveGlobalTheme.isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : <span>💾</span>}
+              Save as Default Theme
+            </Button>
+            <Button
+              type="button" variant="outline" size="sm" className="flex-1 gap-1 text-xs"
+              disabled={!globalThemeData}
+              onClick={() => {
+                if (!globalThemeData) return;
+                try {
+                  const loaded = { ...DEFAULT_THEME, ...JSON.parse(globalThemeData.themeSettings ?? "{}") };
+                  setTheme(loaded);
+                  updateTheme.mutate({ id: formId, themeSettings: JSON.stringify(loaded) });
+                  toast.success("Default theme loaded");
+                } catch { toast.error("Failed to load default theme"); }
+              }}
+            >
+              <span>📥</span> Load Default Theme
+            </Button>
+          </div>
+          {globalThemeData && (
+            <p className="text-[10px] text-gray-400 text-center">Default theme last saved: {new Date(globalThemeData.updatedAt ?? Date.now()).toLocaleDateString()}</p>
+          )}
+        </div>
       </div>
 
       {/* Live Preview */}
@@ -1510,11 +1563,22 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
 }
 
 // ─── Results Tab ─────────────────────────────────────────────────────────────
+type FilterCondition = {
+  id: string;
+  fieldId: string; // item id as string
+  operator: "equals" | "not_equals" | "contains" | "not_contains" | "starts_with" | "is_empty" | "is_not_empty" | "greater_than" | "less_than";
+  value: string;
+};
+type FilterLogic = "AND" | "OR";
+
 function ResultsTab({ formId, template }: { formId: number; template: any }) {
   const [statusFilter, setStatusFilter] = useState<"all" | "submitted" | "draft" | "reviewed">("all");
   const [page, setPage] = useState(1);
   const [selectedSub, setSelectedSub] = useState<any | null>(null);
   const [exportStatus, setExportStatus] = useState<"all" | "submitted" | "draft" | "reviewed">("all");
+  const [filterConditions, setFilterConditions] = useState<FilterCondition[]>([]);
+  const [filterLogic, setFilterLogic] = useState<FilterLogic>("AND");
+  const [showFilters, setShowFilters] = useState(false);
   const utils = trpc.useUtils();
 
   const { data, isLoading, refetch } = trpc.generalForm.getFormResults.useQuery({
@@ -1589,6 +1653,124 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
 
   const parseResponses = (s: any) => { try { return JSON.parse(s.responses); } catch { return {}; } };
 
+  // Build a map from item ID -> label for quick lookup
+  const itemLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const item of (data?.items ?? [])) {
+      map[String(item.id)] = item.label || item.itemType;
+    }
+    return map;
+  }, [data?.items]);
+
+  // Find email field item ID (first email-type field)
+  const emailItemId = useMemo(() => {
+    const emailItem = (data?.items ?? []).find((it: any) => it.itemType === "email");
+    return emailItem ? String(emailItem.id) : null;
+  }, [data?.items]);
+
+  // Get the best display email for a submission
+  const getSubmitterEmail = (sub: any) => {
+    if (sub.userEmail) return sub.userEmail;
+    if (emailItemId) {
+      const r = parseResponses(sub);
+      return r[emailItemId] || null;
+    }
+    return null;
+  };
+
+  // Get the best display name for a submission
+  const getSubmitterName = (sub: any) => {
+    if (sub.userName) return sub.userName;
+    // Try to find a name-like field
+    const r = parseResponses(sub);
+    const nameItem = (data?.items ?? []).find((it: any) =>
+      it.itemType === "text" && /name/i.test(it.label || "")
+    );
+    if (nameItem) return r[String(nameItem.id)] || null;
+    return null;
+  };
+
+  // Get first few non-empty response values for table preview
+  const getResponsePreview = (sub: any) => {
+    const r = parseResponses(sub);
+    const items = data?.items ?? [];
+    const preview: { label: string; value: string }[] = [];
+    for (const item of items) {
+      if (["heading", "paragraph", "section_break", "rich_text"].includes(item.itemType)) continue;
+      const v = r[String(item.id)];
+      if (v === undefined || v === null || v === "") continue;
+      const displayVal = Array.isArray(v) ? v.join(", ") : String(v);
+      preview.push({ label: item.label || item.itemType, value: displayVal });
+      if (preview.length >= 3) break;
+    }
+    return preview;
+  };
+
+  // Evaluate a single filter condition against a submission
+  const evalCondition = (sub: any, cond: FilterCondition): boolean => {
+    const r = parseResponses(sub);
+    const raw = r[cond.fieldId];
+    const fieldVal = Array.isArray(raw) ? raw.join(", ") : (raw === undefined || raw === null ? "" : String(raw));
+    const condVal = cond.value.toLowerCase();
+    const fv = fieldVal.toLowerCase();
+    switch (cond.operator) {
+      case "equals": return fv === condVal;
+      case "not_equals": return fv !== condVal;
+      case "contains": return fv.includes(condVal);
+      case "not_contains": return !fv.includes(condVal);
+      case "starts_with": return fv.startsWith(condVal);
+      case "is_empty": return fieldVal === "";
+      case "is_not_empty": return fieldVal !== "";
+      case "greater_than": return parseFloat(fieldVal) > parseFloat(cond.value);
+      case "less_than": return parseFloat(fieldVal) < parseFloat(cond.value);
+      default: return true;
+    }
+  };
+
+  // Apply all filter conditions to submissions
+  const filteredSubmissions = useMemo(() => {
+    const subs = data?.submissions ?? [];
+    if (filterConditions.length === 0) return subs;
+    return subs.filter(sub => {
+      const results = filterConditions.map(c => evalCondition(sub, c));
+      return filterLogic === "AND" ? results.every(Boolean) : results.some(Boolean);
+    });
+  }, [data?.submissions, filterConditions, filterLogic]);
+
+  const addFilterCondition = () => {
+    const firstField = (data?.items ?? []).find((it: any) => !["heading", "paragraph", "section_break", "rich_text"].includes(it.itemType));
+    setFilterConditions(prev => [...prev, {
+      id: Math.random().toString(36).slice(2),
+      fieldId: firstField ? String(firstField.id) : "",
+      operator: "contains",
+      value: "",
+    }]);
+  };
+
+  const updateFilterCondition = (id: string, updates: Partial<FilterCondition>) => {
+    setFilterConditions(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  };
+
+  const removeFilterCondition = (id: string) => {
+    setFilterConditions(prev => prev.filter(c => c.id !== id));
+  };
+
+  const OPERATORS = [
+    { value: "equals", label: "equals" },
+    { value: "not_equals", label: "does not equal" },
+    { value: "contains", label: "contains" },
+    { value: "not_contains", label: "does not contain" },
+    { value: "starts_with", label: "starts with" },
+    { value: "is_empty", label: "is empty" },
+    { value: "is_not_empty", label: "is not empty" },
+    { value: "greater_than", label: "greater than" },
+    { value: "less_than", label: "less than" },
+  ] as const;
+
+  const filterableItems = useMemo(() => {
+    return (data?.items ?? []).filter((it: any) => !["heading", "paragraph", "section_break", "rich_text"].includes(it.itemType));
+  }, [data?.items]);
+
   return (
     <div className="space-y-4">
       {/* Header row */}
@@ -1607,6 +1789,14 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
           ))}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            size="sm" variant={showFilters ? "default" : "outline"}
+            className={`gap-1 h-8 ${showFilters ? "bg-teal-600 text-white hover:bg-teal-700" : ""}`}
+            onClick={() => setShowFilters(v => !v)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filters {filterConditions.length > 0 && <span className="ml-0.5 bg-white text-teal-700 rounded-full px-1.5 text-[10px] font-bold">{filterConditions.length}</span>}
+          </Button>
           <Select value={exportStatus} onValueChange={v => setExportStatus(v as any)}>
             <SelectTrigger className="h-8 text-xs w-32"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -1622,6 +1812,93 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
         </div>
       </div>
 
+      {/* Filter Panel */}
+      {showFilters && (
+        <Card className="border-teal-200 bg-teal-50/40">
+          <CardContent className="pt-4 pb-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-700">Filter submissions where</span>
+                <div className="flex rounded border border-gray-200 overflow-hidden text-xs">
+                  {(["AND", "OR"] as const).map(l => (
+                    <button key={l} type="button"
+                      onClick={() => setFilterLogic(l)}
+                      className={`px-2.5 py-1 font-medium transition-colors ${
+                        filterLogic === l ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                      }`}>{l}</button>
+                  ))}
+                </div>
+                <span className="text-xs text-gray-500">of the following conditions match:</span>
+              </div>
+              {filterConditions.length > 0 && (
+                <button type="button" onClick={() => setFilterConditions([])} className="text-xs text-red-400 hover:text-red-600">Clear all</button>
+              )}
+            </div>
+
+            {filterConditions.length === 0 && (
+              <p className="text-xs text-gray-400 italic">No filters yet. Click "Add Condition" to filter by any form field.</p>
+            )}
+
+            {filterConditions.map((cond, idx) => (
+              <div key={cond.id} className="flex items-center gap-2 flex-wrap">
+                {idx > 0 && (
+                  <span className="text-xs font-semibold text-teal-700 w-8 text-center">{filterLogic}</span>
+                )}
+                {idx === 0 && <span className="text-xs text-gray-400 w-8">If</span>}
+
+                {/* Field selector */}
+                <Select value={cond.fieldId} onValueChange={v => updateFilterCondition(cond.id, { fieldId: v })}>
+                  <SelectTrigger className="h-7 text-xs w-44"><SelectValue placeholder="Select field" /></SelectTrigger>
+                  <SelectContent>
+                    {filterableItems.map((it: any) => (
+                      <SelectItem key={it.id} value={String(it.id)}>{it.label || it.itemType}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Operator selector */}
+                <Select value={cond.operator} onValueChange={v => updateFilterCondition(cond.id, { operator: v as any })}>
+                  <SelectTrigger className="h-7 text-xs w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {OPERATORS.map(op => (
+                      <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Value input (hidden for is_empty / is_not_empty) */}
+                {!["is_empty", "is_not_empty"].includes(cond.operator) && (
+                  <input
+                    type="text"
+                    value={cond.value}
+                    onChange={e => updateFilterCondition(cond.id, { value: e.target.value })}
+                    placeholder="value"
+                    className="h-7 px-2 text-xs border border-gray-200 rounded w-36 bg-white focus:outline-none focus:border-teal-400"
+                  />
+                )}
+
+                <button type="button" onClick={() => removeFilterCondition(cond.id)}
+                  className="text-gray-400 hover:text-red-500 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            ))}
+
+            <Button size="sm" variant="outline" className="h-7 text-xs gap-1 mt-1" onClick={addFilterCondition}
+              disabled={filterableItems.length === 0}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Condition
+            </Button>
+
+            {filterConditions.length > 0 && (
+              <p className="text-xs text-teal-700 font-medium">
+                Showing {filteredSubmissions.length} of {data?.submissions?.length ?? 0} submissions
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Table */}
       <Card>
         <CardContent className="p-0">
@@ -1629,6 +1906,11 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
             <div className="flex items-center justify-center py-12 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin mr-2" />Loading…</div>
           ) : !data?.submissions?.length ? (
             <div className="text-center py-12 text-gray-400">No results found</div>
+          ) : filteredSubmissions.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <p className="font-medium">No submissions match your filters</p>
+              <p className="text-xs mt-1">Try adjusting or clearing your filter conditions</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -1636,6 +1918,7 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
                   <tr className="border-b border-gray-100 bg-gray-50/50">
                     <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">#</th>
                     <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Submitter</th>
+                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Responses</th>
                     <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Date</th>
                     <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Status</th>
                     <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Score</th>
@@ -1643,43 +1926,66 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.submissions.map((sub: any) => (
-                    <tr
-                      key={sub.id}
-                      className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer"
-                      onClick={() => setSelectedSub(sub)}
-                    >
-                      <td className="py-2.5 px-4 font-mono text-xs text-gray-400">#{sub.id}</td>
-                      <td className="py-2.5 px-4">
-                        <div className="font-medium text-gray-800 text-xs">{sub.userName || <span className="text-gray-400 italic">Anonymous</span>}</div>
-                        {sub.userEmail && <div className="text-xs text-gray-400">{sub.userEmail}</div>}
-                      </td>
-                      <td className="py-2.5 px-4 text-xs text-gray-500">{new Date(sub.submittedAt).toLocaleString()}</td>
-                      <td className="py-2.5 px-4" onClick={e => e.stopPropagation()}>
-                        <Select value={sub.status} onValueChange={v => updateStatus.mutate({ id: sub.id, status: v as any })}>
-                          <SelectTrigger className="h-6 text-xs w-28"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="submitted">Submitted</SelectItem>
-                            <SelectItem value="reviewed">Reviewed</SelectItem>
-                            <SelectItem value="draft">Incomplete</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="py-2.5 px-4 text-xs">
-                        {sub.maxScore > 0 ? (
-                          <span className="font-medium" style={{ color: BRAND }}>{sub.score}/{sub.maxScore}</span>
-                        ) : <span className="text-gray-400">—</span>}
-                      </td>
-                      <td className="py-2.5 px-4 text-right" onClick={e => e.stopPropagation()}>
-                        <Button
-                          variant="ghost" size="sm" className="text-red-400 hover:text-red-600 h-6 w-6 p-0"
-                          onClick={() => { if (confirm("Delete this submission?")) deleteSubmission.mutate({ id: sub.id }); }}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredSubmissions.map((sub: any) => {
+                    const submitterEmail = getSubmitterEmail(sub);
+                    const submitterName = getSubmitterName(sub);
+                    const preview = getResponsePreview(sub);
+                    return (
+                      <tr
+                        key={sub.id}
+                        className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer"
+                        onClick={() => setSelectedSub(sub)}
+                      >
+                        <td className="py-2.5 px-4 font-mono text-xs text-gray-400">#{sub.id}</td>
+                        <td className="py-2.5 px-4 min-w-[140px]">
+                          <div className="font-medium text-gray-800 text-xs">
+                            {submitterName || submitterEmail || <span className="text-gray-400 italic">Anonymous</span>}
+                          </div>
+                          {submitterEmail && submitterName && (
+                            <div className="text-xs text-gray-400">{submitterEmail}</div>
+                          )}
+                          {!submitterEmail && !submitterName && sub.ipAddress && (
+                            <div className="text-xs text-gray-400">{sub.ipAddress}</div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-4 max-w-[280px]">
+                          <div className="space-y-0.5">
+                            {preview.map((p, i) => (
+                              <div key={i} className="flex gap-1 text-xs">
+                                <span className="text-gray-400 shrink-0">{p.label}:</span>
+                                <span className="text-gray-700 truncate max-w-[180px]">{p.value}</span>
+                              </div>
+                            ))}
+                            {preview.length === 0 && <span className="text-gray-300 text-xs italic">No data</span>}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-4 text-xs text-gray-500 whitespace-nowrap">{new Date(sub.submittedAt).toLocaleString()}</td>
+                        <td className="py-2.5 px-4" onClick={e => e.stopPropagation()}>
+                          <Select value={sub.status} onValueChange={v => updateStatus.mutate({ id: sub.id, status: v as any })}>
+                            <SelectTrigger className="h-6 text-xs w-28"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="submitted">Submitted</SelectItem>
+                              <SelectItem value="reviewed">Reviewed</SelectItem>
+                              <SelectItem value="draft">Incomplete</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2.5 px-4 text-xs">
+                          {sub.maxScore > 0 ? (
+                            <span className="font-medium" style={{ color: BRAND }}>{sub.score}/{sub.maxScore}</span>
+                          ) : <span className="text-gray-400">—</span>}
+                        </td>
+                        <td className="py-2.5 px-4 text-right" onClick={e => e.stopPropagation()}>
+                          <Button
+                            variant="ghost" size="sm" className="text-red-400 hover:text-red-600 h-6 w-6 p-0"
+                            onClick={() => { if (confirm("Delete this submission?")) deleteSubmission.mutate({ id: sub.id }); }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1709,21 +2015,39 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><span className="text-gray-500">Submitter:</span> <span className="font-medium">{selectedSub.userName || "Anonymous"}</span></div>
-                <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selectedSub.userEmail || "—"}</span></div>
-                <div><span className="text-gray-500">Date:</span> <span className="font-medium">{new Date(selectedSub.submittedAt).toLocaleString()}</span></div>
-                <div><span className="text-gray-500">Score:</span> <span className="font-medium">{selectedSub.maxScore > 0 ? `${selectedSub.score}/${selectedSub.maxScore}` : "N/A"}</span></div>
-              </div>
+              {(() => {
+                const selEmail = getSubmitterEmail(selectedSub);
+                const selName = getSubmitterName(selectedSub);
+                return (
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><span className="text-gray-500">Submitter:</span> <span className="font-medium">{selName || selEmail || "Anonymous"}</span></div>
+                    <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selEmail || "—"}</span></div>
+                    <div><span className="text-gray-500">Date:</span> <span className="font-medium">{new Date(selectedSub.submittedAt).toLocaleString()}</span></div>
+                    <div><span className="text-gray-500">Score:</span> <span className="font-medium">{selectedSub.maxScore > 0 ? `${selectedSub.score}/${selectedSub.maxScore}` : "N/A"}</span></div>
+                  </div>
+                );
+              })()}
               <div className="border-t pt-3">
                 <p className="text-xs font-medium text-gray-500 mb-2">Responses</p>
                 <div className="space-y-2">
-                  {Object.entries(parseResponses(selectedSub)).map(([k, v]) => (
-                    <div key={k} className="bg-gray-50 rounded p-2">
-                      <p className="text-xs text-gray-500">Field #{k}</p>
-                      <p className="text-sm font-medium text-gray-800 mt-0.5">
-                        {Array.isArray(v) ? v.join(", ") : String(v)}
-                      </p>
+                  {(data?.items ?? []).filter((it: any) => !['heading','paragraph','section_break','rich_text'].includes(it.itemType)).map((item: any) => {
+                    const r = parseResponses(selectedSub);
+                    const v = r[String(item.id)];
+                    if (v === undefined || v === null || v === '') return null;
+                    return (
+                      <div key={item.id} className="bg-gray-50 rounded p-2">
+                        <p className="text-xs text-gray-500 font-medium">{item.label || item.itemType}</p>
+                        <p className="text-sm font-medium text-gray-800 mt-0.5">
+                          {Array.isArray(v) ? v.join(", ") : String(v)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                  {/* Show any responses for fields not in items list (e.g. deleted fields) */}
+                  {Object.entries(parseResponses(selectedSub)).filter(([k]) => !(data?.items ?? []).some((it: any) => String(it.id) === k)).map(([k, v]) => (
+                    <div key={k} className="bg-gray-50 rounded p-2 opacity-60">
+                      <p className="text-xs text-gray-400">Deleted field #{k}</p>
+                      <p className="text-sm text-gray-600 mt-0.5">{Array.isArray(v) ? v.join(", ") : String(v)}</p>
                     </div>
                   ))}
                 </div>

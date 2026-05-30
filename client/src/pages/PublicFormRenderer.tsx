@@ -48,6 +48,11 @@ interface ThemeSettings {
   cardShadow: "none" | "sm" | "md" | "lg";
   cardBgOpacity: number;
   dropdownAccentColor: string;
+  // Welcome / Start page
+  welcomeBgColor: string;
+  welcomeTextColor: string;
+  welcomeButtonColor: string;
+  welcomeButtonTextColor: string;
 }
 
 const DEFAULT_THEME: ThemeSettings = {
@@ -79,6 +84,11 @@ const DEFAULT_THEME: ThemeSettings = {
   cardShadow: "md",
   cardBgOpacity: 100,
   dropdownAccentColor: "#1d6fa4",
+  // Welcome / Start page
+  welcomeBgColor: "#0e7490",
+  welcomeTextColor: "#ffffff",
+  welcomeButtonColor: "#ffffff",
+  welcomeButtonTextColor: "#0e7490",
 };
 
 function parseTheme(raw?: string | null): ThemeSettings {
@@ -296,11 +306,14 @@ function WelcomeScreen({ template, theme, onStart }: { template: any; theme: The
   const subtitle = template.welcomeSubtitle || theme.headerSubtitle || template.description;
   const btnText = template.welcomeButtonText || "Start";
 
+  // Use welcome-specific colors, falling back to form colors if not set
+  const wBg = theme.welcomeBgColor || theme.backgroundColor;
+  const wText = theme.welcomeTextColor || theme.textColor;
+  const wBtn = theme.welcomeButtonColor || theme.buttonColor;
+  const wBtnText = theme.welcomeButtonTextColor || theme.buttonTextColor;
+
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", fontFamily: theme.fontFamily, ...bgStyle }}>
-      {theme.bgType === "image" && theme.bgImageUrl && theme.bgOpacity < 100 && (
-        <div style={{ position: "fixed", inset: 0, background: "#fff", opacity: 1 - (theme.bgOpacity / 100), pointerEvents: "none", zIndex: 0 }} />
-      )}
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", fontFamily: theme.fontFamily, background: wBg }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: 640, width: "100%", textAlign: "center" }}>
         {theme.showLogo && theme.logoUrl && (
           <img src={theme.logoUrl} alt="Logo" style={{ height: 56, marginBottom: 32, objectFit: "contain", display: "block", margin: "0 auto 32px" }} />
@@ -308,14 +321,14 @@ function WelcomeScreen({ template, theme, onStart }: { template: any; theme: The
         {template.welcomeImageUrl && (
           <img src={template.welcomeImageUrl} alt="" style={{ maxWidth: "100%", maxHeight: 320, objectFit: "contain", display: "block", margin: "0 auto 32px", borderRadius: `${parseInt(theme.borderRadius) + 4}px` }} />
         )}
-        <h1 style={{ fontSize: "clamp(28px, 5vw, 48px)", fontWeight: 800, color: theme.textColor, lineHeight: 1.15, marginBottom: 16 }}>{title}</h1>
+        <h1 style={{ fontSize: "clamp(28px, 5vw, 48px)", fontWeight: 800, color: wText, lineHeight: 1.15, marginBottom: 16 }}>{title}</h1>
         {subtitle && (
-          <p style={{ fontSize: "clamp(15px, 2vw, 18px)", color: theme.textColor, opacity: 0.75, lineHeight: 1.6, marginBottom: 40 }}>{subtitle}</p>
+          <p style={{ fontSize: "clamp(15px, 2vw, 18px)", color: wText, opacity: 0.85, lineHeight: 1.6, marginBottom: 40 }}>{subtitle}</p>
         )}
         <button onClick={onStart} style={{
           display: "inline-flex", alignItems: "center", gap: 10,
           padding: "14px 36px", borderRadius: `${theme.borderRadius}px`,
-          background: theme.buttonColor, color: theme.buttonTextColor,
+          background: wBtn, color: wBtnText,
           border: "none", fontSize: parseInt(theme.fontSize) + 1, fontWeight: 700,
           cursor: "pointer", fontFamily: theme.fontFamily,
           boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
@@ -326,7 +339,7 @@ function WelcomeScreen({ template, theme, onStart }: { template: any; theme: The
         >
           {btnText} <ArrowRight style={{ width: 18, height: 18 }} />
         </button>
-        <p style={{ fontSize: 12, color: theme.textColor, opacity: 0.4, marginTop: 24 }}>Press Enter ↵ to continue</p>
+        <p style={{ fontSize: 12, color: wText, opacity: 0.4, marginTop: 24 }}>Press Enter ↵ to continue</p>
       </div>
       <style>{`@keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>

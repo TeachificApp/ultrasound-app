@@ -28,6 +28,7 @@ import {
   generalFormOptions,
   generalFormBranchRules,
   generalFormSubmissions,
+  globalFormTheme,
   users,
 } from "../../drizzle/schema";
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
@@ -733,7 +734,11 @@ export const generalFormRouter = router({
           .offset(offset),
         db.select({ total: count() }).from(generalFormSubmissions).where(and(...conditions)),
       ]);
-      return { submissions, total: total as number };
+      const items = await db.select({ id: generalFormItems.id, label: generalFormItems.label, itemType: generalFormItems.itemType, sortOrder: generalFormItems.sortOrder })
+        .from(generalFormItems)
+        .where(eq(generalFormItems.templateId, input.templateId))
+        .orderBy(asc(generalFormItems.sortOrder));
+      return { submissions, total: total as number, items };
     }),
 
   // ── PUBLIC: Submit form ───────────────────────────────────────────────────
@@ -810,5 +815,32 @@ export const generalFormRouter = router({
         for (const u of userRows) userMap[u.id] = { name: u.name, email: u.email };
       }
       return { submissions, items, userMap };
+    }),
+
+  // ── Global Form Theme ─────────────────────────────────────────────────────
+  getGlobalTheme: protectedProcedure
+    .query(async ({ ctx }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(globalFormTheme).limit(1);
+      return rows[0] ?? null;
+    }),
+
+  saveGlobalTheme: protectedProcedure
+    .input(z.object({ themeSettings: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select({ id: globalFormTheme.id }).from(globalFormTheme).limit(1);
+      if (rows.length > 0) {
+        await db.update(globalFormTheme)
+          .set({ themeSettings: input.themeSettings })
+          .where(eq(globalFormTheme.id, rows[0].id));
+      } else {
+        await db.insert(globalFormTheme).values({ themeSettings: input.themeSettings });
+      }
+      return { ok: true };
     }),
 });

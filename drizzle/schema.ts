@@ -5335,3 +5335,14 @@ export const affiliateCourseAccess = mysqlTable("affiliate_course_access", {
   revokedAt: timestamp("revoked_at"), // null = active, set = revoked
 });
 export type AffiliateCourseAccess = typeof affiliateCourseAccess.$inferSelect;
+
+// ─── Global Form Style/Branding Theme ────────────────────────────────────────
+// Single-row settings table (id=1 always). Stores the default theme JSON that
+// is pre-populated when a new form is created and can be loaded into any form's
+// Style/Branding tab as a starting point.
+export const globalFormTheme = mysqlTable("global_form_theme", {
+  id: int("id").autoincrement().primaryKey(),
+  themeSettings: text("theme_settings"), // JSON blob matching DEFAULT_THEME shape
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type GlobalFormTheme = typeof globalFormTheme.$inferSelect;

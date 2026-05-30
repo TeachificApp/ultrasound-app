@@ -4031,3 +4031,15 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] DIY Form Builder: add same rich-text thank-you message editor in settings
 - [x] DIY Form Builder: add URL redirect option with toggle between message vs redirect
 - [x] DIY Form Builder: render rich-text thank-you on DIY form submission success screen
+
+## Form Results & Analytics (May 30, 2026)
+- [x] Results tab: show submitter email (from form responses if not logged in) instead of "Anonymous"
+- [x] Results tab: show field labels (Name, Email, etc.) instead of "Field #ID" in modal
+- [x] Results tab: add inline response preview columns in table rows (first 3 non-empty fields)
+- [x] Results tab: add dynamic field-based filter panel with AND/OR logic, multiple conditions, operators (equals, contains, starts with, is empty, greater than, etc.)
+- [x] Results tab: filter count badge on Filters button, clear all, match count display
+- [x] getFormResults backend: include form items (id, label, itemType) in response for label resolution
+- [x] Welcome/Start page: add separate theme colors (welcomeBgColor, welcomeTextColor, welcomeButtonColor, welcomeButtonTextColor) to ThemeSettings interface and DEFAULT_THEME
+- [x] Welcome/Start page: WelcomeScreen renderer uses welcome-specific colors instead of shared form colors
+- [x] Style/Branding tab: Save as Default Theme button (saves current theme as org default)
+- [x] Style/Branding tab: Load Default Theme button (applies saved org default to current form)
