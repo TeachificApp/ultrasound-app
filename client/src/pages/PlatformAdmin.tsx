@@ -91,7 +91,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
-import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
+import { isIHeartEchoDomain, LEARN_APP_URL } from "@/hooks/useSubdomain";
 
 type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";
 
@@ -1144,20 +1144,37 @@ function SortableToolCard({ card }: { card: ToolCard }) {
       >
         <GripVertical className="w-3.5 h-3.5 text-gray-400" />
       </div>
-      <Link href={card.href}>
-        <div className="flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-gray-200 cursor-pointer transition-all h-full">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: card.color + "18" }}>
-            <Icon className="w-4.5 h-4.5" style={{ color: card.color }} />
+      {card.href.startsWith("http") ? (
+        <a href={card.href} target="_blank" rel="noopener noreferrer">
+          <div className="flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-gray-200 cursor-pointer transition-all h-full">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: card.color + "18" }}>
+              <Icon className="w-4.5 h-4.5" style={{ color: card.color }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800 mb-0.5">{card.label}</p>
+              <p className="text-xs text-gray-400 leading-relaxed">{card.description}</p>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-medium group-hover:gap-2 transition-all" style={{ color: card.color }}>
+              Open <ChevronRight className="w-3 h-3" />
+            </div>
           </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-800 mb-0.5">{card.label}</p>
-            <p className="text-xs text-gray-400 leading-relaxed">{card.description}</p>
+        </a>
+      ) : (
+        <Link href={card.href}>
+          <div className="flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-gray-200 cursor-pointer transition-all h-full">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: card.color + "18" }}>
+              <Icon className="w-4.5 h-4.5" style={{ color: card.color }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800 mb-0.5">{card.label}</p>
+              <p className="text-xs text-gray-400 leading-relaxed">{card.description}</p>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-medium group-hover:gap-2 transition-all" style={{ color: card.color }}>
+              Open <ChevronRight className="w-3 h-3" />
+            </div>
           </div>
-          <div className="flex items-center gap-1 text-xs font-medium group-hover:gap-2 transition-all" style={{ color: card.color }}>
-            Open <ChevronRight className="w-3 h-3" />
-          </div>
-        </div>
-      </Link>
+        </Link>
+      )}
     </div>
   );
 }
@@ -1182,7 +1199,7 @@ export default function PlatformAdmin() {
     { id: "email", href: "/admin/email", icon: Mail, label: "Email Campaigns", description: "Create and send email campaigns to members", color: "#189aa1" },
     { id: "general-form-builder", href: "/admin/general-forms", icon: ClipboardList, label: "General Form Builder", description: "Build public forms, surveys, and quizzes with branding, analytics, and share links", color: "#0e7490" },
     { id: "media-repository", href: "/admin/media-repository", icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
-    { id: "lms", href: "/admin/lms", icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
+    { id: "lms", href: `${LEARN_APP_URL}/admin/lms`, icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
     { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Management", description: "Build funnels, manage contacts/leads, and track Lead → User → Purchaser conversions", color: "#be185d" },
     { id: "members", href: "/admin/members", icon: Users, label: "Members", description: "Registered users, enrollments, sales, memberships, and activity logs", color: "#0d9488" },
     { id: "discount-codes", href: "/admin/discount-codes", icon: Tag, label: "Discount Codes", description: "Create and manage Stripe coupons and promo codes for all products", color: "#f59e0b" },

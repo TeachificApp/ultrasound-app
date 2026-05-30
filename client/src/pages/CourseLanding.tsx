@@ -193,6 +193,7 @@ function resolveBtnAction(
   onEnroll: () => void,
   onEnrollWithOption?: (pricingOptionId: number | undefined) => void,
   pricingOptionId?: number,
+  onFreePreview?: () => void,
 ): () => void {
   const b = behavior ?? (link ? "url" : "");
   if (b === "url" && link) return () => window.open(link, "_blank", "noopener,noreferrer");
@@ -202,7 +203,9 @@ function resolveBtnAction(
   if (b === "download_file" && downloadUrl) return () => window.open(downloadUrl, "_blank", "noopener,noreferrer");
   // pricing_option → enroll with specific pricing option
   if (b === "pricing_option" && onEnrollWithOption) return () => onEnrollWithOption(pricingOptionId);
-  // direct_checkout, group_purchase, free_preview, next_funnel_step, or default → onEnroll
+  // free_preview → open free preview flow (not checkout)
+  if (b === "free_preview" && onFreePreview) return onFreePreview;
+  // direct_checkout, group_purchase, next_funnel_step, or default → onEnroll
   return onEnroll;
 }
 
@@ -260,7 +263,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn, i) => (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined)}
+                    <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined)}
                       className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
@@ -301,9 +304,18 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const mwCL = d.maxWidth ?? "auto";
       const imgStyleCL: React.CSSProperties = { maxWidth: mwCL === "auto" ? "100%" : mwCL, width: mwCL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
       const imgElCL = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyleCL} /> : null;
+      // Resolve onAction for checkout/free_preview image link behaviors
+      const imgOnAction = (() => {
+        const beh = d.linkBehavior as string | undefined;
+        if (!beh) return undefined;
+        if (beh === "free_preview") return onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : onEnroll;
+        if (beh === "pricing_option") return onEnrollWithOption ? () => onEnrollWithOption(d.linkPricingOptionId ? Number(d.linkPricingOptionId) : undefined) : onEnroll;
+        if (beh === "direct_checkout" || beh === "group_purchase") return onEnroll;
+        return undefined;
+      })();
       return (
         <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyCL }}>
-          {imgElCL && <ImageLinkWrapper d={d}>{imgElCL}</ImageLinkWrapper>}
+          {imgElCL && <ImageLinkWrapper d={d} onAction={imgOnAction}>{imgElCL}</ImageLinkWrapper>}
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignCL as any }}>{d.caption}</p>}
         </div>
       );
@@ -1146,6 +1158,15 @@ export default function CourseLanding() {
     + ((course as any).topLevelLessons?.length ?? 0);
   const totalDuration = (course.sections ?? []).reduce((sum: number, s: any) =>
     sum + (s.lessons ?? []).reduce((ls: number, l: any) => ls + (l.durationMinutes ?? 0), 0), 0);
+
+  // Compute first preview lesson for free_preview CTA buttons
+  const firstPreviewLesson = (() => {
+    const allLessons = (course.sections ?? []).flatMap((s: any) => s.lessons ?? []);
+    return allLessons.find((l: any) => l.isPreview || l.previewMode === "preview") ?? allLessons[0] ?? null;
+  })();
+  const handleFreePreviewCta = firstPreviewLesson
+    ? () => handleFreePreviewClick(firstPreviewLesson.id)
+    : handleEnroll;
 
   // Parse blocks from landing page
   let blocks: Block[] = [];

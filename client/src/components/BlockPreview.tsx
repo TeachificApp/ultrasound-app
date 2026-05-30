@@ -20,7 +20,7 @@ import { handleCtaBtnClick } from "@/pages/CourseLanding";
  * Handles: url, send_email, scroll_to_section, open_popup, download_file.
  * For checkout/funnel behaviors the image is not wrapped (no-op).
  */
-export function ImageLinkWrapper({ d, children }: { d: Record<string, any>; children: React.ReactNode }) {
+export function ImageLinkWrapper({ d, children, onAction }: { d: Record<string, any>; children: React.ReactNode; onAction?: () => void }) {
   // Determine effective behavior: explicit linkBehavior wins; fall back to "url" if linkUrl is set
   const behavior: string = d.linkBehavior && d.linkBehavior !== "" ? d.linkBehavior : (d.linkUrl ? "url" : "");
   const newTab = d.openInNewTab !== false;
@@ -46,6 +46,12 @@ export function ImageLinkWrapper({ d, children }: { d: Record<string, any>; chil
   if (behavior === "open_popup" && d.linkPopupUrl) {
     return (
       <span style={style} onClick={e => { e.stopPropagation(); const w = 800, h = 600; const left = window.screenX + (window.outerWidth - w) / 2; const top = window.screenY + (window.outerHeight - h) / 2; window.open(d.linkPopupUrl, "_blank", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`); }}>{children}</span>
+    );
+  }
+  // Checkout/free_preview/pricing_option behaviors — delegate to onAction if provided
+  if (onAction && (behavior === "direct_checkout" || behavior === "free_preview" || behavior === "pricing_option" || behavior === "group_purchase")) {
+    return (
+      <span style={style} onClick={e => { e.stopPropagation(); onAction(); }}>{children}</span>
     );
   }
   return <>{children}</>;

@@ -176,7 +176,7 @@ export default function Profile() {
       setWebsite(u.website || "");
       setPendingEmail((u as any).pendingEmail ?? null);
     }
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, editMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const requestEmailChange = trpc.auth.requestEmailChange.useMutation({
     onSuccess: (data) => {

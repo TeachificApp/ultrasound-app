@@ -204,6 +204,17 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
         </div>
       </header>
 
+      {/* Breadcrumb bar — shown on admin sub-pages */}
+      {location.startsWith("/platform-admin") && (
+        <div className="bg-white border-b border-gray-100 px-4 py-2">
+          <div className="max-w-7xl mx-auto flex items-center gap-1.5 text-sm text-gray-500">
+            <Link href="/my-dashboard" className="hover:text-teal-600 transition-colors">Member Hub</Link>
+            <span className="text-gray-300">/</span>
+            <span className="text-gray-800 font-medium">Platform Admin</span>
+          </div>
+        </div>
+      )}
+
       {/* Page content */}
       <main className="flex-1">
         {children}
