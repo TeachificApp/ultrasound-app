@@ -42,8 +42,8 @@ interface LessonBlockEditorProps {
   courseId?: number;
   courseSlug?: string;
   initialBlocks: Block[];
-  onClose: () => void;
-  onSaved: () => void;
+  onClose?: () => void;
+  onSaved?: () => void;
   onSavedAndClose?: () => void;
   prevLesson?: { id: number; title: string } | null;
   nextLesson?: { id: number; title: string } | null;
