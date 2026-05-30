@@ -1872,14 +1872,14 @@ function AnalyticsTab({ formId, template }: { formId: number; template: any }) {
 
 // ─── Form Editor Shell (tabs) ─────────────────────────────────────────────────
 function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "results" | "analytics">("editor");
+  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "results" | "analytics">("settings");
   const { data: formData, isLoading, refetch } = trpc.generalForm.getForm.useQuery({ id: formId });
 
   const TABS = [
+    { id: "settings", label: "Settings", icon: Settings },
     { id: "editor", label: "Editor", icon: FileText },
     { id: "style", label: "Style / Branding", icon: Palette },
     { id: "share", label: "Share", icon: Share2 },
-    { id: "settings", label: "Settings", icon: Settings },
     { id: "results", label: "Results", icon: Download },
     { id: "analytics", label: "Analytics", icon: BarChart2 },
   ] as const;
