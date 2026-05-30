@@ -2955,10 +2955,22 @@ export type LmsLessonProgress = typeof lmsLessonProgress.$inferSelect;
 
 export const lmsGroups = mysqlTable("lms_groups", {
   id: int("id").autoincrement().primaryKey(),
-  courseId: int("course_id").notNull(),
+  /** Legacy single-course field — kept for backward compat, new teams use lmsGroupCourses */
+  courseId: int("course_id"),
   name: varchar("name", { length: 255 }).notNull(),
+  /** Legacy total seats — new teams track seats per course in lmsGroupCourses */
   seats: int("seats").default(1).notNull(),
-  managerId: int("manager_id"), // FK to users — the group manager
+  managerId: int("manager_id"), // FK to users — the group manager (legacy)
+  /** Team admin user ID — has team-admin role, can manage this team only */
+  teamAdminId: int("team_admin_id"),
+  /** Organisation / institution name */
+  orgName: varchar("org_name", { length: 255 }),
+  /** Team admin contact email */
+  adminEmail: varchar("admin_email", { length: 320 }),
+  /** Team admin contact phone */
+  adminPhone: varchar("admin_phone", { length: 50 }),
+  /** Organisation website */
+  website: varchar("website", { length: 255 }),
   notes: text("notes"),
   // Stripe order that created this group (set after webhook fulfillment)
   orderId: int("order_id"),
@@ -2966,6 +2978,19 @@ export const lmsGroups = mysqlTable("lms_groups", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LmsGroup = typeof lmsGroups.$inferSelect;
+
+/** Per-course seat allocation for a team (replaces single courseId+seats on lmsGroups) */
+export const lmsGroupCourses = mysqlTable("lms_group_courses", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  courseId: int("course_id").notNull(),
+  seats: int("seats").default(1).notNull(),
+  /** Stripe order that added this course allocation */
+  orderId: int("order_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsGroupCourse = typeof lmsGroupCourses.$inferSelect;
 
 export const lmsGroupSeats = mysqlTable("lms_group_seats", {
   id: int("id").autoincrement().primaryKey(),

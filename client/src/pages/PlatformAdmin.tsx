@@ -91,7 +91,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
-import { isIHeartEchoDomain, LEARN_APP_URL } from "@/hooks/useSubdomain";
+import { isIHeartEchoDomain, LEARN_APP_URL, APP_URL, getAdminUrl } from "@/hooks/useSubdomain";
 
 type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";
 
@@ -1196,33 +1196,33 @@ export default function PlatformAdmin() {
 
   // Dual App tool cards
   const DUAL_TOOLS_DEFAULT: ToolCard[] = [
-    { id: "email", href: "/admin/email", icon: Mail, label: "Email Campaigns", description: "Create and send email campaigns to members", color: "#189aa1" },
-    { id: "general-form-builder", href: "/admin/general-forms", icon: ClipboardList, label: "General Form Builder", description: "Build public forms, surveys, and quizzes with branding, analytics, and share links", color: "#0e7490" },
-    { id: "media-repository", href: "/admin/media-repository", icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
-    { id: "lms", href: `${LEARN_APP_URL}/admin/lms`, icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
-    { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Management", description: "Build funnels, manage contacts/leads, and track Lead → User → Purchaser conversions", color: "#be185d" },
-    { id: "members", href: "/admin/members", icon: Users, label: "Members", description: "Registered users, enrollments, sales, memberships, and activity logs", color: "#0d9488" },
-    { id: "discount-codes", href: "/admin/discount-codes", icon: Tag, label: "Discount Codes", description: "Create and manage Stripe coupons and promo codes for all products", color: "#f59e0b" },
+    { id: "email", href: getAdminUrl("/admin/email"), icon: Mail, label: "Email Campaigns", description: "Create and send email campaigns to members", color: "#189aa1" },
+    { id: "general-form-builder", href: getAdminUrl("/admin/general-forms"), icon: ClipboardList, label: "General Form Builder", description: "Build public forms, surveys, and quizzes with branding, analytics, and share links", color: "#0e7490" },
+    { id: "media-repository", href: getAdminUrl("/admin/media-repository"), icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
+    { id: "lms", href: getAdminUrl("/admin/lms"), icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
+    { id: "funnels", href: getAdminUrl("/admin/funnels"), icon: LayoutTemplate, label: "Funnel Management", description: "Build funnels, manage contacts/leads, and track Lead \u2192 User \u2192 Purchaser conversions", color: "#be185d" },
+    { id: "members", href: getAdminUrl("/admin/members"), icon: Users, label: "Members", description: "Registered users, enrollments, sales, memberships, and activity logs", color: "#0d9488" },
+    { id: "discount-codes", href: getAdminUrl("/admin/discount-codes"), icon: Tag, label: "Discount Codes", description: "Create and manage Stripe coupons and promo codes for all products", color: "#f59e0b" },
   ];
 
   // Per-Brand tool cards (auto-scoped to current brand)
   const PER_BRAND_TOOLS_DEFAULT: ToolCard[] = [
-    { id: "cases", href: "/admin/cases", icon: ClipboardList, label: "Case Management", description: "Manage clinical case submissions and reviews", color: "#189aa1" },
-    { id: "quickfire", href: "/admin/quickfire", icon: Zap, label: "Daily Challenge", description: "Manage daily quiz challenges and questions", color: "#f59e0b" },
-    { id: "scancoach", href: "/admin/scancoach", icon: Scan, label: "ScanCoach Editor", description: "Edit ScanCoach protocols and content", color: "#0891b2" },
-    { id: "navigator", href: "/admin/navigator", icon: Globe, label: "Navigator Editor", description: "Edit Navigator pathways and content", color: "#7c3aed" },
-    { id: "thinkific-webhook", href: "/admin/thinkific-webhook", icon: Webhook, label: "Thinkific Webhook", description: "Configure Thinkific course sync webhooks", color: "#be185d" },
-    { id: "challenge-cards", href: "/admin/challenge-cards", icon: GraduationCap, label: "Challenge Card Generator", description: "Generate visual challenge cards for social media", color: "#059669" },
-    { id: "social-content", href: "/admin/social-content", icon: Image, label: "Social Content Generator", description: "Create branded social media content", color: "#f97316" },
-    { id: "soundbytes", href: "/admin/soundbytes", icon: Volume2, label: "SoundBytes Admin", description: "Manage SoundBytes audio content and playlists", color: "#7c3aed" },
+    { id: "cases", href: getAdminUrl("/admin/cases"), icon: ClipboardList, label: "Case Management", description: "Manage clinical case submissions and reviews", color: "#189aa1" },
+    { id: "quickfire", href: getAdminUrl("/admin/quickfire"), icon: Zap, label: "Daily Challenge", description: "Manage daily quiz challenges and questions", color: "#f59e0b" },
+    { id: "scancoach", href: getAdminUrl("/admin/scancoach"), icon: Scan, label: "ScanCoach Editor", description: "Edit ScanCoach protocols and content", color: "#0891b2" },
+    { id: "navigator", href: getAdminUrl("/admin/navigator"), icon: Globe, label: "Navigator Editor", description: "Edit Navigator pathways and content", color: "#7c3aed" },
+    { id: "thinkific-webhook", href: getAdminUrl("/admin/thinkific-webhook"), icon: Webhook, label: "Thinkific Webhook", description: "Configure Thinkific course sync webhooks", color: "#be185d" },
+    { id: "challenge-cards", href: getAdminUrl("/admin/challenge-cards"), icon: GraduationCap, label: "Challenge Card Generator", description: "Generate visual challenge cards for social media", color: "#059669" },
+    { id: "social-content", href: getAdminUrl("/admin/social-content"), icon: Image, label: "Social Content Generator", description: "Create branded social media content", color: "#f97316" },
+    { id: "soundbytes", href: getAdminUrl("/admin/soundbytes"), icon: Volume2, label: "SoundBytes Admin", description: "Manage SoundBytes audio content and playlists", color: "#7c3aed" },
   ];
 
   // IHE-only tool cards
   const IHE_ONLY_TOOLS_DEFAULT: ToolCard[] = [
-    { id: "engagement", href: "/admin/engagement", icon: BarChart2, label: "Engagement Dashboard", description: "iHeartEcho engagement metrics and analytics", color: "#be185d" },
+    { id: "engagement", href: getAdminUrl("/admin/engagement"), icon: BarChart2, label: "Engagement Dashboard", description: "iHeartEcho engagement metrics and analytics", color: "#be185d" },
     { id: "image-quality", href: "/image-quality-review", icon: Image, label: "Image Quality Review", description: "Review and rate echo image quality submissions", color: "#0891b2" },
-    { id: "diy-accreditation-admin", href: "/admin/diy-accreditation", icon: Award, label: "DIY Accreditation Admin", description: "Hub for all DIY Accreditation tools: navigator, forms, org management, lab admin", color: "#0891b2" },
-    { id: "form-builder", href: "/admin/form-builder", icon: ClipboardList, label: "DIY Accreditation Forms", description: "Build accreditation review forms for DIY organizations", color: "#0891b2" },
+    { id: "diy-accreditation-admin", href: getAdminUrl("/admin/diy-accreditation"), icon: Award, label: "DIY Accreditation Admin", description: "Hub for all DIY Accreditation tools: navigator, forms, org management, lab admin", color: "#0891b2" },
+    { id: "form-builder", href: getAdminUrl("/admin/form-builder"), icon: ClipboardList, label: "DIY Accreditation Forms", description: "Build accreditation review forms for DIY organizations", color: "#0891b2" },
   ];
 
   const [dualToolOrder, setDualToolOrder] = useState<string[]>(() => DUAL_TOOLS_DEFAULT.map(t => t.id));
@@ -1749,9 +1749,9 @@ export default function PlatformAdmin() {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (userSearchQuery.trim()) {
-                  window.location.href = `/admin/members?tab=members&search=${encodeURIComponent(userSearchQuery.trim())}`;
+                  window.location.href = getAdminUrl(`/admin/members?tab=members&search=${encodeURIComponent(userSearchQuery.trim())}`);
                 } else {
-                  window.location.href = "/admin/members";
+                  window.location.href = getAdminUrl("/admin/members");
                 }
               }}
               className="flex gap-2"
@@ -1771,24 +1771,24 @@ export default function PlatformAdmin() {
               </Button>
             </form>
             <div className="mt-3 flex gap-2 flex-wrap">
-              <Link href="/admin/members">
+              <a href={getAdminUrl("/admin/members")}>
                 <Button variant="outline" size="sm" className="text-xs gap-1.5">
                   <ExternalLink className="w-3.5 h-3.5" />
                   View All Members
                 </Button>
-              </Link>
-              <Link href="/admin/members?tab=enrollments">
+              </a>
+              <a href={getAdminUrl("/admin/members?tab=enrollments")}>
                 <Button variant="outline" size="sm" className="text-xs gap-1.5">
                   <ExternalLink className="w-3.5 h-3.5" />
                   Enrollments
                 </Button>
-              </Link>
-              <Link href="/admin/members?tab=sales">
+              </a>
+              <a href={getAdminUrl("/admin/members?tab=sales")}>
                 <Button variant="outline" size="sm" className="text-xs gap-1.5">
                   <ExternalLink className="w-3.5 h-3.5" />
                   Sales
                 </Button>
-              </Link>
+              </a>
             </div>
           </CardContent>
         </Card>

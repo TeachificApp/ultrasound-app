@@ -54,8 +54,39 @@ export const IHEARTECHO_APP_URL = "https://app.iheartecho.net";
 export const LEARN_APP_URL = "https://learn.allaboutultrasound.com";
 /** The canonical members subdomain — profile, dashboard, subscriptions */
 export const MEMBERS_APP_URL = "https://members.allaboutultrasound.com";
+/** The canonical app/platform admin domain — all admin tools except LMS */
+export const APP_URL = "https://app.allaboutultrasound.com";
 /** The canonical root domain — landing pages, education library, funnels (Cloudflare proxied) */
 export const ROOT_DOMAIN_URL = "https://allaboutultrasound.com";
+
+/**
+ * Returns the correct absolute admin URL for a given path.
+ * LMS-related paths open on learn.allaboutultrasound.com;
+ * all other admin paths open on app.allaboutultrasound.com.
+ * If already on the correct domain, returns a relative path.
+ */
+export function getAdminUrl(path: string): string {
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const isAppDomain = hostname === "app.allaboutultrasound.com";
+  const isLearn = isLearnDomain();
+  const isMembers = isMembersDomain();
+
+  // LMS-only paths → learn.allaboutultrasound.com
+  const lmsPaths = ["/admin/lms", "/admin/lesson-comments"];
+  const isLmsPath = lmsPaths.some(p => path === p || path.startsWith(p + "/"));
+  if (isLmsPath) {
+    if (isLearn) return path; // already on learn domain
+    return `${LEARN_APP_URL}${path}`;
+  }
+
+  // All other admin/platform paths → app.allaboutultrasound.com
+  // If already on app domain, keep relative
+  if (isAppDomain) return path;
+  // If on learn or members subdomain, redirect to app domain
+  if (isLearn || isMembers) return `${APP_URL}${path}`;
+  // On any other domain (iheartecho, manus preview, localhost) keep relative
+  return path;
+}
 
 export function useSubdomain() {
   const isLearnSubdomain = useMemo(() => isLearnDomain(), []);

@@ -58,6 +58,7 @@ import AssignmentBlockEditor from "@/components/AssignmentBlockEditor";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import { useLearnLink } from "@/hooks/useLearnLink";
+import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
@@ -5668,7 +5669,7 @@ const LMS_NAV_GROUPS = [
     label: "People",
     color: "teal",
     items: [
-      { value: "members_hub", label: "Members Hub ↗", icon: Users, href: "/admin/members" },
+      { value: "members_hub", label: "Members Hub ↗", icon: Users, href: getAdminUrl("/admin/members") },
       { value: "groups",      label: "Teams",      icon: Users },
       { value: "instructors", label: "Instructors", icon: GraduationCap },
       { value: "certificates",label: "Certificates",icon: CheckCircle },
@@ -5733,9 +5734,9 @@ export default function LMSAdmin() {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto">
           <div className="mb-2">
-            <Link href="/platform-admin" className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+            <a href={getAdminUrl("/platform-admin")} className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
               <ChevronLeft className="w-3 h-3" /> Platform Admin
-            </Link>
+            </a>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
