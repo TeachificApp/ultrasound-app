@@ -33,10 +33,12 @@ import {
   digitalBundles,
   membershipSubscriptions,
   membershipPlans,
-  lmsCertificates,
   lmsGroupSeats,
   lmsGroupCourses,
   lmsGroups,
+  userLoginEvents,
+  userActivityLogs,
+  emailSendLog,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
@@ -1467,4 +1469,163 @@ export const adminUserRouter = router({
       })),
     };
   }),
+
+  /** Update a user's profile fields (admin only) */
+  updateUserProfile: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      displayName: z.string().max(100).optional(),
+      firstName: z.string().max(100).optional(),
+      lastName: z.string().max(100).optional(),
+      email: z.string().email().optional(),
+      bio: z.string().max(2000).optional(),
+      specialty: z.string().max(100).optional(),
+      credentials: z.string().max(200).optional(),
+      location: z.string().max(150).optional(),
+      website: z.string().max(255).optional(),
+      timezone: z.string().max(64).optional(),
+      isDemo: z.boolean().optional(),
+      isPremium: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { userId, ...fields } = input;
+      const updateData: Record<string, any> = {};
+      if (fields.displayName !== undefined) updateData.displayName = fields.displayName || null;
+      if (fields.firstName !== undefined) updateData.firstName = fields.firstName || null;
+      if (fields.lastName !== undefined) updateData.lastName = fields.lastName || null;
+      if (fields.email !== undefined) updateData.email = fields.email;
+      if (fields.bio !== undefined) updateData.bio = fields.bio || null;
+      if (fields.specialty !== undefined) updateData.specialty = fields.specialty || null;
+      if (fields.credentials !== undefined) updateData.credentials = fields.credentials || null;
+      if (fields.location !== undefined) updateData.location = fields.location || null;
+      if (fields.website !== undefined) updateData.website = fields.website || null;
+      if (fields.timezone !== undefined) updateData.timezone = fields.timezone || null;
+      if (fields.isDemo !== undefined) updateData.isDemo = fields.isDemo;
+      if (fields.isPremium !== undefined) updateData.isPremium = fields.isPremium;
+      if (Object.keys(updateData).length === 0) return { success: true };
+      await db.update(users).set(updateData).where(eq(users.id, userId));
+      return { success: true };
+    }),
+
+  /** Get login history for a user */
+  getUserLoginHistory: protectedProcedure
+    .input(z.object({ userId: z.number().int(), page: z.number().int().default(1), pageSize: z.number().int().default(25) }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const offset = (input.page - 1) * input.pageSize;
+      const [countRow] = await db.execute(sql`
+        SELECT COUNT(*) as total FROM user_login_events WHERE user_id = ${input.userId}
+      `) as any;
+      const total = Number(Array.isArray(countRow) ? countRow[0]?.total : countRow?.total ?? 0);
+      const [rows] = await db.execute(sql`
+        SELECT id, ip_address AS ipAddress, user_agent AS userAgent, country, created_at AS createdAt
+        FROM user_login_events
+        WHERE user_id = ${input.userId}
+        ORDER BY created_at DESC
+        LIMIT ${input.pageSize} OFFSET ${offset}
+      `) as any;
+      const logins = (Array.isArray(rows) ? rows : []).map((r: any) => ({
+        id: Number(r.id),
+        ipAddress: r.ipAddress as string | null,
+        userAgent: r.userAgent as string | null,
+        country: r.country as string | null,
+        createdAt: r.createdAt,
+      }));
+      return { logins, total, totalPages: Math.ceil(total / input.pageSize) };
+    }),
+
+  /** Get activity log for a user (all event types) */
+  getUserActivityLog: protectedProcedure
+    .input(z.object({ userId: z.number().int(), page: z.number().int().default(1), pageSize: z.number().int().default(50) }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const offset = (input.page - 1) * input.pageSize;
+      const [countRow] = await db.execute(sql`
+        SELECT COUNT(*) as total FROM user_activity_logs WHERE user_id = ${input.userId}
+      `) as any;
+      const total = Number(Array.isArray(countRow) ? countRow[0]?.total : countRow?.total ?? 0);
+      const [rows] = await db.execute(sql`
+        SELECT id, event_type AS eventType, description, path, ip_address AS ipAddress, metadata, created_at AS createdAt
+        FROM user_activity_logs
+        WHERE user_id = ${input.userId}
+        ORDER BY created_at DESC
+        LIMIT ${input.pageSize} OFFSET ${offset}
+      `) as any;
+      const events = (Array.isArray(rows) ? rows : []).map((r: any) => ({
+        id: Number(r.id),
+        eventType: String(r.eventType),
+        description: String(r.description),
+        path: r.path as string | null,
+        ipAddress: r.ipAddress as string | null,
+        metadata: r.metadata,
+        createdAt: r.createdAt,
+      }));
+      return { events, total, totalPages: Math.ceil(total / input.pageSize) };
+    }),
+
+  /** Get all purchases for a user (funnel + LMS orders + digital + physical) */
+  getUserPurchases: protectedProcedure
+    .input(z.object({ userId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Funnel purchases
+      const [funnelRows] = await db.execute(sql`
+        SELECT id, product_name AS productName, amount_paid AS amountPaid, currency, status,
+          stripe_payment_intent_id AS stripePaymentIntentId, created_at AS createdAt
+        FROM funnel_purchases WHERE user_id = ${input.userId} ORDER BY created_at DESC
+      `) as any;
+      // LMS orders
+      const [lmsRows] = await db.execute(sql`
+        SELECT lo.id, c.title AS productName, lo.amount_paid AS amountPaid, lo.currency, lo.status,
+          lo.stripe_payment_intent_id AS stripePaymentIntentId, lo.created_at AS createdAt
+        FROM lms_orders lo
+        JOIN lms_courses c ON c.id = lo.course_id
+        WHERE lo.user_id = ${input.userId} ORDER BY lo.created_at DESC
+      `) as any;
+      // Digital purchases
+      const [digitalRows] = await db.execute(sql`
+        SELECT dp.id, dprod.title AS productName, dp.amount_paid AS amountPaid, 'usd' AS currency, 'paid' AS status,
+          dp.stripe_payment_intent_id AS stripePaymentIntentId, dp.purchased_at AS createdAt
+        FROM digital_purchases dp
+        JOIN digital_products dprod ON dprod.id = dp.product_id
+        WHERE dp.user_id = ${input.userId} ORDER BY dp.purchased_at DESC
+      `) as any;
+      // Physical orders
+      const [physicalRows] = await db.execute(sql`
+        SELECT po.id, pp.title AS productName, po.amount_paid AS amountPaid, po.currency,
+          po.fulfillment_status AS status, po.stripe_payment_intent_id AS stripePaymentIntentId,
+          po.created_at AS createdAt
+        FROM physical_product_orders po
+        JOIN physical_products pp ON pp.id = po.product_id
+        WHERE po.user_id = ${input.userId} ORDER BY po.created_at DESC
+      `) as any;
+      const toList = (rows: any, type: string) =>
+        (Array.isArray(rows) ? rows : []).map((r: any) => ({
+          id: Number(r.id),
+          type,
+          productName: String(r.productName ?? ''),
+          amountPaid: Number(r.amountPaid ?? 0),
+          currency: String(r.currency ?? 'usd'),
+          status: String(r.status ?? 'paid'),
+          stripePaymentIntentId: r.stripePaymentIntentId as string | null,
+          createdAt: r.createdAt,
+        }));
+      const all = [
+        ...toList(funnelRows, 'funnel'),
+        ...toList(lmsRows, 'course'),
+        ...toList(digitalRows, 'digital'),
+        ...toList(physicalRows, 'physical'),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const totalRevenue = all.filter(p => p.status === 'paid' || p.status === 'fulfilled' || p.status === 'pending').reduce((s, p) => s + p.amountPaid, 0);
+      return { purchases: all, totalRevenue };
+    }),
 });

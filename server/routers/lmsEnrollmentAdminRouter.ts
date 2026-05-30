@@ -400,8 +400,22 @@ export const lmsEnrollmentAdminRouter = router({
         .from(lmsGroupCourses)
         .leftJoin(lmsCourses, eq(lmsCourses.id, lmsGroupCourses.courseId))
         .where(eq(lmsGroupCourses.groupId, g.id));
-      // Get seat records
-      const seats = await db.select().from(lmsGroupSeats).where(eq(lmsGroupSeats.groupId, g.id));
+      // Get seat records enriched with userId via enrollment join
+      const seats = await db
+        .select({
+          id: lmsGroupSeats.id,
+          groupId: lmsGroupSeats.groupId,
+          email: lmsGroupSeats.email,
+          memberName: lmsGroupSeats.memberName,
+          status: lmsGroupSeats.status,
+          assignedAt: lmsGroupSeats.assignedAt,
+          enrollmentId: lmsGroupSeats.enrollmentId,
+          acceptedAt: lmsGroupSeats.acceptedAt,
+          userId: lmsEnrollments.userId,
+        })
+        .from(lmsGroupSeats)
+        .leftJoin(lmsEnrollments, eq(lmsEnrollments.id, lmsGroupSeats.enrollmentId))
+        .where(eq(lmsGroupSeats.groupId, g.id));
       const activeSeats = seats.filter(s => s.status === "active").length;
       const pendingSeats = seats.filter(s => s.status === "pending").length;
       // Legacy single course

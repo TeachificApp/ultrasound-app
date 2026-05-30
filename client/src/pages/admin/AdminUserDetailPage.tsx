@@ -99,12 +99,11 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates" | "communications";
-const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates", "communications"];
+type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates" | "communications" | "activity" | "logins";
+const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates", "communications", "activity", "logins"];
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
-  const utils = trpc.useUtils();
   const updateRole = trpc.adminUser.updateUserRole.useMutation({
     onSuccess: () => { toast.success("Role updated."); refetch(); },
     onError: (e) => toast.error(e.message),
@@ -113,45 +112,91 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: () => { toast.success("Membership granted."); refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const updateProfile = trpc.adminUser.updateUserProfile.useMutation({
+    onSuccess: () => { toast.success("Profile updated."); refetch(); setEditOpen(false); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const [grantOpen, setGrantOpen] = useState(false);
   const [grantBrand, setGrantBrand] = useState<"aaus" | "iheartecho">("aaus");
   const [grantTier, setGrantTier] = useState<"free" | "premium">("premium");
   const [grantExpiry, setGrantExpiry] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
 
   const user = data.user;
 
+  const [editForm, setEditForm] = useState({
+    displayName: "", firstName: "", lastName: "", email: "",
+    bio: "", specialty: "", credentials: "", location: "", website: "", timezone: "",
+    isDemo: false, isPremium: false,
+  });
+
+  const handleEditOpen = () => {
+    setEditForm({
+      displayName: user.displayName ?? "",
+      firstName: user.firstName ?? "",
+      lastName: user.lastName ?? "",
+      email: user.email ?? "",
+      bio: user.bio ?? "",
+      specialty: user.specialty ?? "",
+      credentials: user.credentials ?? "",
+      location: user.location ?? "",
+      website: user.website ?? "",
+      timezone: user.timezone ?? "",
+      isDemo: user.isDemo ?? false,
+      isPremium: user.isPremium ?? false,
+    });
+    setEditOpen(true);
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Avatar + info */}
+      {/* Avatar + info card with Edit button */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-center gap-5">
+        <div className="flex items-start gap-5">
           {user.avatarUrl ? (
-            <img src={user.avatarUrl} alt="Avatar" className="w-20 h-20 rounded-full object-cover border-4 border-[#189aa1]/20 shadow" />
+            <img src={user.avatarUrl} alt="Avatar" className="w-20 h-20 rounded-full object-cover border-4 border-[#189aa1]/20 shadow flex-shrink-0" />
           ) : (
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow"
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow flex-shrink-0"
               style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}>
               {(user.displayName ?? user.name ?? "?").charAt(0).toUpperCase()}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-gray-800">{user.displayName ?? user.name ?? "—"}</h2>
-            <p className="text-sm text-gray-500">{user.email}</p>
-            <p className="text-xs text-gray-400 mt-0.5">Member since {formatDate(user.createdAt)}</p>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">{user.displayName ?? user.name ?? "—"}</h2>
+                <p className="text-sm text-gray-500">{user.email}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Member since {formatDate(user.createdAt)}</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={handleEditOpen} className="flex-shrink-0 gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50">
+                <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+              </Button>
+            </div>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <StatusBadge status={user.role} />
+              {user.isPremium && <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">★ Premium</span>}
+              {user.isDemo && <span className="text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">Demo</span>}
               {user.specialty && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{user.specialty}</span>}
-              {user.location && <span className="text-xs text-gray-500">{user.location}</span>}
+              {user.credentials && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{user.credentials}</span>}
             </div>
           </div>
         </div>
-        {user.bio && <p className="text-sm text-gray-600 mt-4 border-t border-gray-100 pt-4">{user.bio}</p>}
-        {user.website && (
-          <a href={user.website} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-[#189aa1] hover:underline mt-2">
-            <ExternalLink className="w-3 h-3" /> {user.website}
-          </a>
-        )}
+        {/* Profile detail grid */}
+        <div className="mt-5 pt-5 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          {user.firstName && <div><span className="text-xs text-gray-400 uppercase tracking-wide">First Name</span><p className="text-gray-800 font-medium">{user.firstName}</p></div>}
+          {user.lastName && <div><span className="text-xs text-gray-400 uppercase tracking-wide">Last Name</span><p className="text-gray-800 font-medium">{user.lastName}</p></div>}
+          {user.location && <div><span className="text-xs text-gray-400 uppercase tracking-wide">Location</span><p className="text-gray-800">{user.location}</p></div>}
+          {user.timezone && <div><span className="text-xs text-gray-400 uppercase tracking-wide">Timezone</span><p className="text-gray-800">{user.timezone}</p></div>}
+          {user.website && <div className="sm:col-span-2"><span className="text-xs text-gray-400 uppercase tracking-wide">Website</span><a href={user.website} target="_blank" rel="noopener noreferrer" className="block text-[#189aa1] hover:underline truncate">{user.website}</a></div>}
+          {user.bio && <div className="sm:col-span-2"><span className="text-xs text-gray-400 uppercase tracking-wide">Bio</span><p className="text-gray-700 mt-0.5 leading-relaxed">{user.bio}</p></div>}
+        </div>
+        {/* Quick stats */}
+        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-3">
+          <div className="text-center"><div className="text-lg font-bold text-gray-900">{data.enrollments?.length ?? 0}</div><div className="text-xs text-gray-500">Enrollments</div></div>
+          <div className="text-center"><div className="text-lg font-bold text-gray-900">{data.certificates?.length ?? 0}</div><div className="text-xs text-gray-500">Certificates</div></div>
+          <div className="text-center"><div className="text-lg font-bold text-gray-900">{data.memberships?.length ?? 0}</div><div className="text-xs text-gray-500">Memberships</div></div>
+        </div>
       </div>
 
       {/* Role management */}
@@ -159,85 +204,84 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
         <SectionHeader title="Role & Access" />
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm text-gray-600">Current role: <strong>{user.role}</strong></span>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={updateRole.isPending || user.role === "admin"}
-            onClick={() => updateRole.mutate({ userId, role: "admin" })}
-            className="text-teal-700 border-teal-200 hover:bg-teal-50"
-          >
+          <Button size="sm" variant="outline" disabled={updateRole.isPending || user.role === "admin"} onClick={() => updateRole.mutate({ userId, role: "admin" })} className="text-teal-700 border-teal-200 hover:bg-teal-50">
             <Shield className="w-3.5 h-3.5 mr-1.5" /> Promote to Admin
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={updateRole.isPending || user.role === "user"}
-            onClick={() => updateRole.mutate({ userId, role: "user" })}
-            className="text-gray-600 border-gray-200 hover:bg-gray-50"
-          >
+          <Button size="sm" variant="outline" disabled={updateRole.isPending || user.role === "user"} onClick={() => updateRole.mutate({ userId, role: "user" })} className="text-gray-600 border-gray-200 hover:bg-gray-50">
             <ShieldOff className="w-3.5 h-3.5 mr-1.5" /> Demote to User
           </Button>
         </div>
       </div>
 
-      {/* Grant membership */}
+      {/* Brand memberships */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
-        <SectionHeader
-          title="Grant Brand Membership"
-          action={
-            <Button size="sm" onClick={() => setGrantOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
-              <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant Access
-            </Button>
-          }
-        />
-        <p className="text-sm text-gray-500">Grant or upgrade this user's access to a brand app directly from here.</p>
+        <SectionHeader title="Brand Memberships" action={
+          <Button size="sm" onClick={() => setGrantOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
+            <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant Access
+          </Button>
+        } />
+        {data.memberships && data.memberships.length > 0 ? (
+          <div className="space-y-2">
+            {data.memberships.map((m: any) => (
+              <div key={m.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
+                <div><BrandBadge brand={m.brand} /><p className="text-xs text-gray-500 mt-1">{m.tier === "premium" ? "★ Premium" : "Free"}{m.expiresAt ? ` • Expires ${formatDate(m.expiresAt)}` : " • No expiry"}</p></div>
+                <StatusBadge status={m.status ?? "active"} />
+              </div>
+            ))}
+          </div>
+        ) : <p className="text-sm text-gray-500">No brand memberships yet.</p>}
       </div>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+            <DialogDescription>Update this member's profile information.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>First Name</Label><Input value={editForm.firstName} onChange={e => setEditForm(f => ({ ...f, firstName: e.target.value }))} placeholder="First name" /></div>
+              <div className="space-y-1.5"><Label>Last Name</Label><Input value={editForm.lastName} onChange={e => setEditForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Last name" /></div>
+            </div>
+            <div className="space-y-1.5"><Label>Display Name</Label><Input value={editForm.displayName} onChange={e => setEditForm(f => ({ ...f, displayName: e.target.value }))} placeholder="Display name" /></div>
+            <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Specialty</Label><Input value={editForm.specialty} onChange={e => setEditForm(f => ({ ...f, specialty: e.target.value }))} placeholder="e.g. Cardiac Sonographer" /></div>
+            <div className="space-y-1.5"><Label>Credentials</Label><Input value={editForm.credentials} onChange={e => setEditForm(f => ({ ...f, credentials: e.target.value }))} placeholder="e.g. RDCS, RVT" /></div>
+            <div className="space-y-1.5"><Label>Location</Label><Input value={editForm.location} onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))} placeholder="City, State" /></div>
+            <div className="space-y-1.5"><Label>Website</Label><Input value={editForm.website} onChange={e => setEditForm(f => ({ ...f, website: e.target.value }))} placeholder="https://..." /></div>
+            <div className="space-y-1.5">
+              <Label>Bio</Label>
+              <textarea value={editForm.bio} onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))} placeholder="Short bio..." rows={3} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none" />
+            </div>
+            <div className="space-y-1.5"><Label>Timezone</Label><Input value={editForm.timezone} onChange={e => setEditForm(f => ({ ...f, timezone: e.target.value }))} placeholder="e.g. America/New_York" /></div>
+            <div className="flex items-center gap-4 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editForm.isPremium} onChange={e => setEditForm(f => ({ ...f, isPremium: e.target.checked }))} className="rounded" /><span className="text-sm text-gray-700">Premium member</span></label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editForm.isDemo} onChange={e => setEditForm(f => ({ ...f, isDemo: e.target.checked }))} className="rounded" /><span className="text-sm text-gray-700">Demo/test account</span></label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={() => updateProfile.mutate({ userId, ...editForm })} disabled={updateProfile.isPending} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
+              {updateProfile.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Grant dialog */}
       <Dialog open={grantOpen} onOpenChange={setGrantOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Grant Brand Membership</DialogTitle>
-            <DialogDescription>Manually grant access to a brand app for this user.</DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Grant Brand Membership</DialogTitle><DialogDescription>Manually grant access to a brand app for this user.</DialogDescription></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Brand</Label>
-              <Select value={grantBrand} onValueChange={(v) => setGrantBrand(v as any)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem>
-                  <SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Tier</Label>
-              <Select value={grantTier} onValueChange={(v) => setGrantTier(v as any)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="premium">Premium</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Expiry Date (optional)</Label>
-              <Input type="date" value={grantExpiry} onChange={e => setGrantExpiry(e.target.value)} />
-            </div>
+            <div className="space-y-1.5"><Label>Brand</Label><Select value={grantBrand} onValueChange={(v) => setGrantBrand(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem><SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1.5"><Label>Tier</Label><Select value={grantTier} onValueChange={(v) => setGrantTier(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="premium">Premium</SelectItem><SelectItem value="free">Free</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1.5"><Label>Expiry Date (optional)</Label><Input type="date" value={grantExpiry} onChange={e => setGrantExpiry(e.target.value)} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGrantOpen(false)}>Cancel</Button>
-            <Button
-              onClick={() => {
-                grantMembership.mutate({ userId, brand: grantBrand, tier: grantTier, expiresAt: grantExpiry || undefined });
-                setGrantOpen(false);
-              }}
-              disabled={grantMembership.isPending}
-              className="bg-[#189aa1] hover:bg-[#157f85] text-white"
-            >
-              {grantMembership.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Grant Access
+            <Button onClick={() => { grantMembership.mutate({ userId, brand: grantBrand, tier: grantTier, expiresAt: grantExpiry || undefined }); setGrantOpen(false); }} disabled={grantMembership.isPending} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
+              {grantMembership.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Grant Access
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1089,6 +1133,164 @@ function CommunicationsTab({ userId }: { userId: number }) {
 }
 
 
+// ─── Activity Tab ─────────────────────────────────────────────────────────────
+function ActivityTab({ userId }: { userId: number }) {
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = trpc.adminUser.getUserActivityLog.useQuery({ userId, page, pageSize: 50 });
+  const events = data?.events ?? [];
+
+  const EVENT_COLORS: Record<string, string> = {
+    login: "bg-blue-100 text-blue-700",
+    page_view: "bg-gray-100 text-gray-600",
+    video_play: "bg-purple-100 text-purple-700",
+    video_complete: "bg-green-100 text-green-700",
+    quiz_attempt: "bg-amber-100 text-amber-700",
+    quiz_pass: "bg-emerald-100 text-emerald-700",
+    quiz_fail: "bg-red-100 text-red-700",
+    course_enroll: "bg-teal-100 text-teal-700",
+    course_complete: "bg-teal-100 text-teal-800",
+    download: "bg-indigo-100 text-indigo-700",
+    module_complete: "bg-cyan-100 text-cyan-700",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700">Activity Log</h3>
+        <span className="text-xs text-gray-400">{(data?.total ?? 0).toLocaleString()} total events</span>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Event</th>
+                <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Description</th>
+                <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Path</th>
+                <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">IP</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Time</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {isLoading ? (
+                <tr><td colSpan={5} className="text-center py-8 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin inline mr-2" />Loading…</td></tr>
+              ) : events.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-10 text-gray-400 text-sm">No activity recorded yet.</td></tr>
+              ) : events.map((e: any) => (
+                <tr key={e.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${EVENT_COLORS[e.eventType] ?? "bg-gray-100 text-gray-600"}`}>
+                      {e.eventType.replace(/_/g, " ")}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-700 max-w-xs">
+                    <p className="truncate">{e.description}</p>
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-gray-400 font-mono max-w-[160px]">
+                    <p className="truncate">{e.path ?? "—"}</p>
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-gray-400 font-mono whitespace-nowrap">{e.ipAddress ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                    {new Date(e.createdAt).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {(data?.totalPages ?? 0) > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+            <span className="text-xs text-gray-500">Page {page} of {data?.totalPages} ({data?.total} events)</span>
+            <div className="flex gap-2">
+              <button onClick={() => setPage(p => p - 1)} disabled={page <= 1}
+                className="text-xs px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">Prev</button>
+              <button onClick={() => setPage(p => p + 1)} disabled={page >= (data?.totalPages ?? 1)}
+                className="text-xs px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">Next</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Logins Tab ───────────────────────────────────────────────────────────────
+function LoginsTab({ userId }: { userId: number }) {
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = trpc.adminUser.getUserLoginHistory.useQuery({ userId, page, pageSize: 25 });
+  const logins = data?.logins ?? [];
+
+  const parseUA = (ua: string | null) => {
+    if (!ua) return "Unknown";
+    if (/iPhone|iPad|iOS/i.test(ua)) return "iOS";
+    if (/Android/i.test(ua)) return "Android";
+    if (/Windows/i.test(ua)) return "Windows";
+    if (/Mac OS X/i.test(ua)) return "macOS";
+    if (/Linux/i.test(ua)) return "Linux";
+    return ua.slice(0, 40);
+  };
+
+  const parseBrowser = (ua: string | null) => {
+    if (!ua) return "";
+    if (/Chrome/i.test(ua) && !/Chromium|Edge/i.test(ua)) return "Chrome";
+    if (/Firefox/i.test(ua)) return "Firefox";
+    if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) return "Safari";
+    if (/Edge/i.test(ua)) return "Edge";
+    return "";
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700">Login History</h3>
+        <span className="text-xs text-gray-400">{(data?.total ?? 0).toLocaleString()} total logins</span>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Date & Time</th>
+                <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">IP Address</th>
+                <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Country</th>
+                <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Device / Browser</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {isLoading ? (
+                <tr><td colSpan={4} className="text-center py-8 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin inline mr-2" />Loading…</td></tr>
+              ) : logins.length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-10 text-gray-400 text-sm">No login history recorded yet.</td></tr>
+              ) : logins.map((l: any) => (
+                <tr key={l.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">{new Date(l.createdAt).toLocaleString()}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500 font-mono">{l.ipAddress ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500">{l.country ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500">
+                    <span>{parseUA(l.userAgent)}</span>
+                    {parseBrowser(l.userAgent) && <span className="ml-1 text-gray-400">/ {parseBrowser(l.userAgent)}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {(data?.totalPages ?? 0) > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+            <span className="text-xs text-gray-500">Page {page} of {data?.totalPages}</span>
+            <div className="flex gap-2">
+              <button onClick={() => setPage(p => p - 1)} disabled={page <= 1}
+                className="text-xs px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">Prev</button>
+              <button onClick={() => setPage(p => p + 1)} disabled={page >= (data?.totalPages ?? 1)}
+                className="text-xs px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">Next</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "profile",        label: "Profile",        icon: User },
@@ -1096,7 +1298,9 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "transactions",   label: "Transactions",    icon: DollarSign },
   { key: "subscriptions",  label: "Subscriptions",   icon: CreditCard },
   { key: "certificates",   label: "Certificates",    icon: Award },
-  { key: "communications", label: "Communications",  icon: FileText },
+  { key: "communications", label: "Emails",          icon: FileText },
+  { key: "activity",       label: "Activity",        icon: ClipboardCheck },
+  { key: "logins",         label: "Logins",          icon: Shield },
 ];
 
 export default function AdminUserDetailPage() {
@@ -1220,6 +1424,8 @@ export default function AdminUserDetailPage() {
           {activeTab === "subscriptions" && <SubscriptionsTab userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "certificates"   && <CertificatesTab   userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "communications"  && <CommunicationsTab userId={userId!} />}
+          {activeTab === "activity"      && <ActivityTab      userId={userId!} />}
+          {activeTab === "logins"        && <LoginsTab        userId={userId!} />}
         </div>
       </div>
     </Layout>

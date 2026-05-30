@@ -5074,6 +5074,11 @@ function GroupsTab() {
                           <span className="text-xs text-gray-400 shrink-0">
                             {seat.status === "revoked" ? "Revoked" : seat.acceptedAt ? "Active" : "Pending invite"}
                           </span>
+                          {seat.userId && (
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-teal-500 hover:bg-teal-50 shrink-0" title="View member profile" onClick={() => navigate(`/admin/users/${seat.userId}`)  }>
+                              <ExternalLink className="w-3 h-3" />
+                            </Button>
+                          )}
                           {seat.status !== "revoked" && (
                             <Button size="sm" variant="ghost" className="h-6 text-red-400 hover:bg-red-50 shrink-0" onClick={() => revokeSeat.mutate({ seatId: seat.id })}>
                               <Trash2 className="w-3 h-3" />
@@ -7323,14 +7328,26 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Button
-                      size="sm" variant="ghost"
-                      className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
-                      title="Unenroll student"
-                      onClick={() => setUnenrollTarget({ id: e.id, name: e.user?.displayName || e.user?.name || e.user?.email || "this student" })}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {e.user?.id && (
+                        <Button
+                          size="sm" variant="ghost"
+                          className="h-7 w-7 p-0 text-teal-500 hover:bg-teal-50 hover:text-teal-700"
+                          title="View member profile"
+                          onClick={() => navigate(`/admin/users/${e.user.id}`)}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      <Button
+                        size="sm" variant="ghost"
+                        className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
+                        title="Unenroll student"
+                        onClick={() => setUnenrollTarget({ id: e.id, name: e.user?.displayName || e.user?.name || e.user?.email || "this student" })}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

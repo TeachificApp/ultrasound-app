@@ -1492,9 +1492,10 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 export default function StudentDashboardPage() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const [, navigate] = useLocation();
   const search = useSearch();
+  const isAdmin = (user as any)?.role === "admin";
 
   // Parse ?tab= from URL
   const urlTab = new URLSearchParams(search).get("tab") as Tab | null;

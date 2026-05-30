@@ -3896,3 +3896,22 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add AddCourseToTeamInline component
 - [x] Add EditTeamDialog component
 - [x] Fix GroupSeatAssignPanel to handle multi-course teams (primaryCourseId fallback)
+
+## Member Roster Deep Links & Admin Breadcrumb (May 30)
+
+- [ ] Add deep-link button to CourseUsersTab rows → /admin/users/:id
+- [ ] Add userId to listTeams seatList (via enrollment join) and add deep-link to team member rows
+- [ ] Add Members/Buyers tab to PhysicalProductsAdmin with deep links
+- [ ] Add platform admin breadcrumb to member dashboard (StudentDashboardPage) for admins
+
+## Admin Member Profile Management (May 30)
+- [x] Fix MembersHub deep-link routing: replace wouter Link with cross-domain anchor tags using getAdminUrl()
+- [x] Make member name/avatar cell clickable in AllMembersPanel table rows
+- [x] Add updateUserProfile procedure (admin edits: name, email, bio, specialty, credentials, location, website, timezone, isPremium, isDemo)
+- [x] Add getUserLoginHistory procedure (paginated login events with IP, country, user agent)
+- [x] Add getUserActivityLog procedure (paginated activity log with event type, description, path, IP)
+- [x] Add getUserPurchases procedure (unified purchases: funnel + LMS orders + digital + physical)
+- [x] Rebuild ProfileTab with inline Edit Profile dialog (all fields editable)
+- [x] Add Activity tab to AdminUserDetailPage (paginated event log with color-coded event types)
+- [x] Add Logins tab to AdminUserDetailPage (paginated login history with device/browser parsing)
+- [x] Update TABS array to include Activity and Logins tabs with icons

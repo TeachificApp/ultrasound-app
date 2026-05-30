@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { getAdminUrl } from "@/hooks/useSubdomain";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -258,11 +259,11 @@ function OverviewPanel() {
         <Card className="xl:col-span-2 border border-slate-200 shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold text-slate-700">Recent Members</CardTitle>
-            <Link href="/admin/users">
+            <a href={getAdminUrl("/admin/members?tab=members")}>
               <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs h-7 px-2">
                 View all <ChevronRight size={13} className="ml-1" />
               </Button>
-            </Link>
+            </a>
           </CardHeader>
           <CardContent className="p-0">
             {recentMembers.length === 0 ? (
@@ -279,11 +280,11 @@ function OverviewPanel() {
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <Link href={`/admin/users/${m.id}`}>
+                        <a href={getAdminUrl(`/admin/users/${m.id}`)}>
                           <span className="text-sm font-medium text-slate-800 hover:text-teal-600 cursor-pointer truncate">
                             {m.name}
                           </span>
-                        </Link>
+                        </a>
                         {m.enrollmentCount > 0 && (
                           <Badge variant="outline" className="text-xs h-4 px-1.5 border-slate-200 text-slate-500">
                             {m.enrollmentCount} course{m.enrollmentCount !== 1 ? "s" : ""}
@@ -354,11 +355,11 @@ function OverviewPanel() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            <Link href="/admin/users">
+            <a href={getAdminUrl("/admin/members?tab=members")}>
               <Button variant="outline" size="sm" className="text-xs gap-1.5 border-slate-200">
                 <Users size={13} /> View All Members
               </Button>
-            </Link>
+            </a>
             <Button
               variant="outline"
               size="sm"
@@ -458,7 +459,7 @@ function AllMembersPanel() {
                   <td colSpan={7} className="px-4 py-12 text-center text-slate-400 text-sm">No members found</td>
                 </tr>
               ) : members.map((m: any) => (
-                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={m.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => { window.location.href = getAdminUrl(`/admin/users/${m.id}`); }}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <Avatar className="h-8 w-8 flex-shrink-0">
@@ -468,7 +469,7 @@ function AllMembersPanel() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="font-medium text-slate-800 truncate">{m.name}</p>
+                        <p className="font-medium text-teal-700 hover:text-teal-900 truncate">{m.name}</p>
                         <p className="text-xs text-slate-400 truncate">{m.email}</p>
                       </div>
                     </div>
@@ -488,11 +489,11 @@ function AllMembersPanel() {
                   <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(m.createdAt)}</td>
                   <td className="px-4 py-3 text-xs text-slate-500">{fmtRelative(m.lastSignedIn)}</td>
                   <td className="px-4 py-3">
-                    <Link href={`/admin/users/${m.id}`}>
+                    <a href={getAdminUrl(`/admin/users/${m.id}`)}>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-teal-600">
                         <ExternalLink size={13} />
                       </Button>
-                    </Link>
+                    </a>
                   </td>
                 </tr>
               ))}
@@ -989,9 +990,9 @@ function CommunicationsPanel() {
                 <tr key={e.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
                     {e.userId ? (
-                      <Link href={`/admin/users/${e.userId}`} className="text-teal-600 hover:underline font-medium">
+                      <a href={getAdminUrl(`/admin/users/${e.userId}`)} className="text-teal-600 hover:underline font-medium">
                         {e.recipientName || e.recipientEmail}
-                      </Link>
+                      </a>
                     ) : (
                       <span className="text-slate-700">{e.recipientName || e.recipientEmail}</span>
                     )}
@@ -1141,11 +1142,11 @@ export default function MembersHub() {
               </Button>
             )}
             {activeNav === "overview" && (
-              <Link href="/admin/users">
+              <a href={getAdminUrl("/admin/members?tab=members")}>
                 <Button size="sm" className="text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 h-8">
                   <Users size={13} /> All Members
                 </Button>
-              </Link>
+              </a>
             )}
           </div>
         </div>
