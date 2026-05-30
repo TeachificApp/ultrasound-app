@@ -629,13 +629,21 @@ export default function RichTextEditor({
     editable: !disabled,
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
+      isInternalUpdate.current = true;
       onChange(html === "<p></p>" ? "" : html);
     },
   });
 
-  // Sync external value changes
+  // Track whether the last value change came from the editor itself
+  const isInternalUpdate = useRef(false);
+
+  // Sync external value changes (only when value was set from outside, not from onUpdate)
   useEffect(() => {
     if (!editor) return;
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      return;
+    }
     const current = editor.getHTML();
     const normalised = current === "<p></p>" ? "" : current;
     if (normalised !== value) {
