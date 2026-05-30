@@ -16,7 +16,7 @@ import { getSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
 import { autoLoginTokens, users } from "../../drizzle/schema";
-import { eq, and, isNull, gt } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 
 /** Generate a cryptographically secure random token */
 function randomToken(): string {
@@ -41,7 +41,8 @@ export async function generateAutoLoginToken(
   if (!db) throw new Error("Database unavailable");
 
   const token = randomToken();
-  const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+  // Access email tokens never expire — users can always click their link to sign in
+  const expiresAt = new Date('2037-12-31T23:59:59Z');
 
   await db.insert(autoLoginTokens).values({
     token,
@@ -69,7 +70,8 @@ export function registerAutoLoginRoute(app: Express) {
       const db = await getDb();
       if (!db) return res.redirect("/?error=db_unavailable");
 
-      // Find valid, unused, non-expired token
+      // Find valid, non-expired token
+      // Tokens are reusable — users can click their access link multiple times
       const now = new Date();
       const [record] = await db
         .select()
@@ -77,7 +79,6 @@ export function registerAutoLoginRoute(app: Express) {
         .where(
           and(
             eq(autoLoginTokens.token, token),
-            isNull(autoLoginTokens.usedAt),
             gt(autoLoginTokens.expiresAt, now)
           )
         )
@@ -101,11 +102,8 @@ export function registerAutoLoginRoute(app: Express) {
         return res.redirect("/?error=user_not_found");
       }
 
-      // Mark token as used
-      await db
-        .update(autoLoginTokens)
-        .set({ usedAt: new Date() })
-        .where(eq(autoLoginTokens.id, record.id));
+      // Tokens are intentionally NOT marked as used — access links are reusable
+      // so users can always click their email link to sign in again.
 
       // Determine the openId to use for the session
       // Email/password users use synthetic openId; OAuth users use their real openId
