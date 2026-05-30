@@ -1518,28 +1518,25 @@ export default function StudentDashboardPage() {
     if (t && VALID_TABS.includes(t) && t !== activeTab) setActiveTab(t);
   }, [search]);
 
-    // On members/learn subdomains the outer router already provides a layout wrapper.
+      // On members/learn subdomains the outer router already provides a layout wrapper.
   // Rendering Layout again would create a double sidebar.
+  // IMPORTANT: Do NOT create an inline component (e.g. `const Wrapper = () => ...`)
+  // inside the render function — that creates a new component identity on every render,
+  // causing all children (including ProfileTab) to unmount/remount and lose state.
   const skipLayout = isMembersDomain() || isLearnDomain();
-  const Wrapper = skipLayout
-    ? ({ children }: { children: React.ReactNode }) => <>{children}</>
-    : Layout;
-
   if (loading) {
-    return (
-      <Wrapper>
-        <div className="flex items-center justify-center h-screen">
-          <Loader2 className="w-8 h-8 animate-spin text-[#189aa1]" />
-        </div>
-      </Wrapper>
+    const inner = (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-[#189aa1]" />
+      </div>
     );
+    return skipLayout ? <>{inner}</> : <Layout>{inner}</Layout>;
   }
   if (!isAuthenticated) {
     navigate("/login");
     return null;
   }
-  return (
-    <Wrapper>
+  const content = (
       <div className="min-h-screen bg-[#f0fbfc]">
         {/* Header */}
         <div className="bg-white border-b border-[#189aa1]/15 px-4 sm:px-8 py-6">
@@ -1579,6 +1576,6 @@ export default function StudentDashboardPage() {
           {activeTab === "certificates"  && <CertificatesTab />}
         </div>
       </div>
-    </Wrapper>
   );
+  return skipLayout ? <>{content}</> : <Layout>{content}</Layout>;
 }
