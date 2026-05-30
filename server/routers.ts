@@ -47,6 +47,7 @@ import { lessonCommentsRouter } from "./routers/lessonCommentsRouter";
 import { pageScraperRouter } from "./routers/pageScraperRouter";
 import { questionBankRouter } from "./routers/questionBankRouter";
 import { communityRouter } from "./routers/communityRouter";
+import { interestsRouter } from "./routers/interestsRouter";
 import { productAnalyticsRouter } from "./routers/productAnalyticsRouter";
 import {
   getUserById,
@@ -205,6 +206,7 @@ export const appRouter = router({
         isPremium: isPremium || brandPremium,
         brandPremium,
         brand: opts.ctx.brand,
+        communityRole: fullUser?.communityRole ?? "member",
         ...demoModeInfo,
       };
     }),
@@ -2050,6 +2052,7 @@ export const appRouter = router({
   productAnalytics: productAnalyticsRouter,
     lessonComments: lessonCommentsRouter,
   pageScraper: pageScraperRouter,
+  interests: interestsRouter,
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({
     /** List all invitations for the current user's lab */

@@ -3820,3 +3820,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix recurring session multi-day bug (only first selected day repeats, others ignored)
 - [ ] Add Discussions tab to student My Cohort view (post text/images/videos, see all group messages)
 - [ ] Backend: student getCohortDiscussions and postCohortMessage procedures (protected, not admin-only)
+
+## Ultrasound Interests System (2026-05-30)
+- [ ] DB: create lms_interests table (id, name, slug, category, brandFilter: aaus|iheartecho|both, sortOrder, isActive)
+- [ ] DB: create user_interests join table (userId, interestId)
+- [ ] DB: seed default interests (cardiac echo, vascular, OB/GYN, POCUS, fetal echo, physics, ergonomics, MSK, breast, abdominal, small parts, pediatric echo, general ultrasound)
+- [ ] Backend: admin CRUD for interests in LMS settings (add/edit/remove/reorder/toggle active)
+- [ ] Backend: getInterests procedure (brand-filtered for current brand context)
+- [ ] Backend: updateUserInterests procedure (save user's selected interests)
+- [ ] Backend: getUserInterests procedure (fetch user's interests)
+- [ ] UI: Profile page - interest picker with brand-filtered chips/tags
+- [ ] UI: LMS Settings - admin interests management panel
+- [ ] UI: Community profile - display user interests as tags
+- [ ] Fix profile Display Name edit click-out bug (useEffect guard when in editMode)
+- [ ] Add communityRole field to users table (member/moderator/admin)
+- [ ] Set larawilliams0501@gmail.com as community admin
+- [ ] Add Admin/Moderator badges to community profile and feed posts
+- [ ] Make author name/avatar in community feed clickable (link to /community/members/:userId)
+- [ ] Add setCommunityRole procedure for platform admins

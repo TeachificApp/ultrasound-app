@@ -86,6 +86,8 @@ export const users = mysqlTable("users", {
   unsubscribeToken: varchar("unsubscribeToken", { length: 64 }),
   // Comment ban: when true, user cannot post lesson comments (silent — no notification sent)
   commentBanned: boolean("commentBanned").default(false).notNull(),
+  // Community role — admin/moderator get special badges and moderation powers in Community
+  communityRole: mysqlEnum("communityRole", ["member", "moderator", "admin"]).default("member").notNull(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -5098,3 +5100,29 @@ export const lmsCohortStaff = mysqlTable("lms_cohort_staff", {
 });
 export type LmsCohortStaff = typeof lmsCohortStaff.$inferSelect;
 export type InsertLmsCohortStaff = typeof lmsCohortStaff.$inferInsert;
+
+// Ultrasound interests (managed by admin, brand-filtered)
+export const lmsInterests = mysqlTable("lms_interests", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  slug: varchar("slug", { length: 100 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull().default("general"), // 'general' | 'echo' | 'both'
+  // brandFilter: 'aaus' = general ultrasound only, 'iheartecho' = echo only, 'both' = all brands
+  brandFilter: varchar("brand_filter", { length: 20 }).notNull().default("both"),
+  iconEmoji: varchar("icon_emoji", { length: 10 }),
+  sortOrder: int("sort_order").notNull().default(0),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsInterest = typeof lmsInterests.$inferSelect;
+export type InsertLmsInterest = typeof lmsInterests.$inferInsert;
+
+// User interests (many-to-many)
+export const userInterests = mysqlTable("user_interests", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  interestId: int("interest_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UserInterest = typeof userInterests.$inferSelect;
+export type InsertUserInterest = typeof userInterests.$inferInsert;

@@ -149,7 +149,7 @@ async function enrichPosts(db: any, posts: any[], currentUserId?: number) {
   const authors = await db.select({
     id: users.id, name: users.name, displayName: users.displayName,
     avatarUrl: users.avatarUrl, credentials: users.credentials,
-    specialty: users.specialty,
+    specialty: users.specialty, communityRole: users.communityRole,
   }).from(users).where(inArray(users.id, userIds));
   const authorMap = Object.fromEntries(authors.map((a: any) => [a.id, a]));
 
@@ -746,7 +746,7 @@ const communityMemberRouter = router({
       bio: users.bio, credentials: users.credentials, specialty: users.specialty,
       yearsExperience: users.yearsExperience, location: users.location, website: users.website,
       followersCount: users.followersCount, followingCount: users.followingCount,
-      createdAt: users.createdAt,
+      createdAt: users.createdAt, communityRole: users.communityRole,
     }).from(users).where(eq(users.id, input.userId)).limit(1);
     if (!u) throw new TRPCError({ code: "NOT_FOUND" });
 

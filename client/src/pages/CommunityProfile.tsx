@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   UserPlus, UserMinus, MapPin, Globe, Calendar, MessageSquare,
-  Star, Flame, Award, Users, ChevronLeft
+  Star, Flame, Award, Users, ChevronLeft, Shield
 } from "lucide-react";
 
 function XPBar({ xp }: { xp: any }) {
@@ -42,6 +42,11 @@ export default function CommunityProfile() {
   const utils = trpc.useUtils();
 
   const { data: profile, isLoading } = trpc.community.member.getMemberProfile.useQuery(
+    { userId: parseInt(userId!) },
+    { enabled: !!userId }
+  );
+
+  const { data: userInterests } = trpc.interests.getUserInterests.useQuery(
     { userId: parseInt(userId!) },
     { enabled: !!userId }
   );
@@ -112,7 +117,19 @@ export default function CommunityProfile() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900">{displayName}</h1>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h1 className="text-xl font-bold text-gray-900">{displayName}</h1>
+                      {profile.communityRole === "admin" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-teal-600 text-white">
+                          <Shield className="w-3 h-3" />Admin
+                        </span>
+                      )}
+                      {profile.communityRole === "moderator" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-purple-600 text-white">
+                          <Shield className="w-3 h-3" />Moderator
+                        </span>
+                      )}
+                    </div>
                     {profile.credentials && <p className="text-teal-600 font-medium text-sm">{profile.credentials}</p>}
                     {profile.specialty && <p className="text-gray-500 text-sm">{profile.specialty}</p>}
                   </div>
@@ -133,6 +150,19 @@ export default function CommunityProfile() {
                 </div>
 
                 {profile.bio && <p className="text-gray-600 text-sm mt-2">{profile.bio}</p>}
+
+                {userInterests && userInterests.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {userInterests.map((interest: any) => (
+                      <span
+                        key={interest.id}
+                        className="px-2.5 py-1 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-100"
+                      >
+                        {interest.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-500">
                   {profile.location && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{profile.location}</span>}

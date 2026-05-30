@@ -200,10 +200,20 @@ function PostCard({ post, isAdmin, communityId }: { post: any; isAdmin: boolean;
       <CardContent className="p-5">
         {/* Header */}
         <div className="flex items-start gap-3 mb-3">
-          <AuthorAvatar author={post.author} size="md" />
+          <Link href={post.author?.id ? `/community/members/${post.author.id}` : "#"}>
+            <AuthorAvatar author={post.author} size="md" className="cursor-pointer hover:opacity-80 transition-opacity" />
+          </Link>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-gray-900 text-sm">{post.author?.displayName || post.author?.name || "Unknown"}</span>
+              <Link href={post.author?.id ? `/community/members/${post.author.id}` : "#"}>
+                <span className="font-semibold text-gray-900 text-sm hover:text-teal-600 cursor-pointer transition-colors">{post.author?.displayName || post.author?.name || "Unknown"}</span>
+              </Link>
+              {post.author?.communityRole === "admin" && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-600 text-white">Admin</span>
+              )}
+              {post.author?.communityRole === "moderator" && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-600 text-white">Mod</span>
+              )}
               {post.author?.credentials && <span className="text-xs text-teal-600 font-medium">{post.author.credentials}</span>}
               {post.author?.specialty && <span className="text-xs text-gray-400">{post.author.specialty}</span>}
               <span className="text-xs text-gray-400 ml-auto">{timeAgo(post.createdAt)}</span>
