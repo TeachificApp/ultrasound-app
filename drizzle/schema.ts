@@ -3549,12 +3549,15 @@ export type InsertUserPageViewEvent = typeof userPageViewEvents.$inferInsert;
 export const userActivityLogs = mysqlTable("user_activity_logs", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("user_id").notNull(),
-  eventType: varchar("event_type", { length: 64 }).notNull(), // 'login'|'page_view'|'video_play'|'video_complete'|'quiz_attempt'|'quiz_pass'|'quiz_fail'|'course_enroll'|'course_complete'|'download'|'module_complete'
+  eventType: varchar("event_type", { length: 64 }).notNull(), // 'login'|'page_view'|'video_play'|'video_complete'|'quiz_attempt'|'quiz_pass'|'quiz_fail'|'course_enroll'|'course_complete'|'lesson_complete'|'purchase'|'download'|'iframe_view'|'module_complete'
   description: varchar("description", { length: 512 }).notNull(),
   path: varchar("path", { length: 512 }),
   ipAddress: varchar("ip_address", { length: 64 }),
   userAgent: text("user_agent"),
   metadata: json("metadata"),  // flexible JSON for event-specific data
+  courseId: int("course_id"),  // for course/lesson-related events
+  lessonId: int("lesson_id"),  // for lesson-related events
+  contentTitle: varchar("content_title", { length: 512 }), // human-readable title for display
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type UserActivityLog = typeof userActivityLogs.$inferSelect;

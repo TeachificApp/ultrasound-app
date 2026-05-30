@@ -6202,6 +6202,7 @@ const LMS_NAV_GROUPS = [
     items: [
       { value: "orderbumps",  label: "Order Bumps", icon: Tag },
       { value: "collections", label: "Collections", icon: LayoutGrid },
+      { value: "discount_codes", label: "Discount Codes ↗", icon: Tag, href: getAdminUrl("/admin/discount-codes") },
     ],
   },
   {
