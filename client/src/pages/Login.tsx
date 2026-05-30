@@ -62,7 +62,7 @@ export default function Login() {
   const [, navigate] = useLocation();
 
   // ── Form state ──
-  const [mode, setMode] = useState<LoginMode>("magic");
+  const [mode, setMode] = useState<LoginMode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -369,7 +369,7 @@ export default function Login() {
                   Sign in with password
                 </h2>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  Enter your email and password to access your account.
+                  Enter your email and password to access your account. First time? Use <Link href="/forgot-password" className="underline" style={{ color: "#189aa1" }}>Forgot password</Link> to set one.
                 </p>
               </div>
 
@@ -418,9 +418,29 @@ export default function Login() {
                     </button>
                   </div>
                   {loginMutation.isError && (
-                    <p className="text-xs text-red-500 mt-1">
-                      {loginMutation.error?.message || "Sign-in failed. Please check your credentials."}
-                    </p>
+                    <div className="mt-1">
+                      <p className="text-xs text-red-500">
+                        {loginMutation.error?.message || "Sign-in failed. Please check your credentials."}
+                      </p>
+                      {loginMutation.error?.message?.includes("magic link") && (
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => switchMode("magic")}
+                            className="flex-1 text-xs py-2 px-3 rounded-lg font-medium text-white"
+                            style={{ background: "linear-gradient(135deg, #189aa1 0%, #0e7a80 100%)" }}
+                          >
+                            Send Magic Link
+                          </button>
+                          <Link
+                            href="/forgot-password"
+                            className="flex-1 text-xs py-2 px-3 rounded-lg font-medium text-center border border-gray-200 text-gray-600 hover:bg-gray-50"
+                          >
+                            Set a Password
+                          </Link>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
                 <Button
