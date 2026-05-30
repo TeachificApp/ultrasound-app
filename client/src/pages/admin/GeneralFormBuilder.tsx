@@ -68,6 +68,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
+import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BRAND = "#0e7490";
@@ -1447,13 +1448,47 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Submission Behavior</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <div>
-            <Label>Success Message (shown after submission)</Label>
-            <Textarea value={successMessage} onChange={e => setSuccessMessage(e.target.value)} placeholder="Thank you for your submission!" className="mt-1" rows={2} />
-          </div>
-          <div>
-            <Label>Redirect URL after submission (optional)</Label>
-            <Input value={successRedirectUrl} onChange={e => setSuccessRedirectUrl(e.target.value)} placeholder="https://yoursite.com/thank-you" className="mt-1" />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Post-Submission Action</Label>
+            </div>
+            <div className="flex gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setSuccessRedirectUrl("")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                  !successRedirectUrl ? "bg-[#0e7490] text-white border-[#0e7490]" : "bg-white text-gray-600 border-gray-200 hover:border-[#0e7490]"
+                }`}
+              >
+                Show Thank-You Message
+              </button>
+              <button
+                type="button"
+                onClick={() => { if (!successRedirectUrl) setSuccessRedirectUrl("https://"); }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                  successRedirectUrl ? "bg-[#0e7490] text-white border-[#0e7490]" : "bg-white text-gray-600 border-gray-200 hover:border-[#0e7490]"
+                }`}
+              >
+                Redirect to URL
+              </button>
+            </div>
+            {!successRedirectUrl ? (
+              <div>
+                <Label className="text-xs text-gray-500 mb-1 block">Thank-You Message (rich text, shown after submission)</Label>
+                <RichTextEditor
+                  value={successMessage}
+                  onChange={setSuccessMessage}
+                  placeholder="Thank you for your submission! We'll be in touch soon."
+                  minHeight={120}
+                  maxHeight={400}
+                />
+              </div>
+            ) : (
+              <div>
+                <Label className="text-xs text-gray-500 mb-1 block">Redirect URL (user is sent here after submitting)</Label>
+                <Input value={successRedirectUrl} onChange={e => setSuccessRedirectUrl(e.target.value)} placeholder="https://yoursite.com/thank-you" className="mt-1" />
+              </div>
+            )}
           </div>
           <div>
             <Label>Notify Email (send a copy of each submission)</Label>

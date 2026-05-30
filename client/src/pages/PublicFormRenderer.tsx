@@ -16,6 +16,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { CheckCircle2, AlertCircle, RefreshCw, Lock, ArrowRight, ArrowLeft, ChevronDown } from "lucide-react";
+import { RichTextDisplay } from "@/components/RichTextEditor";
 
 // ─── Theme helpers ────────────────────────────────────────────────────────────
 interface ThemeSettings {
@@ -796,9 +797,15 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
         <div style={{ background: theme.formBackground, borderRadius: `${parseInt(theme.borderRadius) + 4}px`, padding: "48px 40px", textAlign: "center", maxWidth: 480, width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
           <CheckCircle2 style={{ width: 52, height: 52, color: theme.primaryColor, margin: "0 auto 20px" }} />
           <h2 style={{ color: theme.textColor, fontSize: 24, fontWeight: 800, marginBottom: 10 }}>Thank you!</h2>
-          <p style={{ color: theme.textColor, opacity: 0.8, fontSize: parseInt(theme.fontSize) }}>
-            {template.successMessage || "Your response has been submitted successfully."}
-          </p>
+          {template.successMessage && template.successMessage.trim().startsWith("<") ? (
+            <div style={{ color: theme.textColor, opacity: 0.85, fontSize: parseInt(theme.fontSize), textAlign: "left" }}>
+              <RichTextDisplay html={template.successMessage} />
+            </div>
+          ) : (
+            <p style={{ color: theme.textColor, opacity: 0.8, fontSize: parseInt(theme.fontSize) }}>
+              {template.successMessage || "Your response has been submitted successfully."}
+            </p>
+          )}
         </div>
       </div>
     );

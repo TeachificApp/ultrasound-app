@@ -4023,3 +4023,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Update iconMap and labelMap in ActivityPanel UI for all new types
 - [ ] Add user profile link (ExternalLink) to each activity row in ActivityPanel
 - [ ] Show extra detail (score, product name, etc.) in activity row subtitle
+
+## Form Post-Submission: Thank-You & Redirect
+- [x] General Form Builder: add rich-text thank-you message editor in Settings tab (successMessage field)
+- [x] General Form Builder: add URL redirect option (successRedirectUrl) with toggle between message vs redirect
+- [x] General Form Builder: render rich-text thank-you on public form submission success screen
+- [x] DIY Form Builder: add same rich-text thank-you message editor in settings
+- [x] DIY Form Builder: add URL redirect option with toggle between message vs redirect
+- [x] DIY Form Builder: render rich-text thank-you on DIY form submission success screen

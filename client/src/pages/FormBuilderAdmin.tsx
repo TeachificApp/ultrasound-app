@@ -67,7 +67,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import FormPreview from "@/components/FormPreview";
-import RichTextEditor from "@/components/RichTextEditor";
+import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1470,6 +1470,151 @@ function OrgVisibilityBuilder({ templateId, items, sections, rules, onSaved }: {
   );
 }
 
+// ─── DIY Settings Panel ─────────────────────────────────────────────────────
+
+function DIYSettingsPanel({ template, templateId, updateTemplateMutation }: {
+  template: any;
+  templateId: number;
+  updateTemplateMutation: any;
+}) {
+  const [successMessage, setSuccessMessage] = useState<string>(template.successMessage ?? "");
+  const [successRedirectUrl, setSuccessRedirectUrl] = useState<string>(template.successRedirectUrl ?? "");
+  const [useRedirect, setUseRedirect] = useState<boolean>(!!template.successRedirectUrl);
+
+  const savePostSubmission = () => {
+    updateTemplateMutation.mutate({
+      id: templateId,
+      successMessage: useRedirect ? undefined : (successMessage || undefined),
+      successRedirectUrl: useRedirect ? (successRedirectUrl || undefined) : undefined,
+    });
+  };
+
+  return (
+    <div className="space-y-6 py-4 max-w-xl">
+      {/* Form Details */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Form Details</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Form Name</label>
+            <Input
+              defaultValue={template.name}
+              onBlur={e => { if (e.target.value.trim() && e.target.value.trim() !== template.name) updateTemplateMutation.mutate({ id: templateId, name: e.target.value.trim() }); }}
+              className="text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Description</label>
+            <textarea
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+              rows={3}
+              defaultValue={template.description ?? ""}
+              onBlur={e => { if (e.target.value !== (template.description ?? "")) updateTemplateMutation.mutate({ id: templateId, description: e.target.value }); }}
+              placeholder="Optional description shown to form users…"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Post-Submission Behavior */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Post-Submission Behavior</h3>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setUseRedirect(false)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                !useRedirect ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-200 hover:border-teal-400"
+              }`}
+            >
+              Show Thank-You Message
+            </button>
+            <button
+              type="button"
+              onClick={() => setUseRedirect(true)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                useRedirect ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-200 hover:border-teal-400"
+              }`}
+            >
+              Redirect to URL
+            </button>
+          </div>
+          {!useRedirect ? (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Thank-You Message (rich text, shown after submission)</label>
+              <RichTextEditor
+                value={successMessage}
+                onChange={setSuccessMessage}
+                placeholder="Thank you for your submission! We'll be in touch soon."
+                minHeight={120}
+                maxHeight={400}
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Redirect URL (user is sent here after submitting)</label>
+              <Input
+                value={successRedirectUrl}
+                onChange={e => setSuccessRedirectUrl(e.target.value)}
+                placeholder="https://yoursite.com/thank-you"
+                className="mt-1"
+              />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={savePostSubmission}
+            className="px-4 py-2 rounded-md text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+          >
+            Save Post-Submission Settings
+          </button>
+        </div>
+      </div>
+
+      {/* Host Domain */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Host Domain</h3>
+        <p className="text-xs text-gray-500 mb-2">Select which domain this form is associated with.</p>
+        <Select
+          defaultValue={template.hostDomain ?? "app.allaboutultrasound.com"}
+          onValueChange={val => updateTemplateMutation.mutate({ id: templateId, hostDomain: val })}
+        >
+          <SelectTrigger className="text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {["app.allaboutultrasound.com", "allaboutultrasound.com", "allaboutvascular.com", "allaboutobgyn.com", "allaboutecho.com"].map(d => (
+              <SelectItem key={d} value={d}>{d}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Visibility */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Visibility</h3>
+        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div>
+            <p className="text-sm font-medium text-gray-800">Form Active</p>
+            <p className="text-xs text-gray-500">When inactive, the form is hidden from users</p>
+          </div>
+          <button
+            onClick={() => updateTemplateMutation.mutate({ id: templateId, isActive: !template.isActive })}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              template.isActive ? "bg-teal-500" : "bg-gray-300"
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+              template.isActive ? "translate-x-6" : "translate-x-1"
+            }`} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Form Results Tab ────────────────────────────────────────────────────────
 
 function FormResultsTab({ templateId }: { templateId: number }) {
@@ -1926,69 +2071,7 @@ function FormEditor({ templateId }: { templateId: number }) {
 
       {/* Settings Tab */}
       {activeTab === "settings" && (
-        <div className="space-y-6 py-4 max-w-xl">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Form Details</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">Form Name</label>
-                <div className="flex gap-2">
-                  <Input
-                    defaultValue={template.name}
-                    onBlur={e => { if (e.target.value.trim() && e.target.value.trim() !== template.name) updateTemplateMutation.mutate({ id: templateId, name: e.target.value.trim() }); }}
-                    className="text-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">Description</label>
-                <textarea
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  rows={3}
-                  defaultValue={template.description ?? ""}
-                  onBlur={e => { if (e.target.value !== (template.description ?? "")) updateTemplateMutation.mutate({ id: templateId, description: e.target.value }); }}
-                  placeholder="Optional description shown to form users…"
-                />
-              </div>
-            </div>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Host Domain</h3>
-            <p className="text-xs text-gray-500 mb-2">Select which domain this form is associated with.</p>
-            <Select
-              defaultValue={template.hostDomain ?? "app.allaboutultrasound.com"}
-              onValueChange={val => updateTemplateMutation.mutate({ id: templateId, hostDomain: val })}
-            >
-              <SelectTrigger className="text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {["app.allaboutultrasound.com", "allaboutultrasound.com", "allaboutvascular.com", "allaboutobgyn.com", "allaboutecho.com"].map(d => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Visibility</h3>
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div>
-                <p className="text-sm font-medium text-gray-800">Form Active</p>
-                <p className="text-xs text-gray-500">When inactive, the form is hidden from users</p>
-              </div>
-              <button
-                onClick={() => updateTemplateMutation.mutate({ id: templateId, isActive: !template.isActive })}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  template.isActive ? "bg-teal-500" : "bg-gray-300"
-                }`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                  template.isActive ? "translate-x-6" : "translate-x-1"
-                }`} />
-              </button>
-            </div>
-          </div>
-        </div>
+        <DIYSettingsPanel template={template} templateId={templateId} updateTemplateMutation={updateTemplateMutation} />
       )}
 
       {/* Results Tab */}

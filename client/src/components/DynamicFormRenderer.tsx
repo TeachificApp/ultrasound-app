@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, AlertCircle, ChevronRight } from "lucide-react";
+import { RichTextDisplay } from "@/components/RichTextEditor";
 import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -73,6 +74,8 @@ interface FormTemplate {
   name: string;
   description: string | null;
   formType: string;
+  successMessage?: string | null;
+  successRedirectUrl?: string | null;
   sections: FormSection[];
   branchRules: BranchRule[];
 }
@@ -442,6 +445,8 @@ export default function DynamicFormRenderer({
       name: template.name,
       description: template.description,
       formType: template.formType,
+      successMessage: (template as any).successMessage ?? null,
+      successRedirectUrl: (template as any).successRedirectUrl ?? null,
       sections: sections.map(s => ({
         ...s,
         items: items
@@ -474,10 +479,15 @@ export default function DynamicFormRenderer({
 
   const submitMutation = trpc.formBuilder.submitForm.useMutation({
     onSuccess: (data) => {
-      setSubmitted(true);
       setSubmitting(false);
       toast.success("Form submitted successfully");
       onSubmitted?.(data.id);
+      // Handle redirect first, then show success screen
+      if (templateData?.successRedirectUrl) {
+        window.location.href = templateData.successRedirectUrl;
+      } else {
+        setSubmitted(true);
+      }
     },
     onError: (err) => {
       setSubmitting(false);
@@ -558,15 +568,28 @@ export default function DynamicFormRenderer({
   }
 
   if (submitted) {
+    const hasCustomMsg = templateData?.successMessage && templateData.successMessage.trim().length > 0;
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <CheckCircle2 className="w-12 h-12 text-[#189aa1]" />
         <h3 className="text-lg font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
           Form Submitted
         </h3>
-        <p className="text-sm text-gray-500 text-center max-w-sm">
-          Your response has been recorded. Thank you for completing this review.
-        </p>
+        {hasCustomMsg ? (
+          templateData!.successMessage!.trim().startsWith("<") ? (
+            <div className="max-w-lg w-full">
+              <RichTextDisplay html={templateData!.successMessage!} />
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center max-w-sm">
+              {templateData!.successMessage}
+            </p>
+          )
+        ) : (
+          <p className="text-sm text-gray-500 text-center max-w-sm">
+            Your response has been recorded. Thank you for completing this review.
+          </p>
+        )}
         {maxScore > 0 && (
           <div className="bg-[#f0fbfc] border border-[#189aa1]/20 rounded-lg px-6 py-3 text-center">
             <div className="text-2xl font-bold text-[#189aa1]">

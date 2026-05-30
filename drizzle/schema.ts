@@ -1794,6 +1794,8 @@ export const accreditationFormTemplates = mysqlTable("accreditationFormTemplates
   hostDomain: varchar("hostDomain", { length: 255 }).default("app.allaboutultrasound.com"),
   themeSettings: longtext("themeSettings"),
   importedFromUrl: varchar("importedFromUrl", { length: 1000 }),
+  successMessage: longtext("successMessage"),
+  successRedirectUrl: varchar("successRedirectUrl", { length: 500 }),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
