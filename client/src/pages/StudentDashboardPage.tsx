@@ -144,6 +144,8 @@ function ProfileTab() {
   const updateProfile = trpc.auth.updateProfile.useMutation({
     onSuccess: () => {
       toast.success("Profile updated successfully.");
+      // Reset ref so the effect re-syncs once the invalidated query returns fresh data
+      syncedProfileIdRef.current = null;
       utils.dashboard.getProfile.invalidate();
       utils.auth.me.invalidate();
     },
@@ -181,7 +183,7 @@ function ProfileTab() {
   const [yearsExperience, setYearsExperience] = useState<string>("");
   const [locationVal, setLocationVal] = useState("");
   const [website, setWebsite] = useState("");
-  const [initialized, setInitialized] = useState(false);
+  const syncedProfileIdRef = useRef<number | null>(null);
 
   const [emailChangeOpen, setEmailChangeOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");
@@ -190,7 +192,14 @@ function ProfileTab() {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
 
-  if (profile && !initialized) {
+  // Sync form fields from server data only when the profile ID changes (initial
+  // load or after a save). Using a ref guard prevents the effect from resetting
+  // fields while the user is actively typing.
+  useEffect(() => {
+    if (!profile) return;
+    const profileId = (profile as any).id ?? 0;
+    if (profileId === syncedProfileIdRef.current) return;
+    syncedProfileIdRef.current = profileId;
     setDisplayName(profile.displayName ?? profile.name ?? "");
     setBio(profile.bio ?? "");
     setSpecialty(profile.specialty ?? "");
@@ -198,8 +207,7 @@ function ProfileTab() {
     setYearsExperience(profile.yearsExperience != null ? String(profile.yearsExperience) : "");
     setLocationVal(profile.location ?? "");
     setWebsite(profile.website ?? "");
-    setInitialized(true);
-  }
+  }, [profile]);
 
   const handleAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
