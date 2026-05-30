@@ -183,9 +183,10 @@ function OverviewPanel() {
           color="teal2"
         />
         <StatCard
-          label="Course Completions"
-          value={(stats?.totalCompletions ?? 0).toLocaleString()}
-          icon={<GraduationCap size={18} />}
+          label="Total Revenue"
+          value={`$${((stats?.totalRevenueCents ?? 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          sub={`${(stats?.totalCompletions ?? 0).toLocaleString()} completions`}
+          icon={<DollarSign size={18} />}
           color="amber"
         />
       </div>
@@ -909,6 +910,130 @@ function EnrollmentsPanel() {
   );
 }
 
+// ─── Communications Panel ───────────────────────────────────────────────────
+const EMAIL_TYPE_LABELS: Record<string, string> = {
+  magic_link: "Magic Link",
+  welcome: "Welcome",
+  certificate: "Certificate",
+  enrollment: "Enrollment",
+  campaign: "Campaign",
+  password_reset: "Password Reset",
+  invite: "Invite",
+  purchase_confirmation: "Purchase",
+  other: "Other",
+};
+const EMAIL_TYPE_COLORS: Record<string, string> = {
+  magic_link: "bg-purple-100 text-purple-700",
+  welcome: "bg-teal-100 text-teal-700",
+  certificate: "bg-amber-100 text-amber-700",
+  enrollment: "bg-blue-100 text-blue-700",
+  campaign: "bg-pink-100 text-pink-700",
+  password_reset: "bg-orange-100 text-orange-700",
+  invite: "bg-indigo-100 text-indigo-700",
+  purchase_confirmation: "bg-green-100 text-green-700",
+  other: "bg-slate-100 text-slate-600",
+};
+function CommunicationsPanel() {
+  const [search, setSearch] = useState("");
+  const [emailType, setEmailType] = useState("all");
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = trpc.adminUser.listEmailSendLog.useQuery({ search, emailType, page, pageSize: 25 });
+  const stats = data?.stats;
+  const emails = data?.emails ?? [];
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard label="Total Sent" value={(stats?.totalSent ?? 0).toLocaleString()} icon={<Mail size={18} />} color="teal" />
+        <StatCard label="Campaign Emails" value={(stats?.campaignCount ?? 0).toLocaleString()} icon={<MessageSquare size={18} />} color="blue" />
+        <StatCard label="Transactional" value={(stats?.transactionalCount ?? 0).toLocaleString()} icon={<CheckCircle size={18} />} color="teal2" />
+        <StatCard label="Failed" value={(stats?.failedCount ?? 0).toLocaleString()} icon={<Activity size={18} />} color="amber" />
+      </div>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-48">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Input placeholder="Search email, subject, name..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="pl-9 h-9 text-sm" />
+        </div>
+        <Select value={emailType} onValueChange={v => { setEmailType(v); setPage(1); }}>
+          <SelectTrigger className="w-44 h-9 text-sm"><SelectValue placeholder="All types" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            {Object.entries(EMAIL_TYPE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {/* Table */}
+      <Card className="border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Recipient</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Subject</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sent</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                [...Array(8)].map((_, i) => (
+                  <tr key={i}><td colSpan={5} className="px-4 py-2"><Skeleton className="h-5 w-full" /></td></tr>
+                ))
+              ) : emails.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-12 text-center text-slate-400">
+                  {search || emailType !== 'all' ? 'No emails match your filters.' : 'No emails logged yet. Emails will appear here as they are sent.'}
+                </td></tr>
+              ) : emails.map((e: any) => (
+                <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3">
+                    {e.userId ? (
+                      <Link href={`/admin/users/${e.userId}`} className="text-teal-600 hover:underline font-medium">
+                        {e.recipientName || e.recipientEmail}
+                      </Link>
+                    ) : (
+                      <span className="text-slate-700">{e.recipientName || e.recipientEmail}</span>
+                    )}
+                    <p className="text-xs text-slate-400 truncate max-w-48">{e.recipientEmail}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-slate-700 truncate max-w-72">{e.subject}</p>
+                    {e.campaignSubject && <p className="text-xs text-slate-400">Campaign: {e.campaignSubject}</p>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${EMAIL_TYPE_COLORS[e.emailType] ?? EMAIL_TYPE_COLORS.other}`}>
+                      {EMAIL_TYPE_LABELS[e.emailType] ?? e.emailType}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      e.status === 'sent' ? 'bg-green-100 text-green-700' :
+                      e.status === 'failed' ? 'bg-red-100 text-red-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>{e.status}</span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{fmtRelative(e.sentAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Pagination */}
+        {(data?.totalPages ?? 0) > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+            <span className="text-xs text-slate-500">Page {page} of {data?.totalPages}</span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="h-7 text-xs">Prev</Button>
+              <Button size="sm" variant="outline" disabled={page >= (data?.totalPages ?? 1)} onClick={() => setPage(p => p + 1)} className="h-7 text-xs">Next</Button>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ─── Placeholder Panel ────────────────────────────────────────────────────────
 function PlaceholderPanel({ title, description }: { title: string; description: string }) {
   return (
@@ -938,7 +1063,7 @@ export default function MembersHub() {
       case "invitations":       return <InvitationsPanel />;
       case "import":            return <PlaceholderPanel title="Import Members" description="Bulk import members from CSV or connect your existing platform." />;
       case "activity":          return <ActivityPanel />;
-      case "communications":    return <ContactsAdmin />;
+      case "communications":    return <CommunicationsPanel />;
       case "certificates":      return <CertificatesPanel />;
       case "sales":             return <AdminSalesDashboard />;
       case "product-analytics": return <ProductAnalytics />;

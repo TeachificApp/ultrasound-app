@@ -7,6 +7,42 @@
  */
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
+import { getDb } from "../db";
+import { sql } from "drizzle-orm";
+
+/** Infer email type from subject line for logging purposes */
+function inferEmailType(subject: string): string {
+  const s = subject.toLowerCase();
+  if (s.includes("magic link") || s.includes("sign in") || s.includes("log in") || s.includes("login link")) return "magic_link";
+  if (s.includes("welcome")) return "welcome";
+  if (s.includes("certificate")) return "certificate";
+  if (s.includes("enroll") || s.includes("course access")) return "enrollment";
+  if (s.includes("password") || s.includes("reset")) return "password_reset";
+  if (s.includes("invite") || s.includes("invitation")) return "invite";
+  if (s.includes("purchase") || s.includes("receipt") || s.includes("order") || s.includes("payment")) return "purchase_confirmation";
+  return "other";
+}
+
+/** Silently log a sent email to email_send_log. Never throws. */
+async function _logEmailSend(to: EmailRecipient, subject: string, status: "sent" | "failed"): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    // Look up userId by email
+    const [userRow] = await db.execute(sql`SELECT id, name FROM users WHERE email = ${to.email} LIMIT 1`) as any;
+    const rows = Array.isArray(userRow) ? userRow : (userRow?.[0] ?? []);
+    const user = Array.isArray(rows) ? rows[0] : rows;
+    const userId = user?.id ? Number(user.id) : null;
+    const recipientName = to.name || user?.name || null;
+    const emailType = inferEmailType(subject);
+    await db.execute(sql`
+      INSERT INTO email_send_log (user_id, recipient_email, recipient_name, email_type, subject, status, sent_at, created_at)
+      VALUES (${userId}, ${to.email}, ${recipientName}, ${emailType}, ${subject}, ${status}, NOW(), NOW())
+    `);
+  } catch {
+    // Never break the primary email flow
+  }
+}
 
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 
@@ -74,9 +110,11 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
     }
 
     console.log(`[email] Sent "${opts.subject}" to ${opts.to.email} [brand=${opts.brandMode || "aaus"}]`);
+    _logEmailSend(opts.to, opts.subject, "sent").catch(() => {});
     return true;
   } catch (err) {
     console.error("[email] Failed to send email:", err);
+    _logEmailSend(opts.to, opts.subject, "failed").catch(() => {});
     return false;
   }
 }

@@ -17,7 +17,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { eq, and, desc, lte, isNull, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, desc, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
@@ -283,8 +283,17 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
       htmlBody: htmlWithFooter,
       previewText: campaign.previewText ?? undefined,
     });
-    if (ok) sent++;
-    else failed++;
+    if (ok) {
+      sent++;
+      // Tag this log entry with the campaign ID
+      try {
+        await db.execute(sql`
+          UPDATE email_send_log SET campaign_id = ${campaignId}
+          WHERE recipient_email = ${recipient.email} AND campaign_id IS NULL
+          ORDER BY sent_at DESC LIMIT 1
+        `);
+      } catch { /* ignore */ }
+    } else failed++;
   }
 
   await db

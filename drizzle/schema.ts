@@ -5151,3 +5151,29 @@ export const userInterests = mysqlTable("user_interests", {
 });
 export type UserInterest = typeof userInterests.$inferSelect;
 export type InsertUserInterest = typeof userInterests.$inferInsert;
+
+// ─── Email Send Log ───────────────────────────────────────────────────────────
+// Logs every email sent to a user — both transactional (magic link, welcome,
+// certificate, enrollment confirmation) and campaign emails.
+// This powers the per-user Communications tab in AdminUserDetailPage and the
+// platform-wide Communications panel in MembersHub.
+export const emailSendLog = mysqlTable("email_send_log", {
+  id: int("id").autoincrement().primaryKey(),
+  // Recipient — userId may be null for non-registered recipients (funnel leads)
+  userId: int("user_id"),
+  recipientEmail: varchar("recipient_email", { length: 255 }).notNull(),
+  recipientName: varchar("recipient_name", { length: 255 }),
+  // Email type: 'magic_link' | 'welcome' | 'certificate' | 'enrollment' | 'campaign' | 'password_reset' | 'invite' | 'other'
+  emailType: varchar("email_type", { length: 50 }).notNull().default("other"),
+  subject: varchar("subject", { length: 500 }).notNull(),
+  // Optional: link back to the campaign that triggered this send
+  campaignId: int("campaign_id"),
+  // Status: 'sent' | 'failed' | 'bounced' | 'opened' | 'clicked'
+  status: mysqlEnum("status", ["sent", "failed", "bounced", "opened", "clicked"]).default("sent").notNull(),
+  // Optional metadata (JSON): e.g. { courseId, courseTitle, certUrl }
+  metadata: text("metadata"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type EmailSendLog = typeof emailSendLog.$inferSelect;
+export type InsertEmailSendLog = typeof emailSendLog.$inferInsert;

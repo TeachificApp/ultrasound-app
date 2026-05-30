@@ -99,8 +99,8 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates";
-const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates"];
+type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates" | "communications";
+const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates", "communications"];
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
@@ -1005,13 +1005,98 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
   );
 }
 
+// ─── Communications Tab ────────────────────────────────────────────────────────
+const COMM_TYPE_LABELS: Record<string, string> = {
+  magic_link: "Magic Link", welcome: "Welcome", certificate: "Certificate",
+  enrollment: "Enrollment", campaign: "Campaign", password_reset: "Password Reset",
+  invite: "Invite", purchase_confirmation: "Purchase", other: "Other",
+};
+const COMM_TYPE_COLORS: Record<string, string> = {
+  magic_link: "bg-purple-100 text-purple-700", welcome: "bg-teal-100 text-teal-700",
+  certificate: "bg-amber-100 text-amber-700", enrollment: "bg-blue-100 text-blue-700",
+  campaign: "bg-pink-100 text-pink-700", password_reset: "bg-orange-100 text-orange-700",
+  invite: "bg-indigo-100 text-indigo-700", purchase_confirmation: "bg-green-100 text-green-700",
+  other: "bg-slate-100 text-slate-600",
+};
+function CommunicationsTab({ userId }: { userId: number }) {
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = trpc.adminUser.getUserEmailHistory.useQuery({ userId, page, pageSize: 25 });
+  const emails = data?.emails ?? [];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-700">Email History</h3>
+        <span className="text-xs text-slate-400">{(data?.total ?? 0).toLocaleString()} total emails sent</span>
+      </div>
+      <div className="border border-slate-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Subject</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sent</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {isLoading ? (
+              [...Array(5)].map((_, i) => (
+                <tr key={i}><td colSpan={4} className="px-4 py-2"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td></tr>
+              ))
+            ) : emails.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-400 text-sm">
+                No emails sent to this user yet. Emails will appear here automatically as they are sent.
+              </td></tr>
+            ) : emails.map((e: any) => (
+              <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-4 py-3">
+                  <p className="text-slate-700 truncate max-w-sm">{e.subject}</p>
+                  {e.campaignSubject && <p className="text-xs text-slate-400">Campaign: {e.campaignSubject}</p>}
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COMM_TYPE_COLORS[e.emailType] ?? COMM_TYPE_COLORS.other}`}>
+                    {COMM_TYPE_LABELS[e.emailType] ?? e.emailType}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    e.status === "sent" ? "bg-green-100 text-green-700" :
+                    e.status === "failed" ? "bg-red-100 text-red-700" :
+                    "bg-slate-100 text-slate-600"
+                  }`}>{e.status}</span>
+                </td>
+                <td className="px-4 py-3 text-xs text-slate-500">
+                  {e.sentAt ? new Date(e.sentAt).toLocaleString() : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {(data?.totalPages ?? 0) > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+            <span className="text-xs text-slate-500">Page {page} of {data?.totalPages}</span>
+            <div className="flex gap-2">
+              <button onClick={() => setPage(p => p - 1)} disabled={page <= 1}
+                className="text-xs px-3 py-1 border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50">Prev</button>
+              <button onClick={() => setPage(p => p + 1)} disabled={page >= (data?.totalPages ?? 1)}
+                className="text-xs px-3 py-1 border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50">Next</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: "profile",       label: "Profile",       icon: User },
-  { key: "content",       label: "Content",       icon: BookOpen },
-  { key: "transactions",  label: "Transactions",  icon: DollarSign },
-  { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
-  { key: "certificates",  label: "Certificates",  icon: Award },
+  { key: "profile",        label: "Profile",        icon: User },
+  { key: "content",        label: "Content",         icon: BookOpen },
+  { key: "transactions",   label: "Transactions",    icon: DollarSign },
+  { key: "subscriptions",  label: "Subscriptions",   icon: CreditCard },
+  { key: "certificates",   label: "Certificates",    icon: Award },
+  { key: "communications", label: "Communications",  icon: FileText },
 ];
 
 export default function AdminUserDetailPage() {
@@ -1133,7 +1218,8 @@ export default function AdminUserDetailPage() {
           {activeTab === "content"       && <ContentTab       userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "transactions"  && <TransactionsTab  userId={userId!} />}
           {activeTab === "subscriptions" && <SubscriptionsTab userId={userId!} data={data} refetch={refetch} />}
-          {activeTab === "certificates"  && <CertificatesTab  userId={userId!} data={data} refetch={refetch} />}
+          {activeTab === "certificates"   && <CertificatesTab   userId={userId!} data={data} refetch={refetch} />}
+          {activeTab === "communications"  && <CommunicationsTab userId={userId!} />}
         </div>
       </div>
     </Layout>
