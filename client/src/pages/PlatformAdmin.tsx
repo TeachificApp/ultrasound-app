@@ -28,7 +28,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1341,37 +1340,37 @@ export default function PlatformAdmin() {
   // Auth checks
   if (loading || checkingAdmin) {
     return (
-      <Layout>
+      <div className="min-h-screen bg-gray-50">
         <div className="container py-12 flex items-center justify-center">
           <RefreshCw className="w-6 h-6 animate-spin text-[#189aa1]" />
         </div>
-      </Layout>
+      </div>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <Layout>
+      <div className="min-h-screen bg-gray-50">
         <div className="container py-12 text-center">
           <Lock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <h2 className="text-xl font-bold text-gray-700 mb-2">Authentication Required</h2>
           <p className="text-gray-500 mb-4">Please sign in to access the admin panel.</p>
           <Link href="/"><Button variant="outline">Go Home</Button></Link>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   if (!isAdmin) {
     return (
-      <Layout>
+      <div className="min-h-screen bg-gray-50">
         <div className="container py-12 text-center">
           <Shield className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <h2 className="text-xl font-bold text-gray-700 mb-2">Access Denied</h2>
           <p className="text-gray-500 mb-4">You do not have permission to access the Platform Admin panel.</p>
           <Link href="/"><Button variant="outline">Go Home</Button></Link>
         </div>
-      </Layout>
+      </div>
     );
   }
 
@@ -1392,7 +1391,7 @@ export default function PlatformAdmin() {
   };
 
   return (
-    <Layout>
+    <div className="min-h-screen bg-gray-50">
       <div className="container py-8 max-w-6xl">
 
         {/* Header */}
@@ -1872,6 +1871,6 @@ export default function PlatformAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Layout>
+    </div>
   );
 }
