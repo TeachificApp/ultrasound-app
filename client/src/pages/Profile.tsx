@@ -11,7 +11,6 @@ import {
   Clock, AlertCircle, RefreshCw, Bell, Heart,
 } from "lucide-react";
 import Layout from "@/components/Layout";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -73,7 +72,16 @@ const SPECIALTY_OPTIONS = [
 ];
 
 export default function Profile() {
-  const { user, isAuthenticated, loading } = useAuth();
+  // Use direct query instead of useAuth() to get a stable data reference.
+  // useAuth() wraps the query in useMemo with logoutMutation.isPending in deps,
+  // which can produce a new `user` object reference on unrelated re-renders and
+  // trigger the form-sync useEffect even while the user is actively editing.
+  const { data: meData, isLoading: loading } = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const user = meData ?? null;
+  const isAuthenticated = !!meData;
   const utils = trpc.useUtils();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
