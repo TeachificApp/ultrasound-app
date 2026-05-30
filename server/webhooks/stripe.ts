@@ -718,6 +718,45 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         }
       } else {
         console.log(`[Stripe] Resolved existing account for ${customerEmail} (userId=${resolvedUserId})`);
+        // For existing users, send a purchase confirmation email with auto-login token
+        // (new users get their email in the isNew branch above)
+        try {
+          const brandMode = (meta.brand_mode as string) || "aaus";
+          const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
+          const fulfillmentDownloadIdExisting = meta.product_type === "download" && meta.product_id ? parseInt(meta.product_id) : null;
+          const fulfillmentCourseIdExisting = meta.fulfillment_course_id ? parseInt(meta.fulfillment_course_id) : (meta.product_type === "course" && meta.product_id ? parseInt(meta.product_id) : null);
+          let loginUrlExisting = `${baseUrl}/my-dashboard`;
+          if (fulfillmentCourseIdExisting) {
+            try {
+              const { lmsCourses: lc } = await import("../../drizzle/schema");
+              const [cr] = await db.select({ slug: lc.slug }).from(lc).where(eq(lc.id, fulfillmentCourseIdExisting)).limit(1);
+              if (cr?.slug) loginUrlExisting = `${baseUrl}/courses/${cr.slug}`;
+            } catch { /* keep default */ }
+          } else if (fulfillmentDownloadIdExisting) {
+            loginUrlExisting = `${baseUrl}/my-downloads`;
+          }
+          let autoLoginUrlExisting = loginUrlExisting;
+          try {
+            const token = await generateAutoLoginToken(resolvedUserId!, loginUrlExisting);
+            autoLoginUrlExisting = `${baseUrl}/api/auth/auto-login?token=${token}`;
+          } catch { /* fall back to plain URL */ }
+          const firstName = (customerName || "").split(" ")[0] || "there";
+          const bumpTitleArr = bumpTitles ? bumpTitles.split("|") : [];
+          const bumpPriceArr = bumpPrices ? bumpPrices.split("|").map(Number) : [];
+          const bumpsForEmail = bumpTitleArr.map((t, i) => ({ title: t, price: bumpPriceArr[i] ?? 0 })).filter(b => b.title);
+          const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
+            firstName,
+            productName,
+            amountPaid: amount ?? 0,
+            orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
+            loginUrl: autoLoginUrlExisting,
+            brandMode: brandMode as any,
+          });
+          await sendEmail({ to: { name: customerName || firstName, email: customerEmail! }, subject, htmlBody, previewText });
+          console.log(`[Stripe] Purchase confirmation email sent to existing user ${customerEmail} for "${productName}"`);
+        } catch (emailErr) {
+          console.error(`[Stripe] Failed to send confirmation email to existing user ${customerEmail}:`, emailErr);
+        }
       }
     } catch (autoErr) {
       console.error(`[Stripe] Failed to auto-create account for ${customerEmail}:`, autoErr);
@@ -973,7 +1012,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       // Build a meaningful access URL pointing to the actual content, not the funnel page
       const brandMode = (meta.brand_mode as string) || "aaus";
       const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
-      let loginUrl = `${baseUrl}/my-courses`;
+      let loginUrl = `${baseUrl}/my-dashboard`;
       if (fulfillmentCourseId) {
         try {
           const [courseRow] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, fulfillmentCourseId)).limit(1);
@@ -982,9 +1021,9 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       } else if (fulfillmentDownloadId) {
         loginUrl = `${baseUrl}/my-downloads`;
       } else if (fulfillmentBundleId) {
-        loginUrl = `${baseUrl}/my-courses`;
+        loginUrl = `${baseUrl}/my-downloads`;
       } else if (fulfillmentBrand) {
-        loginUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net/dashboard" : "https://app.allaboutultrasound.com/dashboard";
+        loginUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net/my-dashboard" : "https://app.allaboutultrasound.com/my-dashboard";
       }
       // Generate auto-login token so the email link logs them in automatically
       let autoLoginUrl = loginUrl;

@@ -106,7 +106,7 @@ export function registerAuthLoginRoute(app: Express) {
    */
   app.get("/api/auth/magic-verify", async (req: Request, res: Response) => {
     const { token, returnTo } = req.query as Record<string, string>;
-    const successRedirect = returnTo && returnTo.startsWith("/") ? returnTo : "/dashboard";
+    const successRedirect = returnTo && returnTo.startsWith("/") ? returnTo : "/my-dashboard";
     if (!token) {
       return res.redirect(`/auth/magic-error?reason=missing_token`);
     }

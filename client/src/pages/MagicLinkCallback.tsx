@@ -52,7 +52,7 @@ export default function MagicLinkCallback() {
         // Redirect to returnTo (if set) or dashboard after a short delay
         const returnTo = params.get("returnTo");
         setTimeout(() => {
-          window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : "/dashboard";
+          window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : "/my-dashboard";
         }, 1500);
       })
       .catch(() => {
