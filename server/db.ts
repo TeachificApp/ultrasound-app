@@ -80,6 +80,7 @@ import {
   accreditationFormSubmissions,
   type AccreditationFormSubmission,
   type InsertAccreditationFormSubmission,
+  userEmailAliases,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -271,8 +272,19 @@ export async function clearPendingEmail(userId: number): Promise<void> {
 export async function getUserByEmail(email: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const rows = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  return rows[0];
+  const normalised = email.trim().toLowerCase();
+  // Primary email lookup
+  const rows = await db.select().from(users).where(sql`LOWER(${users.email}) = ${normalised}`).limit(1);
+  if (rows[0]) return rows[0];
+  // Fallback: check email aliases — if matched, return the primary user
+  const aliasRows = await db
+    .select({ userId: userEmailAliases.userId })
+    .from(userEmailAliases)
+    .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`)
+    .limit(1);
+  if (!aliasRows[0]) return undefined;
+  const primaryRows = await db.select().from(users).where(eq(users.id, aliasRows[0].userId)).limit(1);
+  return primaryRows[0];
 }
 
 /**
@@ -2021,16 +2033,25 @@ export async function getUsersByRole(role: AppRole) {
   }));
 }
 
-/** Find a user by email address (case-insensitive) */
+/** Find a user by email address (case-insensitive). Also checks email aliases. */
 export async function findUserByEmail(email: string) {
   const db = await getDb();
   if (!db) return undefined;
   const normalised = email.trim().toLowerCase();
-  // Try exact match first, then case-insensitive via sql
+  // Primary email lookup
   const result = await db.select().from(users)
     .where(sql`LOWER(${users.email}) = ${normalised}`)
     .limit(1);
-  return result[0] ?? undefined;
+  if (result[0]) return result[0];
+  // Fallback: check email aliases — if matched, return the primary user
+  const aliasRows = await db
+    .select({ userId: userEmailAliases.userId })
+    .from(userEmailAliases)
+    .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`)
+    .limit(1);
+  if (!aliasRows[0]) return undefined;
+  const primaryRows = await db.select().from(users).where(eq(users.id, aliasRows[0].userId)).limit(1);
+  return primaryRows[0] ?? undefined;
 }
 
 /** Find a user by email and return with their roles */

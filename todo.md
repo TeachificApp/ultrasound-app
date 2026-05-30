@@ -3915,3 +3915,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Activity tab to AdminUserDetailPage (paginated event log with color-coded event types)
 - [x] Add Logins tab to AdminUserDetailPage (paginated login history with device/browser parsing)
 - [x] Update TABS array to include Activity and Logins tabs with icons
+
+## Deep-Link Fix + Email Aliases + Merge Users (May 30)
+- [x] Fix MembersRouter catch-all: add /admin/users/:userId route before /admin/:rest* redirect
+- [x] Create user_email_aliases table (userId, email, label, source, createdAt)
+- [x] Apply migration for user_email_aliases
+- [x] Wire email aliases into auth lookup: findUserByEmail checks aliases too
+- [x] Magic links always sent to primary email (users.email), not alias
+- [x] Admin procedures: addEmailAlias, removeEmailAlias, listEmailAliases, searchUsersForMerge
+- [x] mergeUsers procedure: re-point all FK tables to primary userId, add duplicate email as alias, soft-delete duplicate
+- [x] Admin UI: email aliases panel in ProfileTab (list + add + remove)
+- [x] Admin UI: Merge Users button/dialog in AdminUserDetailPage (search, preview both accounts, confirm)

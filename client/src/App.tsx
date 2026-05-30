@@ -531,6 +531,8 @@ function MembersRouter() {
       {/* Redirect remaining /admin/* routes to learn subdomain — explicit routes before catch-all */}
       <Route path="/admin/lms">{() => { window.location.replace(`${LEARN_APP_URL}/admin/lms`); return null; }}</Route>
       <Route path="/admin/lms/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/lms/${params.rest ?? ""}`); return null; }}</Route>
+      {/* Admin user detail — must be before the catch-all so it renders on app.allaboutultrasound.com */}
+      <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><AdminUserDetailPage /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
       {/* ── Public Form Renderer — outside MembersLayout (full-screen, no nav) ── */}
       <Route path="/forms/:slug" component={PublicFormRenderer} />

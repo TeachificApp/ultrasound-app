@@ -5177,3 +5177,20 @@ export const emailSendLog = mysqlTable("email_send_log", {
 });
 export type EmailSendLog = typeof emailSendLog.$inferSelect;
 export type InsertEmailSendLog = typeof emailSendLog.$inferInsert;
+
+// ─── User Email Aliases ───────────────────────────────────────────────────────
+// Allows a user to log in with multiple email addresses.
+// The primary email is always stored on users.email; aliases are secondary.
+// Magic links are ALWAYS sent to users.email (primary), never to an alias.
+export const userEmailAliases = mysqlTable("user_email_aliases", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  // Optional human label, e.g. "Work email" or "Old Thinkific account"
+  label: varchar("label", { length: 100 }),
+  // Source of the alias: 'admin_added' | 'account_merge'
+  source: mysqlEnum("source", ["admin_added", "account_merge"]).default("admin_added").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UserEmailAlias = typeof userEmailAliases.$inferSelect;
+export type InsertUserEmailAlias = typeof userEmailAliases.$inferInsert;

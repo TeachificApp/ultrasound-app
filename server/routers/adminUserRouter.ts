@@ -39,6 +39,7 @@ import {
   userLoginEvents,
   userActivityLogs,
   emailSendLog,
+  userEmailAliases,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
@@ -1627,5 +1628,180 @@ export const adminUserRouter = router({
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const totalRevenue = all.filter(p => p.status === 'paid' || p.status === 'fulfilled' || p.status === 'pending').reduce((s, p) => s + p.amountPaid, 0);
       return { purchases: all, totalRevenue };
+    }),
+
+  /** List all email aliases for a user */
+  listEmailAliases: protectedProcedure
+    .input(z.object({ userId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const aliases = await db
+        .select()
+        .from(userEmailAliases)
+        .where(eq(userEmailAliases.userId, input.userId))
+        .orderBy(desc(userEmailAliases.createdAt));
+      return aliases;
+    }),
+
+  /** Add an email alias to a user account */
+  addEmailAlias: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      email: z.string().email(),
+      label: z.string().max(100).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const normalised = input.email.trim().toLowerCase();
+      // Check not already a primary email
+      const [existingPrimary] = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = ${normalised} LIMIT 1`) as any;
+      if (Array.isArray(existingPrimary) && existingPrimary.length > 0) {
+        throw new TRPCError({ code: "CONFLICT", message: "This email is already the primary email of another account." });
+      }
+      // Check not already an alias
+      const [existingAlias] = await db.execute(sql`SELECT id FROM user_email_aliases WHERE LOWER(email) = ${normalised} LIMIT 1`) as any;
+      if (Array.isArray(existingAlias) && existingAlias.length > 0) {
+        throw new TRPCError({ code: "CONFLICT", message: "This email is already registered as an alias." });
+      }
+      await db.insert(userEmailAliases).values({
+        userId: input.userId,
+        email: normalised,
+        label: input.label ?? null,
+        source: 'admin_added',
+      });
+      return { success: true };
+    }),
+
+  /** Remove an email alias */
+  removeEmailAlias: protectedProcedure
+    .input(z.object({ aliasId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(userEmailAliases).where(eq(userEmailAliases.id, input.aliasId));
+      return { success: true };
+    }),
+
+  /**
+   * Merge two user accounts.
+   * - All data from `sourceUserId` is re-pointed to `targetUserId`.
+   * - The source user's email is added as an alias on the target account.
+   * - The source user account is soft-deleted (isPending=true, email cleared).
+   * Magic links always go to the target (primary) user's email.
+   */
+  mergeUsers: protectedProcedure
+    .input(z.object({
+      targetUserId: z.number().int(),  // the account to keep
+      sourceUserId: z.number().int(),  // the duplicate to absorb
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      if (input.targetUserId === input.sourceUserId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot merge a user with themselves." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Fetch both users
+      const [targetRows, sourceRows] = await Promise.all([
+        db.select({ id: users.id, email: users.email, name: users.name }).from(users).where(eq(users.id, input.targetUserId)).limit(1),
+        db.select({ id: users.id, email: users.email, name: users.name }).from(users).where(eq(users.id, input.sourceUserId)).limit(1),
+      ]);
+      if (!targetRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
+      if (!sourceRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Source user not found." });
+      const sourceEmail = sourceRows[0].email;
+
+      // Tables to re-point userId from source → target
+      const tablesToUpdate = [
+        "lms_enrollments", "lms_orders", "lms_certificates", "lms_lesson_notes",
+        "lms_lesson_bookmarks", "lms_video_events", "lms_quiz_attempts",
+        "digital_purchases", "digital_download_events", "digital_bundle_purchases",
+        "physical_product_orders", "funnel_purchases", "order_bump_conversions",
+        "brandMemberships", "membershipSubscriptions",
+        "userRoles", "userPointsLog",
+        "user_login_events", "user_activity_logs",
+        "email_send_log",
+        "ip_access_logs", "sharing_abuse_flags",
+        "quickfireAttempts", "echoLibraryCaseAttempts", "userCaseViews",
+        "cmeEnrollmentCache",
+        "accreditationReadiness", "accreditationReadinessNavigator",
+        "user_email_aliases",
+      ];
+
+      // Re-point each table — skip rows that would create a duplicate (e.g. unique userId)
+      for (const table of tablesToUpdate) {
+        try {
+          const col = table === 'email_send_log' || table === 'ip_access_logs' ||
+            table === 'sharing_abuse_flags' || table === 'user_login_events' ||
+            table === 'user_activity_logs' || table === 'physical_product_orders' ||
+            table === 'digital_purchases' || table === 'digital_download_events' ||
+            table === 'digital_bundle_purchases' || table === 'funnel_purchases' ||
+            table === 'order_bump_conversions' || table === 'lms_enrollments' ||
+            table === 'lms_orders' || table === 'lms_certificates' ||
+            table === 'lms_lesson_notes' || table === 'lms_lesson_bookmarks' ||
+            table === 'lms_video_events' || table === 'lms_quiz_attempts' ||
+            table === 'user_email_aliases'
+            ? 'user_id' : 'userId';
+          await db.execute(sql.raw(
+            `UPDATE \`${table}\` SET \`${col}\` = ${input.targetUserId} WHERE \`${col}\` = ${input.sourceUserId}`
+          ));
+        } catch (_e) {
+          // Ignore duplicate key errors — the target already has that record
+          console.warn(`[mergeUsers] Skipped table ${table}:`, (_e as Error).message?.slice(0, 80));
+        }
+      }
+
+      // Add source email as alias on target (if not already there and not null)
+      if (sourceEmail) {
+        const normalised = sourceEmail.trim().toLowerCase();
+        try {
+          await db.insert(userEmailAliases).values({
+            userId: input.targetUserId,
+            email: normalised,
+            label: `Merged from account #${input.sourceUserId}`,
+            source: 'account_merge',
+          });
+        } catch (_e) {
+          // Alias already exists — that's fine
+        }
+      }
+
+      // Soft-delete the source account: clear email + mark as pending so it can't be logged into
+      await db.update(users).set({
+        email: null,
+        openId: `merged_${input.sourceUserId}_${Date.now()}`,
+        isPending: true,
+        name: `[Merged into #${input.targetUserId}] ${sourceRows[0].name ?? ''}`,
+      }).where(eq(users.id, input.sourceUserId));
+
+      return { success: true, message: `Account #${input.sourceUserId} merged into #${input.targetUserId}. Source email added as alias.` };
+    }),
+
+  /** Search users by name or email (for merge dialog) */
+  searchUsersForMerge: protectedProcedure
+    .input(z.object({
+      query: z.string().min(2).max(100),
+      excludeUserId: z.number().int(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const q = `%${input.query.trim()}%`;
+      const rows = await db
+        .select({ id: users.id, name: users.name, email: users.email, avatarUrl: users.avatarUrl, createdAt: users.createdAt })
+        .from(users)
+        .where(and(
+          sql`(LOWER(${users.email}) LIKE LOWER(${q}) OR LOWER(${users.name}) LIKE LOWER(${q}))`,
+          sql`${users.id} != ${input.excludeUserId}`,
+          eq(users.isPending, false),
+        ))
+        .limit(10);
+      return rows;
     }),
 });

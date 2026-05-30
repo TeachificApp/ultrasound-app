@@ -17,7 +17,7 @@ import {
   FileText, Package, AlertCircle, CheckCircle2, Clock, XCircle,
   RefreshCw, Loader2, ChevronRight, ChevronLeft, ShoppingCart,
   UserCog, PlusCircle, Trash2, Shield, ShieldOff, BadgeCheck,
-  ClipboardCheck, RotateCcw, DollarSign, Edit3,
+  ClipboardCheck, RotateCcw, DollarSign, Edit3, GitMerge, Mail, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -268,6 +268,9 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Email Aliases Panel */}
+      <EmailAliasesPanel userId={userId} />
 
       {/* Grant dialog */}
       <Dialog open={grantOpen} onOpenChange={setGrantOpen}>
@@ -1291,6 +1294,236 @@ function LoginsTab({ userId }: { userId: number }) {
   );
 }
 
+// ─── Email Aliases Panel ─────────────────────────────────────────────────────
+function EmailAliasesPanel({ userId }: { userId: number }) {
+  const [addOpen, setAddOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+  const utils = trpc.useUtils();
+
+  const { data: aliases, isLoading } = trpc.adminUser.listEmailAliases.useQuery({ userId });
+
+  const addAlias = trpc.adminUser.addEmailAlias.useMutation({
+    onSuccess: () => {
+      toast.success("Email alias added.");
+      utils.adminUser.listEmailAliases.invalidate({ userId });
+      setAddOpen(false);
+      setNewEmail("");
+      setNewLabel("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeAlias = trpc.adminUser.removeEmailAlias.useMutation({
+    onSuccess: () => {
+      toast.success("Alias removed.");
+      utils.adminUser.listEmailAliases.invalidate({ userId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+      <SectionHeader title="Email Aliases" action={
+        <Button size="sm" onClick={() => setAddOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
+          <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Add Alias
+        </Button>
+      } />
+      <p className="text-xs text-gray-500">Aliases allow this user to log in with multiple email addresses. Magic links are always sent to the primary email above.</p>
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-gray-400"><Loader2 className="w-4 h-4 animate-spin" /> Loading aliases...</div>
+      ) : aliases && aliases.length > 0 ? (
+        <div className="space-y-2">
+          {aliases.map((a: any) => (
+            <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
+              <div className="flex items-center gap-2 min-w-0">
+                <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{a.email}</p>
+                  <p className="text-xs text-gray-400">
+                    {a.label ? `${a.label} · ` : ""}
+                    {a.source === "account_merge" ? "From account merge" : "Admin added"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => removeAlias.mutate({ aliasId: a.id })}
+                disabled={removeAlias.isPending}
+                className="ml-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                title="Remove alias"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No email aliases. Add one to let this user log in with an additional email address.</p>
+      )}
+
+      {/* Add Alias Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Email Alias</DialogTitle>
+            <DialogDescription>This email will work for login but magic links always go to the primary email.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Email Address</Label>
+              <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="alias@example.com" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Label (optional)</Label>
+              <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="e.g. Work email, Old account" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => addAlias.mutate({ userId, email: newEmail, label: newLabel || undefined })}
+              disabled={addAlias.isPending || !newEmail}
+              className="bg-[#189aa1] hover:bg-[#157f85] text-white"
+            >
+              {addAlias.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Add Alias
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── Merge Users Dialog ───────────────────────────────────────────────────────
+function MergeUsersDialog({ userId, userName, onClose }: { userId: number; userName: string; onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
+
+  const { data: searchResults, isLoading: searching } = trpc.adminUser.searchUsersForMerge.useQuery(
+    { query, excludeUserId: userId },
+    { enabled: query.length >= 2 }
+  );
+
+  const merge = trpc.adminUser.mergeUsers.useMutation({
+    onSuccess: (res) => {
+      toast.success(res.message);
+      utils.adminUser.getUserDetail.invalidate({ userId });
+      utils.adminUser.listEmailAliases.invalidate({ userId });
+      setConfirmOpen(false);
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <>
+      <Dialog open={!confirmOpen} onOpenChange={(o) => { if (!o) onClose(); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><GitMerge className="w-5 h-5 text-[#189aa1]" /> Merge Duplicate Accounts</DialogTitle>
+            <DialogDescription>
+              Search for the duplicate account to merge into <strong>{userName}</strong>.
+              All data (enrollments, purchases, activity) will be moved to this account.
+              The duplicate's email will become a login alias.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Search for duplicate account</Label>
+              <Input
+                value={query}
+                onChange={e => { setQuery(e.target.value); setSelectedUser(null); }}
+                placeholder="Search by name or email..."
+              />
+            </div>
+            {searching && <div className="flex items-center gap-2 text-sm text-gray-400"><Loader2 className="w-4 h-4 animate-spin" /> Searching...</div>}
+            {searchResults && searchResults.length > 0 && !selectedUser && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                {searchResults.map((u: any) => (
+                  <button
+                    key={u.id}
+                    onClick={() => setSelectedUser(u)}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-teal-50 transition-colors text-left border-b border-gray-100 last:border-0"
+                  >
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                      style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}>
+                      {(u.name ?? "?").charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{u.name ?? "—"}</p>
+                      <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                    </div>
+                    <span className="text-xs text-gray-400 ml-auto flex-shrink-0">#{u.id}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {searchResults && searchResults.length === 0 && query.length >= 2 && !searching && (
+              <p className="text-sm text-gray-400">No matching accounts found.</p>
+            )}
+            {selectedUser && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                <p className="text-sm font-semibold text-amber-800">Selected duplicate account:</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                    style={{ background: "linear-gradient(135deg, #f59e0b, #fbbf24)" }}>
+                    {(selectedUser.name ?? "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-800">{selectedUser.name ?? "—"}</p>
+                    <p className="text-sm text-gray-500">{selectedUser.email}</p>
+                    <p className="text-xs text-gray-400">Account #{selectedUser.id}</p>
+                  </div>
+                  <button onClick={() => setSelectedUser(null)} className="ml-auto text-gray-400 hover:text-gray-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="text-xs text-amber-700 bg-amber-100 rounded p-2">
+                  <strong>What will happen:</strong> All enrollments, purchases, certificates, activity, and login history from account #{selectedUser.id} will be moved to <strong>{userName}</strong>. The email <em>{selectedUser.email}</em> will be added as a login alias. Account #{selectedUser.id} will be deactivated.
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
+              onClick={() => setConfirmOpen(true)}
+              disabled={!selectedUser}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              <GitMerge className="w-4 h-4 mr-1.5" /> Merge Accounts
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Account Merge</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently merge account #{selectedUser?.id} ({selectedUser?.email}) into {userName}.
+              This action cannot be undone. The duplicate account will be deactivated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => merge.mutate({ targetUserId: userId, sourceUserId: selectedUser.id })}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {merge.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Yes, Merge Accounts
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "profile",        label: "Profile",        icon: User },
@@ -1325,6 +1558,8 @@ export default function AdminUserDetailPage() {
     const t = new URLSearchParams(search).get("tab") as Tab | null;
     if (t && VALID_TABS.includes(t) && t !== activeTab) setActiveTab(t);
   }, [search]);
+
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   const { data, isLoading, refetch } = trpc.adminUser.getUserDetail.useQuery(
     { userId: userId! },
@@ -1382,7 +1617,7 @@ export default function AdminUserDetailPage() {
                   {studentName.charAt(0).toUpperCase()}
                 </div>
               )}
-              <div>
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
                     {studentName}
@@ -1394,6 +1629,14 @@ export default function AdminUserDetailPage() {
                 </div>
                 <p className="text-sm text-gray-500">{data.user.email}</p>
               </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMergeOpen(true)}
+                className="flex-shrink-0 gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50 ml-auto"
+              >
+                <GitMerge className="w-3.5 h-3.5" /> Merge Accounts
+              </Button>
             </div>
           </div>
         </div>
@@ -1428,6 +1671,15 @@ export default function AdminUserDetailPage() {
           {activeTab === "logins"        && <LoginsTab        userId={userId!} />}
         </div>
       </div>
+
+      {/* Merge Users Dialog */}
+      {mergeOpen && (
+        <MergeUsersDialog
+          userId={userId!}
+          userName={studentName}
+          onClose={() => setMergeOpen(false)}
+        />
+      )}
     </Layout>
   );
 }
