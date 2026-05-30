@@ -1800,6 +1800,8 @@ export const lmsLearnerRouter = router({
         isPinned: lmsCohortMessages.isPinned,
         createdAt: lmsCohortMessages.createdAt,
         userName: users.name,
+        userDisplayName: users.displayName,
+        userAvatar: users.avatarUrl,
       })
         .from(lmsCohortMessages)
         .innerJoin(users, eq(users.id, lmsCohortMessages.userId))

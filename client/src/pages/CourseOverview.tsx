@@ -920,7 +920,14 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
                   <div key={msg.id} className={`bg-white border rounded-xl p-4 space-y-2 ${msg.isPinned ? 'border-teal-400 bg-teal-50' : 'border-gray-200'}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-gray-800">{msg.userName}</span>
+                        {msg.userAvatar ? (
+                          <img src={msg.userAvatar} alt={msg.userDisplayName || msg.userName} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-bold text-teal-700">{(msg.userDisplayName || msg.userName || '?')[0].toUpperCase()}</span>
+                          </div>
+                        )}
+                        <span className="text-sm font-semibold text-gray-800">{msg.userDisplayName || msg.userName}</span>
                         {msg.isAdminPost && <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">Instructor</span>}
                         {msg.isPinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">📌 Pinned</span>}
                         <span className="text-xs text-gray-400">{new Date(msg.createdAt).toLocaleString()}</span>

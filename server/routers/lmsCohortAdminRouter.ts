@@ -925,7 +925,7 @@ export const lmsCohortAdminRouter = router({
 
   /** Assign a student to a cohort group (moves from any existing group) */
   assignStudentToCohortGroup: protectedProcedure
-    .input(z.object({ cohortGroupId: z.number(), userId: z.number(), courseId: z.number() }))
+    .input(z.object({ cohortGroupId: z.number(), userId: z.number(), courseId: z.number(), sendWelcomeEmail: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
@@ -942,6 +942,31 @@ export const lmsCohortAdminRouter = router({
         userId: input.userId,
         courseId: input.courseId,
       });
+      // Auto-send welcome email when assigning to cohort group (fire-and-forget)
+      if (input.sendWelcomeEmail !== false) {
+        (async () => {
+          try {
+            const [settings] = await db.select({ enrollmentEmailEnabled: platformSettings.enrollmentEmailEnabled, enrollmentEmailSubject: platformSettings.enrollmentEmailSubject, enrollmentEmailIntro: platformSettings.enrollmentEmailIntro }).from(platformSettings).limit(1);
+            const platformEnabled = settings?.enrollmentEmailEnabled !== false;
+            if (!platformEnabled) return;
+            const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+            if (!course?.sendEnrollmentEmail) return;
+            const [user] = await db.select({ name: users.name, displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
+            if (!user?.email) return;
+            const accessToken = await getOrCreateAccessToken(input.userId);
+            await sendEnrollmentEmail({
+              to: { name: user.displayName || user.name || "Student", email: user.email },
+              courseTitle: course.title,
+              courseSlug: course.slug,
+              customSubject: settings?.enrollmentEmailSubject,
+              customIntro: settings?.enrollmentEmailIntro,
+              accessToken,
+            });
+          } catch (e) {
+            console.error("[cohort-welcome-email] Failed to send:", e);
+          }
+        })();
+      }
       return { success: true };
     }),
 
@@ -1053,6 +1078,7 @@ export const lmsCohortAdminRouter = router({
           createdAt: lmsCohortMessages.createdAt,
           updatedAt: lmsCohortMessages.updatedAt,
           userName: users.name,
+          userDisplayName: users.displayName,
           userEmail: users.email,
           userAvatar: users.avatarUrl,
         })

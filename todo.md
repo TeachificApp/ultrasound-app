@@ -3852,3 +3852,25 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix recurring session expansion: inclusive end date (+24h) so sessions on end date are included
 - [x] Re-expand all 5 parent sessions in DB — now 34 total sessions
 - [ ] Upgrade assignment editor to full LessonBlockEditor (full-page, block-based like lessons/landing pages)
+
+## Profile & Display Name Fixes — COMPLETED (May 30 2026)
+- [x] auth.me now returns fresh displayName/avatarUrl/name from DB (not stale session cache)
+- [x] MembersLayout header shows avatarUrl image and displayName with fallback to name
+- [x] MembersLayout dropdown also shows displayName
+- [x] getCohortDiscussions query returns userDisplayName and userAvatar
+- [x] CourseOverview cohort discussion messages show avatar image + displayName
+- [x] Admin cohort group discussion thread shows avatar image + displayName
+- [x] Admin all-discussions panel shows avatar image + displayName
+- [x] assignStudentToCohortGroup fires welcome email automatically
+- [x] Assignment editor now uses full LessonBlockEditor (key prop for reset on switch)
+
+## Teams Redesign (TODO)
+- [ ] Schema: add org contact info fields to lmsGroups (orgName, adminUserId, adminEmail, adminPhone, website)
+- [ ] Schema: new lmsGroupCourses table (id, groupId, courseId, seats, createdAt)
+- [ ] Schema: migrate existing lmsGroups.courseId + totalSeats into lmsGroupCourses
+- [ ] Server: create team without requiring a course (admin path, no payment)
+- [ ] Server: addCourseToTeam procedure (admin: free; team admin: Stripe payment-gated)
+- [ ] Server: team admin role — can manage own team only, no other admin access
+- [ ] UI: Create Team dialog — name, org contact, admin user, members list, then courses+seats
+- [ ] UI: Team detail page — multi-course seat breakdown, member assignment per course
+- [ ] UI: Team admin portal — manage members, assign to courses, purchase additional seats/courses

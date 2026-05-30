@@ -201,6 +201,10 @@ export const appRouter = router({
       }
       return {
         ...opts.ctx.user,
+        // Override with fresh DB values so profile updates reflect immediately
+        displayName: fullUser?.displayName ?? opts.ctx.user.displayName ?? null,
+        avatarUrl: fullUser?.avatarUrl ?? opts.ctx.user.avatarUrl ?? null,
+        name: fullUser?.name ?? opts.ctx.user.name ?? null,
         pendingEmail: fullUser?.pendingEmail ?? null,
         appRoles: roles,
         isPremium: isPremium || brandPremium,
