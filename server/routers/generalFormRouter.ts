@@ -82,16 +82,28 @@ export const generalFormRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const offset = (input.page - 1) * input.pageSize;
-      let query = db.select().from(generalFormTemplates).orderBy(desc(generalFormTemplates.updatedAt));
       const conditions: any[] = [];
       if (input.search) conditions.push(like(generalFormTemplates.name, `%${input.search}%`));
       if (input.status !== "all") conditions.push(eq(generalFormTemplates.status, input.status as any));
+      const baseQuery = conditions.length > 0
+        ? db.select().from(generalFormTemplates).where(and(...conditions))
+        : db.select().from(generalFormTemplates);
       const [forms, [{ total }]] = await Promise.all([
-        (conditions.length > 0 ? db.select().from(generalFormTemplates).where(and(...conditions)) : db.select().from(generalFormTemplates))
-          .orderBy(desc(generalFormTemplates.updatedAt)).limit(input.pageSize).offset(offset),
+        baseQuery.orderBy(desc(generalFormTemplates.updatedAt)).limit(input.pageSize).offset(offset),
         (conditions.length > 0 ? db.select({ total: count() }).from(generalFormTemplates).where(and(...conditions)) : db.select({ total: count() }).from(generalFormTemplates)),
       ]);
-      return { forms, total: total as number };
+      // Fetch submission counts for each form
+      const formIds = forms.map(f => f.id);
+      let submissionCounts: Record<number, number> = {};
+      if (formIds.length > 0) {
+        const counts = await db.select({
+          templateId: generalFormSubmissions.templateId,
+          cnt: count(),
+        }).from(generalFormSubmissions).where(inArray(generalFormSubmissions.templateId, formIds)).groupBy(generalFormSubmissions.templateId);
+        for (const row of counts) submissionCounts[row.templateId] = Number(row.cnt);
+      }
+      const formsWithCounts = forms.map(f => ({ ...f, submissionCount: submissionCounts[f.id] ?? 0 }));
+      return { forms: formsWithCounts, total: total as number };
     }),
 
   // ── Get full form ─────────────────────────────────────────────────────────
