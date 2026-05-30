@@ -35,6 +35,7 @@ const LEARN_HOSTNAMES = [
 const MEMBERS_HOSTNAMES = [
   "members.allaboutultrasound.com",
   "member.allaboutultrasound.com",
+  "app.allaboutultrasound.com",  // primary member dashboard domain
 ];
 
 const IHEARTECHO_HOSTNAMES = [
