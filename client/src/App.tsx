@@ -520,9 +520,16 @@ function MembersRouter() {
       <Route path="/courses/:slug/overview">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/overview`); return null; }}</Route>
       <Route path="/courses/:slug">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}`); return null; }}</Route>
       <Route path="/education-library">{() => { window.location.replace(`${LEARN_APP_URL}/education-library`); return null; }}</Route>
-      {/* Redirect all /admin/* routes to app subdomain */}
+      {/* ── Admin routes served directly on app.allaboutultrasound.com ── */}
+      <Route path="/admin/members">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembersHub /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/product-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductAnalytics /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
+      <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
+      <Route path="/admin/user-analytics">{() => { window.location.replace("/admin/members?tab=members"); return null; }}</Route>
+      <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
+      <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PlatformAdmin /></Suspense></RoleGuard>}</Route>
+      {/* Redirect remaining /admin/* routes to learn subdomain */}
       <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
-      <Route path="/platform-admin">{() => { window.location.replace(`${LEARN_APP_URL}/platform-admin`); return null; }}</Route>
       {/* ── Public Form Renderer — outside MembersLayout (full-screen, no nav) ── */}
       <Route path="/forms/:slug" component={PublicFormRenderer} />
       <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
