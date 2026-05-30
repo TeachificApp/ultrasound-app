@@ -218,7 +218,7 @@ function FormList({ onSelect }: { onSelect: (id: number) => void }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">General Form Builder</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Form Builder</h1>
           <p className="text-sm text-gray-500 mt-0.5">Build public forms, surveys, and quizzes with branding, analytics, and share links</p>
         </div>
         <div className="flex gap-2">
