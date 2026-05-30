@@ -4843,7 +4843,7 @@ function EnrollmentsTab() {
   );
 }
 
-// ─── Groups Tab ───────────────────────────────────────────────────────────────
+// ─── Teams Tab ───────────────────────────────────────────────────────────────
 function GroupSeatAssignPanel({ group, onRefetch }: { group: any; onRefetch: () => void }) {
   const [mode, setMode] = useState<"invite" | "existing">("existing");
   const [newEmail, setNewEmail] = useState("");
@@ -4961,7 +4961,7 @@ function GroupsTab() {
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4 mr-1" /> New Group
+          <Plus className="w-4 h-4 mr-1" /> New Team
         </Button>
       </div>
       {isLoading ? <Skeleton className="h-40 w-full" /> : (
@@ -5012,12 +5012,12 @@ function GroupsTab() {
           )}
         </div>
       )}
-      <CreateGroupDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); refetch(); }} />
+      <CreateTeamDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); refetch(); }} />
     </div>
   );
 }
 
-function CreateGroupDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+function CreateTeamDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   
   const { data: courses } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 100 });
   const [courseId, setCourseId] = useState("");
@@ -5025,14 +5025,14 @@ function CreateGroupDialog({ open, onClose, onCreated }: { open: boolean; onClos
   const [seats, setSeats] = useState("5");
 
   const create = trpc.lmsAdmin.createGroup.useMutation({
-    onSuccess: () => { toast.success("Group created"); onCreated(); },
+    onSuccess: () => { toast.success("Team created"); onCreated(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Create Group</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Create Team</DialogTitle></DialogHeader>
         <div className="space-y-3 py-2">
           <div>
             <Label className="text-sm">Course *</Label>
@@ -5044,7 +5044,7 @@ function CreateGroupDialog({ open, onClose, onCreated }: { open: boolean; onClos
             </Select>
           </div>
           <div>
-            <Label className="text-sm">Group Name *</Label>
+            <Label className="text-sm">Team Name *</Label>
             <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Hospital ABC — Batch 1" className="mt-1" />
           </div>
           <div>
@@ -5059,7 +5059,7 @@ function CreateGroupDialog({ open, onClose, onCreated }: { open: boolean; onClos
             disabled={!courseId || !name.trim() || create.isPending}
             onClick={() => create.mutate({ courseId: parseInt(courseId), name: name.trim(), seats: parseInt(seats) || 1 })}
           >
-            {create.isPending ? "Creating..." : "Create Group"}
+            {create.isPending ? "Creating..." : "Create Team"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -5669,7 +5669,7 @@ const LMS_NAV_GROUPS = [
     color: "teal",
     items: [
       { value: "members_hub", label: "Members Hub ↗", icon: Users, href: "/admin/members" },
-      { value: "groups",      label: "Groups",      icon: Users },
+      { value: "groups",      label: "Teams",      icon: Users },
       { value: "instructors", label: "Instructors", icon: GraduationCap },
       { value: "certificates",label: "Certificates",icon: CheckCircle },
       { value: "enrollments", label: "Enrollments", icon: UserCheck },

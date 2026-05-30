@@ -133,6 +133,10 @@ export default function Profile() {
   const [yearsExperience, setYearsExperience] = useState<string>("");
   const [location, setLocation] = useState("");
   const [website, setWebsite] = useState("");
+  // Track the last user ID we synced from so we only reset form when the
+  // actual user record changes, not on every re-render that produces a new
+  // object reference from useAuth's useMemo.
+  const syncedUserIdRef = useRef<number | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -161,8 +165,13 @@ export default function Profile() {
     }
   }, []);
 
+  // Sync form fields from user data ONLY when:
+  // 1. We have a user and are NOT currently editing (so we don't clobber in-progress edits)
+  // 2. The user's ID has changed since last sync (avoids resetting on every re-render
+  //    caused by useAuth's useMemo returning a new object reference)
+  const userId = (user as any)?.id ?? null;
   useEffect(() => {
-    if (user && !editMode) {
+    if (user && !editMode && userId !== null && userId !== syncedUserIdRef.current) {
       const u = user as any;
       setFirstName(u.firstName || "");
       setLastName(u.lastName || "");
@@ -175,8 +184,16 @@ export default function Profile() {
       setLocation(u.location || "");
       setWebsite(u.website || "");
       setPendingEmail((u as any).pendingEmail ?? null);
+      syncedUserIdRef.current = userId;
     }
-  }, [user, editMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId, editMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // After a successful save, re-sync the form with the updated server data
+  // (invalidate triggers a refetch; when it completes, force a re-sync by
+  // clearing the cached ID so the effect runs again)
+  const resyncAfterSave = () => {
+    syncedUserIdRef.current = null;
+  };
 
   const requestEmailChange = trpc.auth.requestEmailChange.useMutation({
     onSuccess: (data) => {
@@ -207,6 +224,7 @@ export default function Profile() {
     onSuccess: () => {
       toast.success("Profile updated successfully.");
       setEditMode(false);
+      resyncAfterSave(); // allow effect to re-sync once invalidate completes
       utils.auth.me.invalidate();
     },
     onError: (err) => {
