@@ -1544,32 +1544,33 @@ export default function StudentDashboardPage() {
   const content = (
       <div className="min-h-screen bg-[#f0fbfc]">
         {/* Header */}
-        <div className="bg-white border-b border-[#189aa1]/15 px-4 sm:px-8 py-6">
+        <div className="bg-white border-b border-[#189aa1]/15 px-4 sm:px-8 py-4 sm:py-6">
           <div className="max-w-5xl mx-auto">
-            <h1 className="text-2xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
               My Dashboard
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 hidden sm:block">
               Manage your profile, content, subscriptions, and certificates across all platforms.
             </p>
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+        <div className="max-w-5xl mx-auto px-3 sm:px-8 py-4 sm:py-8">
           {/* Tab Navigation */}
-          <div className="flex gap-1 bg-white rounded-xl border border-gray-100 shadow-sm p-1 mb-8 overflow-x-auto">
+          <div className="flex gap-1 bg-white rounded-xl border border-gray-100 shadow-sm p-1 mb-5 sm:mb-8">
             {TABS.map(t => (
               <button
                 key={t.key}
                 onClick={() => handleTabChange(t.key)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-1 justify-center ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex-1 min-h-[44px] ${
                   activeTab === t.key
                     ? "bg-[#189aa1] text-white shadow-sm"
                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 }`}
               >
                 <t.icon className="w-4 h-4 shrink-0" />
-                <span>{t.label}</span>
+                <span className="hidden sm:inline">{t.label}</span>
+                <span className="sm:hidden text-[10px] font-semibold leading-tight text-center">{t.label.split(' ')[0]}</span>
               </button>
             ))}
           </div>

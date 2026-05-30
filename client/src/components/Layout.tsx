@@ -308,7 +308,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 const isCaseLibrary = resolvedPath === "/case-library";
                 const innerContent = (
                   <div
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 transition-all duration-150 group
+                    className={`flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg mb-0.5 transition-all duration-150 group min-h-[44px] lg:min-h-0
                       ${active
                         ? "bg-[#189aa1] text-white"
                         : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -316,7 +316,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     onClick={() => setSidebarOpen(false)}
                   >
                     <Icon className={`w-4 h-4 flex-shrink-0 ${active ? "text-white" : "text-[#4ad9e0] group-hover:text-white"}`} />
-                    <span className="text-sm md:text-base font-medium">{resolvedLabel}</span>
+                    <span className="text-sm font-medium">{resolvedLabel}</span>
                     {/* Lock icon for non-DIY users on the DIY smart link */}
                     {isDiySmartLink && !hasDiyAccess && (
                       <Lock className="w-3 h-3 ml-auto text-white/30 group-hover:text-white/60" />
@@ -379,20 +379,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="sticky top-0 z-10 bg-white border-b border-[#189aa1]/20 px-4 py-3 flex items-center gap-3 shadow-sm">
+        <header className="sticky top-0 z-10 bg-white border-b border-[#189aa1]/20 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-sm">
           <button
-            className="lg:hidden p-1.5 rounded-md text-[#189aa1] hover:bg-[#f0fbfc]"
+            className="lg:hidden p-2 rounded-md text-[#189aa1] hover:bg-[#f0fbfc] min-w-[40px] min-h-[40px] flex items-center justify-center flex-shrink-0"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
-            <span className="text-sm font-semibold text-[#189aa1]" style={{ fontFamily: "Merriweather, serif" }}>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse flex-shrink-0" />
+            <span className="text-xs sm:text-sm font-semibold text-[#189aa1] truncate" style={{ fontFamily: "Merriweather, serif" }}>
               {allNavItems.find((n: { path: string; label: string }) => n.path === location)?.label ?? brandNav.title}
             </span>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <span className="text-xs text-gray-400 hidden sm:block">{brandNav.subtitle}</span>
             {isAuthenticated && <NotificationBell />}
             {/* Account / Login in header */}

@@ -197,10 +197,10 @@ export default function Home() {
               </p>
 
               {/* CTA Buttons — iHeartEcho style */}
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 sm:gap-3">
                 <Link href="/ultrasound-assist">
                   <button
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90 hover:scale-105"
+                    className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90 hover:scale-105 min-h-[44px]"
                     style={{ background: "#189aa1" }}
                   >
                     <Stethoscope className="w-4 h-4" />
@@ -208,7 +208,7 @@ export default function Home() {
                   </button>
                 </Link>
                 <Link href="/quickfire">
-                  <button className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all">
+                  <button className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all min-h-[44px]">
                     <Zap className="w-4 h-4" />
                     Daily Challenge
                   </button>
@@ -217,7 +217,7 @@ export default function Home() {
                   href="https://www.allaboutultrasound.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+                  className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all min-h-[44px]"
                 >
                   <ExternalLink className="w-4 h-4" />
                   allaboutultrasound.com

@@ -70,14 +70,14 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[#f0fbfc]">
       {/* Top bar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200/60 shadow-sm">
-        <div className="flex items-center gap-3 px-4 h-14">
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 h-14">
           {/* Logo + branding */}
           <Link href="/">
-            <div className="flex items-center gap-2.5 cursor-pointer select-none shrink-0">
-              <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-8 h-8 rounded-full" />
+            <div className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none shrink-0">
+              <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-7 sm:w-8 h-7 sm:h-8 rounded-full" />
               <div className="flex flex-col leading-none">
-                <span className="text-[10px] font-medium text-gray-500">All About Ultrasound™ | iHeartEcho™</span>
-                <span className="text-sm font-bold text-[#189aa1]">Learning Platform</span>
+                <span className="text-[9px] sm:text-[10px] font-medium text-gray-500 hidden sm:block">All About Ultrasound™ | iHeartEcho™</span>
+                <span className="text-xs sm:text-sm font-bold text-[#189aa1]">Learning Platform</span>
               </div>
             </div>
           </Link>
@@ -206,7 +206,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
 
             {/* Mobile menu toggle */}
             <button
-              className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"
               onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setAccountOpen(false); }}
               aria-label="Toggle navigation menu"
             >
@@ -217,11 +217,11 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
 
         {/* Mobile nav drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 bg-white px-4 py-3 flex flex-col gap-1">
+          <div className="md:hidden border-t border-gray-200 bg-white px-3 py-2 flex flex-col gap-0.5">
             {NAV_ITEMS.map(item => (
               <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
                 <div
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                  className={`flex items-center gap-2 px-3 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer min-h-[44px] ${
                     isActive(item.href, item.exact)
                       ? "bg-[#189aa1]/10 text-[#189aa1]"
                       : "text-gray-700 hover:bg-gray-100"

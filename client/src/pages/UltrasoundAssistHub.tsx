@@ -327,11 +327,11 @@ export default function UltrasoundAssistHub() {
                       <Lock className="w-3 h-3" /> Premium Access Required
                     </div>
                   ) : (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {/* Navigator button */}
                       {navLocked ? (
                         <button
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border border-gray-200 bg-gray-50 text-gray-400 transition-all hover:bg-gray-100"
+                          className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg font-semibold text-xs border border-gray-200 bg-gray-50 text-gray-400 transition-all hover:bg-gray-100 min-h-[36px]"
                           onClick={(e) => { e.stopPropagation(); setUpgradeModal({ title: spec.title, type: "navigator" }); }}
                         >
                           <Lock className="w-3 h-3" />
@@ -340,7 +340,7 @@ export default function UltrasoundAssistHub() {
                       ) : (
                         <Link href={spec.path}>
                           <button
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs text-white transition-all hover:opacity-90"
+                            className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg font-semibold text-xs text-white transition-all hover:opacity-90 min-h-[36px]"
                             style={{ background: "#189aa1" }}
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -354,7 +354,7 @@ export default function UltrasoundAssistHub() {
                       {(spec as any).calculatorPath && (
                         <Link href={(spec as any).calculatorPath}>
                           <button
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border bg-white transition-all hover:bg-[#f0fbfc]"
+                            className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg font-semibold text-xs border bg-white transition-all hover:bg-[#f0fbfc] min-h-[36px]"
                             style={{ borderColor: "#189aa150", color: "#189aa1" }}
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -367,7 +367,7 @@ export default function UltrasoundAssistHub() {
                       {/* ScanCoach button — Crown icon when locked */}
                       {coachLocked ? (
                         <button
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border border-gray-200 bg-gray-50 text-gray-400 transition-all hover:bg-gray-100"
+                          className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg font-semibold text-xs border border-gray-200 bg-gray-50 text-gray-400 transition-all hover:bg-gray-100 min-h-[36px]"
                           onClick={(e) => { e.stopPropagation(); setUpgradeModal({ title: spec.title, type: "scancoach" }); }}
                         >
                           <Crown className="w-3 h-3" />
@@ -376,7 +376,7 @@ export default function UltrasoundAssistHub() {
                       ) : (
                         <Link href={spec.scanCoachPath}>
                           <button
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border bg-white transition-all hover:bg-[#f0fbfc]"
+                            className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg font-semibold text-xs border bg-white transition-all hover:bg-[#f0fbfc] min-h-[36px]"
                             style={{ borderColor: "#189aa150", color: "#189aa1" }}
                             onClick={(e) => e.stopPropagation()}
                           >

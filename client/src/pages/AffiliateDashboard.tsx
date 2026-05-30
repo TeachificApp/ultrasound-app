@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -262,25 +262,26 @@ export default function AffiliateDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-5">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Affiliate Dashboard</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {profile ? <>Code: <span className="font-mono font-semibold text-teal-700">{profile.code}</span> · {profile.commissionPct}% base commission</> : "Loading..."}
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 sm:py-5">
+        <div className="max-w-5xl mx-auto flex items-start sm:items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900">Affiliate Dashboard</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">
+              {profile ? <>Code: <span className="font-mono font-semibold text-teal-700">{profile.code}</span><span className="hidden sm:inline"> · {profile.commissionPct}% base commission</span></> : "Loading..."}
             </p>
           </div>
           <Button
-            className="bg-teal-600 hover:bg-teal-700 text-white"
+            size="sm"
+            className="bg-teal-600 hover:bg-teal-700 text-white flex-shrink-0"
             onClick={() => setPayoutOpen(true)}
             disabled={!profile}
           >
-            <DollarSign size={15} className="mr-1.5" /> Request Payout
+            <DollarSign size={14} className="mr-1" /> <span className="hidden sm:inline">Request </span>Payout
           </Button>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard icon={<DollarSign size={18} />} label="Total Earnings" value={`$${(totalEarnings / 100).toFixed(2)}`} sub="All time" />
@@ -328,24 +329,25 @@ export default function AffiliateDashboard() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Date</th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Course</th>
-                        <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Sale</th>
-                        <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Commission</th>
-                        <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">Status</th>
+                        <th className="text-left px-3 sm:px-4 py-3 text-xs font-medium text-gray-500">Date</th>
+                        <th className="text-left px-3 sm:px-4 py-3 text-xs font-medium text-gray-500 hidden sm:table-cell">Course</th>
+                        <th className="text-right px-3 sm:px-4 py-3 text-xs font-medium text-gray-500">Sale</th>
+                        <th className="text-right px-3 sm:px-4 py-3 text-xs font-medium text-gray-500">Commission</th>
+                        <th className="text-center px-3 sm:px-4 py-3 text-xs font-medium text-gray-500">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {conversions.map((c: any) => (
                         <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                          <td className="px-4 py-3 text-xs text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
-                          <td className="px-4 py-3 text-xs text-gray-700">{c.courseId ?? "—"}</td>
-                          <td className="px-4 py-3 text-xs text-gray-700 text-right">${((c.saleAmount ?? 0) / 100).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-xs font-semibold text-teal-700 text-right">${((c.commissionAmount ?? 0) / 100).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-3 sm:px-4 py-3 text-xs text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
+                          <td className="px-3 sm:px-4 py-3 text-xs text-gray-700 hidden sm:table-cell">{c.courseId ?? "—"}</td>
+                          <td className="px-3 sm:px-4 py-3 text-xs text-gray-700 text-right">${((c.saleAmount ?? 0) / 100).toFixed(2)}</td>
+                          <td className="px-3 sm:px-4 py-3 text-xs font-semibold text-teal-700 text-right">${((c.commissionAmount ?? 0) / 100).toFixed(2)}</td>
+                          <td className="px-3 sm:px-4 py-3 text-center">
                             <div className="flex items-center justify-center gap-1">
                               {statusIcon(c.status)}
-                              <span className="text-xs capitalize text-gray-600">{c.status}</span>
+                              <span className="text-xs capitalize text-gray-600 hidden sm:inline">{c.status}</span>
+                              <span className="sm:hidden">{statusIcon(c.status)}</span>
                             </div>
                           </td>
                         </tr>

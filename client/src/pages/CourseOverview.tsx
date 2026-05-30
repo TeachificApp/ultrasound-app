@@ -340,20 +340,20 @@ export default function CourseOverview() {
       )}
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            {LOGO && <img src={LOGO} alt="Logo" className="h-8 w-auto shrink-0" />}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            {LOGO && <img src={LOGO} alt="Logo" className="h-7 sm:h-8 w-auto shrink-0" />}
             <div className="min-w-0">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Course Overview</p>
-              <h1 className="font-bold text-gray-900 text-base leading-tight truncate">{course.title}</h1>
+              <p className="text-xs text-gray-500 uppercase tracking-wide hidden sm:block">Course Overview</p>
+              <h1 className="font-bold text-gray-900 text-sm sm:text-base leading-tight truncate">{course.title}</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {effectiveIsAdmin && (
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-1.5 text-gray-600"
+                className="gap-1.5 text-gray-600 hidden sm:flex"
                 onClick={() => setShowEditor(true)}
               >
                 <Edit3 className="w-3.5 h-3.5" /> Edit Overview
@@ -375,12 +375,12 @@ export default function CourseOverview() {
 
       {/* Cohort tab bar — only shown for cohort-type courses */}
       {isCohortCourse && (
-        <div className="bg-white border-b border-gray-200 sticky top-[65px] z-20">
-          <div className="max-w-5xl mx-auto px-6">
-            <div className="flex gap-0">
+        <div className="bg-white border-b border-gray-200 sticky top-[57px] sm:top-[65px] z-20">
+          <div className="max-w-5xl mx-auto px-3 sm:px-6">
+            <div className="flex gap-0 overflow-x-auto">
               <button
                 onClick={() => setActiveTab("overview")}
-                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`px-3 sm:px-5 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === "overview"
                     ? "border-teal-600 text-teal-700"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -393,7 +393,7 @@ export default function CourseOverview() {
               </button>
               <button
                 onClick={() => setActiveTab("cohort")}
-                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`px-3 sm:px-5 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === "cohort"
                     ? "border-teal-600 text-teal-700"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -415,7 +415,7 @@ export default function CourseOverview() {
               </button>
               <button
                 onClick={() => setActiveTab("calendar")}
-                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`px-3 sm:px-5 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === "calendar"
                     ? "border-teal-600 text-teal-700"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -441,7 +441,7 @@ export default function CourseOverview() {
         <CohortCalendarTab cohortData={cohortData as any} isLoading={cohortLoading} />
       )}
 
-      <div className={`max-w-5xl mx-auto px-6 py-8 space-y-8 ${isCohortCourse && (activeTab === "cohort" || activeTab === "calendar") ? "hidden" : ""}`}>
+      <div className={`max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8 ${isCohortCourse && (activeTab === "cohort" || activeTab === "calendar") ? "hidden" : ""}`}>
         {/* Top Zone blocks (above progress bar) */}
         {overviewTopBlocks.length > 0 && (
           <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200">

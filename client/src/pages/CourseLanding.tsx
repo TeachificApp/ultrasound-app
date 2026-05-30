@@ -1247,8 +1247,8 @@ export default function CourseLanding() {
       </div>
       {/* Hero */}
       <div style={heroBg} className="text-white">
-        <div className="max-w-6xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          <div className="lg:col-span-2 space-y-4">
+        <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 items-start">
+          <div className="lg:col-span-2 space-y-3 sm:space-y-4">
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary" className="bg-teal-600 text-white border-0 flex items-center gap-1">
                 {TYPE_ICONS[course.type]} {course.type === "download" ? "Digital Download" : course.type.charAt(0).toUpperCase() + course.type.slice(1)}
@@ -1257,7 +1257,7 @@ export default function CourseLanding() {
                 {course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"}
               </Badge>
             </div>
-            <h1 className="text-3xl font-bold leading-tight">{lp?.heroTitle ?? course.title}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold leading-tight">{lp?.heroTitle ?? course.title}</h1>
             {(lp?.heroSubtitle ?? course.subtitle) && (
               <p className="text-teal-100 text-lg">{lp?.heroSubtitle ?? course.subtitle}</p>
             )}

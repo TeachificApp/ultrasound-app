@@ -3936,3 +3936,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Scope instructor course edit access to courses where they are assigned instructor
 - [ ] Admin LMS panel: instructor publish approval queue (pending requests with approve/reject)
 - [ ] Per-instructor publish toggle in AdminUserDetailPage (when user has instructor role)
+
+## Mobile UI — Public/User-Facing Pages (May 2026)
+- [x] Layout.tsx: improve header responsiveness (shrink page title on mobile, better touch targets)
+- [x] MembersLayout.tsx: hamburger/drawer for mobile nav links already implemented and verified
+- [x] CoursePlayer: mobile-friendly lesson sidebar (collapsible/drawer on mobile), responsive video — already implemented and verified
+- [x] StudentDashboard/MyDashboard: responsive grid layout for mobile — already responsive, verified
+- [x] CourseLanding/BundleLanding: responsive hero (smaller heading, reduced padding on mobile)
+- [x] AffiliateDashboard: responsive header (smaller text, truncated code on mobile), stat cards already responsive
+- [x] Home.tsx: responsive landing page layout (full-width CTA buttons on mobile, hide external link)
+- [x] Global: all tables have overflow-x-auto wrapper
+- [x] Global: touch-friendly tap targets (min 44px) on nav items and buttons
+- [x] LMS CourseOverview: responsive layout for mobile — already responsive with overflow-x-auto tabs, verified
+- [x] Login page: mobile-friendly card layout — already responsive, verified
+- [x] LMSLayout: improved header touch targets and mobile menu items
+- [x] UltrasoundAssistHub: larger touch targets on specialty buttons
+- [x] ProtocolProgressBar: compact on mobile, hide Reset label
+- [x] ScanCoachNavBar: larger touch targets, hide 'Go to' prefix on mobile
+- [x] Fix build error: AffiliateDashboard.tsx wrong useAuth import path (@/hooks/useAuth → @/_core/hooks/useAuth)

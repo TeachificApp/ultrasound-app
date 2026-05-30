@@ -12,7 +12,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   FolderOpen, ExternalLink, LayoutDashboard,
-  GraduationCap, ShieldCheck, ArrowLeft, MessageSquare, Users
+  GraduationCap, ShieldCheck, ArrowLeft, MessageSquare, Users, Menu, X
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -27,6 +27,7 @@ const LEARN_URL = "https://learn.allaboutultrasound.com";
 
 export default function MembersLayout({ children }: { children: React.ReactNode }) {
   const [accountOpen, setAccountOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [location] = useLocation();
 
   const { isAuthenticated, user, loading: authLoading, logout } = useAuth();
@@ -53,16 +54,72 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="min-h-screen bg-[#f0fbfc]">
+      {/* Mobile nav overlay */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      {/* Mobile nav drawer */}
+      {mobileNavOpen && (
+        <div className="fixed top-0 left-0 bottom-0 z-50 w-72 bg-white shadow-2xl flex flex-col md:hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-7 h-7 rounded-full" />
+              <span className="text-sm font-bold text-[#189aa1]">Member Hub</span>
+            </div>
+            <button onClick={() => setMobileNavOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-700">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <nav className="flex-1 overflow-y-auto py-3 px-2">
+            <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Navigation</p>
+            <a href={LEARN_URL} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
+              <GraduationCap className="w-4 h-4 text-[#189aa1]" /> Learning Platform
+            </a>
+            <a href={`${LEARN_URL}/community`} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
+              <Users className="w-4 h-4 text-[#189aa1]" /> Community
+            </a>
+            <a href={AAUS_APP_URL} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
+              <ExternalLink className="w-4 h-4 text-[#189aa1]" /> UltrasoundAssist™
+            </a>
+            <a href={IHE_APP_URL} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
+              <ExternalLink className="w-4 h-4 text-[#189aa1]" /> EchoAssist™
+            </a>
+            {isPlatformAdmin && (
+              <>
+                <div className="border-t border-gray-100 my-2" />
+                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin</p>
+                <a href={getAdminUrl("/platform-admin")} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
+                  <ShieldCheck className="w-4 h-4 text-gray-500" /> Platform Admin
+                </a>
+                <a href={getAdminUrl("/admin/lms")} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
+                  <Settings className="w-4 h-4 text-gray-500" /> LMS Admin
+                </a>
+              </>
+            )}
+          </nav>
+        </div>
+      )}
       {/* Top bar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200/60 shadow-sm">
-        <div className="flex items-center gap-3 px-4 h-14">
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 h-14">
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100 min-w-[40px] min-h-[40px] flex items-center justify-center flex-shrink-0"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open navigation"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           {/* Logo + branding */}
           <Link href="/">
-            <div className="flex items-center gap-2.5 cursor-pointer select-none shrink-0">
-              <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-8 h-8 rounded-full" />
+            <div className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none shrink-0">
+              <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-7 sm:w-8 h-7 sm:h-8 rounded-full" />
               <div className="flex flex-col leading-none">
-                <span className="text-[10px] font-medium text-gray-500">All About Ultrasound™ | iHeartEcho™</span>
-                <span className="text-sm font-bold text-[#189aa1]">Member Hub</span>
+                <span className="text-[9px] sm:text-[10px] font-medium text-gray-500 hidden sm:block">All About Ultrasound™ | iHeartEcho™</span>
+                <span className="text-xs sm:text-sm font-bold text-[#189aa1]">Member Hub</span>
               </div>
             </div>
           </Link>

@@ -24,12 +24,12 @@ export default function ScanCoachNavBar({
 }: ScanCoachNavBarProps) {
   return (
     <div
-      className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-white ${className}`}
+      className={`flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 border-b border-gray-100 bg-white ${className}`}
     >
       {/* Back to ScanCoach Hub */}
       <Link href="/scan-coach-hub">
         <span
-          className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer hover:opacity-75 transition-opacity"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer hover:opacity-75 transition-opacity min-h-[40px] py-1"
           style={{ color: BRAND }}
         >
           <ChevronLeft className="w-3.5 h-3.5" />
@@ -40,10 +40,10 @@ export default function ScanCoachNavBar({
       {/* Go to Navigator */}
       <Link href={navigatorPath}>
         <span
-          className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer hover:opacity-75 transition-opacity"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer hover:opacity-75 transition-opacity min-h-[40px] py-1"
           style={{ color: AQUA }}
         >
-          Go to {navigatorLabel}
+          <span className="hidden sm:inline">Go to </span>{navigatorLabel}
           <ExternalLink className="w-3.5 h-3.5" />
         </span>
       </Link>

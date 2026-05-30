@@ -1228,11 +1228,11 @@ export default function CoursePlayer() {
       )}
 
       {/* Top Header Bar */}
-      <div className={cn("flex items-center justify-between px-5 py-2.5 border-b shrink-0 shadow-sm", isDarkTheme ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200")}>
-        <div className="flex items-center gap-3">
+      <div className={cn("flex items-center justify-between px-3 sm:px-5 py-2 sm:py-2.5 border-b shrink-0 shadow-sm", isDarkTheme ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200")}>
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {/* Mobile hamburger */}
           <button
-            className="lg:hidden text-gray-500 transition-colors mr-1"
+            className="lg:hidden text-gray-500 transition-colors p-1 min-w-[40px] min-h-[40px] flex items-center justify-center flex-shrink-0"
             onMouseEnter={e => (e.currentTarget.style.color = primaryColor)}
             onMouseLeave={e => (e.currentTarget.style.color = "")}
             onClick={() => setMobileSidebarOpen(o => !o)}
@@ -1241,16 +1241,16 @@ export default function CoursePlayer() {
             <Menu className="w-5 h-5" />
           </button>
           {LOGO
-            ? <img src={LOGO} alt="Logo" className="h-8 w-auto" />
-            : <span className="font-bold text-base" style={{ color: primaryColor }}>All About Ultrasound</span>
+            ? <img src={LOGO} alt="Logo" className="h-7 sm:h-8 w-auto flex-shrink-0" />
+            : <span className="font-bold text-sm sm:text-base truncate" style={{ color: primaryColor }}>All About Ultrasound</span>
           }
         </div>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-2 sm:gap-5 flex-shrink-0">
           {/* Progress bar — hidden when course.hideProgress is enabled */}
           {!course.hideProgress && (
-            <div className="flex items-center gap-2.5">
-              <span className="text-gray-500 text-xs">Your Progress</span>
-              <div className="w-36 bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
+              <span className="text-gray-500 text-xs hidden sm:block">Your Progress</span>
+              <div className="w-20 sm:w-36 bg-gray-200 rounded-full h-2 overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${data.enrollment?.progressPct ?? 0}%`, ...gradientStyle }}
@@ -1260,8 +1260,8 @@ export default function CoursePlayer() {
             </div>
           )}
 
-          {/* Welcome */}
-          <div className="flex items-center gap-2 text-gray-600">
+          {/* Welcome — hidden on small mobile */}
+          <div className="hidden sm:flex items-center gap-2 text-gray-600">
             <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: `${primaryColor}18` }}>
               <User className="w-3.5 h-3.5" style={{ color: primaryColor }} />
             </div>
