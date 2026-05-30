@@ -3051,8 +3051,10 @@ export type LmsAffiliate = typeof lmsAffiliates.$inferSelect;
 export const lmsAffiliateConversions = mysqlTable("lms_affiliate_conversions", {
   id: int("id").autoincrement().primaryKey(),
   affiliateId: int("affiliate_id").notNull(),
-  enrollmentId: int("enrollment_id").notNull(),
-  orderId: int("order_id").notNull(),
+  enrollmentId: int("enrollment_id"), // nullable for non-LMS conversions (e.g. digital downloads)
+  orderId: int("order_id"), // nullable for non-LMS conversions
+  digitalPurchaseId: int("digital_purchase_id"), // for digital download conversions
+  conversionType: varchar("conversion_type", { length: 32 }).default("lms_course"), // lms_course | digital_download
   saleAmount: int("sale_amount").notNull(), // cents
   commissionAmount: int("commission_amount").notNull(), // cents
   paidAt: timestamp("paid_at"),

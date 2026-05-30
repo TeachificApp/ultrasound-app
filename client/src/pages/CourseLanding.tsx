@@ -26,6 +26,7 @@ import CarouselBlock from "@/components/CarouselBlock";
 import type { Block } from "@/components/BlockPreview";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview } from "@/components/BlockPreview";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
+import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1075,7 +1076,7 @@ export default function CourseLanding() {
         ? (course?.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.pricingType ?? course?.pricingType)
         : (course?.pricingType ?? (course?.isFree ? "free" : "one_time"));
       if (resolvedPricingType === "free") await enrollFree.mutateAsync({ courseSlug: slug! });
-      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId, pricingOptionId: selectedPricingOptionId, promoCode: promoCode ?? undefined });
+      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId, pricingOptionId: selectedPricingOptionId, promoCode: promoCode ?? undefined, affiliateCode: getStoredAffiliateCode() ?? undefined });
     } finally { setEnrolling(false); }
   };
 
@@ -1095,7 +1096,7 @@ export default function CourseLanding() {
         ? (course?.pricingOptions?.find((o: any) => o.id === pricingOptionId)?.pricingType ?? course?.pricingType)
         : (course?.pricingType ?? (course?.isFree ? "free" : "one_time"));
       if (resolvedPricingType === "free") await enrollFree.mutateAsync({ courseSlug: slug! });
-      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId, pricingOptionId, promoCode: promoCode ?? undefined });
+      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId, pricingOptionId, promoCode: promoCode ?? undefined, affiliateCode: getStoredAffiliateCode() ?? undefined });
     } finally { setEnrolling(false); }
   };
 

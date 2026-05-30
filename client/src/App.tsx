@@ -74,6 +74,7 @@ const ProductLandingPageBuilder = lazy(() => import("./pages/admin/ProductLandin
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
+const InstructorPortal = lazy(() => import("./pages/InstructorPortal"));
 const AffiliateRedirect = lazy(() => import("./pages/AffiliateRedirect"));
 const UltrasoundAssistHub = lazy(() => import("./pages/UltrasoundAssistHub"));
 const ObGynCalculators = lazy(() => import("./pages/ObGynCalculators"));
@@ -549,6 +550,7 @@ function MembersRouter() {
             <Switch>
               <Route path="/my-dashboard" component={StudentDashboardPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
+        <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
               <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
               <Route path="/my-downloads" component={MyDownloads} />
@@ -655,6 +657,7 @@ function LMSRouter() {
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
         <Route path="/my-dashboard" component={StudentDashboardPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
+        <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />

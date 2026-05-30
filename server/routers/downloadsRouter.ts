@@ -195,7 +195,7 @@ export const downloadsLearnerRouter = router({
 
   /** Create Stripe checkout session for a digital product */
   createCheckout: protectedProcedure
-    .input(z.object({ productId: z.number(), orderBumpId: z.number().optional(), promoCode: z.string().optional() }))
+    .input(z.object({ productId: z.number(), orderBumpId: z.number().optional(), promoCode: z.string().optional(), affiliateCode: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -269,6 +269,7 @@ export const downloadsLearnerRouter = router({
           user_id: ctx.user.id.toString(),
           customer_email: ctx.user.email ?? "",
           trigger_order_type: "download",
+          affiliate_code: input.affiliateCode ?? "",
           ...orderBumpCheckout?.metadata,
         },
         success_url: `${origin}/downloads/${product.slug}/files?success=1`,

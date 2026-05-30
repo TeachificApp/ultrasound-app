@@ -2571,4 +2571,72 @@ export const lmsGroupRouter = router({
       }
       return { ok: true };
     }),
+
+  /** Instructor: get own assigned courses with revenue share and publish status */
+  getMyInstructorCourses: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      // Get all courses where this user is assigned as instructor
+      const perms = await db.select({
+        permId: instructorCoursePermissions.id,
+        courseId: instructorCoursePermissions.courseId,
+        canSelfPublish: instructorCoursePermissions.canSelfPublish,
+        courseTitle: lmsCourses.title,
+        courseStatus: lmsCourses.status,
+        courseSlug: lmsCourses.slug,
+        courseThumbnail: lmsCourses.thumbnailUrl,
+      })
+        .from(instructorCoursePermissions)
+        .leftJoin(lmsCourses, eq(lmsCourses.id, instructorCoursePermissions.courseId))
+        .where(eq(instructorCoursePermissions.instructorId, ctx.user.id));
+      // Get revenue share for each course
+      const enriched = await Promise.all(perms.map(async (p) => {
+        const [share] = await db.select({ revenueSharePct: lmsCourseInstructors.revenueSharePct })
+          .from(lmsCourseInstructors)
+          .where(and(eq(lmsCourseInstructors.courseId, p.courseId!), eq(lmsCourseInstructors.instructorId, ctx.user.id)))
+          .limit(1);
+        // Get latest publish request status
+        const [latestReq] = await db.select({
+          id: instructorPublishRequests.id,
+          status: instructorPublishRequests.status,
+          note: instructorPublishRequests.note,
+          reviewNote: instructorPublishRequests.reviewNote,
+          requestedAt: instructorPublishRequests.requestedAt,
+          reviewedAt: instructorPublishRequests.reviewedAt,
+        })
+          .from(instructorPublishRequests)
+          .where(and(
+            eq(instructorPublishRequests.courseId, p.courseId!),
+            eq(instructorPublishRequests.instructorId, ctx.user.id),
+          ))
+          .orderBy(desc(instructorPublishRequests.requestedAt))
+          .limit(1);
+        return {
+          ...p,
+          revenueSharePct: share?.revenueSharePct ?? 0,
+          latestPublishRequest: latestReq ?? null,
+        };
+      }));
+      return enriched;
+    }),
+
+  /** Instructor: get own publish request history */
+  getMyPublishRequests: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      return db.select({
+        id: instructorPublishRequests.id,
+        courseId: instructorPublishRequests.courseId,
+        status: instructorPublishRequests.status,
+        note: instructorPublishRequests.note,
+        reviewNote: instructorPublishRequests.reviewNote,
+        requestedAt: instructorPublishRequests.requestedAt,
+        reviewedAt: instructorPublishRequests.reviewedAt,
+        courseTitle: lmsCourses.title,
+      })
+        .from(instructorPublishRequests)
+        .leftJoin(lmsCourses, eq(lmsCourses.id, instructorPublishRequests.courseId))
+        .where(eq(instructorPublishRequests.instructorId, ctx.user.id))
+        .orderBy(desc(instructorPublishRequests.requestedAt));
+    }),
 });

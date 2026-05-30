@@ -3954,3 +3954,24 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] ProtocolProgressBar: compact on mobile, hide Reset label
 - [x] ScanCoachNavBar: larger touch targets, hide 'Go to' prefix on mobile
 - [x] Fix build error: AffiliateDashboard.tsx wrong useAuth import path (@/hooks/useAuth → @/_core/hooks/useAuth)
+
+## Affiliate & Instructor System Completion (May 2026)
+- [x] Fix AdminUserDetailPage: wait for auth before querying getUserDetail (was showing "User not found" due to race condition)
+- [x] Affiliate tracking: store affiliate code in localStorage on ref link click (AffiliateRedirect.tsx)
+- [x] Affiliate tracking: pass stored affiliate code through CourseLanding checkout
+- [x] Affiliate tracking: add affiliateCode support to downloads createCheckout procedure
+- [x] Affiliate tracking: pass stored affiliate code through DownloadLanding checkout (both manual and auto-checkout paths)
+- [x] Affiliate tracking: add digital download affiliate conversion tracking to Stripe webhook
+- [x] Schema migration: make enrollmentId and orderId nullable in lms_affiliate_conversions to support download conversions
+- [x] AffiliateDashboard: fix payout request dialog (correct input schema: requestorType, amountCents, paymentMethod, paymentDetails)
+- [x] AffiliateDashboard: add payout request history section
+- [x] AffiliateDashboard: fix conversion table to show courseTitle instead of courseId
+- [x] Instructor Portal: create InstructorPortal.tsx self-service page with 3 tabs (My Courses, Publish History, Payouts)
+- [x] Instructor Portal: add getMyInstructorCourses procedure to lmsRouter (returns assigned courses with revenue share and publish status)
+- [x] Instructor Portal: add getMyPublishRequests procedure to lmsRouter (returns publish request history with course title)
+- [x] Instructor Portal: request course publish dialog with admin note
+- [x] Instructor Portal: payout settings form (PayPal, ACH, Stripe) with pre-fill from saved config
+- [x] Instructor Portal: payout request history table
+- [x] Navigation: add Affiliate Dashboard and Instructor Portal links to Layout.tsx account dropdown (role-based)
+- [x] Navigation: add Affiliate Dashboard and Instructor Portal links to LMSLayout.tsx account dropdown (role-based)
+- [x] Routes: register /affiliate-dashboard and /instructor-portal in App.tsx across all router contexts

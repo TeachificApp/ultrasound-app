@@ -8,6 +8,7 @@ import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -715,7 +716,7 @@ export default function DownloadLanding() {
         window.location.href = getLoginUrl();
         return;
       }
-      checkoutMut.mutate({ productId: product.id, orderBumpId: undefined });
+      checkoutMut.mutate({ productId: product.id, orderBumpId: undefined, affiliateCode: getStoredAffiliateCode() ?? undefined });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCheckout, product?.id, isLoading]);
@@ -753,7 +754,7 @@ export default function DownloadLanding() {
       window.location.href = getLoginUrl();
       return;
     }
-    checkoutMut.mutate({ productId: product.id, orderBumpId: selectedOrderBumpId, promoCode: promoCode ?? undefined });
+    checkoutMut.mutate({ productId: product.id, orderBumpId: selectedOrderBumpId, promoCode: promoCode ?? undefined, affiliateCode: getStoredAffiliateCode() ?? undefined });
   };
 
   // ── Parse landing page blocks ──

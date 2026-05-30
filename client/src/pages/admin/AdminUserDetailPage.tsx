@@ -1654,12 +1654,13 @@ export default function AdminUserDetailPage() {
 
   const [mergeOpen, setMergeOpen] = useState(false);
 
-  const { data, isLoading, refetch } = trpc.adminUser.getUserDetail.useQuery(
+  const isAdmin = !loading && !!adminUser && adminUser.role === "admin";
+  const { data, isLoading, error, refetch } = trpc.adminUser.getUserDetail.useQuery(
     { userId: userId! },
-    { enabled: !!userId }
+    { enabled: !!userId && isAdmin, retry: false }
   );
 
-  if (loading || isLoading) {
+  if (loading || (isAdmin && isLoading)) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-screen">
@@ -1674,11 +1675,15 @@ export default function AdminUserDetailPage() {
     return null;
   }
 
-  if (!data) {
+  if (error || !data) {
+    const errMsg = (error as any)?.message ?? "User not found.";
+    const isForbidden = (error as any)?.data?.code === "FORBIDDEN";
     return (
       <Layout>
-        <div className="flex items-center justify-center h-screen">
-          <p className="text-gray-500">User not found.</p>
+        <div className="flex flex-col items-center justify-center h-screen gap-4">
+          <p className="text-gray-500">{isForbidden ? "Access denied. Please ensure you are logged in as an admin." : errMsg}</p>
+          <button onClick={() => refetch()} className="text-sm text-teal-600 hover:underline">Try again</button>
+          <button onClick={() => navigate("/admin/members")} className="text-sm text-gray-400 hover:underline">← Back to Members</button>
         </div>
       </Layout>
     );

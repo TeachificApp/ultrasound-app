@@ -2781,7 +2781,9 @@ CRITICAL REQUIREMENTS:
         userAgent: req?.headers?.['user-agent']?.substring(0, 512) ?? null,
         referrer: req?.headers?.referer?.substring(0, 512) ?? null,
       });
-      return { ok: true, destinationUrl: link.destinationUrl };
+      // Return the affiliate code so the frontend can store it for checkout attribution (30-day window)
+      const [aff] = await db.select({ code: lmsAffiliates.code }).from(lmsAffiliates).where(eq(lmsAffiliates.id, link.affiliateId)).limit(1);
+      return { ok: true, destinationUrl: link.destinationUrl, affiliateCode: aff?.code ?? null };
     }),
 });
 

@@ -10,7 +10,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   GraduationCap, FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users
+  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users, DollarSign
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -180,6 +180,28 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                           </a>
                           <a href={getAdminUrl("/admin/community")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
                               <Users className="w-3.5 h-3.5 text-gray-500" /> Community Admin
+                          </a>
+                        </>
+                      )}
+
+                      {/* Affiliate Dashboard */}
+                      {appRoles.includes("affiliate") && (
+                        <>
+                          <div className="border-t border-gray-100 my-1" />
+                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Affiliate</div>
+                          <a href={`${MEMBERS_URL}/affiliate-dashboard`} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 cursor-pointer flex items-center gap-2">
+                            <DollarSign className="w-3.5 h-3.5 text-purple-500" /> Affiliate Dashboard
+                          </a>
+                        </>
+                      )}
+
+                      {/* Instructor Portal */}
+                      {appRoles.includes("instructor") && (
+                        <>
+                          <div className="border-t border-gray-100 my-1" />
+                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Instructor</div>
+                          <a href={`${MEMBERS_URL}/instructor-portal`} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer flex items-center gap-2">
+                            <BookOpen className="w-3.5 h-3.5 text-emerald-500" /> Instructor Portal
                           </a>
                         </>
                       )}

@@ -277,11 +277,35 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     return;
   }
 
-  await db.insert(digitalPurchases).values({
+  const [newPurchase] = await db.insert(digitalPurchases).values({
     userId,
     productId,
     stripeCheckoutSessionId: session.id as string,
   });
+  const newPurchaseId = (newPurchase as any)?.insertId ?? null;
+
+  // Track affiliate conversion for digital download
+  const downloadAffiliateCode = meta.affiliate_code ?? null;
+  if (downloadAffiliateCode) {
+    try {
+      const [affiliate] = await db.select().from(lmsAffiliates).where(eq(lmsAffiliates.code, downloadAffiliateCode)).limit(1);
+      if (affiliate) {
+        const amountTotal = (session.amount_total as number) ?? 0;
+        const commission = Math.round(amountTotal * (affiliate.commissionPct / 100));
+        await db.insert(lmsAffiliateConversions).values({
+          affiliateId: affiliate.id,
+          digitalPurchaseId: newPurchaseId,
+          conversionType: "digital_download",
+          saleAmount: amountTotal,
+          commissionAmount: commission,
+        });
+        await db.update(lmsAffiliates).set({ totalEarned: affiliate.totalEarned + commission }).where(eq(lmsAffiliates.id, affiliate.id));
+        console.log(`[Stripe] Affiliate conversion tracked: affiliate ${affiliate.id}, download product ${productId}, commission ${commission} cents`);
+      }
+    } catch (affErr) {
+      console.error(`[Stripe] Failed to track affiliate conversion for download:`, affErr);
+    }
+  }
 
   await notifyOwner({
     title: "📦 New Digital Download Purchase",
