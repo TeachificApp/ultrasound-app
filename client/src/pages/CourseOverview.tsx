@@ -714,6 +714,14 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
     onSuccess: () => refetchDisc(),
     onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
   });
+  const { data: notifPref, refetch: refetchNotifPref } = trpc.lmsLearner.getCohortNotifPref.useQuery(
+    undefined,
+    { enabled: cohortTab === "discussions" }
+  );
+  const setNotifPref = trpc.lmsLearner.setCohortNotifPref.useMutation({
+    onSuccess: () => { refetchNotifPref(); const toast = (window as any).__toast; if (toast) toast.success(notifPref?.cohortDiscussions ? "Cohort notifications disabled" : "Cohort notifications enabled"); },
+    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
+  });
   const handleDiscMediaUpload = async (file: File) => {
     setDiscUploading(true);
     try {
@@ -918,6 +926,22 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
           )}
           {discData?.cohortGroupId && (
             <>
+              {/* Notification toggle */}
+              <div className="flex items-center justify-end">
+                <button
+                  onClick={() => setNotifPref.mutate({ cohortDiscussions: !(notifPref?.cohortDiscussions ?? true) })}
+                  disabled={setNotifPref.isPending}
+                  title={notifPref?.cohortDiscussions !== false ? "Disable discussion notifications" : "Enable discussion notifications"}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                    notifPref?.cohortDiscussions !== false
+                      ? "bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100"
+                      : "bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200"
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill={notifPref?.cohortDiscussions !== false ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                  {notifPref?.cohortDiscussions !== false ? "Notifications On" : "Notifications Off"}
+                </button>
+              </div>
               {/* Post composer */}
               <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
                 <textarea value={discBody} onChange={e => setDiscBody(e.target.value)} placeholder="Share something with your cohort..." className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" rows={3} />

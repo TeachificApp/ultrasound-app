@@ -3985,3 +3985,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Activity Log to LMSAdmin Insights nav group (Activity Log ↗ link)
 - [x] Add Activity Log card to PlatformAdmin DUAL_TOOLS_DEFAULT
 - [x] Register /admin/activity-log route in Router, MembersRouter, and LMSRouter
+
+## Cohort Discussion Notifications (May 2026)
+- [x] Instrument postStudentCohortMessage in lmsRouter.ts to send email + platform notification to admins and cohort staff
+- [x] Notification respects notificationPrefs.cohortDiscussions preference (default ON)
+- [x] Added getCohortNotifPref and setCohortNotifPref procedures to lmsLearnerRouter
+- [x] Added notification toggle button to discussions tab in CourseOverview.tsx (student view)
+- [x] Added adminNotifPref state + setAdminNotifPref mutation + toggle button to LMSAdmin.tsx discussions tab
+- [x] Removed duplicate hidden filter div from LMSAdmin.tsx discussions tab

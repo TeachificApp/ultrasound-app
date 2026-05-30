@@ -9237,6 +9237,14 @@ function CohortTab({ courseId }: { courseId: number }) {
     onSuccess: () => { refetchAllDiscussions(); setDiscBody(""); setDiscMedia([]); toast.success("Message posted"); },
     onError: (e) => toast.error(e.message),
   });
+  const { data: adminNotifPref, refetch: refetchAdminNotifPref } = trpc.lmsLearner.getCohortNotifPref.useQuery(
+    undefined,
+    { enabled: activeTab === "discussions" }
+  );
+  const setAdminNotifPref = trpc.lmsLearner.setCohortNotifPref.useMutation({
+    onSuccess: (d) => { refetchAdminNotifPref(); toast.success(d.cohortDiscussions ? "Cohort notifications enabled" : "Cohort notifications disabled"); },
+    onError: (e) => toast.error(e.message),
+  });
   const handleDiscMediaUpload = async (file: File) => {
     setDiscUploadingMedia(true);
     try {
@@ -10691,13 +10699,27 @@ function CohortTab({ courseId }: { courseId: number }) {
       {/* Discussions Tab */}
       {activeTab === "discussions" && (
         <div className="space-y-4">
-          {/* Filter by group */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-medium text-gray-700">Filter by group:</span>
-            <button onClick={() => setDiscFilterGroupId(null)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${!discFilterGroupId ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-200 text-gray-600 hover:border-teal-400'}`}>All Groups</button>
-            {cohortGroups.map(g => (
-              <button key={g.id} onClick={() => setDiscFilterGroupId(g.id)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${discFilterGroupId === g.id ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-200 text-gray-600 hover:border-teal-400'}`}>{g.name}</button>
-            ))}
+          {/* Notification toggle + Filter by group */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-medium text-gray-700">Filter by group:</span>
+              <button onClick={() => setDiscFilterGroupId(null)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${!discFilterGroupId ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-200 text-gray-600 hover:border-teal-400'}`}>All Groups</button>
+              {cohortGroups.map(g => (
+                <button key={g.id} onClick={() => setDiscFilterGroupId(g.id)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${discFilterGroupId === g.id ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-200 text-gray-600 hover:border-teal-400'}`}>{g.name}</button>
+              ))}
+            </div>
+            <button
+              onClick={() => setAdminNotifPref.mutate({ cohortDiscussions: !(adminNotifPref?.cohortDiscussions ?? true) })}
+              disabled={setAdminNotifPref.isPending}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                adminNotifPref?.cohortDiscussions !== false
+                  ? "bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100"
+                  : "bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill={adminNotifPref?.cohortDiscussions !== false ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+              {adminNotifPref?.cohortDiscussions !== false ? "Notifications On" : "Notifications Off"}
+            </button>
           </div>
 
           {/* Post new message */}

@@ -80,13 +80,16 @@ import {
   funnelLeads,
   lmsCohortGroups,
   lmsCohortGroupEnrollments,
+  lmsCohortStaff,
+  lmsCohortMessages,
   instructorCoursePermissions,
   instructorPublishRequests,
   userRoles,
   userActivityLogs,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
-import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
+import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
+import { notifyOwner } from "../_core/notification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -1862,7 +1865,6 @@ export const lmsLearnerRouter = router({
         ))
         .limit(1);
       if (!groupEnrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not in a cohort group for this course" });
-      const { lmsCohortMessages } = await import("../../drizzle/schema");
       const [result] = await db.insert(lmsCohortMessages).values({
         cohortGroupId: groupEnrollment.cohortGroupId,
         courseId: input.courseId,
@@ -1872,6 +1874,72 @@ export const lmsLearnerRouter = router({
         isAdminPost: false,
         isPinned: false,
       }).$returningId();
+      // ── Fire-and-forget notifications ──
+      (async () => {
+        try {
+          // Get course + group name for notification context
+          const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug })
+            .from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+          const [group] = await db.select({ name: lmsCohortGroups.name })
+            .from(lmsCohortGroups).where(eq(lmsCohortGroups.id, groupEnrollment.cohortGroupId)).limit(1);
+          const [poster] = await db.select({ name: users.name, displayName: users.displayName, email: users.email })
+            .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+          const posterName = poster?.displayName || poster?.name || "A student";
+          const courseName = course?.title ?? "your cohort course";
+          const groupName = group?.name ?? "";
+          const snippet = input.body ? (input.body.length > 200 ? input.body.slice(0, 200) + "…" : input.body) : "[media attachment]";
+          const discussionUrl = `https://learn.allaboutultrasound.com/courses/${course?.slug ?? input.courseId}?tab=cohort&cohortTab=discussions`;
+          // Collect admins + cohort staff (exclude the poster)
+          const adminUsers = await db.select({ id: users.id, email: users.email, name: users.name, displayName: users.displayName, notificationPrefs: users.notificationPrefs })
+            .from(users).where(eq(users.role, "admin"));
+          const staffUsers = await db.select({ id: users.id, email: users.email, name: users.name, displayName: users.displayName, notificationPrefs: users.notificationPrefs })
+            .from(users)
+            .innerJoin(lmsCohortStaff, eq(lmsCohortStaff.userId, users.id))
+            .where(and(
+              eq(lmsCohortStaff.cohortGroupId, groupEnrollment.cohortGroupId),
+              eq(lmsCohortStaff.courseId, input.courseId),
+            ));
+          // Merge and deduplicate by user id
+          const allRecipients = [...adminUsers, ...staffUsers].filter((u, idx, arr) =>
+            u.id !== ctx.user.id && arr.findIndex(x => x.id === u.id) === idx
+          );
+          // Filter by notification preference (default = enabled)
+          const recipients = allRecipients.filter(u => {
+            try {
+              const prefs = u.notificationPrefs ? JSON.parse(u.notificationPrefs) : {};
+              return prefs.cohortDiscussions !== false;
+            } catch { return true; }
+          });
+          // Build email HTML
+          const emailHtml = emailWrapper(`
+            <h2 style="margin:0 0 8px;font-size:20px;color:#0e4a50;font-family:Georgia,serif;">New Cohort Discussion Post</h2>
+            <p style="margin:0 0 16px;font-size:14px;color:#64748b;">${courseName}${groupName ? ` — ${groupName}` : ""}</p>
+            <div style="background:#f0fbfc;border-left:4px solid #0d9488;border-radius:4px;padding:12px 16px;margin:0 0 20px;">
+              <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0e4a50;">${posterName}</p>
+              <p style="margin:0;font-size:14px;color:#374151;white-space:pre-wrap;">${snippet}</p>
+            </div>
+            <a href="${discussionUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;">View Discussion →</a>
+            <p style="margin:16px 0 0;font-size:12px;color:#94a3b8;">You can manage your notification preferences in your account settings.</p>
+          `, "aaus");
+          // Send emails
+          for (const r of recipients) {
+            if (r.email) {
+              await sendEmail({
+                to: r.email,
+                subject: `New discussion post in ${courseName}`,
+                html: emailHtml,
+              }).catch(() => {});
+            }
+          }
+          // Platform notification to owner
+          await notifyOwner({
+            title: `New cohort discussion: ${courseName}`,
+            content: `${posterName} posted in ${groupName || courseName}: "${snippet}"`,
+          }).catch(() => {});
+        } catch (e) {
+          console.warn("[CohortDiscussion] Notification error:", e);
+        }
+      })();
       return { id: result.id };
     }),
 
@@ -1888,11 +1956,37 @@ export const lmsLearnerRouter = router({
         .limit(1);
       if (!msg) throw new TRPCError({ code: "NOT_FOUND" });
       if (msg.userId !== ctx.user.id && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      await db.update(lmsCohortMessages).set({ deletedAt: new Date() }).where(eq(lmsCohortMessages.id, input.id));
+            await db.update(lmsCohortMessages).set({ deletedAt: new Date() }).where(eq(lmsCohortMessages.id, input.id));
       return { success: true };
     }),
-});
 
+  /** Get cohort discussion notification preference for current user */
+  getCohortNotifPref: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [u] = await db.select({ notificationPrefs: users.notificationPrefs })
+      .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+    try {
+      const prefs = u?.notificationPrefs ? JSON.parse(u.notificationPrefs) : {};
+      return { cohortDiscussions: prefs.cohortDiscussions !== false };
+    } catch { return { cohortDiscussions: true }; }
+  }),
+
+  /** Toggle cohort discussion notification preference for current user */
+  setCohortNotifPref: protectedProcedure
+    .input(z.object({ cohortDiscussions: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [u] = await db.select({ notificationPrefs: users.notificationPrefs })
+        .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+      let prefs: Record<string, unknown> = {};
+      try { prefs = u?.notificationPrefs ? JSON.parse(u.notificationPrefs) : {}; } catch {}
+      prefs.cohortDiscussions = input.cohortDiscussions;
+      await db.update(users).set({ notificationPrefs: JSON.stringify(prefs) }).where(eq(users.id, ctx.user.id));
+      return { success: true, cohortDiscussions: input.cohortDiscussions };
+    }),
+});
 // ─── Group Manager Router ─────────────────────────────────────────────────
 
 export const lmsGroupRouter = router({
