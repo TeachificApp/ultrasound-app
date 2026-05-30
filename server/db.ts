@@ -1423,7 +1423,8 @@ export async function getPhysicianPeerReviewTrend(labId: number, revieweeLabMemb
 export async function createPhysicianNotification(data: {
   recipientUserId: number;
   recipientLabMemberId?: number;
-  reviewId: number;
+  reviewId?: number | null;
+  type?: string;
   title: string;
   message: string;
   payload?: object;
@@ -1433,8 +1434,8 @@ export async function createPhysicianNotification(data: {
   await db.insert(physicianNotifications).values({
     recipientUserId: data.recipientUserId,
     recipientLabMemberId: data.recipientLabMemberId ?? null,
-    reviewId: data.reviewId,
-    type: "peer_review_result",
+    reviewId: data.reviewId ?? null,
+    type: data.type ?? "peer_review_result",
     title: data.title,
     message: data.message,
     payload: data.payload ? JSON.stringify(data.payload) : null,

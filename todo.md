@@ -3993,3 +3993,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Added notification toggle button to discussions tab in CourseOverview.tsx (student view)
 - [x] Added adminNotifPref state + setAdminNotifPref mutation + toggle button to LMSAdmin.tsx discussions tab
 - [x] Removed duplicate hidden filter div from LMSAdmin.tsx discussions tab
+
+## Cohort Discussion Notifications — Mark-as-Read & Deep Links (May 2026)
+- [ ] Insert cohort_discussion notifications into physicianNotifications table for each recipient (so they appear in the bell dropdown with mark-as-read)
+- [ ] Add deepLink field to notification payload pointing to the specific discussion message
+- [ ] Update email "View Discussion" deep link to include cohortGroupId and messageId anchor
+- [ ] Update NotificationBell to handle cohort_discussion type (show MessageSquare icon, render deep link on click)
+
+## CSV Export — Enrolled Students per Course/Cohort/Product (May 2026)
+- [ ] Add exportEnrollments tRPC procedure (admin) — returns CSV rows for a given courseId (courses, cohorts, downloads)
+- [ ] Add exportProductAccess tRPC procedure (admin) — returns CSV rows for a given productId (digital products / physical products)
+- [ ] Add "Export CSV" button to LMSAdmin Enrollments tab (course/cohort view)
+- [ ] Add "Export CSV" button to LMSAdmin Orders/Products tab for digital/physical product access lists
+- [ ] CSV columns: Name, Email, Enrolled At, Status, Progress %, Completed At, Group (cohort only), Role

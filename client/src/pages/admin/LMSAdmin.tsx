@@ -5008,6 +5008,7 @@ function GroupSeatAssignPanel({ group, onRefetch }: { group: any; onRefetch: () 
 }
 
 function GroupsTab() {
+  const [, navigate] = useLocation();
   const { data: groups, isLoading, refetch } = trpc.lmsAdmin.listTeams.useQuery();
   const [createOpen, setCreateOpen] = useState(false);
   const [editTeam, setEditTeam] = useState<any>(null);
@@ -5132,7 +5133,7 @@ function GroupsTab() {
                             {seat.status === "revoked" ? "Revoked" : seat.acceptedAt ? "Active" : "Pending invite"}
                           </span>
                           {seat.userId && (
-                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-teal-500 hover:bg-teal-50 shrink-0" title="View member profile" onClick={() => navigate(`/admin/users/${seat.userId}`)  }>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-teal-500 hover:bg-teal-50 shrink-0" title="View member profile" onClick={() => window.open(`/admin/users/${seat.userId}`, '_blank')}>
                               <ExternalLink className="w-3 h-3" />
                             </Button>
                           )}
@@ -7679,6 +7680,7 @@ function CollectionFormDialog({
 // ─── Course Users Tab ─────────────────────────────────────────────────────────
 
 function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType?: string }) {
+  const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -7816,7 +7818,7 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
                           size="sm" variant="ghost"
                           className="h-7 w-7 p-0 text-teal-500 hover:bg-teal-50 hover:text-teal-700"
                           title="View member profile"
-                          onClick={() => navigate(`/admin/users/${e.user.id}`)}
+                          onClick={() => window.open(`/admin/users/${e.user.id}`, '_blank')}
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </Button>
@@ -10315,6 +10317,9 @@ function CohortTab({ courseId }: { courseId: number }) {
                                 {cohortGroups.filter((g: any) => g.id !== group.id).length > 0 && (
                                   <Button size="sm" variant="ghost" onClick={() => setTransferDialog({ userId: s.userId, userName: s.userName ?? s.userEmail ?? "Student", fromGroupId: group.id })} className="text-xs text-teal-600 hover:text-teal-800 h-6 px-2">Transfer</Button>
                                 )}
+                                <Button size="sm" variant="ghost" title="View student profile" onClick={() => window.open(`/admin/users/${s.userId}`, '_blank')} className="h-6 w-6 p-0 text-teal-500 hover:bg-teal-50">
+                                  <ExternalLink className="w-3 h-3" />
+                                </Button>
                                 <Button size="sm" variant="ghost" onClick={() => removeStudent.mutate({ cohortGroupId: group.id, userId: s.userId })} className="text-xs text-red-500 hover:text-red-700 h-6 px-2">Remove</Button>
                               </div>
                             </div>

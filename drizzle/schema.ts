@@ -714,8 +714,8 @@ export const physicianNotifications = mysqlTable("physicianNotifications", {
   recipientUserId: int("recipientUserId").notNull(),
   // The lab member record for the physician (FK → labMembers.id), if linked
   recipientLabMemberId: int("recipientLabMemberId"),
-  // The review that triggered this notification (FK → physicianPeerReviews.id)
-  reviewId: int("reviewId").notNull(),
+  // The review that triggered this notification (FK → physicianPeerReviews.id); NULL for non-peer-review types (e.g. cohort_discussion)
+  reviewId: int("reviewId"),
   // Notification type
   type: varchar("type", { length: 50 }).notNull().default("peer_review_result"),
   // Short title shown in the bell dropdown
