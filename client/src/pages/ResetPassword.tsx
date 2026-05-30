@@ -22,9 +22,11 @@ export default function ResetPassword() {
   const [done, setDone] = useState(false);
 
   const resetMutation = trpc.auth.resetPassword.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       setDone(true);
-      setTimeout(() => { window.location.href = "/login"; }, 3000);
+      // Use auto-login URL if returned, otherwise fall back to login page
+      const redirectUrl = (data as any)?.autoLoginUrl ?? "/login";
+      setTimeout(() => { window.location.href = redirectUrl; }, 2000);
     },
     onError: (err) => {
       toast.error(err.message || "Password reset failed");
@@ -63,9 +65,9 @@ export default function ResetPassword() {
               <CheckCircle2 className="w-8 h-8" style={{ color: "#189aa1" }} />
             </div>
             <h2 className="text-2xl font-black mb-3" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>Password updated!</h2>
-            <p className="text-gray-500 text-sm mb-6">Your password has been changed. Redirecting you to sign in…</p>
-            <Link href="/login">
-              <Button className="w-full font-semibold text-white" style={{ background: "#189aa1" }}>Sign In</Button>
+            <p className="text-gray-500 text-sm mb-6">Your password has been changed. Signing you in…</p>
+            <Link href="/my-dashboard">
+              <Button className="w-full font-semibold text-white" style={{ background: "#189aa1" }}>Go to Dashboard</Button>
             </Link>
           </div>
         ) : (

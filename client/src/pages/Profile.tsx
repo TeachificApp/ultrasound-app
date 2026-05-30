@@ -214,6 +214,18 @@ export default function Profile() {
     },
   });
 
+  const hasPassword = !!(user as any)?.hasPassword;
+  const setPasswordMutation = trpc.auth.setPassword.useMutation({
+    onSuccess: () => {
+      toast.success("Password set! You can now sign in with email and password.");
+      setNewPassword("");
+      setConfirmPassword("");
+      utils.auth.me.invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to set password.");
+    },
+  });
   const changePassword = trpc.auth.changePassword.useMutation({
     onSuccess: () => {
       toast.success("Password changed successfully.");
@@ -323,10 +335,16 @@ export default function Profile() {
   };
 
   const handlePasswordChange = () => {
-    if (!currentPassword) { toast.error("Please enter your current password."); return; }
-    if (newPassword.length < 8) { toast.error("New password must be at least 8 characters."); return; }
-    if (newPassword !== confirmPassword) { toast.error("New passwords do not match."); return; }
-    changePassword.mutate({ currentPassword, newPassword });
+    if (!hasPassword) {
+      if (newPassword.length < 8) { toast.error("Password must be at least 8 characters."); return; }
+      if (newPassword !== confirmPassword) { toast.error("Passwords do not match."); return; }
+      setPasswordMutation.mutate({ newPassword });
+    } else {
+      if (!currentPassword) { toast.error("Please enter your current password."); return; }
+      if (newPassword.length < 8) { toast.error("New password must be at least 8 characters."); return; }
+      if (newPassword !== confirmPassword) { toast.error("New passwords do not match."); return; }
+      changePassword.mutate({ currentPassword, newPassword });
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -936,12 +954,15 @@ export default function Profile() {
                 style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
                 <div className="px-6 py-4 border-b border-gray-100">
                   <h2 className="text-sm font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-                    Change Password
+                    {hasPassword ? "Change Password" : "Set Password"}
                   </h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Update your account password. Minimum 8 characters.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {hasPassword ? "Update your account password. Minimum 8 characters." : "Add a password so you can sign in with email and password."}
+                  </p>
                 </div>
 
                 <div className="px-6 py-5 space-y-4 max-w-md">
+                  {hasPassword && (
                   <div>
                     <label className={labelClass}>Current Password</label>
                     <div className="relative">
@@ -962,6 +983,7 @@ export default function Profile() {
                       </button>
                     </div>
                   </div>
+                  )}
 
                   <div>
                     <label className={labelClass}>New Password</label>
@@ -1014,16 +1036,22 @@ export default function Profile() {
                   <div className="pt-2">
                     <button
                       onClick={handlePasswordChange}
-                      disabled={changePassword.isPending || !currentPassword || !newPassword || !confirmPassword}
+                      disabled={
+                        (hasPassword ? changePassword.isPending : setPasswordMutation.isPending) ||
+                        (hasPassword && !currentPassword) ||
+                        !newPassword || !confirmPassword
+                      }
                       className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: "#189aa1" }}
                     >
-                      {changePassword.isPending ? (
+                      {(hasPassword ? changePassword.isPending : setPasswordMutation.isPending) ? (
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <Lock className="w-4 h-4" />
                       )}
-                      {changePassword.isPending ? "Updating..." : "Update Password"}
+                      {(hasPassword ? changePassword.isPending : setPasswordMutation.isPending)
+                        ? "Saving..."
+                        : hasPassword ? "Update Password" : "Set Password"}
                     </button>
                   </div>
 

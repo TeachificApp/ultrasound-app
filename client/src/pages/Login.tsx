@@ -76,7 +76,7 @@ export default function Login() {
   // Redirect if already signed in
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      navigate(returnTo ?? "/");
+      navigate(returnTo ?? "/my-dashboard");
     }
   }, [isAuthenticated, loading, navigate, returnTo]);
 
@@ -89,7 +89,7 @@ export default function Login() {
   const loginMutation = trpc.auth.loginWithPassword.useMutation({
     onSuccess: () => {
       // Reload to pick up the new session cookie
-      window.location.href = returnTo ?? "/";
+      window.location.href = returnTo ?? "/my-dashboard";
     },
     onError: (err) => {
       toast.error(err.message || "Sign-in failed. Please check your credentials.");
@@ -99,7 +99,7 @@ export default function Login() {
   // ── Register mutation ──
   const registerMutation = trpc.auth.registerWithPassword.useMutation({
     onSuccess: () => {
-      window.location.href = returnTo ?? "/";
+      window.location.href = returnTo ?? "/my-dashboard";
     },
     onError: (err) => {
       toast.error(err.message || "Registration failed. Please try again.");

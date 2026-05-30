@@ -207,6 +207,7 @@ export const appRouter = router({
         brandPremium,
         brand: opts.ctx.brand,
         communityRole: fullUser?.communityRole ?? "member",
+        hasPassword: !!(fullUser?.passwordHash),
         ...demoModeInfo,
       };
     }),
@@ -235,6 +236,21 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    setPassword: protectedProcedure
+      .input(z.object({
+        newPassword: z.string().min(8).max(128),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { getUserPasswordHash, updateUserPassword } = await import('./db');
+        const bcrypt = await import('bcryptjs');
+        const currentHash = await getUserPasswordHash(ctx.user.id);
+        if (currentHash) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'You already have a password. Please use Change Password instead.' });
+        }
+        const newHash = await bcrypt.hash(input.newPassword, 12);
+        await updateUserPassword(ctx.user.id, newHash);
+        return { success: true };
+      }),
     changePassword: protectedProcedure
       .input(z.object({
         currentPassword: z.string().min(1),
@@ -437,15 +453,15 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    resetPassword: publicProcedure
+        resetPassword: publicProcedure
       .input(z.object({
         token: z.string().min(1).max(200),
         newPassword: z.string().min(8).max(128),
       }))
       .mutation(async ({ input }) => {
         const { getUserByPasswordResetToken, updateUserPassword, clearPasswordResetToken } = await import('./db');
+        const { generateAutoLoginToken } = await import('./routes/autoLogin');
         const bcrypt = await import('bcryptjs');
-
         const user = await getUserByPasswordResetToken(input.token);
         if (!user) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Reset link is invalid or has already been used.' });
@@ -453,12 +469,12 @@ export const appRouter = router({
         if (!user.passwordResetExpiry || new Date() > user.passwordResetExpiry) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'This reset link has expired. Please request a new one.' });
         }
-
         const newHash = await bcrypt.hash(input.newPassword, 12);
         await updateUserPassword(user.id, newHash);
         await clearPasswordResetToken(user.id);
-
-        return { success: true };
+        // Generate a one-time auto-login token so the user is signed in immediately after reset
+        const autoLoginUrl = await generateAutoLoginToken(user.id, '/my-dashboard');
+        return { success: true, autoLoginUrl };
       }),
 
     // ─── Magic Link (Passwordless) Login ──────────────────────────────────
