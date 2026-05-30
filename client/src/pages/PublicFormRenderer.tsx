@@ -306,7 +306,7 @@ function WelcomeScreen({ template, theme, onStart }: { template: any; theme: The
           <img src={theme.logoUrl} alt="Logo" style={{ height: 56, marginBottom: 32, objectFit: "contain", display: "block", margin: "0 auto 32px" }} />
         )}
         {template.welcomeImageUrl && (
-          <img src={template.welcomeImageUrl} alt="" style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: `${parseInt(theme.borderRadius) + 4}px`, marginBottom: 32 }} />
+          <img src={template.welcomeImageUrl} alt="" style={{ maxWidth: "100%", maxHeight: 320, objectFit: "contain", display: "block", margin: "0 auto 32px", borderRadius: `${parseInt(theme.borderRadius) + 4}px` }} />
         )}
         <h1 style={{ fontSize: "clamp(28px, 5vw, 48px)", fontWeight: 800, color: theme.textColor, lineHeight: 1.15, marginBottom: 16 }}>{title}</h1>
         {subtitle && (
@@ -335,9 +335,9 @@ function WelcomeScreen({ template, theme, onStart }: { template: any; theme: The
 
 // ─── Page-by-page renderer ────────────────────────────────────────────────────
 function PageByPageRenderer({
-  template, items, options, branchRules, theme, isEmbed, isPreview, onSubmit, submitting, globalError,
+  template, items, sections, options, branchRules, theme, isEmbed, isPreview, onSubmit, submitting, globalError,
 }: {
-  template: any; items: any[]; options: any[]; branchRules: any[];
+  template: any; items: any[]; sections: any[]; options: any[]; branchRules: any[];
   theme: ThemeSettings; isEmbed: boolean; isPreview: boolean;
   onSubmit: (responses: Record<string, any>) => void;
   submitting: boolean; globalError: string;
@@ -378,9 +378,25 @@ function PageByPageRenderer({
     [items, hiddenIds]
   );
 
-  // For page-by-page, group: each non-display item is its own "page"
-  // Heading/paragraph items are prepended to the next question page
+  // Group all items in the same section onto one page (one section = one page).
+  // Falls back to one-question-per-page if no sections are provided.
   const pages = useMemo(() => {
+    if (sections && sections.length > 0) {
+      const sortedSections = [...sections].sort((a, b) => a.sortOrder - b.sortOrder);
+      const result: any[][] = [];
+      for (const section of sortedSections) {
+        const sectionItems = visibleItems
+          .filter(i => i.sectionId === section.id)
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+        if (sectionItems.length > 0) result.push(sectionItems);
+      }
+      // Safety net: orphan items with no matching section
+      const assignedIds = new Set(result.flat().map(i => i.id));
+      const orphans = visibleItems.filter(i => !assignedIds.has(i.id));
+      if (orphans.length > 0) result.push(orphans);
+      return result;
+    }
+    // Legacy fallback: one question per page
     const result: any[][] = [];
     let pending: any[] = [];
     for (const item of visibleItems) {
@@ -393,20 +409,24 @@ function PageByPageRenderer({
     }
     if (pending.length > 0) result.push(pending);
     return result;
-  }, [visibleItems]);
+  }, [visibleItems, sections]);
 
   const currentPage = pages[currentIdx];
-  const currentQuestion = currentPage?.find(i => !["heading", "paragraph", "section_break", "rich_text"].includes(i.itemType));
+  // All answerable questions on the current page (for multi-question-per-page validation)
+  const currentQuestions = (currentPage ?? []).filter(i => !["heading", "paragraph", "section_break", "rich_text"].includes(i.itemType));
+  const currentQuestion = currentQuestions[0];
   const isLast = currentIdx === pages.length - 1;
   const getOptions = (itemId: number) => (options ?? []).filter((o: any) => o.itemId === itemId).sort((a: any, b: any) => a.sortOrder - b.sortOrder);
 
   const validate = () => {
-    if (!currentQuestion) return true;
-    if (currentQuestion.isRequired) {
-      const v = responses[currentQuestion.id.toString()];
-      if (v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length)) {
-        setFieldError("This field is required");
-        return false;
+    // Validate all required questions on the current page
+    for (const q of currentQuestions) {
+      if (q.isRequired) {
+        const v = responses[q.id.toString()];
+        if (v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length)) {
+          setFieldError("Please answer all required fields before continuing");
+          return false;
+        }
       }
     }
     setFieldError("");
@@ -822,6 +842,7 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
       <PageByPageRenderer
         template={template}
         items={items}
+        sections={sections}
         options={options}
         branchRules={branchRules}
         theme={theme}
