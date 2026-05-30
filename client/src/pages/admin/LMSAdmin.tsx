@@ -6224,7 +6224,7 @@ const LMS_NAV_GROUPS = [
     items: [
       { value: "analytics",   label: "Analytics",   icon: TrendingUp },
       { value: "affiliates",  label: "Affiliates",  icon: DollarSign },
-      { value: "activity_log", label: "Activity Log ↗", icon: Activity, href: getAdminUrl("/admin/activity-log") },
+      { value: "activity_log", label: "Activity Log ↗", icon: Activity, href: getAdminUrl("/admin/members?tab=activity") },
     ],
   },
   {

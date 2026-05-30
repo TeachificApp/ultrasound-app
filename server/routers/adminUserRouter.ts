@@ -1095,8 +1095,11 @@ export const adminUserRouter = router({
   /** Activity feed: recent enrollments, completions, certificates, logins */
   getActivityFeed: protectedProcedure
     .input(z.object({
-      limit: z.number().int().min(1).max(200).default(50),
+      limit: z.number().int().min(1).max(500).default(100),
       type: z.enum(['all', 'enrollment', 'completion', 'certificate', 'login']).default('all'),
+      search: z.string().optional(),
+      dateFrom: z.string().optional(), // ISO date string YYYY-MM-DD
+      dateTo: z.string().optional(),   // ISO date string YYYY-MM-DD
     }))
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -1105,6 +1108,19 @@ export const adminUserRouter = router({
       const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
 
       const typeFilter = input.type !== 'all' ? sql`AND event_type = ${input.type}` : sql``;
+      const searchFilter = input.search?.trim()
+        ? sql`AND (user_name LIKE ${'%' + input.search.trim() + '%'} OR user_email LIKE ${'%' + input.search.trim() + '%'})`
+        : sql``;
+      const dateFromFilter = input.dateFrom
+        ? sql`AND occurred_at >= ${input.dateFrom + ' 00:00:00'}`
+        : sql``;
+      const dateToFilter = input.dateTo
+        ? sql`AND occurred_at <= ${input.dateTo + ' 23:59:59'}`
+        : sql``;
+      // Only restrict logins to 7 days when no date filter is applied
+      const loginDateFilter = (input.dateFrom || input.dateTo)
+        ? sql`1=1`
+        : sql`u.lastSignedIn >= DATE_SUB(NOW(), INTERVAL 30 DAY)`;
 
       const [rows] = await db.execute(sql`
         SELECT * FROM (
@@ -1136,9 +1152,9 @@ export const adminUserRouter = router({
           SELECT 'login' AS event_type, u.id, u.name, u.email, u.avatarUrl,
             NULL, NULL, u.lastSignedIn
           FROM users u
-          WHERE u.lastSignedIn >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+          WHERE ${loginDateFilter}
         ) AS feed
-        WHERE 1=1 ${typeFilter}
+        WHERE 1=1 ${typeFilter} ${searchFilter} ${dateFromFilter} ${dateToFilter}
         ORDER BY occurred_at DESC
         LIMIT ${input.limit}
       `) as any;

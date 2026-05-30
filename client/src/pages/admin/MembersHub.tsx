@@ -734,8 +734,13 @@ function InvitationsPanel() {
 // ─── Activity Panel ───────────────────────────────────────────────────────────
 function ActivityPanel() {
   const [typeFilter, setTypeFilter] = useState<"all" | "enrollment" | "completion" | "certificate" | "login">("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
   const { data, isLoading, refetch } = trpc.adminUser.getActivityFeed.useQuery(
-    { limit: 100, type: typeFilter },
+    { limit: 200, type: typeFilter, search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined },
     { keepPreviousData: true } as any
   );
   const activities = data ?? [];
@@ -755,24 +760,72 @@ function ActivityPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Filter */}
-      <div className="flex items-center gap-3">
-        <Select value={typeFilter} onValueChange={(v: any) => setTypeFilter(v)}>
-          <SelectTrigger className="w-44 h-9 text-sm border-slate-200">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Activity</SelectItem>
-            <SelectItem value="enrollment">Enrollments</SelectItem>
-            <SelectItem value="completion">Completions</SelectItem>
-            <SelectItem value="certificate">Certificates</SelectItem>
-            <SelectItem value="login">Logins (7d)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5 border-slate-200" onClick={() => refetch()}>
-          <RefreshCw size={13} /> Refresh
-        </Button>
-        <span className="text-xs text-slate-500">{activities.length} events</span>
+      {/* Filters — always at top */}
+      <div className="flex flex-wrap items-end gap-3">
+        {/* Event type */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500 font-medium">Event type</span>
+          <Select value={typeFilter} onValueChange={(v: any) => setTypeFilter(v)}>
+            <SelectTrigger className="w-44 h-9 text-sm border-slate-200">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Activity</SelectItem>
+              <SelectItem value="enrollment">Enrollments</SelectItem>
+              <SelectItem value="completion">Completions</SelectItem>
+              <SelectItem value="certificate">Certificates</SelectItem>
+              <SelectItem value="login">Logins</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Date from */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500 font-medium">From</span>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="h-9 px-2 text-sm border border-slate-200 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-400"
+          />
+        </div>
+        {/* Date to */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500 font-medium">To</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            className="h-9 px-2 text-sm border border-slate-200 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-400"
+          />
+        </div>
+        {/* User search */}
+        <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
+          <span className="text-xs text-slate-500 font-medium">Search user</span>
+          <div className="flex gap-2">
+            <Input
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && setSearch(searchInput)}
+              placeholder="Name or email…"
+              className="h-9 text-sm border-slate-200"
+            />
+            <Button size="sm" className="h-9 text-xs" onClick={() => setSearch(searchInput)}>
+              <Search size={13} />
+            </Button>
+          </div>
+        </div>
+        {/* Actions */}
+        <div className="flex items-end gap-2">
+          {(search || dateFrom || dateTo) && (
+            <Button variant="outline" size="sm" className="h-9 text-xs border-slate-200" onClick={() => { setSearch(""); setSearchInput(""); setDateFrom(""); setDateTo(""); }}>
+              Clear
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5 border-slate-200" onClick={() => refetch()}>
+            <RefreshCw size={13} /> Refresh
+          </Button>
+          <span className="text-xs text-slate-500 self-center">{activities.length} events</span>
+        </div>
       </div>
 
       <Card className="border border-slate-200 shadow-sm">

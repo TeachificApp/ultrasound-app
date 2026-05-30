@@ -263,8 +263,6 @@ const AdminDiscountCodesPage = lazy(() => import("./pages/admin/AdminDiscountCod
 const MembershipAdmin = lazy(() => import("./pages/admin/MembershipAdmin"));
 const MembersHub = lazy(() => import("./pages/admin/MembersHub"));
 const ProductAnalytics = lazy(() => import("./pages/admin/ProductAnalytics"));
-const ActivityLogAdmin = lazy(() => import("./pages/admin/ActivityLogAdmin"));
-
 // ── Community ─────────────────────────────────────────────────────────────────
 const CommunityHub = lazy(() => import("./pages/Community"));
 const CommunityFeed = lazy(() => import("./pages/CommunityFeed"));
@@ -469,7 +467,7 @@ function Router() {
         <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
-        <Route path="/admin/activity-log">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ActivityLogAdmin /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
@@ -545,7 +543,7 @@ function MembersRouter() {
       <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><GeneralFormBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FormBuilderAdmin /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FormBuilderAdmin /></Suspense></RoleGuard>}</Route>
-      <Route path="/admin/activity-log">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ActivityLogAdmin /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
       <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
       {/* ── Public Form Renderer — outside MembersLayout (full-screen, no nav) ── */}
       <Route path="/forms/:slug" component={PublicFormRenderer} />
@@ -654,7 +652,7 @@ function LMSRouter() {
         <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
-        <Route path="/admin/activity-log">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ActivityLogAdmin /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
         {/* Form builder routes on learn domain */}
         <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
         <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
