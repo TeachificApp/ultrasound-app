@@ -543,6 +543,22 @@ BLOCK_CATALOG.push(
       bgColor: "#f8fffe",
     },
   },
+  {
+    type: "affiliate_signup",
+    label: "Affiliate Signup",
+    icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    category: "Marketing",
+    defaultData: {
+      headline: "Earn money by sharing what you love",
+      subtext: "Join our affiliate program and earn a commission for every sale you refer. It's free to join and easy to get started.",
+      ctaText: "Become an Affiliate",
+      ctaLink: "/affiliate-dashboard",
+      benefits: ["Earn up to 30% commission", "Real-time earnings dashboard", "Unique tracking links per course", "Monthly payouts via Stripe, PayPal, or ACH"],
+      accentColor: "#179ca3",
+      bgColor: "#f0fdf9",
+      headlineColor: "#111827",
+    },
+  },
 );
 
 // ─── Block Preview ─────────────────────────────────────────────────────────────
@@ -4702,6 +4718,28 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
         </div>
       );
     }
+    case "affiliate_signup":
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subtext" field="subtext" />
+          <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" />
+          <BSTextField data={d} onSet={set} label="CTA Link (URL)" field="ctaLink" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Benefits (one per line)</label>
+            <textarea
+              value={(d.benefits ?? []).join("\n")}
+              onChange={e => set("benefits", e.target.value.split("\n").filter(Boolean))}
+              rows={4}
+              className="w-full text-xs rounded border border-gray-200 px-2 py-1.5 resize-none"
+              placeholder="Earn up to 30% commission\nReal-time dashboard..."
+            />
+          </div>
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
+        </div>
+      );
      default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
   } })();

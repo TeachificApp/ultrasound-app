@@ -1174,8 +1174,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         </TabsList>
 
         {/* Settings Tab */}
-        <TabsContent value="settings" className="mt-4">
+        <TabsContent value="settings" className="mt-4 space-y-4">
           <CourseSettingsForm course={course} onSave={handleSaveCourseSettings} saving={updateCourse.isPending} />
+          <AffiliateCoursePanel courseId={courseId} />
         </TabsContent>
 
         {/* Curriculum Tab */}
@@ -2212,6 +2213,62 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
       >
         {saving ? "Saving..." : "Save Settings"}
       </Button>
+    </div>
+  );
+}
+
+// ─── Affiliate Course Panel ─────────────────────────────────────────────────
+function AffiliateCoursePanel({ courseId }: { courseId: number }) {
+  const { data, isLoading, refetch } = trpc.lmsAdmin.getAffiliateCourseSettings.useQuery({ courseId });
+  const save = trpc.lmsAdmin.setAffiliateCourseSettings.useMutation({
+    onSuccess: () => { toast.success("Affiliate settings saved"); refetch(); },
+    onError: e => toast.error(e.message),
+  });
+  const [enabled, setEnabled] = useState<boolean>(false);
+  const [pctOverride, setPctOverride] = useState<string>("");
+  // Sync state when data loads
+  useEffect(() => {
+    if (data) {
+      setEnabled(data.affiliateEnabled);
+      setPctOverride(data.commissionPctOverride != null ? String(data.commissionPctOverride) : "");
+    }
+  }, [data]);
+  if (isLoading) return <Skeleton className="h-20 w-full" />;
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-gray-800">Affiliate Tracking</p>
+          <p className="text-xs text-gray-500 mt-0.5">Allow affiliates to earn commission on sales of this course</p>
+        </div>
+        <Switch checked={enabled} onCheckedChange={v => {
+          setEnabled(v);
+          save.mutate({ courseId, affiliateEnabled: v, commissionPctOverride: pctOverride ? parseInt(pctOverride) : null });
+        }} />
+      </div>
+      {enabled && (
+        <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
+          <div className="flex-1">
+            <Label className="text-xs text-gray-600">Commission % Override</Label>
+            <p className="text-xs text-gray-400 mt-0.5">Leave blank to use each affiliate's default rate</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number" min="0" max="100"
+              value={pctOverride}
+              onChange={e => setPctOverride(e.target.value)}
+              placeholder="Default"
+              className="w-24 h-8 text-sm"
+            />
+            <span className="text-sm text-gray-500">%</span>
+            <Button size="sm" variant="outline" className="h-8 text-xs"
+              disabled={save.isPending}
+              onClick={() => save.mutate({ courseId, affiliateEnabled: enabled, commissionPctOverride: pctOverride ? parseInt(pctOverride) : null })}>
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5383,105 +5440,387 @@ function InstructorFormDialog({ title, instructor, onClose, onSave, saving }: { 
   );
 }
 
-// ─── Affiliates Tab ───────────────────────────────────────────────────────────
+// ─── Affiliates Tab ─────────────────────────────────────────────────────
 
-function AffiliatesTab() {
-  
-  const { data: affiliates, isLoading, refetch } = trpc.lmsAdmin.listAffiliates.useQuery();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [commission, setCommission] = useState("10");
-
-  const create = trpc.lmsAdmin.createAffiliate.useMutation({
-    onSuccess: (data) => { toast.success(`Affiliate created — code: ${data.code}`); setCreateOpen(false); setName(""); setEmail(""); refetch(); },
-    onError: e => toast.error(`Error: ${e.message}`),
+function AffiliateCourseAccessPanel({ affiliateId }: { affiliateId: number }) {
+  const { data: accessList, isLoading, refetch } = trpc.lmsAdmin.listAffiliateCourseAccess.useQuery({ affiliateId });
+  const { data: enabledCourses } = trpc.lmsAdmin.listAffiliateEnabledCourses.useQuery();
+  const [selectedCourseId, setSelectedCourseId] = useState("");
+  const grant = trpc.lmsAdmin.grantAffiliateCourseAccess.useMutation({
+    onSuccess: () => { toast.success("Course access granted"); refetch(); setSelectedCourseId(""); },
+    onError: (e: any) => toast.error(e.message),
   });
-
-  const update = trpc.lmsAdmin.updateAffiliate.useMutation({
-    onSuccess: () => { toast.success("Saved"); refetch(); },
-    onError: e => toast.error(`Error: ${e.message}`),
+  const revoke = trpc.lmsAdmin.revokeAffiliateCourseAccess.useMutation({
+    onSuccess: () => { toast.success("Access revoked"); refetch(); },
+    onError: (e: any) => toast.error(e.message),
   });
-
+  const grantedIds = new Set((accessList ?? []).map((a: any) => a.courseId));
+  const availableCourses = (enabledCourses ?? []).filter((c: any) => !grantedIds.has(c.id));
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4 mr-1" /> New Affiliate
-        </Button>
+    <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-600">Course Access</p>
+        <div className="flex items-center gap-1">
+          <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+            <SelectTrigger className="h-6 text-xs w-48"><SelectValue placeholder="Grant course access..." /></SelectTrigger>
+            <SelectContent>
+              {(availableCourses ?? []).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600" disabled={!selectedCourseId || grant.isPending}
+            onClick={() => grant.mutate({ affiliateId, courseId: parseInt(selectedCourseId) })}>
+            Grant
+          </Button>
+        </div>
       </div>
-
-      {isLoading ? <Skeleton className="h-40 w-full" /> : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Name</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Code</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Commission</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Earned</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Paid</th>
-                <th className="px-4 py-2.5"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(affiliates ?? []).map((a: any) => (
-                <tr key={a.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5">
-                    <p className="font-medium text-gray-900">{a.name}</p>
-                    {a.email && <p className="text-xs text-gray-400">{a.email}</p>}
-                  </td>
-                  <td className="px-4 py-2.5"><code className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono">{a.code}</code></td>
-                  <td className="px-4 py-2.5 text-gray-700">{a.commissionPct}%</td>
-                  <td className="px-4 py-2.5 text-green-700 font-medium">${(a.totalEarned / 100).toFixed(2)}</td>
-                  <td className="px-4 py-2.5 text-gray-500">${(a.totalPaid / 100).toFixed(2)}</td>
-                  <td className="px-4 py-2.5 flex gap-1">
-                    <Badge variant="outline" className={`text-xs ${a.isActive ? "text-green-600 border-green-300" : "text-gray-400"}`}>{a.isActive ? "Active" : "Inactive"}</Badge>
-                    {a.totalEarned > a.totalPaid && (
-                      <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600 hover:bg-teal-50" onClick={() => update.mutate({ id: a.id, markPaid: true })}>
-                        Mark Paid
-                      </Button>
-                    )}
-                    <Button size="sm" variant="ghost" className="h-6 text-xs text-gray-500" onClick={() => update.mutate({ id: a.id, isActive: !a.isActive })}>
-                      {a.isActive ? "Deactivate" : "Activate"}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {(affiliates ?? []).length === 0 && (
-            <div className="text-center py-10 text-gray-400 text-sm">No affiliates yet</div>
-          )}
+      {isLoading ? <Skeleton className="h-8 w-full" /> : (accessList ?? []).length === 0 ? (
+        <p className="text-xs text-gray-400">No course access granted — affiliate can only promote courses they have been explicitly granted access to</p>
+      ) : (
+        <div className="space-y-1">
+          {(accessList ?? []).map((a: any) => (
+            <div key={a.id} className="flex items-center gap-2 text-xs bg-gray-50 rounded px-2 py-1.5">
+              <div className="flex-1 min-w-0">
+                <p className="text-gray-700 truncate">{a.courseTitle ?? `Course #${a.courseId}`}</p>
+                {a.commissionPctOverride != null && <p className="text-gray-400">{a.commissionPctOverride}% override commission</p>}
+              </div>
+              <button className="text-xs text-red-400 hover:text-red-600" onClick={() => revoke.mutate({ affiliateId, courseId: a.courseId })}>Revoke</button>
+            </div>
+          ))}
         </div>
       )}
+    </div>
+  );
+}
 
-      <Dialog open={createOpen} onOpenChange={() => setCreateOpen(false)}>
+function AffiliateLinksPanel({ affiliateId, affiliateName }: { affiliateId: number; affiliateName: string }) {
+  const { data: links, isLoading, refetch } = trpc.lmsAdmin.listAffiliateLinks.useQuery({ affiliateId });
+  const { data: courses } = trpc.lmsAdmin.listCourses.useQuery();
+  const [open, setOpen] = useState(false);
+  const [destUrl, setDestUrl] = useState("");
+  const [slug, setSlug] = useState("");
+  const [courseId, setCourseId] = useState<string>("");
+  const toggle = trpc.lmsAdmin.toggleAffiliateLink.useMutation({ onSuccess: () => refetch() });
+  const create = trpc.lmsAdmin.createAffiliateLink.useMutation({
+    onSuccess: (d: any) => { toast.success(`Link created: ${d.trackingUrl}`); setOpen(false); setDestUrl(""); setSlug(""); setCourseId(""); refetch(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-600">Tracking Links</p>
+        <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600" onClick={() => setOpen(true)}><Plus className="w-3 h-3 mr-1" />Add Link</Button>
+      </div>
+      {isLoading ? <Skeleton className="h-8 w-full" /> : (links ?? []).length === 0 ? (
+        <p className="text-xs text-gray-400">No links yet</p>
+      ) : (
+        <div className="space-y-1">
+          {(links ?? []).map((l: any) => (
+            <div key={l.id} className="flex items-center gap-2 text-xs bg-gray-50 rounded px-2 py-1.5">
+              <div className="flex-1 min-w-0">
+                <p className="font-mono text-gray-700 truncate">{l.trackingUrl}</p>
+                {l.courseTitle && <p className="text-gray-400">{l.courseTitle}</p>}
+              </div>
+              <span className="text-gray-500 whitespace-nowrap">{l.clicks} clicks · {l.conversions} conv.</span>
+              <button className="text-gray-400 hover:text-gray-600" onClick={() => navigator.clipboard.writeText(l.trackingUrl).then(() => toast.success("Copied!"))}>
+                <Copy className="w-3 h-3" />
+              </button>
+              <button className={`text-xs ${l.isActive ? "text-red-400" : "text-green-600"}`} onClick={() => toggle.mutate({ linkId: l.id, isActive: !l.isActive })}>
+                {l.isActive ? "Disable" : "Enable"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>New Affiliate</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>New Tracking Link — {affiliateName}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <Label className="text-sm">Name *</Label>
-              <Input value={name} onChange={e => setName(e.target.value)} className="mt-1" />
+              <Label className="text-xs">Destination URL *</Label>
+              <Input value={destUrl} onChange={e => setDestUrl(e.target.value)} placeholder="https://learn.allaboutultrasound.com/courses/..." className="mt-1 text-sm" />
             </div>
             <div>
-              <Label className="text-sm">Email</Label>
-              <Input value={email} onChange={e => setEmail(e.target.value)} type="email" className="mt-1" />
+              <Label className="text-xs">Custom Slug (optional)</Label>
+              <Input value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} placeholder="e.g. john-echo" className="mt-1 text-sm" />
+              <p className="text-xs text-gray-400 mt-0.5">Auto-generated if blank</p>
             </div>
             <div>
-              <Label className="text-sm">Commission %</Label>
-              <Input value={commission} onChange={e => setCommission(e.target.value)} type="number" min="0" max="100" className="mt-1 w-24" />
+              <Label className="text-xs">Course (optional)</Label>
+              <Select value={courseId} onValueChange={setCourseId}>
+                <SelectTrigger className="mt-1 text-sm"><SelectValue placeholder="Site-wide link" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Site-wide</SelectItem>
+                  {(courses ?? []).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!name.trim() || create.isPending}
-              onClick={() => create.mutate({ name: name.trim(), email: email.trim() || undefined, commissionPct: parseInt(commission) || 10 })}>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!destUrl.trim() || create.isPending}
+              onClick={() => create.mutate({ affiliateId, destinationUrl: destUrl.trim(), slug: slug.trim() || undefined, courseId: courseId ? parseInt(courseId) : undefined })}>
               {create.isPending ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function PayoutRequestsPanel() {
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "paid" | "rejected">("pending");
+  const { data: requests, isLoading, refetch } = trpc.lmsAdmin.listPayoutRequests.useQuery({ status: statusFilter });
+  const review = trpc.lmsAdmin.reviewPayoutRequest.useMutation({
+    onSuccess: () => { toast.success("Updated"); refetch(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
+  const statusColors: Record<string, string> = {
+    pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    approved: "bg-blue-50 text-blue-700 border-blue-200",
+    paid: "bg-green-50 text-green-700 border-green-200",
+    rejected: "bg-red-50 text-red-700 border-red-200",
+  };
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <p className="text-sm font-semibold text-gray-800 flex-1">Payout Requests</p>
+        {(["pending","approved","paid","rejected","all"] as const).map(s => (
+          <button key={s} onClick={() => setStatusFilter(s)}
+            className={`text-xs px-2 py-0.5 rounded-full border ${statusFilter === s ? "bg-teal-600 text-white border-teal-600" : "text-gray-500 border-gray-200"}`}>
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+          </button>
+        ))}
+      </div>
+      {isLoading ? <Skeleton className="h-24 w-full" /> : (requests ?? []).length === 0 ? (
+        <p className="text-sm text-gray-400 py-4 text-center">No {statusFilter === "all" ? "" : statusFilter} payout requests</p>
+      ) : (
+        <div className="space-y-2">
+          {(requests ?? []).map((r: any) => {
+            const details = (() => { try { return JSON.parse(r.paymentDetails ?? "{}"); } catch { return {}; } })();
+            return (
+              <div key={r.id} className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {r.requestorType === "affiliate" ? r.affiliateName : r.instructorName}
+                      <span className="ml-2 text-xs text-gray-400">{r.requestorType}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">{r.affiliateEmail ?? r.instructorEmail}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-900">${(r.amountCents / 100).toFixed(2)}</p>
+                    <span className={`text-xs px-1.5 py-0.5 rounded border ${statusColors[r.status] ?? ""}`}>{r.status}</span>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 space-y-0.5">
+                  <p>Method: <span className="font-medium text-gray-700 uppercase">{r.paymentMethod}</span></p>
+                  {r.paymentMethod === "paypal" && details.paypal_email && <p>PayPal: {details.paypal_email}</p>}
+                  {r.paymentMethod === "ach" && details.ach_routing && <p>ACH: routing {details.ach_routing} / acct {details.ach_account}</p>}
+                  {r.paymentMethod === "stripe" && details.stripe_account_id && <p>Stripe: {details.stripe_account_id}</p>}
+                  <p>Requested: {new Date(r.requestedAt).toLocaleDateString()}</p>
+                  {r.adminNote && <p className="text-amber-700">Note: {r.adminNote}</p>}
+                </div>
+                {r.status === "pending" && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                    {reviewingId === r.id ? (
+                      <>
+                        <Input value={reviewNote} onChange={e => setReviewNote(e.target.value)} placeholder="Admin note (optional)" className="h-7 text-xs flex-1" />
+                        <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => { review.mutate({ id: r.id, decision: "approved", adminNote: reviewNote || undefined }); setReviewingId(null); setReviewNote(""); }}>Approve</Button>
+                        <Button size="sm" className="h-7 text-xs bg-red-500 hover:bg-red-600 text-white" onClick={() => { review.mutate({ id: r.id, decision: "rejected", adminNote: reviewNote || undefined }); setReviewingId(null); setReviewNote(""); }}>Reject</Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setReviewingId(null)}>Cancel</Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setReviewingId(r.id)}>Review</Button>
+                    )}
+                  </div>
+                )}
+                {r.status === "approved" && (
+                  <div className="pt-1 border-t border-gray-100">
+                    <Button size="sm" className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white" onClick={() => review.mutate({ id: r.id, decision: "paid" })}>
+                      Mark as Paid
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InstructorRevenueSharePanel() {
+  const { data: instructors, isLoading, refetch } = trpc.lmsAdmin.listInstructorRevenueShares.useQuery();
+  const setShare = trpc.lmsAdmin.setInstructorRevenueShare.useMutation({
+    onSuccess: () => { toast.success("Saved"); refetch(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const [editing, setEditing] = useState<{ instructorId: number; courseId: number; pct: string } | null>(null);
+  if (isLoading) return <Skeleton className="h-24 w-full" />;
+  if (!instructors || instructors.length === 0) return (
+    <p className="text-sm text-gray-400 py-4 text-center">No instructors with assigned courses yet</p>
+  );
+  return (
+    <div className="space-y-3">
+      {instructors.map((instr: any) => (
+        <div key={instr.userId} className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-semibold text-sm">{(instr.name ?? "?")[0]}</div>
+            <div>
+              <p className="text-sm font-medium text-gray-900">{instr.name}</p>
+              <p className="text-xs text-gray-400">{instr.email}</p>
+            </div>
+            <div className="ml-auto text-xs text-gray-500">
+              {instr.preferredMethod ? <span className="uppercase font-medium">{instr.preferredMethod}</span> : <span className="text-gray-300">No payout method set</span>}
+            </div>
+          </div>
+          {instr.courseShares.length === 0 ? (
+            <p className="text-xs text-gray-400">No courses assigned</p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead><tr className="text-gray-400"><th className="text-left pb-1">Course</th><th className="text-left pb-1">Revenue Share</th><th></th></tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {instr.courseShares.map((cs: any) => (
+                  <tr key={cs.courseId}>
+                    <td className="py-1 pr-2 text-gray-700">{cs.courseTitle ?? `Course #${cs.courseId}`}</td>
+                    <td className="py-1">
+                      {editing?.instructorId === instr.userId && editing?.courseId === cs.courseId ? (
+                        <div className="flex items-center gap-1">
+                          <Input type="number" min="0" max="100" value={editing.pct} onChange={e => setEditing(v => v ? { ...v, pct: e.target.value } : v)} className="w-16 h-6 text-xs" />
+                          <span className="text-gray-500">%</span>
+                          <Button size="sm" className="h-6 text-xs bg-teal-600 hover:bg-teal-700 text-white" onClick={() => { setShare.mutate({ instructorId: instr.userId, courseId: cs.courseId, revenueSharePct: parseInt(editing.pct) || 0 }); setEditing(null); }}>Save</Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditing(null)}>Cancel</Button>
+                        </div>
+                      ) : (
+                        <span className="font-medium text-gray-800">{cs.revenueSharePct}%</span>
+                      )}
+                    </td>
+                    <td className="py-1 text-right">
+                      {!(editing?.instructorId === instr.userId && editing?.courseId === cs.courseId) && (
+                        <button className="text-teal-600 hover:underline text-xs" onClick={() => setEditing({ instructorId: instr.userId, courseId: cs.courseId, pct: String(cs.revenueSharePct) })}>Edit</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AffiliatesTab() {
+  const [subTab, setSubTab] = useState<"affiliates" | "payouts" | "instructors">("affiliates");
+  const { data: affiliates, isLoading, refetch } = trpc.lmsAdmin.listAffiliates.useQuery();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [commission, setCommission] = useState("10");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const create = trpc.lmsAdmin.createAffiliate.useMutation({
+    onSuccess: (data: any) => { toast.success(`Affiliate created — code: ${data.code}`); setCreateOpen(false); setName(""); setEmail(""); refetch(); },
+    onError: (e: any) => toast.error(`Error: ${e.message}`),
+  });
+
+  const update = trpc.lmsAdmin.updateAffiliate.useMutation({
+    onSuccess: () => { toast.success("Saved"); refetch(); },
+    onError: (e: any) => toast.error(`Error: ${e.message}`),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1 border-b border-gray-200">
+        {(["affiliates", "payouts", "instructors"] as const).map(t => (
+          <button key={t} onClick={() => setSubTab(t)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-t border-b-2 transition-colors ${
+              subTab === t ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}>
+            {t === "affiliates" ? "Affiliates" : t === "payouts" ? "Payout Requests" : "Instructor Revenue Share"}
+          </button>
+        ))}
+      </div>
+
+      {subTab === "affiliates" && (
+        <>
+          <div className="flex justify-end">
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setCreateOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" /> New Affiliate
+            </Button>
+          </div>
+
+          {isLoading ? <Skeleton className="h-40 w-full" /> : (
+            <div className="space-y-2">
+              {(affiliates ?? []).map((a: any) => (
+                <div key={a.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50" onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-gray-900">{a.name}</p>
+                      {a.email && <p className="text-xs text-gray-400">{a.email}</p>}
+                    </div>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono">{a.code}</code>
+                    <span className="text-xs text-gray-600">{a.commissionPct}% commission</span>
+                    <span className="text-xs text-green-700 font-medium">${(a.totalEarned / 100).toFixed(2)} earned</span>
+                    <span className="text-xs text-gray-400">${(a.totalPaid / 100).toFixed(2)} paid</span>
+                    <Badge variant="outline" className={`text-xs ${a.isActive ? "text-green-600 border-green-300" : "text-gray-400"}`}>{a.isActive ? "Active" : "Inactive"}</Badge>
+                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                      {a.totalEarned > a.totalPaid && (
+                        <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600 hover:bg-teal-50" onClick={() => update.mutate({ id: a.id, markPaid: true })}>Mark Paid</Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-6 text-xs text-gray-500" onClick={() => update.mutate({ id: a.id, isActive: !a.isActive })}>{a.isActive ? "Deactivate" : "Activate"}</Button>
+                    </div>
+                  </div>
+                  {expandedId === a.id && (
+                    <div className="px-4 pb-4">
+                      <AffiliateCourseAccessPanel affiliateId={a.id} />
+                      <AffiliateLinksPanel affiliateId={a.id} affiliateName={a.name} />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(affiliates ?? []).length === 0 && (
+                <div className="text-center py-10 text-gray-400 text-sm bg-white rounded-xl border border-gray-200">No affiliates yet</div>
+              )}
+            </div>
+          )}
+
+          <Dialog open={createOpen} onOpenChange={() => setCreateOpen(false)}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader><DialogTitle>New Affiliate</DialogTitle></DialogHeader>
+              <div className="space-y-3 py-2">
+                <div>
+                  <Label className="text-sm">Name *</Label>
+                  <Input value={name} onChange={e => setName(e.target.value)} className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-sm">Email</Label>
+                  <Input value={email} onChange={e => setEmail(e.target.value)} type="email" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-sm">Commission %</Label>
+                  <Input value={commission} onChange={e => setCommission(e.target.value)} type="number" min="0" max="100" className="mt-1 w-24" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!name.trim() || create.isPending}
+                  onClick={() => create.mutate({ name: name.trim(), email: email.trim() || undefined, commissionPct: parseInt(commission) || 10 })}>
+                  {create.isPending ? "Creating..." : "Create"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
+
+      {subTab === "payouts" && <PayoutRequestsPanel />}
+      {subTab === "instructors" && <InstructorRevenueSharePanel />}
     </div>
   );
 }

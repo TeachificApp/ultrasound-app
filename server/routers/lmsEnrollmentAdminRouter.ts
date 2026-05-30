@@ -73,6 +73,13 @@ import {
   mediaUploadFolders,
   mediaUploadResponses,
   lmsGroupCourses,
+  affiliateCourseSettings,
+  affiliateLinks,
+  affiliateClicks,
+  payoutRequests,
+  instructorPayoutConfig,
+  affiliateCourseAccess,
+  userRoles,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -2189,4 +2196,592 @@ CRITICAL REQUIREMENTS:
       const emails = [...new Set(allRows.map(r => r.email).filter(Boolean))] as string[];
       return { csv: csvLines.join("\n"), count: allRows.length, emails };
     }),
+
+  // ─── Affiliate Course Settings ────────────────────────────────────────────────────
+
+  /** Get affiliate settings for a course */
+  getAffiliateCourseSettings: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const row = await db.select().from(affiliateCourseSettings)
+        .where(eq(affiliateCourseSettings.courseId, input.courseId))
+        .then(r => r[0] ?? null);
+      return row ?? { courseId: input.courseId, affiliateEnabled: false, commissionPctOverride: null };
+    }),
+
+  /** Set affiliate enabled/commission for a course */
+  setAffiliateCourseSettings: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      affiliateEnabled: z.boolean(),
+      commissionPctOverride: z.number().int().min(0).max(100).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const existing = await db.select({ id: affiliateCourseSettings.id })
+        .from(affiliateCourseSettings)
+        .where(eq(affiliateCourseSettings.courseId, input.courseId))
+        .then(r => r[0]);
+      if (existing) {
+        await db.update(affiliateCourseSettings)
+          .set({ affiliateEnabled: input.affiliateEnabled, commissionPctOverride: input.commissionPctOverride ?? null })
+          .where(eq(affiliateCourseSettings.id, existing.id));
+      } else {
+        await db.insert(affiliateCourseSettings).values({
+          courseId: input.courseId,
+          affiliateEnabled: input.affiliateEnabled,
+          commissionPctOverride: input.commissionPctOverride ?? null,
+        });
+      }
+      return { ok: true };
+    }),
+
+  // ─── Affiliate Links ────────────────────────────────────────────────────────────────────
+
+  /** Create a unique affiliate tracking link for a course or site-wide */
+  createAffiliateLink: protectedProcedure
+    .input(z.object({
+      affiliateId: z.number(),
+      courseId: z.number().optional(),
+      destinationUrl: z.string().url(),
+      slug: z.string().min(3).max(128).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only").optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Generate slug if not provided
+      const slug = input.slug ?? `${randomBytes(4).toString("hex")}`;
+      // Check slug uniqueness
+      const existing = await db.select({ id: affiliateLinks.id }).from(affiliateLinks)
+        .where(eq(affiliateLinks.slug, slug)).then(r => r[0]);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "Slug already in use. Choose a different one." });
+      const [result] = await db.insert(affiliateLinks).values({
+        affiliateId: input.affiliateId,
+        courseId: input.courseId ?? null,
+        slug,
+        destinationUrl: input.destinationUrl,
+      }).$returningId();
+      return { id: result.id, slug, trackingUrl: `${input.destinationUrl}?ref=${slug}` };
+    }),
+
+  /** List affiliate links for an affiliate */
+  listAffiliateLinks: protectedProcedure
+    .input(z.object({ affiliateId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const links = await db.select({
+        id: affiliateLinks.id,
+        slug: affiliateLinks.slug,
+        destinationUrl: affiliateLinks.destinationUrl,
+        courseId: affiliateLinks.courseId,
+        clicks: affiliateLinks.clicks,
+        conversions: affiliateLinks.conversions,
+        isActive: affiliateLinks.isActive,
+        createdAt: affiliateLinks.createdAt,
+        courseTitle: lmsCourses.title,
+      })
+        .from(affiliateLinks)
+        .leftJoin(lmsCourses, eq(lmsCourses.id, affiliateLinks.courseId))
+        .where(eq(affiliateLinks.affiliateId, input.affiliateId))
+        .orderBy(desc(affiliateLinks.createdAt));
+      return links.map(l => ({ ...l, trackingUrl: `${l.destinationUrl}?ref=${l.slug}` }));
+    }),
+
+  /** Toggle affiliate link active/inactive */
+  toggleAffiliateLink: protectedProcedure
+    .input(z.object({ linkId: z.number(), isActive: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(affiliateLinks).set({ isActive: input.isActive }).where(eq(affiliateLinks.id, input.linkId));
+      return { ok: true };
+    }),
+
+  // ─── Payout Requests (Admin) ───────────────────────────────────────────────────────────
+
+  /** Admin: list all payout requests */
+  listPayoutRequests: protectedProcedure
+    .input(z.object({ status: z.enum(["pending", "approved", "paid", "rejected", "all"]).optional() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions = input.status && input.status !== "all"
+        ? [eq(payoutRequests.status, input.status as any)]
+        : [];
+      const rows = await db.select({
+        id: payoutRequests.id,
+        requestorType: payoutRequests.requestorType,
+        affiliateId: payoutRequests.affiliateId,
+        instructorUserId: payoutRequests.instructorUserId,
+        amountCents: payoutRequests.amountCents,
+        currency: payoutRequests.currency,
+        paymentMethod: payoutRequests.paymentMethod,
+        paymentDetails: payoutRequests.paymentDetails,
+        status: payoutRequests.status,
+        adminNote: payoutRequests.adminNote,
+        requestedAt: payoutRequests.requestedAt,
+        reviewedAt: payoutRequests.reviewedAt,
+        paidAt: payoutRequests.paidAt,
+        affiliateName: lmsAffiliates.name,
+        affiliateEmail: lmsAffiliates.email,
+        instructorName: users.name,
+        instructorEmail: users.email,
+      })
+        .from(payoutRequests)
+        .leftJoin(lmsAffiliates, eq(lmsAffiliates.id, payoutRequests.affiliateId))
+        .leftJoin(users, eq(users.id, payoutRequests.instructorUserId))
+        .where(conditions.length > 0 ? and(...conditions) : sql`1=1`)
+        .orderBy(desc(payoutRequests.requestedAt));
+      return rows;
+    }),
+
+  /** Admin: approve, mark paid, or reject a payout request */
+  reviewPayoutRequest: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      decision: z.enum(["approved", "paid", "rejected"]),
+      adminNote: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const req = await db.select().from(payoutRequests).where(eq(payoutRequests.id, input.id)).then(r => r[0]);
+      if (!req) throw new TRPCError({ code: "NOT_FOUND" });
+      const now = new Date();
+      await db.update(payoutRequests).set({
+        status: input.decision,
+        adminNote: input.adminNote ?? null,
+        reviewedByAdminId: ctx.user.id,
+        reviewedAt: now,
+        paidAt: input.decision === "paid" ? now : req.paidAt,
+      }).where(eq(payoutRequests.id, input.id));
+      // If marking paid, update affiliate totalPaid
+      if (input.decision === "paid" && req.requestorType === "affiliate" && req.affiliateId) {
+        const [aff] = await db.select().from(lmsAffiliates).where(eq(lmsAffiliates.id, req.affiliateId)).limit(1);
+        if (aff) {
+          await db.update(lmsAffiliates)
+            .set({ totalPaid: aff.totalPaid + req.amountCents })
+            .where(eq(lmsAffiliates.id, req.affiliateId));
+        }
+      }
+      return { ok: true };
+    }),
+
+  // ─── Instructor Revenue Share Config (Admin) ─────────────────────────────────────────────
+
+  /** Admin: list instructors with their revenue share % and payout config */
+  listInstructorRevenueShares: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select({
+        userId: users.id,
+        name: users.name,
+        email: users.email,
+        preferredMethod: instructorPayoutConfig.preferredMethod,
+        paymentDetails: instructorPayoutConfig.paymentDetails,
+      })
+        .from(userRoles)
+        .innerJoin(users, eq(users.id, userRoles.userId))
+        .leftJoin(instructorPayoutConfig, eq(instructorPayoutConfig.instructorUserId, userRoles.userId))
+        .where(eq(userRoles.role, "instructor"));
+      // Get revenue share % per course for each instructor
+      const enriched = await Promise.all(rows.map(async (r) => {
+        const courseShares = await db.select({
+          courseId: lmsCourseInstructors.courseId,
+          revenueSharePct: lmsCourseInstructors.revenueSharePct,
+          courseTitle: lmsCourses.title,
+        })
+          .from(lmsCourseInstructors)
+          .leftJoin(lmsCourses, eq(lmsCourses.id, lmsCourseInstructors.courseId))
+          .where(eq(lmsCourseInstructors.instructorId, r.userId));
+        return { ...r, courseShares };
+      }));
+      return enriched;
+    }),
+
+  /** Admin: update revenue share % for an instructor on a course */
+  setInstructorRevenueShare: protectedProcedure
+    .input(z.object({
+      instructorId: z.number(),
+      courseId: z.number(),
+      revenueSharePct: z.number().int().min(0).max(100),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsCourseInstructors)
+        .set({ revenueSharePct: input.revenueSharePct })
+        .where(and(
+          eq(lmsCourseInstructors.instructorId, input.instructorId),
+          eq(lmsCourseInstructors.courseId, input.courseId),
+        ));
+      return { ok: true };
+    }),
+
+  // ─── Self-service: Affiliate Dashboard Procedures ─────────────────────────────────────────
+
+  /** Affiliate: get own affiliate record (linked by userId) */
+  getMyAffiliateProfile: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const aff = await db.select().from(lmsAffiliates)
+        .where(eq(lmsAffiliates.userId, ctx.user.id))
+        .then(r => r[0] ?? null);
+      return aff;
+    }),
+
+  /** Affiliate: get own links */
+  getMyAffiliateLinks: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const aff = await db.select({ id: lmsAffiliates.id }).from(lmsAffiliates)
+        .where(eq(lmsAffiliates.userId, ctx.user.id)).then(r => r[0]);
+      if (!aff) return [];
+      const links = await db.select({
+        id: affiliateLinks.id,
+        slug: affiliateLinks.slug,
+        destinationUrl: affiliateLinks.destinationUrl,
+        courseId: affiliateLinks.courseId,
+        clicks: affiliateLinks.clicks,
+        conversions: affiliateLinks.conversions,
+        isActive: affiliateLinks.isActive,
+        createdAt: affiliateLinks.createdAt,
+        courseTitle: lmsCourses.title,
+      })
+        .from(affiliateLinks)
+        .leftJoin(lmsCourses, eq(lmsCourses.id, affiliateLinks.courseId))
+        .where(and(eq(affiliateLinks.affiliateId, aff.id), eq(affiliateLinks.isActive, true)))
+        .orderBy(desc(affiliateLinks.createdAt));
+      return links.map(l => ({ ...l, trackingUrl: `${l.destinationUrl}?ref=${l.slug}` }));
+    }),
+
+  /** Affiliate: get own conversions */
+  getMyAffiliateConversions: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const aff = await db.select({ id: lmsAffiliates.id }).from(lmsAffiliates)
+        .where(eq(lmsAffiliates.userId, ctx.user.id)).then(r => r[0]);
+      if (!aff) return [];
+      const conversions = await db.select({
+        id: lmsAffiliateConversions.id,
+        saleAmount: lmsAffiliateConversions.saleAmount,
+        commissionAmount: lmsAffiliateConversions.commissionAmount,
+        paidAt: lmsAffiliateConversions.paidAt,
+        createdAt: lmsAffiliateConversions.createdAt,
+        courseTitle: lmsCourses.title,
+      })
+        .from(lmsAffiliateConversions)
+        .leftJoin(lmsOrders, eq(lmsOrders.id, lmsAffiliateConversions.orderId))
+        .leftJoin(lmsCourses, eq(lmsCourses.id, lmsOrders.courseId))
+        .where(eq(lmsAffiliateConversions.affiliateId, aff.id))
+        .orderBy(desc(lmsAffiliateConversions.createdAt));
+      return conversions;
+    }),
+
+  /** Affiliate/Instructor: submit a payout request */
+  requestPayout: protectedProcedure
+    .input(z.object({
+      requestorType: z.enum(["affiliate", "instructor"]),
+      amountCents: z.number().int().min(100),
+      paymentMethod: z.enum(["stripe", "paypal", "ach"]),
+      paymentDetails: z.object({
+        paypal_email: z.string().email().optional(),
+        ach_routing: z.string().optional(),
+        ach_account: z.string().optional(),
+        stripe_account_id: z.string().optional(),
+      }),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      let affiliateId: number | null = null;
+      if (input.requestorType === "affiliate") {
+        const aff = await db.select({ id: lmsAffiliates.id }).from(lmsAffiliates)
+          .where(eq(lmsAffiliates.userId, ctx.user.id)).then(r => r[0]);
+        if (!aff) throw new TRPCError({ code: "FORBIDDEN", message: "No affiliate account found for your user." });
+        affiliateId = aff.id;
+      }
+      await db.insert(payoutRequests).values({
+        requestorType: input.requestorType,
+        affiliateId,
+        instructorUserId: input.requestorType === "instructor" ? ctx.user.id : null,
+        amountCents: input.amountCents,
+        paymentMethod: input.paymentMethod,
+        paymentDetails: JSON.stringify(input.paymentDetails),
+      });
+      return { ok: true };
+    }),
+
+  /** Affiliate/Instructor: get own payout requests */
+  getMyPayoutRequests: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const aff = await db.select({ id: lmsAffiliates.id }).from(lmsAffiliates)
+        .where(eq(lmsAffiliates.userId, ctx.user.id)).then(r => r[0]);
+      const conditions = aff
+        ? [or(eq(payoutRequests.affiliateId, aff.id), eq(payoutRequests.instructorUserId, ctx.user.id))]
+        : [eq(payoutRequests.instructorUserId, ctx.user.id)];
+      return db.select().from(payoutRequests)
+        .where(and(...conditions))
+        .orderBy(desc(payoutRequests.requestedAt));
+    }),
+
+  /** Instructor: save payout config (preferred method + payment details) */
+  saveInstructorPayoutConfig: protectedProcedure
+    .input(z.object({
+      preferredMethod: z.enum(["stripe", "paypal", "ach"]),
+      paymentDetails: z.object({
+        paypal_email: z.string().email().optional(),
+        ach_routing: z.string().optional(),
+        ach_account: z.string().optional(),
+        stripe_account_id: z.string().optional(),
+      }),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const existing = await db.select({ id: instructorPayoutConfig.id })
+        .from(instructorPayoutConfig)
+        .where(eq(instructorPayoutConfig.instructorUserId, ctx.user.id))
+        .then(r => r[0]);
+      if (existing) {
+        await db.update(instructorPayoutConfig)
+          .set({ preferredMethod: input.preferredMethod, paymentDetails: JSON.stringify(input.paymentDetails) })
+          .where(eq(instructorPayoutConfig.id, existing.id));
+      } else {
+        await db.insert(instructorPayoutConfig).values({
+          instructorUserId: ctx.user.id,
+          preferredMethod: input.preferredMethod,
+          paymentDetails: JSON.stringify(input.paymentDetails),
+        });
+      }
+      return { ok: true };
+    }),
+
+  /** Instructor: get own payout config */
+  getMyInstructorPayoutConfig: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(instructorPayoutConfig)
+        .where(eq(instructorPayoutConfig.instructorUserId, ctx.user.id))
+        .then(r => r[0] ?? null);
+    }),
+
+  // ─── Affiliate Course Access Management ─────────────────────────────────────
+
+  /** Admin: list all course access grants for an affiliate */
+  listAffiliateCourseAccess: protectedProcedure
+    .input(z.object({ affiliateId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(affiliateCourseAccess)
+        .where(and(eq(affiliateCourseAccess.affiliateId, input.affiliateId), isNull(affiliateCourseAccess.revokedAt)))
+        .orderBy(desc(affiliateCourseAccess.grantedAt));
+      // Enrich with course title
+      const enriched = await Promise.all(rows.map(async (r) => {
+        const [course] = await db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug })
+          .from(lmsCourses).where(eq(lmsCourses.id, r.courseId)).limit(1);
+        return { ...r, course: course ?? null };
+      }));
+      return enriched;
+    }),
+
+  /** Admin: grant an affiliate access to a specific affiliate-enabled course */
+  grantAffiliateCourseAccess: protectedProcedure
+    .input(z.object({
+      affiliateId: z.number(),
+      courseId: z.number(),
+      commissionPctOverride: z.number().int().min(0).max(100).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Check course has affiliate enabled
+      const [settings] = await db.select().from(affiliateCourseSettings)
+        .where(eq(affiliateCourseSettings.courseId, input.courseId)).limit(1);
+      if (!settings?.affiliateEnabled) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Affiliate program is not enabled for this course. Enable it in course settings first." });
+      }
+      // Upsert: if revoked row exists, re-activate it
+      const [existing] = await db.select().from(affiliateCourseAccess)
+        .where(and(eq(affiliateCourseAccess.affiliateId, input.affiliateId), eq(affiliateCourseAccess.courseId, input.courseId)))
+        .limit(1);
+      if (existing) {
+        await db.update(affiliateCourseAccess)
+          .set({ revokedAt: null, grantedByAdminId: ctx.user.id, commissionPctOverride: input.commissionPctOverride ?? null, grantedAt: new Date() })
+          .where(eq(affiliateCourseAccess.id, existing.id));
+        return { id: existing.id };
+      }
+      const [result] = await db.insert(affiliateCourseAccess).values({
+        affiliateId: input.affiliateId,
+        courseId: input.courseId,
+        commissionPctOverride: input.commissionPctOverride ?? null,
+        grantedByAdminId: ctx.user.id,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** Admin: revoke an affiliate's access to a course */
+  revokeAffiliateCourseAccess: protectedProcedure
+    .input(z.object({ affiliateId: z.number(), courseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(affiliateCourseAccess)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(affiliateCourseAccess.affiliateId, input.affiliateId), eq(affiliateCourseAccess.courseId, input.courseId)));
+      // Also deactivate any active links for this affiliate+course
+      await db.update(affiliateLinks)
+        .set({ isActive: false })
+        .where(and(eq(affiliateLinks.affiliateId, input.affiliateId), eq(affiliateLinks.courseId, input.courseId)));
+      return { ok: true };
+    }),
+
+  /** Admin: remove an affiliate entirely (deactivate + revoke all course access) */
+  removeAffiliate: protectedProcedure
+    .input(z.object({ affiliateId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Deactivate all their links
+      await db.update(affiliateLinks).set({ isActive: false }).where(eq(affiliateLinks.affiliateId, input.affiliateId));
+      // Revoke all course access
+      await db.update(affiliateCourseAccess).set({ revokedAt: new Date() }).where(eq(affiliateCourseAccess.affiliateId, input.affiliateId));
+      // Mark affiliate as inactive
+      await db.update(lmsAffiliates).set({ isActive: false }).where(eq(lmsAffiliates.id, input.affiliateId));
+      return { ok: true };
+    }),
+
+  /** Admin: list all affiliate-enabled courses (for granting access) */
+  listAffiliateEnabledCourses: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const settings = await db.select({ courseId: affiliateCourseSettings.courseId, commissionPctOverride: affiliateCourseSettings.commissionPctOverride })
+        .from(affiliateCourseSettings).where(eq(affiliateCourseSettings.affiliateEnabled, true));
+      if (!settings.length) return [];
+      const courseIds = settings.map(s => s.courseId);
+      const courses = await db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug })
+        .from(lmsCourses).where(inArray(lmsCourses.id, courseIds));
+      return courses.map(c => ({
+        ...c,
+        commissionPctOverride: settings.find(s => s.courseId === c.id)?.commissionPctOverride ?? null,
+      }));
+    }),
+
+  /** Affiliate self-service: get all affiliate-enabled courses I have access to with my links */
+  getMyAffiliateCourses: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Find affiliate record for this user
+      const [aff] = await db.select().from(lmsAffiliates).where(eq(lmsAffiliates.userId, ctx.user.id)).limit(1);
+      if (!aff) return [];
+      // Get all active course access grants
+      const access = await db.select().from(affiliateCourseAccess)
+        .where(and(eq(affiliateCourseAccess.affiliateId, aff.id), isNull(affiliateCourseAccess.revokedAt)));
+      if (!access.length) return [];
+      const courseIds = access.map(a => a.courseId);
+      const courses = await db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, coverImageUrl: lmsCourses.coverImageUrl })
+        .from(lmsCourses).where(inArray(lmsCourses.id, courseIds));
+      // Get affiliate settings (commission %)
+      const courseSettings = await db.select().from(affiliateCourseSettings)
+        .where(inArray(affiliateCourseSettings.courseId, courseIds));
+      // Get existing links for this affiliate
+      const links = await db.select().from(affiliateLinks)
+        .where(and(eq(affiliateLinks.affiliateId, aff.id), inArray(affiliateLinks.courseId, courseIds), eq(affiliateLinks.isActive, true)));
+      return courses.map(c => {
+        const accessRow = access.find(a => a.courseId === c.id);
+        const settings = courseSettings.find(s => s.courseId === c.id);
+        const commissionPct = accessRow?.commissionPctOverride ?? settings?.commissionPctOverride ?? aff.commissionPct;
+        const link = links.find(l => l.courseId === c.id) ?? null;
+        return { ...c, commissionPct, link, affiliateId: aff.id };
+      });
+    }),
+
+  /** Affiliate self-service: generate a unique tracking link for a course */
+  generateAffiliateLink: protectedProcedure
+    .input(z.object({ courseId: z.number(), destinationUrl: z.string().url() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [aff] = await db.select().from(lmsAffiliates).where(eq(lmsAffiliates.userId, ctx.user.id)).limit(1);
+      if (!aff) throw new TRPCError({ code: "FORBIDDEN", message: "No affiliate account found." });
+      // Check access
+      const [access] = await db.select().from(affiliateCourseAccess)
+        .where(and(eq(affiliateCourseAccess.affiliateId, aff.id), eq(affiliateCourseAccess.courseId, input.courseId), isNull(affiliateCourseAccess.revokedAt)))
+        .limit(1);
+      if (!access) throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to promote this course." });
+      // Check if link already exists
+      const [existing] = await db.select().from(affiliateLinks)
+        .where(and(eq(affiliateLinks.affiliateId, aff.id), eq(affiliateLinks.courseId, input.courseId), eq(affiliateLinks.isActive, true)))
+        .limit(1);
+      if (existing) return existing;
+      // Generate unique slug: affiliateCode-courseId
+      const baseSlug = `${aff.code}-c${input.courseId}`;
+      let slug = baseSlug;
+      let attempt = 0;
+      while (true) {
+        const [taken] = await db.select({ id: affiliateLinks.id }).from(affiliateLinks).where(eq(affiliateLinks.slug, slug)).limit(1);
+        if (!taken) break;
+        attempt++;
+        slug = `${baseSlug}-${attempt}`;
+      }
+      const [result] = await db.insert(affiliateLinks).values({
+        affiliateId: aff.id,
+        courseId: input.courseId,
+        slug,
+        destinationUrl: input.destinationUrl,
+      }).$returningId();
+      const [link] = await db.select().from(affiliateLinks).where(eq(affiliateLinks.id, result.id)).limit(1);
+      return link;
+    }),
+
+  /** Public: track a click on an affiliate link */
+  trackAffiliateClick: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { ok: false };
+      const [link] = await db.select().from(affiliateLinks).where(and(eq(affiliateLinks.slug, input.slug), eq(affiliateLinks.isActive, true))).limit(1);
+      if (!link) return { ok: false, destinationUrl: null };
+      // Increment click counter
+      await db.update(affiliateLinks).set({ clicks: link.clicks + 1 }).where(eq(affiliateLinks.id, link.id));
+      // Log click event
+      const req = (ctx as any).req;
+      await db.insert(affiliateClicks).values({
+        linkId: link.id,
+        affiliateId: link.affiliateId,
+        ip: req?.ip ?? null,
+        userAgent: req?.headers?.['user-agent']?.substring(0, 512) ?? null,
+        referrer: req?.headers?.referer?.substring(0, 512) ?? null,
+      });
+      return { ok: true, destinationUrl: link.destinationUrl };
+    }),
 });
+

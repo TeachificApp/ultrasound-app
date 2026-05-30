@@ -5232,3 +5232,99 @@ export const instructorPublishRequests = mysqlTable("instructor_publish_requests
 });
 export type InstructorPublishRequest = typeof instructorPublishRequests.$inferSelect;
 export type InsertInstructorPublishRequest = typeof instructorPublishRequests.$inferInsert;
+
+// ─── Affiliate Course Overrides ───────────────────────────────────────────────
+// Per-course affiliate settings: enable/disable affiliate tracking and set a
+// course-specific commission % that overrides the affiliate's default rate.
+export const affiliateCourseSettings = mysqlTable("affiliate_course_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull().unique(),
+  affiliateEnabled: boolean("affiliate_enabled").default(false).notNull(),
+  // Override commission % for this course (null = use affiliate's default)
+  commissionPctOverride: int("commission_pct_override"), // 0-100, null = use affiliate default
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type AffiliateCourseSettings = typeof affiliateCourseSettings.$inferSelect;
+
+// ─── Affiliate Links ──────────────────────────────────────────────────────────
+// Unique tracking links per affiliate per course (or site-wide).
+// Clicking a link sets a cookie; checkout attributes the sale to this link.
+export const affiliateLinks = mysqlTable("affiliate_links", {
+  id: int("id").autoincrement().primaryKey(),
+  affiliateId: int("affiliate_id").notNull(),
+  courseId: int("course_id"), // null = site-wide link
+  slug: varchar("slug", { length: 128 }).notNull().unique(), // e.g. "john-echo-course"
+  // Full destination URL (landing page or checkout). Generated on creation.
+  destinationUrl: text("destination_url").notNull(),
+  clicks: int("clicks").default(0).notNull(),
+  conversions: int("conversions").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type AffiliateLink = typeof affiliateLinks.$inferSelect;
+
+// ─── Affiliate Click Events ───────────────────────────────────────────────────
+// One row per unique click on an affiliate link (for analytics).
+export const affiliateClicks = mysqlTable("affiliate_clicks", {
+  id: int("id").autoincrement().primaryKey(),
+  linkId: int("link_id").notNull(),
+  affiliateId: int("affiliate_id").notNull(),
+  ip: varchar("ip", { length: 64 }),
+  userAgent: varchar("user_agent", { length: 512 }),
+  referrer: varchar("referrer", { length: 512 }),
+  clickedAt: timestamp("clicked_at").defaultNow().notNull(),
+});
+
+// ─── Payout Requests ─────────────────────────────────────────────────────────
+// Affiliates and instructors request payouts here.
+// Admins approve and mark as paid; payment is processed externally or via Stripe.
+export const payoutRequests = mysqlTable("payout_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  // Who is requesting: affiliate or instructor (via lmsAffiliates or users)
+  requestorType: mysqlEnum("requestor_type", ["affiliate", "instructor"]).notNull(),
+  affiliateId: int("affiliate_id"),   // set when requestorType = 'affiliate'
+  instructorUserId: int("instructor_user_id"), // set when requestorType = 'instructor'
+  amountCents: int("amount_cents").notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  // Payment method chosen by the requestor
+  paymentMethod: mysqlEnum("payment_method", ["stripe", "paypal", "ach"]).notNull(),
+  // Payment details (email for PayPal, account info for ACH, Stripe account ID)
+  paymentDetails: text("payment_details"), // JSON: { paypal_email, ach_routing, ach_account, stripe_account_id }
+  status: mysqlEnum("status", ["pending", "approved", "paid", "rejected"]).default("pending").notNull(),
+  adminNote: text("admin_note"),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewed_at"),
+  paidAt: timestamp("paid_at"),
+  reviewedByAdminId: int("reviewed_by_admin_id"),
+});
+export type PayoutRequest = typeof payoutRequests.$inferSelect;
+export type InsertPayoutRequest = typeof payoutRequests.$inferInsert;
+
+// ─── Instructor Revenue Share Config ─────────────────────────────────────────
+// Per-instructor payment preferences for revenue share payouts.
+export const instructorPayoutConfig = mysqlTable("instructor_payout_config", {
+  id: int("id").autoincrement().primaryKey(),
+  instructorUserId: int("instructor_user_id").notNull().unique(),
+  preferredMethod: mysqlEnum("preferred_method", ["stripe", "paypal", "ach"]).notNull().default("paypal"),
+  // JSON blob: { paypal_email, ach_routing, ach_account, stripe_account_id }
+  paymentDetails: text("payment_details"),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type InstructorPayoutConfig = typeof instructorPayoutConfig.$inferSelect;
+
+// ─── Affiliate Course Access ──────────────────────────────────────────────────
+// Controls which affiliates can promote which affiliate-enabled courses.
+// Admins grant/revoke access per affiliate per course.
+// If no row exists for a (affiliateId, courseId) pair, the affiliate cannot
+// generate a link for that course even if the course has affiliateEnabled=true.
+export const affiliateCourseAccess = mysqlTable("affiliate_course_access", {
+  id: int("id").autoincrement().primaryKey(),
+  affiliateId: int("affiliate_id").notNull(),
+  courseId: int("course_id").notNull(),
+  // Override commission % for this specific affiliate+course (null = use course override or affiliate default)
+  commissionPctOverride: int("commission_pct_override"), // 0-100
+  grantedByAdminId: int("granted_by_admin_id"),
+  grantedAt: timestamp("granted_at").defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at"), // null = active, set = revoked
+});
+export type AffiliateCourseAccess = typeof affiliateCourseAccess.$inferSelect;

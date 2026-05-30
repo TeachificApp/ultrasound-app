@@ -73,6 +73,8 @@ const ProductLanding = lazy(() => import("./pages/ProductLanding"));
 const ProductLandingPageBuilder = lazy(() => import("./pages/admin/ProductLandingPageBuilder"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
+const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
+const AffiliateRedirect = lazy(() => import("./pages/AffiliateRedirect"));
 const UltrasoundAssistHub = lazy(() => import("./pages/UltrasoundAssistHub"));
 const ObGynCalculators = lazy(() => import("./pages/ObGynCalculators"));
 const ClinicalInterpretationEngine = lazy(() => import("./pages/ClinicalInterpretationEngine"));
@@ -301,6 +303,8 @@ function Router() {
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
+        <Route path="/ref/:slug" component={AffiliateRedirect} />
 
         {/* ── UltrasoundAssist™ Hub ───────────────────────────────────── */}
         <Route path="/ultrasound-assist" component={UltrasoundAssistHub} />
@@ -544,6 +548,8 @@ function MembersRouter() {
           <Suspense fallback={pageFallback}>
             <Switch>
               <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
+        <Route path="/ref/:slug" component={AffiliateRedirect} />
               <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
               <Route path="/my-downloads" component={MyDownloads} />
               <Route path="/downloads" component={DownloadsBrowse} />
@@ -648,6 +654,8 @@ function LMSRouter() {
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
+        <Route path="/ref/:slug" component={AffiliateRedirect} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
             {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
@@ -700,6 +708,8 @@ function IHeartEchoRouter() {
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
+        <Route path="/ref/:slug" component={AffiliateRedirect} />
 
         {/* ── EchoAssist™ Hub ────────────────────────────────────────── */}
         <Route path="/echo-assist-hub" component={EchoAssistHub} />

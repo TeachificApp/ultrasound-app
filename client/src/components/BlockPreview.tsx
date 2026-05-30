@@ -79,7 +79,8 @@ export type BlockType =
   | "upgrade_prompt"
   | "data_table"
   | "file_upload"
-  | "cohort_sessions_auto";
+  | "cohort_sessions_auto"
+  | "affiliate_signup";
 
 export interface Block {
   id: string;
@@ -1277,6 +1278,32 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             ))}
           </div>
           <p className="text-xs text-gray-400 mt-3 text-center">Auto-populated from cohort live sessions</p>
+        </div>
+      );
+    }
+    case "affiliate_signup": {
+      const accentColor = d.accentColor ?? "#179ca3";
+      const headline = d.headline ?? "Earn money by sharing what you love";
+      const subtext = d.subtext ?? "Join our affiliate program and earn a commission for every sale you refer. It's free to join and easy to get started.";
+      const ctaText = d.ctaText ?? "Become an Affiliate";
+      const benefits = d.benefits ?? ["Earn up to 30% commission", "Real-time earnings dashboard", "Unique tracking links per course", "Monthly payouts via Stripe, PayPal, or ACH"];
+      return (
+        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fdf9" }}>
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold mb-4" style={{ backgroundColor: `${accentColor}20`, color: accentColor }}>
+              <span>💰</span> Affiliate Program
+            </div>
+            <h2 className="text-3xl font-bold mb-4" style={{ color: d.headlineColor ?? "#111827" }}>{headline}</h2>
+            <p className="text-gray-600 mb-8 text-lg">{subtext}</p>
+            <div className="grid grid-cols-2 gap-3 mb-8 text-left">
+              {benefits.map((b: string, i: number) => (
+                <div key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="mt-0.5 text-green-500 font-bold">✓</span> {b}
+                </div>
+              ))}
+            </div>
+            <button className="px-8 py-3 rounded-xl text-white font-semibold text-base" style={{ backgroundColor: accentColor }}>{ctaText}</button>
+          </div>
         </div>
       );
     }
