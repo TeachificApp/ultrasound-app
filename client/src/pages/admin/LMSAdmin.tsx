@@ -42,7 +42,7 @@ import {
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
   Layout as LayoutTemplate, Database,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
-  Repeat, Film, CalendarRange, ExternalLink, Link2,
+  Repeat, Film, CalendarRange, ExternalLink, Link2, Mail,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -4844,28 +4844,119 @@ function EnrollmentsTab() {
 }
 
 // ─── Groups Tab ───────────────────────────────────────────────────────────────
+function GroupSeatAssignPanel({ group, onRefetch }: { group: any; onRefetch: () => void }) {
+  const [mode, setMode] = useState<"invite" | "existing">("existing");
+  const [newEmail, setNewEmail] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const { data: enrolledResults } = trpc.lmsAdmin.searchEnrolledStudents.useQuery(
+    { courseId: group.courseId, query: debouncedSearch },
+    { enabled: debouncedSearch.length >= 2 }
+  );
+
+  const assignSeat = trpc.lmsAdmin.assignSeat.useMutation({
+    onSuccess: () => { toast.success("Invite seat assigned"); setNewEmail(""); onRefetch(); },
+    onError: e => toast.error(e.message),
+  });
+
+  const moveStudent = trpc.lmsAdmin.assignExistingStudentToGroup.useMutation({
+    onSuccess: (res) => {
+      toast.success(res.alreadyEnrolled ? "Student moved into group" : "Student added to group (not yet enrolled in course)");
+      setSelectedStudent(null); setSearchQuery(""); onRefetch();
+    },
+    onError: e => toast.error(e.message),
+  });
+
+  const hasCapacity = group.usedSeats < group.seats;
+  if (!hasCapacity) return <p className="text-xs text-gray-400 italic">All seats filled</p>;
+
+  return (
+    <div className="space-y-3">
+      {/* Mode tabs */}
+      <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+        <button
+          className={`flex-1 py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+            mode === "existing" ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+          }`}
+          onClick={() => setMode("existing")}
+        >
+          <User className="w-3 h-3" /> Move Enrolled Student
+        </button>
+        <button
+          className={`flex-1 py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+            mode === "invite" ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+          }`}
+          onClick={() => setMode("invite")}
+        >
+          <Mail className="w-3 h-3" /> Invite by Email
+        </button>
+      </div>
+
+      {mode === "existing" ? (
+        <div className="space-y-2">
+          <Input
+            placeholder="Search enrolled students by name or email…"
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setSelectedStudent(null); }}
+            className="h-8 text-sm"
+          />
+          {enrolledResults && enrolledResults.length > 0 && !selectedStudent && (
+            <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-36 overflow-y-auto">
+              {enrolledResults.map((u: any) => (
+                <button key={u.userId} onClick={() => { setSelectedStudent(u); setSearchQuery(u.displayName || u.name || u.email); }}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors">
+                  <p className="text-xs font-medium text-gray-900">{u.displayName || u.name}</p>
+                  <p className="text-xs text-gray-400">{u.email}</p>
+                </button>
+              ))}
+            </div>
+          )}
+          {debouncedSearch.length >= 2 && enrolledResults?.length === 0 && !selectedStudent && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">No enrolled students match "{debouncedSearch}"</p>
+          )}
+          {selectedStudent && (
+            <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+              <User className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-900 truncate">{selectedStudent.displayName || selectedStudent.name}</p>
+                <p className="text-xs text-gray-500 truncate">{selectedStudent.email}</p>
+              </div>
+              <button onClick={() => { setSelectedStudent(null); setSearchQuery(""); }} className="text-gray-400 hover:text-gray-700"><X className="w-3.5 h-3.5" /></button>
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-7 text-xs" disabled={moveStudent.isPending}
+                onClick={() => moveStudent.mutate({ groupId: group.id, userId: selectedStudent.userId })}>
+                {moveStudent.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Move into Group"}
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Input placeholder="email@example.com" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="h-8 text-sm flex-1" type="email" />
+          <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" disabled={assignSeat.isPending || !newEmail.trim()}
+            onClick={() => assignSeat.mutate({ groupId: group.id, email: newEmail })}>
+            {assignSeat.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Send Invite"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function GroupsTab() {
-  
   const { data: groups, isLoading, refetch } = trpc.lmsAdmin.listGroups.useQuery({});
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null);
-  const [newEmail, setNewEmail] = useState<Record<number, string>>({});
-
-  const assignSeat = trpc.lmsAdmin.assignSeat.useMutation({
-    onSuccess: (data, vars) => {
-      toast.success(`Seat assigned — invite token: ${data.token}`);
-      setNewEmail(e => ({ ...e, [vars.groupId]: "" }));
-      refetch();
-    },
-    onError: e => toast.error(`Error: ${e.message}`),
-  });
-
   const revokeSeat = trpc.lmsAdmin.revokeSeat.useMutation({
     onSuccess: () => { toast.success("Seat revoked"); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
-
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -4873,7 +4964,6 @@ function GroupsTab() {
           <Plus className="w-4 h-4 mr-1" /> New Group
         </Button>
       </div>
-
       {isLoading ? <Skeleton className="h-40 w-full" /> : (
         <div className="space-y-3">
           {(groups ?? []).map((g: any) => (
@@ -4889,36 +4979,30 @@ function GroupsTab() {
                 </div>
                 <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${expandedGroup === g.id ? "rotate-90" : ""}`} />
               </div>
-
               {expandedGroup === g.id && (
-                <div className="border-t border-gray-100 p-4 space-y-3">
+                <div className="border-t border-gray-100 p-4 space-y-4">
+                  {/* Seat list */}
                   <div className="space-y-2">
+                    {(g.seatList ?? []).length === 0 && <p className="text-xs text-gray-400 italic">No seats assigned yet</p>}
                     {(g.seatList ?? []).map((seat: any) => (
                       <div key={seat.id} className="flex items-center gap-3 text-sm">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${seat.acceptedAt ? "bg-green-400" : "bg-yellow-400"}`} />
-                        <span className="flex-1 text-gray-700">{seat.email}</span>
-                        <span className="text-xs text-gray-400">{seat.acceptedAt ? "Accepted" : "Pending"}</span>
-                        <Button size="sm" variant="ghost" className="h-6 text-red-400 hover:bg-red-50" onClick={() => revokeSeat.mutate({ seatId: seat.id })}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          seat.status === "revoked" ? "bg-red-300" : seat.acceptedAt ? "bg-green-400" : "bg-yellow-400"
+                        }`} />
+                        <span className="flex-1 text-gray-700 truncate">{seat.memberName || seat.email}</span>
+                        <span className="text-xs text-gray-400 shrink-0">
+                          {seat.status === "revoked" ? "Revoked" : seat.acceptedAt ? "Active" : "Pending invite"}
+                        </span>
+                        {seat.status !== "revoked" && (
+                          <Button size="sm" variant="ghost" className="h-6 text-red-400 hover:bg-red-50 shrink-0" onClick={() => revokeSeat.mutate({ seatId: seat.id })}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
-                  {g.usedSeats < g.seats && (
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="email@example.com"
-                        value={newEmail[g.id] ?? ""}
-                        onChange={e => setNewEmail(em => ({ ...em, [g.id]: e.target.value }))}
-                        className="h-8 text-sm flex-1"
-                        type="email"
-                      />
-                      <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" disabled={assignSeat.isPending}
-                        onClick={() => assignSeat.mutate({ groupId: g.id, email: newEmail[g.id] ?? "" })}>
-                        Assign
-                      </Button>
-                    </div>
-                  )}
+                  {/* Add seat panel */}
+                  <GroupSeatAssignPanel group={g} onRefetch={refetch} />
                 </div>
               )}
             </div>
@@ -4928,7 +5012,6 @@ function GroupsTab() {
           )}
         </div>
       )}
-
       <CreateGroupDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); refetch(); }} />
     </div>
   );

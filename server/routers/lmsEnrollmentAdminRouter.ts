@@ -378,6 +378,75 @@ export const lmsEnrollmentAdminRouter = router({
       return { success: true };
     }),
 
+  // ── Move existing enrolled student into a group seat ──
+  assignExistingStudentToGroup: protectedProcedure
+    .input(z.object({
+      groupId: z.number(),
+      userId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Verify group exists and has capacity
+      const [group] = await db.select().from(lmsGroups).where(eq(lmsGroups.id, input.groupId)).limit(1);
+      if (!group) throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      const seats = await db.select().from(lmsGroupSeats).where(eq(lmsGroupSeats.groupId, input.groupId));
+      const activeSeats = seats.filter(s => s.status !== "revoked");
+      if (activeSeats.length >= group.seats) throw new TRPCError({ code: "BAD_REQUEST", message: "No seats remaining in this group" });
+      // Get user info
+      const [user] = await db.select({ id: users.id, email: users.email, name: users.name, displayName: users.displayName })
+        .from(users).where(eq(users.id, input.userId)).limit(1);
+      if (!user || !user.email) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      // Check not already in this group
+      const alreadyInGroup = seats.find(s => s.email.toLowerCase() === (user.email ?? "").toLowerCase() && s.status !== "revoked");
+      if (alreadyInGroup) throw new TRPCError({ code: "BAD_REQUEST", message: "User is already in this group" });
+      // Find their existing enrollment for this course
+      const [enrollment] = await db.select().from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, group.courseId)))
+        .limit(1);
+      // Create an active seat record (no invite needed — user is already enrolled)
+      const now = new Date();
+      const [result] = await db.insert(lmsGroupSeats).values({
+        groupId: input.groupId,
+        email: user.email,
+        memberName: user.displayName || user.name || null,
+        status: "active",
+        assignedAt: now,
+        acceptedAt: now,
+        enrollmentId: enrollment?.id ?? null,
+        inviteToken: null,
+      }).$returningId();
+      return { id: result.id, alreadyEnrolled: !!enrollment };
+    }),
+
+  // ── Search enrolled students for a course (for moving into group) ──
+  searchEnrolledStudents: protectedProcedure
+    .input(z.object({ courseId: z.number(), query: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const q = `%${input.query}%`;
+      const rows = await db
+        .select({
+          userId: lmsEnrollments.userId,
+          enrollmentId: lmsEnrollments.id,
+          name: users.name,
+          displayName: users.displayName,
+          email: users.email,
+          enrolledAt: lmsEnrollments.enrolledAt,
+        })
+        .from(lmsEnrollments)
+        .innerJoin(users, eq(users.id, lmsEnrollments.userId))
+        .where(and(
+          eq(lmsEnrollments.courseId, input.courseId),
+          sql`(${users.name} LIKE ${q} OR ${users.displayName} LIKE ${q} OR ${users.email} LIKE ${q})`
+        ))
+        .limit(20);
+      return rows;
+    }),
+
   // ── Instructors ──
   listInstructors: protectedProcedure.query(async ({ ctx }) => {
     await assertAdmin(ctx);
