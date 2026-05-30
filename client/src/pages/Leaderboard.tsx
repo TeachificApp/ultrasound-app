@@ -71,9 +71,17 @@ export default function Leaderboard() {
 
   return (
     <div className="min-h-screen" style={{ background: "#f0f4f8" }}>
-      {/* Simple teal header */}
-      <div style={{ background: "linear-gradient(135deg, #0e4a50 0%, #179ca3 100%)" }}>
-        <div className="max-w-5xl mx-auto px-4 py-5">
+      {/* Hero header */}
+      <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}>
+        <div
+          className="absolute inset-0 opacity-25"
+          style={{
+            backgroundImage: `url("/manus-storage/ihe-daily-challenge-hero_6384adcf.webp")`,
+            backgroundSize: "cover",
+            backgroundPosition: "center right",
+          }}
+        />
+        <div className="relative max-w-5xl mx-auto px-4 py-5">
           <Link href="/" className="flex items-center gap-1 text-white/70 text-sm mb-3 hover:text-white transition-colors">
             <ArrowLeft size={14} /> Dashboard
           </Link>
