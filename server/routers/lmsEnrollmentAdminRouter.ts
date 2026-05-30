@@ -1319,7 +1319,7 @@ CRITICAL REQUIREMENTS:
       // Enroll the user
       const [existingEnrollment] = await db.select().from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
-      if (existingEnrollment) return { enrollmentId: existingEnrollment.id, alreadyEnrolled: true, isNewUser };
+      if (existingEnrollment) return { enrollmentId: existingEnrollment.id, alreadyEnrolled: true, isNewUser, userId };
       const [result] = await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId }).$returningId();
       // Fire enrollment email asynchronously (non-blocking)
       void (async () => {
@@ -1344,7 +1344,7 @@ CRITICAL REQUIREMENTS:
           console.error("[enrollment-email] Failed to send:", e);
         }
       })();
-      return { enrollmentId: result.id, alreadyEnrolled: false, isNewUser };
+      return { enrollmentId: result.id, alreadyEnrolled: false, isNewUser, userId };
     }),
   /** Get custom domains list */
   getCustomDomains: protectedProcedure.query(async ({ ctx }) => {
