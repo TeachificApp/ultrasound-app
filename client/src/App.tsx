@@ -33,6 +33,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import MagicLinkRequest from "./pages/MagicLinkRequest";
 import MagicLinkCallback from "./pages/MagicLinkCallback";
+import MagicLinkError from "./pages/MagicLinkError";
 import AccessLinkCallback from "./pages/AccessLinkCallback";
 import Enrolled from "./pages/Enrolled";
 import Unsubscribe from "./pages/Unsubscribe";
@@ -288,8 +289,10 @@ function Router() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/magic-link/callback" component={MagicLinkCallback} />
-        {/* /auth/magic is the URL sent in magic link emails */}
+        {/* /auth/magic is the legacy URL sent in magic link emails (client-side verify) */}
         <Route path="/auth/magic" component={MagicLinkCallback} />
+        {/* /auth/magic-error is shown when the server-side GET verify fails */}
+        <Route path="/auth/magic-error" component={MagicLinkError} />
         {/* /auth/access is used in purchase/access emails — persistent reusable token */}
         <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />

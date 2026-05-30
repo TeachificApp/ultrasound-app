@@ -208,7 +208,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       });
       userId = autoUser.id;
       if (isNew && resetToken) {
-        const baseUrl = "https://learn.allaboutultrasound.com";
+        const baseUrl = "https://app.allaboutultrasound.com";
         const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
         const firstName = autoUser.firstName || nameParts[0] || "there";
         let accessTokenForEmail: string | null = null;
@@ -218,7 +218,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
           console.error(`[Stripe] Failed to generate access token for ${customerEmail}:`, atErr);
         }
         const accessUrl = accessTokenForEmail
-          ? `${baseUrl}/auth/access?token=${accessTokenForEmail}&next=${encodeURIComponent(baseUrl + "/downloads")}`
+          ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}`
           : setPasswordUrl;
         try {
           const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");

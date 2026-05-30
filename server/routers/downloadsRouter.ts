@@ -1288,8 +1288,19 @@ export async function sendPurchaseConfirmationEmail(userId: number, productId: n
     .where(eq(digitalProductFiles.productId, productId))
     .orderBy(asc(digitalProductFiles.sortOrder));
 
-  const appUrl = process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
-  const filesUrl = `${appUrl}/downloads/${product.slug}/files`;
+  const appUrl = 'https://app.allaboutultrasound.com';
+  const filesPath = `/downloads/${product.slug}/files`;
+  const filesUrl = `${appUrl}${filesPath}`;
+
+  // Generate a persistent auto-login token so the button logs them in automatically
+  let accessUrl = filesUrl;
+  try {
+    const { generateAutoLoginToken } = await import('../routes/autoLogin');
+    const token = await generateAutoLoginToken(userId, filesUrl);
+    accessUrl = `${appUrl}/api/auth/auto-login?token=${token}`;
+  } catch (tokenErr) {
+    console.error(`[sendPurchaseConfirmationEmail] Failed to generate auto-login token for user ${userId}:`, tokenErr);
+  }
 
   const fileListHtml = files.map(f => 
     `<li style="margin:4px 0;"><a href="${f.fileUrl}" style="color:#189aa1;">${f.fileName}</a> (${(f.fileSize / 1024 / 1024).toFixed(1)} MB)</li>`
@@ -1314,8 +1325,9 @@ export async function sendPurchaseConfirmationEmail(userId: number, productId: n
             <ul style="margin:0;padding-left:20px;font-size:14px;color:#475569;">${fileListHtml}</ul>
           </div>
           <div style="text-align:center;margin:28px 0;">
-            <a href="${filesUrl}" style="display:inline-block;background:linear-gradient(135deg,#189aa1,#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">Access Your Files</a>
+            <a href="${accessUrl}" style="display:inline-block;background:linear-gradient(135deg,#189aa1,#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">Access Your Files</a>
           </div>
+          <p style="margin:4px 0 16px;font-size:12px;color:#94a3b8;text-align:center;">This link signs you in automatically — no password needed.</p>
           <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">Questions? Contact us at <a href="mailto:support@allaboutultrasound.com" style="color:#189aa1;">support@allaboutultrasound.com</a>.</p>
         </td></tr>
         <tr><td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
@@ -1330,6 +1342,7 @@ export async function sendPurchaseConfirmationEmail(userId: number, productId: n
     to: { name: user.name || "Customer", email: user.email },
     subject: `Your download is ready: ${product.title}`,
     htmlBody,
-    previewText: `Your download "${product.title}" is ready — access your files now.`,
+    previewText: `Your download "${product.title}" is ready — click to access your files instantly.`,
   });
+  console.log(`[sendPurchaseConfirmationEmail] Sent access email to ${user.email} for product ${productId} (auto-login: ${accessUrl !== filesUrl ? 'yes' : 'no'})`);
 }

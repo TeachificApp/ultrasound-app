@@ -100,6 +100,49 @@ export function registerAuthLoginRoute(app: Express) {
   });
 
   /**
+   * GET /api/auth/magic-verify?token=...&returnTo=...
+   * Server-side redirect flow — bypasses Cloudflare stripping Set-Cookie on XHR/fetch.
+   * The browser follows a full page navigation so the cookie is preserved.
+   */
+  app.get("/api/auth/magic-verify", async (req: Request, res: Response) => {
+    const { token, returnTo } = req.query as Record<string, string>;
+    const successRedirect = returnTo && returnTo.startsWith("/") ? returnTo : "/dashboard";
+    if (!token) {
+      return res.redirect(`/auth/magic-error?reason=missing_token`);
+    }
+    try {
+      const db = await getDb();
+      if (!db) return res.redirect(`/auth/magic-error?reason=db_unavailable`);
+
+      const result = await db.select().from(users).where(eq(users.magicLinkToken, String(token))).limit(1);
+      const user = result[0];
+
+      if (!user) {
+        return res.redirect(`/auth/magic-error?reason=invalid`);
+      }
+      if (!user.magicLinkExpiry || new Date() > user.magicLinkExpiry) {
+        return res.redirect(`/auth/magic-error?reason=expired`);
+      }
+
+      const openId = user.openId ?? emailOpenId(user.email ?? "");
+      const updateFields: Record<string, unknown> = { magicLinkToken: null, magicLinkExpiry: null, emailVerified: true };
+      if (!user.openId) updateFields.openId = openId;
+      await db.update(users).set(updateFields as any).where(eq(users.id, user.id));
+      await ensureUserRole(user.id);
+
+      const sessionToken = await sdk.createSessionToken(openId, { name: user.name ?? user.email ?? "", expiresInMs: ONE_YEAR_MS });
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+      console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, redirecting to ${successRedirect}`);
+      return res.redirect(successRedirect);
+    } catch (err) {
+      console.error("[magic-verify GET] Error:", err);
+      return res.redirect(`/auth/magic-error?reason=server_error`);
+    }
+  });
+
+  /**
    * POST /api/auth/magic-verify
    * Body: { token: string }
    * Sets cookie and returns { success: true } so the browser can navigate.

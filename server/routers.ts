@@ -497,8 +497,10 @@ export const appRouter = router({
         // Resolve canonical app domain from brand — iHeartEcho → app.iheartecho.net, all others → app.allaboutultrasound.com
         const { getBrandDisplayConfig: gbc } = await import('@shared/brands');
         const appUrl = gbc(brandMode).appUrl;
+        // Use server-side GET redirect — bypasses Cloudflare stripping Set-Cookie on XHR/fetch responses.
+        // The browser follows a full page navigation so the session cookie is preserved correctly.
         const returnToParam = input.returnTo ? `&returnTo=${encodeURIComponent(input.returnTo)}` : '';
-        const magicUrl = `${appUrl}/auth/magic?token=${token}${returnToParam}`;
+        const magicUrl = `${appUrl}/api/auth/magic-verify?token=${token}${returnToParam}`;
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });

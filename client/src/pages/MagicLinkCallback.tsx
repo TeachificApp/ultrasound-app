@@ -49,10 +49,10 @@ export default function MagicLinkCallback() {
           return;
         }
         setStatus("success");
-        // Redirect to returnTo (if set) or home after a short delay
+        // Redirect to returnTo (if set) or dashboard after a short delay
         const returnTo = params.get("returnTo");
         setTimeout(() => {
-          window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : "/";
+          window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : "/dashboard";
         }, 1500);
       })
       .catch(() => {
