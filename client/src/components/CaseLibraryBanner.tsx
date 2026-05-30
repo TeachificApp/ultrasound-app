@@ -7,7 +7,7 @@ import { Plus, BookOpen, LogIn } from "lucide-react";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
 const AAUS_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/caselibrary-banner-final_AAUS_4bee1eff.webp";
-const IHE_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
+const IHE_BANNER_IMG = "/manus-storage/ihe-daily-challenge-hero_6384adcf.webp";
 
 interface CaseLibraryBannerProps {
   isAuthenticated: boolean;

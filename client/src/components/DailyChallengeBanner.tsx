@@ -6,7 +6,7 @@ import { Trophy, Archive, CheckCircle2, Flame } from "lucide-react";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
 const AAUS_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/daily-challenge-banner-v3_AAUS_ccb55bf0.webp";
-const IHE_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
+const IHE_BANNER_IMG = "/manus-storage/ihe-daily-challenge-hero_6384adcf.webp";
 
 interface DailyChallengeBannerProps {
   streak?: number;
