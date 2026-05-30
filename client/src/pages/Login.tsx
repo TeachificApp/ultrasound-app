@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Loader2, Stethoscope, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft, GraduationCap, Award, Users, Eye, EyeOff, Lock, UserPlus, KeyRound } from "lucide-react";
-import { isCombinedBrandingDomain, isIHeartEchoDomain } from "@/hooks/useSubdomain";
+import { isCombinedBrandingDomain, isIHeartEchoDomain, isLearnDomain, MEMBERS_APP_URL } from "@/hooks/useSubdomain";
 import { toast } from "sonner";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
@@ -70,13 +70,30 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [sent, setSent] = useState(false);
 
-  // Read returnTo from URL so magic link redirects back after login
-  const returnTo = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("returnTo") ?? undefined : undefined;
+  // Read returnTo from URL so magic link redirects back after login.
+  // Sanitize: never redirect back to auth pages (would cause a loop).
+  const AUTH_PATHS = ["/login", "/register", "/magic-link", "/auth/magic", "/auth/access", "/forgot-password", "/reset-password"];
+  const rawReturnTo = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("returnTo") ?? undefined : undefined;
+  const returnTo = rawReturnTo && !AUTH_PATHS.some(p => rawReturnTo === p || rawReturnTo.startsWith(p + "?")) ? rawReturnTo : undefined;
+
+  // On the learn subdomain:
+  // - If there's a returnTo (e.g. /courses/my-course/player), stay on learn domain
+  // - If no returnTo (e.g. user just went to /login directly), send to members dashboard
+  //   because /my-dashboard on learn would redirect back to login (loop).
+  const postLoginUrl = isLearnDomain()
+    ? (returnTo ?? `${MEMBERS_APP_URL}/my-dashboard`)
+    : (returnTo ?? "/my-dashboard");
 
   // Redirect if already signed in
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      navigate(returnTo ?? "/my-dashboard");
+      if (isLearnDomain()) {
+        // returnTo is a learn-domain path (e.g. /courses/...) — stay on learn.
+        // No returnTo → go to members dashboard to avoid /my-dashboard loop on learn.
+        window.location.href = returnTo ?? `${MEMBERS_APP_URL}/my-dashboard`;
+      } else {
+        navigate(returnTo ?? "/my-dashboard");
+      }
     }
   }, [isAuthenticated, loading, navigate, returnTo]);
 
@@ -89,7 +106,7 @@ export default function Login() {
   const loginMutation = trpc.auth.loginWithPassword.useMutation({
     onSuccess: () => {
       // Reload to pick up the new session cookie
-      window.location.href = returnTo ?? "/my-dashboard";
+      window.location.href = postLoginUrl;
     },
     onError: (err) => {
       toast.error(err.message || "Sign-in failed. Please check your credentials.");
@@ -99,7 +116,7 @@ export default function Login() {
   // ── Register mutation ──
   const registerMutation = trpc.auth.registerWithPassword.useMutation({
     onSuccess: () => {
-      window.location.href = returnTo ?? "/my-dashboard";
+      window.location.href = postLoginUrl;
     },
     onError: (err) => {
       toast.error(err.message || "Registration failed. Please try again.");

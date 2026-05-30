@@ -1533,7 +1533,11 @@ export default function StudentDashboardPage() {
     return skipLayout ? <>{inner}</> : <Layout>{inner}</Layout>;
   }
   if (!isAuthenticated) {
-    navigate("/login");
+    // On the learn subdomain, redirect to the login page with a returnTo so the user
+    // comes back to the right page after signing in. The login page will then send
+    // them to members.allaboutultrasound.com after authentication.
+    const currentPath = window.location.pathname + window.location.search;
+    navigate(`/login?returnTo=${encodeURIComponent(currentPath)}`);
     return null;
   }
   const content = (

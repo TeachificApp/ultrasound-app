@@ -951,7 +951,7 @@ export default function CoursePlayer() {
       </div>
     );
   }
-  if (!user) { navigate("/login"); return null; }
+  if (!user) { navigate(`/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`); return null; }
   // adminBypass is now defined above (before hooks) via useMemo
 
   // Check if course has any preview lessons — unenrolled registered users can access the player in preview mode
