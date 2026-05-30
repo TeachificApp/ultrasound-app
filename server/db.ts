@@ -1853,7 +1853,7 @@ export async function getReadinessAutoChecks(labId: number): Promise<Record<stri
 
 // ─── RBAC / User Roles ────────────────────────────────────────────────────────
 
-export type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";
+export type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager" | "education_manager" | "education_admin" | "education_student" | "platform_owner" | "platform_moderator" | "instructor" | "team_admin" | "affiliate";
 
 /** Return all roles assigned to a user */
 export async function getUserRoles(userId: number): Promise<AppRole[]> {

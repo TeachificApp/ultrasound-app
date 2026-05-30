@@ -98,6 +98,110 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
   );
 }
 
+// ─── Role definitions ────────────────────────────────────────────────────────
+const ALL_ROLES = [
+  { value: "user",                label: "User",               color: "#6b7280", additive: false, removable: false },
+  { value: "premium_user",        label: "Premium User",        color: "#189aa1", additive: false, removable: true },
+  { value: "platform_owner",      label: "Platform Owner",      color: "#7c3aed", additive: false, removable: true },
+  { value: "platform_admin",      label: "Platform Admin",      color: "#dc2626", additive: false, removable: true },
+  { value: "platform_moderator",  label: "Platform Moderator",  color: "#0891b2", additive: false, removable: true },
+  { value: "accreditation_manager", label: "Accreditation Manager", color: "#d97706", additive: false, removable: true },
+  { value: "education_manager",   label: "Education Manager",   color: "#059669", additive: false, removable: true },
+  { value: "education_admin",     label: "Education Admin",     color: "#0d9488", additive: false, removable: true },
+  { value: "education_student",   label: "Education Student",   color: "#6366f1", additive: false, removable: true },
+  { value: "diy_admin",           label: "DIY Admin",           color: "#f97316", additive: false, removable: true },
+  { value: "diy_user",            label: "DIY User",            color: "#f59e0b", additive: false, removable: true },
+  // Additive roles — can be stacked on any account type
+  { value: "instructor",          label: "Instructor",          color: "#059669", additive: true,  removable: true },
+  { value: "team_admin",          label: "Team Admin",          color: "#d97706", additive: true,  removable: true },
+  { value: "affiliate",           label: "Affiliate",           color: "#9333ea", additive: true,  removable: true },
+] as const;
+
+type AppRoleValue = typeof ALL_ROLES[number]["value"];
+
+function AppRolesPanel({ userId, refetch }: { userId: number; refetch: () => void }) {
+  const { data: rolesData, refetch: refetchRoles } = trpc.adminUser.getUserAppRoles.useQuery({ userId });
+  const grantRole = trpc.adminUser.grantAppRole.useMutation({
+    onSuccess: () => { toast.success("Role granted."); refetchRoles(); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const revokeRole = trpc.adminUser.revokeAppRole.useMutation({
+    onSuccess: () => { toast.success("Role removed."); refetchRoles(); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const [addRole, setAddRole] = useState<AppRoleValue | "">("");
+
+  const assignedRoles = (rolesData ?? []).map((r: any) => r.role as AppRoleValue);
+  const availableToAdd = ALL_ROLES.filter(r => !assignedRoles.includes(r.value));
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+      <SectionHeader title="Platform Roles" />
+      {/* Current roles as chips */}
+      <div className="flex flex-wrap gap-2">
+        {assignedRoles.length === 0 && <p className="text-sm text-gray-400">No roles assigned yet.</p>}
+        {ALL_ROLES.filter(r => assignedRoles.includes(r.value)).map(role => (
+          <span key={role.value}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border"
+            style={{ background: role.color + "18", color: role.color, borderColor: role.color + "40" }}>
+            {role.additive && <span className="text-[9px] font-bold opacity-60">+</span>}
+            {role.label}
+            {role.removable && (
+              <button
+                onClick={() => revokeRole.mutate({ userId, role: role.value })}
+                disabled={revokeRole.isPending}
+                className="ml-0.5 hover:opacity-70 transition-opacity"
+                title={`Remove ${role.label}`}>
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </span>
+        ))}
+      </div>
+      {/* Add role row */}
+      {availableToAdd.length > 0 && (
+        <div className="flex items-center gap-2 pt-1">
+          <Select value={addRole} onValueChange={(v) => setAddRole(v as AppRoleValue)}>
+            <SelectTrigger className="h-8 text-xs w-52">
+              <SelectValue placeholder="Add a role…" />
+            </SelectTrigger>
+            <SelectContent>
+              <div className="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Standard Roles</div>
+              {availableToAdd.filter(r => !r.additive).map(r => (
+                <SelectItem key={r.value} value={r.value}>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ background: r.color }} />
+                    {r.label}
+                  </span>
+                </SelectItem>
+              ))}
+              {availableToAdd.some(r => r.additive) && (
+                <>
+                  <div className="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">Additive Roles</div>
+                  {availableToAdd.filter(r => r.additive).map(r => (
+                    <SelectItem key={r.value} value={r.value}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ background: r.color }} />
+                        {r.label} <span className="text-[10px] text-gray-400">(additive)</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </>
+              )}
+            </SelectContent>
+          </Select>
+          <Button size="sm" disabled={!addRole || grantRole.isPending}
+            onClick={() => { if (addRole) { grantRole.mutate({ userId, role: addRole }); setAddRole(""); } }}
+            className="h-8 text-xs bg-[#189aa1] hover:bg-[#157f85] text-white">
+            <PlusCircle className="w-3.5 h-3.5 mr-1" /> Grant
+          </Button>
+        </div>
+      )}
+      <p className="text-[11px] text-gray-400">Roles marked with <strong>+</strong> are additive — they can be stacked on any account type. The base <em>user</em> role cannot be removed.</p>
+    </div>
+  );
+}
+
 // ─── Tab types ────────────────────────────────────────────────────────────────
 type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates" | "communications" | "activity" | "logins";
 const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates", "communications", "activity", "logins"];
@@ -199,19 +303,8 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
         </div>
       </div>
 
-      {/* Role management */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
-        <SectionHeader title="Role & Access" />
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-sm text-gray-600">Current role: <strong>{user.role}</strong></span>
-          <Button size="sm" variant="outline" disabled={updateRole.isPending || user.role === "admin"} onClick={() => updateRole.mutate({ userId, role: "admin" })} className="text-teal-700 border-teal-200 hover:bg-teal-50">
-            <Shield className="w-3.5 h-3.5 mr-1.5" /> Promote to Admin
-          </Button>
-          <Button size="sm" variant="outline" disabled={updateRole.isPending || user.role === "user"} onClick={() => updateRole.mutate({ userId, role: "user" })} className="text-gray-600 border-gray-200 hover:bg-gray-50">
-            <ShieldOff className="w-3.5 h-3.5 mr-1.5" /> Demote to User
-          </Button>
-        </div>
-      </div>
+      {/* Platform Roles panel */}
+      <AppRolesPanel userId={userId} refetch={refetch} />
 
       {/* Brand memberships */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">

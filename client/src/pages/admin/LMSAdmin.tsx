@@ -5890,9 +5890,10 @@ const LMS_NAV_GROUPS = [
     label: "Tools",
     color: "gray",
     items: [
-      { value: "question_bank", label: "Question Bank", icon: Database },
-      { value: "thinkific",   label: "Import",      icon: Upload }, // Upload already imported
-      { value: "trash",       label: "Trash",       icon: Trash2, danger: true },
+      { value: "question_bank",     label: "Question Bank",     icon: Database },
+      { value: "publish_requests",  label: "Publish Requests",  icon: CheckCircle },
+      { value: "thinkific",         label: "Import",            icon: Upload },
+      { value: "trash",             label: "Trash",             icon: Trash2, danger: true },
     ],
   },
   {
@@ -6026,10 +6027,11 @@ export default function LMSAdmin() {
               {activeTab === "export"      && <EnrollmentExportTab />}
               {activeTab === "analytics"   && <AnalyticsTab />}
               {activeTab === "affiliates"  && <AffiliatesTab />}
-              {activeTab === "question_bank" && <QuestionBankAdmin />}
-              {activeTab === "thinkific"   && <ThinkificImporter />}
-              {activeTab === "trash"       && <TrashTab />}
-              {activeTab === "lms_settings" && <LMSPublishDomainSettings />}
+              {activeTab === "question_bank"    && <QuestionBankAdmin />}
+              {activeTab === "publish_requests" && <PublishRequestsTab />}
+              {activeTab === "thinkific"         && <ThinkificImporter />}
+              {activeTab === "trash"             && <TrashTab />}
+              {activeTab === "lms_settings"      && <LMSPublishDomainSettings />}
             </main>
           </div>
         )}
@@ -6774,6 +6776,145 @@ const ITEM_TYPE_COLORS: Record<string, string> = {
   product: "bg-orange-100 text-orange-700",
   bundle: "bg-pink-100 text-pink-700",
 };
+
+// ─── Publish Requests Tab ────────────────────────────────────────────────────
+function PublishRequestsTab() {
+  const [statusFilter, setStatusFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [decision, setDecision] = useState<"approved" | "rejected">("approved");
+
+  const { data: requests = [], isLoading, refetch } = trpc.lms.listPublishRequests.useQuery(
+    statusFilter === "all" ? {} : { status: statusFilter },
+  );
+
+  const reviewMutation = trpc.lms.reviewPublishRequest.useMutation({
+    onSuccess: () => { toast.success(`Request ${decision}.`); refetch(); setReviewOpen(false); setSelectedRequest(null); setReviewNote(""); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  function openReview(req: any, dec: "approved" | "rejected") {
+    setSelectedRequest(req);
+    setDecision(dec);
+    setReviewNote("");
+    setReviewOpen(true);
+  }
+
+  const statusColors: Record<string, string> = {
+    pending:  "bg-amber-100 text-amber-700 border-amber-200",
+    approved: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    rejected: "bg-red-100 text-red-700 border-red-200",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-900">Instructor Publish Requests</h2>
+        <div className="flex gap-1">
+          {(["pending", "approved", "rejected", "all"] as const).map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                statusFilter === s ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-200 hover:border-teal-300"
+              }`}>
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-teal-600" /></div>
+      ) : requests.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+          <CheckCircle className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 font-medium">No {statusFilter !== "all" ? statusFilter : ""} publish requests</p>
+          <p className="text-xs text-gray-400 mt-1">When instructors submit courses for review, they will appear here.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {requests.map((req: any) => (
+            <div key={req.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-gray-900 truncate">{req.courseTitle ?? `Course #${req.courseId}`}</h3>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColors[req.status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                      {req.status}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Submitted by <strong>{req.instructorName ?? "Unknown"}</strong> ({req.instructorEmail ?? "—"})
+                    {" · "}{new Date(req.requestedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                  </p>
+                  {req.note && (
+                    <p className="mt-2 text-sm text-gray-600 bg-gray-50 rounded-lg p-3 border border-gray-100">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wide block mb-1">Instructor Note</span>
+                      {req.note}
+                    </p>
+                  )}
+                  {req.reviewNote && (
+                    <p className="mt-2 text-sm text-gray-600 bg-teal-50 rounded-lg p-3 border border-teal-100">
+                      <span className="text-xs font-bold text-teal-600 uppercase tracking-wide block mb-1">Review Note</span>
+                      {req.reviewNote}
+                    </p>
+                  )}
+                </div>
+                {req.status === "pending" && (
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button size="sm" onClick={() => openReview(req, "approved")}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8">
+                      <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => openReview(req, "rejected")}
+                      className="text-red-600 border-red-200 hover:bg-red-50 text-xs h-8">
+                      <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Review dialog */}
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{decision === "approved" ? "Approve" : "Reject"} Publish Request</DialogTitle>
+            <DialogDescription>
+              {decision === "approved"
+                ? "This will publish the course immediately and notify the instructor."
+                : "The course will remain unpublished. The instructor will be notified."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs text-gray-500">Review Note (optional)</Label>
+              <textarea
+                value={reviewNote}
+                onChange={e => setReviewNote(e.target.value)}
+                placeholder={decision === "approved" ? "Great work! Published." : "Please revise the introduction section before publishing."}
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewOpen(false)}>Cancel</Button>
+            <Button
+              disabled={reviewMutation.isPending}
+              onClick={() => selectedRequest && reviewMutation.mutate({ requestId: selectedRequest.id, decision, reviewNote: reviewNote || undefined })}
+              className={decision === "approved" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-red-600 hover:bg-red-700 text-white"}>
+              {reviewMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (decision === "approved" ? "Approve & Publish" : "Reject")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 function TrashTab() {
   const [typeFilter, setTypeFilter] = useState<"all" | "course" | "quiz" | "download" | "product" | "bundle">("all");

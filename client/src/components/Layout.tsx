@@ -210,7 +210,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isAdmin = (user as any)?.role === "admin";
   // Use appRoles (the authoritative role array from auth.me) for access checks
   const appRoles: string[] = (user as any)?.appRoles ?? [];
-  const hasDiyAccess = appRoles.includes("diy_user") || appRoles.includes("diy_admin") || appRoles.includes("platform_admin") || isAdmin;
+  const hasDiyAccess = appRoles.includes("diy_user") || appRoles.includes("diy_admin") || appRoles.includes("platform_admin") || appRoles.includes("platform_owner") || isAdmin;
   const hasDiyAdmin = appRoles.includes("diy_admin");
   const isDemoMode = !!(user as any)?.demoMode;
 
@@ -433,11 +433,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   const roles: string[] = (user as any).appRoles ?? [];
                   const isPremiumUser = (user as any).isPremium === true;
                   const hasDiyAdmin = roles.includes("diy_admin");
-                  const hasPlatformAdmin = roles.includes("platform_admin") || (user as any).role === "admin";
+                  const hasPlatformAdmin = roles.includes("platform_admin") || roles.includes("platform_owner") || roles.includes("platform_moderator") || (user as any).role === "admin";
                   const hasAccreditationManager = roles.includes("accreditation_manager") || hasPlatformAdmin;
                   const ROLE_LABELS: Record<string, { label: string; color: string }> = {
                     diy_user:  { label: "DIY Accreditation", color: "#f59e0b" },
                     diy_admin: { label: "Lab Admin",         color: "#f97316" },
+                    platform_owner:     { label: "Platform Owner",     color: "#7c3aed" },
+                    platform_admin:     { label: "Platform Admin",     color: "#dc2626" },
+                    platform_moderator: { label: "Moderator",          color: "#0891b2" },
+                    instructor:         { label: "Instructor",         color: "#059669" },
+                    team_admin:         { label: "Team Admin",         color: "#d97706" },
+                    affiliate:          { label: "Affiliate",          color: "#9333ea" },
                   };
                   const roleBadges = roles.filter(r => ROLE_LABELS[r]).map(r => ROLE_LABELS[r]);
                   const allBadges = [

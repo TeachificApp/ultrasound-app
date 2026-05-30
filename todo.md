@@ -3926,3 +3926,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] mergeUsers procedure: re-point all FK tables to primary userId, add duplicate email as alias, soft-delete duplicate
 - [x] Admin UI: email aliases panel in ProfileTab (list + add + remove)
 - [x] Admin UI: Merge Users button/dialog in AdminUserDetailPage (search, preview both accounts, confirm)
+
+## Role System — Phase 2 (Instructor/Team/Affiliate Logic)
+- [ ] AppRolesPanel in AdminUserDetailPage: show all assigned roles as removable chips, add-role dropdown with all 14 roles, additive roles (instructor/team_admin/affiliate) clearly labeled
+- [ ] instructor_course_permissions table: userId, courseId, canPublish (boolean), requiresApproval (boolean)
+- [ ] instructor_publish_requests table: courseId, instructorId, status (pending/approved/rejected), reviewedByAdminId, requestedAt, reviewedAt
+- [ ] Backend: getInstructorPermissions, setInstructorPublishPermission, requestPublish, reviewPublishRequest procedures
+- [ ] Gate Team Management routes with RoleGuard for team_admin
+- [ ] Scope instructor course edit access to courses where they are assigned instructor
+- [ ] Admin LMS panel: instructor publish approval queue (pending requests with approve/reject)
+- [ ] Per-instructor publish toggle in AdminUserDetailPage (when user has instructor role)

@@ -823,12 +823,17 @@ export const appRoleEnum = mysqlEnum("appRole", [
   "education_manager",
   "education_admin",
   "education_student",
+  "platform_owner",
+  "platform_moderator",
+  "instructor",
+  "team_admin",
+  "affiliate",
 ]);
 
 export const userRoles = mysqlTable("userRoles", {
   id: int("id").primaryKey().autoincrement(),
   userId: int("userId").notNull(),
-  role: mysqlEnum("role", ["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager", "education_manager", "education_admin", "education_student"]).notNull(),
+  role: mysqlEnum("role", ["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager", "education_manager", "education_admin", "education_student", "platform_owner", "platform_moderator", "instructor", "team_admin", "affiliate"]).notNull(),
   // For diy_user: which lab subscription granted this seat
   grantedByLabId: int("grantedByLabId"),
   // Who assigned this role (platform_admin or diy_admin userId)
@@ -5194,3 +5199,36 @@ export const userEmailAliases = mysqlTable("user_email_aliases", {
 });
 export type UserEmailAlias = typeof userEmailAliases.$inferSelect;
 export type InsertUserEmailAlias = typeof userEmailAliases.$inferInsert;
+
+// ─── Instructor Course Permissions ───────────────────────────────────────────
+// Tracks which courses an instructor can edit and whether they can self-publish
+// or require platform admin approval before publishing.
+export const instructorCoursePermissions = mysqlTable("instructor_course_permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  instructorId: int("instructor_id").notNull(),   // users.id
+  courseId: int("course_id").notNull(),            // lms_courses.id
+  // true = instructor can publish directly; false = requires admin approval
+  canSelfPublish: boolean("can_self_publish").default(false).notNull(),
+  grantedByAdminId: int("granted_by_admin_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type InstructorCoursePermission = typeof instructorCoursePermissions.$inferSelect;
+export type InsertInstructorCoursePermission = typeof instructorCoursePermissions.$inferInsert;
+
+// ─── Instructor Publish Requests ─────────────────────────────────────────────
+// When an instructor without self-publish permission wants to publish a course,
+// they submit a request here. Admins approve or reject it.
+export const instructorPublishRequests = mysqlTable("instructor_publish_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  instructorId: int("instructor_id").notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+  note: text("note"),
+  reviewNote: text("review_note"),
+  reviewedByAdminId: int("reviewed_by_admin_id"),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+export type InstructorPublishRequest = typeof instructorPublishRequests.$inferSelect;
+export type InsertInstructorPublishRequest = typeof instructorPublishRequests.$inferInsert;

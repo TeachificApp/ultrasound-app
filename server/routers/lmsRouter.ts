@@ -80,6 +80,9 @@ import {
   funnelLeads,
   lmsCohortGroups,
   lmsCohortGroupEnrollments,
+  instructorCoursePermissions,
+  instructorPublishRequests,
+  userRoles,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -2408,5 +2411,164 @@ export const lmsGroupRouter = router({
       const raw = response.choices?.[0]?.message?.content ?? "{}";
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       return { cards: (parsed.cards ?? []).slice(0, input.count) };
+    }),
+
+  // ─── Instructor Course Permissions ─────────────────────────────────────────
+
+  /** List courses this instructor is assigned to with their publish permission */
+  getInstructorCourses: protectedProcedure
+    .input(z.object({ instructorUserId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const rows = await db
+        .select({
+          permId: instructorCoursePermissions.id,
+          courseId: instructorCoursePermissions.courseId,
+          canSelfPublish: instructorCoursePermissions.canSelfPublish,
+          courseTitle: lmsCourses.title,
+          courseStatus: lmsCourses.status,
+        })
+        .from(instructorCoursePermissions)
+        .leftJoin(lmsCourses, eq(lmsCourses.id, instructorCoursePermissions.courseId))
+        .where(eq(instructorCoursePermissions.instructorId, input.instructorUserId));
+      return rows;
+    }),
+
+  /** Assign an instructor to a course (or update their publish permission) */
+  setInstructorCoursePermission: protectedProcedure
+    .input(z.object({
+      instructorUserId: z.number(),
+      courseId: z.number(),
+      canSelfPublish: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = getDb();
+      const existing = await db
+        .select({ id: instructorCoursePermissions.id })
+        .from(instructorCoursePermissions)
+        .where(and(
+          eq(instructorCoursePermissions.instructorId, input.instructorUserId),
+          eq(instructorCoursePermissions.courseId, input.courseId),
+        ))
+        .then(r => r[0]);
+      if (existing) {
+        await db.update(instructorCoursePermissions)
+          .set({ canSelfPublish: input.canSelfPublish, grantedByAdminId: ctx.user.id })
+          .where(eq(instructorCoursePermissions.id, existing.id));
+      } else {
+        await db.insert(instructorCoursePermissions).values({
+          instructorId: input.instructorUserId,
+          courseId: input.courseId,
+          canSelfPublish: input.canSelfPublish,
+          grantedByAdminId: ctx.user.id,
+        });
+      }
+      return { ok: true };
+    }),
+
+  /** Remove an instructor from a course */
+  removeInstructorFromCourse: protectedProcedure
+    .input(z.object({ instructorUserId: z.number(), courseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = getDb();
+      await db.delete(instructorCoursePermissions)
+        .where(and(
+          eq(instructorCoursePermissions.instructorId, input.instructorUserId),
+          eq(instructorCoursePermissions.courseId, input.courseId),
+        ));
+      return { ok: true };
+    }),
+
+  /** Instructor submits a publish request for a course */
+  requestCoursePublish: protectedProcedure
+    .input(z.object({ courseId: z.number(), note: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      // Check instructor has permission record for this course
+      const perm = await db.select().from(instructorCoursePermissions)
+        .where(and(
+          eq(instructorCoursePermissions.instructorId, ctx.user.id),
+          eq(instructorCoursePermissions.courseId, input.courseId),
+        ))
+        .then(r => r[0]);
+      if (!perm) throw new TRPCError({ code: "FORBIDDEN", message: "You are not assigned as instructor for this course." });
+      if (perm.canSelfPublish) throw new TRPCError({ code: "BAD_REQUEST", message: "You can publish this course directly." });
+      // Check no pending request already exists
+      const existing = await db.select().from(instructorPublishRequests)
+        .where(and(
+          eq(instructorPublishRequests.courseId, input.courseId),
+          eq(instructorPublishRequests.instructorId, ctx.user.id),
+          eq(instructorPublishRequests.status, "pending"),
+        ))
+        .then(r => r[0]);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "A publish request is already pending for this course." });
+      await db.insert(instructorPublishRequests).values({
+        courseId: input.courseId,
+        instructorId: ctx.user.id,
+        note: input.note ?? null,
+      });
+      return { ok: true };
+    }),
+
+  /** Admin lists pending publish requests */
+  listPublishRequests: protectedProcedure
+    .input(z.object({ status: z.enum(["pending", "approved", "rejected"]).optional() }))
+    .query(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = getDb();
+      const conditions = input.status ? [eq(instructorPublishRequests.status, input.status)] : [];
+      const rows = await db
+        .select({
+          id: instructorPublishRequests.id,
+          courseId: instructorPublishRequests.courseId,
+          instructorId: instructorPublishRequests.instructorId,
+          status: instructorPublishRequests.status,
+          note: instructorPublishRequests.note,
+          reviewNote: instructorPublishRequests.reviewNote,
+          requestedAt: instructorPublishRequests.requestedAt,
+          reviewedAt: instructorPublishRequests.reviewedAt,
+          courseTitle: lmsCourses.title,
+          instructorName: users.name,
+          instructorEmail: users.email,
+        })
+        .from(instructorPublishRequests)
+        .leftJoin(lmsCourses, eq(lmsCourses.id, instructorPublishRequests.courseId))
+        .leftJoin(users, eq(users.id, instructorPublishRequests.instructorId))
+        .where(conditions.length > 0 ? and(...conditions) : sql`1=1`)
+        .orderBy(desc(instructorPublishRequests.requestedAt));
+      return rows;
+    }),
+
+  /** Admin approves or rejects a publish request */
+  reviewPublishRequest: protectedProcedure
+    .input(z.object({
+      requestId: z.number(),
+      decision: z.enum(["approved", "rejected"]),
+      reviewNote: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = getDb();
+      const req = await db.select().from(instructorPublishRequests)
+        .where(eq(instructorPublishRequests.id, input.requestId))
+        .then(r => r[0]);
+      if (!req) throw new TRPCError({ code: "NOT_FOUND", message: "Publish request not found." });
+      await db.update(instructorPublishRequests)
+        .set({
+          status: input.decision,
+          reviewNote: input.reviewNote ?? null,
+          reviewedByAdminId: ctx.user.id,
+          reviewedAt: new Date(),
+        })
+        .where(eq(instructorPublishRequests.id, input.requestId));
+      // If approved, publish the course
+      if (input.decision === "approved") {
+        await db.update(lmsCourses)
+          .set({ status: "public" })
+          .where(eq(lmsCourses.id, req.courseId));
+      }
+      return { ok: true };
     }),
 });

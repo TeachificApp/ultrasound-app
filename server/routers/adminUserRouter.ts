@@ -40,6 +40,7 @@ import {
   userActivityLogs,
   emailSendLog,
   userEmailAliases,
+  userRoles,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
@@ -1803,5 +1804,49 @@ export const adminUserRouter = router({
         ))
         .limit(10);
       return rows;
+    }),
+
+  /** Get all app roles assigned to a user */
+  getUserAppRoles: protectedProcedure
+    .input(z.object({ userId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(userRoles).where(eq(userRoles.userId, input.userId));
+      return rows;
+    }),
+
+  /** Grant an app role to a user (idempotent) */
+  grantAppRole: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager", "education_manager", "education_admin", "education_student", "platform_owner", "platform_moderator", "instructor", "team_admin", "affiliate"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const existing = await db.select().from(userRoles)
+        .where(and(eq(userRoles.userId, input.userId), eq(userRoles.role, input.role))).limit(1);
+      if (existing.length === 0) {
+        await db.insert(userRoles).values({ userId: input.userId, role: input.role, assignedByUserId: ctx.user.id });
+      }
+      return { success: true };
+    }),
+
+  /** Revoke an app role from a user */
+  revokeAppRole: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager", "education_manager", "education_admin", "education_student", "platform_owner", "platform_moderator", "instructor", "team_admin", "affiliate"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (input.role === "user") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot remove the base user role" });
+      await db.delete(userRoles).where(and(eq(userRoles.userId, input.userId), eq(userRoles.role, input.role)));
+      return { success: true };
     }),
 });

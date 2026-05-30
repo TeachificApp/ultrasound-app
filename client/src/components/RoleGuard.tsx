@@ -23,7 +23,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 
-type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager" | "education_manager" | "education_admin" | "education_student";
+type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager" | "education_manager" | "education_admin" | "education_student" | "platform_owner" | "platform_moderator" | "instructor" | "team_admin" | "affiliate";
 
 interface RoleGuardProps {
   /** At least one of these roles must be present for access */
@@ -40,19 +40,29 @@ const ROLE_LABELS: Record<AppRole, string> = {
   premium_user: "Premium User",
   diy_admin: "DIY Accreditation Admin",
   diy_user: "DIY Accreditation User",
-  platform_admin: "Platform Administrator",
+  platform_admin: "Platform Admin",
   accreditation_manager: "Accreditation Manager",
   education_manager: "Education Manager",
   education_admin: "Education Admin",
   education_student: "Education Student",
+  platform_owner: "Platform Owner",
+  platform_moderator: "Platform Moderator",
+  instructor: "Instructor",
+  team_admin: "Team Admin",
+  affiliate: "Affiliate",
 };
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   diy_admin: "Lab Admin access to the DIY Accreditation Tool™",
   diy_user: "Seat-based access to the DIY Accreditation Tool™",
   premium_user: "Premium subscription access",
-  platform_admin: "Platform administrator access",
+  platform_admin: "Full platform management access",
   accreditation_manager: "Full access to all DIY Accreditation organizations and managed accounts",
+  platform_owner: "Owner-level access — full platform control",
+  platform_moderator: "Moderation access — content review and member management",
+  instructor: "Instructor access — create and manage courses and content",
+  team_admin: "Team administration — manage team members and settings",
+  affiliate: "Affiliate partner access — referral tracking and commission management",
 };
 
 export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: RoleGuardProps) {
@@ -103,7 +113,7 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
   // Check roles — appRoles is the array returned by auth.me
   // Also treat user.role === "admin" (the base DB admin flag) as platform_admin for allowAdmin gates
   const userRoles: AppRole[] = (user as any).appRoles ?? [];
-  const isPlatformAdmin = userRoles.includes("platform_admin") || (user as any).role === "admin";
+  const isPlatformAdmin = userRoles.includes("platform_admin") || userRoles.includes("platform_owner") || (user as any).role === "admin";
   const hasRequiredRole = roles.some(r => userRoles.includes(r));
   const isAuthorised = hasRequiredRole || (allowAdmin && isPlatformAdmin);
 

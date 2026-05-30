@@ -176,7 +176,7 @@ export const appRouter = router({
       // Fetch full user row to expose pendingEmail and isPremium for the profile UI
       const fullUser = await getUserById(opts.ctx.user.id);
       // Derive isPremium from both the DB flag and role-based premium access
-      const PREMIUM_ROLES = new Set(["premium_user", "diy_user", "diy_admin", "platform_admin"]);
+      const PREMIUM_ROLES = new Set(["premium_user", "diy_user", "diy_admin", "platform_admin", "platform_owner"]);
       const isPremiumByRole = roles.some(r => PREMIUM_ROLES.has(r));
       const isPremium = (fullUser?.isPremium ?? false) || isPremiumByRole;
       // Check brand-specific premium membership
