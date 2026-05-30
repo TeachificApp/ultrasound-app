@@ -66,6 +66,9 @@ import {
   X,
   Layers,
   Sparkles,
+  GitBranch,
+  AlertTriangle,
+  Info,
 } from "lucide-react";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
@@ -2194,14 +2197,313 @@ function AnalyticsTab({ formId, template }: { formId: number; template: any }) {
   );
 }
 
+// ─── Branching / Logic Tab ─────────────────────────────────────────────────────
+type BranchCondition = { id: string; fieldId: string; operator: string; value: string };
+type BranchRule = {
+  id?: number;
+  ruleLabel: string;
+  targetType: "item" | "section";
+  targetId: number;
+  action: "show" | "hide" | "require" | "unrequire";
+  logicOperator: "all" | "any";
+  conditions: BranchCondition[];
+  isEnabled: boolean;
+};
+
+const BRANCH_OPERATORS = [
+  { value: "equals", label: "equals" },
+  { value: "not_equals", label: "does not equal" },
+  { value: "contains", label: "contains" },
+  { value: "not_contains", label: "does not contain" },
+  { value: "starts_with", label: "starts with" },
+  { value: "is_empty", label: "is empty" },
+  { value: "is_not_empty", label: "is not empty" },
+  { value: "greater_than", label: "greater than" },
+  { value: "less_than", label: "less than" },
+];
+
+function BranchingTab({ formId }: { formId: number }) {
+  const { data: formData } = trpc.generalForm.getForm.useQuery({ id: formId });
+  const { data: existingRules, refetch: refetchRules } = trpc.generalForm.getBranchRules.useQuery({ templateId: formId });
+  const upsertRule = trpc.generalForm.upsertBranchRule.useMutation({ onSuccess: () => { toast.success("Rule saved"); refetchRules(); } });
+  const deleteRule = trpc.generalForm.deleteBranchRule.useMutation({ onSuccess: () => { toast.success("Rule deleted"); refetchRules(); } });
+
+  const [editingRule, setEditingRule] = useState<BranchRule | null>(null);
+  const [editingId, setEditingId] = useState<number | undefined>(undefined);
+
+  const items = useMemo(() => (formData?.items ?? []).filter((it: any) => !["heading", "paragraph", "section_break", "rich_text"].includes(it.itemType)), [formData]);
+  const sections = useMemo(() => formData?.sections ?? [], [formData]);
+
+  const newBlankRule = (): BranchRule => ({
+    ruleLabel: "",
+    targetType: "item",
+    targetId: items[0]?.id ?? 0,
+    action: "show",
+    logicOperator: "all",
+    conditions: [{ id: Math.random().toString(36).slice(2), fieldId: items[0] ? String(items[0].id) : "", operator: "equals", value: "" }],
+    isEnabled: true,
+  });
+
+  const startEdit = (rule?: any) => {
+    if (rule) {
+      setEditingId(rule.id);
+      setEditingRule({
+        ruleLabel: rule.ruleLabel ?? "",
+        targetType: rule.targetType as any,
+        targetId: rule.targetId,
+        action: rule.action as any,
+        logicOperator: rule.logicOperator as any,
+        conditions: (() => { try { return JSON.parse(rule.conditions).map((c: any) => ({ ...c, id: c.id || Math.random().toString(36).slice(2) })); } catch { return []; } })(),
+        isEnabled: rule.isEnabled ?? true,
+      });
+    } else {
+      setEditingId(undefined);
+      setEditingRule(newBlankRule());
+    }
+  };
+
+  const saveRule = () => {
+    if (!editingRule) return;
+    if (!editingRule.targetId) { toast.error("Please select a target field or section"); return; }
+    if (editingRule.conditions.length === 0) { toast.error("Add at least one condition"); return; }
+    upsertRule.mutate({
+      id: editingId,
+      templateId: formId,
+      ruleLabel: editingRule.ruleLabel,
+      targetType: editingRule.targetType,
+      targetId: editingRule.targetId,
+      action: editingRule.action,
+      logicOperator: editingRule.logicOperator,
+      conditions: JSON.stringify(editingRule.conditions),
+      isEnabled: editingRule.isEnabled,
+    });
+    setEditingRule(null);
+    setEditingId(undefined);
+  };
+
+  const addCondition = () => {
+    if (!editingRule) return;
+    setEditingRule(r => r ? { ...r, conditions: [...r.conditions, { id: Math.random().toString(36).slice(2), fieldId: items[0] ? String(items[0].id) : "", operator: "equals", value: "" }] } : r);
+  };
+
+  const updateCondition = (condId: string, updates: Partial<BranchCondition>) => {
+    if (!editingRule) return;
+    setEditingRule(r => r ? { ...r, conditions: r.conditions.map(c => c.id === condId ? { ...c, ...updates } : c) } : r);
+  };
+
+  const removeCondition = (condId: string) => {
+    if (!editingRule) return;
+    setEditingRule(r => r ? { ...r, conditions: r.conditions.filter(c => c.id !== condId) } : r);
+  };
+
+  const getItemLabel = (id: number | string) => {
+    const it = (formData?.items ?? []).find((i: any) => String(i.id) === String(id));
+    return it ? (it.label || it.itemType) : `Field #${id}`;
+  };
+
+  const getTargetLabel = (targetId: number, targetType: string) => {
+    if (targetType === "section") {
+      const s = sections.find((s: any) => s.id === targetId);
+      return s ? (s.title || `Section ${s.id}`) : `Section #${targetId}`;
+    }
+    return getItemLabel(targetId);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">Conditional Logic Rules</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Show, hide, or require fields based on previous answers.</p>
+        </div>
+        <Button size="sm" className="gap-1 text-white" style={{ background: BRAND }} onClick={() => startEdit()}>
+          <Plus className="w-3.5 h-3.5" /> Add Rule
+        </Button>
+      </div>
+
+      {!existingRules?.length ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <GitBranch className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm font-medium text-gray-500">No logic rules yet</p>
+            <p className="text-xs text-gray-400 mt-1">Add rules to show or hide fields based on answers.</p>
+            <Button size="sm" variant="outline" className="mt-4 gap-1" onClick={() => startEdit()}>
+              <Plus className="w-3.5 h-3.5" /> Add First Rule
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {existingRules.map((rule: any) => {
+            let conditions: any[] = [];
+            try { conditions = JSON.parse(rule.conditions); } catch {}
+            return (
+              <Card key={rule.id} className={`border ${rule.isEnabled ? "border-gray-200" : "border-gray-100 opacity-60"}`}>
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className={`text-xs ${
+                          rule.action === "show" ? "border-green-300 text-green-700 bg-green-50" :
+                          rule.action === "hide" ? "border-red-300 text-red-700 bg-red-50" :
+                          rule.action === "require" ? "border-blue-300 text-blue-700 bg-blue-50" :
+                          "border-gray-300 text-gray-600"
+                        }`}>{rule.action.toUpperCase()}</Badge>
+                        <span className="text-sm font-medium text-gray-800 truncate">{getTargetLabel(rule.targetId, rule.targetType)}</span>
+                        {rule.ruleLabel && <span className="text-xs text-gray-400 italic">— {rule.ruleLabel}</span>}
+                        {!rule.isEnabled && <Badge variant="outline" className="text-xs text-gray-400">Disabled</Badge>}
+                      </div>
+                      <div className="mt-1.5 space-y-0.5">
+                        {conditions.map((c: any, i: number) => (
+                          <div key={i} className="flex items-center gap-1 text-xs text-gray-500">
+                            {i > 0 && <span className="font-semibold text-teal-600">{rule.logicOperator === "all" ? "AND" : "OR"}</span>}
+                            <span className="bg-gray-100 rounded px-1.5 py-0.5">{getItemLabel(c.fieldId)}</span>
+                            <span>{BRANCH_OPERATORS.find(o => o.value === c.operator)?.label ?? c.operator}</span>
+                            {!["is_empty", "is_not_empty"].includes(c.operator) && <span className="font-medium text-gray-700">"{c.value}"</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEdit(rule)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
+                        onClick={() => { if (confirm("Delete this rule?")) deleteRule.mutate({ id: rule.id }); }}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={!!editingRule} onOpenChange={open => { if (!open) { setEditingRule(null); setEditingId(undefined); } }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitBranch className="w-4 h-4" style={{ color: BRAND }} />
+              {editingId ? "Edit Logic Rule" : "New Logic Rule"}
+            </DialogTitle>
+          </DialogHeader>
+          {editingRule && (
+            <div className="space-y-5">
+              <div>
+                <Label className="text-xs font-medium text-gray-600">Rule Label (optional)</Label>
+                <Input value={editingRule.ruleLabel} onChange={e => setEditingRule(r => r ? { ...r, ruleLabel: e.target.value } : r)}
+                  placeholder="e.g. Show phone field if contact method is phone" className="mt-1 h-8 text-sm" />
+              </div>
+              <Card className="bg-gray-50 border-gray-200">
+                <CardContent className="pt-3 pb-3">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">THEN…</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Select value={editingRule.action} onValueChange={v => setEditingRule(r => r ? { ...r, action: v as any } : r)}>
+                      <SelectTrigger className="h-8 text-sm w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="show">Show</SelectItem>
+                        <SelectItem value="hide">Hide</SelectItem>
+                        <SelectItem value="require">Require</SelectItem>
+                        <SelectItem value="unrequire">Un-require</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-gray-500">the</span>
+                    <Select
+                      value={`${editingRule.targetType}:${editingRule.targetId}`}
+                      onValueChange={v => { const [type, id] = v.split(":"); setEditingRule(r => r ? { ...r, targetType: type as any, targetId: parseInt(id) } : r); }}
+                    >
+                      <SelectTrigger className="h-8 text-sm w-56"><SelectValue placeholder="Select field or section" /></SelectTrigger>
+                      <SelectContent>
+                        {items.map((it: any) => <SelectItem key={it.id} value={`item:${it.id}`}>{it.label || it.itemType}</SelectItem>)}
+                        {sections.length > 0 && sections.map((s: any) => <SelectItem key={s.id} value={`section:${s.id}`}>{s.title || `Section ${s.id}`}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-gray-600">WHEN…</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Match</span>
+                    <div className="flex rounded border border-gray-200 overflow-hidden text-xs">
+                      {(["all", "any"] as const).map(l => (
+                        <button key={l} type="button" onClick={() => setEditingRule(r => r ? { ...r, logicOperator: l } : r)}
+                          className={`px-2.5 py-1 font-medium transition-colors ${
+                            editingRule.logicOperator === l ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                          }`}>{l === "all" ? "ALL" : "ANY"}</button>
+                      ))}
+                    </div>
+                    <span className="text-xs text-gray-500">conditions</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {editingRule.conditions.map((cond, idx) => (
+                    <div key={cond.id} className="flex items-center gap-2 flex-wrap bg-gray-50 rounded-lg p-2">
+                      {idx > 0 && <span className="text-xs font-bold text-teal-700 w-8 text-center">{editingRule.logicOperator === "all" ? "AND" : "OR"}</span>}
+                      {idx === 0 && <span className="text-xs text-gray-400 w-8">If</span>}
+                      <Select value={cond.fieldId} onValueChange={v => updateCondition(cond.id, { fieldId: v })}>
+                        <SelectTrigger className="h-7 text-xs w-44"><SelectValue placeholder="Select field" /></SelectTrigger>
+                        <SelectContent>
+                          {items.map((it: any) => <SelectItem key={it.id} value={String(it.id)}>{it.label || it.itemType}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={cond.operator} onValueChange={v => updateCondition(cond.id, { operator: v })}>
+                        <SelectTrigger className="h-7 text-xs w-40"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {BRANCH_OPERATORS.map(op => <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {!["is_empty", "is_not_empty"].includes(cond.operator) && (
+                        <input type="text" value={cond.value} onChange={e => updateCondition(cond.id, { value: e.target.value })}
+                          placeholder="value" className="h-7 px-2 text-xs border border-gray-200 rounded w-32 bg-white focus:outline-none focus:border-teal-400" />
+                      )}
+                      <button type="button" onClick={() => removeCondition(cond.id)} className="text-gray-400 hover:text-red-500 ml-auto">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <Button size="sm" variant="outline" className="mt-2 h-7 text-xs gap-1" onClick={addCondition}>
+                  <Plus className="w-3 h-3" /> Add Condition
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={editingRule.isEnabled} onCheckedChange={v => setEditingRule(r => r ? { ...r, isEnabled: v } : r)} />
+                <Label className="text-xs text-gray-600">Rule enabled</Label>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-2">
+                <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-700">
+                  Rules are evaluated in real-time as users fill out the form. Fields hidden by rules are excluded from submission.
+                  <strong> Show</strong> = hidden by default, shown when conditions match.
+                  <strong> Hide</strong> = visible by default, hidden when conditions match.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => { setEditingRule(null); setEditingId(undefined); }}>Cancel</Button>
+            <Button size="sm" className="text-white" style={{ background: BRAND }} onClick={saveRule} disabled={upsertRule.isPending}>
+              {upsertRule.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1" /> : null} Save Rule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+
 // ─── Form Editor Shell (tabs) ─────────────────────────────────────────────────
 function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "results" | "analytics">("settings");
+  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "results" | "analytics" | "branching">("settings");
   const { data: formData, isLoading, refetch } = trpc.generalForm.getForm.useQuery({ id: formId });
 
   const TABS = [
     { id: "settings", label: "Settings", icon: Settings },
     { id: "editor", label: "Editor", icon: FileText },
+    { id: "branching", label: "Logic", icon: GitBranch },
     { id: "style", label: "Style / Branding", icon: Palette },
     { id: "share", label: "Share", icon: Share2 },
     { id: "results", label: "Results", icon: Download },
@@ -2278,6 +2580,7 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
 
       {/* Tab content */}
       {activeTab === "editor" && <FormEditor formId={formId} />}
+      {activeTab === "branching" && <BranchingTab formId={formId} />}
       {activeTab === "style" && <StyleTab formId={formId} template={template} />}
       {activeTab === "share" && <ShareTab formId={formId} template={template} onRefetch={refetch} />}
       {activeTab === "settings" && <SettingsTab formId={formId} template={template} onRefetch={refetch} />}

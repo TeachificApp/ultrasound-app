@@ -365,16 +365,24 @@ function PageByPageRenderer({
   const hiddenIds = useMemo(() => {
     const hidden = new Set<number>();
     for (const rule of branchRules ?? []) {
+      if (!rule.isEnabled) continue;
       try {
-        const conditions: Array<{itemId: number; operator: string; value: string}> = JSON.parse(rule.conditions ?? "[]");
+        const conditions: Array<{fieldId?: string; itemId?: number; operator: string; value: string}> = JSON.parse(rule.conditions ?? "[]");
         if (!conditions.length) continue;
         const results = conditions.map((c: any) => {
-          const tv = responses[String(c.itemId)];
-          if (c.operator === "equals") return tv === c.value;
-          if (c.operator === "not_equals") return tv !== c.value;
-          if (c.operator === "contains") return Array.isArray(tv) ? tv.includes(c.value) : String(tv ?? "").includes(c.value);
-          if (c.operator === "is_empty") return !tv || (Array.isArray(tv) ? !tv.length : tv === "");
-          if (c.operator === "is_not_empty") return !!(tv && (Array.isArray(tv) ? tv.length : tv !== ""));
+          const key = c.fieldId != null ? String(c.fieldId) : String(c.itemId ?? "");
+          const tv = responses[key];
+          const strVal = String(tv ?? "");
+          const numVal = parseFloat(strVal);
+          if (c.operator === "equals") return Array.isArray(tv) ? tv.includes(c.value) : strVal === c.value;
+          if (c.operator === "not_equals") return Array.isArray(tv) ? !tv.includes(c.value) : strVal !== c.value;
+          if (c.operator === "contains") return Array.isArray(tv) ? tv.includes(c.value) : strVal.toLowerCase().includes(c.value.toLowerCase());
+          if (c.operator === "not_contains") return Array.isArray(tv) ? !tv.includes(c.value) : !strVal.toLowerCase().includes(c.value.toLowerCase());
+          if (c.operator === "starts_with") return strVal.toLowerCase().startsWith(c.value.toLowerCase());
+          if (c.operator === "is_empty") return !tv || (Array.isArray(tv) ? !tv.length : strVal === "");
+          if (c.operator === "is_not_empty") return !!(tv && (Array.isArray(tv) ? tv.length : strVal !== ""));
+          if (c.operator === "greater_than") return !isNaN(numVal) && numVal > parseFloat(c.value);
+          if (c.operator === "less_than") return !isNaN(numVal) && numVal < parseFloat(c.value);
           return false;
         });
         const met = rule.logicOperator === "all" ? results.every(Boolean) : results.some(Boolean);
@@ -615,16 +623,25 @@ function ClassicRenderer({
   const hiddenIds = useMemo(() => {
     const hidden = new Set<number>();
     for (const rule of branchRules ?? []) {
+      if (!rule.isEnabled) continue;
       try {
-        const conditions: Array<{itemId: number; operator: string; value: string}> = JSON.parse(rule.conditions ?? "[]");
+        const conditions: Array<{fieldId?: string; itemId?: number; operator: string; value: string}> = JSON.parse(rule.conditions ?? "[]");
         if (!conditions.length) continue;
         const results = conditions.map((c: any) => {
-          const tv = responses[String(c.itemId)];
-          if (c.operator === "equals") return tv === c.value;
-          if (c.operator === "not_equals") return tv !== c.value;
-          if (c.operator === "contains") return Array.isArray(tv) ? tv.includes(c.value) : String(tv ?? "").includes(c.value);
-          if (c.operator === "is_empty") return !tv || (Array.isArray(tv) ? !tv.length : tv === "");
-          if (c.operator === "is_not_empty") return !!(tv && (Array.isArray(tv) ? tv.length : tv !== ""));
+          // Support both fieldId (new) and itemId (legacy)
+          const key = c.fieldId != null ? String(c.fieldId) : String(c.itemId ?? "");
+          const tv = responses[key];
+          const strVal = String(tv ?? "");
+          const numVal = parseFloat(strVal);
+          if (c.operator === "equals") return Array.isArray(tv) ? tv.includes(c.value) : strVal === c.value;
+          if (c.operator === "not_equals") return Array.isArray(tv) ? !tv.includes(c.value) : strVal !== c.value;
+          if (c.operator === "contains") return Array.isArray(tv) ? tv.includes(c.value) : strVal.toLowerCase().includes(c.value.toLowerCase());
+          if (c.operator === "not_contains") return Array.isArray(tv) ? !tv.includes(c.value) : !strVal.toLowerCase().includes(c.value.toLowerCase());
+          if (c.operator === "starts_with") return strVal.toLowerCase().startsWith(c.value.toLowerCase());
+          if (c.operator === "is_empty") return !tv || (Array.isArray(tv) ? !tv.length : strVal === "");
+          if (c.operator === "is_not_empty") return !!(tv && (Array.isArray(tv) ? tv.length : strVal !== ""));
+          if (c.operator === "greater_than") return !isNaN(numVal) && numVal > parseFloat(c.value);
+          if (c.operator === "less_than") return !isNaN(numVal) && numVal < parseFloat(c.value);
           return false;
         });
         const met = rule.logicOperator === "all" ? results.every(Boolean) : results.some(Boolean);

@@ -531,6 +531,54 @@ export const generalFormRouter = router({
       return { success: true };
     }),
 
+  getBranchRules: protectedProcedure
+    .input(z.object({ templateId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(generalFormBranchRules)
+        .where(eq(generalFormBranchRules.templateId, input.templateId))
+        .orderBy(asc(generalFormBranchRules.sortOrder));
+    }),
+
+  upsertBranchRule: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      templateId: z.number(),
+      ruleLabel: z.string().default(""),
+      targetType: z.enum(["item", "section"]).default("item"),
+      targetId: z.number(),
+      action: z.enum(["show", "hide", "require", "unrequire"]).default("show"),
+      logicOperator: z.enum(["all", "any"]).default("all"),
+      conditions: z.string(), // JSON array of {fieldId, operator, value}
+      sortOrder: z.number().default(0),
+      isEnabled: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, ...rest } = input;
+      if (id) {
+        await db.update(generalFormBranchRules).set(rest).where(eq(generalFormBranchRules.id, id));
+        return { id };
+      } else {
+        const [result] = await db.insert(generalFormBranchRules).values(rest);
+        return { id: (result as any).insertId };
+      }
+    }),
+
+  deleteBranchRule: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(generalFormBranchRules).where(eq(generalFormBranchRules.id, input.id));
+      return { success: true };
+    }),
+
   // ── Analytics ─────────────────────────────────────────────────────────────
   getFormAnalytics: protectedProcedure
     .input(z.object({ id: z.number() }))

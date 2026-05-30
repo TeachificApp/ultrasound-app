@@ -4043,3 +4043,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Welcome/Start page: WelcomeScreen renderer uses welcome-specific colors instead of shared form colors
 - [x] Style/Branding tab: Save as Default Theme button (saves current theme as org default)
 - [x] Style/Branding tab: Load Default Theme button (applies saved org default to current form)
+
+## Form Branching / Conditional Logic (May 30, 2026)
+- [x] Add branchConditions column (JSON) to generalFormItems schema (used existing generalFormBranchRules table)
+- [x] Apply migration SQL for branchConditions column (table already existed)
+- [x] Build BranchingEditor component in form item editor (field + operator + value, AND/OR logic) - new Logic tab
+- [x] Save/load branchConditions via getBranchRules/upsertBranchRule/deleteBranchRule tRPC procedures
+- [x] Evaluate branch conditions in PublicFormRenderer (hide/show fields based on current answers)
+- [x] Evaluate branch conditions in PageByPageRenderer (skip pages/fields based on answers)
+- [x] Updated operators: equals, not_equals, contains, not_contains, starts_with, is_empty, is_not_empty, greater_than, less_than
