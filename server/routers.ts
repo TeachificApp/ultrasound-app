@@ -345,14 +345,18 @@ export const appRouter = router({
 
         await setPendingEmail(ctx.user.id, newEmail, token, expiry);
 
-        // Build verification URL
-        // Use origin from frontend to build correct redirect URL per domain
-        const appUrl = input.origin || process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
-        const verificationUrl = `${appUrl}/verify-email?token=${token}&type=change`;
-        const firstName = (currentUser.displayName || currentUser.name || 'there').split(' ')[0];
-        // Detect brand from the origin URL hostname (more reliable than proxy hostname)
+        // Build verification URL — always use canonical app domain
         const { detectBrandMode: dbm } = await import('@shared/brands');
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
+        const appUrlChange = (() => {
+          if (!input.origin) return process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
+          try {
+            const h = new URL(input.origin).hostname.toLowerCase();
+            return h.includes('iheartecho') ? 'https://app.iheartecho.net' : 'https://app.allaboutultrasound.com';
+          } catch { return 'https://app.allaboutultrasound.com'; }
+        })();
+        const verificationUrl = `${appUrlChange}/verify-email?token=${token}&type=change`;
+        const firstName = (currentUser.displayName || currentUser.name || 'there').split(' ')[0];
         const brandMode = dbm(originHostname);
         const emailPayload = buildEmailChangeVerificationEmail({
           firstName,
@@ -421,13 +425,18 @@ export const appRouter = router({
         const token = crypto.randomBytes(48).toString('hex');
         const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
         await setPasswordResetToken(user.id, token, expiry);
-        // Use origin from frontend to build correct redirect URL per domain
-        const appUrl = input.origin || process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
-        const resetUrl = `${appUrl}/reset-password?token=${token}`;
-        const firstName = (user.displayName || user.name || 'there').split(' ')[0];
-        // Detect brand from the origin URL hostname (more reliable than proxy hostname)
+        // Always use canonical app domain for reset URLs
         const { detectBrandMode: dbm2 } = await import('@shared/brands');
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
+        const appUrlReset = (() => {
+          if (!input.origin) return process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
+          try {
+            const h = new URL(input.origin).hostname.toLowerCase();
+            return h.includes('iheartecho') ? 'https://app.iheartecho.net' : 'https://app.allaboutultrasound.com';
+          } catch { return 'https://app.allaboutultrasound.com'; }
+        })();
+        const resetUrl = `${appUrlReset}/reset-password?token=${token}`;
+        const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const brandMode = dbm2(originHostname);
         const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
         await sendEmail({
@@ -490,16 +499,31 @@ export const appRouter = router({
 
         await setMagicLinkToken(user.id, token, expiry);
 
-        // Use origin from frontend to build correct redirect URL per domain
-        const appUrl = input.origin || process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
+        // Always use the canonical app domain for magic link URLs.
+        // The origin may be the marketing/WordPress site (e.g. allaboutultrasound.com)
+        // which cannot process magic link tokens. We map origins to their correct app domains.
+        const { detectBrandMode: dbm3 } = await import('@shared/brands');
+        const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
+        const brandMode = dbm3(originHostname);
+
+        // Resolve the correct app domain based on brand
+        function resolveAppDomain(origin: string | undefined): string {
+          if (!origin) return process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
+          try {
+            const h = new URL(origin).hostname.toLowerCase();
+            // iHeartEcho brand
+            if (h.includes('iheartecho')) return 'https://app.iheartecho.net';
+            // Always use app subdomain for AAUS — never www or bare domain
+            return 'https://app.allaboutultrasound.com';
+          } catch {
+            return process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
+          }
+        }
+        const appUrl = resolveAppDomain(input.origin);
         const returnToParam = input.returnTo ? `&returnTo=${encodeURIComponent(input.returnTo)}` : '';
         const magicUrl = `${appUrl}/auth/magic?token=${token}${returnToParam}`;
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
-        // Detect brand from the origin URL hostname (more reliable than proxy hostname)
-        const { detectBrandMode: dbm3 } = await import('@shared/brands');
-        const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
-        const brandMode = dbm3(originHostname);
         const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });
         await sendEmail({
           to: { name: firstName, email: user.email! },
