@@ -75,11 +75,13 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   prevLesson,
   nextLesson,
   onNavigateLesson,
-  embedded = false,
+  embedded: embeddedProp = false,
   lessonTitle,
   onBlocksChange,
   editorLabel,
 }: LessonBlockEditorProps, ref: React.Ref<LessonBlockEditorHandle>) {
+  // In controlled/assignment mode, always use embedded layout (no internal overlay/header)
+  const embedded = embeddedProp || !!onBlocksChange;
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -450,7 +452,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
       onBlocksChange(blocks);
       toast.success("Content saved!");
       if (andClose && onSavedAndClose) onSavedAndClose();
-      else onSaved();
+      else if (onSaved) onSaved();
       return;
     }
     setSaving(true);
@@ -686,13 +688,34 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
             >
               <Bookmark className="w-4 h-4" />
             </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 ml-1">
-              <X className="w-5 h-5" />
-            </button>
+            {onClose && (
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-700 ml-1">
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>}
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Embedded mini-toolbar (shown only in controlled/assignment mode) */}
+          {embedded && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200 shrink-0">
+              <span className="text-xs font-semibold text-teal-700 uppercase tracking-wide mr-1">{editorLabel ?? "Content Editor"}</span>
+              <Button size="sm" className="bg-teal-500 hover:bg-teal-600 text-white text-xs h-7" onClick={() => setAddMenuOpen(true)}>
+                <Plus className="w-3 h-3 mr-1" /> Add Block
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPreviewMode(p => !p)}
+                className={cn("text-xs h-7", previewMode ? "border-teal-500 text-teal-700 bg-teal-50" : "text-gray-500 hover:text-teal-700")}
+              >
+                {previewMode ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+                {previewMode ? "Edit" : "Preview"}
+              </Button>
+              <OpenTemplateLibraryButton />
+            </div>
+          )}
           {/* Left: Canvas */}
           <div ref={canvasRef} className="flex-1 overflow-y-auto bg-gray-50 p-4">
             {/* Blocks canvas */}
