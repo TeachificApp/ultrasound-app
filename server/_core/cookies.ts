@@ -58,6 +58,15 @@ function getPublicHostname(req: Request): string {
       return cleaned;
     }
   }
+  // x-app-hostname is sent by the tRPC client and contains window.location.hostname
+  const xAppHostname = req.headers["x-app-hostname"];
+  if (xAppHostname) {
+    const appHost = Array.isArray(xAppHostname) ? xAppHostname[0] : xAppHostname;
+    const cleaned = appHost.split(",")[0].trim().split(":")[0];
+    if (cleaned && !LOCAL_HOSTS.has(cleaned) && !isIpAddress(cleaned)) {
+      return cleaned;
+    }
+  }
   // Fall back to req.hostname (Express with trust proxy=1 resolves this from x-forwarded-host too,
   // but only if the proxy is trusted — use our own resolution as belt-and-suspenders)
   return req.hostname || (req.headers.host ?? "").split(":")[0];

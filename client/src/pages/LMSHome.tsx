@@ -25,7 +25,8 @@ import {
 export default function LMSHome() {
   const { user, isAuthenticated } = useAuth();
   const { data: featuredCourses, isLoading: loadingFeatured } = trpc.lms.listFeatured.useQuery();
-  const { data: downloads, isLoading: loadingDownloads } = trpc.downloads.list.useQuery({ limit: 4 });
+  const { data: downloadsData, isLoading: loadingDownloads } = trpc.downloads.list.useQuery({ limit: 4 });
+  const downloads = downloadsData?.products ?? [];
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -209,9 +210,9 @@ export default function LMSHome() {
                 </div>
               ))}
             </div>
-          ) : downloads && downloads.length > 0 ? (
+          ) : downloads.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              {downloads.map((product: any) => (
+              {downloads.map((product) => (
                 <Link key={product.id} href={`/downloads/${product.slug}`}>
                   <div className="group bg-gray-50 rounded-xl border border-gray-200 hover:border-[#4ad9e0] hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">
                     <div className="relative h-32 bg-gradient-to-br from-cyan-50 to-teal-50 overflow-hidden">

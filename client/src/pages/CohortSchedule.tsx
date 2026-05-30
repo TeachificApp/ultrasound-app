@@ -515,7 +515,7 @@ export default function CohortSchedule() {
               : "This cohort could not be found or you do not have access."}
           </p>
           <Button asChild variant="outline">
-            <Link href="/my-courses">Back to My Courses</Link>
+            <Link href="/my-dashboard?tab=content">Back to My Courses</Link>
           </Button>
         </Card>
       </div>
@@ -565,7 +565,7 @@ export default function CohortSchedule() {
       )}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 py-4">
-          <Link href="/my-courses" className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 mb-4">
+          <Link href="/my-dashboard?tab=content" className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 mb-4">
             <ChevronLeft className="w-4 h-4" />
             Back to My Courses
           </Link>
