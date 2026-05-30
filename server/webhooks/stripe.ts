@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -169,6 +169,28 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
     title: "🎓 New LMS Course Purchase",
     content: `User ID ${userId} purchased course ID ${courseId} (${seats} seat${seats > 1 ? 's' : ''}). Order #${orderId}. Amount: $${((session.amount_total as number ?? 0) / 100).toFixed(2)}.`,
   });
+  // Log purchase + enrollment to unified activity log (fire-and-forget)
+  try {
+    const [courseRow] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
+    await db.insert(userActivityLogs).values({
+      userId,
+      eventType: 'purchase',
+      description: `Purchased course: ${courseRow?.title ?? `Course #${courseId}`}`,
+      courseId,
+      contentTitle: courseRow?.title ?? null,
+      metadata: { orderId, seats, amountCents: session.amount_total, sessionId },
+    });
+    if (!existingEnrollment) {
+      await db.insert(userActivityLogs).values({
+        userId,
+        eventType: 'course_enroll',
+        description: `Enrolled in course: ${courseRow?.title ?? `Course #${courseId}`}`,
+        courseId,
+        contentTitle: courseRow?.title ?? null,
+        metadata: { orderId, enrollmentType: 'paid' },
+      });
+    }
+  } catch (_e) { /* non-blocking */ }
   await fulfillOrderBumpPurchase(db, meta, {
     userId,
     sessionId,
@@ -311,6 +333,15 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     title: "📦 New Digital Download Purchase",
     content: `User ID ${userId} purchased digital product ID ${productId}. Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
   });
+  // Log purchase to unified activity log (fire-and-forget)
+  try {
+    await db.insert(userActivityLogs).values({
+      userId,
+      eventType: 'purchase',
+      description: `Purchased digital download: product #${productId}`,
+      metadata: { productId, amountCents: session.amount_total, sessionId: session.id },
+    });
+  } catch (_e) { /* non-blocking */ }
   // Send purchase confirmation email with file links
   await sendPurchaseConfirmationEmail(userId, productId);
   await fulfillOrderBumpPurchase(db, meta, {

@@ -3975,3 +3975,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Navigation: add Affiliate Dashboard and Instructor Portal links to Layout.tsx account dropdown (role-based)
 - [x] Navigation: add Affiliate Dashboard and Instructor Portal links to LMSLayout.tsx account dropdown (role-based)
 - [x] Routes: register /affiliate-dashboard and /instructor-portal in App.tsx across all router contexts
+
+## Activity Log System & Form Builder Fix (May 30 2026)
+- [x] Fix Form Builder 404 — MembersRouter catch-all was redirecting /admin/general-forms to learn domain which had no route; added explicit routes to MembersRouter and LMSRouter
+- [x] Upgrade globalActivityLog procedure — added dateFrom/dateTo/userId filters, improved UNION query structure
+- [x] Instrument lmsRouter.ts — markLessonComplete logs lesson_complete events; enrollFree logs course_enroll events
+- [x] Instrument stripe.ts webhook — handleLmsCheckoutCompleted logs purchase + course_enroll; handleDigitalDownloadCheckoutCompleted logs purchase
+- [x] Create ActivityLogAdmin page — paginated feed with event type filter, date range, user search, color-coded badges
+- [x] Add Activity Log to LMSAdmin Insights nav group (Activity Log ↗ link)
+- [x] Add Activity Log card to PlatformAdmin DUAL_TOOLS_DEFAULT
+- [x] Register /admin/activity-log route in Router, MembersRouter, and LMSRouter

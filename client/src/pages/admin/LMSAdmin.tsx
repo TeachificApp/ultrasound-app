@@ -42,7 +42,7 @@ import {
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
   Layout as LayoutTemplate, Database,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
-  Repeat, Film, CalendarRange, ExternalLink, Link2, Mail,
+  Repeat, Film, CalendarRange, ExternalLink, Link2, Mail, Activity,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -6224,6 +6224,7 @@ const LMS_NAV_GROUPS = [
     items: [
       { value: "analytics",   label: "Analytics",   icon: TrendingUp },
       { value: "affiliates",  label: "Affiliates",  icon: DollarSign },
+      { value: "activity_log", label: "Activity Log ↗", icon: Activity, href: getAdminUrl("/admin/activity-log") },
     ],
   },
   {

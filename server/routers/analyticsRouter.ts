@@ -969,36 +969,53 @@ export const analyticsAdminRouter = router({
       return { revoked: input.enrollmentIds.length };
     }),
 
-  /** Global activity log across all users */
+    /** Global activity log across all users */
   globalActivityLog: protectedProcedure
     .input(z.object({
       page: z.number().int().default(1),
       pageSize: z.number().int().default(50),
       eventType: z.string().optional(),
       search: z.string().optional(), // search by user name/email
+      dateFrom: z.string().optional(), // ISO date string
+      dateTo: z.string().optional(),   // ISO date string
+      userId: z.number().int().optional(), // filter by specific user
     }))
     .query(async ({ ctx, input }) => {
       if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
-
       const offset = (input.page - 1) * input.pageSize;
+      const from = input.dateFrom ? new Date(input.dateFrom) : null;
+      const to = input.dateTo ? new Date(input.dateTo) : null;
       const typeCond = input.eventType ? sql`AND a.event_type = ${input.eventType}` : sql``;
       const searchCond = input.search
         ? sql`AND (u.name LIKE ${`%${input.search}%`} OR u.email LIKE ${`%${input.search}%`})`
         : sql``;
-
+      const userCond = input.userId ? sql`AND a.user_id = ${input.userId}` : sql``;
+      const dateCond = from && to
+        ? sql`AND a.created_at BETWEEN ${from} AND ${to}`
+        : from ? sql`AND a.created_at >= ${from}`
+        : to ? sql`AND a.created_at <= ${to}`
+        : sql``;
+      // Page view date/user conditions
+      const pvDateCond = from && to
+        ? sql`AND p.created_at BETWEEN ${from} AND ${to}`
+        : from ? sql`AND p.created_at >= ${from}`
+        : to ? sql`AND p.created_at <= ${to}`
+        : sql``;
+      const pvUserCond = input.userId ? sql`AND p.user_id = ${input.userId}` : sql``;
+      // Login date/user conditions
+      const lnDateCond = from && to
+        ? sql`AND l.created_at BETWEEN ${from} AND ${to}`
+        : from ? sql`AND l.created_at >= ${from}`
+        : to ? sql`AND l.created_at <= ${to}`
+        : sql``;
+      const lnUserCond = input.userId ? sql`AND l.user_id = ${input.userId}` : sql``;
+      // Only include page_view and login from UNION if no specific event type filter or if matching
+      const includePv = !input.eventType || input.eventType === 'page_view';
+      const includeLn = !input.eventType || input.eventType === 'login';
       // Use a UNION of activity_logs + page_view_events + login_events for a complete picture
-      // Fall back to LEFT JOIN so rows without a matching user still appear
-      const rows = await db.execute(sql`
-        SELECT
-          a.id, a.user_id AS userId, u.name AS userName, u.email AS userEmail,
-          a.event_type AS eventType, a.description, a.path,
-          a.ip_address AS ipAddress, a.user_agent AS userAgent,
-          a.metadata, a.created_at AS createdAt
-        FROM user_activity_logs a
-        LEFT JOIN users u ON u.id = a.user_id
-        WHERE 1=1 ${typeCond} ${searchCond}
+      const pvUnion = includePv ? sql`
         UNION ALL
         SELECT
           p.id, p.user_id AS userId, u2.name AS userName, u2.email AS userEmail,
@@ -1007,8 +1024,10 @@ export const analyticsAdminRouter = router({
           NULL AS metadata, p.created_at AS createdAt
         FROM user_page_view_events p
         LEFT JOIN users u2 ON u2.id = p.user_id
-        WHERE ${input.eventType ? sql`'page_view' = ${input.eventType}` : sql`1=1`}
+        WHERE 1=1 ${pvDateCond} ${pvUserCond}
           ${input.search ? sql`AND (u2.name LIKE ${`%${input.search}%`} OR u2.email LIKE ${`%${input.search}%`})` : sql``}
+      ` : sql``;
+      const lnUnion = includeLn ? sql`
         UNION ALL
         SELECT
           l.id, l.user_id AS userId, u3.name AS userName, u3.email AS userEmail,
@@ -1017,33 +1036,53 @@ export const analyticsAdminRouter = router({
           NULL AS metadata, l.created_at AS createdAt
         FROM user_login_events l
         LEFT JOIN users u3 ON u3.id = l.user_id
-        WHERE ${input.eventType ? sql`'login' = ${input.eventType}` : sql`1=1`}
+        WHERE 1=1 ${lnDateCond} ${lnUserCond}
           ${input.search ? sql`AND (u3.name LIKE ${`%${input.search}%`} OR u3.email LIKE ${`%${input.search}%`})` : sql``}
+      ` : sql``;
+      const rows = await db.execute(sql`
+        SELECT * FROM (
+          SELECT
+            a.id, a.user_id AS userId, u.name AS userName, u.email AS userEmail,
+            a.event_type AS eventType, a.description, a.path,
+            a.ip_address AS ipAddress, a.user_agent AS userAgent,
+            a.metadata, a.created_at AS createdAt
+          FROM user_activity_logs a
+          LEFT JOIN users u ON u.id = a.user_id
+          WHERE 1=1 ${typeCond} ${searchCond} ${userCond} ${dateCond}
+          ${pvUnion}
+          ${lnUnion}
+        ) AS combined
         ORDER BY createdAt DESC
         LIMIT ${input.pageSize} OFFSET ${offset}
       `);
-
-      const [totalRow] = await db.execute(sql`
-        SELECT (
-          SELECT COUNT(*) FROM user_activity_logs a LEFT JOIN users u ON u.id = a.user_id
-          WHERE 1=1 ${typeCond} ${searchCond}
-        ) + (
-          SELECT COUNT(*) FROM user_page_view_events p LEFT JOIN users u2 ON u2.id = p.user_id
-          WHERE ${input.eventType ? sql`'page_view' = ${input.eventType}` : sql`1=1`}
-            ${input.search ? sql`AND (u2.name LIKE ${`%${input.search}%`} OR u2.email LIKE ${`%${input.search}%`})` : sql``}
-        ) + (
-          SELECT COUNT(*) FROM user_login_events l LEFT JOIN users u3 ON u3.id = l.user_id
-          WHERE ${input.eventType ? sql`'login' = ${input.eventType}` : sql`1=1`}
-            ${input.search ? sql`AND (u3.name LIKE ${`%${input.search}%`} OR u3.email LIKE ${`%${input.search}%`})` : sql``}
-        ) AS total
+      // Count total
+      const activityCount = await db.execute(sql`
+        SELECT COUNT(*) AS c FROM user_activity_logs a LEFT JOIN users u ON u.id = a.user_id
+        WHERE 1=1 ${typeCond} ${searchCond} ${userCond} ${dateCond}
       `);
-
+      let total = Number((activityCount[0] as any)?.c ?? 0);
+      if (includePv) {
+        const pvCount = await db.execute(sql`
+          SELECT COUNT(*) AS c FROM user_page_view_events p LEFT JOIN users u2 ON u2.id = p.user_id
+          WHERE 1=1 ${pvDateCond} ${pvUserCond}
+            ${input.search ? sql`AND (u2.name LIKE ${`%${input.search}%`} OR u2.email LIKE ${`%${input.search}%`})` : sql``}
+        `);
+        total += Number((pvCount[0] as any)?.c ?? 0);
+      }
+      if (includeLn) {
+        const lnCount = await db.execute(sql`
+          SELECT COUNT(*) AS c FROM user_login_events l LEFT JOIN users u3 ON u3.id = l.user_id
+          WHERE 1=1 ${lnDateCond} ${lnUserCond}
+            ${input.search ? sql`AND (u3.name LIKE ${`%${input.search}%`} OR u3.email LIKE ${`%${input.search}%`})` : sql``}
+        `);
+        total += Number((lnCount[0] as any)?.c ?? 0);
+      }
       return {
         logs: (rows as any[]).map(r => ({
           id: Number(r.id),
-          userId: Number(r.userId),
-          userName: r.userName as string,
-          userEmail: r.userEmail as string,
+          userId: r.userId ? Number(r.userId) : null,
+          userName: (r.userName as string) ?? null,
+          userEmail: (r.userEmail as string) ?? null,
           eventType: (r.eventType as string) ?? 'unknown',
           description: r.description as string,
           path: r.path as string | null,
@@ -1052,7 +1091,7 @@ export const analyticsAdminRouter = router({
           metadata: r.metadata,
           createdAt: r.createdAt as Date,
         })),
-        total: Number((totalRow as any).total ?? 0),
+        total,
       };
     }),
 

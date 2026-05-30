@@ -83,6 +83,7 @@ import {
   instructorCoursePermissions,
   instructorPublishRequests,
   userRoles,
+  userActivityLogs,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -760,7 +761,9 @@ export const lmsLearnerRouter = router({
 
       const [existing] = await db.select().from(lmsLessonProgress)
         .where(and(eq(lmsLessonProgress.enrollmentId, enrollment.id), eq(lmsLessonProgress.lessonId, input.lessonId))).limit(1);
+      let wasAlreadyComplete = false;
       if (existing) {
+        wasAlreadyComplete = !!existing.completedAt;
         if (!existing.completedAt) {
           await db.update(lmsLessonProgress).set({ completedAt: new Date() }).where(eq(lmsLessonProgress.id, existing.id));
         }
@@ -768,6 +771,19 @@ export const lmsLearnerRouter = router({
         await db.insert(lmsLessonProgress).values({ enrollmentId: enrollment.id, lessonId: input.lessonId, completedAt: new Date() });
       }
       await recalcProgress(db, enrollment.id);
+      // Log lesson completion to unified activity log (fire-and-forget)
+      if (!wasAlreadyComplete) {
+        const [lesson] = await db.select({ title: lmsLessons.title }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+        db.insert(userActivityLogs).values({
+          userId: ctx.user.id,
+          eventType: 'lesson_complete',
+          description: `Completed lesson: ${lesson?.title ?? `Lesson #${input.lessonId}`} in ${course.title}`,
+          courseId: course.id,
+          lessonId: input.lessonId,
+          contentTitle: lesson?.title ?? null,
+          metadata: { courseSlug: input.courseSlug, courseTitle: course.title },
+        }).catch(() => {});
+      }
       return { success: true };
     }),
 
@@ -840,6 +856,15 @@ export const lmsLearnerRouter = router({
         userId: ctx.user.id, courseId: course.id,
         affiliateCode: input.affiliateCode ?? null,
       }).$returningId();
+      // Log free enrollment to unified activity log (fire-and-forget)
+      db.insert(userActivityLogs).values({
+        userId: ctx.user.id,
+        eventType: 'course_enroll',
+        description: `Enrolled in free course: ${course.title}`,
+        courseId: course.id,
+        contentTitle: course.title,
+        metadata: { courseSlug: input.courseSlug, enrollmentType: 'free', affiliateCode: input.affiliateCode ?? null },
+      }).catch(() => {});
       return { enrollmentId: result.id, alreadyEnrolled: false };
     }),
 
