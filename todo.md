@@ -3874,3 +3874,25 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] UI: Create Team dialog — name, org contact, admin user, members list, then courses+seats
 - [ ] UI: Team detail page — multi-course seat breakdown, member assignment per course
 - [ ] UI: Team admin portal — manage members, assign to courses, purchase additional seats/courses
+
+## Member Analytics & Teams Rebuild (May 2026)
+- [x] Add getCertificateList procedure to adminUserRouter (paginated, searchable)
+- [x] Add getEnrollmentAnalytics procedure (per-course breakdown + monthly trend)
+- [x] Add getActivityFeed procedure (enrollments, completions, certificates, logins)
+- [x] Add getInvitationStats procedure (group summary + recent invites)
+- [x] Rebuild CertificatesPanel in MembersHub with real data (table + pagination + search)
+- [x] Rebuild InvitationsPanel in MembersHub with real data (summary cards + groups + recent invites)
+- [x] Rebuild ActivityPanel in MembersHub with real data (feed + type filter)
+- [x] Rebuild EnrollmentsPanel in MembersHub with real data (summary cards + monthly trend + per-course table)
+- [x] Add lmsGroupCourses to lmsEnrollmentAdminRouter imports
+- [x] Add listTeams procedure (multi-course enriched)
+- [x] Add createTeam procedure (no course required, org info fields)
+- [x] Add updateTeam procedure
+- [x] Add addCourseToTeam procedure
+- [x] Add removeCourseFromTeam procedure
+- [x] Add updateCourseSeatCount procedure
+- [x] Add deleteTeam procedure
+- [x] Rebuild GroupsTab in LMSAdmin with multi-course Teams UI (org info, courses, seats)
+- [x] Add AddCourseToTeamInline component
+- [x] Add EditTeamDialog component
+- [x] Fix GroupSeatAssignPanel to handle multi-course teams (primaryCourseId fallback)

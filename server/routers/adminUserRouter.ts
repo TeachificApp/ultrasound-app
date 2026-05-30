@@ -33,8 +33,12 @@ import {
   digitalBundles,
   membershipSubscriptions,
   membershipPlans,
+  lmsCertificates,
+  lmsGroupSeats,
+  lmsGroupCourses,
+  lmsGroups,
 } from "../../drizzle/schema";
-import { and, eq, desc, sql } from "drizzle-orm";
+import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
@@ -928,6 +932,289 @@ export const adminUserRouter = router({
       ],
       recentMembers,
       recentActivity,
+    };
+  }),
+
+  /** List all issued certificates with pagination and filters */
+  getCertificateList: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      courseId: z.number().int().optional(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(25),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
+      const offset = (input.page - 1) * input.pageSize;
+
+      const searchFilter = input.search
+        ? sql`(u.name LIKE ${`%${input.search}%`} OR u.email LIKE ${`%${input.search}%`})`
+        : sql`1=1`;
+      const courseFilter = input.courseId ? sql`cert.course_id = ${input.courseId}` : sql`1=1`;
+
+      const [rows] = await db.execute(sql`
+        SELECT
+          cert.id, cert.user_id, cert.course_id, cert.certificate_url, cert.issued_at,
+          u.name AS user_name, u.email AS user_email, u.avatar_url,
+          c.title AS course_title, c.slug AS course_slug
+        FROM lms_certificates cert
+        JOIN users u ON u.id = cert.user_id
+        JOIN lms_courses c ON c.id = cert.course_id
+        WHERE ${searchFilter} AND ${courseFilter}
+        ORDER BY cert.issued_at DESC
+        LIMIT ${input.pageSize} OFFSET ${offset}
+      `) as any;
+
+      const [countRow] = await db.execute(sql`
+        SELECT COUNT(*) as total
+        FROM lms_certificates cert
+        JOIN users u ON u.id = cert.user_id
+        WHERE ${searchFilter} AND ${courseFilter}
+      `) as any;
+      const total = Number(toArr2(countRow)[0]?.total ?? 0);
+
+      return {
+        certificates: toArr2(rows).map((r: any) => ({
+          id: Number(r.id),
+          userId: Number(r.user_id),
+          courseId: Number(r.course_id),
+          certificateUrl: r.certificate_url ?? '',
+          issuedAt: r.issued_at,
+          userName: r.user_name ?? r.user_email ?? 'Unknown',
+          userEmail: r.user_email ?? '',
+          avatarUrl: r.avatar_url ?? null,
+          courseTitle: r.course_title ?? 'Unknown Course',
+          courseSlug: r.course_slug ?? '',
+        })),
+        total,
+        page: input.page,
+        pageSize: input.pageSize,
+        totalPages: Math.ceil(total / input.pageSize),
+      };
+    }),
+
+  /** Enrollment analytics: per-course breakdown with completion rates */
+  getEnrollmentAnalytics: protectedProcedure
+    .input(z.object({
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
+
+      const dateFrom = input.dateFrom ? new Date(input.dateFrom) : null;
+      const dateTo = input.dateTo ? (() => { const d = new Date(input.dateTo!); d.setHours(23,59,59,999); return d; })() : null;
+
+      const dateFilter = dateFrom && dateTo
+        ? sql`e.enrolled_at BETWEEN ${dateFrom} AND ${dateTo}`
+        : dateFrom
+        ? sql`e.enrolled_at >= ${dateFrom}`
+        : dateTo
+        ? sql`e.enrolled_at <= ${dateTo}`
+        : sql`1=1`;
+
+      const [courseRows] = await db.execute(sql`
+        SELECT
+          c.id AS courseId,
+          c.title AS courseTitle,
+          c.slug AS courseSlug,
+          c.thumbnail_url AS thumbnailUrl,
+          COUNT(e.id) AS enrollments,
+          SUM(CASE WHEN e.completed_at IS NOT NULL THEN 1 ELSE 0 END) AS completions,
+          ROUND(AVG(e.progress_pct), 1) AS avgProgress
+        FROM lms_courses c
+        LEFT JOIN lms_enrollments e ON e.course_id = c.id AND ${dateFilter}
+        WHERE c.status = 'published'
+        GROUP BY c.id, c.title, c.slug, c.thumbnail_url
+        ORDER BY COUNT(e.id) DESC
+        LIMIT 50
+      `) as any;
+
+      const [monthlyRows] = await db.execute(sql`
+        SELECT DATE_FORMAT(enrolled_at, '%Y-%m') AS month, COUNT(*) AS enrollments
+        FROM lms_enrollments
+        WHERE enrolled_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+        GROUP BY month
+        ORDER BY month ASC
+      `) as any;
+
+      const [totalRow] = await db.execute(sql`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END) AS completed,
+          ROUND(AVG(progress_pct), 1) AS avgProgress
+        FROM lms_enrollments
+      `) as any;
+      const totals = toArr2(totalRow)[0] ?? {};
+
+      return {
+        courses: toArr2(courseRows).map((r: any) => ({
+          courseId: Number(r.courseId),
+          courseTitle: r.courseTitle ?? 'Unknown',
+          courseSlug: r.courseSlug ?? '',
+          thumbnailUrl: r.thumbnailUrl ?? null,
+          enrollments: Number(r.enrollments ?? 0),
+          completions: Number(r.completions ?? 0),
+          completionRate: Number(r.enrollments ?? 0) > 0
+            ? Math.round((Number(r.completions ?? 0) / Number(r.enrollments)) * 100)
+            : 0,
+          avgProgress: Number(r.avgProgress ?? 0),
+        })),
+        monthlyTrend: toArr2(monthlyRows).map((r: any) => ({
+          month: r.month,
+          enrollments: Number(r.enrollments ?? 0),
+        })),
+        totals: {
+          total: Number(totals.total ?? 0),
+          completed: Number(totals.completed ?? 0),
+          avgProgress: Number(totals.avgProgress ?? 0),
+          completionRate: Number(totals.total ?? 0) > 0
+            ? Math.round((Number(totals.completed ?? 0) / Number(totals.total)) * 100)
+            : 0,
+        },
+      };
+    }),
+
+  /** Activity feed: recent enrollments, completions, certificates, logins */
+  getActivityFeed: protectedProcedure
+    .input(z.object({
+      limit: z.number().int().min(1).max(200).default(50),
+      type: z.enum(['all', 'enrollment', 'completion', 'certificate', 'login']).default('all'),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
+
+      const typeFilter = input.type !== 'all' ? sql`AND event_type = ${input.type}` : sql``;
+
+      const [rows] = await db.execute(sql`
+        SELECT * FROM (
+          SELECT 'enrollment' AS event_type, u.id AS user_id, u.name AS user_name, u.email AS user_email, u.avatar_url,
+            c.title AS subject, NULL AS subject2, e.enrolled_at AS occurred_at
+          FROM lms_enrollments e
+          JOIN users u ON u.id = e.user_id
+          JOIN lms_courses c ON c.id = e.course_id
+
+          UNION ALL
+
+          SELECT 'completion' AS event_type, u.id, u.name, u.email, u.avatar_url,
+            c.title, NULL, e.completed_at
+          FROM lms_enrollments e
+          JOIN users u ON u.id = e.user_id
+          JOIN lms_courses c ON c.id = e.course_id
+          WHERE e.completed_at IS NOT NULL
+
+          UNION ALL
+
+          SELECT 'certificate' AS event_type, u.id, u.name, u.email, u.avatar_url,
+            c.title, NULL, cert.issued_at
+          FROM lms_certificates cert
+          JOIN users u ON u.id = cert.user_id
+          JOIN lms_courses c ON c.id = cert.course_id
+
+          UNION ALL
+
+          SELECT 'login' AS event_type, u.id, u.name, u.email, u.avatar_url,
+            NULL, NULL, u.last_signed_in
+          FROM users u
+          WHERE u.last_signed_in >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        ) AS feed
+        WHERE 1=1 ${typeFilter}
+        ORDER BY occurred_at DESC
+        LIMIT ${input.limit}
+      `) as any;
+
+      return toArr2(rows).map((r: any) => ({
+        type: r.event_type as string,
+        userId: Number(r.user_id),
+        userName: r.user_name ?? r.user_email ?? 'Unknown',
+        userEmail: r.user_email ?? '',
+        avatarUrl: r.avatar_url ?? null,
+        subject: r.subject ?? null,
+        occurredAt: r.occurred_at,
+      }));
+    }),
+
+  /** Group/team invitation stats */
+  getInvitationStats: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
+
+    const [summaryRow] = await db.execute(sql`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN status = 'revoked' THEN 1 ELSE 0 END) AS revoked
+      FROM lms_group_seats
+    `) as any;
+    const summary = toArr2(summaryRow)[0] ?? {};
+
+    const [groupRows] = await db.execute(sql`
+      SELECT
+        g.id AS groupId,
+        g.name AS groupName,
+        c.title AS courseTitle,
+        COUNT(gs.id) AS totalSeats,
+        SUM(CASE WHEN gs.status = 'active' THEN 1 ELSE 0 END) AS activeSeats,
+        SUM(CASE WHEN gs.status = 'pending' THEN 1 ELSE 0 END) AS pendingSeats,
+        g.created_at AS createdAt
+      FROM lms_groups g
+      LEFT JOIN lms_courses c ON c.id = g.course_id
+      LEFT JOIN lms_group_seats gs ON gs.group_id = g.id
+      GROUP BY g.id, g.name, c.title, g.created_at
+      ORDER BY g.created_at DESC
+      LIMIT 50
+    `) as any;
+
+    const [recentRows] = await db.execute(sql`
+      SELECT
+        gs.id, gs.email, gs.member_name, gs.status, gs.assigned_at, gs.accepted_at,
+        g.name AS groupName,
+        c.title AS courseTitle
+      FROM lms_group_seats gs
+      JOIN lms_groups g ON g.id = gs.group_id
+      LEFT JOIN lms_courses c ON c.id = g.course_id
+      ORDER BY gs.assigned_at DESC
+      LIMIT 25
+    `) as any;
+
+    return {
+      summary: {
+        total: Number(summary.total ?? 0),
+        pending: Number(summary.pending ?? 0),
+        active: Number(summary.active ?? 0),
+        revoked: Number(summary.revoked ?? 0),
+      },
+      groups: toArr2(groupRows).map((r: any) => ({
+        groupId: Number(r.groupId),
+        groupName: r.groupName ?? 'Unknown',
+        courseTitle: r.courseTitle ?? 'Unknown Course',
+        totalSeats: Number(r.totalSeats ?? 0),
+        activeSeats: Number(r.activeSeats ?? 0),
+        pendingSeats: Number(r.pendingSeats ?? 0),
+        createdAt: r.createdAt,
+      })),
+      recentInvites: toArr2(recentRows).map((r: any) => ({
+        id: Number(r.id),
+        email: r.email ?? '',
+        memberName: r.member_name ?? null,
+        status: r.status as string,
+        assignedAt: r.assigned_at,
+        acceptedAt: r.accepted_at ?? null,
+        groupName: r.groupName ?? 'Unknown',
+        courseTitle: r.courseTitle ?? 'Unknown Course',
+      })),
     };
   }),
 

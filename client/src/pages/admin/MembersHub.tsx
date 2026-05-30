@@ -34,7 +34,6 @@ import {
 import AdminSalesDashboard from "./AdminSalesDashboard";
 import MembershipAdmin from "./MembershipAdmin";
 import ContactsAdmin from "./ContactsAdmin";
-import UserAnalytics from "./UserAnalytics";
 import ProductAnalytics from "./ProductAnalytics";
 import SharingMonitor from "./SharingMonitor";
 
@@ -519,6 +518,397 @@ function AllMembersPanel() {
   );
 }
 
+// ─── Certificates Panel ──────────────────────────────────────────────────────
+function CertificatesPanel() {
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = trpc.adminUser.getCertificateList.useQuery(
+    { search: search || undefined, page, pageSize: 25 },
+    { keepPreviousData: true } as any
+  );
+  const certs = data?.certificates ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 min-w-48">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search by name or email…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            className="pl-9 h-9 text-sm border-slate-200"
+          />
+        </div>
+        <span className="text-xs text-slate-500">{total.toLocaleString()} total</span>
+      </div>
+      <Card className="border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Member</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Course</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Issued</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                [...Array(6)].map((_, i) => (
+                  <tr key={i}><td colSpan={4} className="px-4 py-3"><Skeleton className="h-8 w-full" /></td></tr>
+                ))
+              ) : certs.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-12 text-center text-slate-400 text-sm">
+                    {total === 0 ? "No certificates have been issued yet" : "No results found"}
+                  </td>
+                </tr>
+              ) : certs.map((c: any) => (
+                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src={c.avatarUrl ?? undefined} />
+                        <AvatarFallback className="bg-teal-100 text-teal-700 text-xs font-semibold">{initials(c.userName)}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-800 truncate">{c.userName}</p>
+                        <p className="text-xs text-slate-400 truncate">{c.userEmail}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-sm text-slate-700 truncate max-w-48">{c.courseTitle}</p>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(c.issuedAt)}</td>
+                  <td className="px-4 py-3">
+                    {c.certificateUrl && (
+                      <a href={c.certificateUrl} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-teal-600">
+                          <ExternalLink size={13} />
+                        </Button>
+                      </a>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span>Page {page} of {totalPages}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="h-8 px-3 text-xs border-slate-200" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
+            <Button variant="outline" size="sm" className="h-8 px-3 text-xs border-slate-200" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Invitations Panel ────────────────────────────────────────────────────────
+function InvitationsPanel() {
+  const { data, isLoading } = trpc.adminUser.getInvitationStats.useQuery();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    );
+  }
+
+  const summary = data?.summary ?? { total: 0, pending: 0, active: 0, revoked: 0 };
+  const groups = data?.groups ?? [];
+  const recentInvites = data?.recentInvites ?? [];
+
+  const statusColor: Record<string, string> = {
+    pending: "bg-amber-50 text-amber-700 border-amber-200",
+    active: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    revoked: "bg-red-50 text-red-700 border-red-200",
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard label="Total Invites" value={summary.total.toLocaleString()} icon={<UserPlus size={18} />} color="teal" />
+        <StatCard label="Pending" value={summary.pending.toLocaleString()} icon={<Clock size={18} />} color="amber" />
+        <StatCard label="Accepted" value={summary.active.toLocaleString()} icon={<CheckCircle size={18} />} color="blue" />
+        <StatCard label="Revoked" value={summary.revoked.toLocaleString()} icon={<Shield size={18} />} color="teal2" />
+      </div>
+
+      {/* Groups Table */}
+      <Card className="border border-slate-200 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-slate-700">Groups / Teams</CardTitle>
+        </CardHeader>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Group</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Course</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Seats</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Active</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Pending</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {groups.length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400 text-sm">No groups yet</td></tr>
+              ) : groups.map((g: any) => (
+                <tr key={g.groupId} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-slate-800">{g.groupName}</td>
+                  <td className="px-4 py-3 text-slate-600 truncate max-w-40">{g.courseTitle}</td>
+                  <td className="px-4 py-3 text-slate-600">{g.totalSeats}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant="outline" className="text-xs border-emerald-200 text-emerald-700 bg-emerald-50">{g.activeSeats}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant="outline" className="text-xs border-amber-200 text-amber-700 bg-amber-50">{g.pendingSeats}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(g.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Recent Invites */}
+      <Card className="border border-slate-200 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-slate-700">Recent Invitations</CardTitle>
+        </CardHeader>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Group</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Invited</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Accepted</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {recentInvites.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400 text-sm">No invitations yet</td></tr>
+              ) : recentInvites.map((inv: any) => (
+                <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-800 truncate">{inv.memberName || inv.email}</p>
+                    {inv.memberName && <p className="text-xs text-slate-400">{inv.email}</p>}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 truncate max-w-36">{inv.groupName}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant="outline" className={`text-xs ${statusColor[inv.status] ?? "border-slate-200 text-slate-600"}`}>
+                      {inv.status}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(inv.assignedAt)}</td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{inv.acceptedAt ? fmtDate(inv.acceptedAt) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Activity Panel ───────────────────────────────────────────────────────────
+function ActivityPanel() {
+  const [typeFilter, setTypeFilter] = useState<"all" | "enrollment" | "completion" | "certificate" | "login">("all");
+  const { data, isLoading, refetch } = trpc.adminUser.getActivityFeed.useQuery(
+    { limit: 100, type: typeFilter },
+    { keepPreviousData: true } as any
+  );
+  const activities = data ?? [];
+
+  const iconMap: Record<string, React.ReactNode> = {
+    enrollment:  <BookOpen size={13} className="text-teal-500" />,
+    completion:  <CheckCircle size={13} className="text-emerald-500" />,
+    certificate: <Award size={13} className="text-amber-500" />,
+    login:       <Activity size={13} className="text-blue-500" />,
+  };
+  const labelMap: Record<string, string> = {
+    enrollment:  "enrolled in",
+    completion:  "completed",
+    certificate: "earned certificate for",
+    login:       "logged in",
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filter */}
+      <div className="flex items-center gap-3">
+        <Select value={typeFilter} onValueChange={(v: any) => setTypeFilter(v)}>
+          <SelectTrigger className="w-44 h-9 text-sm border-slate-200">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Activity</SelectItem>
+            <SelectItem value="enrollment">Enrollments</SelectItem>
+            <SelectItem value="completion">Completions</SelectItem>
+            <SelectItem value="certificate">Certificates</SelectItem>
+            <SelectItem value="login">Logins (7d)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5 border-slate-200" onClick={() => refetch()}>
+          <RefreshCw size={13} /> Refresh
+        </Button>
+        <span className="text-xs text-slate-500">{activities.length} events</span>
+      </div>
+
+      <Card className="border border-slate-200 shadow-sm">
+        {isLoading ? (
+          <div className="p-4 space-y-3">
+            {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}
+          </div>
+        ) : activities.length === 0 ? (
+          <div className="h-48 flex items-center justify-center text-slate-400 text-sm">No activity found</div>
+        ) : (
+          <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+            {activities.map((a: any, i: number) => (
+              <div key={i} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                <div className="mt-0.5 p-1.5 bg-slate-100 rounded-full flex-shrink-0">
+                  {iconMap[a.type] ?? <Activity size={13} className="text-slate-500" />}
+                </div>
+                <Avatar className="h-7 w-7 flex-shrink-0">
+                  <AvatarImage src={a.avatarUrl ?? undefined} />
+                  <AvatarFallback className="bg-teal-100 text-teal-700 text-xs">{initials(a.userName)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-700 leading-snug">
+                    <span className="font-medium">{a.userName}</span>{" "}
+                    <span className="text-slate-500">{labelMap[a.type] ?? a.type}</span>{" "}
+                    {a.subject && <span className="font-medium">{a.subject}</span>}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">{fmtRelative(a.occurredAt)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ─── Enrollments Panel ────────────────────────────────────────────────────────
+function EnrollmentsPanel() {
+  const { data, isLoading } = trpc.adminUser.getEnrollmentAnalytics.useQuery({});
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    );
+  }
+
+  const courses = data?.courses ?? [];
+  const monthlyTrend = data?.monthlyTrend ?? [];
+  const totals = data?.totals ?? { total: 0, completed: 0, avgProgress: 0, completionRate: 0 };
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard label="Total Enrollments" value={totals.total.toLocaleString()} icon={<BookOpen size={18} />} color="teal" />
+        <StatCard label="Completions" value={totals.completed.toLocaleString()} icon={<CheckCircle size={18} />} color="blue" />
+        <StatCard label="Completion Rate" value={`${totals.completionRate}%`} icon={<GraduationCap size={18} />} color="teal2" />
+        <StatCard label="Avg Progress" value={`${totals.avgProgress}%`} icon={<TrendingUp size={18} />} color="amber" />
+      </div>
+
+      {/* Monthly Trend */}
+      {monthlyTrend.length > 0 && (
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-700">Enrollment Trend (12 months)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={monthlyTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                <Line type="monotone" dataKey="enrollments" stroke="#14b8a6" strokeWidth={2.5} dot={{ r: 3, fill: "#14b8a6" }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Per-Course Table */}
+      <Card className="border border-slate-200 shadow-sm overflow-hidden">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-slate-700">Per-Course Breakdown</CardTitle>
+        </CardHeader>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Course</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Enrollments</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Completions</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Rate</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Avg Progress</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {courses.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400 text-sm">No published courses yet</td></tr>
+              ) : courses.map((c: any) => (
+                <tr key={c.courseId} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-800 truncate max-w-64">{c.courseTitle}</p>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{c.enrollments.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-slate-600">{c.completions.toLocaleString()}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-teal-500 rounded-full" style={{ width: `${c.completionRate}%` }} />
+                      </div>
+                      <span className="text-xs text-slate-500">{c.completionRate}%</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-400 rounded-full" style={{ width: `${c.avgProgress}%` }} />
+                      </div>
+                      <span className="text-xs text-slate-500">{c.avgProgress}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Placeholder Panel ────────────────────────────────────────────────────────
 function PlaceholderPanel({ title, description }: { title: string; description: string }) {
   return (
@@ -544,12 +934,12 @@ export default function MembersHub() {
     switch (activeNav) {
       case "overview":          return <OverviewPanel />;
       case "all-members":       return <AllMembersPanel />;
-      case "enrollments":       return <UserAnalytics />;
-      case "invitations":       return <PlaceholderPanel title="Invitations" description="Send and manage member invitations. Track invite status and acceptance rates." />;
+      case "enrollments":       return <EnrollmentsPanel />;
+      case "invitations":       return <InvitationsPanel />;
       case "import":            return <PlaceholderPanel title="Import Members" description="Bulk import members from CSV or connect your existing platform." />;
-      case "activity":          return <UserAnalytics />;
+      case "activity":          return <ActivityPanel />;
       case "communications":    return <ContactsAdmin />;
-      case "certificates":      return <PlaceholderPanel title="Certificates" description="View and manage all issued certificates across courses." />;
+      case "certificates":      return <CertificatesPanel />;
       case "sales":             return <AdminSalesDashboard />;
       case "product-analytics": return <ProductAnalytics />;
       case "memberships":       return <MembershipAdmin />;

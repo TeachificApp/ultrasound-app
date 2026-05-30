@@ -72,6 +72,7 @@ import {
   lmsCohortSubmissions,
   mediaUploadFolders,
   mediaUploadResponses,
+  lmsGroupCourses,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -375,6 +376,163 @@ export const lmsEnrollmentAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(lmsGroupSeats).where(eq(lmsGroupSeats.id, input.seatId));
+      return { success: true };
+    }),
+
+  // ── New Teams System (multi-course, multi-seat) ──────────────────────────────
+
+  /** List all teams with their courses and seat counts */
+  listTeams: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const groups = await db.select().from(lmsGroups).orderBy(desc(lmsGroups.createdAt));
+    const enriched = await Promise.all(groups.map(async (g) => {
+      // Get courses for this team
+      const groupCourses = await db
+        .select({
+          id: lmsGroupCourses.id,
+          courseId: lmsGroupCourses.courseId,
+          seats: lmsGroupCourses.seats,
+          courseTitle: lmsCourses.title,
+          courseSlug: lmsCourses.slug,
+        })
+        .from(lmsGroupCourses)
+        .leftJoin(lmsCourses, eq(lmsCourses.id, lmsGroupCourses.courseId))
+        .where(eq(lmsGroupCourses.groupId, g.id));
+      // Get seat records
+      const seats = await db.select().from(lmsGroupSeats).where(eq(lmsGroupSeats.groupId, g.id));
+      const activeSeats = seats.filter(s => s.status === "active").length;
+      const pendingSeats = seats.filter(s => s.status === "pending").length;
+      // Legacy single course
+      const legacyCourse = g.courseId
+        ? await db.select({ title: lmsCourses.title, slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, g.courseId)).limit(1).then(r => r[0] ?? null)
+        : null;
+      // Team admin user
+      const teamAdmin = g.teamAdminId
+        ? await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, g.teamAdminId)).limit(1).then(r => r[0] ?? null)
+        : null;
+      return {
+        ...g,
+        courses: groupCourses,
+        legacyCourse,
+        teamAdmin,
+        totalSeats: seats.length,
+        activeSeats,
+        pendingSeats,
+        seatList: seats,
+      };
+    }));
+    return enriched;
+  }),
+
+  /** Create a new team (no course required) */
+  createTeam: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(255),
+      orgName: z.string().optional(),
+      adminEmail: z.string().email().optional(),
+      adminPhone: z.string().optional(),
+      website: z.string().optional(),
+      notes: z.string().optional(),
+      teamAdminId: z.number().int().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [result] = await db.insert(lmsGroups).values({
+        name: input.name,
+        orgName: input.orgName ?? null,
+        adminEmail: input.adminEmail ?? null,
+        adminPhone: input.adminPhone ?? null,
+        website: input.website ?? null,
+        notes: input.notes ?? null,
+        teamAdminId: input.teamAdminId ?? null,
+        seats: 0, // legacy field — seats tracked per course in lmsGroupCourses
+        courseId: null,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** Update team info */
+  updateTeam: protectedProcedure
+    .input(z.object({
+      id: z.number().int(),
+      name: z.string().min(1).max(255).optional(),
+      orgName: z.string().optional().nullable(),
+      adminEmail: z.string().email().optional().nullable(),
+      adminPhone: z.string().optional().nullable(),
+      website: z.string().optional().nullable(),
+      notes: z.string().optional().nullable(),
+      teamAdminId: z.number().int().optional().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, ...updates } = input;
+      const filtered = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
+      if (Object.keys(filtered).length > 0) await db.update(lmsGroups).set(filtered).where(eq(lmsGroups.id, id));
+      return { success: true };
+    }),
+
+  /** Add a course allocation to a team */
+  addCourseToTeam: protectedProcedure
+    .input(z.object({
+      groupId: z.number().int(),
+      courseId: z.number().int(),
+      seats: z.number().int().min(1).default(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Check not already added
+      const [existing] = await db.select().from(lmsGroupCourses)
+        .where(and(eq(lmsGroupCourses.groupId, input.groupId), eq(lmsGroupCourses.courseId, input.courseId)))
+        .limit(1);
+      if (existing) throw new TRPCError({ code: "BAD_REQUEST", message: "Course already added to this team" });
+      const [result] = await db.insert(lmsGroupCourses).values({
+        groupId: input.groupId,
+        courseId: input.courseId,
+        seats: input.seats,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** Remove a course allocation from a team */
+  removeCourseFromTeam: protectedProcedure
+    .input(z.object({ groupCourseId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsGroupCourses).where(eq(lmsGroupCourses.id, input.groupCourseId));
+      return { success: true };
+    }),
+
+  /** Update seat count for a course allocation */
+  updateCourseSeatCount: protectedProcedure
+    .input(z.object({ groupCourseId: z.number().int(), seats: z.number().int().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsGroupCourses).set({ seats: input.seats }).where(eq(lmsGroupCourses.id, input.groupCourseId));
+      return { success: true };
+    }),
+
+  /** Delete a team (removes group + all seats) */
+  deleteTeam: protectedProcedure
+    .input(z.object({ groupId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsGroupSeats).where(eq(lmsGroupSeats.groupId, input.groupId));
+      await db.delete(lmsGroupCourses).where(eq(lmsGroupCourses.groupId, input.groupId));
+      await db.delete(lmsGroups).where(eq(lmsGroups.id, input.groupId));
       return { success: true };
     }),
 

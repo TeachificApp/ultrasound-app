@@ -4857,9 +4857,12 @@ function GroupSeatAssignPanel({ group, onRefetch }: { group: any; onRefetch: () 
     return () => clearTimeout(t);
   }, [searchQuery]);
 
+  // For multi-course teams, use the first course for student search; for legacy single-course use group.courseId
+  const primaryCourseId = group.courses?.[0]?.courseId ?? group.courseId ?? 0;
+
   const { data: enrolledResults } = trpc.lmsAdmin.searchEnrolledStudents.useQuery(
-    { courseId: group.courseId, query: debouncedSearch },
-    { enabled: debouncedSearch.length >= 2 }
+    { courseId: primaryCourseId, query: debouncedSearch },
+    { enabled: debouncedSearch.length >= 2 && primaryCourseId > 0 }
   );
 
   const assignSeat = trpc.lmsAdmin.assignSeat.useMutation({
@@ -4874,9 +4877,6 @@ function GroupSeatAssignPanel({ group, onRefetch }: { group: any; onRefetch: () 
     },
     onError: e => toast.error(e.message),
   });
-
-  const hasCapacity = group.usedSeats < group.seats;
-  if (!hasCapacity) return <p className="text-xs text-gray-400 italic">All seats filled</p>;
 
   return (
     <div className="space-y-3">
@@ -4951,13 +4951,26 @@ function GroupSeatAssignPanel({ group, onRefetch }: { group: any; onRefetch: () 
 }
 
 function GroupsTab() {
-  const { data: groups, isLoading, refetch } = trpc.lmsAdmin.listGroups.useQuery({});
+  const { data: groups, isLoading, refetch } = trpc.lmsAdmin.listTeams.useQuery();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editTeam, setEditTeam] = useState<any>(null);
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null);
+
   const revokeSeat = trpc.lmsAdmin.revokeSeat.useMutation({
     onSuccess: () => { toast.success("Seat revoked"); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
+
+  const deleteTeam = trpc.lmsAdmin.deleteTeam.useMutation({
+    onSuccess: () => { toast.success("Team deleted"); refetch(); },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+
+  const removeCourse = trpc.lmsAdmin.removeCourseFromTeam.useMutation({
+    onSuccess: () => { toast.success("Course removed"); refetch(); },
+    onError: e => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -4965,100 +4978,221 @@ function GroupsTab() {
           <Plus className="w-4 h-4 mr-1" /> New Team
         </Button>
       </div>
+
       {isLoading ? <Skeleton className="h-40 w-full" /> : (
         <div className="space-y-3">
+          {(groups ?? []).length === 0 && (
+            <div className="text-center py-10 text-gray-400 text-sm">No teams yet. Create your first team to manage group enrollments.</div>
+          )}
           {(groups ?? []).map((g: any) => (
             <div key={g.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* Team header */}
               <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50" onClick={() => setExpandedGroup(expandedGroup === g.id ? null : g.id)}>
-                <Users className="w-4 h-4 text-teal-500" />
-                <div className="flex-1">
-                  <p className="font-medium text-sm text-gray-900">{g.name}</p>
-                  <p className="text-xs text-gray-400">{g.course?.title} · {g.usedSeats}/{g.seats} seats used</p>
+                <div className="p-1.5 bg-teal-50 rounded-lg">
+                  <Users className="w-4 h-4 text-teal-600" />
                 </div>
-                <div className="w-24 bg-gray-200 rounded-full h-1.5">
-                  <div className="bg-teal-500 h-1.5 rounded-full" style={{ width: `${g.seats > 0 ? (g.usedSeats / g.seats) * 100 : 0}%` }} />
-                </div>
-                <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${expandedGroup === g.id ? "rotate-90" : ""}`} />
-              </div>
-              {expandedGroup === g.id && (
-                <div className="border-t border-gray-100 p-4 space-y-4">
-                  {/* Seat list */}
-                  <div className="space-y-2">
-                    {(g.seatList ?? []).length === 0 && <p className="text-xs text-gray-400 italic">No seats assigned yet</p>}
-                    {(g.seatList ?? []).map((seat: any) => (
-                      <div key={seat.id} className="flex items-center gap-3 text-sm">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          seat.status === "revoked" ? "bg-red-300" : seat.acceptedAt ? "bg-green-400" : "bg-yellow-400"
-                        }`} />
-                        <span className="flex-1 text-gray-700 truncate">{seat.memberName || seat.email}</span>
-                        <span className="text-xs text-gray-400 shrink-0">
-                          {seat.status === "revoked" ? "Revoked" : seat.acceptedAt ? "Active" : "Pending invite"}
-                        </span>
-                        {seat.status !== "revoked" && (
-                          <Button size="sm" variant="ghost" className="h-6 text-red-400 hover:bg-red-50 shrink-0" onClick={() => revokeSeat.mutate({ seatId: seat.id })}>
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm text-gray-900">{g.name}</p>
+                    {g.orgName && <span className="text-xs text-gray-400 truncate">· {g.orgName}</span>}
                   </div>
-                  {/* Add seat panel */}
-                  <GroupSeatAssignPanel group={g} onRefetch={refetch} />
+                  <div className="flex items-center gap-3 mt-0.5">
+                    {g.courses.length > 0 ? (
+                      <span className="text-xs text-gray-400">{g.courses.length} course{g.courses.length !== 1 ? "s" : ""}</span>
+                    ) : g.legacyCourse ? (
+                      <span className="text-xs text-gray-400">{g.legacyCourse.title}</span>
+                    ) : (
+                      <span className="text-xs text-amber-500">No courses assigned</span>
+                    )}
+                    <span className="text-xs text-gray-400">·</span>
+                    <span className="text-xs text-gray-400">{g.activeSeats} active / {g.pendingSeats} pending seats</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-teal-600" onClick={e => { e.stopPropagation(); setEditTeam(g); }}>
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-500" onClick={e => { e.stopPropagation(); if (confirm(`Delete team "${g.name}"?`)) deleteTeam.mutate({ groupId: g.id }); }}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${expandedGroup === g.id ? "rotate-90" : ""}`} />
+                </div>
+              </div>
+
+              {expandedGroup === g.id && (
+                <div className="border-t border-gray-100 p-4 space-y-5">
+                  {/* Org info */}
+                  {(g.orgName || g.adminEmail || g.adminPhone || g.website) && (
+                    <div className="bg-gray-50 rounded-lg p-3 grid grid-cols-2 gap-2 text-xs">
+                      {g.orgName && <div><span className="text-gray-400">Org:</span> <span className="text-gray-700 font-medium">{g.orgName}</span></div>}
+                      {g.adminEmail && <div><span className="text-gray-400">Email:</span> <a href={`mailto:${g.adminEmail}`} className="text-teal-600 hover:underline">{g.adminEmail}</a></div>}
+                      {g.adminPhone && <div><span className="text-gray-400">Phone:</span> <span className="text-gray-700">{g.adminPhone}</span></div>}
+                      {g.website && <div><span className="text-gray-400">Web:</span> <a href={g.website} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline truncate">{g.website}</a></div>}
+                      {g.teamAdmin && <div className="col-span-2"><span className="text-gray-400">Team Admin:</span> <span className="text-gray-700">{g.teamAdmin.name} ({g.teamAdmin.email})</span></div>}
+                    </div>
+                  )}
+
+                  {/* Courses */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Courses</p>
+                    {g.courses.length === 0 && !g.legacyCourse && (
+                      <p className="text-xs text-gray-400 italic mb-2">No courses assigned yet</p>
+                    )}
+                    <div className="space-y-2">
+                      {g.courses.map((gc: any) => (
+                        <div key={gc.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-lg px-3 py-2">
+                          <BookOpen className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+                          <span className="flex-1 text-sm text-gray-800 truncate">{gc.courseTitle}</span>
+                          <span className="text-xs text-gray-500 shrink-0">{gc.seats} seat{gc.seats !== 1 ? "s" : ""}</span>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-300 hover:text-red-500 shrink-0" onClick={() => removeCourse.mutate({ groupCourseId: gc.id })}>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                      {g.legacyCourse && g.courses.length === 0 && (
+                        <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                          <BookOpen className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span className="flex-1 text-sm text-gray-800 truncate">{g.legacyCourse.title}</span>
+                          <span className="text-xs text-amber-600 shrink-0">Legacy</span>
+                        </div>
+                      )}
+                    </div>
+                    <AddCourseToTeamInline groupId={g.id} onAdded={refetch} />
+                  </div>
+
+                  {/* Members / Seats */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Members</p>
+                    {(g.seatList ?? []).length === 0 && <p className="text-xs text-gray-400 italic mb-2">No members assigned yet</p>}
+                    <div className="space-y-1.5 mb-3">
+                      {(g.seatList ?? []).map((seat: any) => (
+                        <div key={seat.id} className="flex items-center gap-3 text-sm">
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                            seat.status === "revoked" ? "bg-red-300" : seat.acceptedAt ? "bg-green-400" : "bg-yellow-400"
+                          }`} />
+                          <span className="flex-1 text-gray-700 truncate">{seat.memberName || seat.email}</span>
+                          <span className="text-xs text-gray-400 shrink-0">
+                            {seat.status === "revoked" ? "Revoked" : seat.acceptedAt ? "Active" : "Pending invite"}
+                          </span>
+                          {seat.status !== "revoked" && (
+                            <Button size="sm" variant="ghost" className="h-6 text-red-400 hover:bg-red-50 shrink-0" onClick={() => revokeSeat.mutate({ seatId: seat.id })}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <GroupSeatAssignPanel group={g} onRefetch={refetch} />
+                  </div>
+
+                  {g.notes && (
+                    <div className="bg-slate-50 rounded-lg p-3 text-xs text-gray-600">
+                      <span className="font-medium text-gray-500">Notes:</span> {g.notes}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           ))}
-          {(groups ?? []).length === 0 && (
-            <div className="text-center py-10 text-gray-400 text-sm">No groups yet</div>
-          )}
         </div>
       )}
+
       <CreateTeamDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); refetch(); }} />
+      {editTeam && (
+        <EditTeamDialog team={editTeam} onClose={() => setEditTeam(null)} onSaved={() => { setEditTeam(null); refetch(); }} />
+      )}
+    </div>
+  );
+}
+
+function AddCourseToTeamInline({ groupId, onAdded }: { groupId: number; onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [courseId, setCourseId] = useState("");
+  const [seats, setSeats] = useState("5");
+  const { data: courses } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 100 });
+  const addCourse = trpc.lmsAdmin.addCourseToTeam.useMutation({
+    onSuccess: () => { toast.success("Course added"); setCourseId(""); setSeats("5"); setOpen(false); onAdded(); },
+    onError: e => toast.error(e.message),
+  });
+  if (!open) return (
+    <button className="mt-2 flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium" onClick={() => setOpen(true)}>
+      <Plus className="w-3.5 h-3.5" /> Add Course
+    </button>
+  );
+  return (
+    <div className="mt-2 flex items-center gap-2 bg-teal-50 border border-teal-100 rounded-lg p-2">
+      <Select value={courseId} onValueChange={setCourseId}>
+        <SelectTrigger className="h-8 text-xs flex-1 bg-white"><SelectValue placeholder="Select course" /></SelectTrigger>
+        <SelectContent>
+          {(courses?.courses ?? []).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Input value={seats} onChange={e => setSeats(e.target.value)} type="number" min="1" className="h-8 text-xs w-20 bg-white" placeholder="Seats" />
+      <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8 text-xs" disabled={!courseId || addCourse.isPending}
+        onClick={() => addCourse.mutate({ groupId, courseId: parseInt(courseId), seats: parseInt(seats) || 1 })}>
+        {addCourse.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add"}
+      </Button>
+      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400" onClick={() => setOpen(false)}><X className="w-3.5 h-3.5" /></Button>
     </div>
   );
 }
 
 function CreateTeamDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
-  
-  const { data: courses } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 100 });
-  const [courseId, setCourseId] = useState("");
   const [name, setName] = useState("");
-  const [seats, setSeats] = useState("5");
+  const [orgName, setOrgName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPhone, setAdminPhone] = useState("");
+  const [website, setWebsite] = useState("");
+  const [notes, setNotes] = useState("");
 
-  const create = trpc.lmsAdmin.createGroup.useMutation({
-    onSuccess: () => { toast.success("Team created"); onCreated(); },
+  const create = trpc.lmsAdmin.createTeam.useMutation({
+    onSuccess: () => {
+      toast.success("Team created");
+      setName(""); setOrgName(""); setAdminEmail(""); setAdminPhone(""); setWebsite(""); setNotes("");
+      onCreated();
+    },
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Create Team</DialogTitle></DialogHeader>
         <div className="space-y-3 py-2">
-          <div>
-            <Label className="text-sm">Course *</Label>
-            <Select value={courseId} onValueChange={setCourseId}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder="Select course" /></SelectTrigger>
-              <SelectContent>
-                {(courses?.courses ?? []).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
           <div>
             <Label className="text-sm">Team Name *</Label>
             <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Hospital ABC — Batch 1" className="mt-1" />
           </div>
-          <div>
-            <Label className="text-sm">Number of Seats</Label>
-            <Input value={seats} onChange={e => setSeats(e.target.value)} type="number" min="1" className="mt-1 w-24" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Organisation</Label>
+              <Input value={orgName} onChange={e => setOrgName(e.target.value)} placeholder="Hospital / School name" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Contact Email</Label>
+              <Input value={adminEmail} onChange={e => setAdminEmail(e.target.value)} placeholder="admin@org.com" type="email" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Contact Phone</Label>
+              <Input value={adminPhone} onChange={e => setAdminPhone(e.target.value)} placeholder="+1 555 000 0000" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Website</Label>
+              <Input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://..." className="mt-1" />
+            </div>
           </div>
+          <div>
+            <Label className="text-sm">Notes (internal)</Label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Internal notes about this team..." />
+          </div>
+          <p className="text-xs text-gray-400">You can add courses and members after creating the team.</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             className="bg-teal-600 hover:bg-teal-700 text-white"
-            disabled={!courseId || !name.trim() || create.isPending}
-            onClick={() => create.mutate({ courseId: parseInt(courseId), name: name.trim(), seats: parseInt(seats) || 1 })}
+            disabled={!name.trim() || create.isPending}
+            onClick={() => create.mutate({ name: name.trim(), orgName: orgName || undefined, adminEmail: adminEmail || undefined, adminPhone: adminPhone || undefined, website: website || undefined, notes: notes || undefined })}
           >
             {create.isPending ? "Creating..." : "Create Team"}
           </Button>
@@ -5067,6 +5201,67 @@ function CreateTeamDialog({ open, onClose, onCreated }: { open: boolean; onClose
     </Dialog>
   );
 }
+
+function EditTeamDialog({ team, onClose, onSaved }: { team: any; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(team.name ?? "");
+  const [orgName, setOrgName] = useState(team.orgName ?? "");
+  const [adminEmail, setAdminEmail] = useState(team.adminEmail ?? "");
+  const [adminPhone, setAdminPhone] = useState(team.adminPhone ?? "");
+  const [website, setWebsite] = useState(team.website ?? "");
+  const [notes, setNotes] = useState(team.notes ?? "");
+
+  const update = trpc.lmsAdmin.updateTeam.useMutation({
+    onSuccess: () => { toast.success("Team updated"); onSaved(); },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Edit Team</DialogTitle></DialogHeader>
+        <div className="space-y-3 py-2">
+          <div>
+            <Label className="text-sm">Team Name *</Label>
+            <Input value={name} onChange={e => setName(e.target.value)} className="mt-1" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Organisation</Label>
+              <Input value={orgName} onChange={e => setOrgName(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Contact Email</Label>
+              <Input value={adminEmail} onChange={e => setAdminEmail(e.target.value)} type="email" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Contact Phone</Label>
+              <Input value={adminPhone} onChange={e => setAdminPhone(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Website</Label>
+              <Input value={website} onChange={e => setWebsite(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <div>
+            <Label className="text-sm">Notes</Label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+            disabled={!name.trim() || update.isPending}
+            onClick={() => update.mutate({ id: team.id, name: name.trim(), orgName: orgName || null, adminEmail: adminEmail || null, adminPhone: adminPhone || null, website: website || null, notes: notes || null })}
+          >
+            {update.isPending ? "Saving..." : "Save Changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 // ─── Instructors Tab ──────────────────────────────────────────────────────────
 
