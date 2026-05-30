@@ -13,6 +13,9 @@ export const BRAND_DOMAINS: Record<string, Brand> = {
   "member.allaboutultrasound.com": "aaus",   // future subdomain
   "app.iheartecho.com": "iheartecho",
   "iheartecho.com": "iheartecho",
+  "app.iheartecho.net": "iheartecho",
+  "iheartecho.net": "iheartecho",
+  "accreditation.iheartecho.com": "iheartecho",
 };
 
 export const ALL_BRANDS: Brand[] = ["aaus", "iheartecho"];
@@ -72,7 +75,7 @@ export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
         senderName: "iHeartEcho™",
         supportEmail: "support@iheartecho.com",
         websiteUrl: "https://www.iheartecho.com",
-        appUrl: "https://app.iheartecho.com",
+        appUrl: "https://app.iheartecho.net",
         logoUrl: IHE_LOGO,
         primaryColor: "#189aa1",
         darkColor: "#0e1e2e",
@@ -88,7 +91,7 @@ export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
         senderName: "All About Ultrasound | iHeartEcho™",
         supportEmail: "support@allaboutultrasound.com",
         websiteUrl: "https://www.allaboutultrasound.com",
-        appUrl: "https://members.allaboutultrasound.com",
+        appUrl: "https://app.allaboutultrasound.com",
         logoUrl: AAUS_LOGO,
         primaryColor: "#189aa1",
         darkColor: "#0e1e2e",

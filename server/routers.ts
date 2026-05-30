@@ -346,18 +346,12 @@ export const appRouter = router({
         await setPendingEmail(ctx.user.id, newEmail, token, expiry);
 
         // Build verification URL — always use canonical app domain
-        const { detectBrandMode: dbm } = await import('@shared/brands');
+        const { detectBrandMode: dbm, getBrandDisplayConfig: gbcChange } = await import('@shared/brands');
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
-        const appUrlChange = (() => {
-          if (!input.origin) return process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
-          try {
-            const h = new URL(input.origin).hostname.toLowerCase();
-            return h.includes('iheartecho') ? 'https://app.iheartecho.net' : 'https://app.allaboutultrasound.com';
-          } catch { return 'https://app.allaboutultrasound.com'; }
-        })();
+        const brandMode = dbm(originHostname);
+        const appUrlChange = gbcChange(brandMode).appUrl;
         const verificationUrl = `${appUrlChange}/verify-email?token=${token}&type=change`;
         const firstName = (currentUser.displayName || currentUser.name || 'there').split(' ')[0];
-        const brandMode = dbm(originHostname);
         const emailPayload = buildEmailChangeVerificationEmail({
           firstName,
           newEmail,
@@ -426,18 +420,12 @@ export const appRouter = router({
         const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
         await setPasswordResetToken(user.id, token, expiry);
         // Always use canonical app domain for reset URLs
-        const { detectBrandMode: dbm2 } = await import('@shared/brands');
+        const { detectBrandMode: dbm2, getBrandDisplayConfig: gbcReset } = await import('@shared/brands');
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
-        const appUrlReset = (() => {
-          if (!input.origin) return process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
-          try {
-            const h = new URL(input.origin).hostname.toLowerCase();
-            return h.includes('iheartecho') ? 'https://app.iheartecho.net' : 'https://app.allaboutultrasound.com';
-          } catch { return 'https://app.allaboutultrasound.com'; }
-        })();
+        const brandMode = dbm2(originHostname);
+        const appUrlReset = gbcReset(brandMode).appUrl;
         const resetUrl = `${appUrlReset}/reset-password?token=${token}`;
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
-        const brandMode = dbm2(originHostname);
         const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
         await sendEmail({
           to: { name: firstName, email: user.email! },
@@ -506,20 +494,9 @@ export const appRouter = router({
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
         const brandMode = dbm3(originHostname);
 
-        // Resolve the correct app domain based on brand
-        function resolveAppDomain(origin: string | undefined): string {
-          if (!origin) return process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
-          try {
-            const h = new URL(origin).hostname.toLowerCase();
-            // iHeartEcho brand
-            if (h.includes('iheartecho')) return 'https://app.iheartecho.net';
-            // Always use app subdomain for AAUS — never www or bare domain
-            return 'https://app.allaboutultrasound.com';
-          } catch {
-            return process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
-          }
-        }
-        const appUrl = resolveAppDomain(input.origin);
+        // Resolve canonical app domain from brand — iHeartEcho → app.iheartecho.net, all others → app.allaboutultrasound.com
+        const { getBrandDisplayConfig: gbc } = await import('@shared/brands');
+        const appUrl = gbc(brandMode).appUrl;
         const returnToParam = input.returnTo ? `&returnTo=${encodeURIComponent(input.returnTo)}` : '';
         const magicUrl = `${appUrl}/auth/magic?token=${token}${returnToParam}`;
 
