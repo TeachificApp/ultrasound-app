@@ -2783,6 +2783,29 @@ export const lmsCourses = mysqlTable("lms_courses", {
   // Send a welcome/enrollment confirmation email to the student when they enroll in this course
   // Can be overridden per-course; also subject to the platform-wide enrollmentEmailEnabled setting
   sendEnrollmentEmail: boolean("send_enrollment_email").default(true).notNull(),
+
+  // ── After Purchase Settings ──────────────────────────────────────────────────
+  // Custom thank-you page: when true, show a page-builder page after purchase
+  customThankYouEnabled: boolean("custom_thank_you_enabled").default(false).notNull(),
+  // JSON array of Block objects for the custom thank-you page
+  customThankYouBlocks: longtext("custom_thank_you_blocks"),
+  // Post-purchase redirect URL — overrides thank-you page if set
+  postPurchaseRedirectUrl: varchar("post_purchase_redirect_url", { length: 1024 }),
+  // Welcome email settings (separate from enrollment confirmation)
+  welcomeEmailEnabled: boolean("welcome_email_enabled").default(true).notNull(),
+  welcomeEmailSubject: varchar("welcome_email_subject", { length: 500 }),
+  welcomeEmailBody: longtext("welcome_email_body"),
+  // Upsell offer shown on the thank-you page
+  upsellEnabled: boolean("upsell_enabled").default(false).notNull(),
+  upsellCourseId: int("upsell_course_id"),
+  upsellHeadline: varchar("upsell_headline", { length: 500 }),
+  upsellDescription: text("upsell_description"),
+  // Completion actions
+  completionRedirectUrl: varchar("completion_redirect_url", { length: 1024 }),
+  completionEmailEnabled: boolean("completion_email_enabled").default(false).notNull(),
+  completionEmailSubject: varchar("completion_email_subject", { length: 500 }),
+  completionEmailBody: longtext("completion_email_body"),
+
   // Course color scheme — applied to player sidebar, overview curriculum, landing page curriculum block
   // primaryColor: main brand color (buttons, active states, section headers)
   // accentColor: secondary/highlight color

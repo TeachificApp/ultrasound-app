@@ -1049,4 +1049,67 @@ export const lmsCourseBuilderRouter = router({
       }).where(eq(lmsLessons.id, input.id));
       return { success: true };
     }),
+
+  // ── After Purchase Settings ────────────────────────────────────────────────
+  getAfterPurchase: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db
+        .select({
+          id: lmsCourses.id,
+          title: lmsCourses.title,
+          customThankYouEnabled: lmsCourses.customThankYouEnabled,
+          customThankYouBlocks: lmsCourses.customThankYouBlocks,
+          postPurchaseRedirectUrl: lmsCourses.postPurchaseRedirectUrl,
+          welcomeEmailEnabled: lmsCourses.welcomeEmailEnabled,
+          welcomeEmailSubject: lmsCourses.welcomeEmailSubject,
+          welcomeEmailBody: lmsCourses.welcomeEmailBody,
+          upsellEnabled: lmsCourses.upsellEnabled,
+          upsellCourseId: lmsCourses.upsellCourseId,
+          upsellHeadline: lmsCourses.upsellHeadline,
+          upsellDescription: lmsCourses.upsellDescription,
+          completionRedirectUrl: lmsCourses.completionRedirectUrl,
+          completionEmailEnabled: lmsCourses.completionEmailEnabled,
+          completionEmailSubject: lmsCourses.completionEmailSubject,
+          completionEmailBody: lmsCourses.completionEmailBody,
+        })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, input.courseId))
+        .limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      return course;
+    }),
+
+  updateAfterPurchase: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      customThankYouEnabled: z.boolean().optional(),
+      customThankYouBlocks: z.string().nullable().optional(),
+      postPurchaseRedirectUrl: z.string().max(1024).nullable().optional(),
+      welcomeEmailEnabled: z.boolean().optional(),
+      welcomeEmailSubject: z.string().max(500).nullable().optional(),
+      welcomeEmailBody: z.string().nullable().optional(),
+      upsellEnabled: z.boolean().optional(),
+      upsellCourseId: z.number().nullable().optional(),
+      upsellHeadline: z.string().max(500).nullable().optional(),
+      upsellDescription: z.string().nullable().optional(),
+      completionRedirectUrl: z.string().max(1024).nullable().optional(),
+      completionEmailEnabled: z.boolean().optional(),
+      completionEmailSubject: z.string().max(500).nullable().optional(),
+      completionEmailBody: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { courseId, ...updates } = input;
+      const filtered = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
+      if (Object.keys(filtered).length > 0) {
+        await db.update(lmsCourses).set(filtered).where(eq(lmsCourses.id, courseId));
+      }
+      return { success: true };
+    }),
 });

@@ -1173,6 +1173,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           <TabsTrigger value="users" className="text-xs">Students</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
           <TabsTrigger value="sales" className="text-xs">Sales</TabsTrigger>
+          <TabsTrigger value="after-purchase" className="text-xs">After Purchase</TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -1330,6 +1331,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         </TabsContent>
         <TabsContent value="sales" className="mt-4">
           <LMSSalesTab courseId={courseId} />
+        </TabsContent>
+        <TabsContent value="after-purchase" className="mt-4">
+          <AfterPurchaseTab courseId={courseId} />
         </TabsContent>
         {/* Cohort Tab — only visible for cohort type */}
         <TabsContent value="cohort" className="mt-4">
@@ -11179,6 +11183,304 @@ function LMSPublishDomainSettings() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+
+// ── After Purchase Tab ────────────────────────────────────────────────────────
+function AfterPurchaseTab({ courseId }: { courseId: number }) {
+  const { data, isLoading } = trpc.lmsAdmin.getAfterPurchase.useQuery({ courseId });
+  const update = trpc.lmsAdmin.updateAfterPurchase.useMutation({
+    onSuccess: () => toast.success("After purchase settings saved"),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [form, setForm] = React.useState({
+    customThankYouEnabled: false,
+    postPurchaseRedirectUrl: "",
+    welcomeEmailEnabled: true,
+    welcomeEmailSubject: "",
+    welcomeEmailBody: "",
+    upsellEnabled: false,
+    upsellCourseId: null as number | null,
+    upsellHeadline: "",
+    upsellDescription: "",
+    completionRedirectUrl: "",
+    completionEmailEnabled: false,
+    completionEmailSubject: "",
+    completionEmailBody: "",
+  });
+
+  const [dirty, setDirty] = React.useState(false);
+
+  // Populate form when data loads
+  React.useEffect(() => {
+    if (!data) return;
+    setForm({
+      customThankYouEnabled: data.customThankYouEnabled ?? false,
+      postPurchaseRedirectUrl: data.postPurchaseRedirectUrl ?? "",
+      welcomeEmailEnabled: data.welcomeEmailEnabled ?? true,
+      welcomeEmailSubject: data.welcomeEmailSubject ?? "",
+      welcomeEmailBody: data.welcomeEmailBody ?? "",
+      upsellEnabled: data.upsellEnabled ?? false,
+      upsellCourseId: data.upsellCourseId ?? null,
+      upsellHeadline: data.upsellHeadline ?? "",
+      upsellDescription: data.upsellDescription ?? "",
+      completionRedirectUrl: data.completionRedirectUrl ?? "",
+      completionEmailEnabled: data.completionEmailEnabled ?? false,
+      completionEmailSubject: data.completionEmailSubject ?? "",
+      completionEmailBody: data.completionEmailBody ?? "",
+    });
+    setDirty(false);
+  }, [data]);
+
+  // Course search for upsell picker
+  const [courseSearch, setCourseSearch] = React.useState("");
+  const { data: courseList } = trpc.lmsAdmin.listCourses.useQuery(
+    { status: "all", type: "all", page: 1, pageSize: 200 },
+    { enabled: form.upsellEnabled }
+  );
+  const filteredCourses = React.useMemo(() => {
+    if (!courseList?.courses) return [];
+    const q = courseSearch.toLowerCase();
+    return courseList.courses.filter((c: any) => c.title.toLowerCase().includes(q) && c.id !== courseId);
+  }, [courseList, courseSearch, courseId]);
+
+  function patch(updates: Partial<typeof form>) {
+    setForm(prev => ({ ...prev, ...updates }));
+    setDirty(true);
+  }
+
+  function handleSave() {
+    update.mutate({
+      courseId,
+      customThankYouEnabled: form.customThankYouEnabled,
+      postPurchaseRedirectUrl: form.postPurchaseRedirectUrl || null,
+      welcomeEmailEnabled: form.welcomeEmailEnabled,
+      welcomeEmailSubject: form.welcomeEmailSubject || null,
+      welcomeEmailBody: form.welcomeEmailBody || null,
+      upsellEnabled: form.upsellEnabled,
+      upsellCourseId: form.upsellCourseId,
+      upsellHeadline: form.upsellHeadline || null,
+      upsellDescription: form.upsellDescription || null,
+      completionRedirectUrl: form.completionRedirectUrl || null,
+      completionEmailEnabled: form.completionEmailEnabled,
+      completionEmailSubject: form.completionEmailSubject || null,
+      completionEmailBody: form.completionEmailBody || null,
+    });
+    setDirty(false);
+  }
+
+  if (isLoading) return <div className="p-6 text-sm text-gray-500">Loading…</div>;
+
+  const selectedUpsellCourse = courseList?.courses?.find((c: any) => c.id === form.upsellCourseId);
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">After Purchase Settings</h2>
+        <p className="text-sm text-gray-500 mt-1">Configure what happens after a student purchases this course.</p>
+      </div>
+
+      {/* Custom Thank You Page */}
+      <Card>
+        <CardContent className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-teal-600" />
+              <span className="font-medium text-gray-900">Custom Thank You Page</span>
+            </div>
+            <Switch checked={form.customThankYouEnabled} onCheckedChange={(v) => patch({ customThankYouEnabled: v })} />
+          </div>
+          <p className="text-sm text-gray-500">Show a custom thank-you page after purchase instead of the default confirmation. Build it with the page builder using your brand colors and messaging.</p>
+          {form.customThankYouEnabled && (
+            <div className="rounded-md border border-teal-200 bg-teal-50 p-3 text-sm text-teal-700">
+              Use the <strong>Landing Page</strong> tab to build the custom thank-you page content.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Post-Purchase Redirect URL */}
+      <Card>
+        <CardContent className="p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <ExternalLink className="w-5 h-5 text-teal-600" />
+            <span className="font-medium text-gray-900">Post-Purchase Redirect URL</span>
+          </div>
+          <p className="text-sm text-gray-500">
+            After successful purchase, redirect the student to this URL instead of the default thank-you page.
+            Leave empty to use the custom thank-you page (if enabled) or the default course access page.
+          </p>
+          <Input
+            placeholder="https://example.com/thank-you"
+            value={form.postPurchaseRedirectUrl}
+            onChange={(e) => patch({ postPurchaseRedirectUrl: e.target.value })}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Welcome Email */}
+      <Card>
+        <CardContent className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-teal-600" />
+              <span className="font-medium text-gray-900">Welcome Email</span>
+            </div>
+            <Switch checked={form.welcomeEmailEnabled} onCheckedChange={(v) => patch({ welcomeEmailEnabled: v })} />
+          </div>
+          <p className="text-sm text-gray-500">Send an automated welcome email when a student enrolls in this course.</p>
+          {form.welcomeEmailEnabled && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium">Subject Line</Label>
+                <Input
+                  className="mt-1"
+                  placeholder="Welcome to {{course_title}}!"
+                  value={form.welcomeEmailSubject}
+                  onChange={(e) => patch({ welcomeEmailSubject: e.target.value })}
+                />
+                <p className="text-xs text-gray-400 mt-1">Available variables: {"{{course_title}}"}, {"{{student_name}}"}, {"{{instructor_name}}"}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Email Body</Label>
+                <textarea
+                  className="mt-1 w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder={"Hi {{student_name}},\n\nWelcome to {{course_title}}! We're excited to have you.\n\nClick the button below to get started.\n\nBest,\n{{instructor_name}}"}
+                  value={form.welcomeEmailBody}
+                  onChange={(e) => patch({ welcomeEmailBody: e.target.value })}
+                />
+                <p className="text-xs text-gray-400 mt-1">Available variables: {"{{course_title}}"}, {"{{student_name}}"}, {"{{instructor_name}}"}, {"{{course_url}}"}</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Upsell Offer */}
+      <Card>
+        <CardContent className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-teal-600" />
+              <span className="font-medium text-gray-900">Upsell Offer</span>
+            </div>
+            <Switch checked={form.upsellEnabled} onCheckedChange={(v) => patch({ upsellEnabled: v })} />
+          </div>
+          <p className="text-sm text-gray-500">Show a related course offer on the thank-you page to increase revenue.</p>
+          {form.upsellEnabled && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium">Upsell Course</Label>
+                <div className="mt-1 relative">
+                  <Input
+                    placeholder="Search courses…"
+                    value={courseSearch || (selectedUpsellCourse ? selectedUpsellCourse.title : "")}
+                    onChange={(e) => { setCourseSearch(e.target.value); patch({ upsellCourseId: null }); }}
+                  />
+                  {courseSearch && filteredCourses.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {filteredCourses.map((c: any) => (
+                        <button
+                          key={c.id}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-teal-50 hover:text-teal-700"
+                          onClick={() => { patch({ upsellCourseId: c.id }); setCourseSearch(""); }}
+                        >
+                          {c.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {selectedUpsellCourse && !courseSearch && (
+                  <p className="text-xs text-teal-600 mt-1">Selected: {selectedUpsellCourse.title}</p>
+                )}
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Headline</Label>
+                <Input
+                  className="mt-1"
+                  placeholder="Take your learning further…"
+                  value={form.upsellHeadline}
+                  onChange={(e) => patch({ upsellHeadline: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Description</Label>
+                <textarea
+                  className="mt-1 w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder="Describe why they should enroll in this next course…"
+                  value={form.upsellDescription}
+                  onChange={(e) => patch({ upsellDescription: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Completion Actions */}
+      <Card>
+        <CardContent className="p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-teal-600" />
+            <span className="font-medium text-gray-900">Completion Actions</span>
+          </div>
+          <p className="text-sm text-gray-500">Configure what happens when a student completes this course.</p>
+          <div>
+            <Label className="text-sm font-medium">Completion Redirect URL</Label>
+            <Input
+              className="mt-1"
+              placeholder="https://example.com/congratulations"
+              value={form.completionRedirectUrl}
+              onChange={(e) => patch({ completionRedirectUrl: e.target.value })}
+            />
+            <p className="text-xs text-gray-400 mt-1">Redirect students to this URL when they complete the course. Leave empty to show the default completion screen.</p>
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Completion Email</p>
+              <p className="text-xs text-gray-500">Send an email when a student completes this course.</p>
+            </div>
+            <Switch checked={form.completionEmailEnabled} onCheckedChange={(v) => patch({ completionEmailEnabled: v })} />
+          </div>
+          {form.completionEmailEnabled && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium">Subject Line</Label>
+                <Input
+                  className="mt-1"
+                  placeholder="Congratulations on completing {{course_title}}!"
+                  value={form.completionEmailSubject}
+                  onChange={(e) => patch({ completionEmailSubject: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Email Body</Label>
+                <textarea
+                  className="mt-1 w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder={"Hi {{student_name}},\n\nCongratulations on completing {{course_title}}!\n\nBest,\n{{instructor_name}}"}
+                  value={form.completionEmailBody}
+                  onChange={(e) => patch({ completionEmailBody: e.target.value })}
+                />
+                <p className="text-xs text-gray-400 mt-1">Available variables: {"{{course_title}}"}, {"{{student_name}}"}, {"{{instructor_name}}"}, {"{{certificate_url}}"}</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end pb-8">
+        <Button
+          onClick={handleSave}
+          disabled={!dirty || update.isPending}
+          className="bg-teal-600 hover:bg-teal-700 text-white"
+        >
+          {update.isPending ? "Saving…" : "Save After Purchase Settings"}
+        </Button>
+      </div>
     </div>
   );
 }
