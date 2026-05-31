@@ -78,6 +78,10 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   product: "Product",
   all_courses: "All Courses",
   all_downloads: "All Downloads",
+  ultrasoundassist_free: "UltrasoundAssist™ (Free Member)",
+  ultrasoundassist_premium: "UltrasoundAssist™ (Premium Member)",
+  echoassist_free: "EchoAssist™ (Free Member)",
+  echoassist_premium: "EchoAssist™ (Premium Member)",
 };
 
 const ITEM_TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -90,6 +94,10 @@ const ITEM_TYPE_ICONS: Record<string, React.ReactNode> = {
   product: <Tag className="w-3.5 h-3.5" />,
   all_courses: <BookOpen className="w-3.5 h-3.5" />,
   all_downloads: <Download className="w-3.5 h-3.5" />,
+  ultrasoundassist_free: <Globe className="w-3.5 h-3.5" />,
+  ultrasoundassist_premium: <Globe className="w-3.5 h-3.5" />,
+  echoassist_free: <Globe className="w-3.5 h-3.5" />,
+  echoassist_premium: <Globe className="w-3.5 h-3.5" />,
 };
 
 const BILLING_LABELS: Record<string, string> = {
@@ -667,7 +675,7 @@ function MembershipItemsTab({
     onError: (e) => toast.error(e.message),
   });
 
-  const needsItemId = !["all_courses", "all_downloads"].includes(addType);
+  const needsItemId = !["all_courses", "all_downloads", "ultrasoundassist_free", "ultrasoundassist_premium", "echoassist_free", "echoassist_premium"].includes(addType);
 
   return (
     <div className="max-w-2xl space-y-6">
