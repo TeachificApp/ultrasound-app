@@ -220,6 +220,46 @@ async function startServer() {
   registerAutoLoginRoute(app);
   // Google OAuth2 routes for per-form Google Sheets integration
   registerGoogleOAuthRoutes(app);
+  // Public REST API: GET /api/forms/:formId/submissions (auth via Bearer apiToken)
+  app.get("/api/forms/:formId/submissions", async (req: any, res: any) => {
+    try {
+      const auth = req.headers.authorization ?? "";
+      const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+      if (!token) return res.status(401).json({ error: "Missing Bearer token" });
+      const { getDb } = await import("../db");
+      const { generalFormTemplates, generalFormSubmissions, generalFormItems } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = getDb();
+      const formId = parseInt(req.params.formId);
+      if (isNaN(formId)) return res.status(400).json({ error: "Invalid formId" });
+      const [form] = await db.select({ id: generalFormTemplates.id, apiToken: generalFormTemplates.apiToken, name: generalFormTemplates.name })
+        .from(generalFormTemplates).where(eq(generalFormTemplates.id, formId)).limit(1);
+      if (!form) return res.status(404).json({ error: "Form not found" });
+      if (!form.apiToken || form.apiToken !== token) return res.status(403).json({ error: "Invalid token" });
+      const items = await db.select({ id: generalFormItems.id, label: generalFormItems.label, itemType: generalFormItems.itemType })
+        .from(generalFormItems).where(eq(generalFormItems.templateId, formId));
+      const fieldMap: Record<string, string> = {};
+      for (const item of items) fieldMap[item.id.toString()] = item.label || item.itemType;
+      const page = parseInt((req.query.page as string) ?? "1") || 1;
+      const pageSize = Math.min(parseInt((req.query.pageSize as string) ?? "100") || 100, 500);
+      const { desc, count } = await import("drizzle-orm");
+      const [submissions, [{ total }]] = await Promise.all([
+        db.select().from(generalFormSubmissions).where(eq(generalFormSubmissions.templateId, formId))
+          .orderBy(desc(generalFormSubmissions.createdAt)).limit(pageSize).offset((page - 1) * pageSize),
+        db.select({ total: count() }).from(generalFormSubmissions).where(eq(generalFormSubmissions.templateId, formId)),
+      ]);
+      const data = submissions.map((s: any) => {
+        const raw: Record<string, any> = JSON.parse(s.responses ?? "{}");
+        const labeled: Record<string, any> = {};
+        for (const [k, v] of Object.entries(raw)) labeled[fieldMap[k] ?? k] = v;
+        return { id: s.id, submittedAt: s.createdAt, status: s.status, score: s.score, maxScore: s.maxScore, responses: labeled };
+      });
+      return res.json({ form: { id: form.id, name: form.name }, total, page, pageSize, submissions: data });
+    } catch (e: any) {
+      console.error("[FormsAPI]", e);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
   // tRPC API
   app.use(
     "/api/trpc",

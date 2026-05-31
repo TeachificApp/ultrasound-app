@@ -4063,3 +4063,18 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Build Google Sheets connect UI in new Integrations tab (toggle, Client ID/Secret, Connect, Disconnect)
 - [x] Show connected email, spreadsheet link, disconnect button in Integrations tab
 - [x] Fix form list 0 submissions count bug (real count via JOIN)
+
+## Form Webhook & API Integration (May 31, 2026)
+- [ ] Add generalFormWebhooks table (formId, webhookUrl, secret, events JSON, isEnabled, lastTriggeredAt, lastStatus)
+- [ ] Apply migration SQL for generalFormWebhooks table
+- [ ] Add getWebhookConfig, saveWebhookConfig, testWebhook tRPC procedures
+- [ ] Add API token column to generalFormTemplates (apiToken, auto-generated UUID)
+- [ ] Build webhook delivery: POST submission JSON to webhookUrl with X-Signature-256 HMAC header on each submission
+- [ ] Build public API endpoint GET /api/forms/:formId/submissions (auth via Bearer apiToken)
+- [ ] Add Webhook card to IntegrationsTab (URL input, secret, events checkboxes, enable toggle, Test button, last delivery status)
+- [ ] Add API card to IntegrationsTab (show endpoint URL, copy token button, regenerate token button, code example)
+
+## Form Custom Domain Delivery (May 31, 2026)
+- [ ] Add hostDomain selector to form Settings tab (dropdown of available project domains)
+- [ ] Show live preview URL in Settings tab using selected domain + /forms/[slug]
+- [ ] Ensure PublicFormRenderer route /forms/:slug works on all configured domains

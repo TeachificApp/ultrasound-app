@@ -5374,3 +5374,20 @@ export const googleFormIntegrations = mysqlTable("googleFormIntegrations", {
 });
 export type GoogleFormIntegration = typeof googleFormIntegrations.$inferSelect;
 export type InsertGoogleFormIntegration = typeof googleFormIntegrations.$inferInsert;
+
+// ─── General Form Webhooks ─────────────────────────────────────────────────────
+export const generalFormWebhooks = mysqlTable("generalFormWebhooks", {
+  id: int("id").autoincrement().primaryKey(),
+  formId: int("formId").notNull(),
+  webhookUrl: varchar("webhookUrl", { length: 1000 }),
+  secret: varchar("secret", { length: 255 }),        // HMAC signing secret
+  events: varchar("events", { length: 255 }).default("submission"), // "submission" | "submission,partial"
+  isEnabled: boolean("isEnabled").default(false).notNull(),
+  lastTriggeredAt: bigint("lastTriggeredAt", { mode: "number" }),
+  lastStatus: varchar("lastStatus", { length: 50 }), // "success" | "error"
+  lastStatusCode: int("lastStatusCode"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type GeneralFormWebhook = typeof generalFormWebhooks.$inferSelect;
+export type InsertGeneralFormWebhook = typeof generalFormWebhooks.$inferInsert;

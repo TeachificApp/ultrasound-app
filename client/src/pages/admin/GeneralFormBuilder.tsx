@@ -61,6 +61,7 @@ import {
   ArrowLeft,
   GripVertical,
   Eye,
+  EyeOff,
   Download,
   Search,
   X,
@@ -70,7 +71,11 @@ import {
   AlertTriangle,
   Info,
   Plug,
-  CheckCircle2,
+  Webhook,
+  Code,
+  Zap,
+  Check,
+  Save,
 } from "lucide-react";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
@@ -1421,6 +1426,22 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
               onChange={(v) => setHostDomain(v || DEFAULT_HOST_DOMAIN)}
               className="mt-1 w-full text-sm"
             />
+            {template.publicSlug && (
+              <div className="mt-2 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <span className="text-xs text-gray-600 font-mono truncate">
+                  https://{hostDomain || DEFAULT_HOST_DOMAIN}/forms/{template.publicSlug}
+                </span>
+                <a
+                  href={`https://${hostDomain || DEFAULT_HOST_DOMAIN}/forms/${template.publicSlug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto shrink-0 text-[#0e7490] hover:text-[#0c6478]"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -2746,6 +2767,195 @@ function IntegrationsTab({ formId }: { formId: number }) {
               </Button>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ── Webhook Card ── */}
+      <WebhookCard formId={formId} />
+
+      {/* ── API Card ── */}
+      <ApiCard formId={formId} />
+    </div>
+  );
+}
+
+// ─── Webhook Integration Card ─────────────────────────────────────────────────
+function WebhookCard({ formId }: { formId: number }) {
+  const utils = trpc.useUtils();
+  const { data: webhook } = trpc.generalForm.getWebhookConfig.useQuery({ formId });
+  const saveMutation = trpc.generalForm.saveWebhookConfig.useMutation({
+    onSuccess: () => utils.generalForm.getWebhookConfig.invalidate({ formId }),
+  });
+  const testMutation = trpc.generalForm.testWebhook.useMutation();
+
+  const [url, setUrl] = useState("");
+  const [secret, setSecret] = useState("");
+  const [enabled, setEnabled] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; statusCode: number; error?: string } | null>(null);
+
+  useEffect(() => {
+    if (webhook) {
+      setUrl(webhook.webhookUrl ?? "");
+      setEnabled(webhook.isEnabled ?? false);
+    }
+  }, [webhook]);
+
+  const handleSave = async () => {
+    await saveMutation.mutateAsync({ formId, webhookUrl: url, secret: secret || undefined, isEnabled: enabled });
+    toast.success("Webhook settings saved");
+  };
+
+  const handleTest = async () => {
+    setTestResult(null);
+    try {
+      const res = await testMutation.mutateAsync({ formId });
+      setTestResult(res);
+    } catch (e: any) {
+      setTestResult({ ok: false, statusCode: 0, error: e.message });
+    }
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-xl p-5 bg-white">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+            <Webhook className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">Webhook</h3>
+            <p className="text-xs text-gray-500">POST submission data to any URL in real-time</p>
+          </div>
+        </div>
+        <Switch checked={enabled} onCheckedChange={v => { setEnabled(v); saveMutation.mutate({ formId, isEnabled: v }); }} />
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <Label className="text-xs text-gray-600 mb-1 block">Endpoint URL</Label>
+          <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://your-server.com/webhook" className="h-8 text-sm" />
+        </div>
+        <div>
+          <Label className="text-xs text-gray-600 mb-1 block">Signing Secret (optional)</Label>
+          <div className="relative">
+            <Input
+              type={showSecret ? "text" : "password"}
+              value={secret}
+              onChange={e => setSecret(e.target.value)}
+              placeholder="Leave blank to keep existing secret"
+              className="h-8 text-sm pr-8"
+            />
+            <button type="button" onClick={() => setShowSecret(s => !s)} className="absolute right-2 top-1.5 text-gray-400 hover:text-gray-600">
+              {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Sent as <code className="bg-gray-100 px-1 rounded">X-Signature-256: sha256=...</code> header</p>
+        </div>
+        {webhook?.lastTriggeredAt && (
+          <p className="text-xs text-gray-400">
+            Last delivery: {new Date(webhook.lastTriggeredAt).toLocaleString()} —{" "}
+            <span className={webhook.lastStatus === "success" ? "text-green-600" : "text-red-500"}>
+              {webhook.lastStatus} {webhook.lastStatusCode ? `(${webhook.lastStatusCode})` : ""}
+            </span>
+          </p>
+        )}
+        <div className="flex gap-2 pt-1">
+          <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending} className="gap-1 bg-[#0e7490] hover:bg-[#0c6478] text-white">
+            <Save className="w-3.5 h-3.5" /> Save
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleTest} disabled={testMutation.isPending || !url} className="gap-1">
+            <Zap className="w-3.5 h-3.5" /> Test
+          </Button>
+        </div>
+        {testResult && (
+          <div className={`text-xs rounded-lg px-3 py-2 ${testResult.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+            {testResult.ok ? `✓ Success (HTTP ${testResult.statusCode})` : `✗ Failed${testResult.statusCode ? ` (HTTP ${testResult.statusCode})` : ""}: ${testResult.error ?? "Unknown error"}`}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── API Integration Card ─────────────────────────────────────────────────────
+function ApiCard({ formId }: { formId: number }) {
+  const utils = trpc.useUtils();
+  const { data: tokenData } = trpc.generalForm.getApiToken.useQuery({ formId });
+  const regenMutation = trpc.generalForm.regenerateApiToken.useMutation({
+    onSuccess: () => utils.generalForm.getApiToken.invalidate({ formId }),
+  });
+  const [copied, setCopied] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+
+  const apiToken = tokenData?.apiToken;
+  const apiEndpoint = `${window.location.origin}/api/forms/${formId}/submissions`;
+
+  const copyToken = () => {
+    if (apiToken) {
+      navigator.clipboard.writeText(apiToken);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-xl p-5 bg-white">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+          <Code className="w-5 h-5 text-blue-600" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-gray-900">API Access</h3>
+          <p className="text-xs text-gray-500">Pull submissions programmatically via REST API</p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <Label className="text-xs text-gray-600 mb-1 block">Endpoint</Label>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 font-mono truncate">{apiEndpoint}</code>
+            <Button size="sm" variant="outline" className="shrink-0 h-7 px-2" onClick={() => { navigator.clipboard.writeText(apiEndpoint); toast.success("Copied!"); }}>
+              <Copy className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        <div>
+          <Label className="text-xs text-gray-600 mb-1 block">Bearer Token</Label>
+          {apiToken ? (
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 font-mono truncate">
+                {showToken ? apiToken : "••••••••••••••••••••••••••••••••"}
+              </code>
+              <Button size="sm" variant="outline" className="shrink-0 h-7 px-2" onClick={() => setShowToken(s => !s)}>
+                {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </Button>
+              <Button size="sm" variant="outline" className="shrink-0 h-7 px-2" onClick={copyToken}>
+                {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+              </Button>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400">No token yet — generate one below</p>
+          )}
+        </div>
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => regenMutation.mutate({ formId })}
+          disabled={regenMutation.isPending}
+          className="gap-1 text-xs"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          {apiToken ? "Regenerate Token" : "Generate Token"}
+        </Button>
+
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <p className="text-xs font-medium text-gray-600 mb-1.5">Example request</p>
+          <pre className="text-xs text-gray-700 font-mono whitespace-pre-wrap break-all">{`curl -H "Authorization: Bearer ${apiToken ?? "<your-token>"}" \\
+  "${apiEndpoint}"`}</pre>
         </div>
       </div>
     </div>

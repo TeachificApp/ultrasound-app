@@ -30,6 +30,7 @@ import {
   generalFormSubmissions,
   globalFormTheme,
   googleFormIntegrations,
+  generalFormWebhooks,
   users,
 } from "../../drizzle/schema";
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
@@ -858,7 +859,47 @@ export const generalFormRouter = router({
           console.error("[GoogleSheets] Sync failed for form", input.templateId, err.message);
         });
       } catch {}
-      return { id: (result as any).insertId, score, maxScore };
+      // Fire-and-forget Webhook delivery (non-blocking)
+      const submissionId = (result as any).insertId;
+      ;(async () => {
+        try {
+          const [webhookRow] = await db.select().from(generalFormWebhooks)
+            .where(eq(generalFormWebhooks.formId, input.templateId)).limit(1);
+          if (webhookRow?.isEnabled && webhookRow.webhookUrl) {
+            const payload = JSON.stringify({
+              event: "submission",
+              formId: input.templateId,
+              submissionId,
+              timestamp: new Date().toISOString(),
+              responses: JSON.parse(input.responses),
+              score: template.scoreEnabled ? { score, maxScore } : undefined,
+            });
+            let signature = "";
+            if (webhookRow.secret) {
+              const { createHmac } = await import("crypto");
+              signature = createHmac("sha256", webhookRow.secret).update(payload).digest("hex");
+            }
+            const res = await fetch(webhookRow.webhookUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(signature ? { "X-Signature-256": `sha256=${signature}` } : {}),
+              },
+              body: payload,
+              signal: AbortSignal.timeout(15000),
+            });
+            const statusCode = res.status;
+            await db.update(generalFormWebhooks).set({
+              lastTriggeredAt: Date.now(),
+              lastStatus: statusCode >= 200 && statusCode < 300 ? "success" : "error",
+              lastStatusCode: statusCode,
+            }).where(eq(generalFormWebhooks.id, webhookRow.id));
+          }
+        } catch (e: any) {
+          console.error("[Webhook] Delivery failed for form", input.templateId, e.message);
+        }
+      })();
+      return { id: submissionId, score, maxScore };
     }),
 
     // ── ADMIN: Export form results as CSV-ready data ───────────────────────────
@@ -983,5 +1024,106 @@ export const generalFormRouter = router({
         updatedAt: new Date(),
       }).where(eq(googleFormIntegrations.formId, input.formId));
       return { ok: true };
+    }),
+
+  // ─── Webhook Integration ──────────────────────────────────────────────────
+  getWebhookConfig: protectedProcedure
+    .input(z.object({ formId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const [row] = await db.select().from(generalFormWebhooks)
+        .where(eq(generalFormWebhooks.formId, input.formId)).limit(1);
+      return row ?? null;
+    }),
+
+  saveWebhookConfig: protectedProcedure
+    .input(z.object({
+      formId: z.number(),
+      webhookUrl: z.string().optional(),
+      secret: z.string().optional(),
+      events: z.string().optional(),
+      isEnabled: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [existing] = await db.select({ id: generalFormWebhooks.id })
+        .from(generalFormWebhooks).where(eq(generalFormWebhooks.formId, input.formId)).limit(1);
+      const updates: any = {};
+      if (input.webhookUrl !== undefined) updates.webhookUrl = input.webhookUrl;
+      if (input.secret !== undefined) updates.secret = input.secret;
+      if (input.events !== undefined) updates.events = input.events;
+      if (input.isEnabled !== undefined) updates.isEnabled = input.isEnabled;
+      if (existing) {
+        await db.update(generalFormWebhooks).set(updates).where(eq(generalFormWebhooks.id, existing.id));
+      } else {
+        await db.insert(generalFormWebhooks).values({ formId: input.formId, ...updates });
+      }
+      return { ok: true };
+    }),
+
+  testWebhook: protectedProcedure
+    .input(z.object({ formId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [row] = await db.select().from(generalFormWebhooks)
+        .where(eq(generalFormWebhooks.formId, input.formId)).limit(1);
+      if (!row?.webhookUrl) throw new TRPCError({ code: "BAD_REQUEST", message: "No webhook URL configured" });
+      const payload = JSON.stringify({
+        event: "test",
+        formId: input.formId,
+        timestamp: new Date().toISOString(),
+        submission: { id: 0, answers: { example_field: "test value" } },
+      });
+      let signature = "";
+      if (row.secret) {
+        const { createHmac } = await import("crypto");
+        signature = createHmac("sha256", row.secret).update(payload).digest("hex");
+      }
+      try {
+        const res = await fetch(row.webhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(signature ? { "X-Signature-256": `sha256=${signature}` } : {}),
+          },
+          body: payload,
+          signal: AbortSignal.timeout(10000),
+        });
+        const status = res.status;
+        await db.update(generalFormWebhooks).set({
+          lastTriggeredAt: Date.now(),
+          lastStatus: status >= 200 && status < 300 ? "success" : "error",
+          lastStatusCode: status,
+        }).where(eq(generalFormWebhooks.id, row.id));
+        return { ok: status >= 200 && status < 300, statusCode: status };
+      } catch (e: any) {
+        await db.update(generalFormWebhooks).set({
+          lastTriggeredAt: Date.now(),
+          lastStatus: "error",
+          lastStatusCode: 0,
+        }).where(eq(generalFormWebhooks.id, row.id));
+        return { ok: false, statusCode: 0, error: e.message };
+      }
+    }),
+
+  // ─── API Token ────────────────────────────────────────────────────────────
+  getApiToken: protectedProcedure
+    .input(z.object({ formId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const [row] = await db.select({ apiToken: generalFormTemplates.apiToken })
+        .from(generalFormTemplates).where(eq(generalFormTemplates.id, input.formId)).limit(1);
+      return { apiToken: row?.apiToken ?? null };
+    }),
+
+  regenerateApiToken: protectedProcedure
+    .input(z.object({ formId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const { randomUUID } = await import("crypto");
+      const token = randomUUID().replace(/-/g, "");
+      await db.update(generalFormTemplates).set({ apiToken: token })
+        .where(eq(generalFormTemplates.id, input.formId));
+      return { apiToken: token };
     }),
 });
