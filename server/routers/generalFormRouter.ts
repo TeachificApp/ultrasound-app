@@ -29,6 +29,7 @@ import {
   generalFormBranchRules,
   generalFormSubmissions,
   globalFormTheme,
+  googleFormIntegrations,
   users,
 } from "../../drizzle/schema";
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
@@ -849,6 +850,14 @@ export const generalFormRouter = router({
         userAgent: req?.headers?.["user-agent"]?.substring(0, 500) ?? null,
         referrer: req?.headers?.referer?.substring(0, 500) ?? null,
       });
+      // Fire-and-forget Google Sheets sync (non-blocking)
+      try {
+        const { syncSubmissionToSheets } = await import("../lib/googleSheets");
+        const parsedResponses: Record<string, any> = JSON.parse(input.responses);
+        syncSubmissionToSheets(input.templateId, parsedResponses, new Date()).catch((err: any) => {
+          console.error("[GoogleSheets] Sync failed for form", input.templateId, err.message);
+        });
+      } catch {}
       return { id: (result as any).insertId, score, maxScore };
     }),
 
@@ -901,6 +910,78 @@ export const generalFormRouter = router({
       } else {
         await db.insert(globalFormTheme).values({ themeSettings: input.themeSettings });
       }
+      return { ok: true };
+    }),
+
+  // ── Google Sheets Integration (per-form) ──────────────────────────────────
+  getGoogleIntegration: protectedProcedure
+    .input(z.object({ formId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [row] = await db.select().from(googleFormIntegrations).where(eq(googleFormIntegrations.formId, input.formId));
+      if (!row) return null;
+      // Never expose tokens to the client
+      return {
+        id: row.id,
+        formId: row.formId,
+        googleClientId: row.googleClientId,
+        // Mask client secret — only show if set
+        hasClientSecret: !!row.googleClientSecret,
+        connectedEmail: row.connectedEmail,
+        spreadsheetId: row.spreadsheetId,
+        spreadsheetName: row.spreadsheetName,
+        sheetTabName: row.sheetTabName,
+        isEnabled: row.isEnabled,
+        headersInitialised: row.headersInitialised,
+        isConnected: !!(row.accessToken && row.connectedEmail),
+      };
+    }),
+
+  saveGoogleIntegrationConfig: protectedProcedure
+    .input(z.object({
+      formId: z.number(),
+      googleClientId: z.string().optional(),
+      googleClientSecret: z.string().optional(),
+      spreadsheetName: z.string().optional(),
+      sheetTabName: z.string().optional(),
+      isEnabled: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [existing] = await db.select({ id: googleFormIntegrations.id }).from(googleFormIntegrations).where(eq(googleFormIntegrations.formId, input.formId));
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (input.googleClientId !== undefined) updates.googleClientId = input.googleClientId;
+      if (input.googleClientSecret !== undefined) updates.googleClientSecret = input.googleClientSecret;
+      if (input.spreadsheetName !== undefined) updates.spreadsheetName = input.spreadsheetName;
+      if (input.sheetTabName !== undefined) updates.sheetTabName = input.sheetTabName;
+      if (input.isEnabled !== undefined) updates.isEnabled = input.isEnabled;
+      if (existing) {
+        await db.update(googleFormIntegrations).set(updates).where(eq(googleFormIntegrations.formId, input.formId));
+      } else {
+        await db.insert(googleFormIntegrations).values({ formId: input.formId, ...updates });
+      }
+      return { ok: true };
+    }),
+
+  disconnectGoogleIntegration: protectedProcedure
+    .input(z.object({ formId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(googleFormIntegrations).set({
+        accessToken: null,
+        refreshToken: null,
+        tokenExpiresAt: null,
+        connectedEmail: null,
+        isEnabled: false,
+        headersInitialised: false,
+        updatedAt: new Date(),
+      }).where(eq(googleFormIntegrations.formId, input.formId));
       return { ok: true };
     }),
 });

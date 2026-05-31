@@ -5346,3 +5346,31 @@ export const globalFormTheme = mysqlTable("global_form_theme", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type GlobalFormTheme = typeof globalFormTheme.$inferSelect;
+
+// ─── Google Sheets Integration (per-form) ────────────────────────────────────
+// Stores per-form Google OAuth credentials and sheet connection details.
+// The admin enters their own Google Client ID/Secret in the form's Integrations
+// tab, authorises via OAuth, and submissions are appended to the chosen sheet.
+export const googleFormIntegrations = mysqlTable("googleFormIntegrations", {
+  id: int("id").autoincrement().primaryKey(),
+  formId: int("formId").notNull().unique(),          // FK → generalFormTemplates.id
+  // OAuth app credentials entered by the form builder
+  googleClientId: varchar("googleClientId", { length: 500 }),
+  googleClientSecret: varchar("googleClientSecret", { length: 500 }),
+  // Tokens obtained after OAuth consent
+  accessToken: text("accessToken"),
+  refreshToken: text("refreshToken"),
+  tokenExpiresAt: bigint("tokenExpiresAt", { mode: "number" }), // unix ms
+  connectedEmail: varchar("connectedEmail", { length: 255 }),   // Google account email
+  // Sheet configuration
+  spreadsheetId: varchar("spreadsheetId", { length: 255 }),
+  spreadsheetName: varchar("spreadsheetName", { length: 500 }),
+  sheetTabName: varchar("sheetTabName", { length: 255 }).default("Form Responses"),
+  headersInitialised: boolean("headersInitialised").default(false).notNull(),
+  // Toggle
+  isEnabled: boolean("isEnabled").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type GoogleFormIntegration = typeof googleFormIntegrations.$inferSelect;
+export type InsertGoogleFormIntegration = typeof googleFormIntegrations.$inferInsert;

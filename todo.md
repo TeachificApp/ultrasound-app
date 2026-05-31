@@ -4052,3 +4052,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Evaluate branch conditions in PublicFormRenderer (hide/show fields based on current answers)
 - [x] Evaluate branch conditions in PageByPageRenderer (skip pages/fields based on answers)
 - [x] Updated operators: equals, not_equals, contains, not_contains, starts_with, is_empty, is_not_empty, greater_than, less_than
+
+## Google Sheets Integration for Forms (May 30, 2026)
+- [x] No platform-level secrets needed — credentials entered per-form by admin
+- [x] Add googleFormIntegrations table (per-form: clientId, clientSecret, accessToken, refreshToken, email, spreadsheetId, sheetTabName, isEnabled)
+- [x] Apply migration SQL for googleFormIntegrations table
+- [x] Build /api/google/auth and /api/google/callback OAuth2 routes (per-form credentials)
+- [x] Build server-side Google Sheets helpers: createSheet, appendRow, refreshToken (server/lib/googleSheets.ts)
+- [x] On form submission: fire-and-forget sync to Google Sheets if integration enabled
+- [x] Build Google Sheets connect UI in new Integrations tab (toggle, Client ID/Secret, Connect, Disconnect)
+- [x] Show connected email, spreadsheet link, disconnect button in Integrations tab
+- [x] Fix form list 0 submissions count bug (real count via JOIN)

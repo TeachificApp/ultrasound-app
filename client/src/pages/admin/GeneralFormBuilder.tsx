@@ -69,6 +69,8 @@ import {
   GitBranch,
   AlertTriangle,
   Info,
+  Plug,
+  CheckCircle2,
 } from "lucide-react";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
@@ -2495,9 +2497,265 @@ function BranchingTab({ formId }: { formId: number }) {
 }
 
 
+// ─── Integrations Tab ────────────────────────────────────────────────────────
+function IntegrationsTab({ formId }: { formId: number }) {
+  const utils = trpc.useUtils();
+  const { data: integration, isLoading } = trpc.generalForm.getGoogleIntegration.useQuery({ formId });
+  const saveMutation = trpc.generalForm.saveGoogleIntegrationConfig.useMutation({
+    onSuccess: () => utils.generalForm.getGoogleIntegration.invalidate({ formId }),
+  });
+  const disconnectMutation = trpc.generalForm.disconnectGoogleIntegration.useMutation({
+    onSuccess: () => utils.generalForm.getGoogleIntegration.invalidate({ formId }),
+  });
+
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [spreadsheetName, setSpreadsheetName] = useState("");
+  const [sheetTabName, setSheetTabName] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+
+  // Sync state from loaded data
+  useEffect(() => {
+    if (integration) {
+      setClientId(integration.googleClientId ?? "");
+      setSpreadsheetName(integration.spreadsheetName ?? "");
+      setSheetTabName(integration.sheetTabName ?? "Form Responses");
+      setEnabled(integration.isEnabled ?? false);
+    }
+  }, [integration]);
+
+  // Handle ?google=connected redirect from OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("google") === "connected") {
+      utils.generalForm.getGoogleIntegration.invalidate({ formId });
+      // Clean up URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete("google");
+      url.searchParams.delete("tab");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
+  const handleSaveConfig = async () => {
+    const updates: any = { formId, spreadsheetName, sheetTabName, isEnabled: enabled };
+    if (clientId) updates.googleClientId = clientId;
+    if (clientSecret) updates.googleClientSecret = clientSecret;
+    await saveMutation.mutateAsync(updates);
+  };
+
+  const handleConnect = async () => {
+    // Save credentials first, then redirect to OAuth
+    if (clientId || clientSecret) {
+      const updates: any = { formId };
+      if (clientId) updates.googleClientId = clientId;
+      if (clientSecret) updates.googleClientSecret = clientSecret;
+      await saveMutation.mutateAsync(updates);
+    }
+    const origin = window.location.origin;
+    window.location.href = `/api/google/auth?formId=${formId}&origin=${encodeURIComponent(origin)}`;
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm("Disconnect Google account? Submissions will no longer sync to Sheets.")) return;
+    await disconnectMutation.mutateAsync({ formId });
+  };
+
+  const handleToggle = async (val: boolean) => {
+    setEnabled(val);
+    await saveMutation.mutateAsync({ formId, isEnabled: val });
+  };
+
+  if (isLoading) return <div className="flex items-center justify-center py-16 text-gray-400"><RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading…</div>;
+
+  const isConnected = integration?.isConnected;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-1">Integrations</h3>
+        <p className="text-sm text-gray-500">Connect external services to automatically sync form submissions.</p>
+      </div>
+
+      {/* Google Sheets Card */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        {/* Card Header */}
+        <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+                <rect width="24" height="24" rx="4" fill="#34A853" />
+                <path d="M7 8h10M7 12h10M7 16h6" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div>
+              <div className="font-medium text-gray-900 text-sm">Google Sheets</div>
+              <div className="text-xs text-gray-400">Auto-sync submissions to a spreadsheet</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {isConnected && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-xs text-gray-500">{enabled ? "Enabled" : "Disabled"}</span>
+                <button
+                  onClick={() => handleToggle(!enabled)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    enabled ? "bg-[#0e7490]" : "bg-gray-200"
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                    enabled ? "translate-x-4.5" : "translate-x-0.5"
+                  }`} />
+                </button>
+              </label>
+            )}
+          </div>
+        </div>
+
+        {/* Card Body */}
+        <div className="px-5 py-5 bg-gray-50 space-y-5">
+          {/* Connected status */}
+          {isConnected ? (
+            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <span className="text-sm text-green-800 font-medium">Connected as {integration?.connectedEmail}</span>
+              </div>
+              <button
+                onClick={handleDisconnect}
+                className="text-xs text-red-500 hover:text-red-700 underline"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <strong>Not connected.</strong> Enter your Google OAuth credentials below, then click Connect.
+            </div>
+          )}
+
+          {/* Google OAuth Credentials */}
+          <div className="space-y-3">
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Google OAuth Credentials</div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Client ID</label>
+              <Input
+                value={clientId}
+                onChange={e => setClientId(e.target.value)}
+                placeholder="Your Google OAuth Client ID"
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Client Secret</label>
+              <div className="relative">
+                <Input
+                  type={showSecret ? "text" : "password"}
+                  value={clientSecret}
+                  onChange={e => setClientSecret(e.target.value)}
+                  placeholder={integration?.hasClientSecret ? "••••••••••••••••" : "Your Google OAuth Client Secret"}
+                  className="text-sm pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecret(v => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Create credentials at{" "}
+                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-[#0e7490] hover:underline">
+                  Google Cloud Console <ExternalLink className="w-3 h-3 inline" />
+                </a>. Add <code className="bg-gray-100 px-1 rounded">{window.location.origin}/api/google/callback</code> as an authorized redirect URI.
+              </p>
+            </div>
+          </div>
+
+          {/* Sheet Configuration */}
+          <div className="space-y-3">
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Spreadsheet Settings</div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Spreadsheet Name</label>
+              <Input
+                value={spreadsheetName}
+                onChange={e => setSpreadsheetName(e.target.value)}
+                placeholder={`Form Responses - Form ${formId}`}
+                className="text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">Name for the new Google Sheet that will be created in your Drive.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Sheet Tab Name</label>
+              <Input
+                value={sheetTabName}
+                onChange={e => setSheetTabName(e.target.value)}
+                placeholder="Form Responses"
+                className="text-sm"
+              />
+            </div>
+            {integration?.spreadsheetId && (
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span className="text-gray-600">Spreadsheet created</span>
+                <a
+                  href={`https://docs.google.com/spreadsheets/d/${integration.spreadsheetId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#0e7490] hover:underline flex items-center gap-1"
+                >
+                  Open in Google Sheets <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSaveConfig}
+              disabled={saveMutation.isPending}
+              className="gap-1"
+            >
+              {saveMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+              Save Settings
+            </Button>
+            {!isConnected ? (
+              <Button
+                size="sm"
+                onClick={handleConnect}
+                disabled={saveMutation.isPending}
+                className="gap-1 bg-[#0e7490] hover:bg-[#0c6478] text-white"
+              >
+                <Plug className="w-3.5 h-3.5" />
+                Connect Google Account
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={handleConnect}
+                variant="outline"
+                className="gap-1"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Reconnect
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // ─── Form Editor Shell (tabs) ─────────────────────────────────────────────────
 function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "results" | "analytics" | "branching">("settings");
+  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "results" | "analytics" | "branching" | "integrations">("settings");
   const { data: formData, isLoading, refetch } = trpc.generalForm.getForm.useQuery({ id: formId });
 
   const TABS = [
@@ -2508,6 +2766,7 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
     { id: "share", label: "Share", icon: Share2 },
     { id: "results", label: "Results", icon: Download },
     { id: "analytics", label: "Analytics", icon: BarChart2 },
+    { id: "integrations", label: "Integrations", icon: Plug },
   ] as const;
 
   if (isLoading) return <div className="flex items-center justify-center py-16 text-gray-400"><RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading…</div>;
@@ -2586,6 +2845,7 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
       {activeTab === "settings" && <SettingsTab formId={formId} template={template} onRefetch={refetch} />}
       {activeTab === "results" && <ResultsTab formId={formId} template={template} />}
       {activeTab === "analytics" && <AnalyticsTab formId={formId} template={template} />}
+      {activeTab === "integrations" && <IntegrationsTab formId={formId} />}
     </div>
   );
 }

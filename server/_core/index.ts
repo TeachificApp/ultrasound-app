@@ -23,6 +23,7 @@ import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
 import { registerFunnelOgMetaRoutes } from "../routes/funnelOgMeta";
 import { registerAutoLoginRoute } from "../routes/autoLogin";
+import { registerGoogleOAuthRoutes } from "../routes/googleOAuth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -217,6 +218,8 @@ async function startServer() {
   registerFunnelOgMetaRoutes(app);
   // Auto-login route — one-time token redemption for post-purchase automatic sign-in
   registerAutoLoginRoute(app);
+  // Google OAuth2 routes for per-form Google Sheets integration
+  registerGoogleOAuthRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",
