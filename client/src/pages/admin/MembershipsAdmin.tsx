@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -637,6 +637,26 @@ function MembershipItemsTab({
     !downloadSearch || d.title?.toLowerCase().includes(downloadSearch.toLowerCase())
   );
 
+  // Build lookup maps for resolving item names
+  const courseMap = useMemo(() => {
+    const m: Record<number, string> = {};
+    for (const c of allCourses?.courses ?? []) m[c.id] = c.title;
+    return m;
+  }, [allCourses]);
+  const downloadMap = useMemo(() => {
+    const m: Record<number, string> = {};
+    for (const d of downloads?.downloads ?? []) m[d.id] = d.title;
+    return m;
+  }, [downloads]);
+
+  function resolveItemName(item: AccessItem): string {
+    if (item.label) return item.label;
+    if (!item.itemId) return ITEM_TYPE_LABELS[item.itemType];
+    if (item.itemType === "course") return courseMap[item.itemId] ?? `Course #${item.itemId}`;
+    if (item.itemType === "download") return downloadMap[item.itemId] ?? `Download #${item.itemId}`;
+    return `${ITEM_TYPE_LABELS[item.itemType]} #${item.itemId}`;
+  }
+
   const addMutation = trpc.membership.addItem.useMutation({
     onSuccess: () => { onRefetch(); setAddItemId(""); setAddItemTitle(""); setAddLabel(""); setCourseSearch(""); setDownloadSearch(""); toast.success("Item added"); },
     onError: (e) => toast.error(e.message),
@@ -792,7 +812,7 @@ function MembershipItemsTab({
                   <div className="text-teal-600">{ITEM_TYPE_ICONS[item.itemType]}</div>
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium text-gray-800">
-                      {item.label ?? `${ITEM_TYPE_LABELS[item.itemType]}${item.itemId ? ` #${item.itemId}` : ""}`}
+                      {resolveItemName(item)}
                     </span>
                     <span className="ml-2 text-xs text-gray-400">{ITEM_TYPE_LABELS[item.itemType]}</span>
                   </div>
