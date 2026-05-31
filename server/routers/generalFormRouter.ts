@@ -56,6 +56,53 @@ function generateSlug(name: string): string {
     + "-" + Math.random().toString(36).substring(2, 7);
 }
 
+// ─── Embedded form detector ─────────────────────────────────────────────────
+/**
+ * Fetches the raw HTML of a page and looks for embedded form widgets.
+ * Returns the canonical form URL if an embedded form is detected.
+ * Supports: Typeform (data-tf-widget, iframe), JotForm (data-jotform-id, iframe),
+ * Cognito Forms (iframe), Wufoo (iframe), Formstack (iframe), Gravity Forms (native HTML).
+ */
+async function detectEmbeddedFormUrl(pageUrl: string): Promise<string | null> {
+  try {
+    const resp = await fetch(pageUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FormImporter/1.0)', 'Accept': 'text/html' },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) return null;
+    const html = await resp.text();
+
+    // Typeform: data-tf-widget="FORMID" or data-tf-live="FORMID" or iframe src containing typeform.com/to/
+    const tfWidget = html.match(/data-tf-(?:widget|live|popup|sidetab|slider)=["']([A-Za-z0-9]+)["']/i);
+    if (tfWidget) return `https://form.typeform.com/to/${tfWidget[1]}`;
+    const tfIframe = html.match(/src=["'][^"']*typeform\.com\/to\/([A-Za-z0-9]+)[^"']*["']/i);
+    if (tfIframe) return `https://form.typeform.com/to/${tfIframe[1]}`;
+
+    // JotForm: data-jotform-id or iframe src
+    const jfAttr = html.match(/data-jotform-id=["']([0-9]+)["']/i);
+    if (jfAttr) return `https://form.jotform.com/${jfAttr[1]}`;
+    const jfIframe = html.match(/src=["'][^"']*jotform\.com\/(?:form\/)?([0-9]+)[^"']*["']/i);
+    if (jfIframe) return `https://form.jotform.com/${jfIframe[1]}`;
+
+    // Cognito Forms: iframe src containing cognitoforms.com
+    const cogIframe = html.match(/src=["']([^"']*cognitoforms\.com[^"']*)["']/i);
+    if (cogIframe) return cogIframe[1];
+
+    // Wufoo: iframe src containing wufoo.com
+    const wufooIframe = html.match(/src=["']([^"']*wufoo\.com\/forms\/[^"']+)["']/i);
+    if (wufooIframe) return wufooIframe[1];
+
+    // Formstack: iframe src containing formstack.com
+    const fsIframe = html.match(/src=["']([^"']*formstack\.com\/forms[^"']+)["']/i);
+    if (fsIframe) return fsIframe[1];
+
+    // Gravity Forms / native HTML form on the same page — return null to use HTML scraping
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Typeform URL detector & API importer ────────────────────────────────────
 function extractTypeformId(url: string): string | null {
   try {
@@ -467,8 +514,13 @@ export const generalFormRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
+      // ── Embedded form detection: resolve the actual form URL if page embeds a widget ──
+      let resolvedUrl = input.url;
+      const embeddedUrl = await detectEmbeddedFormUrl(input.url);
+      if (embeddedUrl) resolvedUrl = embeddedUrl;
+
       // ── Typeform fast-path: use public API instead of scraping ──────────────
-      const typeformId = extractTypeformId(input.url);
+      const typeformId = extractTypeformId(resolvedUrl);
       if (typeformId) {
         let tfParsed: TFParsed;
         try {
@@ -545,7 +597,7 @@ export const generalFormRouter = router({
       // Fetch page content — preserve structural HTML hints before stripping
       let pageText = "";
       try {
-        const res = await fetch(input.url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; FormImporter/1.0)" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
+        const res = await fetch(resolvedUrl, { headers: { "User-Agent": "Mozilla/5.0 (compatible; FormImporter/1.0)" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
         const html = await res.text();
         pageText = html
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
@@ -555,7 +607,7 @@ export const generalFormRouter = router({
           .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
           .replace(/\s+/g, " ").trim().substring(0, 6000);
       } catch {
-        pageText = `Form from: ${input.url}`;
+        pageText = `Form from: ${resolvedUrl}`;
       }
       // AI scaffold with rich field metadata + branching + calculations
       const systemPrompt = `You are a form builder assistant. Given a web page or form description, extract or infer ALL form fields, their types, options, conditional/branching logic, scoring, and any calculated/computed fields. Return structured JSON exactly matching the schema provided.
@@ -706,8 +758,13 @@ ${pageText}`;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
+      // ── Embedded form detection ─────────────────────────────────────────────────────
+      let resolvedUrlAppend = input.url;
+      const embeddedUrlAppend = await detectEmbeddedFormUrl(input.url);
+      if (embeddedUrlAppend) resolvedUrlAppend = embeddedUrlAppend;
+
       // ── Typeform fast-path ─────────────────────────────────────────────────────
-      const typeformIdAppend = extractTypeformId(input.url);
+      const typeformIdAppend = extractTypeformId(resolvedUrlAppend);
       if (typeformIdAppend) {
         let tfParsed: TFParsed;
         try { tfParsed = await fetchAndParseTypeform(typeformIdAppend); }
@@ -758,7 +815,7 @@ ${pageText}`;
       // Fetch page content — preserve structural hints
       let pageText = "";
       try {
-        const res = await fetch(input.url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; FormImporter/1.0)" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
+        const res = await fetch(resolvedUrlAppend, { headers: { "User-Agent": "Mozilla/5.0 (compatible; FormImporter/1.0)" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
         const html = await res.text();
         pageText = html
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
@@ -768,7 +825,7 @@ ${pageText}`;
           .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
           .replace(/\s+/g, " ").trim().substring(0, 6000);
       } catch {
-        pageText = `Form from: ${input.url}`;
+        pageText = `Form from: ${resolvedUrlAppend}`;
       }
       // AI scaffold with rich metadata + branching + calculations
       const systemPrompt = `You are a form builder assistant. Extract ALL form fields, their types, options, placeholder text, help text, conditional/branching logic, scoring weights, and any calculated/computed fields from the page. Return structured JSON exactly matching the schema provided.

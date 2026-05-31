@@ -74,6 +74,30 @@ function extractTypeformId_fb(url: string): string | null {
   } catch {}
   return null;
 }
+
+// ─── Embedded form detector (DIY) ────────────────────────────────────────────
+async function detectEmbeddedFormUrl_fb(pageUrl: string): Promise<string | null> {
+  try {
+    const resp = await fetch(pageUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FormImporter/1.0)', 'Accept': 'text/html' },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) return null;
+    const html = await resp.text();
+    const tfWidget = html.match(/data-tf-(?:widget|live|popup|sidetab|slider)=["']([A-Za-z0-9]+)["']/i);
+    if (tfWidget) return `https://form.typeform.com/to/${tfWidget[1]}`;
+    const tfIframe = html.match(/src=["'][^"']*typeform\.com\/to\/([A-Za-z0-9]+)[^"']*["']/i);
+    if (tfIframe) return `https://form.typeform.com/to/${tfIframe[1]}`;
+    const jfAttr = html.match(/data-jotform-id=["']([0-9]+)["']/i);
+    if (jfAttr) return `https://form.jotform.com/${jfAttr[1]}`;
+    const jfIframe = html.match(/src=["'][^"']*jotform\.com\/(?:form\/)?([0-9]+)[^"']*["']/i);
+    if (jfIframe) return `https://form.jotform.com/${jfIframe[1]}`;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function tfTypeToItemType_fb(type: string): string {
   const map: Record<string, string> = {
     short_text: 'text', long_text: 'textarea', email: 'email', phone_number: 'text',
@@ -851,8 +875,13 @@ export const formBuilderRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
 
+      // ── Embedded form detection ──────────────────────────────────────────────
+      let resolvedUrl_fb = input.url;
+      const embeddedUrl_fb = await detectEmbeddedFormUrl_fb(input.url);
+      if (embeddedUrl_fb) resolvedUrl_fb = embeddedUrl_fb;
+
       // ── Typeform fast-path ────────────────────────────────────────────────────
-      const tfId = extractTypeformId_fb(input.url);
+      const tfId = extractTypeformId_fb(resolvedUrl_fb);
       if (tfId) {
         let tfParsed: Awaited<ReturnType<typeof fetchAndParseTypeform_fb>>;
         try { tfParsed = await fetchAndParseTypeform_fb(tfId); }
