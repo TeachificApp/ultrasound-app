@@ -2396,36 +2396,9 @@ function BranchingTab({ formId }: { formId: number }) {
                 <Input value={editingRule.ruleLabel} onChange={e => setEditingRule(r => r ? { ...r, ruleLabel: e.target.value } : r)}
                   placeholder="e.g. Show phone field if contact method is phone" className="mt-1 h-8 text-sm" />
               </div>
-              <Card className="bg-gray-50 border-gray-200">
-                <CardContent className="pt-3 pb-3">
-                  <p className="text-xs font-semibold text-gray-600 mb-2">THEN…</p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Select value={editingRule.action} onValueChange={v => setEditingRule(r => r ? { ...r, action: v as any } : r)}>
-                      <SelectTrigger className="h-8 text-sm w-32"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="show">Show</SelectItem>
-                        <SelectItem value="hide">Hide</SelectItem>
-                        <SelectItem value="require">Require</SelectItem>
-                        <SelectItem value="unrequire">Un-require</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <span className="text-sm text-gray-500">the</span>
-                    <Select
-                      value={`${editingRule.targetType}:${editingRule.targetId}`}
-                      onValueChange={v => { const [type, id] = v.split(":"); setEditingRule(r => r ? { ...r, targetType: type as any, targetId: parseInt(id) } : r); }}
-                    >
-                      <SelectTrigger className="h-8 text-sm w-56"><SelectValue placeholder="Select field or section" /></SelectTrigger>
-                      <SelectContent>
-                        {items.map((it: any) => <SelectItem key={it.id} value={`item:${it.id}`}>{it.label || it.itemType}</SelectItem>)}
-                        {sections.length > 0 && sections.map((s: any) => <SelectItem key={s.id} value={`section:${s.id}`}>{s.title || `Section ${s.id}`}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-gray-600">WHEN…</p>
+                  <p className="text-xs font-semibold text-gray-600">IF…</p>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500">Match</span>
                     <div className="flex rounded border border-gray-200 overflow-hidden text-xs">
@@ -2470,6 +2443,33 @@ function BranchingTab({ formId }: { formId: number }) {
                   <Plus className="w-3 h-3" /> Add Condition
                 </Button>
               </div>
+              <Card className="bg-gray-50 border-gray-200">
+                <CardContent className="pt-3 pb-3">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">THEN…</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Select value={editingRule.action} onValueChange={v => setEditingRule(r => r ? { ...r, action: v as any } : r)}>
+                      <SelectTrigger className="h-8 text-sm w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="show">Show</SelectItem>
+                        <SelectItem value="hide">Hide</SelectItem>
+                        <SelectItem value="require">Require</SelectItem>
+                        <SelectItem value="unrequire">Un-require</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-gray-500">the</span>
+                    <Select
+                      value={`${editingRule.targetType}:${editingRule.targetId}`}
+                      onValueChange={v => { const [type, id] = v.split(":"); setEditingRule(r => r ? { ...r, targetType: type as any, targetId: parseInt(id) } : r); }}
+                    >
+                      <SelectTrigger className="h-8 text-sm w-56"><SelectValue placeholder="Select field or section" /></SelectTrigger>
+                      <SelectContent>
+                        {items.map((it: any) => <SelectItem key={it.id} value={`item:${it.id}`}>{it.label || it.itemType}</SelectItem>)}
+                        {sections.length > 0 && sections.map((s: any) => <SelectItem key={s.id} value={`section:${s.id}`}>{s.title || `Section ${s.id}`}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
               <div className="flex items-center gap-2">
                 <Switch checked={editingRule.isEnabled} onCheckedChange={v => setEditingRule(r => r ? { ...r, isEnabled: v } : r)} />
                 <Label className="text-xs text-gray-600">Rule enabled</Label>
