@@ -1109,6 +1109,78 @@ export const emailCampaignRouter = router({
       return { ok: true };
     }),
 
+  // ─── Email List: CSV Import ────────────────────────────────────────────────────
+  importSubscribersFromCsv: protectedProcedure
+    .input(z.object({
+      listId: z.number(),
+      rows: z.array(z.object({
+        email: z.string().email(),
+        name: z.string().max(300).optional(),
+      })).min(1).max(10000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [list] = await db.select({ id: emailLists.id }).from(emailLists).where(eq(emailLists.id, input.listId)).limit(1);
+      if (!list) throw new TRPCError({ code: "NOT_FOUND", message: "List not found" });
+      let imported = 0;
+      let skipped = 0;
+      for (const row of input.rows) {
+        try {
+          await addToEmailList(input.listId, row.email.trim().toLowerCase(), row.name?.trim(), { source: "csv_import" });
+          imported++;
+        } catch { skipped++; }
+      }
+      return { imported, skipped, total: input.rows.length };
+    }),
+
+  // ─── Email List: Generate / Rotate Webhook Token ─────────────────────────────
+  generateWebhookToken: protectedProcedure
+    .input(z.object({ listId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const token = randomBytes(32).toString("hex");
+      await db.update(emailLists).set({ webhookToken: token } as any).where(eq(emailLists.id, input.listId));
+      return { token };
+    }),
+
+  // ─── Email List: Get connected sources (forms + widgets) ─────────────────────
+  getListConnectedSources: protectedProcedure
+    .input(z.object({ listId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const widgets = await db.select({ id: leadCaptureWidgets.id, name: leadCaptureWidgets.name })
+        .from(leadCaptureWidgets).where(eq(leadCaptureWidgets.listId, input.listId));
+      return { widgets, forms: [] as { id: number; name: string }[] };
+    }),
+
+  // ─── Email List: Bulk remove subscribers ─────────────────────────────────────
+  bulkRemoveSubscribers: protectedProcedure
+    .input(z.object({
+      listId: z.number(),
+      subscriberIds: z.array(z.number()).min(1).max(500),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(emailListSubscribers)
+        .set({ status: "unsubscribed", unsubscribedAt: new Date() })
+        .where(and(
+          eq(emailListSubscribers.listId, input.listId),
+          inArray(emailListSubscribers.id, input.subscriberIds),
+        ));
+      await db.update(emailLists)
+        .set({ subscriberCount: sql`GREATEST(subscriberCount - ${input.subscriberIds.length}, 0)` })
+        .where(eq(emailLists.id, input.listId));
+      return { removed: input.subscriberIds.length };
+    }),
+
   // Public: submit a lead capture widget form (embedded on external sites)
   submitLeadCaptureWidget: publicProcedure
     .input(z.object({
@@ -1125,11 +1197,11 @@ export const emailCampaignRouter = router({
       await ensureAllContactsList();
       const allContactsList = await db.select({ id: emailLists.id }).from(emailLists).where(eq(emailLists.name, "All Contacts")).limit(1);
       if (allContactsList.length > 0) {
-        await addToEmailList({ listId: allContactsList[0].id, email: input.email, name: input.name, source: "lead_capture_widget", sourceId: String(input.widgetId) });
+        await addToEmailList(allContactsList[0].id, input.email, input.name, { source: "lead_capture_widget", sourceId: String(input.widgetId) });
       }
       // Add to specific list if configured
       if (widget.listId) {
-        await addToEmailList({ listId: widget.listId, email: input.email, name: input.name, source: "lead_capture_widget", sourceId: String(input.widgetId) });
+        await addToEmailList(widget.listId, input.email, input.name, { source: "lead_capture_widget", sourceId: String(input.widgetId) });
       }
       return { ok: true };
     }),

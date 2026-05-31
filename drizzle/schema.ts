@@ -5413,6 +5413,7 @@ export const emailLists = mysqlTable("emailLists", {
   description: text("description"),
   isActive: boolean("isActive").default(true).notNull(),
   subscriberCount: int("subscriberCount").default(0).notNull(),
+  webhookToken: varchar("webhookToken", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

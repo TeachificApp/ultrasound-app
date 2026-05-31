@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EmailCampaignEditor from "./EmailCampaignEditor";
+import EmailListsTab from "./EmailListsTab";
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({ icon, label, value, sub, color }: { icon: React.ReactNode; label: string; value: string | number; sub?: string; color?: string }) {
@@ -401,6 +402,9 @@ export default function EmailCampaignDashboard() {
               <Zap className="w-4 h-4" /> Lead Capture Widgets
               {leadCaptureWidgets && <Badge variant="secondary" className="ml-1 text-xs">{leadCaptureWidgets.length}</Badge>}
             </TabsTrigger>
+            <TabsTrigger value="lists" className="flex items-center gap-1.5">
+              <List className="w-4 h-4" /> Email Lists
+            </TabsTrigger>
           </TabsList>
 
           {/* ── Campaigns tab ─────────────────────────────────────────────── */}
@@ -612,6 +616,11 @@ export default function EmailCampaignDashboard() {
                 <p className="text-xs text-blue-600">Embed the script tag on any external website or landing page. When a visitor submits their email, they are automatically added to the selected email list and to your All Contacts list.</p>
               </div>
             </div>
+          </TabsContent>
+
+          {/* ── Email Lists tab ─────────────────────────────────────────────── */}
+          <TabsContent value="lists">
+            <EmailListsTab />
           </TabsContent>
         </Tabs>
       </div>

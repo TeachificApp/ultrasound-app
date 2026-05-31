@@ -303,6 +303,38 @@ async function startServer() {
     } catch { /* non-critical */ }
   });
 
+  // ── Public Email List Webhook (POST /api/email-lists/:token/subscribe) ───────
+  app.post("/api/email-lists/:token/subscribe", async (req: any, res: any) => {
+    try {
+      const { token } = req.params;
+      const { email, name, first_name, last_name } = req.body || {};
+      if (!email || typeof email !== "string" || !email.includes("@")) {
+        return res.status(400).json({ error: "Valid email is required" });
+      }
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) return res.status(503).json({ error: "Service unavailable" });
+      const { emailLists } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const [list] = await db.select({ id: emailLists.id, name: emailLists.name })
+        .from(emailLists).where(eq((emailLists as any).webhookToken, token)).limit(1);
+      if (!list) return res.status(404).json({ error: "List not found" });
+      const { addToEmailList, ensureAllContactsList } = await import("../lib/emailListHelper");
+      await ensureAllContactsList();
+      const displayName = name || [first_name, last_name].filter(Boolean).join(" ") || undefined;
+      await addToEmailList(list.id, email.trim().toLowerCase(), displayName, { source: "webhook" });
+      // Also add to All Contacts
+      const allList = await db.select({ id: emailLists.id }).from(emailLists).where(eq(emailLists.name, "All Contacts")).limit(1);
+      if (allList.length > 0 && allList[0].id !== list.id) {
+        await addToEmailList(allList[0].id, email.trim().toLowerCase(), displayName, { source: "webhook" });
+      }
+      res.json({ ok: true, list: list.name });
+    } catch (err: any) {
+      console.error("[EmailListWebhook] Error:", err?.message);
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
