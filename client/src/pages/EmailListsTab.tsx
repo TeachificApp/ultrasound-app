@@ -733,6 +733,8 @@ export default function EmailListsTab() {
   const [editingList, setEditingList] = useState<any | null>(null);
   const [viewingList, setViewingList] = useState<any | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [quickAddList, setQuickAddList] = useState<any | null>(null);
+  const [quickImportList, setQuickImportList] = useState<any | null>(null);
 
   const { data: lists, refetch, isLoading } = trpc.emailCampaign.listEmailLists.useQuery();
 
@@ -757,6 +759,8 @@ export default function EmailListsTab() {
     <div>
       {showCreate && <CreateListDialog onClose={() => setShowCreate(false)} onCreated={() => refetch()} />}
       {editingList && <RenameListDialog list={editingList} onClose={() => setEditingList(null)} onSaved={() => refetch()} />}
+      {quickAddList && <ManualEntryDialog listId={quickAddList.id} onClose={() => setQuickAddList(null)} onAdded={() => { refetch(); setQuickAddList(null); }} />}
+      {quickImportList && <CsvImportDialog listId={quickImportList.id} listName={quickImportList.name} onClose={() => setQuickImportList(null)} onImported={() => { refetch(); }} />}
 
       {/* Delete confirm dialog */}
       {deleteConfirmId !== null && (
@@ -818,7 +822,13 @@ export default function EmailListsTab() {
                     )}
                   </div>
                 </button>
-                <div className="flex gap-1 shrink-0">
+                <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setQuickAddList(list); }} title="Add subscriber manually">
+                    <UserPlus className="w-4 h-4 mr-1" /> Add
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setQuickImportList(list); }} title="Import CSV">
+                    <Upload className="w-4 h-4 mr-1" /> Import
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => setViewingList(list)} title="View subscribers">
                     <Eye className="w-4 h-4" />
                   </Button>
