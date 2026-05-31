@@ -4139,4 +4139,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fixed operator precedence build error in WebinarsAdmin.tsx line 581 (?? mixed with || without parens)
 - [ ] Public-facing webinar landing page / registration flow
 - [ ] Live/recorded viewer page with discussion threads
-- [ ] Webinar-specific content blocks in LandingPageBuilder
+- [x] Webinar-specific content blocks in LandingPageBuilder
+
+## Webinar Content Blocks in Page/Funnel Editors (May 2026)
+- [x] Add 5 webinar block types to BlockType union in BlockPreview.tsx: webinar_hero, webinar_registration, webinar_host_bio, webinar_replay, webinar_agenda
+- [x] Add "Webinar" category to CATALOG_CATEGORIES in LandingPageBuilder.tsx
+- [x] Add 5 webinar block catalog entries to BLOCK_CATALOG in LandingPageBuilder.tsx
+- [x] Add BlockSettings cases for all 5 webinar blocks in LandingPageBuilder.tsx
+- [x] Add BlockPreview render cases for all 5 webinar blocks in BlockPreview.tsx
+- [x] Wire webinar blocks into PublicFunnelPage.tsx renderer

@@ -80,7 +80,12 @@ export type BlockType =
   | "data_table"
   | "file_upload"
   | "cohort_sessions_auto"
-  | "affiliate_signup";
+  | "affiliate_signup"
+  | "webinar_hero"
+  | "webinar_registration"
+  | "webinar_host_bio"
+  | "webinar_replay"
+  | "webinar_agenda";
 
 export interface Block {
   id: string;
@@ -1307,6 +1312,218 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         </div>
       );
     }
+    // ─── Webinar Blocks ──────────────────────────────────────────────────────────
+    case "webinar_hero": {
+      const wh_bgType = d.bgType ?? "gradient";
+      let wh_bg: React.CSSProperties = {};
+      if (wh_bgType === "color") wh_bg = { backgroundColor: d.bgColor ?? "#0e4a50" };
+      else if (wh_bgType === "gradient") wh_bg = { background: `linear-gradient(135deg, ${d.gradientFrom ?? "#0e4a50"}, ${d.gradientTo ?? "#189aa1"})` };
+      else if (wh_bgType === "image") wh_bg = { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
+      const wh_accentColor = d.accentColor ?? "#4ad9e0";
+      const wh_scheduledAt = d.scheduledAt ? new Date(d.scheduledAt) : null;
+      return (
+        <div className="relative px-8 py-16 overflow-hidden" style={{ ...wh_bg, color: d.textColor ?? "#fff" }}>
+          <div className="relative max-w-3xl mx-auto">
+            {d.showBadge !== false && (
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4 uppercase tracking-wider" style={{ backgroundColor: `${wh_accentColor}30`, color: wh_accentColor, border: `1px solid ${wh_accentColor}60` }}>
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
+                {d.badgeText ?? "LIVE WEBINAR"}
+              </div>
+            )}
+            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline ?? "Join Our Live Webinar"}</h1>
+            {d.subheadline && <p className="text-xl opacity-90 mb-6">{d.subheadline}</p>}
+            <div className="flex flex-wrap gap-4 mb-8 text-sm opacity-80">
+              {d.showDate !== false && wh_scheduledAt && (
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  {wh_scheduledAt.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                </span>
+              )}
+              {d.showDuration !== false && d.durationMinutes && (
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  {d.durationMinutes} minutes
+                </span>
+              )}
+            </div>
+            {d.showCountdown !== false && wh_scheduledAt && wh_scheduledAt > new Date() && (
+              <WebinarCountdownTimer targetDate={wh_scheduledAt} accentColor={wh_accentColor} textColor={d.textColor ?? "#fff"} />
+            )}
+            <a href={d.ctaLink ?? "#register"} className="inline-block mt-6 px-8 py-3 rounded-xl font-bold text-base transition-opacity hover:opacity-90" style={{ backgroundColor: wh_accentColor, color: "#0e1e2e" }}>
+              {d.ctaText ?? "Reserve Your Spot"}
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    case "webinar_registration": {
+      const wr_accentColor = d.accentColor ?? "#189aa1";
+      const wr_layout = d.layout ?? "card";
+      const formContent = (
+        <div className="space-y-3">
+          <h2 className="text-2xl font-bold" style={{ color: "#111827" }}>{d.headline ?? "Register for Free"}</h2>
+          {d.subheadline && <p className="text-gray-500 text-sm">{d.subheadline}</p>}
+          <div className="space-y-2 mt-4">
+            <input disabled className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm bg-gray-50" placeholder="First & Last Name" />
+            <input disabled className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm bg-gray-50" placeholder="Email Address" />
+            {d.showPhone && <input disabled className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm bg-gray-50" placeholder={`Phone Number${d.requirePhone ? " *" : ""}`} />}
+            {d.showCompany && <input disabled className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm bg-gray-50" placeholder="Company / Organization" />}
+          </div>
+          <button disabled className="w-full h-11 rounded-lg font-semibold text-white text-sm mt-2" style={{ backgroundColor: wr_accentColor }}>
+            {d.ctaText ?? "Register Now"}
+          </button>
+          <p className="text-[10px] text-gray-400 text-center">Your information is safe. We never share your data.</p>
+        </div>
+      );
+      if (wr_layout === "card") return (
+        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+          <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8" style={{ border: `1px solid ${d.borderColor ?? "#e2e8f0"}` }}>
+            {formContent}
+          </div>
+        </div>
+      );
+      if (wr_layout === "split") return (
+        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+          <div className="max-w-4xl mx-auto grid grid-cols-2 gap-8 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4" style={{ backgroundColor: `${wr_accentColor}20`, color: wr_accentColor }}>LIVE WEBINAR</div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-3">{d.headline ?? "Register for Free"}</h2>
+              {d.subheadline && <p className="text-gray-500">{d.subheadline}</p>}
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6" style={{ border: `1px solid ${d.borderColor ?? "#e2e8f0"}` }}>{formContent}</div>
+          </div>
+        </div>
+      );
+      return (
+        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+          <div className="max-w-lg mx-auto">{formContent}</div>
+        </div>
+      );
+    }
+
+    case "webinar_host_bio": {
+      const whb_accentColor = d.accentColor ?? "#189aa1";
+      const whb_layout = d.layout ?? "horizontal";
+      const socialIcons: Record<string, string> = { linkedin: "in", twitter: "X", youtube: "YT", website: "🌐", email: "✉️" };
+      const bioContent = (
+        <div className="min-w-0">
+          <h3 className="text-xl font-bold" style={{ color: d.headlineColor ?? "#111827" }}>{d.name || "Host Name"}</h3>
+          {d.title && <p className="font-semibold text-sm mt-0.5" style={{ color: whb_accentColor }}>{d.title}</p>}
+          {d.credentials && <p className="text-xs text-gray-500 mt-0.5">{d.credentials}</p>}
+          {d.bio && <div className="text-gray-600 leading-relaxed mt-3 text-sm" dangerouslySetInnerHTML={{ __html: d.bio }} />}
+          {(d.socialLinks ?? []).length > 0 && (
+            <div className="flex gap-2 mt-3">
+              {(d.socialLinks as Array<{ platform: string; url: string }>).map((s, i) => (
+                <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-xs font-bold" style={{ backgroundColor: whb_accentColor }}>
+                  {socialIcons[s.platform] ?? s.platform.slice(0, 2).toUpperCase()}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+      const avatar = d.avatarUrl
+        ? <img src={d.avatarUrl} alt={d.name ?? "Host"} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4" style={{ borderColor: `${whb_accentColor}40` }} />
+        : <div className="w-24 h-24 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${whb_accentColor}20` }}><Users size={32} style={{ color: whb_accentColor }} /></div>;
+      return (
+        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+          {d.headline && <h2 className="text-2xl font-bold text-center mb-8" style={{ color: d.headlineColor ?? "#111827" }}>{d.headline}</h2>}
+          {whb_layout === "centered" ? (
+            <div className="max-w-2xl mx-auto text-center">
+              <div className="flex justify-center mb-4">{avatar}</div>
+              {bioContent}
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto flex gap-6 items-start">{avatar}{bioContent}</div>
+          )}
+        </div>
+      );
+    }
+
+    case "webinar_replay": {
+      const wre_accentColor = d.accentColor ?? "#189aa1";
+      const videoUrl = d.videoUrl ?? "";
+      const getEmbedUrl = (url: string, source: string) => {
+        if (!url) return "";
+        if (source === "youtube") {
+          const match = url.match(/(?:v=|youtu\.be\/)([\w-]+)/);
+          return match ? `https://www.youtube.com/embed/${match[1]}` : url;
+        }
+        if (source === "vimeo") {
+          const match = url.match(/vimeo\.com\/(\d+)/);
+          return match ? `https://player.vimeo.com/video/${match[1]}` : url;
+        }
+        return url;
+      };
+      const embedUrl = getEmbedUrl(videoUrl, d.videoSource ?? "youtube");
+      return (
+        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#0e1e2e" }}>
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold mb-3" style={{ color: d.textColor ?? "#fff" }}>{d.headline ?? "Watch the Replay"}</h2>
+            {d.subheadline && <p className="mb-6 opacity-80" style={{ color: d.textColor ?? "#fff" }}>{d.subheadline}</p>}
+            {embedUrl ? (
+              <div className="relative w-full rounded-xl overflow-hidden shadow-2xl" style={{ paddingBottom: "56.25%" }}>
+                <iframe src={embedUrl} className="absolute inset-0 w-full h-full" allow="autoplay; fullscreen" allowFullScreen title="Webinar Replay" />
+              </div>
+            ) : (
+              <div className="w-full rounded-xl flex items-center justify-center" style={{ paddingBottom: "56.25%", position: "relative", backgroundColor: "#1a2a3a" }}>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: `${wre_accentColor}30` }}>
+                    <svg className="w-8 h-8" fill="none" stroke={wre_accentColor} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </div>
+                  <p className="text-sm" style={{ color: d.textColor ?? "#fff", opacity: 0.6 }}>Add a video URL in block settings</p>
+                </div>
+              </div>
+            )}
+            {d.showChapters && (d.chapters ?? []).length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold mb-3" style={{ color: wre_accentColor }}>CHAPTERS</h3>
+                <div className="space-y-1">
+                  {(d.chapters as Array<{ time: string; title: string }>).map((ch, i) => (
+                    <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-white/10 cursor-pointer">
+                      <span className="text-xs font-mono w-10 flex-shrink-0" style={{ color: wre_accentColor }}>{ch.time}</span>
+                      <span className="text-sm" style={{ color: d.textColor ?? "#fff" }}>{ch.title}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    case "webinar_agenda": {
+      const wa_accentColor = d.accentColor ?? "#189aa1";
+      const agendaItems: Array<{ time: string; title: string; description: string; speaker: string }> = d.items ?? [];
+      return (
+        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-3xl mx-auto">
+            {d.headline && <h2 className="text-3xl font-bold mb-2" style={{ color: d.headlineColor ?? "#111827" }}>{d.headline}</h2>}
+            {d.subheadline && <p className="text-gray-500 mb-8">{d.subheadline}</p>}
+            <div className="space-y-0">
+              {agendaItems.map((item, i) => (
+                <div key={i} className="flex gap-4 py-4" style={{ borderBottom: i < agendaItems.length - 1 ? `1px solid ${wa_accentColor}20` : "none" }}>
+                  <div className="w-16 flex-shrink-0">
+                    <span className="text-sm font-mono font-semibold" style={{ color: wa_accentColor }}>{item.time}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900">{item.title}</p>
+                    {item.description && <p className="text-sm text-gray-500 mt-0.5">{item.description}</p>}
+                    {d.showSpeaker && item.speaker && <p className="text-xs mt-1 font-medium" style={{ color: wa_accentColor }}>{item.speaker}</p>}
+                  </div>
+                </div>
+              ))}
+              {agendaItems.length === 0 && (
+                <p className="text-gray-400 text-sm text-center py-8">Add agenda items in block settings.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
@@ -2364,6 +2581,53 @@ function FileUploadBlockPreview({ d }: { d: Record<string, any> }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Webinar Countdown Timer ──────────────────────────────────────────────────
+
+/**
+ * Live countdown timer for webinar_hero blocks.
+ * Shows days / hours / minutes / seconds remaining until the target date.
+ */
+export function WebinarCountdownTimer({ targetDate, accentColor, textColor }: { targetDate: Date; accentColor: string; textColor: string }) {
+  const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
+
+  useEffect(() => {
+    function calc() {
+      const diff = targetDate.getTime() - Date.now();
+      if (diff <= 0) { setTimeLeft(null); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setTimeLeft({ d, h, m, s });
+    }
+    calc();
+    const id = setInterval(calc, 1000);
+    return () => clearInterval(id);
+  }, [targetDate]);
+
+  if (!timeLeft) return null;
+
+  const units = [
+    { label: "Days", value: timeLeft.d },
+    { label: "Hours", value: timeLeft.h },
+    { label: "Mins", value: timeLeft.m },
+    { label: "Secs", value: timeLeft.s },
+  ];
+
+  return (
+    <div className="flex gap-3 flex-wrap">
+      {units.map(u => (
+        <div key={u.label} className="flex flex-col items-center min-w-[56px]">
+          <div className="text-3xl font-bold tabular-nums px-3 py-2 rounded-lg" style={{ backgroundColor: `${accentColor}20`, color: accentColor, border: `1px solid ${accentColor}40` }}>
+            {String(u.value).padStart(2, "0")}
+          </div>
+          <span className="text-[10px] mt-1 uppercase tracking-wider opacity-70" style={{ color: textColor }}>{u.label}</span>
+        </div>
+      ))}
     </div>
   );
 }

@@ -51,7 +51,7 @@ import {
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
   ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, BookmarkPlus, Music, UserPlus, Search,
-  SlidersHorizontal, Radio, Clock, Loader2, ArrowLeftRight,
+  SlidersHorizontal, Radio, Clock, Loader2, ArrowLeftRight, PlayCircle,
   Table2, LayoutList, FileText,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
@@ -381,7 +381,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     } },
 ];
 
-export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart"];
+export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart", "Webinar"];
 
 // Lesson interactive blocks (quiz + flashcard) — added to Content category
 BLOCK_CATALOG.push(
@@ -557,6 +557,119 @@ BLOCK_CATALOG.push(
       accentColor: "#179ca3",
       bgColor: "#f0fdf9",
       headlineColor: "#111827",
+    },
+  },
+);
+
+// ─── Webinar Blocks ───────────────────────────────────────────────────────────
+BLOCK_CATALOG.push(
+  {
+    type: "webinar_hero",
+    label: "Webinar Hero",
+    icon: <Radio size={14} />,
+    category: "Webinar",
+    defaultData: {
+      headline: "Join Our Live Webinar",
+      subheadline: "Learn from experts in a live, interactive session.",
+      webinarId: null,
+      showCountdown: true,
+      scheduledAt: null,
+      ctaText: "Reserve Your Spot",
+      ctaLink: "#register",
+      bgType: "gradient",
+      bgColor: "#0e4a50",
+      gradientFrom: "#0e4a50",
+      gradientTo: "#189aa1",
+      textColor: "#ffffff",
+      accentColor: "#4ad9e0",
+      showBadge: true,
+      badgeText: "LIVE WEBINAR",
+      showDate: true,
+      showDuration: true,
+      durationMinutes: 60,
+      imageUrl: "",
+    },
+  },
+  {
+    type: "webinar_registration",
+    label: "Webinar Registration",
+    icon: <UserPlus size={14} />,
+    category: "Webinar",
+    defaultData: {
+      headline: "Register for Free",
+      subheadline: "Secure your seat — limited spots available.",
+      webinarId: null,
+      ctaText: "Register Now",
+      showPhone: false,
+      showCompany: false,
+      requirePhone: false,
+      requireCompany: false,
+      successMessage: "You're registered! Check your email for the webinar link.",
+      redirectUrl: "",
+      addToEmailListId: null,
+      accentColor: "#189aa1",
+      bgColor: "#ffffff",
+      borderColor: "#e2e8f0",
+      layout: "card",
+    },
+  },
+  {
+    type: "webinar_host_bio",
+    label: "Webinar Host Bio",
+    icon: <Users size={14} />,
+    category: "Webinar",
+    defaultData: {
+      headline: "Meet Your Host",
+      name: "",
+      title: "",
+      credentials: "",
+      bio: "",
+      avatarUrl: "",
+      socialLinks: [],
+      layout: "horizontal",
+      accentColor: "#189aa1",
+      bgColor: "#f8fafc",
+      headlineColor: "#111827",
+    },
+  },
+  {
+    type: "webinar_replay",
+    label: "Webinar Replay",
+    icon: <PlayCircle size={14} />,
+    category: "Webinar",
+    defaultData: {
+      headline: "Watch the Replay",
+      subheadline: "Missed the live session? Watch the full recording below.",
+      webinarId: null,
+      videoUrl: "",
+      videoSource: "youtube",
+      requireRegistration: true,
+      gateMessage: "Register to watch the replay.",
+      showChapters: false,
+      chapters: [],
+      accentColor: "#189aa1",
+      bgColor: "#0e1e2e",
+      textColor: "#ffffff",
+    },
+  },
+  {
+    type: "webinar_agenda",
+    label: "Webinar Agenda",
+    icon: <Clock size={14} />,
+    category: "Webinar",
+    defaultData: {
+      headline: "What We'll Cover",
+      subheadline: "A structured, high-value session designed around your learning.",
+      items: [
+        { time: "0:00", title: "Welcome & Introductions", description: "", speaker: "" },
+        { time: "5:00", title: "Topic One", description: "Deep dive into the first key concept.", speaker: "" },
+        { time: "25:00", title: "Topic Two", description: "Practical application and case examples.", speaker: "" },
+        { time: "50:00", title: "Q&A", description: "Live questions from the audience.", speaker: "" },
+      ],
+      accentColor: "#189aa1",
+      bgColor: "#ffffff",
+      headlineColor: "#111827",
+      showSpeaker: false,
     },
   },
 );
@@ -4740,6 +4853,227 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
         </div>
       );
+    // ─── Webinar Blocks ──────────────────────────────────────────────────────────
+    case "webinar_hero":
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Sub-headline" field="subheadline" />
+          <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" />
+          <BSTextField data={d} onSet={set} label="CTA Link (e.g. #register)" field="ctaLink" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Webinar ID (optional — auto-fills date/time)</label>
+            <input type="number" value={d.webinarId ?? ""} onChange={e => set("webinarId", e.target.value ? Number(e.target.value) : null)} className="w-full h-8 text-xs rounded border border-gray-200 px-2" placeholder="Leave blank to use manual date" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Scheduled Date &amp; Time (manual)</label>
+            <input type="datetime-local" value={d.scheduledAt ?? ""} onChange={e => set("scheduledAt", e.target.value || null)} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Duration (minutes)</label>
+            <input type="number" value={d.durationMinutes ?? 60} onChange={e => set("durationMinutes", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" min={1} />
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.showCountdown !== false} onChange={e => set("showCountdown", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Show countdown timer</label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.showBadge !== false} onChange={e => set("showBadge", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Show badge</label>
+          </div>
+          {d.showBadge !== false && <BSTextField data={d} onSet={set} label="Badge Text" field="badgeText" />}
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.showDate !== false} onChange={e => set("showDate", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Show date</label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.showDuration !== false} onChange={e => set("showDuration", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Show duration</label>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Background Type</label>
+            <select value={d.bgType ?? "gradient"} onChange={e => set("bgType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="color">Solid Color</option>
+              <option value="gradient">Gradient</option>
+              <option value="image">Background Image</option>
+            </select>
+          </div>
+          {(d.bgType ?? "gradient") === "color" && <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />}
+          {(d.bgType ?? "gradient") === "gradient" && <><BSColorField data={d} onSet={set} label="Gradient From" field="gradientFrom" /><BSColorField data={d} onSet={set} label="Gradient To" field="gradientTo" /></>}
+          {(d.bgType ?? "gradient") === "image" && <BSTextField data={d} onSet={set} label="Background Image URL" field="imageUrl" />}
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+        </div>
+      );
+
+    case "webinar_registration":
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Sub-headline" field="subheadline" />
+          <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Webinar ID (links registration to a webinar)</label>
+            <input type="number" value={d.webinarId ?? ""} onChange={e => set("webinarId", e.target.value ? Number(e.target.value) : null)} className="w-full h-8 text-xs rounded border border-gray-200 px-2" placeholder="Required for tracking" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Layout</label>
+            <select value={d.layout ?? "card"} onChange={e => set("layout", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="card">Card (centered, white card)</option>
+              <option value="inline">Inline (full-width, no card)</option>
+              <option value="split">Split (form left, info right)</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.showPhone === true} onChange={e => set("showPhone", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Show phone field</label>
+          </div>
+          {d.showPhone && <div className="flex items-center gap-2 pl-4">
+            <input type="checkbox" checked={d.requirePhone === true} onChange={e => set("requirePhone", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Require phone</label>
+          </div>}
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.showCompany === true} onChange={e => set("showCompany", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Show company/organization field</label>
+          </div>
+          <BSTextField data={d} onSet={set} label="Success Message" field="successMessage" />
+          <BSTextField data={d} onSet={set} label="Redirect URL after registration (optional)" field="redirectUrl" />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+        </div>
+      );
+
+    case "webinar_host_bio": {
+      const socials: Array<{ platform: string; url: string }> = d.socialLinks ?? [];
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Host Name" field="name" />
+          <BSTextField data={d} onSet={set} label="Title / Role" field="title" />
+          <BSTextField data={d} onSet={set} label="Credentials (e.g. RDMS, RVT, MD)" field="credentials" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Bio</label>
+            <textarea value={d.bio ?? ""} onChange={e => set("bio", e.target.value)} rows={4} className="w-full text-xs rounded border border-gray-200 px-2 py-1.5 resize-none" placeholder="Brief bio about the host..." />
+          </div>
+          <BSTextField data={d} onSet={set} label="Avatar / Photo URL" field="avatarUrl" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Layout</label>
+            <select value={d.layout ?? "horizontal"} onChange={e => set("layout", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="horizontal">Horizontal (photo left, bio right)</option>
+              <option value="centered">Centered (photo top)</option>
+            </select>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-gray-500">Social Links</label>
+              <button onClick={() => set("socialLinks", [...socials, { platform: "linkedin", url: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={10} /> Add</button>
+            </div>
+            {socials.map((s, i) => (
+              <div key={i} className="flex gap-1 items-center">
+                <select value={s.platform} onChange={e => { const n = [...socials]; n[i] = { ...n[i], platform: e.target.value }; set("socialLinks", n); }} className="h-7 text-xs rounded border border-gray-200 px-1 w-28">
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="twitter">Twitter/X</option>
+                  <option value="youtube">YouTube</option>
+                  <option value="website">Website</option>
+                  <option value="email">Email</option>
+                </select>
+                <input value={s.url} onChange={e => { const n = [...socials]; n[i] = { ...n[i], url: e.target.value }; set("socialLinks", n); }} className="flex-1 h-7 text-xs rounded border border-gray-200 px-2" placeholder="URL" />
+                <button onClick={() => set("socialLinks", socials.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={12} /></button>
+              </div>
+            ))}
+          </div>
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
+        </div>
+      );
+    }
+
+    case "webinar_replay":
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Sub-headline" field="subheadline" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Video Source</label>
+            <select value={d.videoSource ?? "youtube"} onChange={e => set("videoSource", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="youtube">YouTube</option>
+              <option value="vimeo">Vimeo</option>
+              <option value="upload">Direct Upload URL</option>
+              <option value="embed">Custom Embed Code</option>
+            </select>
+          </div>
+          <BSTextField data={d} onSet={set} label="Video URL" field="videoUrl" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Webinar ID (optional — auto-loads replay URL)</label>
+            <input type="number" value={d.webinarId ?? ""} onChange={e => set("webinarId", e.target.value ? Number(e.target.value) : null)} className="w-full h-8 text-xs rounded border border-gray-200 px-2" placeholder="Leave blank to use manual URL" />
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.requireRegistration !== false} onChange={e => set("requireRegistration", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Require registration to watch</label>
+          </div>
+          {d.requireRegistration !== false && <BSTextField data={d} onSet={set} label="Gate Message" field="gateMessage" />}
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.showChapters === true} onChange={e => set("showChapters", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Show chapter markers</label>
+          </div>
+          {d.showChapters && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-500">Chapters</label>
+                <button onClick={() => set("chapters", [...(d.chapters ?? []), { time: "0:00", title: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={10} /> Add</button>
+              </div>
+              {(d.chapters ?? []).map((ch: any, i: number) => (
+                <div key={i} className="flex gap-1 items-center">
+                  <input value={ch.time} onChange={e => { const n = [...(d.chapters ?? [])]; n[i] = { ...n[i], time: e.target.value }; set("chapters", n); }} className="w-16 h-7 text-xs rounded border border-gray-200 px-2" placeholder="0:00" />
+                  <input value={ch.title} onChange={e => { const n = [...(d.chapters ?? [])]; n[i] = { ...n[i], title: e.target.value }; set("chapters", n); }} className="flex-1 h-7 text-xs rounded border border-gray-200 px-2" placeholder="Chapter title" />
+                  <button onClick={() => set("chapters", (d.chapters ?? []).filter((_: any, j: number) => j !== i))} className="text-red-400 hover:text-red-600"><X size={12} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+        </div>
+      );
+
+    case "webinar_agenda": {
+      const agendaItems: Array<{ time: string; title: string; description: string; speaker: string }> = d.items ?? [];
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Sub-headline" field="subheadline" />
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.showSpeaker === true} onChange={e => set("showSpeaker", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Show speaker column</label>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-gray-500">Agenda Items</label>
+              <button onClick={() => set("items", [...agendaItems, { time: "", title: "", description: "", speaker: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={10} /> Add</button>
+            </div>
+            <div className="space-y-2">
+              {agendaItems.map((item, i) => (
+                <div key={i} className="border border-gray-200 rounded p-2 space-y-1">
+                  <div className="flex gap-1 items-center">
+                    <input value={item.time} onChange={e => { const n = [...agendaItems]; n[i] = { ...n[i], time: e.target.value }; set("items", n); }} className="w-16 h-6 text-xs rounded border border-gray-200 px-1" placeholder="0:00" />
+                    <input value={item.title} onChange={e => { const n = [...agendaItems]; n[i] = { ...n[i], title: e.target.value }; set("items", n); }} className="flex-1 h-6 text-xs rounded border border-gray-200 px-1" placeholder="Topic title" />
+                    <button onClick={() => set("items", agendaItems.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={12} /></button>
+                  </div>
+                  <input value={item.description} onChange={e => { const n = [...agendaItems]; n[i] = { ...n[i], description: e.target.value }; set("items", n); }} className="w-full h-6 text-xs rounded border border-gray-200 px-1" placeholder="Brief description (optional)" />
+                  {d.showSpeaker && <input value={item.speaker} onChange={e => { const n = [...agendaItems]; n[i] = { ...n[i], speaker: e.target.value }; set("items", n); }} className="w-full h-6 text-xs rounded border border-gray-200 px-1" placeholder="Speaker name" />}
+                </div>
+              ))}
+            </div>
+          </div>
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
+        </div>
+      );
+    }
+
      default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
   } })();

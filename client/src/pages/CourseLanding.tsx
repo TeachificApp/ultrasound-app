@@ -24,7 +24,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import type { Block } from "@/components/BlockPreview";
-import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview } from "@/components/BlockPreview";
+import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 
@@ -930,6 +930,13 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         </div>
       );
     }
+    // Webinar blocks — delegate to shared BlockPreview renderers
+    case "webinar_hero":
+    case "webinar_registration":
+    case "webinar_host_bio":
+    case "webinar_replay":
+    case "webinar_agenda":
+      return <BlockPreview block={block} />;
     default:
       return null;
   }

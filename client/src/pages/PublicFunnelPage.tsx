@@ -14,7 +14,8 @@ import { toast } from "sonner";
 import { Loader2, ArrowRight, CheckCircle, Globe, Users, Lock, PlayCircle, ChevronDown } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import type { Block } from "@/components/BlockPreview";
-import { CountdownV2Block, ImageLinkWrapper } from "@/components/BlockPreview";
+import { CountdownV2Block, ImageLinkWrapper, WebinarCountdownTimer } from "@/components/BlockPreview";
+import { BlockPreview } from "@/components/BlockPreview";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
@@ -613,6 +614,13 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       return <FunnelCurriculumBlock block={block} />;
     case "carousel":
       return <div className="px-4 py-4"><CarouselBlock data={d} /></div>;
+    // Webinar blocks — delegate to shared BlockPreview renderers
+    case "webinar_hero":
+    case "webinar_registration":
+    case "webinar_host_bio":
+    case "webinar_replay":
+    case "webinar_agenda":
+      return <BlockPreview block={block} />;
     default:
       return null;
   }
