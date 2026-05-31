@@ -282,22 +282,60 @@ export const generalFormRouter = router({
       await requireAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      // Fetch page content
+      // Fetch page content — preserve structural HTML hints before stripping
       let pageText = "";
       try {
-        const res = await fetch(input.url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(10000) });
+        const res = await fetch(input.url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; FormImporter/1.0)" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
         const html = await res.text();
-        pageText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").substring(0, 4000);
+        pageText = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+          .replace(/<(label|legend|h[1-6]|p|li|option|th|td)[^>]*>/gi, "\n")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+          .replace(/\s+/g, " ").trim().substring(0, 6000);
       } catch {
         pageText = `Form from: ${input.url}`;
       }
-      // AI scaffold
+      // AI scaffold with rich field metadata + branching
+      const systemPrompt = `You are a form builder assistant. Given a web page or form description, extract or infer ALL form fields, their types, options, and any conditional/branching logic. Return structured JSON exactly matching the schema provided. For branching rules, use 0-based field_index values referencing the flat list of all items across all sections in order.`;
+      const userPrompt = `Create a complete form from this page. Return JSON:
+{
+  "name": string,
+  "description": string,
+  "sections": [{
+    "title": string,
+    "items": [{
+      "field_key": string,
+      "itemType": "short_text"|"long_text"|"email"|"phone"|"number"|"dropdown"|"radio"|"checkbox"|"date"|"file"|"signature"|"heading"|"paragraph"|"scale",
+      "label": string,
+      "placeholder": string,
+      "helpText": string,
+      "isRequired": boolean,
+      "minValue": number|null,
+      "maxValue": number|null,
+      "options": [{"label": string, "value": string, "scoreValue": number}]
+    }]
+  }],
+  "branchRules": [{
+    "ruleLabel": string,
+    "targetFieldKey": string,
+    "targetType": "item",
+    "action": "show"|"hide"|"skip_to"|"require",
+    "logicOperator": "any"|"all",
+    "conditions": [{"conditionFieldKey": string, "operator": "equals"|"not_equals"|"contains"|"greater_than"|"less_than", "value": string}]
+  }]
+}
+
+Page content:
+${pageText}`;
+      const aiSchema = { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: { type: "object", properties: { field_key: { type: "string" }, itemType: { type: "string" }, label: { type: "string" }, placeholder: { type: "string" }, helpText: { type: "string" }, isRequired: { type: "boolean" }, minValue: { type: ["number", "null"] }, maxValue: { type: ["number", "null"] }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" }, scoreValue: { type: "number" } }, required: ["label", "value", "scoreValue"], additionalProperties: false } } }, required: ["field_key", "itemType", "label", "placeholder", "helpText", "isRequired", "minValue", "maxValue", "options"], additionalProperties: false } } }, required: ["title", "items"], additionalProperties: false } }, branchRules: { type: "array", items: { type: "object", properties: { ruleLabel: { type: "string" }, targetFieldKey: { type: "string" }, targetType: { type: "string" }, action: { type: "string" }, logicOperator: { type: "string" }, conditions: { type: "array", items: { type: "object", properties: { conditionFieldKey: { type: "string" }, operator: { type: "string" }, value: { type: "string" } }, required: ["conditionFieldKey", "operator", "value"], additionalProperties: false } } }, required: ["ruleLabel", "targetFieldKey", "targetType", "action", "logicOperator", "conditions"], additionalProperties: false } } }, required: ["name", "description", "sections", "branchRules"], additionalProperties: false };
       const aiResp = await invokeLLM({
         messages: [
-          { role: "system", content: "You are a form builder assistant. Given a web page or form description, extract or infer the form fields and return structured JSON." },
-          { role: "user", content: `Create a form based on this page content. Return JSON with: { "name": string, "description": string, "sections": [{ "title": string, "items": [{ "itemType": "text"|"textarea"|"email"|"phone"|"number"|"select"|"radio"|"checkbox"|"date"|"heading"|"paragraph", "label": string, "isRequired": boolean, "options": [{"label": string, "value": string}] }] }] }\n\nPage content:\n${pageText}` },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
-        response_format: { type: "json_schema", json_schema: { name: "form_scaffold", strict: true, schema: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: { type: "object", properties: { itemType: { type: "string" }, label: { type: "string" }, isRequired: { type: "boolean" }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" } }, required: ["label", "value"], additionalProperties: false } } }, required: ["itemType", "label", "isRequired", "options"], additionalProperties: false } } }, required: ["title", "items"], additionalProperties: false } } }, required: ["name", "description", "sections"], additionalProperties: false } } },
+        response_format: { type: "json_schema", json_schema: { name: "form_scaffold", strict: true, schema: aiSchema } },
       });
       let parsed: any;
       try {
@@ -311,6 +349,8 @@ export const generalFormRouter = router({
         name: formName, description: parsed.description ?? null, formType: "general", status: "draft", publicSlug: slug, isPublic: false, scoreEnabled: false, importedFromUrl: input.url, createdByUserId: ctx.user.id,
       });
       const newId = (newTpl as any).insertId;
+      // Track field_key → DB item ID for branch rule wiring
+      const fieldKeyToItemId: Record<string, number> = {};
       let sortOrder = 0;
       for (const section of (parsed.sections ?? [])) {
         const [ns] = await db.insert(generalFormSections).values({ templateId: newId, title: section.title || "Section", sortOrder: sortOrder++ });
@@ -318,16 +358,49 @@ export const generalFormRouter = router({
         let itemOrder = 0;
         for (const item of (section.items ?? [])) {
           const [ni] = await db.insert(generalFormItems).values({
-            templateId: newId, sectionId, itemType: item.itemType || "text", label: item.label || "Field", isRequired: item.isRequired ?? false, sortOrder: itemOrder++,
+            templateId: newId,
+            sectionId,
+            itemType: item.itemType || "short_text",
+            label: item.label || "Field",
+            placeholder: item.placeholder || null,
+            helpText: item.helpText || null,
+            isRequired: item.isRequired ?? false,
+            minValue: item.minValue ?? null,
+            maxValue: item.maxValue ?? null,
+            sortOrder: itemOrder++,
           });
           const itemId = (ni as any).insertId;
+          if (item.field_key) fieldKeyToItemId[item.field_key] = itemId;
           if (item.options?.length > 0) {
             let optOrder = 0;
             for (const opt of item.options) {
-              await db.insert(generalFormOptions).values({ itemId, label: opt.label, value: opt.value, sortOrder: optOrder++ });
+              await db.insert(generalFormOptions).values({ itemId, label: opt.label, value: opt.value, scoreValue: opt.scoreValue ?? 0, sortOrder: optOrder++ });
             }
           }
         }
+      }
+      // Insert branch rules now that we have real item IDs
+      let branchOrder = 0;
+      for (const rule of (parsed.branchRules ?? [])) {
+        const targetId = fieldKeyToItemId[rule.targetFieldKey];
+        if (!targetId) continue;
+        const conditions = (rule.conditions ?? []).map((c: any) => ({
+          conditionItemId: fieldKeyToItemId[c.conditionFieldKey] ?? 0,
+          operator: c.operator || "equals",
+          value: c.value || "",
+        })).filter((c: any) => c.conditionItemId > 0);
+        if (conditions.length === 0) continue;
+        await db.insert(generalFormBranchRules).values({
+          templateId: newId,
+          ruleLabel: rule.ruleLabel || "",
+          targetType: rule.targetType || "item",
+          targetId,
+          action: rule.action || "show",
+          logicOperator: rule.logicOperator || "any",
+          conditions: JSON.stringify(conditions),
+          sortOrder: branchOrder++,
+          isEnabled: true,
+        });
       }
       return { id: newId, name: formName };
     }),
@@ -342,28 +415,58 @@ export const generalFormRouter = router({
       await requireAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      // Fetch page content
+      // Fetch page content — preserve structural hints
       let pageText = "";
       try {
-        const res = await fetch(input.url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(10000) });
+        const res = await fetch(input.url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; FormImporter/1.0)" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
         const html = await res.text();
-        // Better HTML extraction: strip scripts/styles first, then tags
         pageText = html
-          .replace(/<script[\s\S]*?<\/script>/gi, " ")
-          .replace(/<style[\s\S]*?<\/style>/gi, " ")
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+          .replace(/<(label|legend|h[1-6]|p|li|option|th|td)[^>]*>/gi, "\n")
           .replace(/<[^>]+>/g, " ")
-          .replace(/\s+/g, " ")
-          .substring(0, 5000);
+          .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+          .replace(/\s+/g, " ").trim().substring(0, 6000);
       } catch {
         pageText = `Form from: ${input.url}`;
       }
-      // AI scaffold
+      // AI scaffold with rich metadata + branching
+      const systemPrompt = `You are a form builder assistant. Extract ALL form fields, their types, options, placeholder text, help text, and any conditional/branching logic from the page. Return structured JSON exactly matching the schema provided.`;
+      const userPrompt = `Extract all form fields and branching rules from this page. Return JSON:
+{
+  "sections": [{
+    "title": string,
+    "items": [{
+      "field_key": string,
+      "itemType": "short_text"|"long_text"|"email"|"phone"|"number"|"dropdown"|"radio"|"checkbox"|"date"|"file"|"signature"|"heading"|"paragraph"|"scale",
+      "label": string,
+      "placeholder": string,
+      "helpText": string,
+      "isRequired": boolean,
+      "minValue": number|null,
+      "maxValue": number|null,
+      "options": [{"label": string, "value": string, "scoreValue": number}]
+    }]
+  }],
+  "branchRules": [{
+    "ruleLabel": string,
+    "targetFieldKey": string,
+    "targetType": "item",
+    "action": "show"|"hide"|"skip_to"|"require",
+    "logicOperator": "any"|"all",
+    "conditions": [{"conditionFieldKey": string, "operator": "equals"|"not_equals"|"contains"|"greater_than"|"less_than", "value": string}]
+  }]
+}
+
+Page content:
+${pageText}`;
+      const aiSchema = { type: "object", properties: { sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: { type: "object", properties: { field_key: { type: "string" }, itemType: { type: "string" }, label: { type: "string" }, placeholder: { type: "string" }, helpText: { type: "string" }, isRequired: { type: "boolean" }, minValue: { type: ["number", "null"] }, maxValue: { type: ["number", "null"] }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" }, scoreValue: { type: "number" } }, required: ["label", "value", "scoreValue"], additionalProperties: false } } }, required: ["field_key", "itemType", "label", "placeholder", "helpText", "isRequired", "minValue", "maxValue", "options"], additionalProperties: false } } }, required: ["title", "items"], additionalProperties: false } }, branchRules: { type: "array", items: { type: "object", properties: { ruleLabel: { type: "string" }, targetFieldKey: { type: "string" }, targetType: { type: "string" }, action: { type: "string" }, logicOperator: { type: "string" }, conditions: { type: "array", items: { type: "object", properties: { conditionFieldKey: { type: "string" }, operator: { type: "string" }, value: { type: "string" } }, required: ["conditionFieldKey", "operator", "value"], additionalProperties: false } } }, required: ["ruleLabel", "targetFieldKey", "targetType", "action", "logicOperator", "conditions"], additionalProperties: false } } }, required: ["sections", "branchRules"], additionalProperties: false };
       const aiResp = await invokeLLM({
         messages: [
-          { role: "system", content: "You are a form builder assistant. Extract form fields from a web page and return structured JSON. Focus on actual form questions, input fields, and survey items. Ignore navigation, ads, and boilerplate text." },
-          { role: "user", content: `Extract form fields from this page and return JSON with: { "sections": [{ "title": string, "items": [{ "itemType": "short_text"|"long_text"|"email"|"phone"|"number"|"dropdown"|"radio"|"checkbox"|"date"|"heading"|"paragraph", "label": string, "isRequired": boolean, "options": [{"label": string, "value": string}] }] }] }\n\nPage content:\n${pageText}` },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
-        response_format: { type: "json_schema", json_schema: { name: "form_fields", strict: true, schema: { type: "object", properties: { sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: { type: "object", properties: { itemType: { type: "string" }, label: { type: "string" }, isRequired: { type: "boolean" }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" } }, required: ["label", "value"], additionalProperties: false } } }, required: ["itemType", "label", "isRequired", "options"], additionalProperties: false } } }, required: ["title", "items"], additionalProperties: false } } }, required: ["sections"], additionalProperties: false } } },
+        response_format: { type: "json_schema", json_schema: { name: "form_fields", strict: true, schema: aiSchema } },
       });
       let parsed: any;
       try {
@@ -374,6 +477,7 @@ export const generalFormRouter = router({
       // Get current max sort order for sections
       const [maxSec] = await db.select({ max: sql<number>`COALESCE(MAX(sortOrder),0)` }).from(generalFormSections).where(eq(generalFormSections.templateId, input.templateId));
       let sortOrder = (maxSec?.max ?? 0) + 1;
+      const fieldKeyToItemId: Record<string, number> = {};
       let addedCount = 0;
       for (const section of (parsed.sections ?? [])) {
         const [ns] = await db.insert(generalFormSections).values({ templateId: input.templateId, title: section.title || "Imported Section", sortOrder: sortOrder++ });
@@ -381,17 +485,50 @@ export const generalFormRouter = router({
         let itemOrder = 0;
         for (const item of (section.items ?? [])) {
           const [ni] = await db.insert(generalFormItems).values({
-            templateId: input.templateId, sectionId, itemType: item.itemType || "short_text", label: item.label || "Field", isRequired: item.isRequired ?? false, sortOrder: itemOrder++,
+            templateId: input.templateId,
+            sectionId,
+            itemType: item.itemType || "short_text",
+            label: item.label || "Field",
+            placeholder: item.placeholder || null,
+            helpText: item.helpText || null,
+            isRequired: item.isRequired ?? false,
+            minValue: item.minValue ?? null,
+            maxValue: item.maxValue ?? null,
+            sortOrder: itemOrder++,
           });
           const itemId = (ni as any).insertId;
+          if (item.field_key) fieldKeyToItemId[item.field_key] = itemId;
           if (item.options?.length > 0) {
             let optOrder = 0;
             for (const opt of item.options) {
-              await db.insert(generalFormOptions).values({ itemId, label: opt.label, value: opt.value, sortOrder: optOrder++ });
+              await db.insert(generalFormOptions).values({ itemId, label: opt.label, value: opt.value, scoreValue: opt.scoreValue ?? 0, sortOrder: optOrder++ });
             }
           }
           addedCount++;
         }
+      }
+      // Insert branch rules
+      let branchOrder = 0;
+      for (const rule of (parsed.branchRules ?? [])) {
+        const targetId = fieldKeyToItemId[rule.targetFieldKey];
+        if (!targetId) continue;
+        const conditions = (rule.conditions ?? []).map((c: any) => ({
+          conditionItemId: fieldKeyToItemId[c.conditionFieldKey] ?? 0,
+          operator: c.operator || "equals",
+          value: c.value || "",
+        })).filter((c: any) => c.conditionItemId > 0);
+        if (conditions.length === 0) continue;
+        await db.insert(generalFormBranchRules).values({
+          templateId: input.templateId,
+          ruleLabel: rule.ruleLabel || "",
+          targetType: rule.targetType || "item",
+          targetId,
+          action: rule.action || "show",
+          logicOperator: rule.logicOperator || "any",
+          conditions: JSON.stringify(conditions),
+          sortOrder: branchOrder++,
+          isEnabled: true,
+        });
       }
       return { addedCount };
     }),

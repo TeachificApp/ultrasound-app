@@ -59,6 +59,7 @@ import {
   accreditationFormSections,
   accreditationFormItems,
   accreditationFormOptions,
+  accreditationFormBranchRules,
 } from "../../drizzle/schema";
 
 // ─── Guard helper ─────────────────────────────────────────────────────────────
@@ -772,12 +773,45 @@ export const formBuilderRouter = router({
         console.error('[importFormByUrl] fetch error:', err?.message);
         pageText = `Form from: ${input.url}`;
       }
+      // AI scaffold with rich metadata + branching
+      const diySystemPrompt = `You are a form builder assistant. Given a web page or form description, extract or infer ALL form fields, their types, options, placeholder text, help text, and any conditional/branching logic. Return structured JSON exactly matching the schema provided.`;
+      const diyUserPrompt = `Create a complete form from this page. Return JSON:
+{
+  "name": string,
+  "description": string,
+  "sections": [{
+    "title": string,
+    "items": [{
+      "field_key": string,
+      "itemType": "text"|"textarea"|"email"|"radio"|"checkbox"|"select"|"scale"|"heading"|"info",
+      "label": string,
+      "placeholder": string,
+      "helpText": string,
+      "isRequired": boolean,
+      "scaleMin": number|null,
+      "scaleMax": number|null,
+      "scaleMinLabel": string,
+      "scaleMaxLabel": string,
+      "options": [{"label": string, "value": string, "qualityScore": number}]
+    }]
+  }],
+  "branchRules": [{
+    "targetFieldKey": string,
+    "conditionFieldKey": string,
+    "conditionValue": string,
+    "action": "show"|"hide"
+  }]
+}
+
+Page content:
+${pageText}`;
+      const diyAiSchema = { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, sections: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: { type: 'object', properties: { field_key: { type: 'string' }, itemType: { type: 'string' }, label: { type: 'string' }, placeholder: { type: 'string' }, helpText: { type: 'string' }, isRequired: { type: 'boolean' }, scaleMin: { type: ['number', 'null'] }, scaleMax: { type: ['number', 'null'] }, scaleMinLabel: { type: 'string' }, scaleMaxLabel: { type: 'string' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, qualityScore: { type: 'number' } }, required: ['label', 'value', 'qualityScore'], additionalProperties: false } } }, required: ['field_key', 'itemType', 'label', 'placeholder', 'helpText', 'isRequired', 'scaleMin', 'scaleMax', 'scaleMinLabel', 'scaleMaxLabel', 'options'], additionalProperties: false } } }, required: ['title', 'items'], additionalProperties: false } }, branchRules: { type: 'array', items: { type: 'object', properties: { targetFieldKey: { type: 'string' }, conditionFieldKey: { type: 'string' }, conditionValue: { type: 'string' }, action: { type: 'string' } }, required: ['targetFieldKey', 'conditionFieldKey', 'conditionValue', 'action'], additionalProperties: false } } }, required: ['name', 'description', 'sections', 'branchRules'], additionalProperties: false };
       const aiResp = await invokeLLM({
         messages: [
-          { role: 'system', content: 'You are a form builder assistant. Given a web page or form description, extract or infer the form fields and return structured JSON. Focus on identifying actual form fields, questions, and input types from the content.' },
-          { role: 'user', content: `Create a form based on this page content. Return JSON with: { "name": string, "description": string, "sections": [{ "title": string, "items": [{ "itemType": "text"|"textarea"|"email"|"radio"|"checkbox"|"select"|"scale"|"heading"|"info", "label": string, "isRequired": boolean, "options": [{"label": string, "value": string}] }] }] }\n\nPage content:\n${pageText}` },
+          { role: 'system', content: diySystemPrompt },
+          { role: 'user', content: diyUserPrompt },
         ],
-        response_format: { type: 'json_schema', json_schema: { name: 'form_scaffold', strict: true, schema: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, sections: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: { type: 'object', properties: { itemType: { type: 'string' }, label: { type: 'string' }, isRequired: { type: 'boolean' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' } }, required: ['label', 'value'], additionalProperties: false } } }, required: ['itemType', 'label', 'isRequired', 'options'], additionalProperties: false } } }, required: ['title', 'items'], additionalProperties: false } } }, required: ['name', 'description', 'sections'], additionalProperties: false } } },
+        response_format: { type: 'json_schema', json_schema: { name: 'form_scaffold', strict: true, schema: diyAiSchema } },
       });
       let parsed: any;
       try { parsed = JSON.parse(aiResp.choices[0].message.content as string); }
@@ -788,6 +822,7 @@ export const formBuilderRouter = router({
         version: 1, isActive: true, importedFromUrl: input.url, createdByUserId: ctx.user.id,
       });
       const newId = (newTpl as any).insertId;
+      const diyFieldKeyToItemId: Record<string, number> = {};
       let sectionOrder = 0;
       for (const section of (parsed.sections ?? [])) {
         const [ns] = await db.insert(accreditationFormSections).values({ templateId: newId, title: section.title || 'Section', sortOrder: sectionOrder++ });
@@ -795,16 +830,41 @@ export const formBuilderRouter = router({
         let itemOrder = 0;
         for (const item of (section.items ?? [])) {
           const [ni] = await db.insert(accreditationFormItems).values({
-            templateId: newId, sectionId, itemType: item.itemType || 'text', label: item.label || 'Field', isRequired: item.isRequired ?? false, sortOrder: itemOrder++,
+            templateId: newId,
+            sectionId,
+            itemType: item.itemType || 'text',
+            label: item.label || 'Field',
+            placeholder: item.placeholder || null,
+            helpText: item.helpText || null,
+            isRequired: item.isRequired ?? false,
+            scaleMin: item.scaleMin ?? null,
+            scaleMax: item.scaleMax ?? null,
+            scaleMinLabel: item.scaleMinLabel || null,
+            scaleMaxLabel: item.scaleMaxLabel || null,
+            sortOrder: itemOrder++,
           });
           const itemId = (ni as any).insertId;
+          if (item.field_key) diyFieldKeyToItemId[item.field_key] = itemId;
           if (item.options?.length > 0) {
             let optOrder = 0;
             for (const opt of item.options) {
-              await db.insert(accreditationFormOptions).values({ itemId, label: opt.label, value: opt.value, sortOrder: optOrder++ });
+              await db.insert(accreditationFormOptions).values({ itemId, label: opt.label, value: opt.value, qualityScore: opt.qualityScore ?? 0, sortOrder: optOrder++ });
             }
           }
         }
+      }
+      // Insert branch rules
+      for (const rule of (parsed.branchRules ?? [])) {
+        const targetItemId = diyFieldKeyToItemId[rule.targetFieldKey];
+        const conditionItemId = diyFieldKeyToItemId[rule.conditionFieldKey];
+        if (!targetItemId || !conditionItemId) continue;
+        await db.insert(accreditationFormBranchRules).values({
+          templateId: newId,
+          targetItemId,
+          conditionItemId,
+          conditionValue: rule.conditionValue || '',
+          action: (rule.action === 'hide' ? 'hide' : 'show') as 'show' | 'hide',
+        });
       }
       return { id: newId, name: formName };
     }),
