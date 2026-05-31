@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import {
   Plus, Edit2, Trash2, Eye, EyeOff, Tag, Users, Package, LayoutTemplate,
   ChevronRight, GripVertical, X, Copy, RefreshCw, DollarSign, Percent,
-  BookOpen, Download, Globe, Lock, Settings, FileText, Award
+  BookOpen, Download, Globe, Lock, Settings, FileText, Award, Search
 } from "lucide-react";
 import MembershipPageBuilder from "@/components/MembershipPageBuilder";
 
@@ -622,17 +622,27 @@ function MembershipItemsTab({
   
   const [addType, setAddType] = useState<string>("course");
   const [addItemId, setAddItemId] = useState("");
+  const [addItemTitle, setAddItemTitle] = useState("");
   const [addLabel, setAddLabel] = useState("");
+  const [courseSearch, setCourseSearch] = useState("");
+  const [downloadSearch, setDownloadSearch] = useState("");
 
-  const { data: courses } = trpc.lms.listCourses.useQuery({ pageSize: 200 });
-  const { data: downloads } = trpc.downloads.admin.list.useQuery({ pageSize: 200 });
+  const { data: allCourses } = trpc.lmsAdmin.listCourses.useQuery({ pageSize: 500 });
+  const { data: downloads } = trpc.downloads.admin.list.useQuery({ pageSize: 500 });
+
+  const filteredCourses = (allCourses?.courses ?? []).filter((c: any) =>
+    !courseSearch || c.title?.toLowerCase().includes(courseSearch.toLowerCase())
+  );
+  const filteredDownloads = (downloads?.downloads ?? []).filter((d: any) =>
+    !downloadSearch || d.title?.toLowerCase().includes(downloadSearch.toLowerCase())
+  );
 
   const addMutation = trpc.membership.addItem.useMutation({
-    onSuccess: () => { onRefetch(); setAddItemId(""); setAddLabel(""); toast({ title: "Item added" }); },
+    onSuccess: () => { onRefetch(); setAddItemId(""); setAddItemTitle(""); setAddLabel(""); setCourseSearch(""); setDownloadSearch(""); toast.success("Item added"); },
     onError: (e) => toast.error(e.message),
   });
   const removeMutation = trpc.membership.removeItem.useMutation({
-    onSuccess: () => { onRefetch(); toast({ title: "Item removed" }); },
+    onSuccess: () => { onRefetch(); toast.success("Item removed"); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -648,7 +658,7 @@ function MembershipItemsTab({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Item Type</Label>
-              <Select value={addType} onValueChange={setAddType}>
+              <Select value={addType} onValueChange={v => { setAddType(v); setAddItemId(""); setAddItemTitle(""); setCourseSearch(""); setDownloadSearch(""); }}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -664,28 +674,72 @@ function MembershipItemsTab({
                 <Label>
                   {addType === "course" ? "Course" : addType === "download" ? "Download" : "Item ID"}
                 </Label>
-                {addType === "course" && courses?.courses ? (
-                  <Select value={addItemId} onValueChange={setAddItemId}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select course" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses.courses.map((c: any) => (
-                        <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : addType === "download" && downloads?.downloads ? (
-                  <Select value={addItemId} onValueChange={setAddItemId}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select download" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {downloads.downloads.map((d: any) => (
-                        <SelectItem key={d.id} value={String(d.id)}>{d.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {addType === "course" ? (
+                  <div className="mt-1 space-y-1">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
+                      <Input
+                        value={courseSearch}
+                        onChange={e => { setCourseSearch(e.target.value); setAddItemId(""); setAddItemTitle(""); }}
+                        placeholder="Search courses..."
+                        className="pl-8 text-sm"
+                      />
+                    </div>
+                    {addItemId && (
+                      <div className="flex items-center gap-1 bg-teal-50 border border-teal-200 rounded px-2 py-1">
+                        <span className="text-xs text-teal-700 flex-1 truncate">{addItemTitle}</span>
+                        <button onClick={() => { setAddItemId(""); setAddItemTitle(""); setCourseSearch(""); }} className="text-teal-400 hover:text-teal-600"><X className="w-3 h-3" /></button>
+                      </div>
+                    )}
+                    {!addItemId && courseSearch && (
+                      <div className="border rounded-md max-h-40 overflow-y-auto bg-white shadow-sm">
+                        {filteredCourses.length === 0 ? (
+                          <p className="text-xs text-gray-400 p-2 text-center">No courses found</p>
+                        ) : filteredCourses.slice(0, 20).map((c: any) => (
+                          <button
+                            key={c.id}
+                            className="w-full text-left px-3 py-1.5 text-sm hover:bg-teal-50 border-b last:border-0 truncate"
+                            onClick={() => { setAddItemId(String(c.id)); setAddItemTitle(c.title); setCourseSearch(""); }}
+                          >
+                            {c.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : addType === "download" ? (
+                  <div className="mt-1 space-y-1">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
+                      <Input
+                        value={downloadSearch}
+                        onChange={e => { setDownloadSearch(e.target.value); setAddItemId(""); setAddItemTitle(""); }}
+                        placeholder="Search downloads..."
+                        className="pl-8 text-sm"
+                      />
+                    </div>
+                    {addItemId && (
+                      <div className="flex items-center gap-1 bg-teal-50 border border-teal-200 rounded px-2 py-1">
+                        <span className="text-xs text-teal-700 flex-1 truncate">{addItemTitle}</span>
+                        <button onClick={() => { setAddItemId(""); setAddItemTitle(""); setDownloadSearch(""); }} className="text-teal-400 hover:text-teal-600"><X className="w-3 h-3" /></button>
+                      </div>
+                    )}
+                    {!addItemId && downloadSearch && (
+                      <div className="border rounded-md max-h-40 overflow-y-auto bg-white shadow-sm">
+                        {filteredDownloads.length === 0 ? (
+                          <p className="text-xs text-gray-400 p-2 text-center">No downloads found</p>
+                        ) : filteredDownloads.slice(0, 20).map((d: any) => (
+                          <button
+                            key={d.id}
+                            className="w-full text-left px-3 py-1.5 text-sm hover:bg-teal-50 border-b last:border-0 truncate"
+                            onClick={() => { setAddItemId(String(d.id)); setAddItemTitle(d.title); setDownloadSearch(""); }}
+                          >
+                            {d.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <Input
                     type="number"
@@ -785,7 +839,7 @@ function MembershipDiscountCodesTab({
     onSuccess: () => {
       onRefetch();
       setForm({ code: "", discountType: "percent", discountValue: "", maxUses: "", expiresAt: "", allPlans: false });
-      toast({ title: "Discount code created" });
+      toast.success("Discount code created");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -940,7 +994,7 @@ function MembershipDiscountCodesTab({
                       size="sm"
                       variant="ghost"
                       className="text-gray-400 hover:text-gray-700"
-                      onClick={() => { navigator.clipboard.writeText(code.code); toast({ title: "Copied!" }); }}
+                      onClick={() => { navigator.clipboard.writeText(code.code); toast.success("Copied!"); }}
                       title="Copy code"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -988,11 +1042,11 @@ function MembershipPageBuilderTab({
 }) {
   
   const landingMutation = trpc.membership.updateLandingPageBlocks.useMutation({
-    onSuccess: () => { onRefetch(); toast({ title: "Sales page saved" }); },
+    onSuccess: () => { onRefetch(); toast.success("Sales page saved"); },
     onError: (e) => toast.error(e.message),
   });
   const memberMutation = trpc.membership.updateMemberPageBlocks.useMutation({
-    onSuccess: () => { onRefetch(); toast({ title: "Member page saved" }); },
+    onSuccess: () => { onRefetch(); toast.success("Member page saved"); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -1034,7 +1088,7 @@ function MembershipMembersTab({
 }) {
   
   const cancelMutation = trpc.membership.cancelEnrollment.useMutation({
-    onSuccess: () => { onRefetch(); toast({ title: "Enrollment cancelled" }); },
+    onSuccess: () => { onRefetch(); toast.success("Enrollment cancelled"); },
     onError: (e) => toast.error(e.message),
   });
 
