@@ -624,6 +624,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
     case "webinar_host_bio":
     case "webinar_replay":
     case "webinar_agenda":
+    // File download block — delegate to shared BlockPreview renderer
+    case "file_download":
       return <BlockPreview block={block} />;
     default:
       return null;

@@ -5,7 +5,7 @@
  * Supports 25+ block types + Template Library (save/reuse pages and blocks).
  */
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo, createPortal } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   DndContext,
@@ -52,7 +52,7 @@ import {
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
   ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, BookmarkPlus, Music, UserPlus, Search,
   SlidersHorizontal, Radio, Clock, Loader2, ArrowLeftRight, PlayCircle,
-  Table2, LayoutList, FileText,
+  Table2, LayoutList, FileText, Download,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
 import CarouselBlock from "@/components/CarouselBlock";
@@ -6562,14 +6562,22 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
   setUploading: (v: string | null) => void;
   uploadMedia: any;
 }) {
-  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerTab, setPickerTab] = useState<"media_repo" | "downloads">("media_repo");
   const [mediaSearch, setMediaSearch] = useState("");
   const [mediaPage, setMediaPage] = useState(1);
+  const [dlSearch, setDlSearch] = useState("");
+  const [dlPage, setDlPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: mediaData } = trpc.mediaRepo.listAssets.useQuery(
     { search: mediaSearch || undefined, page: mediaPage, pageSize: 12 },
-    { enabled: showMediaPicker }
+    { enabled: showPicker && pickerTab === "media_repo" }
+  );
+
+  const { data: dlData } = trpc.downloadsAdmin.listAllFiles.useQuery(
+    { search: dlSearch || undefined, page: dlPage, pageSize: 12 },
+    { enabled: showPicker && pickerTab === "downloads" }
   );
 
   const handleFileUpload = async (file: File) => {
@@ -6583,13 +6591,12 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
       set("fileName", file.name);
       set("fileSize", file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`);
       set("source", "upload");
-      toast.success("File uploaded");
+      toast.success("File uploaded successfully");
     } catch (err: any) { toast.error(err.message || "Upload failed"); }
     setUploading(null);
   };
 
   const selectMediaAsset = (asset: any) => {
-    // Use slug-based serve URL so it never expires and access control is enforced
     const slug = asset.slug ?? "";
     const url = slug ? `/api/media/${slug}/download` : (asset.currentVersion?.s3Url ?? "");
     const title = asset.title ?? asset.currentVersion?.fileName ?? "File";
@@ -6603,15 +6610,47 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
     set("mediaAssetSlug", slug);
     set("mediaAssetTitle", title);
     set("mediaAssetUrl", url);
+    set("fileUrl", url);
     set("fileName", asset.currentVersion?.fileName ?? title);
     set("fileSize", size);
     if (!d.label) set("label", title);
-    setShowMediaPicker(false);
+    setShowPicker(false);
     toast.success("File selected from media repository");
   };
 
-  const currentFileUrl = d.source === "media_repo" ? (d.mediaAssetUrl || "") : (d.fileUrl || "");
-  const currentFileName = d.source === "media_repo" ? (d.mediaAssetTitle || d.fileName || "") : (d.fileName || "");
+  const selectDownloadFile = (file: any) => {
+    const size = file.fileSize
+      ? file.fileSize > 1024 * 1024
+        ? `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.round(file.fileSize / 1024)} KB`
+      : "";
+    set("source", "download_library");
+    set("fileUrl", file.fileUrl);
+    set("fileName", file.fileName);
+    set("fileSize", size);
+    set("downloadProductId", file.productId);
+    set("downloadFileId", file.id);
+    if (!d.label) set("label", file.fileName.replace(/\.[^.]+$/, ""));
+    setShowPicker(false);
+    toast.success("File selected from downloads library");
+  };
+
+  const clearFile = () => {
+    set("fileUrl", "");
+    set("fileName", "");
+    set("fileSize", "");
+    set("mediaAssetId", null);
+    set("mediaAssetUrl", "");
+    set("mediaAssetTitle", "");
+    set("downloadProductId", null);
+    set("downloadFileId", null);
+    set("source", "upload");
+  };
+
+  const currentFileName = d.source === "media_repo"
+    ? (d.mediaAssetTitle || d.fileName || "")
+    : (d.fileName || "");
+  const sourceLabel = d.source === "media_repo" ? "Media Repo" : d.source === "download_library" ? "Downloads Library" : "Uploaded";
 
   return (
     <div className="space-y-3">
@@ -6629,33 +6668,43 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
 
       {/* File Source */}
       <div>
-        <label className="text-xs text-gray-500 block mb-1">File Source</label>
-        <div className="flex gap-2">
+        <label className="text-xs text-gray-500 block mb-1">File</label>
+        <div className="flex gap-1.5">
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading === "file_download_file"}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 disabled:opacity-50"
           >
-            <Upload size={12} />
-            {uploading === "file_download_file" ? "Uploading..." : "Upload File"}
+            <Upload size={11} />
+            {uploading === "file_download_file" ? "Uploading..." : "Upload"}
           </button>
           <button
-            onClick={() => setShowMediaPicker(true)}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100"
+            onClick={() => { setPickerTab("media_repo"); setShowPicker(true); }}
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100"
           >
-            <FolderOpen size={12} />
+            <FolderOpen size={11} />
             Media Repo
+          </button>
+          <button
+            onClick={() => { setPickerTab("downloads"); setShowPicker(true); }}
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-purple-50 text-purple-700 rounded border border-purple-200 hover:bg-purple-100"
+          >
+            <Download size={11} />
+            Downloads
           </button>
           <input ref={fileInputRef} type="file" className="hidden"
             onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ""; }} />
         </div>
-        {currentFileName && (
+        {currentFileName ? (
           <div className="mt-1.5 flex items-center gap-1.5 p-2 bg-gray-50 rounded text-xs text-gray-600 border border-gray-200">
-            <Upload size={11} className="text-teal-600 flex-shrink-0" />
+            <FileText size={11} className="text-teal-600 flex-shrink-0" />
             <span className="truncate flex-1">{currentFileName}</span>
             {d.fileSize && <span className="text-gray-400 flex-shrink-0">{d.fileSize}</span>}
-            <button onClick={() => { set("fileUrl", ""); set("fileName", ""); set("mediaAssetId", null); set("mediaAssetUrl", ""); set("mediaAssetTitle", ""); }} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={11} /></button>
+            <span className="text-[10px] text-gray-400 flex-shrink-0 bg-gray-100 px-1 rounded">{sourceLabel}</span>
+            <button onClick={clearFile} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={11} /></button>
           </div>
+        ) : (
+          <p className="mt-1 text-[10px] text-gray-400">No file selected. Upload a new file, pick from Media Repo, or choose from your Downloads library.</p>
         )}
       </div>
 
@@ -6689,63 +6738,123 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
         <label htmlFor="fd-show-size" className="text-xs text-gray-600">Show file size</label>
       </div>
 
-      {/* Media Repo Picker Modal */}
-      {showMediaPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-2xl w-[640px] max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="font-semibold text-gray-800">Select from Media Repository</h3>
-              <button onClick={() => setShowMediaPicker(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+      {/* File Picker Modal — rendered via portal to escape overflow:hidden parents */}
+      {showPicker && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={e => { if (e.target === e.currentTarget) setShowPicker(false); }}>
+          <div className="bg-white rounded-xl shadow-2xl w-[680px] max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h3 className="font-semibold text-gray-800 text-sm">Select File</h3>
+              <button onClick={() => setShowPicker(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
+            {/* Tabs */}
+            <div className="flex border-b">
+              <button
+                onClick={() => setPickerTab("media_repo")}
+                className={`flex-1 py-2 text-xs font-medium border-b-2 transition-colors ${
+                  pickerTab === "media_repo" ? "border-teal-500 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Media Repository
+              </button>
+              <button
+                onClick={() => setPickerTab("downloads")}
+                className={`flex-1 py-2 text-xs font-medium border-b-2 transition-colors ${
+                  pickerTab === "downloads" ? "border-purple-500 text-purple-700" : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Downloads Library
+              </button>
+            </div>
+            {/* Search */}
             <div className="p-3 border-b">
               <input
                 type="text"
-                placeholder="Search files..."
-                value={mediaSearch}
-                onChange={e => { setMediaSearch(e.target.value); setMediaPage(1); }}
+                placeholder={pickerTab === "media_repo" ? "Search media assets..." : "Search downloads..."}
+                value={pickerTab === "media_repo" ? mediaSearch : dlSearch}
+                onChange={e => {
+                  if (pickerTab === "media_repo") { setMediaSearch(e.target.value); setMediaPage(1); }
+                  else { setDlSearch(e.target.value); setDlPage(1); }
+                }}
                 className="w-full h-8 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                autoFocus
               />
             </div>
+            {/* Content */}
             <div className="flex-1 overflow-y-auto p-3">
-              {!mediaData ? (
-                <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading...</div>
-              ) : mediaData.assets.length === 0 ? (
-                <div className="flex items-center justify-center h-32 text-gray-400 text-sm">No files found</div>
+              {pickerTab === "media_repo" ? (
+                !mediaData ? (
+                  <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading...</div>
+                ) : mediaData.assets.length === 0 ? (
+                  <div className="flex items-center justify-center h-32 text-gray-400 text-sm">No media assets found</div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {mediaData.assets.map((asset: any) => {
+                      const url = asset.currentVersion?.s3Url ?? "";
+                      const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].some(ext => url.toLowerCase().includes(`.${ext}`));
+                      return (
+                        <button
+                          key={asset.id}
+                          onClick={() => selectMediaAsset(asset)}
+                          className="flex flex-col items-center gap-1.5 p-2 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 transition-all text-left"
+                        >
+                          {isImage ? (
+                            <img src={url} alt={asset.title} className="w-full h-20 object-cover rounded" />
+                          ) : (
+                            <div className="w-full h-20 bg-gray-100 rounded flex items-center justify-center">
+                              <FileText size={24} className="text-gray-400" />
+                            </div>
+                          )}
+                          <p className="text-xs text-gray-700 font-medium truncate w-full text-center">{asset.title}</p>
+                          {asset.currentVersion?.fileSize && (
+                            <p className="text-[10px] text-gray-400">
+                              {asset.currentVersion.fileSize > 1024 * 1024
+                                ? `${(asset.currentVersion.fileSize / (1024 * 1024)).toFixed(1)} MB`
+                                : `${Math.round(asset.currentVersion.fileSize / 1024)} KB`}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
               ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {mediaData.assets.map((asset: any) => {
-                    const url = asset.currentVersion?.s3Url ?? "";
-                    const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].some(ext => url.toLowerCase().includes(`.${ext}`));
-                    return (
+                !dlData ? (
+                  <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading...</div>
+                ) : dlData.files.length === 0 ? (
+                  <div className="flex items-center justify-center h-32 text-gray-400 text-sm">No files found in downloads library</div>
+                ) : (
+                  <div className="space-y-1">
+                    {dlData.files.map((file: any) => (
                       <button
-                        key={asset.id}
-                        onClick={() => selectMediaAsset(asset)}
-                        className="flex flex-col items-center gap-1.5 p-2 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 transition-all text-left"
+                        key={file.id}
+                        onClick={() => selectDownloadFile(file)}
+                        className="w-full flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all text-left"
                       >
-                        {isImage ? (
-                          <img src={url} alt={asset.title} className="w-full h-20 object-cover rounded" />
-                        ) : (
-                          <div className="w-full h-20 bg-gray-100 rounded flex items-center justify-center">
-                            <Upload size={24} className="text-gray-400" />
-                          </div>
-                        )}
-                        <p className="text-xs text-gray-700 font-medium truncate w-full text-center">{asset.title}</p>
-                        {asset.currentVersion?.fileSize && (
-                          <p className="text-[10px] text-gray-400">
-                            {asset.currentVersion.fileSize > 1024 * 1024
-                              ? `${(asset.currentVersion.fileSize / (1024 * 1024)).toFixed(1)} MB`
-                              : `${Math.round(asset.currentVersion.fileSize / 1024)} KB`}
-                          </p>
+                        <div className="w-8 h-8 bg-purple-100 rounded flex items-center justify-center flex-shrink-0">
+                          <FileText size={16} className="text-purple-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-700 font-medium truncate">{file.fileName}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{file.productTitle}</p>
+                        </div>
+                        {file.fileSize > 0 && (
+                          <span className="text-[10px] text-gray-400 flex-shrink-0">
+                            {file.fileSize > 1024 * 1024
+                              ? `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`
+                              : `${Math.round(file.fileSize / 1024)} KB`}
+                          </span>
                         )}
                       </button>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )
               )}
             </div>
-            {mediaData && mediaData.total > mediaData.pageSize && (
+            {/* Pagination */}
+            {pickerTab === "media_repo" && mediaData && mediaData.total > mediaData.pageSize && (
               <div className="p-3 border-t flex items-center justify-between text-xs text-gray-500">
-                <span>{mediaData.total} files total</span>
+                <span>{mediaData.total} assets total</span>
                 <div className="flex gap-2">
                   <button disabled={mediaPage === 1} onClick={() => setMediaPage(p => p - 1)} className="px-2 py-1 rounded border disabled:opacity-40">Prev</button>
                   <span>Page {mediaPage}</span>
@@ -6753,8 +6862,19 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
                 </div>
               </div>
             )}
+            {pickerTab === "downloads" && dlData && dlData.total > dlData.pageSize && (
+              <div className="p-3 border-t flex items-center justify-between text-xs text-gray-500">
+                <span>{dlData.total} files total</span>
+                <div className="flex gap-2">
+                  <button disabled={dlPage === 1} onClick={() => setDlPage(p => p - 1)} className="px-2 py-1 rounded border disabled:opacity-40">Prev</button>
+                  <span>Page {dlPage}</span>
+                  <button disabled={dlPage * dlData.pageSize >= dlData.total} onClick={() => setDlPage(p => p + 1)} className="px-2 py-1 rounded border disabled:opacity-40">Next</button>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

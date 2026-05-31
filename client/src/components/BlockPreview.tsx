@@ -996,10 +996,12 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       );
     }
     case "file_download": {
-      // For media_repo: prefer stored mediaAssetUrl, fall back to slug-based serve endpoint
-      // (handles existing blocks saved before slug-URL fix)
+      // Resolve file URL based on source type:
+      // - media_repo: use stored mediaAssetUrl or slug-based serve endpoint
+      // - download_library: use stored fileUrl directly (S3 URL from digital product files)
+      // - upload: use stored fileUrl (S3 URL from page media upload)
       const fileUrl = d.source === "media_repo"
-        ? (d.mediaAssetUrl || (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}/download` : ""))
+        ? (d.mediaAssetUrl || d.fileUrl || (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}/download` : ""))
         : (d.fileUrl || "");
       const fileName = d.source === "media_repo" ? (d.mediaAssetTitle || d.fileName || "File") : (d.fileName || "File");
       const displayMode = d.displayMode ?? "card";

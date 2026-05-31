@@ -4211,3 +4211,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Extend getUserDetail in adminUserRouter.ts to include teamSeats (group + seat + enrollment data) and nativeMemberships
 - [x] Add Teams tab to AdminUserDetailPage.tsx showing organization info and team-seat badges on enrollments
 - [x] Add Native Memberships tab to AdminUserDetailPage.tsx showing active membership subscriptions
+
+## Download File Block Full Audit & Fix (May 2026)
+- [ ] Audit FileDownloadBlockSettings: upload button, media repo picker, downloads library picker
+- [ ] Fix media repo picker: ensure listAssets query fires correctly and shows all files
+- [ ] Add downloads library picker: let admins pick files from digitalProductFiles (existing uploaded downloads)
+- [ ] Fix canvas preview (BlockPreview.tsx file_download case): show file name, size, button
+- [ ] Fix public renderer in PublicFunnelPage.tsx: correct download URL resolution for both upload and media_repo sources
+- [ ] Fix public renderer in CourseLanding.tsx: same download URL resolution
+- [ ] Fix public renderer in lesson player (CoursePlayer.tsx): correct download URL for lesson blocks
+- [ ] Verify /api/media/:slug/download route works for media_repo sourced files
+- [ ] Test upload flow: file uploads to S3 and URL is stored correctly
+- [ ] Test media repo picker: shows files from media repository
+- [ ] Test downloads library picker: shows files from digital downloads

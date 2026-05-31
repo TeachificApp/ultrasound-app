@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, sql, asc } from "drizzle-orm";
+import { and, desc, eq, sql, asc, or, like } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb, getUserById, getOrCreateAccessToken } from "../db";
@@ -1274,6 +1274,54 @@ Make ALL content specific and compelling based on the product title and descript
         .where(eq(digitalPurchases.id, input.purchaseId));
 
       return { refundId: refund.id, status: refund.status };
+    }),
+
+  /** List all files across all digital products — for the file_download block picker */
+  listAllFiles: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(24),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return { files: [], total: 0, page: 1, pageSize: 24 };
+      const offset = (input.page - 1) * input.pageSize;
+      const conditions = [];
+      if (input.search) {
+        conditions.push(
+          or(
+            like(digitalProductFiles.fileName, `%${input.search}%`),
+            like(digitalProducts.title, `%${input.search}%`)
+          )!
+        );
+      }
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const files = await db
+        .select({
+          id: digitalProductFiles.id,
+          productId: digitalProductFiles.productId,
+          productTitle: digitalProducts.title,
+          fileName: digitalProductFiles.fileName,
+          fileUrl: digitalProductFiles.fileUrl,
+          fileKey: digitalProductFiles.fileKey,
+          fileSize: digitalProductFiles.fileSize,
+          mimeType: digitalProductFiles.mimeType,
+          sortOrder: digitalProductFiles.sortOrder,
+        })
+        .from(digitalProductFiles)
+        .innerJoin(digitalProducts, eq(digitalProductFiles.productId, digitalProducts.id))
+        .where(where)
+        .orderBy(asc(digitalProducts.libraryOrder), asc(digitalProductFiles.sortOrder))
+        .limit(input.pageSize)
+        .offset(offset);
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(digitalProductFiles)
+        .innerJoin(digitalProducts, eq(digitalProductFiles.productId, digitalProducts.id))
+        .where(where);
+      return { files, total: count, page: input.page, pageSize: input.pageSize };
     }),
 });
 
