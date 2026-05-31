@@ -4143,6 +4143,7 @@ export const generalFormTemplates = mysqlTable("generalFormTemplates", {
   welcomeImageUrl: text("welcomeImageUrl"),
   submitButtonText: varchar("submitButtonText", { length: 100 }),
   createdByUserId: int("createdByUserId"),
+  emailListId: int("emailListId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -5404,3 +5405,56 @@ export const emailSenderProfiles = mysqlTable("emailSenderProfiles", {
 });
 export type EmailSenderProfile = typeof emailSenderProfiles.$inferSelect;
 export type InsertEmailSenderProfile = typeof emailSenderProfiles.$inferInsert;
+
+// ─── Email Lists ───────────────────────────────────────────────────────────────
+export const emailLists = mysqlTable("emailLists", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  isActive: boolean("isActive").default(true).notNull(),
+  subscriberCount: int("subscriberCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type EmailList = typeof emailLists.$inferSelect;
+export type InsertEmailList = typeof emailLists.$inferInsert;
+
+// ─── Email List Subscribers ────────────────────────────────────────────────────
+export const emailListSubscribers = mysqlTable("emailListSubscribers", {
+  id: int("id").autoincrement().primaryKey(),
+  listId: int("listId").notNull(),
+  email: varchar("email", { length: 300 }).notNull(),
+  name: varchar("name", { length: 300 }),
+  userId: int("userId"),
+  source: varchar("source", { length: 100 }),
+  sourceId: varchar("sourceId", { length: 100 }),
+  status: varchar("status", { length: 50 }).default("subscribed").notNull(),
+  subscribedAt: timestamp("subscribedAt").defaultNow().notNull(),
+  unsubscribedAt: timestamp("unsubscribedAt"),
+  metadata: text("metadata"),
+});
+export type EmailListSubscriber = typeof emailListSubscribers.$inferSelect;
+export type InsertEmailListSubscriber = typeof emailListSubscribers.$inferInsert;
+
+// ─── Lead Capture Widgets ──────────────────────────────────────────────────────
+export const leadCaptureWidgets = mysqlTable("leadCaptureWidgets", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  headline: varchar("headline", { length: 500 }).default("Stay in the loop").notNull(),
+  subtext: varchar("subtext", { length: 1000 }),
+  emailPlaceholder: varchar("emailPlaceholder", { length: 200 }).default("Enter your email").notNull(),
+  namePlaceholder: varchar("namePlaceholder", { length: 200 }).default("Your name (optional)"),
+  buttonText: varchar("buttonText", { length: 200 }).default("Subscribe").notNull(),
+  buttonColor: varchar("buttonColor", { length: 20 }).default("#189aa1").notNull(),
+  buttonTextColor: varchar("buttonTextColor", { length: 20 }).default("#ffffff").notNull(),
+  bgColor: varchar("bgColor", { length: 20 }).default("#f0fbfc").notNull(),
+  textColor: varchar("textColor", { length: 20 }).default("#0e1e2e").notNull(),
+  borderRadius: int("borderRadius").default(8).notNull(),
+  showNameField: boolean("showNameField").default(false).notNull(),
+  listId: int("listId"),
+  embedCode: text("embedCode"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type LeadCaptureWidget = typeof leadCaptureWidgets.$inferSelect;
+export type InsertLeadCaptureWidget = typeof leadCaptureWidgets.$inferInsert;

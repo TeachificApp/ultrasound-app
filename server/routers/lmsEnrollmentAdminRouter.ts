@@ -28,6 +28,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
+import { addToAllContacts } from "../lib/emailListHelper";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
   lmsCourses,
@@ -262,6 +263,7 @@ export const lmsEnrollmentAdminRouter = router({
             });
             userId = (newUser as any).insertId as number;
             emailToUserId.set(email, userId);
+            addToAllContacts(enrollment.user_email.toLowerCase(), displayName, { userId, source: "enrollment" }).catch(() => {});
           }
 
           // Skip if already enrolled
@@ -1494,6 +1496,7 @@ CRITICAL REQUIREMENTS:
         }).$returningId();
         userId = inserted.id;
         isNewUser = true;
+        addToAllContacts(input.email, input.name, { userId, source: "enrollment" }).catch(() => {});
       }
       // Enroll the user
       const [existingEnrollment] = await db.select().from(lmsEnrollments)

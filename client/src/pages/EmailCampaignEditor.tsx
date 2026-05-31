@@ -33,7 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ─── Block types ──────────────────────────────────────────────────────────────
-type BlockType = "heading1" | "heading2" | "text" | "image" | "button" | "divider" | "spacer" | "quote" | "html";
+type BlockType = "heading1" | "heading2" | "text" | "image" | "button" | "divider" | "spacer" | "quote" | "html" | "lead_capture";
 
 interface Block {
   id: string;
@@ -50,9 +50,29 @@ interface Block {
   spacerHeight?: number;
   // alignment
   align?: "left" | "center" | "right";
+  // per-block styling
+  textColor?: string;
+  bgColor?: string;
+  fontSize?: number;        // px
+  fontWeight?: "normal" | "bold";
+  paddingTop?: number;      // px
+  paddingBottom?: number;   // px
+  paddingLeft?: number;     // px
+  paddingRight?: number;    // px
+  borderRadius?: number;    // px
+  lineHeight?: number;      // e.g. 1.5
+  // lead_capture-specific
+  leadCaptureTitle?: string;
+  leadCapturePlaceholder?: string;
+  leadCaptureButtonText?: string;
+  leadCaptureButtonColor?: string;
+  leadCaptureButtonTextColor?: string;
+  leadCaptureListId?: number | null;
+  leadCaptureShowName?: boolean;
 }
 
 const BLOCK_CATALOG: { type: BlockType; icon: React.ReactNode; label: string }[] = [
+  { type: "lead_capture", icon: <Mail className="w-4 h-4" />, label: "Lead Capture" },
   { type: "heading1", icon: <Heading1 className="w-4 h-4" />, label: "Heading 1" },
   { type: "heading2", icon: <Heading2 className="w-4 h-4" />, label: "Heading 2" },
   { type: "text", icon: <AlignLeft className="w-4 h-4" />, label: "Text" },
@@ -78,6 +98,7 @@ function defaultBlock(type: BlockType): Block {
     case "divider": return { ...base, content: "" };
     case "spacer": return { ...base, content: "", spacerHeight: 24 };
     case "html": return { ...base, content: "<p>Custom HTML here</p>" };
+    case "lead_capture": return { ...base, content: "", leadCaptureTitle: "Stay in the loop", leadCapturePlaceholder: "Enter your email", leadCaptureButtonText: "Subscribe", leadCaptureButtonColor: "#189aa1", leadCaptureButtonTextColor: "#ffffff", leadCaptureShowName: false, leadCaptureListId: null, align: "center" };
     default: return base;
   }
 }
@@ -85,25 +106,72 @@ function defaultBlock(type: BlockType): Block {
 // ─── Block → HTML renderer ────────────────────────────────────────────────────
 function blockToHtml(block: Block): string {
   const align = block.align ?? "left";
+  const pt = block.paddingTop ?? 0;
+  const pb = block.paddingBottom ?? 0;
+  const pl = block.paddingLeft ?? 0;
+  const pr = block.paddingRight ?? 0;
+  const hasPadding = pt || pb || pl || pr;
+  const paddingStyle = hasPadding ? `padding:${pt}px ${pr}px ${pb}px ${pl}px;` : "";
+  const bgStyle = block.bgColor ? `background:${block.bgColor};` : "";
+  const brStyle = block.borderRadius ? `border-radius:${block.borderRadius}px;` : "";
+  const wrapStyle = (bgStyle || paddingStyle || brStyle) ? `style="${bgStyle}${paddingStyle}${brStyle}"` : "";
+  const wrap = (inner: string) => wrapStyle ? `<div ${wrapStyle}>${inner}</div>` : inner;
+
   switch (block.type) {
-    case "heading1":
-      return `<h1 style="font-family:Merriweather,Georgia,serif;color:#0e1e2e;font-size:28px;font-weight:900;margin:0 0 16px;text-align:${align};">${block.content}</h1>`;
-    case "heading2":
-      return `<h2 style="font-family:Merriweather,Georgia,serif;color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 12px;text-align:${align};">${block.content}</h2>`;
-    case "text":
-      return `<p style="color:#1a2e3b;font-size:15px;line-height:1.7;margin:0 0 16px;text-align:${align};">${block.content.replace(/\n/g, "<br/>")}</p>`;
-    case "quote":
-      return `<blockquote style="border-left:4px solid #189aa1;margin:16px 0;padding:12px 20px;background:#f0fbfc;border-radius:0 8px 8px 0;"><p style="color:#0e4a50;font-size:15px;font-style:italic;margin:0;">${block.content}</p></blockquote>`;
-    case "button":
-      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr><td align="${align}"><a href="${block.buttonUrl || "#"}" style="display:inline-block;background:${block.buttonColor || "#189aa1"};color:${block.buttonTextColor || "#ffffff"};text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;font-size:15px;">${block.content}</a></td></tr></table>`;
+    case "heading1": {
+      const color = block.textColor || "#0e1e2e";
+      const size = block.fontSize || 28;
+      const weight = block.fontWeight === "normal" ? 400 : 900;
+      const lh = block.lineHeight || 1.2;
+      return wrap(`<h1 style="font-family:Merriweather,Georgia,serif;color:${color};font-size:${size}px;font-weight:${weight};line-height:${lh};margin:0 0 16px;text-align:${align};">${block.content}</h1>`);
+    }
+    case "heading2": {
+      const color = block.textColor || "#0e1e2e";
+      const size = block.fontSize || 20;
+      const weight = block.fontWeight === "normal" ? 400 : 700;
+      const lh = block.lineHeight || 1.3;
+      return wrap(`<h2 style="font-family:Merriweather,Georgia,serif;color:${color};font-size:${size}px;font-weight:${weight};line-height:${lh};margin:0 0 12px;text-align:${align};">${block.content}</h2>`);
+    }
+    case "text": {
+      const color = block.textColor || "#1a2e3b";
+      const size = block.fontSize || 15;
+      const weight = block.fontWeight === "bold" ? 700 : 400;
+      const lh = block.lineHeight || 1.7;
+      return wrap(`<p style="color:${color};font-size:${size}px;font-weight:${weight};line-height:${lh};margin:0 0 16px;text-align:${align};">${block.content.replace(/\n/g, "<br/>")}</p>`);
+    }
+    case "quote": {
+      const color = block.textColor || "#0e4a50";
+      const size = block.fontSize || 15;
+      const bg = block.bgColor || "#f0fbfc";
+      return `<blockquote style="border-left:4px solid #189aa1;margin:16px 0;padding:12px 20px;background:${bg};border-radius:0 8px 8px 0;"><p style="color:${color};font-size:${size}px;font-style:italic;margin:0;">${block.content}</p></blockquote>`;
+    }
+    case "button": {
+      const btnBg = block.buttonColor || "#189aa1";
+      const btnText = block.buttonTextColor || "#ffffff";
+      const btnSize = block.fontSize || 15;
+      const btnBr = block.borderRadius ?? 8;
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr><td align="${align}"><a href="${block.buttonUrl || "#"}" style="display:inline-block;background:${btnBg};color:${btnText};text-decoration:none;padding:14px 28px;border-radius:${btnBr}px;font-weight:700;font-size:${btnSize}px;">${block.content}</a></td></tr></table>`;
+    }
     case "image":
-      return block.content ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr><td align="${align}"><img src="${block.content}" alt="${block.imageAlt || ""}" width="${block.imageWidth || "100%"}" style="max-width:100%;border-radius:8px;display:block;" /></td></tr></table>` : "";
+      return block.content ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr><td align="${align}"><img src="${block.content}" alt="${block.imageAlt || ""}" width="${block.imageWidth || "100%"}" style="max-width:100%;border-radius:${block.borderRadius ?? 8}px;display:block;" /></td></tr></table>` : "";
     case "divider":
       return `<hr style="border:none;border-top:1px solid #e5eaec;margin:20px 0;" />`;
     case "spacer":
       return `<div style="height:${block.spacerHeight || 24}px;"></div>`;
     case "html":
       return block.content;
+    case "lead_capture": {
+      const title = block.leadCaptureTitle || "Stay in the loop";
+      const placeholder = block.leadCapturePlaceholder || "Enter your email";
+      const btnText = block.leadCaptureButtonText || "Subscribe";
+      const btnBg = block.leadCaptureButtonColor || "#189aa1";
+      const btnColor = block.leadCaptureButtonTextColor || "#ffffff";
+      const showName = block.leadCaptureShowName;
+      const bg = block.bgColor || "#f0fbfc";
+      const br = block.borderRadius ?? 8;
+      const nameField = showName ? `<tr><td style="padding-bottom:8px;"><input type="text" name="name" placeholder="Your name" style="width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;" /></td></tr>` : "";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr><td align="${align}"><table cellpadding="0" cellspacing="0" style="background:${bg};border-radius:${br}px;padding:24px;max-width:480px;width:100%;margin:0 auto;"><tr><td style="padding-bottom:12px;text-align:center;"><strong style="font-size:18px;color:#0e1e2e;">${title}</strong></td></tr>${nameField}<tr><td style="padding-bottom:8px;"><input type="email" name="email" placeholder="${placeholder}" style="width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;" /></td></tr><tr><td style="text-align:center;"><a href="#" style="display:inline-block;background:${btnBg};color:${btnColor};text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:700;font-size:14px;">${btnText}</a></td></tr></table></td></tr></table>`;
+    }
     default:
       return "";
   }
@@ -165,6 +233,31 @@ const INTEREST_OPTIONS: { key: InterestKey; label: string }[] = [
   { key: "fetalEcho", label: "Fetal Echo" },
   { key: "pocus", label: "POCUS" },
 ];
+
+// ─── Lead Capture List Selector ─────────────────────────────────────────────
+function LeadCaptureListSelector({ listId, onChange }: { listId: number | null; onChange: (id: number | null) => void }) {
+  const { data: lists } = trpc.emailCampaign.listEmailLists.useQuery();
+  return (
+    <div>
+      <label className="text-xs text-gray-500 mb-1 block">Subscribe to Email List</label>
+      <Select
+        value={listId != null ? String(listId) : "none"}
+        onValueChange={(v) => onChange(v === "none" ? null : Number(v))}
+      >
+        <SelectTrigger className="text-sm">
+          <SelectValue placeholder="Select a list (optional)" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">None — don't subscribe</SelectItem>
+          {(lists ?? []).map((l) => (
+            <SelectItem key={l.id} value={String(l.id)}>{l.name} ({l.subscriberCount ?? 0})</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-gray-400 mt-1">Subscribers who click this form will be added to the selected list.</p>
+    </div>
+  );
+}
 
 // ─── Block editor component ───────────────────────────────────────────────────
 function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Block[]) => void }) {
@@ -228,7 +321,15 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
               {block.type === "spacer" && <div className="text-gray-400 text-xs">Spacer ({block.spacerHeight || 24}px)</div>}
               {block.type === "image" && (block.content ? <div className="text-xs text-gray-500">🖼 {block.content.slice(0, 50)}</div> : <div className="text-xs text-gray-400">Image (no URL set)</div>)}
               {block.type === "button" && <div className="inline-block px-3 py-1 rounded text-xs font-bold text-white" style={{ background: block.buttonColor || "#189aa1" }}>{block.content || "Button"}</div>}
-              {!["divider", "spacer", "image", "button"].includes(block.type) && (
+              {block.type === "lead_capture" && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: block.leadCaptureButtonColor || "#189aa1", color: block.leadCaptureButtonTextColor || "#fff" }}>
+                    <Mail className="w-3 h-3" /> {block.leadCaptureTitle || "Lead Capture"}
+                  </span>
+                  <span className="text-gray-400">{block.leadCaptureListId ? `→ List #${block.leadCaptureListId}` : "(no list selected)"}</span>
+                </div>
+              )}
+              {!["divider", "spacer", "image", "button", "lead_capture"].includes(block.type) && (
                 <span className={`${block.type === "heading1" ? "font-bold text-base" : block.type === "heading2" ? "font-semibold" : ""}`}>
                   {block.content.slice(0, 80) || `(empty ${block.type})`}
                 </span>
@@ -250,12 +351,12 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
         {/* Add block */}
         <div className="border rounded-lg p-3 bg-gray-50">
           <p className="text-xs font-semibold text-gray-500 mb-2">ADD BLOCK</p>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {BLOCK_CATALOG.map(({ type, icon, label }) => (
               <button
                 key={type}
                 onClick={() => addBlock(type)}
-                className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded border border-gray-200 bg-white hover:border-[#189aa1] hover:text-[#189aa1] transition-colors"
+                className="flex items-center gap-1 text-xs px-2 py-1.5 rounded border border-gray-200 bg-white hover:border-[#189aa1] hover:text-[#189aa1] transition-colors whitespace-nowrap"
               >
                 {icon} {label}
               </button>
@@ -265,11 +366,55 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
 
         {/* Selected block settings */}
         {selected && (
-          <div className="border rounded-lg p-3 bg-white space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase">{selected.type} Settings</p>
+          <div className="border rounded-lg p-3 bg-white space-y-3 max-h-[72vh] overflow-y-auto">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{selected.type.replace(/([12])$/, ' $1')} Block</p>
+
+            {/* Lead Capture settings */}
+            {selected.type === "lead_capture" && (
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Headline</label>
+                  <Input value={selected.leadCaptureTitle || ""} onChange={(e) => updateBlock(selected.id, { leadCaptureTitle: e.target.value })} placeholder="Stay in the loop" className="text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Email Placeholder</label>
+                  <Input value={selected.leadCapturePlaceholder || ""} onChange={(e) => updateBlock(selected.id, { leadCapturePlaceholder: e.target.value })} placeholder="Enter your email" className="text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Button Text</label>
+                  <Input value={selected.leadCaptureButtonText || ""} onChange={(e) => updateBlock(selected.id, { leadCaptureButtonText: e.target.value })} placeholder="Subscribe" className="text-sm" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500 mb-1 block">Button BG</label>
+                    <input type="color" value={selected.leadCaptureButtonColor || "#189aa1"} onChange={(e) => updateBlock(selected.id, { leadCaptureButtonColor: e.target.value })} className="w-full h-8 rounded border cursor-pointer" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500 mb-1 block">Button Text</label>
+                    <input type="color" value={selected.leadCaptureButtonTextColor || "#ffffff"} onChange={(e) => updateBlock(selected.id, { leadCaptureButtonTextColor: e.target.value })} className="w-full h-8 rounded border cursor-pointer" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="lc-name" checked={!!selected.leadCaptureShowName} onCheckedChange={(v) => updateBlock(selected.id, { leadCaptureShowName: v })} />
+                  <Label htmlFor="lc-name" className="text-xs text-gray-600">Show name field</Label>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Background Color</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={selected.bgColor || "#f0fbfc"} onChange={(e) => updateBlock(selected.id, { bgColor: e.target.value })} className="h-8 w-12 rounded border cursor-pointer" />
+                    {selected.bgColor && <button onClick={() => updateBlock(selected.id, { bgColor: undefined })} className="text-xs text-gray-400 hover:text-red-500">Clear</button>}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Border Radius (px)</label>
+                  <Input type="number" min={0} max={50} value={selected.borderRadius ?? 8} onChange={(e) => updateBlock(selected.id, { borderRadius: parseInt(e.target.value) || 0 })} className="text-sm" />
+                </div>
+                <LeadCaptureListSelector listId={selected.leadCaptureListId ?? null} onChange={(id) => updateBlock(selected.id, { leadCaptureListId: id })} />
+              </div>
+            )}
 
             {/* Content */}
-            {!["divider", "spacer", "image"].includes(selected.type) && (
+            {!["divider", "spacer", "image", "lead_capture"].includes(selected.type) && (
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Content</label>
                 <Textarea
@@ -296,10 +441,14 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
                   <label className="text-xs text-gray-500 mb-1 block">Width</label>
                   <Input value={selected.imageWidth || "100%"} onChange={(e) => updateBlock(selected.id, { imageWidth: e.target.value })} placeholder="100% or 300px" className="text-sm" />
                 </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Border Radius (px)</label>
+                  <Input type="number" min={0} max={50} value={selected.borderRadius ?? 8} onChange={(e) => updateBlock(selected.id, { borderRadius: parseInt(e.target.value) || 0 })} className="text-sm" />
+                </div>
               </>
             )}
 
-            {/* Button settings */}
+            {/* Button-specific */}
             {selected.type === "button" && (
               <>
                 <div>
@@ -308,13 +457,21 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
                 </div>
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <label className="text-xs text-gray-500 mb-1 block">BG Color</label>
-                    <input type="color" value={selected.buttonColor || "#189aa1"} onChange={(e) => updateBlock(selected.id, { buttonColor: e.target.value })} className="w-full h-8 rounded border" />
+                    <label className="text-xs text-gray-500 mb-1 block">Button BG</label>
+                    <input type="color" value={selected.buttonColor || "#189aa1"} onChange={(e) => updateBlock(selected.id, { buttonColor: e.target.value })} className="w-full h-8 rounded border cursor-pointer" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs text-gray-500 mb-1 block">Text Color</label>
-                    <input type="color" value={selected.buttonTextColor || "#ffffff"} onChange={(e) => updateBlock(selected.id, { buttonTextColor: e.target.value })} className="w-full h-8 rounded border" />
+                    <label className="text-xs text-gray-500 mb-1 block">Button Text</label>
+                    <input type="color" value={selected.buttonTextColor || "#ffffff"} onChange={(e) => updateBlock(selected.id, { buttonTextColor: e.target.value })} className="w-full h-8 rounded border cursor-pointer" />
                   </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Font Size (px)</label>
+                  <Input type="number" min={10} max={36} value={selected.fontSize || 15} onChange={(e) => updateBlock(selected.id, { fontSize: parseInt(e.target.value) || 15 })} className="text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Border Radius (px)</label>
+                  <Input type="number" min={0} max={50} value={selected.borderRadius ?? 8} onChange={(e) => updateBlock(selected.id, { borderRadius: parseInt(e.target.value) || 0 })} className="text-sm" />
                 </div>
               </>
             )}
@@ -336,6 +493,102 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
                     <button key={a} onClick={() => updateBlock(selected.id, { align: a })} className={`flex-1 text-xs py-1 rounded border ${selected.align === a ? "border-[#189aa1] bg-[#f0fbfc] text-[#189aa1]" : "border-gray-200"}`}>{a}</button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* ── Typography ── */}
+            {!["divider", "spacer", "image", "html", "button"].includes(selected.type) && (
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Typography</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Text Color</label>
+                    <input
+                      type="color"
+                      value={selected.textColor || (selected.type === "quote" ? "#0e4a50" : selected.type.startsWith("heading") ? "#0e1e2e" : "#1a2e3b")}
+                      onChange={(e) => updateBlock(selected.id, { textColor: e.target.value })}
+                      className="w-full h-8 rounded border cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Font Size (px)</label>
+                    <Input
+                      type="number" min={10} max={72}
+                      value={selected.fontSize || (selected.type === "heading1" ? 28 : selected.type === "heading2" ? 20 : 15)}
+                      onChange={(e) => updateBlock(selected.id, { fontSize: parseInt(e.target.value) || 15 })}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Font Weight</label>
+                  <div className="flex gap-1">
+                    {(["normal", "bold"] as const).map((w) => (
+                      <button
+                        key={w}
+                        onClick={() => updateBlock(selected.id, { fontWeight: w })}
+                        className={`flex-1 text-xs py-1 rounded border capitalize ${
+                          (selected.fontWeight === w) || (!selected.fontWeight && ((selected.type.startsWith("heading") && w === "bold") || (selected.type === "text" && w === "normal")))
+                            ? "border-[#189aa1] bg-[#f0fbfc] text-[#189aa1]"
+                            : "border-gray-200"
+                        }`}
+                      >{w}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Line Height</label>
+                  <Input
+                    type="number" min={1} max={3} step={0.1}
+                    value={selected.lineHeight || (selected.type.startsWith("heading") ? 1.2 : 1.7)}
+                    onChange={(e) => updateBlock(selected.id, { lineHeight: parseFloat(e.target.value) || 1.5 })}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── Background & Spacing ── */}
+            {!["divider", "spacer", "html"].includes(selected.type) && (
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Background & Spacing</p>
+                {selected.type !== "quote" && (
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Background Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={selected.bgColor || "#ffffff"}
+                        onChange={(e) => updateBlock(selected.id, { bgColor: e.target.value })}
+                        className="h-8 w-12 rounded border cursor-pointer"
+                      />
+                      {selected.bgColor && (
+                        <button onClick={() => updateBlock(selected.id, { bgColor: undefined })} className="text-xs text-gray-400 hover:text-red-500">Clear</button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Padding (px) — T / R / B / L</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"] as const).map((key, i) => (
+                      <Input
+                        key={key}
+                        type="number" min={0} max={80}
+                        value={(selected[key] as number) ?? 0}
+                        onChange={(e) => updateBlock(selected.id, { [key]: parseInt(e.target.value) || 0 })}
+                        className="text-xs text-center px-1"
+                        placeholder={["T","R","B","L"][i]}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {selected.type !== "quote" && selected.type !== "button" && (
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Border Radius (px)</label>
+                    <Input type="number" min={0} max={50} value={selected.borderRadius ?? 0} onChange={(e) => updateBlock(selected.id, { borderRadius: parseInt(e.target.value) || 0 })} className="text-sm" />
+                  </div>
+                )}
               </div>
             )}
           </div>

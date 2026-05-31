@@ -4112,3 +4112,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add duplicate campaign mutation (copies subject, body, audienceFilter, senderProfileId as new draft)
 - [ ] Add save-as-template from campaign editor (saves emailBlocks + subject + previewText to emailTemplates)
 - [ ] Add load-from-template button in campaign editor (opens template picker dialog)
+
+## Email List Management & Lead Capture Widgets (May 31, 2026)
+- [x] Add emailLists and emailListSubscribers tables to schema
+- [x] Add emailListHelper lib (addToEmailList, ensureAllContactsList, addToAllContacts)
+- [x] Auto-subscribe all contacts to "All Contacts" list on user creation (emailAuthRouter, downloadsRouter, lmsEnrollmentAdminRouter)
+- [x] Backfill existing users into All Contacts list on server startup
+- [x] Add emailListId column to generalFormTemplates for per-form list subscription
+- [x] Wire form submissions to subscribe submitter to form's email list + All Contacts
+- [x] Add email list CRUD procedures to emailCampaignRouter
+- [x] Add email list selector to form Settings tab in GeneralFormBuilder
+- [x] Add lead_capture block type to EmailCampaignEditor (block catalog, settings panel, blockToHtml renderer)
+- [x] Add LeadCaptureListSelector component in EmailCampaignEditor
+- [x] Make block selector responsive (flex-wrap) in EmailCampaignEditor
+- [x] Add leadCaptureWidgets table to schema and DB
+- [x] Add lead capture widget CRUD procedures (listLeadCaptureWidgets, saveLeadCaptureWidget, deleteLeadCaptureWidget, submitLeadCaptureWidget)
+- [x] Add Lead Capture Widgets tab to EmailCampaignDashboard with create/edit/delete UI and embed code
+- [x] Add LeadCaptureWidgetForm component with live preview and list selector

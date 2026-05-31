@@ -30,12 +30,12 @@ import {
   generalFormSubmissions,
   globalFormTheme,
   googleFormIntegrations,
-  generalFormWebhooks,
+    generalFormWebhooks,
   users,
 } from "../../drizzle/schema";
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
-
 import { invokeLLM } from "../_core/llm";
+import { addToEmailList, addToAllContacts } from "../lib/emailListHelper";
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 async function requireAdmin(ctx: any) {
@@ -176,6 +176,7 @@ export const generalFormRouter = router({
       welcomeButtonText: z.string().optional(),
       welcomeImageUrl: z.string().optional(),
       submitButtonText: z.string().optional(),
+      emailListId: z.number().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireAdmin(ctx);
@@ -859,8 +860,39 @@ export const generalFormRouter = router({
           console.error("[GoogleSheets] Sync failed for form", input.templateId, err.message);
         });
       } catch {}
-      // Fire-and-forget Webhook delivery (non-blocking)
+      // Fire-and-forget Email List subscription (non-blocking)
       const submissionId = (result as any).insertId;
+      ;(async () => {
+        try {
+          // Extract submitter email from responses
+          const parsedResponses: Record<string, any> = JSON.parse(input.responses);
+          let submitterEmail: string | null = null;
+          let submitterName: string | null = null;
+          for (const [, val] of Object.entries(parsedResponses)) {
+            if (typeof val === 'string' && val.includes('@') && val.includes('.')) {
+              submitterEmail = val.trim().toLowerCase();
+            }
+            if (typeof val === 'string' && !val.includes('@') && val.trim().length > 1 && !submitterName) {
+              submitterName = val.trim();
+            }
+          }
+          if (!submitterEmail && input.userId) {
+            const [u] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, input.userId)).limit(1);
+            if (u?.email) { submitterEmail = u.email; submitterName = submitterName || u.name; }
+          }
+          if (submitterEmail) {
+            // Always add to All Contacts
+            await addToAllContacts(submitterEmail, submitterName, { userId: input.userId, source: 'form', sourceId: String(input.templateId) });
+            // Add to form-specific list if configured
+            if (template.emailListId) {
+              await addToEmailList(template.emailListId, submitterEmail, submitterName, { userId: input.userId, source: 'form', sourceId: String(input.templateId) });
+            }
+          }
+        } catch (e: any) {
+          console.error('[EmailList] Form subscription failed for form', input.templateId, e.message);
+        }
+      })();
+      // Fire-and-forget Webhook delivery (non-blocking)
       ;(async () => {
         try {
           const [webhookRow] = await db.select().from(generalFormWebhooks)

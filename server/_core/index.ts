@@ -31,6 +31,7 @@ import { detectBrandFromHostname, detectBrandMode } from "../../shared/brands";
 import { startChallengeCron } from "../jobs/challengeCron";
 import { startMediaPurgeCron } from "../jobs/mediaPurgeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
+import { backfillAllContacts } from "../lib/emailListHelper";
 import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
 import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
@@ -370,6 +371,8 @@ async function startServer() {
     startMirrorSync();
     // Start the Account Sharing Monitor (detects multi-IP abuse every 30 min)
     startSharingMonitor();
+    // Backfill all existing users into the "All Contacts" email list (safe to run on every startup)
+    backfillAllContacts().catch((err) => console.error("[backfillAllContacts] Error:", err));
   });
 }
 

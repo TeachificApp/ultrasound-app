@@ -1390,6 +1390,9 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
   const [welcomeButtonText, setWelcomeButtonText] = useState(template.welcomeButtonText ?? "");
   const [welcomeImageUrl, setWelcomeImageUrl] = useState(template.welcomeImageUrl ?? "");
   const [submitButtonText, setSubmitButtonText] = useState(template.submitButtonText ?? "");
+  const [emailListId, setEmailListId] = useState<number | null>(template.emailListId ?? null);
+
+  const { data: emailListsData } = trpc.emailCampaign.listEmailLists.useQuery();
 
   const updateForm = trpc.generalForm.updateForm.useMutation({
     onSuccess: () => { toast.success("Settings saved"); onRefetch(); },
@@ -1416,6 +1419,7 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
       welcomeButtonText: welcomeButtonText || undefined,
       welcomeImageUrl: welcomeImageUrl || undefined,
       submitButtonText: submitButtonText || undefined,
+      emailListId: emailListId ?? undefined,
     });
   };
 
@@ -1612,6 +1616,24 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
           <div>
             <Label>Max Submissions (leave blank for unlimited)</Label>
             <Input type="number" min={1} value={maxSubmissions} onChange={e => setMaxSubmissions(e.target.value)} placeholder="Unlimited" className="mt-1 w-36" />
+          </div>
+          <div>
+            <Label>Subscribe Submitters to Email List</Label>
+            <p className="text-xs text-gray-500 mb-1">When a form is submitted, the submitter's email will be added to this list automatically.</p>
+            <Select
+              value={emailListId ? String(emailListId) : "none"}
+              onValueChange={v => setEmailListId(v === "none" ? null : Number(v))}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="None (don't subscribe)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (don't subscribe)</SelectItem>
+                {(emailListsData ?? []).map((list: any) => (
+                  <SelectItem key={list.id} value={String(list.id)}>{list.name} ({list.subscriberCount} subscribers)</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

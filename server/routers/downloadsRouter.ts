@@ -20,6 +20,7 @@ import { invokeLLM } from "../_core/llm";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import { sendDownloadAccessEmail, sendBundleAccessEmail } from "../lib/enrollmentEmail";
+import { addToAllContacts } from "../lib/emailListHelper";
 
 function assertAdmin(ctx: any) {
   if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -989,6 +990,7 @@ export const downloadsAdminRouter = router({
         }).$returningId();
         userId = inserted.id;
         isNewUser = true;
+        addToAllContacts(input.email, input.name, { userId, source: "purchase" }).catch(() => {});
       }
       // Check if already has access
       const [existingPurchase] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
@@ -1054,6 +1056,7 @@ export const downloadsAdminRouter = router({
         }).$returningId();
         userId = inserted.id;
         isNewUser = true;
+        addToAllContacts(input.email, input.name, { userId, source: "purchase" }).catch(() => {});
       }
       // Check if already has access
       const [existingPurchase] = await db.select({ id: digitalBundlePurchases.id }).from(digitalBundlePurchases)

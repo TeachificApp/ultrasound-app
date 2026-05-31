@@ -34,7 +34,11 @@ import {
   generalFormSubmissions,
   lmsGroups,
   lmsCohortGroups,
+  emailLists,
+  emailListSubscribers,
+  leadCaptureWidgets,
 } from "../../drizzle/schema";
+import { addToEmailList, ensureAllContactsList } from "../lib/emailListHelper";
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
 import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
@@ -873,6 +877,138 @@ export const emailCampaignRouter = router({
       return { id: (r as any).insertId as number };
     }),
 
+  // ── Admin: email lists CRUD ───────────────────────────────────────────────
+
+  listEmailLists: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx.user.id);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    return db.select().from(emailLists).orderBy(desc(emailLists.createdAt));
+  }),
+
+  createEmailList: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(200),
+      description: z.string().max(1000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [r] = await db.insert(emailLists).values({
+        name: input.name,
+        description: input.description ?? null,
+        isActive: true,
+        subscriberCount: 0,
+      });
+      return { id: (r as any).insertId as number };
+    }),
+
+  updateEmailList: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().min(1).max(200).optional(),
+      description: z.string().max(1000).optional(),
+      isActive: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const updates: Record<string, unknown> = {};
+      if (input.name !== undefined) updates.name = input.name;
+      if (input.description !== undefined) updates.description = input.description;
+      if (input.isActive !== undefined) updates.isActive = input.isActive;
+      if (Object.keys(updates).length > 0) {
+        await db.update(emailLists).set(updates as any).where(eq(emailLists.id, input.id));
+      }
+      return { success: true };
+    }),
+
+  deleteEmailList: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      // Prevent deleting the master All Contacts list
+      const [list] = await db.select({ name: emailLists.name }).from(emailLists).where(eq(emailLists.id, input.id)).limit(1);
+      if (list?.name === "All Contacts") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The \"All Contacts\" list cannot be deleted." });
+      }
+      await db.delete(emailListSubscribers).where(eq(emailListSubscribers.listId, input.id));
+      await db.delete(emailLists).where(eq(emailLists.id, input.id));
+      return { success: true };
+    }),
+
+  getEmailListSubscribers: protectedProcedure
+    .input(z.object({
+      listId: z.number(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(200).default(50),
+      search: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const offset = (input.page - 1) * input.pageSize;
+      let rows;
+      if (input.search) {
+        const pattern = `%${input.search}%`;
+        rows = await db.execute(sql`
+          SELECT * FROM emailListSubscribers
+          WHERE listId = ${input.listId}
+            AND (email LIKE ${pattern} OR name LIKE ${pattern})
+          ORDER BY subscribedAt DESC
+          LIMIT ${input.pageSize} OFFSET ${offset}
+        `);
+      } else {
+        rows = await db.execute(sql`
+          SELECT * FROM emailListSubscribers
+          WHERE listId = ${input.listId}
+          ORDER BY subscribedAt DESC
+          LIMIT ${input.pageSize} OFFSET ${offset}
+        `);
+      }
+      const [countRaw] = await db.execute(sql`SELECT COUNT(*) as cnt FROM emailListSubscribers WHERE listId = ${input.listId}`) as any;
+      const total = Number((countRaw as any[])[0]?.cnt ?? 0);
+      return { subscribers: (rows[0] as any[]) ?? [], total, page: input.page, pageSize: input.pageSize };
+    }),
+
+  removeSubscriber: protectedProcedure
+    .input(z.object({ subscriberId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      // Mark as unsubscribed (soft delete)
+      await db.update(emailListSubscribers)
+        .set({ status: "unsubscribed", unsubscribedAt: new Date() })
+        .where(eq(emailListSubscribers.id, input.subscriberId));
+      // Decrement subscriber count
+      const [sub] = await db.select({ listId: emailListSubscribers.listId })
+        .from(emailListSubscribers).where(eq(emailListSubscribers.id, input.subscriberId)).limit(1);
+      if (sub) {
+        await db.update(emailLists)
+          .set({ subscriberCount: sql`GREATEST(0, subscriberCount - 1)` })
+          .where(eq(emailLists.id, sub.listId));
+      }
+      return { success: true };
+    }),
+
+  addSubscriberManually: protectedProcedure
+    .input(z.object({
+      listId: z.number(),
+      email: z.string().email(),
+      name: z.string().max(300).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      await addToEmailList(input.listId, input.email, input.name ?? null, { source: "manual" });
+      return { success: true };
+    }),
+
   // ── Admin: save draft campaign ────────────────────────────────────────────
 
   saveDraft: protectedProcedure
@@ -907,5 +1043,94 @@ export const emailCampaignRouter = router({
         const [r] = await db.insert(emailCampaigns).values({ ...vals, sentByUserId: ctx.user.id });
         return { id: (r as any).insertId as number };
       }
+    }),
+
+  // ─── Lead Capture Widgets ────────────────────────────────────────────────────
+
+  listLeadCaptureWidgets: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx.user.id);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    return db.select().from(leadCaptureWidgets).orderBy(desc(leadCaptureWidgets.createdAt));
+  }),
+
+  saveLeadCaptureWidget: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      name: z.string().min(1).max(255),
+      headline: z.string().max(500).optional(),
+      subtext: z.string().max(1000).optional(),
+      emailPlaceholder: z.string().max(200).optional(),
+      namePlaceholder: z.string().max(200).optional(),
+      buttonText: z.string().max(200).optional(),
+      buttonColor: z.string().max(20).optional(),
+      buttonTextColor: z.string().max(20).optional(),
+      bgColor: z.string().max(20).optional(),
+      textColor: z.string().max(20).optional(),
+      borderRadius: z.number().min(0).max(50).optional(),
+      showNameField: z.boolean().optional(),
+      listId: z.number().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const vals = {
+        name: input.name,
+        headline: input.headline ?? "Stay in the loop",
+        subtext: input.subtext ?? null,
+        emailPlaceholder: input.emailPlaceholder ?? "Enter your email",
+        namePlaceholder: input.namePlaceholder ?? "Your name (optional)",
+        buttonText: input.buttonText ?? "Subscribe",
+        buttonColor: input.buttonColor ?? "#189aa1",
+        buttonTextColor: input.buttonTextColor ?? "#ffffff",
+        bgColor: input.bgColor ?? "#f0fbfc",
+        textColor: input.textColor ?? "#0e1e2e",
+        borderRadius: input.borderRadius ?? 8,
+        showNameField: input.showNameField ?? false,
+        listId: input.listId ?? null,
+      };
+      if (input.id) {
+        await db.update(leadCaptureWidgets).set(vals as any).where(eq(leadCaptureWidgets.id, input.id));
+        return { id: input.id };
+      } else {
+        const [r] = await db.insert(leadCaptureWidgets).values(vals as any);
+        return { id: (r as any).insertId as number };
+      }
+    }),
+
+  deleteLeadCaptureWidget: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.delete(leadCaptureWidgets).where(eq(leadCaptureWidgets.id, input.id));
+      return { ok: true };
+    }),
+
+  // Public: submit a lead capture widget form (embedded on external sites)
+  submitLeadCaptureWidget: publicProcedure
+    .input(z.object({
+      widgetId: z.number(),
+      email: z.string().email(),
+      name: z.string().max(300).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [widget] = await db.select().from(leadCaptureWidgets).where(eq(leadCaptureWidgets.id, input.widgetId)).limit(1);
+      if (!widget) throw new TRPCError({ code: "NOT_FOUND", message: "Widget not found" });
+      // Add to All Contacts
+      await ensureAllContactsList();
+      const allContactsList = await db.select({ id: emailLists.id }).from(emailLists).where(eq(emailLists.name, "All Contacts")).limit(1);
+      if (allContactsList.length > 0) {
+        await addToEmailList({ listId: allContactsList[0].id, email: input.email, name: input.name, source: "lead_capture_widget", sourceId: String(input.widgetId) });
+      }
+      // Add to specific list if configured
+      if (widget.listId) {
+        await addToEmailList({ listId: widget.listId, email: input.email, name: input.name, source: "lead_capture_widget", sourceId: String(input.widgetId) });
+      }
+      return { ok: true };
     }),
 });

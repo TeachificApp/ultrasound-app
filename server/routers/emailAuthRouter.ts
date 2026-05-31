@@ -18,6 +18,7 @@ import { z } from "zod";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
+import { addToAllContacts } from "../lib/emailListHelper";
 import { ENV } from "../_core/env";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb, ensureUserRole, markThinkificEnrolled } from "../db";
@@ -194,6 +195,8 @@ export const emailAuthRouter = router({
       const newUser = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
       if (newUser[0]) {
         await ensureUserRole(newUser[0].id);
+        // Auto-add to All Contacts email list
+        addToAllContacts(email, fullName, { userId: newUser[0].id, source: "registration" }).catch(() => {});
         // Auto-enroll in Thinkific free membership
         if (newUser[0].email) {
           enrollInFreeMembership(newUser[0].email, input.firstName, input.lastName)

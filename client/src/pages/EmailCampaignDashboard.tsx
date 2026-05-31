@@ -15,7 +15,7 @@ import {
   Mail, Plus, BarChart2, Users, Send, Clock, CheckCircle, XCircle,
   RefreshCw, Trash2, Copy, Eye, TrendingUp, MousePointer, UserMinus,
   Shield, ChevronRight, Settings, UserCircle, Edit, Star, StarOff,
-  AlertTriangle, Download,
+  AlertTriangle, Download, Zap, Code, List,
 } from "lucide-react";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -109,6 +109,110 @@ function SenderProfileForm({ onSaved }: { onSaved: () => void }) {
 }
 
 // ─── Analytics modal ──────────────────────────────────────────────────────────
+
+// ─── Lead Capture Widget Form ──────────────────────────────────────────────────
+function LeadCaptureWidgetForm({
+  widget, emailLists, onSave, onCancel, saving,
+}: {
+  widget: any | null;
+  emailLists: { id: number; name: string; subscriberCount?: number }[];
+  onSave: (data: any) => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const [name, setName] = useState(widget?.name ?? "");
+  const [headline, setHeadline] = useState(widget?.headline ?? "Stay in the loop");
+  const [subtext, setSubtext] = useState(widget?.subtext ?? "");
+  const [emailPlaceholder, setEmailPlaceholder] = useState(widget?.emailPlaceholder ?? "Enter your email");
+  const [namePlaceholder, setNamePlaceholder] = useState(widget?.namePlaceholder ?? "Your name (optional)");
+  const [buttonText, setButtonText] = useState(widget?.buttonText ?? "Subscribe");
+  const [buttonColor, setButtonColor] = useState(widget?.buttonColor ?? "#189aa1");
+  const [buttonTextColor, setButtonTextColor] = useState(widget?.buttonTextColor ?? "#ffffff");
+  const [bgColor, setBgColor] = useState(widget?.bgColor ?? "#f0fbfc");
+  const [textColor, setTextColor] = useState(widget?.textColor ?? "#0e1e2e");
+  const [borderRadius, setBorderRadius] = useState(widget?.borderRadius ?? 8);
+  const [showNameField, setShowNameField] = useState(widget?.showNameField ?? false);
+  const [listId, setListId] = useState<number | null>(widget?.listId ?? null);
+
+  function handleSave() {
+    onSave({ id: widget?.id, name, headline, subtext: subtext || undefined, emailPlaceholder, namePlaceholder, buttonText, buttonColor, buttonTextColor, bgColor, textColor, borderRadius, showNameField, listId });
+  }
+
+  return (
+    <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
+      <p className="text-sm font-semibold text-gray-700">{widget ? "Edit Widget" : "New Lead Capture Widget"}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
+          <label className="text-xs text-gray-500 mb-1 block">Widget Name (internal)</label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Homepage lead form" className="text-sm" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs text-gray-500 mb-1 block">Headline</label>
+          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Stay in the loop" className="text-sm" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs text-gray-500 mb-1 block">Subtext (optional)</label>
+          <Input value={subtext} onChange={(e) => setSubtext(e.target.value)} placeholder="Get the latest ultrasound tips..." className="text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Email Placeholder</label>
+          <Input value={emailPlaceholder} onChange={(e) => setEmailPlaceholder(e.target.value)} className="text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Button Text</label>
+          <Input value={buttonText} onChange={(e) => setButtonText(e.target.value)} className="text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Button Color</label>
+          <input type="color" value={buttonColor} onChange={(e) => setButtonColor(e.target.value)} className="w-full h-8 rounded border cursor-pointer" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Button Text Color</label>
+          <input type="color" value={buttonTextColor} onChange={(e) => setButtonTextColor(e.target.value)} className="w-full h-8 rounded border cursor-pointer" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Background Color</label>
+          <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-full h-8 rounded border cursor-pointer" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Text Color</label>
+          <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="w-full h-8 rounded border cursor-pointer" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Border Radius (px)</label>
+          <Input type="number" min={0} max={50} value={borderRadius} onChange={(e) => setBorderRadius(Number(e.target.value))} className="text-sm" />
+        </div>
+        <div className="flex items-center gap-2 pt-4">
+          <input type="checkbox" id="lcw-name" checked={showNameField} onChange={(e) => setShowNameField(e.target.checked)} className="rounded" />
+          <label htmlFor="lcw-name" className="text-sm text-gray-600">Show name field</label>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs text-gray-500 mb-1 block">Subscribe to Email List</label>
+          <select value={listId ?? ""} onChange={(e) => setListId(e.target.value ? Number(e.target.value) : null)} className="w-full border rounded px-2 py-1.5 text-sm bg-white">
+            <option value="">None — don&apos;t subscribe to a specific list</option>
+            {emailLists.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.subscriberCount ?? 0})</option>)}
+          </select>
+          <p className="text-xs text-gray-400 mt-1">Submitters are always added to All Contacts regardless of this setting.</p>
+        </div>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500 mb-1">Preview</p>
+        <div className="rounded-lg p-4 text-center max-w-sm" style={{ background: bgColor, color: textColor, borderRadius }}>
+          <div className="font-semibold mb-1 text-sm">{headline || "Headline"}</div>
+          {subtext && <div className="text-xs mb-2 opacity-80">{subtext}</div>}
+          {showNameField && <div className="mb-1 border rounded px-2 py-1 text-xs text-gray-400 bg-white">{namePlaceholder}</div>}
+          <div className="mb-2 border rounded px-2 py-1 text-xs text-gray-400 bg-white">{emailPlaceholder}</div>
+          <div className="inline-block px-3 py-1 text-xs font-bold" style={{ background: buttonColor, color: buttonTextColor, borderRadius }}>{buttonText || "Subscribe"}</div>
+        </div>
+      </div>
+      <div className="flex gap-2">
+          {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />} {widget ? "Save Changes" : "Create Widget"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={onCancel}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
 function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; subject: string; onClose: () => void }) {
   const { data: analytics, isLoading } = trpc.emailCampaign.getCampaignAnalytics.useQuery({ campaignId });
 
@@ -195,10 +299,14 @@ export default function EmailCampaignDashboard() {
   const [analyticsSubject, setAnalyticsSubject] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingWidget, setEditingWidget] = useState<any | null>(null);
+  const [showWidgetForm, setShowWidgetForm] = useState(false);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
   const { data: campaigns, refetch: refetchCampaigns, isLoading: campaignsLoading } = trpc.emailCampaign.listCampaigns.useQuery(undefined, { enabled: !!user });
   const { data: senderProfiles, refetch: refetchProfiles } = trpc.emailCampaign.listSenderProfiles.useQuery(undefined, { enabled: !!user });
+  const { data: emailLists } = trpc.emailCampaign.listEmailLists.useQuery(undefined, { enabled: !!user });
+  const { data: leadCaptureWidgets, refetch: refetchWidgets } = trpc.emailCampaign.listLeadCaptureWidgets.useQuery(undefined, { enabled: !!user });
 
   // ── Mutations ───────────────────────────────────────────────────────────────
   const duplicateMutation = trpc.emailCampaign.duplicateCampaign.useMutation({
@@ -213,6 +321,14 @@ export default function EmailCampaignDashboard() {
 
   const setDefaultSenderMutation = trpc.emailCampaign.saveSenderProfile.useMutation({
     onSuccess: () => { toast.success("Default sender updated"); refetchProfiles(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const saveWidgetMutation = trpc.emailCampaign.saveLeadCaptureWidget.useMutation({
+    onSuccess: () => { toast.success("Widget saved"); refetchWidgets(); setShowWidgetForm(false); setEditingWidget(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteWidgetMutation = trpc.emailCampaign.deleteLeadCaptureWidget.useMutation({
+    onSuccess: () => { toast.success("Widget deleted"); refetchWidgets(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -270,7 +386,7 @@ export default function EmailCampaignDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 flex-wrap">
             <TabsTrigger value="campaigns" className="flex items-center gap-1.5">
               <Mail className="w-4 h-4" /> Campaigns
               {campaigns && <Badge variant="secondary" className="ml-1 text-xs">{campaigns.length}</Badge>}
@@ -278,6 +394,10 @@ export default function EmailCampaignDashboard() {
             <TabsTrigger value="senders" className="flex items-center gap-1.5">
               <UserCircle className="w-4 h-4" /> Sender Profiles
               {senderProfiles && <Badge variant="secondary" className="ml-1 text-xs">{senderProfiles.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="widgets" className="flex items-center gap-1.5">
+              <Zap className="w-4 h-4" /> Lead Capture Widgets
+              {leadCaptureWidgets && <Badge variant="secondary" className="ml-1 text-xs">{leadCaptureWidgets.length}</Badge>}
             </TabsTrigger>
           </TabsList>
 
@@ -419,6 +539,75 @@ export default function EmailCampaignDashboard() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
                 <p className="font-medium mb-1">📧 About Sender Profiles</p>
                 <p className="text-xs text-blue-600">Sender profiles let you send campaigns from different names and email addresses (e.g. "Lara Williams" for course emails, "Support Team" for billing). Make sure each email address is verified in your SendGrid account.</p>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ── Lead Capture Widgets tab ────────────────────────────────────────────── */}
+          <TabsContent value="widgets">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">Create embeddable lead capture forms that subscribe visitors to your email lists.</p>
+                <Button onClick={() => { setEditingWidget(null); setShowWidgetForm(true); }} style={{ background: "#189aa1" }} className="text-white" size="sm">
+                  <Plus className="w-4 h-4 mr-1" /> New Widget
+                </Button>
+              </div>
+
+              {showWidgetForm && (
+                <LeadCaptureWidgetForm
+                  widget={editingWidget}
+                  emailLists={emailLists ?? []}
+                  onSave={(data) => saveWidgetMutation.mutate(data)}
+                  onCancel={() => { setShowWidgetForm(false); setEditingWidget(null); }}
+                  saving={saveWidgetMutation.isPending}
+                />
+              )}
+
+              {(!leadCaptureWidgets || leadCaptureWidgets.length === 0) ? (
+                <div className="text-center py-8 text-gray-400 text-sm">No lead capture widgets yet. Create one above.</div>
+              ) : (
+                <div className="space-y-3">
+                  {leadCaptureWidgets.map((w) => (
+                    <div key={w.id} className="border rounded-xl bg-white shadow-sm p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-900 text-sm">{w.name}</span>
+                            {w.listId && emailLists?.find(l => l.id === w.listId) && (
+                              <Badge variant="secondary" className="text-xs">
+                                <List className="w-3 h-3 mr-1" />
+                                {emailLists.find(l => l.id === w.listId)?.name}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mb-2">{w.headline}</p>
+                          {/* Preview */}
+                          <div className="rounded-lg p-3 text-center text-xs max-w-xs" style={{ background: w.bgColor, color: w.textColor }}>
+                            <div className="font-semibold mb-1" style={{ color: w.textColor }}>{w.headline}</div>
+                            {w.subtext && <div className="mb-2 text-xs opacity-80">{w.subtext}</div>}
+                            {w.showNameField && <div className="mb-1 border rounded px-2 py-1 text-xs text-gray-400 bg-white">{w.namePlaceholder}</div>}
+                            <div className="mb-2 border rounded px-2 py-1 text-xs text-gray-400 bg-white">{w.emailPlaceholder}</div>
+                            <div className="inline-block px-3 py-1 rounded text-xs font-bold" style={{ background: w.buttonColor, color: w.buttonTextColor, borderRadius: w.borderRadius }}>{w.buttonText}</div>
+                          </div>
+                          {/* Embed code */}
+                          <div className="mt-3">
+                            <p className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1"><Code className="w-3 h-3" /> Embed Code</p>
+                            <pre className="text-xs bg-gray-50 border rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">{`<script src="${window.location.origin}/api/widget/${w.id}.js"></script>\n<div id="lcw-${w.id}"></div>`}</pre>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <Button variant="outline" size="sm" onClick={() => { setEditingWidget(w); setShowWidgetForm(true); }}><Edit className="w-4 h-4" /></Button>
+                          <Button variant="outline" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => deleteWidgetMutation.mutate({ id: w.id })}><Trash2 className="w-4 h-4" /></Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
+                <p className="font-medium mb-1">📌 About Lead Capture Widgets</p>
+                <p className="text-xs text-blue-600">Embed the script tag on any external website or landing page. When a visitor submits their email, they are automatically added to the selected email list and to your All Contacts list.</p>
               </div>
             </div>
           </TabsContent>
