@@ -4605,7 +4605,7 @@ export type NewMembershipPlan = typeof membershipPlans.$inferInsert;
 export const membershipPlanAccess = mysqlTable("membership_plan_access", {
   id: int("id").autoincrement().primaryKey(),
   planId: int("plan_id").notNull(),
-  itemType: mysqlEnum("item_type", ["course", "quiz", "bundle", "community", "webinar", "download", "product", "all_courses", "all_downloads"]).notNull(),
+  itemType: mysqlEnum("item_type", ["course", "quiz", "bundle", "community", "webinar", "download", "product", "all_courses", "all_downloads", "ultrasoundassist_free", "ultrasoundassist_premium", "echoassist_free", "echoassist_premium"]).notNull(),
   itemId: int("item_id"),
   /** Human-readable label override */
   label: varchar("label", { length: 255 }),

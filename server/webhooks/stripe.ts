@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -171,6 +171,41 @@ async function handleMembershipCheckoutCompleted(session: Record<string, unknown
     await db.update(membershipDiscountCodes)
       .set({ usedCount: sql`used_count + 1` })
       .where(eq(membershipDiscountCodes.id, dcId));
+  }
+
+  // Grant app-tier access based on plan access items
+  try {
+    const accessItems = await db.select().from(membershipPlanAccess).where(eq(membershipPlanAccess.planId, planId));
+    for (const item of accessItems) {
+      const brand = item.itemType.startsWith("ultrasoundassist") ? "all_about_ultrasound" : item.itemType.startsWith("echoassist") ? "iheartecho" : null;
+      if (!brand) continue;
+      const tier = item.itemType.endsWith("_premium") ? "premium" : "free";
+      const [existingBM] = await db.select().from(brandMemberships)
+        .where(and(eq(brandMemberships.userId, userId), eq(brandMemberships.brand, brand as any)))
+        .limit(1);
+      if (existingBM) {
+        // Only upgrade tier, never downgrade
+        const shouldUpgrade = tier === "premium" && existingBM.tier !== "premium";
+        if (shouldUpgrade || existingBM.status !== "active") {
+          await db.update(brandMemberships)
+            .set({ tier: tier as any, status: "active", source: "membership", grantedAt: new Date() })
+            .where(eq(brandMemberships.id, existingBM.id));
+        }
+      } else {
+        await db.insert(brandMemberships).values({
+          userId,
+          brand: brand as any,
+          tier: tier as any,
+          status: "active",
+          source: "membership",
+          stripeSubscriptionId: stripeSubscriptionId ?? null,
+          stripeCustomerId: null,
+        });
+      }
+      console.log(`[Stripe] Membership granted ${brand} ${tier} access to user ${userId} via plan ${planId}`);
+    }
+  } catch (err) {
+    console.error(`[Stripe] Failed to grant app-tier access for membership planId=${planId} userId=${userId}:`, err);
   }
 
   await notifyOwner({
