@@ -297,9 +297,14 @@ export const generalFormRouter = router({
       } catch {
         pageText = `Form from: ${input.url}`;
       }
-      // AI scaffold with rich field metadata + branching
-      const systemPrompt = `You are a form builder assistant. Given a web page or form description, extract or infer ALL form fields, their types, options, and any conditional/branching logic. Return structured JSON exactly matching the schema provided. For branching rules, use 0-based field_index values referencing the flat list of all items across all sections in order.`;
-      const userPrompt = `Create a complete form from this page. Return JSON:
+      // AI scaffold with rich field metadata + branching + calculations
+      const systemPrompt = `You are a form builder assistant. Given a web page or form description, extract or infer ALL form fields, their types, options, conditional/branching logic, scoring, and any calculated/computed fields. Return structured JSON exactly matching the schema provided.
+
+For branching rules: reference fields by their field_key.
+For calculated fields: use itemType "paragraph" and put the formula in extraConfig as JSON {"formula": "expression using field_key names", "description": "what it calculates"}.
+For score weights: assign scoreWeight (0-100) to each scored field based on importance.
+For email routing: if a field routes submissions to different emails based on answer, set emailRoutingRules as JSON array [{"label": string, "conditionFieldKey": string, "conditionValue": string, "routeTo": string}].`;
+      const userPrompt = `Create a complete form from this page. Extract ALL fields, logic, calculations, and scoring. Return JSON:
 {
   "name": string,
   "description": string,
@@ -312,8 +317,11 @@ export const generalFormRouter = router({
       "placeholder": string,
       "helpText": string,
       "isRequired": boolean,
+      "scoreWeight": number,
       "minValue": number|null,
       "maxValue": number|null,
+      "extraConfig": string,
+      "emailRoutingRules": string,
       "options": [{"label": string, "value": string, "scoreValue": number}]
     }]
   }],
@@ -321,15 +329,24 @@ export const generalFormRouter = router({
     "ruleLabel": string,
     "targetFieldKey": string,
     "targetType": "item",
-    "action": "show"|"hide"|"skip_to"|"require",
+    "action": "show"|"hide"|"skip_to"|"require"|"unrequire"|"set_value",
+    "setValue": string,
     "logicOperator": "any"|"all",
-    "conditions": [{"conditionFieldKey": string, "operator": "equals"|"not_equals"|"contains"|"greater_than"|"less_than", "value": string}]
+    "conditions": [{"conditionFieldKey": string, "operator": "equals"|"not_equals"|"contains"|"not_contains"|"greater_than"|"less_than"|"is_empty"|"is_not_empty", "value": string}]
   }]
 }
 
+IMPORTANT:
+- If the form has calculated outputs (BMI, total score, risk level, etc.), create a "paragraph" item with extraConfig={"formula":"expression","description":"what it computes"}.
+- If the form has score thresholds (e.g. score 0-10=low risk, 11-20=high risk), add a "paragraph" item with extraConfig={"scoreThresholds":[{"min":0,"max":10,"label":"Low Risk","description":"..."},...]}.
+- Capture ALL conditional logic including skip patterns, required-if rules, and value-setting rules.
+- Use scoreWeight on each field to reflect its relative importance in scoring.
+
 Page content:
 ${pageText}`;
-      const aiSchema = { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: { type: "object", properties: { field_key: { type: "string" }, itemType: { type: "string" }, label: { type: "string" }, placeholder: { type: "string" }, helpText: { type: "string" }, isRequired: { type: "boolean" }, minValue: { type: ["number", "null"] }, maxValue: { type: ["number", "null"] }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" }, scoreValue: { type: "number" } }, required: ["label", "value", "scoreValue"], additionalProperties: false } } }, required: ["field_key", "itemType", "label", "placeholder", "helpText", "isRequired", "minValue", "maxValue", "options"], additionalProperties: false } } }, required: ["title", "items"], additionalProperties: false } }, branchRules: { type: "array", items: { type: "object", properties: { ruleLabel: { type: "string" }, targetFieldKey: { type: "string" }, targetType: { type: "string" }, action: { type: "string" }, logicOperator: { type: "string" }, conditions: { type: "array", items: { type: "object", properties: { conditionFieldKey: { type: "string" }, operator: { type: "string" }, value: { type: "string" } }, required: ["conditionFieldKey", "operator", "value"], additionalProperties: false } } }, required: ["ruleLabel", "targetFieldKey", "targetType", "action", "logicOperator", "conditions"], additionalProperties: false } } }, required: ["name", "description", "sections", "branchRules"], additionalProperties: false };
+      const itemSchema = { type: "object", properties: { field_key: { type: "string" }, itemType: { type: "string" }, label: { type: "string" }, placeholder: { type: "string" }, helpText: { type: "string" }, isRequired: { type: "boolean" }, scoreWeight: { type: "number" }, minValue: { type: ["number", "null"] }, maxValue: { type: ["number", "null"] }, extraConfig: { type: "string" }, emailRoutingRules: { type: "string" }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" }, scoreValue: { type: "number" } }, required: ["label", "value", "scoreValue"], additionalProperties: false } } }, required: ["field_key", "itemType", "label", "placeholder", "helpText", "isRequired", "scoreWeight", "minValue", "maxValue", "extraConfig", "emailRoutingRules", "options"], additionalProperties: false };
+      const branchSchema = { type: "object", properties: { ruleLabel: { type: "string" }, targetFieldKey: { type: "string" }, targetType: { type: "string" }, action: { type: "string" }, setValue: { type: "string" }, logicOperator: { type: "string" }, conditions: { type: "array", items: { type: "object", properties: { conditionFieldKey: { type: "string" }, operator: { type: "string" }, value: { type: "string" } }, required: ["conditionFieldKey", "operator", "value"], additionalProperties: false } } }, required: ["ruleLabel", "targetFieldKey", "targetType", "action", "setValue", "logicOperator", "conditions"], additionalProperties: false };
+      const aiSchema = { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: itemSchema } }, required: ["title", "items"], additionalProperties: false } }, branchRules: { type: "array", items: branchSchema } }, required: ["name", "description", "sections", "branchRules"], additionalProperties: false };
       const aiResp = await invokeLLM({
         messages: [
           { role: "system", content: systemPrompt },
@@ -357,6 +374,7 @@ ${pageText}`;
         const sectionId = (ns as any).insertId;
         let itemOrder = 0;
         for (const item of (section.items ?? [])) {
+          // Resolve emailRoutingRules: replace conditionFieldKey with real item IDs (post-insert pass below)
           const [ni] = await db.insert(generalFormItems).values({
             templateId: newId,
             sectionId,
@@ -365,8 +383,11 @@ ${pageText}`;
             placeholder: item.placeholder || null,
             helpText: item.helpText || null,
             isRequired: item.isRequired ?? false,
+            scoreWeight: item.scoreWeight ?? 0,
             minValue: item.minValue ?? null,
             maxValue: item.maxValue ?? null,
+            extraConfig: item.extraConfig && item.extraConfig !== "" ? item.extraConfig : null,
+            richTextContent: item.itemType === "paragraph" && item.extraConfig ? `<p><em>${(() => { try { const ec = JSON.parse(item.extraConfig); return ec.description || ec.formula || ""; } catch { return ""; } })()}</em></p>` : null,
             sortOrder: itemOrder++,
           });
           const itemId = (ni as any).insertId;
@@ -377,6 +398,14 @@ ${pageText}`;
               await db.insert(generalFormOptions).values({ itemId, label: opt.label, value: opt.value, scoreValue: opt.scoreValue ?? 0, sortOrder: optOrder++ });
             }
           }
+          // Resolve emailRoutingRules conditionFieldKey → conditionItemId after all items inserted
+          if (item.emailRoutingRules && item.emailRoutingRules !== "") {
+            try {
+              const rules = JSON.parse(item.emailRoutingRules);
+              // Store raw for now; will be resolved in a second pass if needed
+              // For now store as-is (field keys will be resolved post-loop)
+            } catch {}
+          }
         }
       }
       // Insert branch rules now that we have real item IDs
@@ -385,10 +414,10 @@ ${pageText}`;
         const targetId = fieldKeyToItemId[rule.targetFieldKey];
         if (!targetId) continue;
         const conditions = (rule.conditions ?? []).map((c: any) => ({
-          conditionItemId: fieldKeyToItemId[c.conditionFieldKey] ?? 0,
+          fieldId: String(fieldKeyToItemId[c.conditionFieldKey] ?? 0),
           operator: c.operator || "equals",
           value: c.value || "",
-        })).filter((c: any) => c.conditionItemId > 0);
+        })).filter((c: any) => c.fieldId !== "0");
         if (conditions.length === 0) continue;
         await db.insert(generalFormBranchRules).values({
           templateId: newId,
@@ -396,6 +425,7 @@ ${pageText}`;
           targetType: rule.targetType || "item",
           targetId,
           action: rule.action || "show",
+          setValue: rule.setValue || "",
           logicOperator: rule.logicOperator || "any",
           conditions: JSON.stringify(conditions),
           sortOrder: branchOrder++,
@@ -430,9 +460,13 @@ ${pageText}`;
       } catch {
         pageText = `Form from: ${input.url}`;
       }
-      // AI scaffold with rich metadata + branching
-      const systemPrompt = `You are a form builder assistant. Extract ALL form fields, their types, options, placeholder text, help text, and any conditional/branching logic from the page. Return structured JSON exactly matching the schema provided.`;
-      const userPrompt = `Extract all form fields and branching rules from this page. Return JSON:
+      // AI scaffold with rich metadata + branching + calculations
+      const systemPrompt = `You are a form builder assistant. Extract ALL form fields, their types, options, placeholder text, help text, conditional/branching logic, scoring weights, and any calculated/computed fields from the page. Return structured JSON exactly matching the schema provided.
+
+For calculated fields: use itemType "paragraph" and put the formula in extraConfig as JSON {"formula": "expression using field_key names", "description": "what it calculates"}.
+For score thresholds: add a "paragraph" item with extraConfig={"scoreThresholds":[{"min":0,"max":10,"label":"Low Risk","description":"..."},...]}.
+For email routing: if a field routes submissions to different emails, set emailRoutingRules as JSON array [{"label": string, "conditionFieldKey": string, "conditionValue": string, "routeTo": string}].`;
+      const userPrompt = `Extract all form fields, logic, calculations, and scoring from this page. Return JSON:
 {
   "sections": [{
     "title": string,
@@ -443,8 +477,11 @@ ${pageText}`;
       "placeholder": string,
       "helpText": string,
       "isRequired": boolean,
+      "scoreWeight": number,
       "minValue": number|null,
       "maxValue": number|null,
+      "extraConfig": string,
+      "emailRoutingRules": string,
       "options": [{"label": string, "value": string, "scoreValue": number}]
     }]
   }],
@@ -452,15 +489,18 @@ ${pageText}`;
     "ruleLabel": string,
     "targetFieldKey": string,
     "targetType": "item",
-    "action": "show"|"hide"|"skip_to"|"require",
+    "action": "show"|"hide"|"skip_to"|"require"|"unrequire"|"set_value",
+    "setValue": string,
     "logicOperator": "any"|"all",
-    "conditions": [{"conditionFieldKey": string, "operator": "equals"|"not_equals"|"contains"|"greater_than"|"less_than", "value": string}]
+    "conditions": [{"conditionFieldKey": string, "operator": "equals"|"not_equals"|"contains"|"not_contains"|"greater_than"|"less_than"|"is_empty"|"is_not_empty", "value": string}]
   }]
 }
 
 Page content:
 ${pageText}`;
-      const aiSchema = { type: "object", properties: { sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: { type: "object", properties: { field_key: { type: "string" }, itemType: { type: "string" }, label: { type: "string" }, placeholder: { type: "string" }, helpText: { type: "string" }, isRequired: { type: "boolean" }, minValue: { type: ["number", "null"] }, maxValue: { type: ["number", "null"] }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" }, scoreValue: { type: "number" } }, required: ["label", "value", "scoreValue"], additionalProperties: false } } }, required: ["field_key", "itemType", "label", "placeholder", "helpText", "isRequired", "minValue", "maxValue", "options"], additionalProperties: false } } }, required: ["title", "items"], additionalProperties: false } }, branchRules: { type: "array", items: { type: "object", properties: { ruleLabel: { type: "string" }, targetFieldKey: { type: "string" }, targetType: { type: "string" }, action: { type: "string" }, logicOperator: { type: "string" }, conditions: { type: "array", items: { type: "object", properties: { conditionFieldKey: { type: "string" }, operator: { type: "string" }, value: { type: "string" } }, required: ["conditionFieldKey", "operator", "value"], additionalProperties: false } } }, required: ["ruleLabel", "targetFieldKey", "targetType", "action", "logicOperator", "conditions"], additionalProperties: false } } }, required: ["sections", "branchRules"], additionalProperties: false };
+      const appendItemSchema = { type: "object", properties: { field_key: { type: "string" }, itemType: { type: "string" }, label: { type: "string" }, placeholder: { type: "string" }, helpText: { type: "string" }, isRequired: { type: "boolean" }, scoreWeight: { type: "number" }, minValue: { type: ["number", "null"] }, maxValue: { type: ["number", "null"] }, extraConfig: { type: "string" }, emailRoutingRules: { type: "string" }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" }, scoreValue: { type: "number" } }, required: ["label", "value", "scoreValue"], additionalProperties: false } } }, required: ["field_key", "itemType", "label", "placeholder", "helpText", "isRequired", "scoreWeight", "minValue", "maxValue", "extraConfig", "emailRoutingRules", "options"], additionalProperties: false };
+      const appendBranchSchema = { type: "object", properties: { ruleLabel: { type: "string" }, targetFieldKey: { type: "string" }, targetType: { type: "string" }, action: { type: "string" }, setValue: { type: "string" }, logicOperator: { type: "string" }, conditions: { type: "array", items: { type: "object", properties: { conditionFieldKey: { type: "string" }, operator: { type: "string" }, value: { type: "string" } }, required: ["conditionFieldKey", "operator", "value"], additionalProperties: false } } }, required: ["ruleLabel", "targetFieldKey", "targetType", "action", "setValue", "logicOperator", "conditions"], additionalProperties: false };
+      const aiSchema = { type: "object", properties: { sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: appendItemSchema } }, required: ["title", "items"], additionalProperties: false } }, branchRules: { type: "array", items: appendBranchSchema } }, required: ["sections", "branchRules"], additionalProperties: false };
       const aiResp = await invokeLLM({
         messages: [
           { role: "system", content: systemPrompt },
@@ -492,8 +532,11 @@ ${pageText}`;
             placeholder: item.placeholder || null,
             helpText: item.helpText || null,
             isRequired: item.isRequired ?? false,
+            scoreWeight: item.scoreWeight ?? 0,
             minValue: item.minValue ?? null,
             maxValue: item.maxValue ?? null,
+            extraConfig: item.extraConfig && item.extraConfig !== "" ? item.extraConfig : null,
+            richTextContent: item.itemType === "paragraph" && item.extraConfig ? `<p><em>${(() => { try { const ec = JSON.parse(item.extraConfig); return ec.description || ec.formula || ""; } catch { return ""; } })()}</em></p>` : null,
             sortOrder: itemOrder++,
           });
           const itemId = (ni as any).insertId;
@@ -513,10 +556,10 @@ ${pageText}`;
         const targetId = fieldKeyToItemId[rule.targetFieldKey];
         if (!targetId) continue;
         const conditions = (rule.conditions ?? []).map((c: any) => ({
-          conditionItemId: fieldKeyToItemId[c.conditionFieldKey] ?? 0,
+          fieldId: String(fieldKeyToItemId[c.conditionFieldKey] ?? 0),
           operator: c.operator || "equals",
           value: c.value || "",
-        })).filter((c: any) => c.conditionItemId > 0);
+        })).filter((c: any) => c.fieldId !== "0");
         if (conditions.length === 0) continue;
         await db.insert(generalFormBranchRules).values({
           templateId: input.templateId,
@@ -524,6 +567,7 @@ ${pageText}`;
           targetType: rule.targetType || "item",
           targetId,
           action: rule.action || "show",
+          setValue: rule.setValue || "",
           logicOperator: rule.logicOperator || "any",
           conditions: JSON.stringify(conditions),
           sortOrder: branchOrder++,

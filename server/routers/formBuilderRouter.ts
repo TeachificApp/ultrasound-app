@@ -773,9 +773,14 @@ export const formBuilderRouter = router({
         console.error('[importFormByUrl] fetch error:', err?.message);
         pageText = `Form from: ${input.url}`;
       }
-      // AI scaffold with rich metadata + branching
-      const diySystemPrompt = `You are a form builder assistant. Given a web page or form description, extract or infer ALL form fields, their types, options, placeholder text, help text, and any conditional/branching logic. Return structured JSON exactly matching the schema provided.`;
-      const diyUserPrompt = `Create a complete form from this page. Return JSON:
+      // AI scaffold with rich metadata + branching + calculations
+      const diySystemPrompt = `You are a form builder assistant. Given a web page or form description, extract or infer ALL form fields, their types, options, placeholder text, help text, conditional/branching logic, scoring weights, and any calculated/computed fields. Return structured JSON exactly matching the schema provided.
+
+For calculated fields: use itemType "info" and put the formula/description in richTextContent as HTML.
+For score thresholds: use itemType "info" with richTextContent describing the scoring bands.
+For email routing: if a field routes submissions to different emails, set emailRoutingRules as JSON array [{"label": string, "conditionItemId": 0, "conditionValue": string, "routeTo": string}].
+For score weights: assign scoreWeight (0-100) to each scored field based on importance.`;
+      const diyUserPrompt = `Create a complete form from this page. Extract ALL fields, logic, calculations, and scoring. Return JSON:
 {
   "name": string,
   "description": string,
@@ -788,10 +793,13 @@ export const formBuilderRouter = router({
       "placeholder": string,
       "helpText": string,
       "isRequired": boolean,
+      "scoreWeight": number,
       "scaleMin": number|null,
       "scaleMax": number|null,
       "scaleMinLabel": string,
       "scaleMaxLabel": string,
+      "richTextContent": string,
+      "emailRoutingRules": string,
       "options": [{"label": string, "value": string, "qualityScore": number}]
     }]
   }],
@@ -803,9 +811,16 @@ export const formBuilderRouter = router({
   }]
 }
 
+IMPORTANT:
+- If the form has calculated outputs (total score, risk level, etc.), create an "info" item with richTextContent describing the calculation.
+- If the form has score thresholds (e.g. 0-10=low risk, 11-20=high risk), add an "info" item with richTextContent listing the bands.
+- Capture ALL conditional logic including skip patterns.
+- Use scoreWeight on each field to reflect its relative importance in scoring.
+
 Page content:
 ${pageText}`;
-      const diyAiSchema = { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, sections: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: { type: 'object', properties: { field_key: { type: 'string' }, itemType: { type: 'string' }, label: { type: 'string' }, placeholder: { type: 'string' }, helpText: { type: 'string' }, isRequired: { type: 'boolean' }, scaleMin: { type: ['number', 'null'] }, scaleMax: { type: ['number', 'null'] }, scaleMinLabel: { type: 'string' }, scaleMaxLabel: { type: 'string' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, qualityScore: { type: 'number' } }, required: ['label', 'value', 'qualityScore'], additionalProperties: false } } }, required: ['field_key', 'itemType', 'label', 'placeholder', 'helpText', 'isRequired', 'scaleMin', 'scaleMax', 'scaleMinLabel', 'scaleMaxLabel', 'options'], additionalProperties: false } } }, required: ['title', 'items'], additionalProperties: false } }, branchRules: { type: 'array', items: { type: 'object', properties: { targetFieldKey: { type: 'string' }, conditionFieldKey: { type: 'string' }, conditionValue: { type: 'string' }, action: { type: 'string' } }, required: ['targetFieldKey', 'conditionFieldKey', 'conditionValue', 'action'], additionalProperties: false } } }, required: ['name', 'description', 'sections', 'branchRules'], additionalProperties: false };
+      const diyItemSchema = { type: 'object', properties: { field_key: { type: 'string' }, itemType: { type: 'string' }, label: { type: 'string' }, placeholder: { type: 'string' }, helpText: { type: 'string' }, isRequired: { type: 'boolean' }, scoreWeight: { type: 'number' }, scaleMin: { type: ['number', 'null'] }, scaleMax: { type: ['number', 'null'] }, scaleMinLabel: { type: 'string' }, scaleMaxLabel: { type: 'string' }, richTextContent: { type: 'string' }, emailRoutingRules: { type: 'string' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, qualityScore: { type: 'number' } }, required: ['label', 'value', 'qualityScore'], additionalProperties: false } } }, required: ['field_key', 'itemType', 'label', 'placeholder', 'helpText', 'isRequired', 'scoreWeight', 'scaleMin', 'scaleMax', 'scaleMinLabel', 'scaleMaxLabel', 'richTextContent', 'emailRoutingRules', 'options'], additionalProperties: false };
+      const diyAiSchema = { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, sections: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: diyItemSchema } }, required: ['title', 'items'], additionalProperties: false } }, branchRules: { type: 'array', items: { type: 'object', properties: { targetFieldKey: { type: 'string' }, conditionFieldKey: { type: 'string' }, conditionValue: { type: 'string' }, action: { type: 'string' } }, required: ['targetFieldKey', 'conditionFieldKey', 'conditionValue', 'action'], additionalProperties: false } } }, required: ['name', 'description', 'sections', 'branchRules'], additionalProperties: false };
       const aiResp = await invokeLLM({
         messages: [
           { role: 'system', content: diySystemPrompt },
@@ -837,10 +852,13 @@ ${pageText}`;
             placeholder: item.placeholder || null,
             helpText: item.helpText || null,
             isRequired: item.isRequired ?? false,
+            scoreWeight: item.scoreWeight ?? 1,
             scaleMin: item.scaleMin ?? null,
             scaleMax: item.scaleMax ?? null,
             scaleMinLabel: item.scaleMinLabel || null,
             scaleMaxLabel: item.scaleMaxLabel || null,
+            richTextContent: item.richTextContent && item.richTextContent !== '' ? item.richTextContent : null,
+            emailRoutingRules: item.emailRoutingRules && item.emailRoutingRules !== '' ? item.emailRoutingRules : null,
             sortOrder: itemOrder++,
           });
           const itemId = (ni as any).insertId;
@@ -891,33 +909,69 @@ ${pageText}`;
         console.error('[appendFieldsFromUrl] fetch error:', err?.message);
         pageText = `Form fields from: ${input.url}`;
       }
+      const appendDiyItemSchema = { type: 'object', properties: { field_key: { type: 'string' }, itemType: { type: 'string' }, label: { type: 'string' }, placeholder: { type: 'string' }, helpText: { type: 'string' }, isRequired: { type: 'boolean' }, scoreWeight: { type: 'number' }, scaleMin: { type: ['number', 'null'] }, scaleMax: { type: ['number', 'null'] }, scaleMinLabel: { type: 'string' }, scaleMaxLabel: { type: 'string' }, richTextContent: { type: 'string' }, emailRoutingRules: { type: 'string' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, qualityScore: { type: 'number' } }, required: ['label', 'value', 'qualityScore'], additionalProperties: false } } }, required: ['field_key', 'itemType', 'label', 'placeholder', 'helpText', 'isRequired', 'scoreWeight', 'scaleMin', 'scaleMax', 'scaleMinLabel', 'scaleMaxLabel', 'richTextContent', 'emailRoutingRules', 'options'], additionalProperties: false };
+      const appendDiyBranchSchema = { type: 'object', properties: { targetFieldKey: { type: 'string' }, conditionFieldKey: { type: 'string' }, conditionValue: { type: 'string' }, action: { type: 'string' } }, required: ['targetFieldKey', 'conditionFieldKey', 'conditionValue', 'action'], additionalProperties: false };
+      const appendDiyAiSchema = { type: 'object', properties: { sections: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: appendDiyItemSchema } }, required: ['title', 'items'], additionalProperties: false } }, branchRules: { type: 'array', items: appendDiyBranchSchema } }, required: ['sections', 'branchRules'], additionalProperties: false };
       const aiResp = await invokeLLM({
         messages: [
-          { role: 'system', content: 'You are a form builder assistant. Extract form fields from the page content and return structured JSON.' },
-          { role: 'user', content: `Extract form fields from this page. Return JSON with: { "sectionTitle": string, "items": [{ "itemType": "text"|"textarea"|"email"|"radio"|"checkbox"|"select"|"scale"|"heading"|"info", "label": string, "isRequired": boolean, "options": [{"label": string, "value": string}] }] }\n\nPage content:\n${pageText}` },
+          { role: 'system', content: `You are a form builder assistant. Extract ALL form fields, their types, options, placeholder text, help text, conditional/branching logic, scoring weights, and any calculated/computed fields from the page. Return structured JSON exactly matching the schema provided.\n\nFor calculated fields: use itemType "info" and put the formula/description in richTextContent as HTML.\nFor score thresholds: use itemType "info" with richTextContent describing the scoring bands.\nFor email routing: set emailRoutingRules as JSON array [{"label": string, "conditionItemId": 0, "conditionValue": string, "routeTo": string}].` },
+          { role: 'user', content: `Extract all form fields, logic, calculations, and scoring from this page. Return JSON with sections and branchRules.\n\nPage content:\n${pageText}` },
         ],
-        response_format: { type: 'json_schema', json_schema: { name: 'form_fields', strict: true, schema: { type: 'object', properties: { sectionTitle: { type: 'string' }, items: { type: 'array', items: { type: 'object', properties: { itemType: { type: 'string' }, label: { type: 'string' }, isRequired: { type: 'boolean' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' } }, required: ['label', 'value'], additionalProperties: false } } }, required: ['itemType', 'label', 'isRequired', 'options'], additionalProperties: false } } }, required: ['sectionTitle', 'items'], additionalProperties: false } } },
+        response_format: { type: 'json_schema', json_schema: { name: 'form_fields', strict: true, schema: appendDiyAiSchema } },
       });
       let parsed: any;
       try { parsed = JSON.parse(aiResp.choices[0].message.content as string); }
       catch { throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI failed to parse fields. Please try again.' }); }
       const [maxSec] = await db.select({ max: sql<number>`COALESCE(MAX(sortOrder), 0)` }).from(accreditationFormSections).where(eq(accreditationFormSections.templateId, input.templateId));
-      const [ns] = await db.insert(accreditationFormSections).values({ templateId: input.templateId, title: parsed.sectionTitle || 'Imported Fields', sortOrder: (maxSec?.max ?? 0) + 1 });
-      const sectionId = (ns as any).insertId;
-      let itemOrder = 0;
-      for (const item of (parsed.items ?? [])) {
-        const [ni] = await db.insert(accreditationFormItems).values({
-          templateId: input.templateId, sectionId, itemType: item.itemType || 'text', label: item.label || 'Field', isRequired: item.isRequired ?? false, sortOrder: itemOrder++,
-        });
-        const itemId = (ni as any).insertId;
-        if (item.options?.length > 0) {
-          let optOrder = 0;
-          for (const opt of item.options) {
-            await db.insert(accreditationFormOptions).values({ itemId, label: opt.label, value: opt.value, sortOrder: optOrder++ });
+      let sectionSortOrder = (maxSec?.max ?? 0) + 1;
+      const appendDiyFieldKeyToItemId: Record<string, number> = {};
+      let itemCount = 0;
+      for (const section of (parsed.sections ?? [])) {
+        const [ns] = await db.insert(accreditationFormSections).values({ templateId: input.templateId, title: section.title || 'Imported Fields', sortOrder: sectionSortOrder++ });
+        const sectionId = (ns as any).insertId;
+        let itemOrder = 0;
+        for (const item of (section.items ?? [])) {
+          const [ni] = await db.insert(accreditationFormItems).values({
+            templateId: input.templateId, sectionId,
+            itemType: item.itemType || 'text',
+            label: item.label || 'Field',
+            placeholder: item.placeholder || null,
+            helpText: item.helpText || null,
+            isRequired: item.isRequired ?? false,
+            scoreWeight: item.scoreWeight ?? 1,
+            scaleMin: item.scaleMin ?? null,
+            scaleMax: item.scaleMax ?? null,
+            scaleMinLabel: item.scaleMinLabel || null,
+            scaleMaxLabel: item.scaleMaxLabel || null,
+            richTextContent: item.richTextContent && item.richTextContent !== '' ? item.richTextContent : null,
+            emailRoutingRules: item.emailRoutingRules && item.emailRoutingRules !== '' ? item.emailRoutingRules : null,
+            sortOrder: itemOrder++,
+          });
+          const itemId = (ni as any).insertId;
+          if (item.field_key) appendDiyFieldKeyToItemId[item.field_key] = itemId;
+          if (item.options?.length > 0) {
+            let optOrder = 0;
+            for (const opt of item.options) {
+              await db.insert(accreditationFormOptions).values({ itemId, label: opt.label, value: opt.value, qualityScore: opt.qualityScore ?? 0, sortOrder: optOrder++ });
+            }
           }
+          itemCount++;
         }
       }
-      return { sectionId, itemCount: (parsed.items ?? []).length };
+      // Insert branch rules
+      for (const rule of (parsed.branchRules ?? [])) {
+        const targetItemId = appendDiyFieldKeyToItemId[rule.targetFieldKey];
+        const conditionItemId = appendDiyFieldKeyToItemId[rule.conditionFieldKey];
+        if (!targetItemId || !conditionItemId) continue;
+        await db.insert(accreditationFormBranchRules).values({
+          templateId: input.templateId,
+          targetItemId,
+          conditionItemId,
+          conditionValue: rule.conditionValue || '',
+          action: (rule.action === 'hide' ? 'hide' : 'show') as 'show' | 'hide',
+        });
+      }
+      return { itemCount };
     }),
 
   /** Update theme/branding settings for a DIY form template */
