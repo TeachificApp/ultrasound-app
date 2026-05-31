@@ -6797,6 +6797,7 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
                         <button
                           key={asset.id}
                           onClick={() => selectMediaAsset(asset)}
+                          title={[asset.title, asset.currentVersion?.fileName].filter(Boolean).join(' — ')}
                           className="flex flex-col items-center gap-1.5 p-2 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 transition-all text-left"
                         >
                           {isImage ? (
@@ -6830,6 +6831,7 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
                       <button
                         key={file.id}
                         onClick={() => selectDownloadFile(file)}
+                        title={[file.fileName, file.productTitle].filter(Boolean).join(' — ')}
                         className="w-full flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all text-left"
                       >
                         <div className="w-8 h-8 bg-purple-100 rounded flex items-center justify-center flex-shrink-0">
