@@ -64,6 +64,101 @@ import {
 
 // ─── Guard helper ─────────────────────────────────────────────────────────────
 
+
+// ─── Typeform helpers ─────────────────────────────────────────────────────────
+function extractTypeformId_fb(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const m = u.pathname.match(/\/to\/([A-Za-z0-9]+)/);
+    if (m && u.hostname.endsWith('typeform.com')) return m[1];
+  } catch {}
+  return null;
+}
+function tfTypeToItemType_fb(type: string): string {
+  const map: Record<string, string> = {
+    short_text: 'text', long_text: 'textarea', email: 'email', phone_number: 'text',
+    number: 'text', multiple_choice: 'radio', picture_choice: 'radio', dropdown: 'select',
+    date: 'text', file_upload: 'text', signature: 'text', opinion_scale: 'scale',
+    rating: 'scale', yes_no: 'radio', statement: 'heading', group: 'heading',
+    website: 'text', payment: 'text',
+  };
+  return map[type] || 'text';
+}
+function tfOpToOperator_fb(op: string): string {
+  const map: Record<string, string> = {
+    is: 'equals', is_not: 'not_equals', contains: 'contains', not_contains: 'not_contains',
+    lower_than: 'less_than', greater_than: 'greater_than',
+    lower_equal_than: 'less_than', greater_equal_than: 'greater_than',
+    equal: 'equals', not_equal: 'not_equals', always: 'always',
+  };
+  return map[op] || 'equals';
+}
+async function fetchAndParseTypeform_fb(formId: string) {
+  const resp = await fetch(`https://api.typeform.com/forms/${formId}`, {
+    headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(15000),
+  });
+  if (!resp.ok) throw new Error(`Typeform API returned ${resp.status}`);
+  const tf = await resp.json() as any;
+  const refToKey: Record<string, string> = {};
+  const refToChoiceLabel: Record<string, string> = {};
+  for (const f of (tf.fields ?? [])) {
+    refToKey[f.ref] = f.ref;
+    refToKey[f.id] = f.ref;
+    for (const c of (f.properties?.choices ?? [])) refToChoiceLabel[c.ref] = c.label;
+  }
+  const items: any[] = [];
+  for (const f of (tf.fields ?? [])) {
+    const itemType = tfTypeToItemType_fb(f.type);
+    const options = (f.properties?.choices ?? []).map((c: any) => ({ label: c.label, value: c.ref }));
+    if (f.type === 'yes_no') { options.push({ label: 'Yes', value: 'yes' }); options.push({ label: 'No', value: 'no' }); }
+    items.push({
+      field_key: f.ref, itemType,
+      label: f.title || f.ref,
+      helpText: f.properties?.description || '',
+      isRequired: f.validations?.required ?? false,
+      scoreWeight: 0,
+      extraConfig: '', emailRoutingRules: '',
+      options,
+    });
+  }
+  const vars = tf.variables ?? {};
+  const varNames = Object.keys(vars);
+  if (varNames.length > 0) {
+    items.push({
+      field_key: '__variables__', itemType: 'info',
+      label: 'Score Variables',
+      helpText: `Calculated variables: ${varNames.map((v: string) => `${v} (starts at ${vars[v]})`).join(', ')}`,
+      isRequired: false, scoreWeight: 0, extraConfig: '', emailRoutingRules: '', options: [],
+    });
+  }
+  const branchRules: any[] = [];
+  for (const rule of (tf.logic ?? [])) {
+    const sourceKey = refToKey[rule.ref];
+    if (!sourceKey) continue;
+    for (const action of (rule.actions ?? [])) {
+      if (action.action !== 'jump') continue;
+      const targetKey = refToKey[action.details?.to?.value] || action.details?.to?.value;
+      if (!targetKey) continue;
+      const cond = action.condition;
+      const op = cond?.op || 'always';
+      if (op === 'always') continue;
+      const condVar = cond?.vars?.[0];
+      const condVal = cond?.vars?.[1];
+      const condFieldKey = refToKey[condVar?.value] || condVar?.value || sourceKey;
+      let condValue = '';
+      if (condVal?.type === 'choice') condValue = refToChoiceLabel[condVal.value] || condVal.value;
+      else condValue = String(condVal?.value ?? '');
+      branchRules.push({
+        ruleLabel: `Show ${targetKey} if ${condFieldKey} ${op} ${condValue}`,
+        targetFieldKey: targetKey,
+        action: 'show',
+        conditions: [{ conditionFieldKey: condFieldKey, operator: tfOpToOperator_fb(op), value: condValue }],
+      });
+    }
+  }
+  return { name: tf.title || 'Imported Form', sections: [{ title: 'Imported from Typeform', items }], branchRules, variables: vars };
+}
+
 async function requirePlatformAdmin(ctx: { user: { id: number; role: string } }) {
   const roles = await getUserRoles(ctx.user.id);
   if (ctx.user.role !== "admin" && !roles.includes("platform_admin")) {
@@ -755,6 +850,58 @@ export const formBuilderRouter = router({
       await requirePlatformAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+
+      // ── Typeform fast-path ────────────────────────────────────────────────────
+      const tfId = extractTypeformId_fb(input.url);
+      if (tfId) {
+        let tfParsed: Awaited<ReturnType<typeof fetchAndParseTypeform_fb>>;
+        try { tfParsed = await fetchAndParseTypeform_fb(tfId); }
+        catch (e: any) { throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Typeform API error: ${(e as Error).message}` }); }
+        const formName = input.formName || tfParsed.name;
+        const [newForm] = await db.insert(accreditationFormTemplates).values({
+          name: formName, description: '', status: 'draft', isPublic: false,
+          scoreEnabled: Object.keys(tfParsed.variables).length > 0,
+          createdByUserId: ctx.user.id,
+        });
+        const newId = (newForm as any).insertId;
+        const fieldKeyToItemId: Record<string, number> = {};
+        let sortOrder = 0;
+        for (const section of tfParsed.sections) {
+          const [ns] = await db.insert(accreditationFormSections).values({ templateId: newId, title: section.title, sortOrder: sortOrder++ });
+          const sectionId = (ns as any).insertId;
+          let itemOrder = 0;
+          for (const item of section.items) {
+            const [ni] = await db.insert(accreditationFormItems).values({
+              templateId: newId, sectionId,
+              itemType: item.itemType || 'text',
+              label: item.label || 'Field',
+              helpText: item.helpText || null,
+              isRequired: item.isRequired ?? false,
+              scoreWeight: item.scoreWeight ?? 0,
+              sortOrder: itemOrder++,
+            });
+            const itemId = (ni as any).insertId;
+            if (item.field_key) fieldKeyToItemId[item.field_key] = itemId;
+            if (item.options?.length > 0) {
+              let optOrder = 0;
+              for (const opt of item.options) {
+                await db.insert(accreditationFormOptions).values({ itemId, label: opt.label, value: opt.value, qualityScore: 0, sortOrder: optOrder++ });
+              }
+            }
+          }
+        }
+        let branchOrder = 0;
+        for (const rule of tfParsed.branchRules) {
+          const targetId = fieldKeyToItemId[rule.targetFieldKey];
+          if (!targetId) continue;
+          const conditions = (rule.conditions ?? []).map((c: any) => ({ conditionItemId: fieldKeyToItemId[c.conditionFieldKey] ?? 0, operator: c.operator || 'equals', value: c.value || '' })).filter((c: any) => c.conditionItemId !== 0);
+          if (conditions.length === 0) continue;
+          await db.insert(accreditationFormBranchRules).values({ templateId: newId, ruleLabel: rule.ruleLabel || '', targetItemId: targetId, action: rule.action || 'show', logicOperator: 'any', conditions: JSON.stringify(conditions), sortOrder: branchOrder++, isEnabled: true });
+        }
+        return { id: newId, name: formName };
+      }
+
+      // ── Generic HTML scrape path ─────────────────────────────────────────────
       let pageText = '';
       try {
         const res = await fetch(input.url, {

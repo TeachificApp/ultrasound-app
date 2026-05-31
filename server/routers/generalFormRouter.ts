@@ -56,6 +56,190 @@ function generateSlug(name: string): string {
     + "-" + Math.random().toString(36).substring(2, 7);
 }
 
+// ─── Typeform URL detector & API importer ────────────────────────────────────
+function extractTypeformId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    // Matches: typeform.com/to/FORMID or *.typeform.com/to/FORMID
+    const m = u.pathname.match(/\/to\/([A-Za-z0-9]+)/);
+    if (m && (u.hostname.endsWith('typeform.com'))) return m[1];
+  } catch {}
+  return null;
+}
+
+/** Map Typeform field type → internal itemType */
+function tfTypeToItemType(type: string): string {
+  const map: Record<string, string> = {
+    short_text: 'short_text', long_text: 'long_text', email: 'email', phone_number: 'phone',
+    number: 'number', multiple_choice: 'radio', picture_choice: 'radio', dropdown: 'dropdown',
+    date: 'date', file_upload: 'file', signature: 'signature', opinion_scale: 'scale',
+    rating: 'scale', yes_no: 'radio', statement: 'heading', group: 'heading',
+    website: 'short_text', payment: 'number',
+  };
+  return map[type] || 'short_text';
+}
+
+/** Map Typeform op → internal operator */
+function tfOpToOperator(op: string): string {
+  const map: Record<string, string> = {
+    is: 'equals', is_not: 'not_equals', contains: 'contains', not_contains: 'not_contains',
+    lower_than: 'less_than', greater_than: 'greater_than',
+    lower_equal_than: 'less_than', greater_equal_than: 'greater_than',
+    equal: 'equals', not_equal: 'not_equals', always: 'always',
+  };
+  return map[op] || 'equals';
+}
+
+interface TFParsed {
+  name: string;
+  description: string;
+  sections: Array<{ title: string; items: any[] }>;
+  branchRules: any[];
+  variables: Record<string, number>;
+}
+
+async function fetchAndParseTypeform(formId: string): Promise<TFParsed> {
+  const resp = await fetch(`https://api.typeform.com/forms/${formId}`, {
+    headers: { 'Accept': 'application/json' },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!resp.ok) throw new Error(`Typeform API returned ${resp.status}`);
+  const tf = await resp.json() as any;
+
+  // Build a ref→field_key map (use ref as field_key)
+  const refToKey: Record<string, string> = {};
+  const refToChoiceLabel: Record<string, string> = {};
+  for (const f of (tf.fields ?? [])) {
+    refToKey[f.ref] = f.ref;
+    refToKey[f.id] = f.ref; // also map by id
+    for (const c of (f.properties?.choices ?? [])) {
+      refToChoiceLabel[c.ref] = c.label;
+    }
+  }
+
+  // Convert fields to items
+  const items: any[] = [];
+  for (const f of (tf.fields ?? [])) {
+    const itemType = tfTypeToItemType(f.type);
+    const options = (f.properties?.choices ?? []).map((c: any) => ({
+      label: c.label, value: c.ref, scoreValue: 0,
+    }));
+    // yes_no special case
+    if (f.type === 'yes_no') {
+      options.push({ label: 'Yes', value: 'yes', scoreValue: 0 });
+      options.push({ label: 'No', value: 'no', scoreValue: 0 });
+    }
+    items.push({
+      field_key: f.ref,
+      itemType,
+      label: f.title || f.ref,
+      placeholder: f.properties?.placeholder || '',
+      helpText: f.properties?.description || '',
+      isRequired: f.validations?.required ?? false,
+      scoreWeight: 0,
+      minValue: f.validations?.min_value ?? null,
+      maxValue: f.validations?.max_value ?? null,
+      extraConfig: '',
+      emailRoutingRules: '',
+      options,
+    });
+  }
+
+  // Add variable summary as a paragraph block if variables exist
+  const vars = tf.variables ?? {};
+  const varNames = Object.keys(vars);
+  if (varNames.length > 0) {
+    const formulaDesc = varNames.map(v => `${v} (starts at ${vars[v]})`).join(', ');
+    items.push({
+      field_key: '__variables__',
+      itemType: 'paragraph',
+      label: 'Score Variables',
+      placeholder: '', helpText: '', isRequired: false, scoreWeight: 0, minValue: null, maxValue: null,
+      extraConfig: JSON.stringify({ formula: varNames.join(' + '), description: `Calculated variables: ${formulaDesc}` }),
+      emailRoutingRules: '',
+      options: [],
+    });
+  }
+
+  // Convert logic to branchRules
+  const branchRules: any[] = [];
+  for (const rule of (tf.logic ?? [])) {
+    const sourceKey = refToKey[rule.ref];
+    if (!sourceKey) continue;
+    for (const action of (rule.actions ?? [])) {
+      if (action.action === 'jump') {
+        const targetKey = refToKey[action.details?.to?.value] || action.details?.to?.value;
+        if (!targetKey) continue;
+        const cond = action.condition;
+        const op = cond?.op || 'always';
+        if (op === 'always') {
+          // unconditional jump — skip_to with no condition (use a dummy always condition)
+          branchRules.push({
+            ruleLabel: `Skip from ${sourceKey} to ${targetKey}`,
+            targetFieldKey: targetKey,
+            targetType: 'item',
+            action: 'skip_to',
+            setValue: '',
+            logicOperator: 'any',
+            conditions: [{ conditionFieldKey: sourceKey, operator: 'is_not_empty', value: '' }],
+          });
+        } else {
+          const condVar = cond?.vars?.[0];
+          const condVal = cond?.vars?.[1];
+          const condFieldKey = refToKey[condVar?.value] || condVar?.value || sourceKey;
+          let condValue = '';
+          if (condVal?.type === 'choice') condValue = refToChoiceLabel[condVal.value] || condVal.value;
+          else if (condVal?.type === 'constant') condValue = String(condVal.value);
+          else condValue = String(condVal?.value ?? '');
+          branchRules.push({
+            ruleLabel: `Jump to ${targetKey} if ${condFieldKey} ${op} ${condValue}`,
+            targetFieldKey: targetKey,
+            targetType: 'item',
+            action: 'skip_to',
+            setValue: '',
+            logicOperator: 'any',
+            conditions: [{ conditionFieldKey: condFieldKey, operator: tfOpToOperator(op), value: condValue }],
+          });
+        }
+      } else if (['add', 'subtract', 'multiply', 'divide', 'set'].includes(action.action)) {
+        // Calculator action — store as extraConfig on a variable paragraph item
+        const targetVar = action.details?.target?.value;
+        const valType = action.details?.value?.type;
+        const valVal = action.details?.value?.value;
+        const valFieldKey = valType === 'field' ? (refToKey[valVal] || valVal) : null;
+        const formulaStr = valType === 'constant' ? `${action.action}(${targetVar}, ${valVal})` : `${action.action}(${targetVar}, field:${valFieldKey})`;
+        // Find or create a paragraph item for this variable
+        const existingVarItem = items.find(i => i.field_key === `__calc_${targetVar}__`);
+        if (existingVarItem) {
+          try {
+            const ec = JSON.parse(existingVarItem.extraConfig || '{}');
+            ec.formula = (ec.formula ? ec.formula + '; ' : '') + formulaStr;
+            existingVarItem.extraConfig = JSON.stringify(ec);
+          } catch {}
+        } else {
+          items.push({
+            field_key: `__calc_${targetVar}__`,
+            itemType: 'paragraph',
+            label: `Calculation: ${targetVar}`,
+            placeholder: '', helpText: '', isRequired: false, scoreWeight: 0, minValue: null, maxValue: null,
+            extraConfig: JSON.stringify({ formula: formulaStr, description: `Variable ${targetVar} calculation` }),
+            emailRoutingRules: '',
+            options: [],
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    name: tf.title || 'Imported Form',
+    description: tf.settings?.meta?.description || '',
+    sections: [{ title: 'Imported from Typeform', items }],
+    branchRules,
+    variables: vars,
+  };
+}
+
 // ─── Full form fetch helper ───────────────────────────────────────────────────
 async function getFullForm(db: any, templateId: number) {
   const [template] = await db.select().from(generalFormTemplates).where(eq(generalFormTemplates.id, templateId)).limit(1);
@@ -282,6 +466,82 @@ export const generalFormRouter = router({
       await requireAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // ── Typeform fast-path: use public API instead of scraping ──────────────
+      const typeformId = extractTypeformId(input.url);
+      if (typeformId) {
+        let tfParsed: TFParsed;
+        try {
+          tfParsed = await fetchAndParseTypeform(typeformId);
+        } catch (e: any) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Typeform API error: ${e.message}` });
+        }
+        const formName = input.formName || tfParsed.name;
+        const slug = generateSlug(formName);
+        const [newTpl] = await db.insert(generalFormTemplates).values({
+          name: formName, description: tfParsed.description ?? null, formType: "general", status: "draft",
+          publicSlug: slug, isPublic: false, scoreEnabled: Object.keys(tfParsed.variables).length > 0,
+          importedFromUrl: input.url, createdByUserId: ctx.user.id,
+        });
+        const newId = (newTpl as any).insertId;
+        const fieldKeyToItemId: Record<string, number> = {};
+        let sortOrder = 0;
+        for (const section of tfParsed.sections) {
+          const [ns] = await db.insert(generalFormSections).values({ templateId: newId, title: section.title, sortOrder: sortOrder++ });
+          const sectionId = (ns as any).insertId;
+          let itemOrder = 0;
+          for (const item of section.items) {
+            const [ni] = await db.insert(generalFormItems).values({
+              templateId: newId, sectionId,
+              itemType: item.itemType || "short_text",
+              label: item.label || "Field",
+              placeholder: item.placeholder || null,
+              helpText: item.helpText || null,
+              isRequired: item.isRequired ?? false,
+              scoreWeight: item.scoreWeight ?? 0,
+              minValue: item.minValue ?? null,
+              maxValue: item.maxValue ?? null,
+              extraConfig: item.extraConfig && item.extraConfig !== "" ? item.extraConfig : null,
+              richTextContent: item.itemType === "paragraph" && item.extraConfig
+                ? `<p><em>${(() => { try { const ec = JSON.parse(item.extraConfig); return ec.description || ec.formula || ""; } catch { return ""; } })()}</em></p>`
+                : null,
+              sortOrder: itemOrder++,
+            });
+            const itemId = (ni as any).insertId;
+            if (item.field_key) fieldKeyToItemId[item.field_key] = itemId;
+            if (item.options?.length > 0) {
+              let optOrder = 0;
+              for (const opt of item.options) {
+                await db.insert(generalFormOptions).values({ itemId, label: opt.label, value: opt.value, scoreValue: opt.scoreValue ?? 0, sortOrder: optOrder++ });
+              }
+            }
+          }
+        }
+        // Insert branch rules
+        let branchOrder = 0;
+        for (const rule of tfParsed.branchRules) {
+          const targetId = fieldKeyToItemId[rule.targetFieldKey];
+          if (!targetId) continue;
+          const conditions = (rule.conditions ?? []).map((c: any) => ({
+            fieldId: String(fieldKeyToItemId[c.conditionFieldKey] ?? 0),
+            operator: c.operator || "equals",
+            value: c.value || "",
+          })).filter((c: any) => c.fieldId !== "0");
+          if (conditions.length === 0) continue;
+          await db.insert(generalFormBranchRules).values({
+            templateId: newId, ruleLabel: rule.ruleLabel || "",
+            targetType: "item", targetId,
+            action: rule.action || "skip_to",
+            setValue: rule.setValue || "",
+            logicOperator: rule.logicOperator || "any",
+            conditions: JSON.stringify(conditions),
+            sortOrder: branchOrder++, isEnabled: true,
+          });
+        }
+        return { id: newId, name: formName };
+      }
+
+      // ── Generic HTML scrape path ─────────────────────────────────────────────
       // Fetch page content — preserve structural HTML hints before stripping
       let pageText = "";
       try {
@@ -445,6 +705,56 @@ ${pageText}`;
       await requireAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // ── Typeform fast-path ─────────────────────────────────────────────────────
+      const typeformIdAppend = extractTypeformId(input.url);
+      if (typeformIdAppend) {
+        let tfParsed: TFParsed;
+        try { tfParsed = await fetchAndParseTypeform(typeformIdAppend); }
+        catch (e: any) { throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Typeform API error: ${e.message}` }); }
+        const fieldKeyToItemId: Record<string, number> = {};
+        let sortOrder = 0;
+        for (const section of tfParsed.sections) {
+          const [ns] = await db.insert(generalFormSections).values({ templateId: input.templateId, title: section.title, sortOrder: sortOrder++ });
+          const sectionId = (ns as any).insertId;
+          let itemOrder = 0;
+          for (const item of section.items) {
+            const [ni] = await db.insert(generalFormItems).values({
+              templateId: input.templateId, sectionId,
+              itemType: item.itemType || "short_text",
+              label: item.label || "Field",
+              placeholder: item.placeholder || null,
+              helpText: item.helpText || null,
+              isRequired: item.isRequired ?? false,
+              scoreWeight: item.scoreWeight ?? 0,
+              minValue: item.minValue ?? null, maxValue: item.maxValue ?? null,
+              extraConfig: item.extraConfig && item.extraConfig !== "" ? item.extraConfig : null,
+              richTextContent: item.itemType === "paragraph" && item.extraConfig
+                ? `<p><em>${(() => { try { const ec = JSON.parse(item.extraConfig); return ec.description || ec.formula || ""; } catch { return ""; } })()}</em></p>` : null,
+              sortOrder: itemOrder++,
+            });
+            const itemId = (ni as any).insertId;
+            if (item.field_key) fieldKeyToItemId[item.field_key] = itemId;
+            if (item.options?.length > 0) {
+              let optOrder = 0;
+              for (const opt of item.options) {
+                await db.insert(generalFormOptions).values({ itemId, label: opt.label, value: opt.value, scoreValue: opt.scoreValue ?? 0, sortOrder: optOrder++ });
+              }
+            }
+          }
+        }
+        let branchOrder = 0;
+        for (const rule of tfParsed.branchRules) {
+          const targetId = fieldKeyToItemId[rule.targetFieldKey];
+          if (!targetId) continue;
+          const conditions = (rule.conditions ?? []).map((c: any) => ({ fieldId: String(fieldKeyToItemId[c.conditionFieldKey] ?? 0), operator: c.operator || "equals", value: c.value || "" })).filter((c: any) => c.fieldId !== "0");
+          if (conditions.length === 0) continue;
+          await db.insert(generalFormBranchRules).values({ templateId: input.templateId, ruleLabel: rule.ruleLabel || "", targetType: "item", targetId, action: rule.action || "skip_to", setValue: rule.setValue || "", logicOperator: rule.logicOperator || "any", conditions: JSON.stringify(conditions), sortOrder: branchOrder++, isEnabled: true });
+        }
+        return { added: tfParsed.sections.reduce((acc, s) => acc + s.items.length, 0) };
+      }
+
+      // ── Generic HTML scrape path ────────────────────────────────────────────────
       // Fetch page content — preserve structural hints
       let pageText = "";
       try {
