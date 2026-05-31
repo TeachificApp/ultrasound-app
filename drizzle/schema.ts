@@ -4601,8 +4601,14 @@ export const communities = mysqlTable("communities", {
   coverImage: text("cover_image"),
   logoImage: text("logo_image"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
-  privacy: mysqlEnum("privacy", ["public", "private", "paid"]).default("public").notNull(),
-  accessType: mysqlEnum("access_type", ["free", "paid", "restricted"]).default("free").notNull(),
+  privacy: mysqlEnum("privacy", ["public", "private", "paid", "invite_only", "course_gated"]).default("public").notNull(),
+  accessType: mysqlEnum("access_type", ["free", "paid", "restricted", "invite_only", "course_gated"]).default("free").notNull(),
+  /** Thinkific source: 'thinkific_community' | 'thinkific_space' | null for native */
+  thinkificSourceType: mysqlEnum("thinkific_source_type", ["thinkific_community", "thinkific_space"]),
+  /** Thinkific community ID this was imported from */
+  thinkificCommunityId: varchar("thinkific_community_id", { length: 64 }),
+  /** Thinkific space ID (when sourceType = thinkific_space) */
+  thinkificSpaceId: varchar("thinkific_space_id", { length: 64 }),
   pricingOptions: longtext("pricing_options"),
   landingPageBlocks: longtext("landing_page_blocks"),
   pageBlocks: longtext("page_blocks"),
@@ -5517,3 +5523,88 @@ export const leadCaptureWidgets = mysqlTable("leadCaptureWidgets", {
 });
 export type LeadCaptureWidget = typeof leadCaptureWidgets.$inferSelect;
 export type InsertLeadCaptureWidget = typeof leadCaptureWidgets.$inferInsert;
+
+
+// ─── Thinkific Community Sync ──────────────────────────────────────────────────
+
+/**
+ * Thinkific sync metadata on the communities table is added via migration SQL.
+ * This table tracks per-community sync state for the Thinkific GraphQL import.
+ */
+export const thinkificCommunitySyncState = mysqlTable("thinkific_community_sync_state", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Local community ID this sync state belongs to */
+  communityId: int("community_id").notNull().unique(),
+  /** Thinkific community ID (numeric string, e.g. "1200") */
+  thinkificCommunityId: varchar("thinkific_community_id", { length: 64 }),
+  /** Thinkific space ID — set when this community was created from a Thinkific space */
+  thinkificSpaceId: varchar("thinkific_space_id", { length: 64 }),
+  /** GraphQL cursor for the next page of posts to fetch */
+  syncCursor: varchar("sync_cursor", { length: 255 }),
+  /** Whether ongoing sync is enabled */
+  syncEnabled: boolean("sync_enabled").default(true).notNull(),
+  /** Timestamp of last successful sync */
+  lastSyncedAt: bigint("last_synced_at", { mode: "number" }),
+  /** Total posts synced from Thinkific */
+  totalPostsSynced: int("total_posts_synced").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type ThinkificCommunitySyncState = typeof thinkificCommunitySyncState.$inferSelect;
+
+/**
+ * Links a community to one or more LMS courses for enrollment-gated access.
+ * Users enrolled in any linked course automatically gain community access.
+ */
+export const communityCourseLinkages = mysqlTable("community_course_linkages", {
+  id: int("id").autoincrement().primaryKey(),
+  communityId: int("community_id").notNull(),
+  /** LMS course ID from the lmsCourses table */
+  lmsCourseId: int("lms_course_id").notNull(),
+  /** Thinkific course ID for cross-referencing enrollment data */
+  thinkificCourseId: varchar("thinkific_course_id", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityCourseLinkage = typeof communityCourseLinkages.$inferSelect;
+
+/**
+ * Invite tokens for private/invite-only communities.
+ */
+export const communityInvites = mysqlTable("community_invites", {
+  id: int("id").autoincrement().primaryKey(),
+  communityId: int("community_id").notNull(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  /** Email this invite was sent to (optional — null = generic link) */
+  email: varchar("email", { length: 255 }),
+  /** User who accepted the invite */
+  usedByUserId: int("used_by_user_id"),
+  usedAt: bigint("used_at", { mode: "number" }),
+  /** Unix ms expiry — null = never expires */
+  expiresAt: bigint("expires_at", { mode: "number" }),
+  /** Max number of uses — null = unlimited */
+  maxUses: int("max_uses"),
+  useCount: int("use_count").default(0).notNull(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityInvite = typeof communityInvites.$inferSelect;
+
+/**
+ * Tracks which Thinkific post IDs have been imported so we can upsert without duplicates.
+ */
+export const thinkificPostImports = mysqlTable("thinkific_post_imports", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Thinkific post ID (string from GraphQL) */
+  thinkificPostId: varchar("thinkific_post_id", { length: 64 }).notNull().unique(),
+  /** Local community post ID */
+  localPostId: int("local_post_id").notNull(),
+  /** Local community ID */
+  communityId: int("community_id").notNull(),
+  /** Thinkific depth: 0=post, 1=reply, 2=reply-to-reply */
+  depth: int("depth").default(0).notNull(),
+  /** For replies: the local post ID of the parent */
+  parentLocalPostId: int("parent_local_post_id"),
+  importedAt: timestamp("imported_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type ThinkificPostImport = typeof thinkificPostImports.$inferSelect;

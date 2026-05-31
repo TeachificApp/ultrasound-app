@@ -716,6 +716,8 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
               <OpenTemplateLibraryButton />
             </div>
           )}
+          {/* Canvas + Settings row */}
+          <div className="flex flex-1 overflow-hidden">
           {/* Left: Canvas */}
           <div ref={canvasRef} className="flex-1 overflow-y-auto bg-gray-50 p-4">
             {/* Blocks canvas */}
@@ -853,6 +855,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
               </div>
             </div>
           )}
+          </div>{/* end canvas+settings row */}
         </div>
       </div>
     </div>

@@ -36,6 +36,7 @@ import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
 import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
+import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -221,6 +222,8 @@ async function startServer() {
   registerAutoLoginRoute(app);
   // Google OAuth2 routes for per-form Google Sheets integration
   registerGoogleOAuthRoutes(app);
+  // Heartbeat: Thinkific community sync (every 6 hours)
+  app.post("/api/scheduled/thinkific-community-sync", thinkificCommunitySyncHandler);
   // Public REST API: GET /api/forms/:formId/submissions (auth via Bearer apiToken)
   app.get("/api/forms/:formId/submissions", async (req: any, res: any) => {
     try {

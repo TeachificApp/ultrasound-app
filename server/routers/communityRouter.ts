@@ -39,6 +39,9 @@ import {
   communityAdminProfiles,
   lmsEnrollments,
   lmsCourses,
+  communityCourseLinkages,
+  communityInvites,
+  thinkificCommunitySyncState,
 } from "../../drizzle/schema";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -244,6 +247,22 @@ const communityMemberRouter = router({
     const [c] = await db.select().from(communities).where(eq(communities.id, input.communityId)).limit(1);
     if (!c || c.status !== "published") throw new TRPCError({ code: "NOT_FOUND" });
     if (c.accessType === "paid") throw new TRPCError({ code: "FORBIDDEN", message: "This community requires a paid membership." });
+    // Course-gated: check if user is enrolled in any linked course
+    if (c.accessType === "course_gated") {
+      const linkages = await db.select({ lmsCourseId: communityCourseLinkages.lmsCourseId })
+        .from(communityCourseLinkages).where(eq(communityCourseLinkages.communityId, c.id));
+      const courseIds = linkages.map(l => l.lmsCourseId);
+      if (courseIds.length > 0) {
+        const enrollment = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), inArray(lmsEnrollments.courseId, courseIds), eq(lmsEnrollments.status, "active")))
+          .limit(1);
+        if (!enrollment.length) throw new TRPCError({ code: "FORBIDDEN", message: "You must be enrolled in a linked course to join this community." });
+      }
+    }
+    // Invite-only: must use the joinWithInvite procedure
+    if (c.accessType === "invite_only") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "This community is invite-only. Please use an invite link to join." });
+    }
     // Restricted communities: set memberStatus to pending for admin approval
     const memberStatus = c.accessType === "restricted" ? "pending" : "approved";
     await db.insert(communityMembers).values({
@@ -251,6 +270,47 @@ const communityMemberRouter = router({
     }).onDuplicateKeyUpdate({ set: { role: "member" } });
     if (memberStatus === "approved") await awardXP(db, ctx.user.id, "join", 5);
     return { success: true, pending: memberStatus === "pending" };
+  }),
+
+  /** Join a community via invite token */
+  joinWithInvite: protectedProcedure.input(z.object({ token: z.string() })).mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [invite] = await db.select().from(communityInvites).where(eq(communityInvites.token, input.token)).limit(1);
+    if (!invite) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid invite link." });
+    if (invite.expiresAt && invite.expiresAt < Date.now()) throw new TRPCError({ code: "FORBIDDEN", message: "This invite link has expired." });
+    if (invite.maxUses && invite.useCount >= invite.maxUses) throw new TRPCError({ code: "FORBIDDEN", message: "This invite link has reached its maximum uses." });
+    if (invite.email && invite.email.toLowerCase() !== ctx.user.email?.toLowerCase()) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "This invite is for a different email address." });
+    }
+    const [c] = await db.select().from(communities).where(eq(communities.id, invite.communityId)).limit(1);
+    if (!c || c.status !== "published") throw new TRPCError({ code: "NOT_FOUND" });
+    await db.insert(communityMembers).values({
+      communityId: invite.communityId, userId: ctx.user.id, role: "member", memberStatus: "approved",
+    }).onDuplicateKeyUpdate({ set: { role: "member", memberStatus: "approved" } });
+    await db.update(communityInvites).set({
+      useCount: invite.useCount + 1,
+      usedByUserId: invite.usedByUserId ?? ctx.user.id,
+      usedAt: invite.usedAt ?? Date.now(),
+    }).where(eq(communityInvites.id, invite.id));
+    await awardXP(db, ctx.user.id, "join", 5);
+    return { success: true, communitySlug: c.slug };
+  }),
+
+  /** Check if user has access to a course-gated community */
+  checkCourseAccess: protectedProcedure.input(z.object({ communityId: z.number() })).query(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) return { hasAccess: false, linkedCourses: [] };
+    const linkages = await db.select({ lmsCourseId: communityCourseLinkages.lmsCourseId })
+      .from(communityCourseLinkages).where(eq(communityCourseLinkages.communityId, input.communityId));
+    const courseIds = linkages.map(l => l.lmsCourseId);
+    if (!courseIds.length) return { hasAccess: false, linkedCourses: [] };
+    const courses = await db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug })
+      .from(lmsCourses).where(inArray(lmsCourses.id, courseIds));
+    const enrollment = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+      .where(and(eq(lmsEnrollments.userId, ctx.user.id), inArray(lmsEnrollments.courseId, courseIds), eq(lmsEnrollments.status, "active")))
+      .limit(1);
+    return { hasAccess: enrollment.length > 0, linkedCourses: courses };
   }),
 
   /** Leave a community */
@@ -779,8 +839,8 @@ const communityAdminRouter = router({
     slug: z.string().min(1).max(255),
     description: z.string().optional(),
     brand: z.enum(["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound"),
-    privacy: z.enum(["public", "private", "paid"]).default("public"),
-    accessType: z.enum(["free", "paid", "restricted"]).default("free"),
+    privacy: z.enum(["public", "private", "paid", "invite_only", "course_gated"]).default("public"),
+    accessType: z.enum(["free", "paid", "restricted", "invite_only", "course_gated"]).default("free"),
     accentColor: z.string().default("#189aa1"),
     coverImage: z.string().optional(),
     logoImage: z.string().optional(),
@@ -805,8 +865,8 @@ const communityAdminRouter = router({
     title: z.string().min(1).max(255).optional(),
     description: z.string().optional(),
     status: z.enum(["draft", "published"]).optional(),
-    privacy: z.enum(["public", "private", "paid"]).optional(),
-    accessType: z.enum(["free", "paid", "restricted"]).optional(),
+    privacy: z.enum(["public", "private", "paid", "invite_only", "course_gated"]).optional(),
+    accessType: z.enum(["free", "paid", "restricted", "invite_only", "course_gated"]).optional(),
     accentColor: z.string().optional(),
     coverImage: z.string().optional(),
     logoImage: z.string().optional(),
@@ -1427,6 +1487,149 @@ const communityAdminRouter = router({
     const field = input.pageType === "landing" ? { landingPageBlocks: input.blocks } : { pageBlocks: input.blocks };
     await db.update(communities).set(field).where(eq(communities.id, input.communityId));
     return { success: true };
+  }),
+
+  // ─── Course Linkage ────────────────────────────────────────────────────────
+
+  /** List courses linked to a community for enrollment-gated access */
+  listCourseLinkages: protectedProcedure.input(z.object({ communityId: z.number() })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db.select({
+      id: communityCourseLinkages.id,
+      communityId: communityCourseLinkages.communityId,
+      lmsCourseId: communityCourseLinkages.lmsCourseId,
+      thinkificCourseId: communityCourseLinkages.thinkificCourseId,
+      courseTitle: lmsCourses.title,
+      courseSlug: lmsCourses.slug,
+    }).from(communityCourseLinkages)
+      .leftJoin(lmsCourses, eq(communityCourseLinkages.lmsCourseId, lmsCourses.id))
+      .where(eq(communityCourseLinkages.communityId, input.communityId));
+    return rows;
+  }),
+
+  /** Link a course to a community for enrollment-gated access */
+  addCourseLinkage: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    lmsCourseId: z.number(),
+    thinkificCourseId: z.string().optional(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.insert(communityCourseLinkages).values({
+      communityId: input.communityId,
+      lmsCourseId: input.lmsCourseId,
+      thinkificCourseId: input.thinkificCourseId,
+    }).onDuplicateKeyUpdate({ set: { thinkificCourseId: input.thinkificCourseId } });
+    return { success: true };
+  }),
+
+  /** Remove a course linkage */
+  removeCourseLinkage: protectedProcedure.input(z.object({ linkageId: z.number() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.delete(communityCourseLinkages).where(eq(communityCourseLinkages.id, input.linkageId));
+    return { success: true };
+  }),
+
+  // ─── Invite Management ───────────────────────────────────────────────────────
+
+  /** List invite links for a community */
+  listInvites: protectedProcedure.input(z.object({ communityId: z.number() })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(communityInvites)
+      .where(eq(communityInvites.communityId, input.communityId))
+      .orderBy(desc(communityInvites.createdAt));
+  }),
+
+  /** Create an invite link */
+  createInvite: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    email: z.string().email().optional(),
+    expiresInDays: z.number().min(1).max(365).optional(),
+    maxUses: z.number().min(1).optional(),
+    origin: z.string().optional(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const token = randomBytes(24).toString("hex");
+    const expiresAt = input.expiresInDays ? Date.now() + input.expiresInDays * 86400000 : null;
+    await db.insert(communityInvites).values({
+      communityId: input.communityId,
+      token,
+      email: input.email,
+      expiresAt: expiresAt ?? undefined,
+      maxUses: input.maxUses,
+      createdByUserId: ctx.user.id,
+    });
+    const origin = input.origin ?? "";
+    return { token, inviteUrl: `${origin}/community/join/${token}` };
+  }),
+
+  /** Revoke (delete) an invite link */
+  revokeInvite: protectedProcedure.input(z.object({ inviteId: z.number() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.delete(communityInvites).where(eq(communityInvites.id, input.inviteId));
+    return { success: true };
+  }),
+
+  // ─── Thinkific Sync ──────────────────────────────────────────────────────────
+
+  /** Get sync state for a community */
+  getSyncState: protectedProcedure.input(z.object({ communityId: z.number() })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return null;
+    const [row] = await db.select().from(thinkificCommunitySyncState)
+      .where(eq(thinkificCommunitySyncState.communityId, input.communityId)).limit(1);
+    return row ?? null;
+  }),
+
+  /** Toggle sync enabled/disabled for a community */
+  setSyncEnabled: protectedProcedure.input(z.object({ communityId: z.number(), enabled: z.boolean() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.update(thinkificCommunitySyncState)
+      .set({ syncEnabled: input.enabled })
+      .where(eq(thinkificCommunitySyncState.communityId, input.communityId));
+    return { success: true };
+  }),
+
+  /** Trigger an immediate sync for a community */
+  triggerSync: protectedProcedure.input(z.object({ communityId: z.number() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [syncRow] = await db.select().from(thinkificCommunitySyncState)
+      .where(eq(thinkificCommunitySyncState.communityId, input.communityId)).limit(1);
+    if (!syncRow) throw new TRPCError({ code: "NOT_FOUND", message: "No sync state found for this community." });
+    // Fire and forget — sync runs in background
+    import("../services/thinkificCommunitySync").then(({ syncThinkificCommunity }) => {
+      syncThinkificCommunity(
+        input.communityId,
+        syncRow.thinkificCommunityId ?? "",
+        syncRow.thinkificSpaceId ?? undefined
+      ).catch(console.error);
+    }).catch(console.error);
+    return { success: true, message: "Sync started in background." };
+  }),
+
+  /** Trigger a full sync of all Thinkific communities */
+  triggerFullSync: protectedProcedure.mutation(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    import("../services/thinkificCommunitySync").then(({ syncAllThinkificCommunities }) => {
+      syncAllThinkificCommunities().catch(console.error);
+    }).catch(console.error);
+    return { success: true, message: "Full Thinkific community sync started in background." };
   }),
 
   /** AI: summarize recent posts in a channel */

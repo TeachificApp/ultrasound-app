@@ -4158,3 +4158,36 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add trim controls to lesson video player (LessonBlockEditor / lesson player component — uses shared BlockSettings from LandingPageBuilder)
 - [x] Wire trim into PublicFunnelPage.tsx video renderer
 - [x] Wire trim into CourseLanding.tsx video renderer
+
+## Thinkific Community Import & Sync (May 2026)
+- [ ] Audit existing community schema, router, and UI
+- [ ] Store THINKIFIC_GRAPHQL_JWT secret in env
+- [ ] Extend DB schema: communities table with accessType (public/private/course_gated/invite_only), thinkificCommunityId, thinkificSpaceId, sourceType (thinkific_community/thinkific_space), syncCursor, lastSyncedAt
+- [ ] Extend DB schema: communityCourseLinkages table (communityId → lmsCourseId)
+- [ ] Extend DB schema: communityInvites table (token, communityId, usedBy, expiresAt)
+- [ ] Extend DB schema: communityPosts table with thinkificPostId, communityId, spaceId, authorId, title, content, depth, type, replyCount, pinnedAt, thinkificCreatedAt
+- [ ] Extend DB schema: communityPostReplies table with thinkificReplyId, postId, authorId, content, depth, thinkificCreatedAt
+- [ ] Run DB migrations for all new tables
+- [ ] Build thinkificCommunitySync.ts service: GraphQL client, paginated post fetch, upsert logic
+- [ ] Map Thinkific spaces (Adult Echo Learning Hub, Fetal Echo Learning Hub) as standalone private communities
+- [ ] Map ACS Learning Hub as private community with course gating
+- [ ] Build communityRouter.ts: listCommunities (with access check), getCommunity, getPosts, getPost+replies, createPost, createReply
+- [ ] Build communityAdminRouter.ts: linkCommunityToCourse, createInvite, listInvites, revokeInvite, triggerSync, setSyncEnabled
+- [ ] Build community access middleware: check enrollment OR invite token for private communities
+- [ ] Build periodic sync heartbeat job for Thinkific community posts
+- [ ] Build Community list page (public + enrolled private communities)
+- [ ] Build Community detail page (posts feed with space filter tabs)
+- [ ] Build Post detail page (thread view with nested replies)
+- [ ] Build admin UI for community management (link to course, generate invite links, sync status)
+- [ ] Show private/locked badge on inaccessible communities
+- [ ] Show enrollment gate CTA when user lacks access
+- [ ] Show invite acceptance flow
+
+## Thinkific Lesson Discussion Import (added May 2026)
+- [ ] Probe Thinkific GraphQL schema for lesson/course discussion fields
+- [ ] Extend DB schema: lesson_discussions and lesson_discussion_replies tables linked to lms_lessons
+- [ ] Build thinkificLessonDiscussionSync.ts service with cursor-based pagination
+- [ ] Wire lesson discussion sync into the heartbeat handler (same 6h schedule)
+- [ ] Add tRPC procedures: getLessonDiscussions, postLessonDiscussion, replyToLessonDiscussion
+- [ ] Render lesson discussions in the lesson viewer UI (below video/content)
+- [ ] Admin UI: sync status for lesson discussions per course

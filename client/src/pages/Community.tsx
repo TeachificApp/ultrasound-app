@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, MessageSquare, TrendingUp, ChevronRight, Lock, Star, ArrowRight } from "lucide-react";
+import { Users, MessageSquare, TrendingUp, ChevronRight, Lock, Star, ArrowRight, BookOpen, Mail } from "lucide-react";
 
 export default function CommunityHub() {
   const { isAuthenticated, user } = useAuth();
@@ -76,39 +76,62 @@ export default function CommunityHub() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {communities.map((c) => (
-                <Link key={c.id} href={`/community/${c.slug}`}>
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer group">
-                    <CardContent className="p-0">
-                      {c.coverImage && (
-                        <div className="h-24 rounded-t-xl overflow-hidden">
-                          <img src={c.coverImage} alt={c.title} className="w-full h-full object-cover" />
-                        </div>
-                      )}
-                      <div className="p-5 flex items-start gap-4">
-                        {c.logoImage ? (
-                          <img src={c.logoImage} alt={c.title} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
-                        ) : (
-                          <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-bold text-lg"
-                            style={{ backgroundColor: c.accentColor || "#189aa1" }}>
-                            {c.title.charAt(0)}
+              {communities.map((c) => {
+                const isLocked = (c.accessType === "invite_only" || c.accessType === "course_gated") && !isAuthenticated;
+                const CardWrapper = isLocked ? "div" : Link;
+                const cardProps = isLocked ? {} : { href: `/community/${c.slug}` };
+                return (
+                  <CardWrapper key={c.id} {...(cardProps as any)}>
+                    <Card className={`transition-shadow ${isLocked ? "opacity-80" : "hover:shadow-md cursor-pointer group"}`}>
+                      <CardContent className="p-0">
+                        {c.coverImage && (
+                          <div className="h-24 rounded-t-xl overflow-hidden">
+                            <img src={c.coverImage} alt={c.title} className="w-full h-full object-cover" />
                           </div>
                         )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">{c.title}</h3>
-                            {c.privacy === "private" && <Badge variant="secondary" className="text-xs"><Lock className="w-3 h-3 mr-1" />Private</Badge>}
-                            {c.accessType === "paid" && <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200">Premium</Badge>}
-                            {c.brand === "iheartecho" && <Badge variant="outline" className="text-xs text-pink-600 border-pink-200">iHeartEcho™</Badge>}
+                        <div className="p-5 flex items-start gap-4">
+                          {c.logoImage ? (
+                            <img src={c.logoImage} alt={c.title} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-bold text-lg"
+                              style={{ backgroundColor: c.accentColor || "#189aa1" }}>
+                              {c.title.charAt(0)}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">{c.title}</h3>
+                              {c.accessType === "invite_only" && (
+                                <Badge variant="secondary" className="text-xs"><Mail className="w-3 h-3 mr-1" />Invite Only</Badge>
+                              )}
+                              {c.accessType === "course_gated" && (
+                                <Badge className="text-xs bg-blue-50 text-blue-700 border-blue-200"><BookOpen className="w-3 h-3 mr-1" />Course Access</Badge>
+                              )}
+                              {c.privacy === "private" && c.accessType !== "invite_only" && c.accessType !== "course_gated" && (
+                                <Badge variant="secondary" className="text-xs"><Lock className="w-3 h-3 mr-1" />Private</Badge>
+                              )}
+                              {c.accessType === "paid" && <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200">Premium</Badge>}
+                              {c.brand === "iheartecho" && <Badge variant="outline" className="text-xs text-pink-600 border-pink-200">iHeartEcho™</Badge>}
+                            </div>
+                            {c.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{c.description}</p>}
+                            {c.accessType === "invite_only" && !isAuthenticated && (
+                              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1"><Lock className="w-3 h-3" /> Requires an invite link to join</p>
+                            )}
+                            {c.accessType === "course_gated" && !isAuthenticated && (
+                              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1"><BookOpen className="w-3 h-3" /> Enroll in a linked course to access</p>
+                            )}
                           </div>
-                          {c.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{c.description}</p>}
+                          {isLocked ? (
+                            <Lock className="w-5 h-5 text-gray-300 flex-shrink-0 mt-1" />
+                          ) : (
+                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-500 flex-shrink-0 mt-1" />
+                          )}
                         </div>
-                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-500 flex-shrink-0 mt-1" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+                      </CardContent>
+                    </Card>
+                  </CardWrapper>
+                );
+              })}
             </div>
           )}
         </div>
