@@ -53,6 +53,8 @@ interface ThemeSettings {
   welcomeTextColor: string;
   welcomeButtonColor: string;
   welcomeButtonTextColor: string;
+  // Typeform page transition animation
+  pageAnimation: "fade" | "slideUp" | "slideDown" | "slideLeft" | "slideRight" | "bounce" | "zoom" | "none";
 }
 
 const DEFAULT_THEME: ThemeSettings = {
@@ -89,6 +91,8 @@ const DEFAULT_THEME: ThemeSettings = {
   welcomeTextColor: "#ffffff",
   welcomeButtonColor: "#ffffff",
   welcomeButtonTextColor: "#0e7490",
+  // Typeform page transition animation
+  pageAnimation: "slideUp",
 };
 
 function parseTheme(raw?: string | null): ThemeSettings {
@@ -346,6 +350,54 @@ function WelcomeScreen({ template, theme, onStart }: { template: any; theme: The
   );
 }
 
+// ─── Page animation helper ──────────────────────────────────────────────────
+type PageAnim = ThemeSettings["pageAnimation"];
+
+function getPageAnimStyle(anim: PageAnim, animating: boolean, direction: "forward" | "back"): React.CSSProperties {
+  const dur = "0.32s";
+  const ease = "cubic-bezier(0.22, 1, 0.36, 1)";
+  if (anim === "none") return {};
+  if (anim === "fade") return {
+    opacity: animating ? 0 : 1,
+    transition: `opacity ${dur} ${ease}`,
+  };
+  if (anim === "slideUp") return {
+    opacity: animating ? 0 : 1,
+    transform: animating ? (direction === "forward" ? "translateY(28px)" : "translateY(-28px)") : "translateY(0)",
+    transition: `opacity ${dur} ${ease}, transform ${dur} ${ease}`,
+  };
+  if (anim === "slideDown") return {
+    opacity: animating ? 0 : 1,
+    transform: animating ? (direction === "forward" ? "translateY(-28px)" : "translateY(28px)") : "translateY(0)",
+    transition: `opacity ${dur} ${ease}, transform ${dur} ${ease}`,
+  };
+  if (anim === "slideLeft") return {
+    opacity: animating ? 0 : 1,
+    transform: animating ? (direction === "forward" ? "translateX(40px)" : "translateX(-40px)") : "translateX(0)",
+    transition: `opacity ${dur} ${ease}, transform ${dur} ${ease}`,
+  };
+  if (anim === "slideRight") return {
+    opacity: animating ? 0 : 1,
+    transform: animating ? (direction === "forward" ? "translateX(-40px)" : "translateX(40px)") : "translateX(0)",
+    transition: `opacity ${dur} ${ease}, transform ${dur} ${ease}`,
+  };
+  if (anim === "zoom") return {
+    opacity: animating ? 0 : 1,
+    transform: animating ? (direction === "forward" ? "scale(0.88)" : "scale(1.08)") : "scale(1)",
+    transition: `opacity ${dur} ${ease}, transform ${dur} ${ease}`,
+  };
+  if (anim === "bounce") return {
+    opacity: animating ? 0 : 1,
+    transform: animating ? "translateY(20px)" : "translateY(0)",
+    transition: animating ? `opacity 0.18s ease, transform 0.18s ease` : `opacity 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)`,
+  };
+  // fallback
+  return {
+    opacity: animating ? 0 : 1,
+    transition: `opacity ${dur} ${ease}`,
+  };
+}
+
 // ─── Page-by-page renderer ────────────────────────────────────────────────────
 function PageByPageRenderer({
   template, items, sections, options, branchRules, theme, isEmbed, isPreview, onSubmit, submitting, globalError,
@@ -514,9 +566,7 @@ function PageByPageRenderer({
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 24px 100px", position: "relative", zIndex: 1 }}>
         <div style={{
           maxWidth: 640, width: "100%",
-          opacity: animating ? 0 : 1,
-          transform: animating ? (direction === "forward" ? "translateY(16px)" : "translateY(-16px)") : "translateY(0)",
-          transition: "opacity 0.18s ease, transform 0.18s ease",
+          ...getPageAnimStyle(theme.pageAnimation ?? "slideUp", animating, direction),
         }}>
           {/* Question number */}
           {currentQuestion && (

@@ -4078,3 +4078,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add hostDomain selector to form Settings tab (dropdown of available project domains)
 - [ ] Show live preview URL in Settings tab using selected domain + /forms/[slug]
 - [ ] Ensure PublicFormRenderer route /forms/:slug works on all configured domains
+
+## Typeform Page Animations (May 31, 2026)
+- [ ] Add pageAnimation field to ThemeSettings interface in PublicFormRenderer
+- [ ] Add animation CSS keyframes (fade, slideUp, slideOver, bounce, zoom) to PublicFormRenderer
+- [ ] Wire animation into PageByPageRenderer question transitions
+- [ ] Add animation selector card to StyleTab in GeneralFormBuilder

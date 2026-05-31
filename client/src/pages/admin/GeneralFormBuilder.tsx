@@ -154,6 +154,8 @@ const DEFAULT_THEME = {
   welcomeTextColor: "#ffffff",
   welcomeButtonColor: "#ffffff",
   welcomeButtonTextColor: "#0e7490",
+  // Page transition animation
+  pageAnimation: "slideUp" as "fade" | "slideUp" | "slideDown" | "slideLeft" | "slideRight" | "bounce" | "zoom" | "none",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1067,6 +1069,40 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
                 <p className="text-[10px] text-gray-400">PNG, JPG, SVG, WebP — max 10 MB</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* ── Page Transition Animation (Typeform / Page-by-Page only) ── */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">🎬 Page Transition Animation</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-gray-400">Applies to Typeform Style and Page-by-Page display modes.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: "slideUp",    label: "Slide Up",    icon: "↑" },
+                { value: "slideDown",  label: "Slide Down",  icon: "↓" },
+                { value: "slideLeft",  label: "Slide Left",  icon: "←" },
+                { value: "slideRight", label: "Slide Right", icon: "→" },
+                { value: "fade",       label: "Fade",        icon: "☀️" },
+                { value: "zoom",       label: "Zoom",        icon: "🔍" },
+                { value: "bounce",     label: "Bounce",      icon: "⚾" },
+                { value: "none",       label: "None",        icon: "⏹" },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => set("pageAnimation", opt.value)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                    (theme.pageAnimation ?? "slideUp") === opt.value
+                      ? "border-[#0e7490] bg-[#e0f7fa] text-[#0e7490] font-semibold"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  <span className="text-base">{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
