@@ -5,7 +5,8 @@
  * Supports 25+ block types + Template Library (save/reuse pages and blocks).
  */
 
-import React, { useState, useEffect, useCallback, useRef, useMemo, createPortal } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useLocation } from "wouter";
 import {
   DndContext,
