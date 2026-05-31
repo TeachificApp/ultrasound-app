@@ -429,7 +429,7 @@ export default function UltrasoundAssistHub() {
               </p>
             </div>
             <a
-              href="https://app.iheartecho.net"
+              href="https://app.iheartecho.com"
               target="_blank"
               rel="noopener noreferrer"
               className="flex-shrink-0"

@@ -34,6 +34,8 @@
         function setAttr(sel,attr,val){var el=d.querySelector(sel);if(el)el.setAttribute(attr,val);}
         function setContent(sel,val){var el=d.querySelector(sel);if(el)el.setAttribute('content',val);}
         if(isIHE){
+          // Canonical URL: app.iheartecho.com is the preferred domain for SEO
+          var canonicalEl=d.createElement('link');canonicalEl.rel='canonical';canonicalEl.href='https://app.iheartecho.com'+location.pathname+(location.search||'');d.head.appendChild(canonicalEl);
           d.title='iHeartEcho \u2014 Echocardiography Clinical Intelligence';
           setAttr('link[rel="icon"]','href','https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png');
           setAttr('link[rel="apple-touch-icon"]','href','https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png');

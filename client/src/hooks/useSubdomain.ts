@@ -12,8 +12,8 @@
  *   - member.allaboutultrasound.com  (future — after Thinkific migration)
  *
  * iHeartEcho subdomain hostnames:
- *   - app.iheartecho.net (production — primary)
- *   - app.iheartecho.com (legacy — keep detecting so old links still work)
+ *   - app.iheartecho.com (production — canonical)
+ *   - app.iheartecho.net (legacy — keep detecting so old links still work)
  *   - iheartecho-etvpnuid.manus.space (staging)
  *   - Any hostname containing "iheartecho" (EXCEPT accreditation.iheartecho.com)
  *
@@ -39,8 +39,8 @@ const MEMBERS_HOSTNAMES = [
 ];
 
 const IHEARTECHO_HOSTNAMES = [
-  "app.iheartecho.net",   // primary production domain
-  "app.iheartecho.com",   // legacy — keep detecting so old links still work
+  "app.iheartecho.com",   // canonical production domain (.com)
+  "app.iheartecho.net",   // legacy — keep detecting so existing links still work
   "iheartecho-etvpnuid.manus.space",
 ];
 
@@ -49,7 +49,7 @@ const ACCREDITATION_HOSTNAMES = [
 ];
 
 /** The canonical iHeartEcho app URL — used for all outbound links */
-export const IHEARTECHO_APP_URL = "https://app.iheartecho.net";
+export const IHEARTECHO_APP_URL = "https://app.iheartecho.com";
 /** The canonical learn subdomain — course/quiz/download/product player access only */
 export const LEARN_APP_URL = "https://learn.allaboutultrasound.com";
 /** The canonical members subdomain — profile, dashboard, subscriptions */

@@ -130,7 +130,7 @@ Advanced, guideline-driven clinical intelligence app designed for sonographers, 
                     Open Ultrasound-Assist Calculators
                   </button>
                 </Link>
-                <a href="https://app.iheartecho.net/echoassist" target="_blank" rel="noopener noreferrer">
+                <a href="https://app.iheartecho.com/echoassist" target="_blank" rel="noopener noreferrer">
                   <button
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white/80 bg-white/10 border border-white/20 hover:bg-white/20 transition-all"
                   >
@@ -357,7 +357,7 @@ Advanced, guideline-driven clinical intelligence app designed for sonographers, 
                 Structured echo protocols with view-by-view checklists, normal reference values, scanning tips, and guideline-based interpretation for 11 specialties — Adult TTE, Pediatric, Fetal, Strain, Diastology, UEA, Stress Echo, HOCM, Pulmonary HTN &amp; PE, Structural Heart, TEE, and ICE.
               </p>
               <div className="flex flex-wrap gap-2">
-                <a href="https://app.iheartecho.net/echo-assist-hub" target="_blank" rel="noopener noreferrer">
+                <a href="https://app.iheartecho.com/echo-assist-hub" target="_blank" rel="noopener noreferrer">
                   <button
                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90"
                     style={{ background: "#189aa1" }}
@@ -366,7 +366,7 @@ Advanced, guideline-driven clinical intelligence app designed for sonographers, 
                     Open EchoAssist™ Hub
                   </button>
                 </a>
-                <a href="https://app.iheartecho.net/echoassist" target="_blank" rel="noopener noreferrer">
+                <a href="https://app.iheartecho.com/echoassist" target="_blank" rel="noopener noreferrer">
                   <button
                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-sm border bg-white transition-all hover:bg-[#189aa1]/5"
                     style={{ borderColor: "#189aa1" + "50", color: "#189aa1" }}

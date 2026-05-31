@@ -22,7 +22,7 @@ import { getAdminUrl } from "@/hooks/useSubdomain";
 const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
 
 const AAUS_APP_URL = "https://app.allaboutultrasound.com";
-const IHE_APP_URL = "https://app.iheartecho.net";
+const IHE_APP_URL = "https://app.iheartecho.com";
 const LEARN_URL = "https://learn.allaboutultrasound.com";
 
 export default function MembersLayout({ children }: { children: React.ReactNode }) {

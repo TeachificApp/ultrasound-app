@@ -26,7 +26,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 
 /** All known app domains that participate in cross-domain SSO */
 const ALL_DOMAINS = [
-  "https://app.iheartecho.net",
+  "https://app.iheartecho.com",   // canonical .com domain
+  "https://app.iheartecho.net",   // legacy .net domain (keep for existing sessions)
   "https://app.allaboutultrasound.com",
   "https://learn.allaboutultrasound.com",
   "https://members.allaboutultrasound.com",

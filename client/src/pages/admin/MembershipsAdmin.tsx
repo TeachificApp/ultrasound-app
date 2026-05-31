@@ -594,7 +594,8 @@ function MembershipSettingsTab({
               <SelectItem value="learn.allaboutultrasound.com">learn.allaboutultrasound.com</SelectItem>
               <SelectItem value="app.allaboutultrasound.com">app.allaboutultrasound.com</SelectItem>
               <SelectItem value="members.allaboutultrasound.com">members.allaboutultrasound.com</SelectItem>
-              <SelectItem value="app.iheartecho.net">app.iheartecho.net</SelectItem>
+              <SelectItem value="app.iheartecho.com">app.iheartecho.com (canonical)</SelectItem>
+              <SelectItem value="app.iheartecho.net">app.iheartecho.net (legacy)</SelectItem>
               <SelectItem value="accreditation.iheartecho.com">accreditation.iheartecho.com</SelectItem>
             </SelectContent>
           </Select>

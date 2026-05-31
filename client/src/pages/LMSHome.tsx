@@ -306,7 +306,7 @@ export default function LMSHome() {
               <a href={import.meta.env.VITE_APP_URL || "https://app.allaboutultrasound.com"} target="_blank" rel="noopener noreferrer" className="text-sm text-[#189aa1] hover:text-[#0e6b70] font-medium">
                 UltrasoundAssist™ →
               </a>
-              <a href="https://app.iheartecho.net" target="_blank" rel="noopener noreferrer" className="text-sm text-[#189aa1] hover:text-[#0e6b70] font-medium">
+              <a href="https://app.iheartecho.com" target="_blank" rel="noopener noreferrer" className="text-sm text-[#189aa1] hover:text-[#0e6b70] font-medium">
                 EchoAssist™ →
               </a>
             </div>
