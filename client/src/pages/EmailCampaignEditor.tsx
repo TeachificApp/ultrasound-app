@@ -956,12 +956,12 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
               {/* Sender profile */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">From (Sender Profile)</label>
-                <Select value={senderProfileId?.toString() ?? ""} onValueChange={(v) => setSenderProfileId(v ? parseInt(v) : undefined)}>
+                <Select value={senderProfileId?.toString() ?? "__default__"} onValueChange={(v) => setSenderProfileId(v && v !== "__default__" ? parseInt(v) : undefined)}>
                   <SelectTrigger className="text-sm h-9">
                     <SelectValue placeholder="Default sender" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Default sender</SelectItem>
+                    <SelectItem value="__default__">Default sender</SelectItem>
                     {(senderProfiles ?? []).map((sp) => (
                       <SelectItem key={sp.id} value={sp.id.toString()}>
                         {sp.name} &lt;{sp.email}&gt;{sp.isDefault ? " ★" : ""}
