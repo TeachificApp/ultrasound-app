@@ -58,6 +58,12 @@ interface SendEmailOptions {
   previewText?: string;
   /** Brand mode for sender override. Defaults to "aaus" if not provided. */
   brandMode?: BrandMode;
+  /** Override sender name (campaign sender profiles) */
+  fromName?: string;
+  /** Override sender email (campaign sender profiles) */
+  fromEmail?: string;
+  /** List-Unsubscribe header value (RFC 8058 one-click) */
+  listUnsubscribeUrl?: string;
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
@@ -80,8 +86,8 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
           subject: opts.subject,
         },
       ],
-      from: { name: senderName, email: senderEmail },
-      reply_to: { name: senderName, email: senderEmail },
+      from: { name: opts.fromName || senderName, email: opts.fromEmail || senderEmail },
+      reply_to: { name: opts.fromName || senderName, email: opts.fromEmail || senderEmail },
       content: [
         {
           type: "text/html",
@@ -92,6 +98,12 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
         click_tracking: { enable: false },
         open_tracking: { enable: false },
       },
+      ...(opts.listUnsubscribeUrl ? {
+        headers: {
+          "List-Unsubscribe": `<${opts.listUnsubscribeUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
+      } : {}),
     };
 
     const res = await fetch(SENDGRID_API_URL, {

@@ -260,6 +260,48 @@ async function startServer() {
       return res.status(500).json({ error: "Internal server error" });
     }
   });
+  // Email open/click tracking routes
+  app.get("/api/email/track/open/:campaignId/:userIdGif", async (req: any, res: any) => {
+    // Serve 1x1 transparent GIF and record open event
+    const gif = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+    res.setHeader("Content-Type", "image/gif");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.end(gif);
+    // Record event async (non-blocking)
+    try {
+      const campaignId = parseInt(req.params.campaignId);
+      const userIdStr = req.params.userIdGif.replace(".gif", "");
+      const userId = parseInt(userIdStr);
+      if (!isNaN(campaignId) && !isNaN(userId)) {
+        const { getDb } = await import("../db");
+        const db = await getDb();
+        if (db) {
+          const { sql } = await import("drizzle-orm");
+          await db.execute(sql`INSERT IGNORE INTO emailCampaignEvents (campaignId, userId, eventType, createdAt) VALUES (${campaignId}, ${userId}, 'open', NOW())`);
+        }
+      }
+    } catch { /* non-critical */ }
+  });
+
+  app.get("/api/email/track/click/:campaignId/:userId", async (req: any, res: any) => {
+    const url = req.query.url as string;
+    if (!url) return res.redirect(302, "/");
+    // Redirect immediately, record click async
+    res.redirect(302, url);
+    try {
+      const campaignId = parseInt(req.params.campaignId);
+      const userId = parseInt(req.params.userId);
+      if (!isNaN(campaignId) && !isNaN(userId)) {
+        const { getDb } = await import("../db");
+        const db = await getDb();
+        if (db) {
+          const { sql } = await import("drizzle-orm");
+          await db.execute(sql`INSERT INTO emailCampaignEvents (campaignId, userId, eventType, metadata, createdAt) VALUES (${campaignId}, ${userId}, 'click', ${url}, NOW())`);
+        }
+      }
+    } catch { /* non-critical */ }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

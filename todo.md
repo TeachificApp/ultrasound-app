@@ -4084,3 +4084,31 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add animation CSS keyframes (fade, slideUp, slideOver, bounce, zoom) to PublicFormRenderer
 - [ ] Wire animation into PageByPageRenderer question transitions
 - [ ] Add animation selector card to StyleTab in GeneralFormBuilder
+
+## Email Campaign Full-Page Editor & Audience Filters (May 31, 2026)
+- [ ] Review existing emailCampaigns schema and router
+- [ ] Add senderProfiles table (name, email, replyTo, isDefault)
+- [ ] Add audienceFilters JSON column and senderProfileId FK to emailCampaigns table
+- [ ] Apply DB migrations
+- [ ] Add tRPC CRUD for senderProfiles
+- [ ] Update campaign procedures to support audienceFilters and senderProfileId
+- [ ] Add audience preview count query (resolves filters to user count)
+- [ ] Build full-page EmailCampaignEditor with block-based email builder (text/image/button/divider/spacer)
+- [ ] Live HTML email preview in editor
+- [ ] Build AudienceFilterBuilder: filter by course, quiz score, product, download, cohort, team, form submission, user tag, date range
+- [ ] Build SenderProfiles management page under Email Campaigns
+- [ ] Integrate sender selector into campaign editor
+## Email Campaigns Dashboard & Analytics (May 31, 2026)
+- [ ] Add emailCampaignEvents table (campaignId, userId, eventType: open/click/unsubscribe, url, ip, userAgent, createdAt)
+- [ ] Add openCount, clickCount, unsubscribeCount columns to emailCampaigns
+- [ ] Apply migration SQL for analytics tables
+- [ ] Add tracking pixel route GET /api/email/track/open/:campaignId/:userId.gif
+- [ ] Add click redirect route GET /api/email/track/click/:campaignId/:userId?url=...
+- [ ] Inject tracking pixel and wrap links in executeCampaignSend
+- [ ] Add getCampaignAnalytics tRPC procedure
+- [ ] Ensure every email has List-Unsubscribe header and one-click unsubscribe footer
+- [ ] Build Email Campaigns admin dashboard with stats overview, campaign list, analytics drill-down
+- [ ] Build Sender Profiles management tab in dashboard
+- [ ] Add duplicate campaign mutation (copies subject, body, audienceFilter, senderProfileId as new draft)
+- [ ] Add save-as-template from campaign editor (saves emailBlocks + subject + previewText to emailTemplates)
+- [ ] Add load-from-template button in campaign editor (opens template picker dialog)

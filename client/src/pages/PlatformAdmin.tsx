@@ -1196,7 +1196,7 @@ export default function PlatformAdmin() {
 
   // Dual App tool cards
   const DUAL_TOOLS_DEFAULT: ToolCard[] = [
-    { id: "email", href: getAdminUrl("/admin/email"), icon: Mail, label: "Email Campaigns", description: "Create and send email campaigns to members", color: "#189aa1" },
+    { id: "email", href: getAdminUrl("/admin/email-campaigns"), icon: Mail, label: "Email Campaigns", description: "Create and send email campaigns, manage sender profiles, and track open/click analytics", color: "#189aa1" },
     { id: "general-form-builder", href: getAdminUrl("/admin/general-forms"), icon: ClipboardList, label: "Form Builder", description: "Build public forms, surveys, and quizzes with branding, analytics, and share links", color: "#0e7490" },
     { id: "media-repository", href: getAdminUrl("/admin/media-repository"), icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
     { id: "lms", href: getAdminUrl("/admin/lms"), icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },

@@ -5391,3 +5391,16 @@ export const generalFormWebhooks = mysqlTable("generalFormWebhooks", {
 });
 export type GeneralFormWebhook = typeof generalFormWebhooks.$inferSelect;
 export type InsertGeneralFormWebhook = typeof generalFormWebhooks.$inferInsert;
+
+// ─── Email Sender Profiles ─────────────────────────────────────────────────────
+export const emailSenderProfiles = mysqlTable("emailSenderProfiles", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  email: varchar("email", { length: 300 }).notNull(),
+  replyTo: varchar("replyTo", { length: 300 }),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type EmailSenderProfile = typeof emailSenderProfiles.$inferSelect;
+export type InsertEmailSenderProfile = typeof emailSenderProfiles.$inferInsert;

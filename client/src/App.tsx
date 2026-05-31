@@ -184,6 +184,7 @@ const FormBuilderAdmin = lazy(() => import("./pages/FormBuilderAdmin"));
 const GeneralFormBuilder = lazy(() => import("./pages/admin/GeneralFormBuilder"));
 const PublicFormRenderer = lazy(() => import("./pages/PublicFormRenderer"));
 const EmailAdmin = lazy(() => import("./pages/EmailAdmin"));
+const EmailCampaignDashboard = lazy(() => import("./pages/EmailCampaignDashboard"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const EducatorAssist = lazy(() => import("./pages/EducatorAssist"));
 const SonoQuizCreator = lazy(() => import("./pages/SonoQuizCreator"));
@@ -457,6 +458,7 @@ function Router() {
         <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/email-campaigns">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><EmailCampaignDashboard /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         {/* ── Unified Members Hub (replaces scattered user/sales/membership pages) ── */}
         <Route path="/admin/members">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembersHub /></Suspense></RoleGuard>}</Route>

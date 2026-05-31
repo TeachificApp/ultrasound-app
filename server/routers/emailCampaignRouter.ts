@@ -24,8 +24,16 @@ import {
   users,
   emailTemplates,
   emailCampaigns,
+  emailSenderProfiles,
   userRoles,
   lmsEnrollments,
+  digitalPurchases,
+  digitalDownloadEvents,
+  lmsGroupSeats,
+  lmsCohortGroupEnrollments,
+  generalFormSubmissions,
+  lmsGroups,
+  lmsCohortGroups,
 } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
@@ -54,6 +62,20 @@ const AudienceFilterSchema = z.object({
   specificEmails: z.array(z.string().email()).default([]),
   /** Filter to users enrolled in specific course IDs */
   enrolledInCourseIds: z.array(z.number().int()).default([]),
+  /** Filter to users who purchased specific digital product IDs */
+  purchasedProductIds: z.array(z.number().int()).default([]),
+  /** Filter to users who downloaded specific digital product IDs */
+  downloadedProductIds: z.array(z.number().int()).default([]),
+  /** Filter to users in specific team/group IDs (lmsGroups) */
+  inGroupIds: z.array(z.number().int()).default([]),
+  /** Filter to users in specific cohort group IDs (lmsCohortGroups) */
+  inCohortGroupIds: z.array(z.number().int()).default([]),
+  /** Filter to users who submitted a specific general form ID */
+  submittedFormIds: z.array(z.number().int()).default([]),
+  /** Filter to users who completed a course (progressPct = 100) */
+  completedCourseIds: z.array(z.number().int()).default([]),
+  /** AND/OR logic between filter groups: "and" = must match all, "or" = match any */
+  logic: z.enum(["and", "or"]).default("and"),
 });
 
 // ─── Unsubscribe token helper ─────────────────────────────────────────────────
@@ -229,6 +251,84 @@ async function resolveRecipients(
     allUsers = allUsers.filter(u => enrolledUserIds.has(u.id));
   }
 
+  // Apply completed course filter
+  if (filter.completedCourseIds && filter.completedCourseIds.length > 0) {
+    const completedUserIds = new Set<number>();
+    for (const courseId of filter.completedCourseIds) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, courseId), isNotNull(lmsEnrollments.completedAt)));
+      rows.forEach(r => completedUserIds.add(r.userId));
+    }
+    allUsers = allUsers.filter(u => completedUserIds.has(u.id));
+  }
+
+  // Apply digital product purchase filter
+  if (filter.purchasedProductIds && filter.purchasedProductIds.length > 0) {
+    const purchasedUserIds = new Set<number>();
+    for (const productId of filter.purchasedProductIds) {
+      const rows = await db
+        .select({ userId: digitalPurchases.userId })
+        .from(digitalPurchases)
+        .where(eq(digitalPurchases.productId, productId));
+      rows.forEach(r => purchasedUserIds.add(r.userId));
+    }
+    allUsers = allUsers.filter(u => purchasedUserIds.has(u.id));
+  }
+
+  // Apply digital download filter
+  if (filter.downloadedProductIds && filter.downloadedProductIds.length > 0) {
+    const downloadedUserIds = new Set<number>();
+    for (const productId of filter.downloadedProductIds) {
+      const rows = await db
+        .select({ userId: digitalDownloadEvents.userId })
+        .from(digitalDownloadEvents)
+        .where(eq(digitalDownloadEvents.productId, productId));
+      rows.forEach(r => downloadedUserIds.add(r.userId));
+    }
+    allUsers = allUsers.filter(u => downloadedUserIds.has(u.id));
+  }
+
+  // Apply team/group filter (lmsGroupSeats — match by email)
+  if (filter.inGroupIds && filter.inGroupIds.length > 0) {
+    const groupEmails = new Set<string>();
+    for (const groupId of filter.inGroupIds) {
+      const rows = await db
+        .select({ email: lmsGroupSeats.email })
+        .from(lmsGroupSeats)
+        .where(and(eq(lmsGroupSeats.groupId, groupId), eq(lmsGroupSeats.status, "active")));
+      rows.forEach(r => { if (r.email) groupEmails.add(r.email.toLowerCase()); });
+    }
+    allUsers = allUsers.filter(u => u.email && groupEmails.has(u.email.toLowerCase()));
+  }
+
+  // Apply cohort group filter (lmsCohortGroupEnrollments)
+  if (filter.inCohortGroupIds && filter.inCohortGroupIds.length > 0) {
+    const cohortUserIds = new Set<number>();
+    for (const cohortGroupId of filter.inCohortGroupIds) {
+      const rows = await db
+        .select({ userId: lmsCohortGroupEnrollments.userId })
+        .from(lmsCohortGroupEnrollments)
+        .where(eq(lmsCohortGroupEnrollments.cohortGroupId, cohortGroupId));
+      rows.forEach(r => cohortUserIds.add(r.userId));
+    }
+    allUsers = allUsers.filter(u => cohortUserIds.has(u.id));
+  }
+
+  // Apply form submission filter
+  if (filter.submittedFormIds && filter.submittedFormIds.length > 0) {
+    const formUserEmails = new Set<string>();
+    for (const formId of filter.submittedFormIds) {
+      const rows = await db
+        .select({ userEmail: generalFormSubmissions.userEmail })
+        .from(generalFormSubmissions)
+        .where(and(eq(generalFormSubmissions.formId, formId), isNotNull(generalFormSubmissions.userEmail)));
+      rows.forEach(r => { if (r.userEmail) formUserEmails.add(r.userEmail.toLowerCase()); });
+    }
+    allUsers = allUsers.filter(u => u.email && formUserEmails.has(u.email.toLowerCase()));
+  }
+
   return allUsers.map((u) => ({
     id: u.id,
     email: u.email!,
@@ -238,6 +338,27 @@ async function resolveRecipients(
 }
 
 // ─── Core send function (shared by immediate and scheduled sends) ─────────────
+
+/** Inject a 1x1 tracking pixel into an HTML email body */
+function injectTrackingPixel(html: string, campaignId: number, userId: number): string {
+  const appUrl = process.env.CANONICAL_ROOT_DOMAIN || "https://app.allaboutultrasound.com";
+  const pixelUrl = `${appUrl}/api/email/track/open/${campaignId}/${userId}.gif`;
+  const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;" />`;
+  if (html.includes("</body>")) return html.replace("</body>", `${pixel}</body>`);
+  return html + pixel;
+}
+
+/** Wrap all <a href="..."> links in the email with click-tracking redirect */
+function wrapLinksForTracking(html: string, campaignId: number, userId: number): string {
+  const appUrl = process.env.CANONICAL_ROOT_DOMAIN || "https://app.allaboutultrasound.com";
+  // Use a string-based approach to avoid regex literal issues with esbuild
+  const hrefPattern = new RegExp('href="(https?://[^"]+)"', 'gi');
+  return html.replace(hrefPattern, (_, url: string) => {
+    if (url.includes("/api/email/track/") || url.includes("/unsubscribe")) return `href="${url}"`;
+    const encoded = encodeURIComponent(url);
+    return `href="${appUrl}/api/email/track/click/${campaignId}/${userId}?url=${encoded}"`;
+  });
+}
 
 export async function executeCampaignSend(campaignId: number): Promise<void> {
   const db = await getDb();
@@ -261,6 +382,21 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     return;
   }
 
+  // Load sender profile if set
+  let senderName: string | undefined;
+  let senderEmail: string | undefined;
+  if (campaign.senderProfileId) {
+    const [sp] = await db
+      .select()
+      .from(emailSenderProfiles)
+      .where(eq(emailSenderProfiles.id, campaign.senderProfileId))
+      .limit(1);
+    if (sp) { senderName = sp.name; senderEmail = sp.email; }
+  } else if (campaign.fromName || campaign.fromEmail) {
+    senderName = campaign.fromName ?? undefined;
+    senderEmail = campaign.fromEmail ?? undefined;
+  }
+
   await db
     .update(emailCampaigns)
     .set({ status: "sending" })
@@ -274,14 +410,20 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     // Ensure unsubscribe token exists for this user
     const token = await ensureUnsubscribeToken(recipient.id);
     const unsubscribeUrl = buildUnsubscribeUrl(token);
-    const htmlWithFooter = injectUnsubscribeFooter(campaign.htmlBody, unsubscribeUrl);
+    // Inject footer, tracking pixel, and wrap links
+    let html = injectUnsubscribeFooter(campaign.htmlBody, unsubscribeUrl);
+    html = injectTrackingPixel(html, campaignId, recipient.id);
+    html = wrapLinksForTracking(html, campaignId, recipient.id);
 
     const displayName = recipient.displayName || recipient.name || recipient.email;
     const ok = await sendEmail({
       to: { name: displayName, email: recipient.email },
       subject: campaign.subject,
-      htmlBody: htmlWithFooter,
+      htmlBody: html,
       previewText: campaign.previewText ?? undefined,
+      fromName: senderName,
+      fromEmail: senderEmail,
+      listUnsubscribeUrl: unsubscribeUrl,
     });
     if (ok) {
       sent++;
@@ -585,6 +727,78 @@ export const emailCampaignRouter = router({
       return { success: true };
     }),
 
+  // ── Admin: sender profiles ───────────────────────────────────────────────
+
+  listSenderProfiles: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx.user.id);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    return db.select().from(emailSenderProfiles).orderBy(desc(emailSenderProfiles.createdAt));
+  }),
+
+  saveSenderProfile: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      name: z.string().min(1).max(200),
+      email: z.string().email().max(300),
+      replyTo: z.string().email().max(300).optional(),
+      isDefault: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      if (input.isDefault) {
+        // Unset other defaults
+        await db.update(emailSenderProfiles).set({ isDefault: false });
+      }
+      if (input.id) {
+        await db.update(emailSenderProfiles).set({
+          name: input.name, email: input.email,
+          replyTo: input.replyTo ?? null, isDefault: input.isDefault,
+        }).where(eq(emailSenderProfiles.id, input.id));
+        return { id: input.id };
+      } else {
+        const [r] = await db.insert(emailSenderProfiles).values({
+          name: input.name, email: input.email,
+          replyTo: input.replyTo ?? null, isDefault: input.isDefault,
+        });
+        return { id: (r as any).insertId as number };
+      }
+    }),
+
+  deleteSenderProfile: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.delete(emailSenderProfiles).where(eq(emailSenderProfiles.id, input.id));
+      return { success: true };
+    }),
+
+  // ── Admin: option lists for audience builder ──────────────────────────────
+
+  getAudienceOptions: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx.user.id);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const [courses, products, groups, cohortGroups, forms] = await Promise.all([
+      db.execute(sql`SELECT id, title FROM lms_courses WHERE status='published' ORDER BY title LIMIT 200`),
+      db.execute(sql`SELECT id, title FROM digital_products WHERE is_active=1 ORDER BY title LIMIT 200`),
+      db.execute(sql`SELECT id, name FROM lms_groups ORDER BY name LIMIT 200`),
+      db.execute(sql`SELECT id, name FROM lmsCohortGroups ORDER BY name LIMIT 200`),
+      db.execute(sql`SELECT id, title FROM generalFormTemplates WHERE status='open' ORDER BY title LIMIT 200`),
+    ]);
+    return {
+      courses: (courses[0] as any[]).map((r: any) => ({ id: r.id, label: r.title })),
+      products: (products[0] as any[]).map((r: any) => ({ id: r.id, label: r.title })),
+      groups: (groups[0] as any[]).map((r: any) => ({ id: r.id, label: r.name })),
+      cohortGroups: (cohortGroups[0] as any[]).map((r: any) => ({ id: r.id, label: r.name })),
+      forms: (forms[0] as any[]).map((r: any) => ({ id: r.id, label: r.title })),
+    };
+  }),
+
   // ── Admin: list campaigns ─────────────────────────────────────────────────
 
   listCampaigns: protectedProcedure.query(async ({ ctx }) => {
@@ -597,4 +811,101 @@ export const emailCampaignRouter = router({
       .orderBy(desc(emailCampaigns.createdAt))
       .limit(100);
   }),
+
+  // ── Admin: campaign analytics ─────────────────────────────────────────────
+
+  getCampaignAnalytics: protectedProcedure
+    .input(z.object({ campaignId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [campaign] = await db.select().from(emailCampaigns).where(eq(emailCampaigns.id, input.campaignId)).limit(1);
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
+      // Count events from emailCampaignEvents table
+      const [eventsRaw] = await db.execute(sql`
+        SELECT eventType, COUNT(*) as cnt
+        FROM emailCampaignEvents
+        WHERE campaignId = ${input.campaignId}
+        GROUP BY eventType
+      `) as any;
+      const events = Array.isArray(eventsRaw) ? eventsRaw : [];
+      const opens = events.find((e: any) => e.eventType === 'open')?.cnt ?? 0;
+      const clicks = events.find((e: any) => e.eventType === 'click')?.cnt ?? 0;
+      const unsubs = events.find((e: any) => e.eventType === 'unsubscribe')?.cnt ?? 0;
+      const sent = campaign.recipientCount ?? 0;
+      return {
+        campaignId: campaign.id,
+        subject: campaign.subject,
+        status: campaign.status,
+        sentAt: campaign.sentAt,
+        recipientCount: sent,
+        openCount: Number(opens),
+        clickCount: Number(clicks),
+        unsubscribeCount: Number(unsubs),
+        openRate: sent > 0 ? Math.round((Number(opens) / sent) * 100) : 0,
+        clickRate: sent > 0 ? Math.round((Number(clicks) / sent) * 100) : 0,
+        unsubscribeRate: sent > 0 ? Math.round((Number(unsubs) / sent) * 100) : 0,
+      };
+    }),
+
+  // ── Admin: duplicate campaign ─────────────────────────────────────────────
+
+  duplicateCampaign: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [orig] = await db.select().from(emailCampaigns).where(eq(emailCampaigns.id, input.id)).limit(1);
+      if (!orig) throw new TRPCError({ code: "NOT_FOUND" });
+      const [r] = await db.insert(emailCampaigns).values({
+        sentByUserId: ctx.user.id,
+        subject: `Copy of ${orig.subject}`,
+        htmlBody: orig.htmlBody,
+        previewText: orig.previewText,
+        audienceFilter: orig.audienceFilter,
+        status: "draft",
+        senderProfileId: orig.senderProfileId,
+        fromName: orig.fromName,
+        fromEmail: orig.fromEmail,
+      });
+      return { id: (r as any).insertId as number };
+    }),
+
+  // ── Admin: save draft campaign ────────────────────────────────────────────
+
+  saveDraft: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      subject: z.string().max(500).default(""),
+      htmlBody: z.string().default(""),
+      previewText: z.string().max(300).optional(),
+      audienceFilter: AudienceFilterSchema.optional(),
+      senderProfileId: z.number().optional(),
+      fromName: z.string().max(200).optional(),
+      fromEmail: z.string().max(300).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const vals = {
+        subject: input.subject,
+        htmlBody: input.htmlBody,
+        previewText: input.previewText ?? null,
+        audienceFilter: JSON.stringify(input.audienceFilter ?? {}),
+        status: "draft" as const,
+        senderProfileId: input.senderProfileId ?? null,
+        fromName: input.fromName ?? null,
+        fromEmail: input.fromEmail ?? null,
+      };
+      if (input.id) {
+        await db.update(emailCampaigns).set(vals).where(eq(emailCampaigns.id, input.id));
+        return { id: input.id };
+      } else {
+        const [r] = await db.insert(emailCampaigns).values({ ...vals, sentByUserId: ctx.user.id });
+        return { id: (r as any).insertId as number };
+      }
+    }),
 });
