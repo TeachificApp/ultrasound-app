@@ -8,8 +8,9 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
 import {
-  webinars, webinarRegistrations, webinarComments, users,
+  webinars, webinarRegistrations, webinarComments, webinarSessions, webinarFunnelSteps, users,
 } from "../../drizzle/schema";
+import { nanoid } from "nanoid";
 
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80); }
 async function assertAdmin(ctx: any) { if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" }); }
@@ -145,11 +146,22 @@ export const webinarAdminRouter = router({
     .input(z.object({
       id: z.number(), title: z.string().optional(), brand: z.enum(["all_about_ultrasound","iheartecho"]).optional(),
       type: z.enum(["live","prerecorded"]).optional(), status: z.enum(["draft","published","ended"]).optional(),
-      description: z.string().optional(), coverImage: z.string().optional(), scheduledAt: z.number().optional(),
-      durationMinutes: z.number().optional(), meetingUrl: z.string().optional(), replayUrl: z.string().optional(),
-      replayEnabled: z.boolean().optional(), accessType: z.enum(["free","paid"]).optional(),
+      description: z.string().optional(), coverImage: z.string().optional(), thumbnailUrl: z.string().optional(),
+      scheduledAt: z.number().optional(), durationMinutes: z.number().optional(), timezone: z.string().optional(),
+      meetingUrl: z.string().optional(), meetingId: z.string().optional(), replayUrl: z.string().optional(),
+      replayEnabled: z.boolean().optional(), replayDelayMinutes: z.number().optional(),
+      videoSource: z.enum(["upload","youtube","vimeo","zoom","teams","embed"]).optional(),
+      videoUrl: z.string().optional(), videoFileUrl: z.string().optional(), videoFileKey: z.string().optional(),
+      accessType: z.enum(["free","paid","restricted"]).optional(),
       pricingOptions: z.string().optional(), landingPageBlocks: z.string().optional(),
       hostName: z.string().optional(), hostTitle: z.string().optional(), hostAvatar: z.string().optional(), maxAttendees: z.number().optional(),
+      requireRegistration: z.boolean().optional(), registrationFormFields: z.any().optional(),
+      aiViewersEnabled: z.boolean().optional(), aiViewersMin: z.number().optional(), aiViewersMax: z.number().optional(), aiViewersPeakAt: z.number().optional(),
+      postWebinarAction: z.enum(["product","url","thankyou","none"]).optional(),
+      postWebinarProductId: z.number().optional(), postWebinarUrl: z.string().optional(),
+      postWebinarMessage: z.string().optional(), postWebinarDelaySeconds: z.number().optional(),
+      sortOrder: z.number().optional(), iconImage: z.string().optional(), linkedAccessItems: z.string().optional(),
+      publishDomain: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -174,11 +186,95 @@ export const webinarAdminRouter = router({
       await assertAdmin(ctx); const db = await getDb(); if (!db) return { registrations: [], total: 0 };
       const offset = (input.page-1)*input.pageSize;
       const [rows, cnt] = await Promise.all([
-        db.select({ id: webinarRegistrations.id, userId: webinarRegistrations.userId, registeredAt: webinarRegistrations.registeredAt, attendedAt: webinarRegistrations.attendedAt, watchedReplayAt: webinarRegistrations.watchedReplayAt, userName: users.name, userEmail: users.email })
+        db.select({ id: webinarRegistrations.id, userId: webinarRegistrations.userId, registeredAt: webinarRegistrations.registeredAt, attendedAt: webinarRegistrations.attendedAt, watchedReplayAt: webinarRegistrations.watchedReplayAt, attended: webinarRegistrations.attended, watchedSeconds: webinarRegistrations.watchedSeconds, convertedAt: webinarRegistrations.convertedAt, firstName: webinarRegistrations.firstName, lastName: webinarRegistrations.lastName, email: webinarRegistrations.email, userName: users.name, userEmail: users.email })
           .from(webinarRegistrations).leftJoin(users, eq(webinarRegistrations.userId, users.id))
           .where(eq(webinarRegistrations.webinarId, input.webinarId)).orderBy(desc(webinarRegistrations.registeredAt)).limit(input.pageSize).offset(offset),
         db.select({ count: sql<number>`count(*)` }).from(webinarRegistrations).where(eq(webinarRegistrations.webinarId, input.webinarId)),
       ]);
       return { registrations: rows, total: cnt[0]?.count ?? 0 };
+    }),
+
+  getStats: protectedProcedure
+    .input(z.object({ webinarId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) return { totalRegistrations: 0, attended: 0, converted: 0, conversionRate: 0, avgWatchMinutes: 0 };
+      const [regs, sessions] = await Promise.all([
+        db.select().from(webinarRegistrations).where(eq(webinarRegistrations.webinarId, input.webinarId)),
+        db.select().from(webinarSessions).where(eq(webinarSessions.webinarId, input.webinarId)),
+      ]);
+      const attended = regs.filter(r => r.attended).length;
+      const converted = regs.filter(r => r.convertedAt).length;
+      const totalWatchSeconds = sessions.reduce((s, r) => s + (r.watchedSeconds ?? 0), 0);
+      return {
+        totalRegistrations: regs.length, attended, converted,
+        conversionRate: regs.length > 0 ? Math.round((converted / regs.length) * 100) : 0,
+        avgWatchMinutes: sessions.length > 0 ? Math.round(totalWatchSeconds / sessions.length / 60) : 0,
+      };
+    }),
+
+  getFunnelSteps: protectedProcedure
+    .input(z.object({ webinarId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) return [];
+      return db.select().from(webinarFunnelSteps).where(eq(webinarFunnelSteps.webinarId, input.webinarId)).orderBy(asc(webinarFunnelSteps.stepOrder));
+    }),
+
+  saveFunnelSteps: protectedProcedure
+    .input(z.object({ webinarId: z.number(), steps: z.array(z.object({ stepType: z.enum(["registration","confirmation","reminder","watch","offer","thankyou"]), title: z.string().optional(), pageBlocksJson: z.any().optional(), emailSubject: z.string().optional(), emailBody: z.string().optional(), triggerType: z.enum(["immediate","delay","scheduled"]).optional(), triggerDelayMinutes: z.number().optional(), isActive: z.boolean().optional() })) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(webinarFunnelSteps).where(eq(webinarFunnelSteps.webinarId, input.webinarId));
+      if (input.steps.length > 0) {
+        await db.insert(webinarFunnelSteps).values(input.steps.map((s, i) => ({ ...s, webinarId: input.webinarId, stepOrder: i })));
+      }
+      return { success: true };
+    }),
+});
+
+// ── Public session tracking (no auth required) ────────────────────────────────
+export const webinarSessionRouter = router({
+  startSession: publicProcedure
+    .input(z.object({ webinarId: z.number(), registrationId: z.number().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const token = nanoid(32);
+      await db.insert(webinarSessions).values({ webinarId: input.webinarId, registrationId: input.registrationId, sessionToken: token, ipAddress: (ctx as any).req?.ip, userAgent: (ctx as any).req?.headers?.['user-agent'] });
+      return { sessionToken: token };
+    }),
+
+  heartbeat: publicProcedure
+    .input(z.object({ sessionToken: z.string(), watchedSeconds: z.number(), currentViewerCount: z.number().optional() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb(); if (!db) return { ok: false };
+      const [session] = await db.select().from(webinarSessions).where(eq(webinarSessions.sessionToken, input.sessionToken)).limit(1);
+      if (!session) return { ok: false };
+      await db.update(webinarSessions).set({ watchedSeconds: input.watchedSeconds, lastHeartbeatAt: new Date(), peakViewerCount: Math.max(session.peakViewerCount ?? 0, input.currentViewerCount ?? 0) }).where(eq(webinarSessions.id, session.id));
+      if (session.registrationId && input.watchedSeconds > 60) {
+        await db.update(webinarRegistrations).set({ attended: true, watchedSeconds: input.watchedSeconds }).where(eq(webinarRegistrations.id, session.registrationId));
+      }
+      return { ok: true };
+    }),
+
+  markConverted: publicProcedure
+    .input(z.object({ registrationId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb(); if (!db) return { ok: false };
+      await db.update(webinarRegistrations).set({ convertedAt: new Date() }).where(eq(webinarRegistrations.id, input.registrationId));
+      return { ok: true };
+    }),
+
+  getAiViewerCount: publicProcedure
+    .input(z.object({ webinarId: z.number(), elapsedMinutes: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb(); if (!db) return { count: 0 };
+      const [w] = await db.select().from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
+      if (!w || !w.aiViewersEnabled) return { count: 0 };
+      const min = w.aiViewersMin ?? 50, max = w.aiViewersMax ?? 300, peak = w.aiViewersPeakAt ?? 30;
+      const elapsed = input.elapsedMinutes, duration = w.durationMinutes ?? 60;
+      let ratio = elapsed <= peak ? elapsed / peak : 1 - ((elapsed - peak) / (duration - peak)) * 0.4;
+      ratio = Math.max(0.1, Math.min(1, ratio));
+      const base = Math.round(min + (max - min) * ratio);
+      const jitter = Math.round(base * 0.05 * (Math.random() * 2 - 1));
+      return { count: Math.max(1, base + jitter) };
     }),
 });

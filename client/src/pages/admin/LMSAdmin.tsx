@@ -60,6 +60,7 @@ import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } 
 import { useLearnLink } from "@/hooks/useLearnLink";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
+import { WebinarsAdmin } from "./WebinarsAdmin";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -6355,7 +6356,7 @@ export default function LMSAdmin() {
               {activeTab === "cohorts"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="cohort" />}
               {activeTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
               {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
-              {activeTab === "webinars"    && <LMSComingSoonTab icon={Radio} title="Webinars" description="Host and manage live webinar sessions with registration, reminders, and replay access." color="teal" />}
+              {activeTab === "webinars"    && <WebinarsAdmin />}
               {activeTab === "bundles"     && <LMSComingSoonTab icon={Layers} title="Bundles" description="Package courses, downloads, products, and quizzes together and sell them as a single bundle at a special price." color="teal" />}
               {activeTab === "memberships" && <LMSComingSoonTab icon={Award} title="Memberships" description="Create membership tiers that unlock course access, community features, and exclusive content on a recurring basis." color="teal" />}
               {activeTab === "communities" && <CommunitiesTab />}

@@ -4129,3 +4129,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add lead capture widget CRUD procedures (listLeadCaptureWidgets, saveLeadCaptureWidget, deleteLeadCaptureWidget, submitLeadCaptureWidget)
 - [x] Add Lead Capture Widgets tab to EmailCampaignDashboard with create/edit/delete UI and embed code
 - [x] Add LeadCaptureWidgetForm component with live preview and list selector
+
+## Webinars Feature (May 2026)
+- [x] DB schema: webinarSessions table, webinarFunnelSteps table, publishDomain/aiViewerCount/funnelEnabled columns on webinars
+- [x] Server router: webinarRouter.ts with webinarPublic (list, getBySlug, register, markAttended, markWatchedReplay, addComment, listComments, deleteComment, startSession, heartbeat, markConverted, getAiViewerCount) and webinarAdmin (list, getById, create, update, delete, getRegistrations, getStats, getFunnelSteps, saveFunnelSteps)
+- [x] Routers registered in server/routers.ts as webinarPublic and webinarAdmin
+- [x] WebinarsAdmin.tsx: full admin UI with list, settings editor, registration/attendees tab, analytics tab, domain tab
+- [x] LMSAdmin.tsx: Webinars tab wired to <WebinarsAdmin /> (replacing Coming Soon placeholder)
+- [x] Fixed operator precedence build error in WebinarsAdmin.tsx line 581 (?? mixed with || without parens)
+- [ ] Public-facing webinar landing page / registration flow
+- [ ] Live/recorded viewer page with discussion threads
+- [ ] Webinar-specific content blocks in LandingPageBuilder

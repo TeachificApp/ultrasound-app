@@ -4418,6 +4418,28 @@ export const webinars = mysqlTable("webinars", {
   hostTitle: varchar("host_title", { length: 200 }),
   hostAvatar: text("host_avatar"),
   maxAttendees: int("max_attendees"),
+  // Teachific-style extended fields
+  videoSource: mysqlEnum("video_source", ["upload","youtube","vimeo","zoom","teams","embed"]).default("youtube"),
+  videoUrl: text("video_url"),
+  videoFileUrl: text("video_file_url"),
+  videoFileKey: text("video_file_key"),
+  meetingId: varchar("meeting_id", { length: 128 }),
+  timezone: varchar("timezone", { length: 64 }).default("America/New_York"),
+  replayDelayMinutes: int("replay_delay_minutes").default(0),
+  aiViewersEnabled: boolean("ai_viewers_enabled").default(false),
+  aiViewersMin: int("ai_viewers_min").default(50),
+  aiViewersMax: int("ai_viewers_max").default(300),
+  aiViewersPeakAt: int("ai_viewers_peak_at").default(30),
+  salesPageBlocksJson: json("sales_page_blocks_json"),
+  thumbnailUrl: text("thumbnail_url"),
+  requireRegistration: boolean("require_registration").default(true),
+  registrationFormFields: json("registration_form_fields"),
+  postWebinarAction: mysqlEnum("post_webinar_action", ["product","url","thankyou","none"]).default("none"),
+  postWebinarProductId: int("post_webinar_product_id"),
+  postWebinarUrl: text("post_webinar_url"),
+  postWebinarMessage: text("post_webinar_message"),
+  postWebinarDelaySeconds: int("post_webinar_delay_seconds").default(0),
+  publishDomain: varchar("publish_domain", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4447,6 +4469,36 @@ export const webinarComments = mysqlTable("webinar_comments", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type WebinarComment = typeof webinarComments.$inferSelect;
+
+export const webinarSessions = mysqlTable("webinar_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  webinarId: int("webinar_id").notNull(),
+  registrationId: int("registration_id"),
+  sessionToken: varchar("session_token", { length: 128 }).notNull().unique(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  lastHeartbeatAt: timestamp("last_heartbeat_at").defaultNow(),
+  endedAt: timestamp("ended_at"),
+  watchedSeconds: int("watched_seconds").default(0),
+  peakViewerCount: int("peak_viewer_count").default(0),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+});
+export type WebinarSession = typeof webinarSessions.$inferSelect;
+
+export const webinarFunnelSteps = mysqlTable("webinar_funnel_steps", {
+  id: int("id").autoincrement().primaryKey(),
+  webinarId: int("webinar_id").notNull(),
+  stepOrder: int("step_order").default(0),
+  stepType: mysqlEnum("step_type", ["registration","confirmation","reminder","watch","offer","thankyou"]).notNull(),
+  title: varchar("title", { length: 255 }),
+  pageBlocksJson: json("page_blocks_json"),
+  emailSubject: varchar("email_subject", { length: 255 }),
+  emailBody: text("email_body"),
+  triggerType: mysqlEnum("trigger_type", ["immediate","delay","scheduled"]).default("immediate"),
+  triggerDelayMinutes: int("trigger_delay_minutes").default(0),
+  isActive: boolean("is_active").default(true),
+});
+export type WebinarFunnelStep = typeof webinarFunnelSteps.$inferSelect;
 
 // ─── Bundles ──────────────────────────────────────────────────────────────────
 
