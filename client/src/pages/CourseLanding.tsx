@@ -25,6 +25,7 @@ import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import type { Block } from "@/components/BlockPreview";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
+import { applyVideoTrim } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 
@@ -323,13 +324,38 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     }
     case "video": {
       const resolvedVidUrl = injectUserParams(d.embedUrl ?? "", user);
+      const clIsDirectVid = resolvedVidUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(resolvedVidUrl);
+      const clTrimStart = d.trimStart ?? 0;
+      const clTrimEnd = d.trimEnd ?? 0;
+      const clTrimmedUrl = resolvedVidUrl ? applyVideoTrim(resolvedVidUrl, clTrimStart, clTrimEnd) : "";
+      const clContainerStyle: React.CSSProperties = { paddingBottom: d.height ? undefined : (clIsDirectVid ? undefined : "56.25%"), height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
         <div className="px-8 py-6">
           <div className="mx-auto" style={{ maxWidth: d.maxWidth ?? "100%" }}>
             {resolvedVidUrl && (
-              <div className="relative w-full overflow-hidden shadow" style={{ paddingBottom: d.height ? undefined : "56.25%", height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }}>
-                <iframe src={resolvedVidUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
-              </div>
+              clIsDirectVid ? (
+                <div className="overflow-hidden shadow" style={clContainerStyle}>
+                  <video
+                    src={clTrimmedUrl}
+                    autoPlay={d.autoplay ?? false}
+                    muted={d.muted ?? true}
+                    loop={d.loop ?? false}
+                    controls={d.controls ?? true}
+                    playsInline
+                    className="w-full"
+                  />
+                </div>
+              ) : (
+                <div className="relative w-full overflow-hidden shadow" style={clContainerStyle}>
+                  <iframe
+                    src={d.autoplay ? `${clTrimmedUrl}${clTrimmedUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : clTrimmedUrl}
+                    className="absolute inset-0 w-full h-full"
+                    allowFullScreen
+                    title="Video"
+                    allow="autoplay; fullscreen"
+                  />
+                </div>
+              )
             )}
             {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
           </div>

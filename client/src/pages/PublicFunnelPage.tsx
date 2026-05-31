@@ -16,6 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import type { Block } from "@/components/BlockPreview";
 import { CountdownV2Block, ImageLinkWrapper, WebinarCountdownTimer } from "@/components/BlockPreview";
 import { BlockPreview } from "@/components/BlockPreview";
+import { applyVideoTrim } from "@/lib/videoTrim";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
@@ -206,6 +207,9 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       const rawVidUrl = d.embedUrl ?? "";
       const resolvedVidUrl = injectUserParams(rawVidUrl, user);
       const isDirectVid = resolvedVidUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(resolvedVidUrl);
+      const vidTrimStart = d.trimStart ?? 0;
+      const vidTrimEnd = d.trimEnd ?? 0;
+      const trimmedVidUrl = resolvedVidUrl ? applyVideoTrim(resolvedVidUrl, vidTrimStart, vidTrimEnd) : "";
       const vidContainerStyle: React.CSSProperties = { paddingBottom: d.height ? undefined : (isDirectVid ? undefined : "56.25%"), height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
         <div className="px-8 py-8">
@@ -214,7 +218,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
               isDirectVid ? (
                 <div className="overflow-hidden shadow-lg" style={vidContainerStyle}>
                   <video
-                    src={resolvedVidUrl}
+                    src={trimmedVidUrl}
                     autoPlay={d.autoplay ?? false}
                     muted={d.muted ?? true}
                     loop={d.loop ?? false}
@@ -226,7 +230,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
               ) : (
                 <div className="relative w-full overflow-hidden shadow-lg" style={vidContainerStyle}>
                   <iframe
-                    src={d.autoplay ? `${resolvedVidUrl}${resolvedVidUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : resolvedVidUrl}
+                    src={d.autoplay ? `${trimmedVidUrl}${trimmedVidUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : trimmedVidUrl}
                     className="absolute inset-0 w-full h-full"
                     allowFullScreen
                     allow="autoplay; fullscreen"

@@ -14,6 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
+import { applyVideoTrim } from "@/lib/videoTrim";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
@@ -218,6 +219,10 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const videoAccent = d.accentColor ?? "#189aa1";
       const containerStyle: React.CSSProperties = { maxWidth: d.maxWidth ?? "100%", height: d.height || undefined, paddingBottom: d.height ? undefined : (isDirectVideo ? undefined : "56.25%"), borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       const videoId = `aaus-vid-${block.id ?? 'v'}`;
+      const trimStart = d.trimStart ?? 0;
+      const trimEnd = d.trimEnd ?? 0;
+      // Build the trimmed embed URL using platform-aware logic
+      const trimmedEmbedUrl = d.embedUrl ? applyVideoTrim(d.embedUrl, trimStart, trimEnd) : "";
       return (
         <div className="px-8 py-6">
           {d.embedUrl ? (
@@ -225,7 +230,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
               <div className="mx-auto overflow-hidden shadow" style={containerStyle}>
                 <style>{`.${videoId} { accent-color: ${videoAccent}; } .${videoId}::-webkit-media-controls-play-button { filter: none; } .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }`}</style>
                 <video
-                  src={d.trimStart && d.trimStart > 0 ? `${d.embedUrl}#t=${d.trimStart ?? 0}${d.trimEnd ? `,${d.trimEnd}` : ""}` : d.embedUrl}
+                  src={trimmedEmbedUrl}
                   autoPlay={d.autoplay ?? false}
                   muted={d.muted ?? true}
                   loop={d.loop ?? false}
@@ -238,7 +243,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             ) : (
               <div className="relative w-full overflow-hidden shadow mx-auto" style={containerStyle}>
                 <iframe
-                  src={d.autoplay ? `${d.embedUrl}${d.embedUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : d.embedUrl}
+                  src={d.autoplay ? `${trimmedEmbedUrl}${trimmedEmbedUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : trimmedEmbedUrl}
                   className="absolute inset-0 w-full h-full"
                   allowFullScreen
                   title="Video"

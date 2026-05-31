@@ -4455,6 +4455,12 @@ export const webinarRegistrations = mysqlTable("webinar_registrations", {
   registeredAt: timestamp("registered_at").defaultNow().notNull(),
   attendedAt: timestamp("attended_at"),
   watchedReplayAt: timestamp("watched_replay_at"),
+  attended: boolean("attended").default(false).notNull(),
+  convertedAt: timestamp("converted_at"),
+  watchedSeconds: int("watched_seconds").default(0),
+  firstName: varchar("first_name", { length: 128 }),
+  lastName: varchar("last_name", { length: 128 }),
+  email: varchar("email", { length: 255 }),
 });
 export type WebinarRegistration = typeof webinarRegistrations.$inferSelect;
 

@@ -7203,6 +7203,8 @@ export function VideoBlockSettings({ d, set, uploading, setUploading, uploadMedi
         <div className="flex items-center gap-2"><input type="checkbox" checked={d.controls ?? true} onChange={e => set("controls", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show controls</label></div>
       </div>
 
+      <VideoTrimSettings d={d} set={set} />
+
       <div><label className="text-xs text-gray-500 block mb-1">Max Width</label><DebouncedInput value={d.maxWidth ?? "100%"} onChange={v => set("maxWidth", v)} className="h-8 text-sm" placeholder="100%, 800px, etc." /></div>
       <div><label className="text-xs text-gray-500 block mb-1">Height</label><DebouncedInput value={d.height ?? ""} onChange={v => set("height", v)} className="h-8 text-sm" placeholder="auto, 450px, etc." /></div>
       <div><label className="text-xs text-gray-500 block mb-1">Border Radius (px)</label><Input type="number" value={d.borderRadius ?? 0} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={999} /></div>
@@ -7217,6 +7219,108 @@ export function VideoBlockSettings({ d, set, uploading, setUploading, uploadMedi
         <BSColorField data={d} onSet={set} label="Accent Color (play button &amp; progress bar)" field="accentColor" />
         <p className="text-[10px] text-gray-400">Applies to the play button overlay and progress bar on direct video files. Defaults to AAUS teal (#189aa1).</p>
       </div>
+    </div>
+  );
+}
+
+// ─── Video Trim Settings ─────────────────────────────────────────────────────
+/**
+ * Reusable trim control shown inside any video block settings panel.
+ * trimStart / trimEnd are stored as seconds (number).
+ * The UI accepts mm:ss or plain seconds.
+ */
+function VideoTrimSettings({ d, set }: { d: Record<string, any>; set: (key: string, value: any) => void }) {
+  // Local display state so user can type freely without losing cursor position
+  const [startStr, setStartStr] = useState<string>(() => {
+    const v = d.trimStart ?? 0;
+    if (!v) return "";
+    const m = Math.floor(v / 60);
+    const s = Math.floor(v % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+  });
+  const [endStr, setEndStr] = useState<string>(() => {
+    const v = d.trimEnd ?? 0;
+    if (!v) return "";
+    const m = Math.floor(v / 60);
+    const s = Math.floor(v % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+  });
+
+  function parseTime(val: string): number {
+    if (!val.trim()) return 0;
+    if (/^\d+(\.\d+)?$/.test(val.trim())) return Math.max(0, Math.floor(parseFloat(val)));
+    const parts = val.split(":").map(Number);
+    if (parts.some(isNaN)) return 0;
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return 0;
+  }
+
+  const embedUrl = d.embedUrl ?? "";
+  const isYouTube = /youtube\.com\/embed|youtu\.be|youtube-nocookie\.com/i.test(embedUrl);
+  const isVimeo = /player\.vimeo\.com|vimeo\.com/i.test(embedUrl);
+  const isDirect = /\.(mp4|webm|ogg|mov|m4v)([?#]|$)/i.test(embedUrl);
+
+  return (
+    <div className="border border-gray-100 rounded p-2 space-y-2">
+      <p className="text-xs font-semibold text-gray-600 mb-1">Trim / Clip</p>
+      <p className="text-[10px] text-gray-400 leading-relaxed">
+        Set start and end points to clip the video. Enter time as <strong>m:ss</strong> or plain seconds.
+        {isYouTube && " YouTube supports both start and end trim."}
+        {isVimeo && " Vimeo supports start trim only via embed."}
+        {isDirect && " Direct video files support both start and end trim."}
+        {!isYouTube && !isVimeo && !isDirect && " Start trim is applied for most platforms."}
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] text-gray-500 block mb-0.5">Start (trim beginning)</label>
+          <input
+            type="text"
+            value={startStr}
+            onChange={e => setStartStr(e.target.value)}
+            onBlur={() => {
+              const secs = parseTime(startStr);
+              set("trimStart", secs);
+              if (secs === 0) setStartStr("");
+              else {
+                const m = Math.floor(secs / 60);
+                const s = Math.floor(secs % 60);
+                setStartStr(`${m}:${String(s).padStart(2, "0")}`);
+              }
+            }}
+            className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            placeholder="0:00"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-gray-500 block mb-0.5">End (trim ending)</label>
+          <input
+            type="text"
+            value={endStr}
+            onChange={e => setEndStr(e.target.value)}
+            onBlur={() => {
+              const secs = parseTime(endStr);
+              set("trimEnd", secs);
+              if (secs === 0) setEndStr("");
+              else {
+                const m = Math.floor(secs / 60);
+                const s = Math.floor(secs % 60);
+                setEndStr(`${m}:${String(s).padStart(2, "0")}`);
+              }
+            }}
+            className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            placeholder="leave blank"
+          />
+        </div>
+      </div>
+      {(d.trimStart > 0 || d.trimEnd > 0) && (
+        <button
+          onClick={() => { set("trimStart", 0); set("trimEnd", 0); setStartStr(""); setEndStr(""); }}
+          className="text-[10px] text-red-400 hover:text-red-600"
+        >
+          Clear trim
+        </button>
+      )}
     </div>
   );
 }

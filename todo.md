@@ -4148,3 +4148,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add BlockSettings cases for all 5 webinar blocks in LandingPageBuilder.tsx
 - [x] Add BlockPreview render cases for all 5 webinar blocks in BlockPreview.tsx
 - [x] Wire webinar blocks into PublicFunnelPage.tsx renderer
+
+## Video Trim for Embedded Videos (May 2026)
+- [x] Add trimStart/trimEnd settings UI to video block settings panel in LandingPageBuilder.tsx (with time format helpers mm:ss)
+- [x] Implement trim for YouTube embeds: use start= and end= query params in embed URL
+- [x] Implement trim for Vimeo embeds: use #t=Xs query param
+- [x] Implement trim for direct video files: use HTML5 media fragment #t=start,end
+- [x] Implement trim for Wistia/other embeds: use time query params
+- [x] Add trim controls to lesson video player (LessonBlockEditor / lesson player component — uses shared BlockSettings from LandingPageBuilder)
+- [x] Wire trim into PublicFunnelPage.tsx video renderer
+- [x] Wire trim into CourseLanding.tsx video renderer
