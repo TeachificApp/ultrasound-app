@@ -7,7 +7,7 @@
  *   - Configure payout settings (PayPal, ACH, Stripe)
  *   - View payout request history
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
@@ -25,7 +25,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   BookOpen, DollarSign, Send, Clock, CheckCircle, XCircle,
-  Settings, CreditCard, ChevronRight, AlertCircle, Eye, RefreshCw
+  Settings, CreditCard, ChevronRight, AlertCircle, Eye, RefreshCw,
+  BarChart2, TrendingUp, Users, Activity, List
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -252,6 +253,177 @@ function PublishHistoryTab() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ─── Analytics Tab ──────────────────────────────────────────────────────────
+
+function AnalyticsTab() {
+  const { data: courses, isLoading: coursesLoading } = trpc.lms.getMyInstructorCourses.useQuery();
+  const { data: allowedMetrics, isLoading: permsLoading } = trpc.lmsEnrollmentAdmin.getMyAnalyticsPermissions.useQuery();
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+
+  // Auto-select first course
+  useEffect(() => {
+    if (courses && courses.length > 0 && !selectedCourseId) {
+      setSelectedCourseId(courses[0].courseId ?? null);
+    }
+  }, [courses]);
+
+  const { data: analytics, isLoading: analyticsLoading } = trpc.lmsEnrollmentAdmin.getMyInstructorAnalytics.useQuery(
+    { courseId: selectedCourseId! },
+    { enabled: !!selectedCourseId }
+  );
+
+  if (coursesLoading || permsLoading) {
+    return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}</div>;
+  }
+
+  if (!allowedMetrics || allowedMetrics.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <BarChart2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <p className="font-medium">No analytics access</p>
+        <p className="text-sm mt-1">Contact your administrator to enable analytics for your account.</p>
+      </div>
+    );
+  }
+
+  if (!courses || courses.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <p className="font-medium">No courses assigned</p>
+        <p className="text-sm mt-1">You need to be assigned to a course to view analytics.</p>
+      </div>
+    );
+  }
+
+  const allowed = new Set(allowedMetrics);
+
+  return (
+    <div className="space-y-6">
+      {/* Course selector */}
+      {courses.length > 1 && (
+        <div className="flex items-center gap-3">
+          <Label className="text-sm shrink-0">Course</Label>
+          <Select value={selectedCourseId ? String(selectedCourseId) : ""} onValueChange={v => setSelectedCourseId(parseInt(v))}>
+            <SelectTrigger className="w-72"><SelectValue placeholder="Select a course" /></SelectTrigger>
+            <SelectContent>
+              {courses.map(c => <SelectItem key={c.courseId} value={String(c.courseId)}>{c.courseTitle ?? `Course #${c.courseId}`}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {analyticsLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+      ) : analytics ? (
+        <>
+          {/* Metric cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {allowed.has("enrollments") && analytics.totalEnrollments !== undefined && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <Users className="w-4 h-4" />
+                    <span className="text-xs font-medium">Total Enrollments</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{analytics.totalEnrollments.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+            )}
+            {allowed.has("completion_rate") && analytics.completionRate !== undefined && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-xs font-medium">Completion Rate</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{analytics.completionRate}%</p>
+                  {analytics.completedEnrollments !== undefined && (
+                    <p className="text-xs text-muted-foreground">{analytics.completedEnrollments} completed</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+            {allowed.has("avg_progress") && analytics.avgProgress !== undefined && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className="text-xs font-medium">Avg. Progress</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{analytics.avgProgress}%</p>
+                </CardContent>
+              </Card>
+            )}
+            {allowed.has("revenue") && analytics.totalRevenue !== undefined && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <DollarSign className="w-4 h-4" />
+                    <span className="text-xs font-medium">Total Revenue</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">${(analytics.totalRevenue / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Monthly chart */}
+          {allowed.has("monthly_chart") && analytics.monthlyEnrollments && analytics.monthlyEnrollments.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2"><Activity className="w-4 h-4 text-teal-600" /> Monthly Enrollments (12 months)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end gap-1 h-32">
+                  {analytics.monthlyEnrollments.map((m: any, i: number) => {
+                    const max = Math.max(...analytics.monthlyEnrollments.map((x: any) => Number(x.count)));
+                    const height = max > 0 ? Math.round((Number(m.count) / max) * 100) : 0;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-xs text-muted-foreground">{Number(m.count)}</span>
+                        <div className="w-full bg-teal-500 rounded-t" style={{ height: `${height}%` }} />
+                        <span className="text-xs text-muted-foreground rotate-45 origin-left" style={{ fontSize: "9px" }}>{m.month}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Lesson stats */}
+          {allowed.has("lesson_stats") && analytics.lessonStats && analytics.lessonStats.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2"><List className="w-4 h-4 text-teal-600" /> Lesson Completion Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {analytics.lessonStats.map((section: any) => (
+                  <div key={section.id}>
+                    <p className="text-xs font-semibold text-gray-600 mb-1">{section.title}</p>
+                    <div className="space-y-1">
+                      {section.lessons.map((lesson: any) => (
+                        <div key={lesson.id} className="flex items-center gap-3 text-xs">
+                          <span className="flex-1 text-gray-700 truncate">{lesson.title}</span>
+                          <span className="text-muted-foreground shrink-0">{lesson.views} views</span>
+                          <span className="text-green-600 shrink-0">{lesson.completions} completed</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -500,6 +672,10 @@ export default function InstructorPortal() {
               <BookOpen className="w-3.5 h-3.5" />
               <span>My Courses</span>
             </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-1.5">
+              <BarChart2 className="w-3.5 h-3.5" />
+              <span>Analytics</span>
+            </TabsTrigger>
             <TabsTrigger value="publish-history" className="flex items-center gap-1.5">
               <Send className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Publish</span> History
@@ -512,6 +688,10 @@ export default function InstructorPortal() {
 
           <TabsContent value="courses">
             <MyCoursesTab />
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <AnalyticsTab />
           </TabsContent>
 
           <TabsContent value="publish-history">

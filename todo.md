@@ -4212,6 +4212,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Teams tab to AdminUserDetailPage.tsx showing organization info and team-seat badges on enrollments
 - [x] Add Native Memberships tab to AdminUserDetailPage.tsx showing active membership subscriptions
 
+## Instructor Dashboard (May 2026)
+- [x] DB: instructor_analytics_permissions table created and migrated
+- [x] Backend: getInstructorAnalyticsPermissions, setInstructorAnalyticsPermissions (admin), getMyAnalyticsPermissions, getMyInstructorAnalytics (instructor-scoped), linkInstructorUserAccount, listInstructorsWithDetails procedures
+- [x] Admin UI: InstructorsTab enhanced with user-account linking dialog and analytics permissions dialog
+- [x] InstructorPortal: Analytics tab added (permission-gated metrics: enrollments, revenue, completion rate, avg progress, monthly chart, lesson stats)
+- [x] Profile menu: Instructor Portal link changed from hardcoded external URL to internal /instructor-portal route
+
 ## Download File Block Full Audit & Fix (May 2026)
 - [ ] Audit FileDownloadBlockSettings: upload button, media repo picker, downloads library picker
 - [ ] Fix media repo picker: ensure listAssets query fires correctly and shows all files

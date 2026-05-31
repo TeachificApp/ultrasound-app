@@ -81,6 +81,8 @@ import {
   instructorPayoutConfig,
   affiliateCourseAccess,
   userRoles,
+  instructorAnalyticsPermissions,
+  instructorCoursePermissions,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -2787,6 +2789,165 @@ CRITICAL REQUIREMENTS:
       // Return the affiliate code so the frontend can store it for checkout attribution (30-day window)
       const [aff] = await db.select({ code: lmsAffiliates.code }).from(lmsAffiliates).where(eq(lmsAffiliates.id, link.affiliateId)).limit(1);
       return { ok: true, destinationUrl: link.destinationUrl, affiliateCode: aff?.code ?? null };
+    }),
+
+  // ─── Instructor Analytics Permissions (Admin) ────────────────────────────────
+
+  /** Admin: get all analytics permissions for a specific instructor */
+  getInstructorAnalyticsPermissions: protectedProcedure
+    .input(z.object({ instructorUserId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(instructorAnalyticsPermissions)
+        .where(eq(instructorAnalyticsPermissions.instructorUserId, input.instructorUserId));
+      return rows;
+    }),
+
+  /** Admin: set analytics permissions for an instructor (replaces all existing for that instructor) */
+  setInstructorAnalyticsPermissions: protectedProcedure
+    .input(z.object({
+      instructorUserId: z.number(),
+      // Array of metric names to enable (all others are disabled)
+      metrics: z.array(z.enum(["enrollments", "revenue", "completion_rate", "avg_progress", "lesson_stats", "monthly_chart"])),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Delete all existing permissions for this instructor
+      await db.delete(instructorAnalyticsPermissions)
+        .where(eq(instructorAnalyticsPermissions.instructorUserId, input.instructorUserId));
+      // Insert new permissions
+      if (input.metrics.length > 0) {
+        await db.insert(instructorAnalyticsPermissions).values(
+          input.metrics.map(metric => ({ instructorUserId: input.instructorUserId, metric }))
+        );
+      }
+      return { ok: true };
+    }),
+
+  /** Instructor: get their own analytics permissions */
+  getMyAnalyticsPermissions: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select({ metric: instructorAnalyticsPermissions.metric })
+        .from(instructorAnalyticsPermissions)
+        .where(eq(instructorAnalyticsPermissions.instructorUserId, ctx.user.id));
+      return rows.map(r => r.metric);
+    }),
+
+  /** Instructor: get analytics for their assigned courses, filtered by their permissions */
+  getMyInstructorAnalytics: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Verify this instructor is assigned to the course
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(
+          eq(instructorCoursePermissions.instructorId, ctx.user.id),
+          eq(instructorCoursePermissions.courseId, input.courseId),
+        )).limit(1);
+      if (!perm) throw new TRPCError({ code: "FORBIDDEN", message: "You are not assigned to this course." });
+      // Get allowed metrics
+      const permRows = await db.select({ metric: instructorAnalyticsPermissions.metric })
+        .from(instructorAnalyticsPermissions)
+        .where(eq(instructorAnalyticsPermissions.instructorUserId, ctx.user.id));
+      const allowed = new Set(permRows.map(r => r.metric));
+      // Build analytics object based on allowed metrics
+      const result: Record<string, any> = { courseId: input.courseId, allowedMetrics: [...allowed] };
+      if (allowed.has("enrollments")) {
+        const [{ total }] = await db.select({ total: sql<number>`count(*)` }).from(lmsEnrollments).where(eq(lmsEnrollments.courseId, input.courseId));
+        result.totalEnrollments = Number(total);
+      }
+      if (allowed.has("completion_rate")) {
+        const [{ completed }] = await db.select({ completed: sql<number>`count(*)` }).from(lmsEnrollments).where(and(eq(lmsEnrollments.courseId, input.courseId), isNotNull(lmsEnrollments.completedAt)));
+        const total = result.totalEnrollments ?? (await db.select({ t: sql<number>`count(*)` }).from(lmsEnrollments).where(eq(lmsEnrollments.courseId, input.courseId)).then(r => Number(r[0].t)));
+        result.completionRate = total > 0 ? Math.round((Number(completed) / total) * 100) : 0;
+        result.completedEnrollments = Number(completed);
+      }
+      if (allowed.has("avg_progress")) {
+        const [{ avg }] = await db.select({ avg: sql<number>`AVG(${lmsEnrollments.progressPct})` }).from(lmsEnrollments).where(eq(lmsEnrollments.courseId, input.courseId));
+        result.avgProgress = Math.round(Number(avg ?? 0));
+      }
+      if (allowed.has("revenue")) {
+        const orders = await db.select({ amount: lmsOrders.amount }).from(lmsOrders).where(and(eq(lmsOrders.courseId, input.courseId), eq(lmsOrders.status, "paid")));
+        result.totalRevenue = orders.reduce((s, o) => s + (o.amount ?? 0), 0);
+      }
+      if (allowed.has("monthly_chart")) {
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+        const monthly = await db.select({
+          month: sql<string>`DATE_FORMAT(${lmsEnrollments.enrolledAt}, '%Y-%m')`,
+          count: sql<number>`count(*)`,
+        }).from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.courseId, input.courseId), sql`${lmsEnrollments.enrolledAt} >= ${twelveMonthsAgo.toISOString().slice(0, 10)}`));
+        result.monthlyEnrollments = monthly;
+      }
+      if (allowed.has("lesson_stats")) {
+        const sections = await db.select({ id: lmsSections.id, title: lmsSections.title, position: lmsSections.position }).from(lmsSections).where(eq(lmsSections.courseId, input.courseId)).orderBy(asc(lmsSections.position));
+        result.lessonStats = await Promise.all(sections.map(async (s) => {
+          const lessons = await db.select({ id: lmsLessons.id, title: lmsLessons.title, position: lmsLessons.position }).from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
+          const withStats = await Promise.all(lessons.map(async (l) => {
+            const [{ completions }] = await db.select({ completions: sql<number>`count(*)` }).from(lmsLessonProgress).where(and(eq(lmsLessonProgress.lessonId, l.id), isNotNull(lmsLessonProgress.completedAt)));
+            const [{ views }] = await db.select({ views: sql<number>`count(*)` }).from(lmsLessonProgress).where(eq(lmsLessonProgress.lessonId, l.id));
+            return { ...l, completions: Number(completions), views: Number(views) };
+          }));
+          return { ...s, lessons: withStats };
+        }));
+      }
+      return result;
+    }),
+
+  /** Admin: link a user account to an lms_instructors profile */
+  linkInstructorUserAccount: protectedProcedure
+    .input(z.object({
+      instructorId: z.number(),   // lms_instructors.id
+      userId: z.number().nullable(), // users.id — null to unlink
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsInstructors).set({ userId: input.userId }).where(eq(lmsInstructors.id, input.instructorId));
+      return { ok: true };
+    }),
+
+  /** Admin: list all instructors with linked user account info and course assignments */
+  listInstructorsWithDetails: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const instructors = await db.select().from(lmsInstructors).orderBy(asc(lmsInstructors.name));
+      return Promise.all(instructors.map(async (ins) => {
+        // Linked user account
+        const linkedUser = ins.userId
+          ? await db.select({ id: users.id, name: users.name, email: users.email, role: users.role })
+              .from(users).where(eq(users.id, ins.userId)).limit(1).then(r => r[0] ?? null)
+          : null;
+        // Course assignments
+        const courses = await db.select({
+          courseId: lmsCourseInstructors.courseId,
+          revenueSharePct: lmsCourseInstructors.revenueSharePct,
+          isPrimary: lmsCourseInstructors.isPrimary,
+          courseTitle: lmsCourses.title,
+          courseStatus: lmsCourses.status,
+        }).from(lmsCourseInstructors)
+          .leftJoin(lmsCourses, eq(lmsCourses.id, lmsCourseInstructors.courseId))
+          .where(eq(lmsCourseInstructors.instructorId, ins.id));
+        // Analytics permissions (by linked userId)
+        const analyticsPerms = ins.userId
+          ? await db.select({ metric: instructorAnalyticsPermissions.metric })
+              .from(instructorAnalyticsPermissions)
+              .where(eq(instructorAnalyticsPermissions.instructorUserId, ins.userId))
+              .then(r => r.map(x => x.metric))
+          : [];
+        return { ...ins, linkedUser, courses, analyticsPerms };
+      }));
     }),
 });
 

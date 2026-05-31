@@ -26,7 +26,7 @@ function slugify(title: string) {
 const listPublicMemberships = publicProcedure
   .input(z.object({ brand: z.string().optional() }).optional())
   .query(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const plans = await db
       .select()
@@ -39,7 +39,7 @@ const listPublicMemberships = publicProcedure
 const getMembershipBySlug = publicProcedure
   .input(z.object({ slug: z.string() }))
   .query(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const [plan] = await db
       .select()
@@ -57,7 +57,7 @@ const getMembershipBySlug = publicProcedure
 const validateDiscountCode = publicProcedure
   .input(z.object({ code: z.string(), planId: z.number() }))
   .query(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const [code] = await db
       .select()
@@ -91,7 +91,7 @@ const validateDiscountCode = publicProcedure
 // ─── Protected Procedures (logged-in users) ───────────────────────────────────
 
 const getMyMemberships = protectedProcedure.query(async ({ ctx }) => {
-  const db = getDb();
+  const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
   const subs = await db
     .select({
@@ -118,7 +118,7 @@ const getMyMemberships = protectedProcedure.query(async ({ ctx }) => {
 const checkMembershipAccess = protectedProcedure
   .input(z.object({ planId: z.number() }))
   .query(async ({ ctx, input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) return { hasAccess: false };
     const [sub] = await db
       .select()
@@ -141,7 +141,7 @@ const checkMembershipAccess = protectedProcedure
 const listAllMemberships = adminProcedure
   .input(z.object({ brand: z.string().optional() }).optional())
   .query(async () => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const plans = await db
       .select()
@@ -153,7 +153,7 @@ const listAllMemberships = adminProcedure
 const getMembershipById = adminProcedure
   .input(z.object({ id: z.number() }))
   .query(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const [plan] = await db
       .select()
@@ -194,7 +194,7 @@ const createMembership = adminProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const slug = slugify(input.title);
     const [existing] = await db
@@ -244,7 +244,7 @@ const updateMembership = adminProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { id, ...rest } = input;
     const updateData: Record<string, unknown> = {};
@@ -258,7 +258,7 @@ const updateMembership = adminProcedure
 const deleteMembership = adminProcedure
   .input(z.object({ id: z.number() }))
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await db.delete(membershipPlanAccess).where(eq(membershipPlanAccess.planId, input.id));
     await db.delete(membershipDiscountCodes).where(eq(membershipDiscountCodes.planId, input.id));
@@ -283,7 +283,7 @@ const setMembershipItems = adminProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await db.delete(membershipPlanAccess).where(eq(membershipPlanAccess.planId, input.planId));
     if (input.items.length > 0) {
@@ -310,7 +310,7 @@ const addMembershipItem = adminProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const existing = await db
       .select({ sortOrder: membershipPlanAccess.sortOrder })
@@ -332,7 +332,7 @@ const addMembershipItem = adminProcedure
 const removeMembershipItem = adminProcedure
   .input(z.object({ id: z.number() }))
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await db.delete(membershipPlanAccess).where(eq(membershipPlanAccess.id, input.id));
     return { success: true };
@@ -343,7 +343,7 @@ const removeMembershipItem = adminProcedure
 const listDiscountCodes = adminProcedure
   .input(z.object({ planId: z.number().optional() }))
   .query(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const conditions = input.planId
       ? or(eq(membershipDiscountCodes.planId, input.planId), isNull(membershipDiscountCodes.planId))
@@ -367,7 +367,7 @@ const createDiscountCode = adminProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const code = input.code.toUpperCase().trim();
     const [existing] = await db
@@ -398,7 +398,7 @@ const updateDiscountCode = adminProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { id, ...rest } = input;
     const updateData: Record<string, unknown> = {};
@@ -412,7 +412,7 @@ const updateDiscountCode = adminProcedure
 const deleteDiscountCode = adminProcedure
   .input(z.object({ id: z.number() }))
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await db.delete(membershipDiscountCodes).where(eq(membershipDiscountCodes.id, input.id));
     return { success: true };
@@ -423,7 +423,7 @@ const deleteDiscountCode = adminProcedure
 const updateLandingPageBlocks = adminProcedure
   .input(z.object({ id: z.number(), blocks: z.string() }))
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await db
       .update(membershipPlans)
@@ -435,7 +435,7 @@ const updateLandingPageBlocks = adminProcedure
 const updateMemberPageBlocks = adminProcedure
   .input(z.object({ id: z.number(), blocks: z.string() }))
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await db
       .update(membershipPlans)
@@ -456,7 +456,7 @@ const manualEnroll = adminProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const [existing] = await db
       .select({ id: membershipSubscriptions.id })
@@ -486,7 +486,7 @@ const manualEnroll = adminProcedure
 const cancelEnrollment = adminProcedure
   .input(z.object({ subscriptionId: z.number() }))
   .mutation(async ({ input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await db
       .update(membershipSubscriptions)
@@ -506,7 +506,7 @@ const createMembershipCheckout = protectedProcedure
     })
   )
   .mutation(async ({ ctx, input }) => {
-    const db = getDb();
+    const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const [plan] = await db
       .select()

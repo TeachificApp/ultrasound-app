@@ -5641,3 +5641,29 @@ export const thinkificPostImports = mysqlTable("thinkific_post_imports", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type ThinkificPostImport = typeof thinkificPostImports.$inferSelect;
+
+// ─── Instructor Analytics Permissions ────────────────────────────────────────
+// Admin-controlled table that determines which analytics metrics each instructor
+// can see in their Instructor Portal dashboard. Each row enables one metric for
+// one instructor. If no rows exist for an instructor, they see no analytics.
+// Metrics: enrollments, revenue, completion_rate, avg_progress, lesson_stats, monthly_chart
+export const instructorAnalyticsPermissions = mysqlTable("instructor_analytics_permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  // The user account ID of the instructor (users.id, role must include "instructor")
+  instructorUserId: int("instructor_user_id").notNull(),
+  // Which metric is enabled for this instructor
+  metric: mysqlEnum("metric", [
+    "enrollments",
+    "revenue",
+    "completion_rate",
+    "avg_progress",
+    "lesson_stats",
+    "monthly_chart",
+  ]).notNull(),
+  // Optionally restrict to a specific course (null = applies to all their courses)
+  courseId: int("course_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type InstructorAnalyticsPermission = typeof instructorAnalyticsPermissions.$inferSelect;
+export type InsertInstructorAnalyticsPermission = typeof instructorAnalyticsPermissions.$inferInsert;

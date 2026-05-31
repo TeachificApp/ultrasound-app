@@ -5328,19 +5328,127 @@ function EditTeamDialog({ team, onClose, onSaved }: { team: any; onClose: () => 
 }
 
 
+// ─── Instructor Analytics Permissions Dialog ─────────────────────────────────
+const ALL_METRICS = [
+  { key: "enrollments", label: "Total Enrollments" },
+  { key: "revenue", label: "Revenue" },
+  { key: "completion_rate", label: "Completion Rate" },
+  { key: "avg_progress", label: "Average Progress" },
+  { key: "lesson_stats", label: "Lesson-by-Lesson Stats" },
+  { key: "monthly_chart", label: "Monthly Enrollment Chart" },
+] as const;
+
+function InstructorAnalyticsPermissionsDialog({ instructorUserId, instructorName, onClose }: { instructorUserId: number; instructorName: string; onClose: () => void }) {
+  const utils = trpc.useUtils();
+  const { data: perms, isLoading } = trpc.lmsEnrollmentAdmin.getInstructorAnalyticsPermissions.useQuery({ instructorUserId });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  useEffect(() => { if (perms) setSelected(new Set(perms.map((p: any) => p.metric))); }, [perms]);
+  const setPermsMut = trpc.lmsEnrollmentAdmin.setInstructorAnalyticsPermissions.useMutation({
+    onSuccess: () => { toast.success("Analytics permissions saved"); utils.lmsEnrollmentAdmin.getInstructorAnalyticsPermissions.invalidate(); onClose(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const toggle = (metric: string) => setSelected(prev => { const s = new Set(prev); s.has(metric) ? s.delete(metric) : s.add(metric); return s; });
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Analytics Permissions — {instructorName}</DialogTitle>
+          <DialogDescription>Choose which metrics this instructor can see in their dashboard for all their assigned courses.</DialogDescription>
+        </DialogHeader>
+        {isLoading ? <Skeleton className="h-32 w-full" /> : (
+          <div className="space-y-2 py-2">
+            {ALL_METRICS.map(m => (
+              <label key={m.key} className="flex items-center gap-3 cursor-pointer rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50">
+                <input type="checkbox" checked={selected.has(m.key)} onChange={() => toggle(m.key)} className="w-4 h-4 accent-teal-600" />
+                <span className="text-sm text-gray-800">{m.label}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={setPermsMut.isPending}
+            onClick={() => setPermsMut.mutate({ instructorUserId, metrics: [...selected] as any })}>
+            {setPermsMut.isPending ? "Saving..." : "Save Permissions"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Instructor Link User Dialog ──────────────────────────────────────────────
+function InstructorLinkUserDialog({ instructor, onClose, onLinked }: { instructor: any; onClose: () => void; onLinked: () => void }) {
+  const [query, setQuery] = useState("");
+  const utils = trpc.useUtils();
+  const { data: searchResults, refetch: doSearch, isFetching } = trpc.lmsEnrollmentAdmin.searchUsers.useQuery({ query }, { enabled: false });
+  const linkMut = trpc.lmsEnrollmentAdmin.linkInstructorUserAccount.useMutation({
+    onSuccess: () => { toast.success("User account linked"); utils.lmsEnrollmentAdmin.listInstructorsWithDetails.invalidate(); onLinked(); onClose(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const unlinkMut = trpc.lmsEnrollmentAdmin.linkInstructorUserAccount.useMutation({
+    onSuccess: () => { toast.success("User account unlinked"); utils.lmsEnrollmentAdmin.listInstructorsWithDetails.invalidate(); onLinked(); onClose(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Link User Account — {instructor.name}</DialogTitle>
+          <DialogDescription>Link this instructor profile to a user account so they can access the Instructor Portal and see analytics.</DialogDescription>
+        </DialogHeader>
+        {instructor.linkedUser && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm font-medium text-green-800">{instructor.linkedUser.name}</p>
+              <p className="text-xs text-green-600">{instructor.linkedUser.email}</p>
+            </div>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 h-7 text-xs"
+              onClick={() => unlinkMut.mutate({ instructorId: instructor.id, userId: null })}>Unlink</Button>
+          </div>
+        )}
+        <div className="space-y-3 py-2">
+          <div className="flex gap-2">
+            <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by email or name..." className="flex-1" onKeyDown={e => e.key === "Enter" && doSearch()} />
+            <Button size="sm" variant="outline" onClick={() => doSearch()} disabled={isFetching} className="shrink-0">{isFetching ? "..." : "Search"}</Button>
+          </div>
+          {searchResults && Array.isArray(searchResults) && searchResults.length > 0 && (
+            <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+              {searchResults.map((u: any) => (
+                <div key={u.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
+                  <div>
+                    <p className="text-sm font-medium">{u.name || u.displayName}</p>
+                    <p className="text-xs text-gray-500">{u.email}</p>
+                  </div>
+                  <Button size="sm" className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+                    onClick={() => linkMut.mutate({ instructorId: instructor.id, userId: u.id })}>Link</Button>
+                </div>
+              ))}
+            </div>
+          )}
+          {searchResults && Array.isArray(searchResults) && searchResults.length === 0 && (
+            <p className="text-xs text-gray-400 text-center py-2">No users found</p>
+          )}
+        </div>
+        <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Instructors Tab ──────────────────────────────────────────────────────────
 
 function InstructorsTab() {
-  
-  const { data: instructors, isLoading, refetch } = trpc.lmsAdmin.listInstructors.useQuery();
+  const { data: instructors, isLoading, refetch } = trpc.lmsEnrollmentAdmin.listInstructorsWithDetails.useQuery();
   const [editInstructor, setEditInstructor] = useState<any>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [analyticsPermInstructor, setAnalyticsPermInstructor] = useState<any>(null);
+  const [linkUserInstructor, setLinkUserInstructor] = useState<any>(null);
 
   const updateInstructor = trpc.lmsAdmin.updateInstructor.useMutation({
     onSuccess: () => { toast.success("Instructor saved"); setEditInstructor(null); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
-
   const createInstructor = trpc.lmsAdmin.createInstructor.useMutation({
     onSuccess: () => { toast.success("Instructor created"); setCreateOpen(false); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
@@ -5348,43 +5456,113 @@ function InstructorsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">Instructor Profiles</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Link instructor profiles to user accounts and control what analytics they can see in their portal.</p>
+        </div>
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setCreateOpen(true)}>
           <Plus className="w-4 h-4 mr-1" /> New Instructor
         </Button>
       </div>
 
       {isLoading ? <Skeleton className="h-40 w-full" /> : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-3">
           {(instructors ?? []).map((ins: any) => (
-            <div key={ins.id} className="bg-white rounded-xl border border-gray-200 p-4 flex gap-4">
-              {ins.avatarUrl ? (
-                <img src={ins.avatarUrl} alt={ins.name} className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
-              ) : (
-                <div className="w-14 h-14 rounded-full bg-teal-100 flex items-center justify-center text-xl font-bold text-teal-700 flex-shrink-0">{ins.name[0]}</div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm">{ins.name}</p>
-                {ins.title && <p className="text-xs text-teal-600">{ins.title}</p>}
-                {ins.website && <a href={ins.website} target="_blank" rel="noreferrer" className="text-xs text-gray-400 hover:underline truncate block">{ins.website}</a>}
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="outline" className={`text-xs ${ins.isActive ? "text-green-600 border-green-300" : "text-gray-400"}`}>{ins.isActive ? "Active" : "Inactive"}</Badge>
-                  <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600 hover:bg-teal-50" onClick={() => setEditInstructor(ins)}>
-                    <Edit2 className="w-3 h-3 mr-1" /> Edit
-                  </Button>
+            <div key={ins.id} className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex gap-4">
+                {ins.avatarUrl ? (
+                  <img src={ins.avatarUrl} alt={ins.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center text-lg font-bold text-teal-700 flex-shrink-0">{ins.name?.[0] ?? "?"}</div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">{ins.name}</p>
+                      {ins.title && <p className="text-xs text-teal-600">{ins.title}</p>}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <Badge variant="outline" className={`text-xs ${ins.isActive ? "text-green-600 border-green-300" : "text-gray-400"}`}>{ins.isActive ? "Active" : "Inactive"}</Badge>
+                      <Button size="sm" variant="ghost" className="h-6 text-xs text-gray-500 hover:bg-gray-50" onClick={() => setEditInstructor(ins)}><Edit2 className="w-3 h-3" /></Button>
+                    </div>
+                  </div>
+                  {/* Linked user account */}
+                  <div className="mt-2 flex items-center gap-2">
+                    {ins.linkedUser ? (
+                      <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded px-2 py-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        <span className="text-xs text-green-700 font-medium">{ins.linkedUser.name}</span>
+                        <span className="text-xs text-green-500">{ins.linkedUser.email}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        <span className="text-xs text-amber-700">No user account linked</span>
+                      </div>
+                    )}
+                    <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600 hover:bg-teal-50" onClick={() => setLinkUserInstructor(ins)}>
+                      {ins.linkedUser ? "Change" : "Link User"}
+                    </Button>
+                  </div>
+                  {/* Course assignments */}
+                  {ins.courses && ins.courses.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-400 font-medium mb-1">Assigned Courses</p>
+                      <div className="flex flex-wrap gap-1">
+                        {ins.courses.map((c: any) => (
+                          <span key={c.courseId} className="text-xs bg-gray-100 text-gray-700 rounded px-1.5 py-0.5">
+                            {c.courseTitle ?? `#${c.courseId}`}
+                            {c.isPrimary && <span className="ml-1 text-teal-600 font-medium">★</span>}
+                            {c.revenueSharePct > 0 && <span className="ml-1 text-gray-400">{c.revenueSharePct}%</span>}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Analytics permissions */}
+                  {ins.linkedUser && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      {ins.analyticsPerms && ins.analyticsPerms.length > 0 ? (
+                        ins.analyticsPerms.map((m: string) => (
+                          <span key={m} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5">{m.replace(/_/g, " ")}</span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-400">No analytics access</span>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-6 text-xs text-blue-600 hover:bg-blue-50 shrink-0"
+                        onClick={() => setAnalyticsPermInstructor(ins)}>
+                        <BarChart2 className="w-3 h-3 mr-1" /> Analytics
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           ))}
           {(instructors ?? []).length === 0 && (
-            <div className="col-span-2 text-center py-10 text-gray-400 text-sm">No instructors yet</div>
+            <div className="text-center py-10 text-gray-400 text-sm">No instructors yet</div>
           )}
         </div>
       )}
 
-      {/* Create/Edit dialogs */}
+      {/* Dialogs */}
       {createOpen && <InstructorFormDialog title="New Instructor" onClose={() => setCreateOpen(false)} onSave={data => createInstructor.mutate(data)} saving={createInstructor.isPending} />}
       {editInstructor && <InstructorFormDialog title="Edit Instructor" instructor={editInstructor} onClose={() => setEditInstructor(null)} onSave={data => updateInstructor.mutate({ id: editInstructor.id, ...data })} saving={updateInstructor.isPending} />}
+      {analyticsPermInstructor?.linkedUser && (
+        <InstructorAnalyticsPermissionsDialog
+          instructorUserId={analyticsPermInstructor.linkedUser.id}
+          instructorName={analyticsPermInstructor.name}
+          onClose={() => setAnalyticsPermInstructor(null)}
+        />
+      )}
+      {linkUserInstructor && (
+        <InstructorLinkUserDialog
+          instructor={linkUserInstructor}
+          onClose={() => setLinkUserInstructor(null)}
+          onLinked={() => refetch()}
+        />
+      )}
     </div>
   );
 }

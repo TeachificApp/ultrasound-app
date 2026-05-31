@@ -614,11 +614,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       {roles.includes("instructor") && (
                         <div className="px-2 py-1.5 border-t border-gray-100">
                           <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Instructor</div>
-                          <a href="https://members.allaboutultrasound.com/instructor-portal" onClick={() => setAccountOpen(false)}
+                          <Link href="/instructor-portal" onClick={() => setAccountOpen(false)}
                             className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 transition-all text-left">
                             <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
                             <span className="flex-1">Instructor Portal</span>
-                          </a>
+                          </Link>
                         </div>
                       )}
 
