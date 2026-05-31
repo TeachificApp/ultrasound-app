@@ -206,7 +206,9 @@ function LeadCaptureWidgetForm({
         </div>
       </div>
       <div className="flex gap-2">
-          {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />} {widget ? "Save Changes" : "Create Widget"}
+        <Button size="sm" onClick={handleSave} disabled={!name.trim() || saving} style={{ background: "#189aa1" }} className="text-white">
+          {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />}
+          {widget ? "Save Changes" : "Create Widget"}
         </Button>
         <Button size="sm" variant="outline" onClick={onCancel}>Cancel</Button>
       </div>
