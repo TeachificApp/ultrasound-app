@@ -407,7 +407,16 @@ function PageByPageRenderer({
   onSubmit: (responses: Record<string, any>) => void;
   submitting: boolean; globalError: string;
 }) {
-  const [responses, setResponses] = useState<Record<string, any>>({});
+  // Pre-fill from URL params: ?field_42=John or ?42=John
+  const [responses, setResponses] = useState<Record<string, any>>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const prefilled: Record<string, any> = {};
+    params.forEach((value, key) => {
+      const m = key.match(/^(?:field_)?(\d+)$/);
+      if (m) prefilled[m[1]] = value;
+    });
+    return prefilled;
+  });
   const [currentIdx, setCurrentIdx] = useState(0);
   const [fieldError, setFieldError] = useState("");
   const [direction, setDirection] = useState<"forward" | "back">("forward");
@@ -667,7 +676,16 @@ function ClassicRenderer({
   onSubmit: (responses: Record<string, any>) => void;
   submitting: boolean; globalError: string;
 }) {
-  const [responses, setResponses] = useState<Record<string, any>>({});
+  // Pre-fill from URL params: ?field_42=John or ?42=John
+  const [responses, setResponses] = useState<Record<string, any>>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const prefilled: Record<string, any> = {};
+    params.forEach((value, key) => {
+      const m = key.match(/^(?:field_)?(\d+)$/);
+      if (m) prefilled[m[1]] = value;
+    });
+    return prefilled;
+  });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const hiddenIds = useMemo(() => {

@@ -426,7 +426,16 @@ export default function DynamicFormRenderer({
   readOnly = false,
   initialResponses = {},
 }: DynamicFormRendererProps) {
-  const [responses, setResponses] = useState<Record<string, string | string[]>>(initialResponses);
+  // Pre-fill from URL params: ?field_42=John or ?42=John (merged with any passed initialResponses)
+  const [responses, setResponses] = useState<Record<string, string | string[]>>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const prefilled: Record<string, string | string[]> = {};
+    params.forEach((value, key) => {
+      const m = key.match(/^(?:field_)?(\d+)$/);
+      if (m) prefilled[m[1]] = value;
+    });
+    return { ...prefilled, ...initialResponses };
+  });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
