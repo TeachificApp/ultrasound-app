@@ -26,6 +26,7 @@ import { menuLinksRouter } from "./routers/menuLinksRouter";
 import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
 import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
+import { careerNetworkRouter } from "./routers/careerNetworkRouter";
 import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter } from "./routers/webinarRouter";
 import { thinkificImportRouter } from "./routers/thinkificImportRouter";
 import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter } from "./routers/downloadsRouter";
@@ -2045,6 +2046,7 @@ export const appRouter = router({
   lmsLearner: lmsLearnerRouter,
   lmsAdmin: lmsAdminRouter,
   lmsEnrollmentAdmin: lmsEnrollmentAdminRouter,
+  careerNetwork: careerNetworkRouter,
   lmsGroup: lmsGroupRouter,
   webinar: webinarPublicRouter,
   webinarLearner: webinarLearnerRouter,

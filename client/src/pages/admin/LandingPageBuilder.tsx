@@ -4288,7 +4288,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
         />
       );
     case "file_download": {
-      return <FileDownloadBlockSettings d={d} set={set} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
+      return <FileDownloadBlockSettings d={d} set={set} setMany={setMany} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
     }
     case "scorm_embed": {
       return <ScormEmbedBlockSettings d={d} set={set} dataRef={dataRef} onChangeRef={onChangeRef} />;
@@ -6556,9 +6556,10 @@ export default function LandingPageBuilder() {
 }
 
 // ─── File Download Block Settings ─────────────────────────────────────────────
-function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedia }: {
+function FileDownloadBlockSettings({ d, set, setMany, uploading, setUploading, uploadMedia }: {
   d: Record<string, any>;
   set: (key: string, val: any) => void;
+  setMany: (patch: Record<string, any>) => void;
   uploading: string | null;
   setUploading: (v: string | null) => void;
   uploadMedia: any;
@@ -6588,10 +6589,12 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
       const reader = new FileReader();
       const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
       const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context: "file-download-block" });
-      set("fileUrl", result.url);
-      set("fileName", file.name);
-      set("fileSize", file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`);
-      set("source", "upload");
+      setMany({
+        fileUrl: result.url,
+        fileName: file.name,
+        fileSize: file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`,
+        source: "upload",
+      });
       toast.success("File uploaded successfully");
     } catch (err: any) { toast.error(err.message || "Upload failed"); }
     setUploading(null);
@@ -6606,15 +6609,17 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
         ? `${(asset.currentVersion.fileSize / (1024 * 1024)).toFixed(1)} MB`
         : `${Math.round(asset.currentVersion.fileSize / 1024)} KB`
       : "";
-    set("source", "media_repo");
-    set("mediaAssetId", asset.id);
-    set("mediaAssetSlug", slug);
-    set("mediaAssetTitle", title);
-    set("mediaAssetUrl", url);
-    set("fileUrl", url);
-    set("fileName", asset.currentVersion?.fileName ?? title);
-    set("fileSize", size);
-    if (!d.label) set("label", title);
+    setMany({
+      source: "media_repo",
+      mediaAssetId: asset.id,
+      mediaAssetSlug: slug,
+      mediaAssetTitle: title,
+      mediaAssetUrl: url,
+      fileUrl: url,
+      fileName: asset.currentVersion?.fileName ?? title,
+      fileSize: size,
+      ...(!d.label ? { label: title } : {}),
+    });
     setShowPicker(false);
     toast.success("File selected from media repository");
   };
@@ -6625,27 +6630,31 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
         ? `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`
         : `${Math.round(file.fileSize / 1024)} KB`
       : "";
-    set("source", "download_library");
-    set("fileUrl", file.fileUrl);
-    set("fileName", file.fileName);
-    set("fileSize", size);
-    set("downloadProductId", file.productId);
-    set("downloadFileId", file.id);
-    if (!d.label) set("label", file.fileName.replace(/\.[^.]+$/, ""));
+    setMany({
+      source: "download_library",
+      fileUrl: file.fileUrl,
+      fileName: file.fileName,
+      fileSize: size,
+      downloadProductId: file.productId,
+      downloadFileId: file.id,
+      ...(!d.label ? { label: file.fileName.replace(/\.[^.]+$/, "") } : {}),
+    });
     setShowPicker(false);
     toast.success("File selected from downloads library");
   };
 
   const clearFile = () => {
-    set("fileUrl", "");
-    set("fileName", "");
-    set("fileSize", "");
-    set("mediaAssetId", null);
-    set("mediaAssetUrl", "");
-    set("mediaAssetTitle", "");
-    set("downloadProductId", null);
-    set("downloadFileId", null);
-    set("source", "upload");
+    setMany({
+      fileUrl: "",
+      fileName: "",
+      fileSize: "",
+      mediaAssetId: null,
+      mediaAssetUrl: "",
+      mediaAssetTitle: "",
+      downloadProductId: null,
+      downloadFileId: null,
+      source: "upload",
+    });
   };
 
   const currentFileName = d.source === "media_repo"

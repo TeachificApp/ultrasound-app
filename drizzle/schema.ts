@@ -5690,3 +5690,145 @@ export const instructorAnalyticsPermissions = mysqlTable("instructor_analytics_p
 });
 export type InstructorAnalyticsPermission = typeof instructorAnalyticsPermissions.$inferSelect;
 export type InsertInstructorAnalyticsPermission = typeof instructorAnalyticsPermissions.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAREER NETWORK MODULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Job categories / tags */
+export const jobCategories = mysqlTable("job_categories", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 100 }).notNull(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  color: varchar("color", { length: 20 }).default("#0d9488"),
+  icon: varchar("icon", { length: 50 }),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type JobCategory = typeof jobCategories.$inferSelect;
+export type InsertJobCategory = typeof jobCategories.$inferInsert;
+
+/** RSS feeds and web URLs to scrape for job postings */
+export const jobSources = mysqlTable("job_sources", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 200 }).notNull(),
+  type: mysqlEnum("type", ["rss", "url"]).notNull().default("rss"),
+  url: text("url").notNull(),
+  categoryId: int("category_id"),
+  isActive: boolean("is_active").default(true),
+  lastFetchedAt: timestamp("last_fetched_at"),
+  fetchIntervalHours: int("fetch_interval_hours").default(6),
+  scheduleCronTaskUid: varchar("schedule_cron_task_uid", { length: 65 }),
+  totalFetched: int("total_fetched").default(0),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type JobSource = typeof jobSources.$inferSelect;
+export type InsertJobSource = typeof jobSources.$inferInsert;
+
+/** Individual job postings (scraped or internal) */
+export const jobs = mysqlTable("jobs", {
+  id: int("id").primaryKey().autoincrement(),
+  sourceId: int("source_id"),
+  externalId: varchar("external_id", { length: 500 }),
+  title: varchar("title", { length: 500 }).notNull(),
+  company: varchar("company", { length: 300 }).notNull(),
+  companyLogoUrl: text("company_logo_url"),
+  location: varchar("location", { length: 300 }),
+  locationType: mysqlEnum("location_type", ["remote", "onsite", "hybrid"]).default("onsite"),
+  employmentType: mysqlEnum("employment_type", ["full_time", "part_time", "contract", "per_diem", "travel", "prn"]).default("full_time"),
+  description: longtext("description"),
+  descriptionHtml: longtext("description_html"),
+  applyUrl: text("apply_url"),
+  applyEmail: varchar("apply_email", { length: 300 }),
+  salary: varchar("salary", { length: 200 }),
+  salaryMin: int("salary_min"),
+  salaryMax: int("salary_max"),
+  salaryCurrency: varchar("salary_currency", { length: 10 }).default("USD"),
+  salaryPeriod: mysqlEnum("salary_period", ["hourly", "daily", "weekly", "annual"]).default("annual"),
+  categoryId: int("category_id"),
+  tags: text("tags"),
+  status: mysqlEnum("status", ["active", "expired", "draft", "closed"]).default("active"),
+  isInternal: boolean("is_internal").default(false),
+  isFeatured: boolean("is_featured").default(false),
+  postedById: int("posted_by_id"),
+  expiresAt: timestamp("expires_at"),
+  publishedAt: timestamp("published_at").defaultNow(),
+  viewCount: int("view_count").default(0),
+  applyCount: int("apply_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type Job = typeof jobs.$inferSelect;
+export type InsertJob = typeof jobs.$inferInsert;
+
+/** Candidate profiles */
+export const candidateProfiles = mysqlTable("candidate_profiles", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull().unique(),
+  headline: varchar("headline", { length: 300 }),
+  bio: text("bio"),
+  location: varchar("location", { length: 200 }),
+  phone: varchar("phone", { length: 50 }),
+  linkedinUrl: text("linkedin_url"),
+  portfolioUrl: text("portfolio_url"),
+  yearsExperience: int("years_experience"),
+  specialties: text("specialties"),
+  certifications: text("certifications"),
+  availability: mysqlEnum("availability", ["immediately", "2_weeks", "1_month", "3_months", "not_looking"]).default("not_looking"),
+  desiredSalary: varchar("desired_salary", { length: 100 }),
+  desiredLocationType: mysqlEnum("desired_location_type", ["remote", "onsite", "hybrid", "any"]).default("any"),
+  isPublic: boolean("is_public").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type CandidateProfile = typeof candidateProfiles.$inferSelect;
+export type InsertCandidateProfile = typeof candidateProfiles.$inferInsert;
+
+/** Resumes attached to candidate profiles */
+export const resumes = mysqlTable("resumes", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  fileUrl: text("file_url"),
+  fileKey: varchar("file_key", { length: 500 }),
+  content: longtext("content"),
+  contentJson: longtext("content_json"),
+  isAiGenerated: boolean("is_ai_generated").default(false),
+  isPrimary: boolean("is_primary").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type Resume = typeof resumes.$inferSelect;
+export type InsertResume = typeof resumes.$inferInsert;
+
+/** Job applications (for internal postings) */
+export const jobApplications = mysqlTable("job_applications", {
+  id: int("id").primaryKey().autoincrement(),
+  jobId: int("job_id").notNull(),
+  userId: int("user_id").notNull(),
+  resumeId: int("resume_id"),
+  coverLetter: text("cover_letter"),
+  status: mysqlEnum("status", ["submitted", "reviewing", "interview", "offer", "rejected", "withdrawn"]).default("submitted"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type JobApplication = typeof jobApplications.$inferSelect;
+export type InsertJobApplication = typeof jobApplications.$inferInsert;
+
+/** Career Network page settings */
+export const careerNetworkSettings = mysqlTable("career_network_settings", {
+  id: int("id").primaryKey().autoincrement(),
+  heroTitle: varchar("hero_title", { length: 300 }).default("Ultrasound Career Network"),
+  heroSubtitle: text("hero_subtitle"),
+  heroImageUrl: text("hero_image_url"),
+  featuredBannerHtml: longtext("featured_banner_html"),
+  seoTitle: varchar("seo_title", { length: 300 }),
+  seoDescription: text("seo_description"),
+  showCandidateProfiles: boolean("show_candidate_profiles").default(true),
+  allowGuestApply: boolean("allow_guest_apply").default(false),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type CareerNetworkSettings = typeof careerNetworkSettings.$inferSelect;

@@ -254,7 +254,7 @@ importers:
         specifier: ^6.0.116
         version: 6.0.116(zod@3.25.76)
       axios:
-        specifier: ^1.12.0
+        specifier: ^1.12.2
         version: 1.12.2
       bcryptjs:
         specifier: ^3.0.3
