@@ -38,6 +38,7 @@ import { leaderboardRouter } from "./routers/leaderboardRouter";
 import { abTestRouter } from "./routers/abTestRouter";
 import { engagementRouter } from "./routers/engagementRouter";
 import { brandMembershipRouter } from "./routers/brandMembershipRouter";
+import { membershipRouter } from "./routers/membershipRouter";
 import { productsPublicRouter, productsLearnerRouter, productsAdminRouter } from "./routers/productsRouter";
 import { dashboardRouter } from "./routers/dashboardRouter";
 import { embeddedCheckoutRouter } from "./routers/embeddedCheckoutRouter";
@@ -2072,6 +2073,7 @@ export const appRouter = router({
   engagement: engagementRouter,
   // ─── Brand Membership (multi-tenant premium) ─────────────────────────────────
   brandMembership: brandMembershipRouter,
+  membership: membershipRouter,
 
   // ─── Student Dashboard ───────────────────────────────────────────────────────
   dashboard: dashboardRouter,

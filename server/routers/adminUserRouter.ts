@@ -165,6 +165,55 @@ export const adminUserRouter = router({
         ORDER BY po.created_at DESC
       `);
 
+      // Team / group memberships — find all groups this user has a seat in
+      const teamSeats = await db.execute(sql`
+        SELECT
+          gs.id AS seatId,
+          gs.group_id AS groupId,
+          gs.status AS seatStatus,
+          gs.assigned_at AS assignedAt,
+          gs.accepted_at AS acceptedAt,
+          gs.enrollment_id AS enrollmentId,
+          g.name AS groupName,
+          g.org_name AS orgName,
+          g.admin_email AS adminEmail,
+          g.admin_phone AS adminPhone,
+          g.website AS orgWebsite,
+          g.notes AS groupNotes,
+          g.created_at AS groupCreatedAt,
+          c.title AS courseTitle,
+          c.id AS courseId
+        FROM lms_group_seats gs
+        JOIN lms_groups g ON g.id = gs.group_id
+        LEFT JOIN lms_enrollments e ON e.id = gs.enrollment_id
+        LEFT JOIN lms_courses c ON c.id = e.course_id
+        WHERE gs.email = (SELECT email FROM users WHERE id = ${input.userId} LIMIT 1)
+           OR gs.enrollment_id IN (SELECT id FROM lms_enrollments WHERE user_id = ${input.userId})
+        ORDER BY gs.assigned_at DESC
+      `);
+
+      // Native membership subscriptions (membership_plans)
+      const nativeMemberships = await db.execute(sql`
+        SELECT
+          ms.id,
+          ms.status,
+          ms.created_at AS createdAt,
+          ms.current_period_start AS currentPeriodStart,
+          ms.current_period_end AS currentPeriodEnd,
+          ms.stripe_subscription_id AS stripeSubscriptionId,
+          mp.id AS planId,
+          mp.title AS planTitle,
+          mp.slug AS planSlug,
+          mp.billing_interval AS billingInterval,
+          mp.price,
+          mp.currency,
+          mp.brand
+        FROM membership_subscriptions ms
+        JOIN membership_plans mp ON mp.id = ms.plan_id
+        WHERE ms.user_id = ${input.userId}
+        ORDER BY ms.created_at DESC
+      `);
+
       return {
         user,
         enrollments: (enrollments as any[]).map(r => ({
@@ -206,6 +255,38 @@ export const adminUserRouter = router({
           shippingAddress: r.shippingAddress as string | null,
           productTitle: String(r.productTitle),
           productSlug: String(r.productSlug),
+        })),
+        teamSeats: (teamSeats as any[]).map(r => ({
+          seatId: Number(r.seatId),
+          groupId: Number(r.groupId),
+          seatStatus: String(r.seatStatus ?? "pending"),
+          assignedAt: r.assignedAt,
+          acceptedAt: r.acceptedAt ?? null,
+          enrollmentId: r.enrollmentId ? Number(r.enrollmentId) : null,
+          groupName: String(r.groupName ?? ""),
+          orgName: r.orgName ? String(r.orgName) : null,
+          adminEmail: r.adminEmail ? String(r.adminEmail) : null,
+          adminPhone: r.adminPhone ? String(r.adminPhone) : null,
+          orgWebsite: r.orgWebsite ? String(r.orgWebsite) : null,
+          groupNotes: r.groupNotes ? String(r.groupNotes) : null,
+          groupCreatedAt: r.groupCreatedAt,
+          courseTitle: r.courseTitle ? String(r.courseTitle) : null,
+          courseId: r.courseId ? Number(r.courseId) : null,
+        })),
+        nativeMemberships: (nativeMemberships as any[]).map(r => ({
+          id: Number(r.id),
+          status: String(r.status ?? "active"),
+          createdAt: r.createdAt,
+          currentPeriodStart: r.currentPeriodStart ? Number(r.currentPeriodStart) : null,
+          currentPeriodEnd: r.currentPeriodEnd ? Number(r.currentPeriodEnd) : null,
+          stripeSubscriptionId: r.stripeSubscriptionId ? String(r.stripeSubscriptionId) : null,
+          planId: Number(r.planId),
+          planTitle: String(r.planTitle ?? ""),
+          planSlug: String(r.planSlug ?? ""),
+          billingInterval: String(r.billingInterval ?? "one_time"),
+          price: Number(r.price ?? 0),
+          currency: String(r.currency ?? "usd"),
+          brand: r.brand ? String(r.brand) : null,
         })),
       };
     }),

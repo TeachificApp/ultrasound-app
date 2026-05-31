@@ -18,6 +18,7 @@ import {
   RefreshCw, Loader2, ChevronRight, ChevronLeft, ShoppingCart,
   UserCog, PlusCircle, Trash2, Shield, ShieldOff, BadgeCheck,
   ClipboardCheck, RotateCcw, DollarSign, Edit3, GitMerge, Mail, X,
+  Users2, Building2, Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -203,8 +204,8 @@ function AppRolesPanel({ userId, refetch }: { userId: number; refetch: () => voi
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates" | "communications" | "activity" | "logins";
-const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates", "communications", "activity", "logins"];
+type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates" | "communications" | "activity" | "logins" | "teams";
+const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates", "communications", "activity", "logins", "teams"];
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
@@ -1617,12 +1618,174 @@ function MergeUsersDialog({ userId, userName, onClose }: { userId: number; userN
   );
 }
 
+// ─── Teams Tab ───────────────────────────────────────────────────────────────
+function TeamsTab({ userId, data }: { userId: number; data: any }) {
+  const teamSeats: any[] = data?.teamSeats ?? [];
+  const nativeMemberships: any[] = data?.nativeMemberships ?? [];
+
+  // Group seats by groupId
+  const groupsMap = new Map<number, { groupId: number; groupName: string; orgName: string | null; adminEmail: string | null; adminPhone: string | null; orgWebsite: string | null; groupNotes: string | null; groupCreatedAt: any; seats: any[] }>();
+  for (const seat of teamSeats) {
+    if (!groupsMap.has(seat.groupId)) {
+      groupsMap.set(seat.groupId, {
+        groupId: seat.groupId,
+        groupName: seat.groupName,
+        orgName: seat.orgName,
+        adminEmail: seat.adminEmail,
+        adminPhone: seat.adminPhone,
+        orgWebsite: seat.orgWebsite,
+        groupNotes: seat.groupNotes,
+        groupCreatedAt: seat.groupCreatedAt,
+        seats: [],
+      });
+    }
+    groupsMap.get(seat.groupId)!.seats.push(seat);
+  }
+  const groups = Array.from(groupsMap.values());
+
+  const seatStatusColor = (s: string) =>
+    s === "active" ? "bg-green-100 text-green-700" :
+    s === "pending" ? "bg-yellow-100 text-yellow-700" :
+    "bg-red-100 text-red-700";
+
+  const membershipStatusColor = (s: string) =>
+    s === "active" ? "bg-green-100 text-green-700" :
+    s === "trialing" ? "bg-blue-100 text-blue-700" :
+    s === "canceled" ? "bg-red-100 text-red-700" :
+    "bg-gray-100 text-gray-600";
+
+  const billingLabel: Record<string, string> = {
+    monthly: "/month", annual: "/year", lifetime: " (lifetime)", one_time: "",
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Team Organizations */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Users2 className="w-5 h-5 text-[#189aa1]" />
+          <h2 className="text-lg font-semibold text-gray-800">Team Organizations</h2>
+          <span className="ml-auto text-xs text-gray-400">{groups.length} organization{groups.length !== 1 ? "s" : ""}</span>
+        </div>
+
+        {groups.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">
+            <Users2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">This student is not part of any team organization.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {groups.map(group => (
+              <div key={group.groupId} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-start gap-3 p-4 border-b border-gray-50 bg-[#f0fbfc]/60">
+                  <div className="w-9 h-9 rounded-lg bg-[#189aa1]/10 flex items-center justify-center shrink-0">
+                    <Building2 className="w-5 h-5 text-[#189aa1]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800 text-sm">{group.groupName}</p>
+                    {group.orgName && <p className="text-xs text-gray-500">{group.orgName}</p>}
+                    <div className="flex flex-wrap gap-3 mt-1">
+                      {group.adminEmail && (
+                        <a href={`mailto:${group.adminEmail}`} className="text-xs text-[#189aa1] hover:underline flex items-center gap-1">
+                          <Mail className="w-3 h-3" /> {group.adminEmail}
+                        </a>
+                      )}
+                      {group.orgWebsite && (
+                        <a href={group.orgWebsite} target="_blank" rel="noreferrer" className="text-xs text-[#189aa1] hover:underline flex items-center gap-1">
+                          <ExternalLink className="w-3 h-3" /> {group.orgWebsite}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <a
+                    href={`/admin/lms?tab=groups&groupId=${group.groupId}`}
+                    className="text-xs text-gray-400 hover:text-[#189aa1] flex items-center gap-1 shrink-0"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" /> View Team
+                  </a>
+                </div>
+                <div className="p-4">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Seat Assignments</p>
+                  <div className="space-y-2">
+                    {group.seats.map((seat: any) => (
+                      <div key={seat.seatId} className="flex items-center gap-3 text-sm">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${seatStatusColor(seat.seatStatus)}`}>
+                          {seat.seatStatus}
+                        </span>
+                        {seat.courseTitle ? (
+                          <span className="text-gray-700 flex items-center gap-1">
+                            <BookOpen className="w-3.5 h-3.5 text-gray-400" /> {seat.courseTitle}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic text-xs">No course linked</span>
+                        )}
+                        <span className="ml-auto text-xs text-gray-400">
+                          {seat.acceptedAt
+                            ? `Accepted ${new Date(seat.acceptedAt).toLocaleDateString()}`
+                            : `Assigned ${new Date(seat.assignedAt).toLocaleDateString()}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Native Membership Subscriptions */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Star className="w-5 h-5 text-[#189aa1]" />
+          <h2 className="text-lg font-semibold text-gray-800">Membership Subscriptions</h2>
+          <span className="ml-auto text-xs text-gray-400">{nativeMemberships.length} membership{nativeMemberships.length !== 1 ? "s" : ""}</span>
+        </div>
+
+        {nativeMemberships.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">
+            <Star className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No membership subscriptions found.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {nativeMemberships.map((ms: any) => (
+              <div key={ms.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
+                <div className="w-9 h-9 rounded-lg bg-[#189aa1]/10 flex items-center justify-center shrink-0">
+                  <Star className="w-5 h-5 text-[#189aa1]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 text-sm">{ms.planTitle}</p>
+                  <p className="text-xs text-gray-500">
+                    {ms.brand && <span className="mr-2 capitalize">{ms.brand}</span>}
+                    {new Intl.NumberFormat("en-US", { style: "currency", currency: ms.currency }).format(ms.price / 100)}
+                    {billingLabel[ms.billingInterval] ?? ""}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${membershipStatusColor(ms.status)}`}>
+                    {ms.status}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Since {new Date(ms.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "profile",        label: "Profile",        icon: User },
   { key: "content",        label: "Content",         icon: BookOpen },
   { key: "transactions",   label: "Transactions",    icon: DollarSign },
   { key: "subscriptions",  label: "Subscriptions",   icon: CreditCard },
+  { key: "teams",          label: "Teams",           icon: Users2 },
   { key: "certificates",   label: "Certificates",    icon: Award },
   { key: "communications", label: "Emails",          icon: FileText },
   { key: "activity",       label: "Activity",        icon: ClipboardCheck },
@@ -1767,6 +1930,7 @@ export default function AdminUserDetailPage() {
           {activeTab === "communications"  && <CommunicationsTab userId={userId!} />}
           {activeTab === "activity"      && <ActivityTab      userId={userId!} />}
           {activeTab === "logins"        && <LoginsTab        userId={userId!} />}
+          {activeTab === "teams"         && <TeamsTab         userId={userId!} data={data} />}
         </div>
       </div>
 

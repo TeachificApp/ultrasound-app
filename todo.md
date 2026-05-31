@@ -4191,3 +4191,23 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add tRPC procedures: getLessonDiscussions, postLessonDiscussion, replyToLessonDiscussion
 - [ ] Render lesson discussions in the lesson viewer UI (below video/content)
 - [ ] Admin UI: sync status for lesson discussions per course
+
+## Membership Feature (May 2026)
+- [x] Extend membership_plans schema: accentColor, featureBullets, landingPageBlocks, memberPageBlocks, trialDays, compareAtPrice, publishDomain, settings
+- [x] Add membership_discount_codes table with percent/fixed discount types, maxUses, expiresAt
+- [x] Build membershipRouter: CRUD for plans, items, discount codes, enrollment, page content, validateCode, createCheckout, myMemberships
+- [x] Register membershipRouter in routers.ts
+- [x] Build MembershipsAdmin.tsx: tier list, editor with Settings/Items/Discount Codes/Sales Page/Member Page/Members tabs
+- [x] Build MembershipPageBuilder.tsx: embedded block editor reusing BLOCK_CATALOG and BlockSettings
+- [x] Wire MembershipsAdmin into LMSAdmin Memberships tab (replacing Coming Soon)
+- [x] Build MembershipPage.tsx: public-facing sales landing page with Stripe checkout and discount code support
+- [x] Build MyMemberships.tsx: member dashboard showing active memberships and admin-configured member page blocks
+- [x] Register /memberships/:slug and /my-memberships routes in App.tsx
+- [x] Wire Stripe webhook for membership checkout.session.completed fulfillment
+- [x] Fix useToast -> sonner toast in MembershipPage.tsx and MembershipsAdmin.tsx
+
+## Teams Section on Student Profiles (May 2026)
+- [x] Audit existing lmsGroups, lmsGroupSeats, lmsGroupCourses schema (groupId already on lmsEnrollments)
+- [x] Extend getUserDetail in adminUserRouter.ts to include teamSeats (group + seat + enrollment data) and nativeMemberships
+- [x] Add Teams tab to AdminUserDetailPage.tsx showing organization info and team-seat badges on enrollments
+- [x] Add Native Memberships tab to AdminUserDetailPage.tsx showing active membership subscriptions

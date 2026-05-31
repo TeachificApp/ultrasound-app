@@ -4553,15 +4553,26 @@ export const membershipPlans = mysqlTable("membership_plans", {
   brand: mysqlEnum("brand", ["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound").notNull(),
   description: longtext("description"),
   coverImage: text("cover_image"),
+  iconImage: text("icon_image"),
+  accentColor: varchar("accent_color", { length: 32 }).default("#189aa1"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
-  billingInterval: mysqlEnum("billing_interval", ["monthly", "annual", "lifetime"]).default("monthly").notNull(),
+  billingInterval: mysqlEnum("billing_interval", ["monthly", "annual", "lifetime", "one_time"]).default("monthly").notNull(),
   price: int("price").default(0).notNull(),
+  compareAtPrice: int("compare_at_price"),
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   stripeProductId: varchar("stripe_product_id", { length: 128 }),
   stripePriceId: varchar("stripe_price_id", { length: 128 }),
   features: longtext("features"),
+  /** JSON array of feature bullet strings shown on sales page */
+  featureBullets: longtext("feature_bullets"),
   landingPageBlocks: longtext("landing_page_blocks"),
+  /** Member-facing page blocks (shown after purchase) */
+  memberPageBlocks: longtext("member_page_blocks"),
   trialDays: int("trial_days").default(0),
+  sortOrder: int("sort_order").default(0).notNull(),
+  publishDomain: varchar("publish_domain", { length: 255 }),
+  /** JSON: { maxMembers, requireApproval, welcomeEmailSubject, welcomeEmailBody } */
+  settings: longtext("settings"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4571,8 +4582,11 @@ export type NewMembershipPlan = typeof membershipPlans.$inferInsert;
 export const membershipPlanAccess = mysqlTable("membership_plan_access", {
   id: int("id").autoincrement().primaryKey(),
   planId: int("plan_id").notNull(),
-  itemType: mysqlEnum("item_type", ["course", "bundle", "community", "webinar", "download"]).notNull(),
-  itemId: int("item_id").notNull(),
+  itemType: mysqlEnum("item_type", ["course", "quiz", "bundle", "community", "webinar", "download", "product", "all_courses", "all_downloads"]).notNull(),
+  itemId: int("item_id"),
+  /** Human-readable label override */
+  label: varchar("label", { length: 255 }),
+  sortOrder: int("sort_order").default(0).notNull(),
 });
 export type MembershipPlanAccess = typeof membershipPlanAccess.$inferSelect;
 
@@ -4589,6 +4603,25 @@ export const membershipSubscriptions = mysqlTable("membership_subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type MembershipSubscription = typeof membershipSubscriptions.$inferSelect;
+
+export const membershipDiscountCodes = mysqlTable("membership_discount_codes", {
+  id: int("id").autoincrement().primaryKey(),
+  planId: int("plan_id"),
+  /** null = applies to all plans */
+  code: varchar("code", { length: 64 }).notNull().unique(),
+  discountType: mysqlEnum("discount_type", ["percent", "fixed"]).default("percent").notNull(),
+  discountValue: int("discount_value").notNull(),
+  maxUses: int("max_uses"),
+  usedCount: int("used_count").default(0).notNull(),
+  expiresAt: bigint("expires_at", { mode: "number" }),
+  isActive: boolean("is_active").default(true).notNull(),
+  stripePromotionCodeId: varchar("stripe_promotion_code_id", { length: 128 }),
+  stripeCouponId: varchar("stripe_coupon_id", { length: 128 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type MembershipDiscountCode = typeof membershipDiscountCodes.$inferSelect;
+export type NewMembershipDiscountCode = typeof membershipDiscountCodes.$inferInsert;
 
 // ─── Communities ──────────────────────────────────────────────────────────────
 

@@ -16,8 +16,8 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs } from "../../drizzle/schema";
-import { and, eq } from "drizzle-orm";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes } from "../../drizzle/schema";
+import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
@@ -116,6 +116,69 @@ async function handleCheckoutSessionCompleted(session: Record<string, unknown>) 
     title: "🎉 New Concierge Purchase",
     content: `Accreditation Concierge™ purchased by ${customerEmail} for organization "${orgName}". Amount: $${(amountTotal / 100).toFixed(2)}. Concierge access has been activated automatically.`,
   });
+}
+
+async function handleMembershipCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata as Record<string, string>) ?? {};
+  if (meta.type !== "membership") return; // Not a membership purchase
+
+  const userId = meta.user_id ? parseInt(meta.user_id) : null;
+  const planId = meta.plan_id ? parseInt(meta.plan_id) : null;
+  if (!userId || !planId) return;
+
+  const db = await getDb();
+  if (!db) return;
+
+  // Check idempotency
+  const [existing] = await db
+    .select()
+    .from(membershipSubscriptions)
+    .where(and(eq(membershipSubscriptions.userId, userId), eq(membershipSubscriptions.planId, planId)))
+    .limit(1);
+
+  const sessionId = session.id as string;
+  const stripeSubscriptionId = session.subscription as string | undefined;
+  const amountTotal = (session.amount_total as number) ?? 0;
+
+  if (existing) {
+    // Update existing subscription (e.g. reactivation)
+    await db.update(membershipSubscriptions)
+      .set({ status: "active", stripeSubscriptionId: stripeSubscriptionId ?? existing.stripeSubscriptionId, updatedAt: new Date() })
+      .where(eq(membershipSubscriptions.id, existing.id));
+    console.log(`[Stripe] Membership reactivated: userId=${userId}, planId=${planId}`);
+    return;
+  }
+
+  // Get plan info for notification
+  const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.id, planId)).limit(1);
+
+  // Create new subscription record
+  await db.insert(membershipSubscriptions).values({
+    userId,
+    planId,
+    status: "active",
+    stripeSubscriptionId: stripeSubscriptionId ?? null,
+    stripeCheckoutSessionId: sessionId,
+    currentPeriodStart: Date.now(),
+    currentPeriodEnd: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  // Increment discount code usage if one was applied
+  if (meta.discount_code_id) {
+    const dcId = parseInt(meta.discount_code_id);
+    await db.update(membershipDiscountCodes)
+      .set({ usedCount: sql`used_count + 1` })
+      .where(eq(membershipDiscountCodes.id, dcId));
+  }
+
+  await notifyOwner({
+    title: "🎫 New Membership Purchase",
+    content: `User ID ${userId} (${meta.customer_email ?? "unknown"}) purchased membership "${plan?.title ?? `Plan #${planId}`}". Amount: $${(amountTotal / 100).toFixed(2)}.`,
+  });
+
+  console.log(`[Stripe] Membership fulfilled: userId=${userId}, planId=${planId}`);
 }
 
 async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
@@ -1265,6 +1328,7 @@ export function registerStripeWebhook(app: Express) {
           await handleBrandMembershipCheckoutCompleted(sessionObj);
           await handleDualMembershipCheckoutCompleted(sessionObj);
           await handlePhysicalProductCheckoutCompleted(sessionObj);
+          await handleMembershipCheckoutCompleted(sessionObj);
         } else if (eventType === "payment_intent.succeeded") {
           await handleFunnelPaymentIntentSucceeded(sessionObj);
         } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {

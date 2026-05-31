@@ -262,6 +262,8 @@ const AdminSalesPage = lazy(() => import("./pages/admin/AdminSalesPage"));
 const AdminSalesDashboard = lazy(() => import("./pages/admin/AdminSalesDashboard"));
 const AdminDiscountCodesPage = lazy(() => import("./pages/admin/AdminDiscountCodesPage"));
 const MembershipAdmin = lazy(() => import("./pages/admin/MembershipAdmin"));
+const MembershipPage = lazy(() => import("./pages/MembershipPage"));
+const MyMemberships = lazy(() => import("./pages/MyMemberships"));
 const MembersHub = lazy(() => import("./pages/admin/MembersHub"));
 const ProductAnalytics = lazy(() => import("./pages/admin/ProductAnalytics"));
 // ── Community ─────────────────────────────────────────────────────────────────
@@ -488,6 +490,11 @@ function Router() {
         <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
         <Route path="/lab-admin">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
         <Route path="/accreditation-manager">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AccreditationManager /></RoleGuard>}</Route>
+
+        {/* ── Membership Public Pages ───────────────────────────────── */}
+        <Route path="/memberships/:slug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembershipPage /></Suspense>}</Route>
+        <Route path="/my-memberships/:slug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MyMemberships /></Suspense>}</Route>
+        <Route path="/my-memberships">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MyMemberships /></Suspense>}</Route>
 
         {/* ── Public Funnel Pages ────────────────────────────────────── */}
         <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>

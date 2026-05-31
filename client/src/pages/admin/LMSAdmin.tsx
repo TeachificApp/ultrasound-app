@@ -61,6 +61,7 @@ import { useLearnLink } from "@/hooks/useLearnLink";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { WebinarsAdmin } from "./WebinarsAdmin";
+import MembershipsAdmin from "./MembershipsAdmin";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -6358,7 +6359,7 @@ export default function LMSAdmin() {
               {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
               {activeTab === "webinars"    && <WebinarsAdmin />}
               {activeTab === "bundles"     && <LMSComingSoonTab icon={Layers} title="Bundles" description="Package courses, downloads, products, and quizzes together and sell them as a single bundle at a special price." color="teal" />}
-              {activeTab === "memberships" && <LMSComingSoonTab icon={Award} title="Memberships" description="Create membership tiers that unlock course access, community features, and exclusive content on a recurring basis." color="teal" />}
+              {activeTab === "memberships" && <MembershipsAdmin />}
               {activeTab === "communities" && <CommunitiesTab />}
               {activeTab === "orderbumps"  && <OrderBumpsAdmin />}
               {activeTab === "collections" && <CollectionsTab />}
