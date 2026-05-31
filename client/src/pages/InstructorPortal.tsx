@@ -23,10 +23,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import {
   BookOpen, DollarSign, Send, Clock, CheckCircle, XCircle,
   Settings, CreditCard, ChevronRight, AlertCircle, Eye, RefreshCw,
-  BarChart2, TrendingUp, Users, Activity, List
+  BarChart2, TrendingUp, Users, Activity, List,
+  PlusCircle, Pencil, Trash2, GripVertical, Upload, Video, FileText,
+  ChevronDown, ChevronUp, FolderOpen, Loader2, ExternalLink
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,6 +47,473 @@ function statusBadge(status: string) {
 function fmtDate(d: Date | string | null | undefined) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// ─── Course Management Tab ───────────────────────────────────────────────────
+
+type LessonType = "video" | "text" | "quiz" | "download" | "embed" | "video_text";
+
+const LESSON_TYPE_LABELS: Record<LessonType, string> = {
+  video: "Video", text: "Text", quiz: "Quiz", download: "Download", embed: "Embed", video_text: "Video + Text",
+};
+
+function lessonTypeBadge(type: string) {
+  const colors: Record<string, string> = {
+    video: "bg-blue-100 text-blue-700",
+    text: "bg-gray-100 text-gray-700",
+    quiz: "bg-purple-100 text-purple-700",
+    download: "bg-green-100 text-green-700",
+    embed: "bg-orange-100 text-orange-700",
+    video_text: "bg-teal-100 text-teal-700",
+  };
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors[type] ?? "bg-gray-100 text-gray-600"}`}>{LESSON_TYPE_LABELS[type as LessonType] ?? type}</span>;
+}
+
+function CourseManagementTab() {
+  const utils = trpc.useUtils();
+  const { data: myCourses, isLoading: coursesLoading } = trpc.lms.getMyInstructorCourses.useQuery();
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+
+  // Auto-select first course
+  useEffect(() => {
+    if (myCourses && myCourses.length > 0 && !selectedCourseId) {
+      setSelectedCourseId(myCourses[0].courseId ?? null);
+    }
+  }, [myCourses]);
+
+  const { data: course, isLoading: courseLoading, refetch: refetchCourse } = trpc.lmsEnrollmentAdmin.instructorGetCourse.useQuery(
+    { courseId: selectedCourseId! },
+    { enabled: !!selectedCourseId }
+  );
+
+  // Section mutations
+  const createSection = trpc.lmsEnrollmentAdmin.instructorCreateSection.useMutation({
+    onSuccess: () => { toast.success("Section created"); refetchCourse(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateSection = trpc.lmsEnrollmentAdmin.instructorUpdateSection.useMutation({
+    onSuccess: () => { toast.success("Section updated"); refetchCourse(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteSection = trpc.lmsEnrollmentAdmin.instructorDeleteSection.useMutation({
+    onSuccess: () => { toast.success("Section deleted"); refetchCourse(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Lesson mutations
+  const createLesson = trpc.lmsEnrollmentAdmin.instructorCreateLesson.useMutation({
+    onSuccess: () => { toast.success("Lesson created"); refetchCourse(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateLesson = trpc.lmsEnrollmentAdmin.instructorUpdateLesson.useMutation({
+    onSuccess: () => { toast.success("Lesson updated"); refetchCourse(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteLesson = trpc.lmsEnrollmentAdmin.instructorDeleteLesson.useMutation({
+    onSuccess: () => { toast.success("Lesson deleted"); refetchCourse(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const uploadAsset = trpc.lmsEnrollmentAdmin.instructorUploadLessonAsset.useMutation({
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Dialog state
+  const [sectionDialog, setSectionDialog] = useState<{ open: boolean; editing?: { id: number; title: string } }>({
+    open: false,
+  });
+  const [sectionTitle, setSectionTitle] = useState("");
+  const [lessonDialog, setLessonDialog] = useState<{
+    open: boolean;
+    sectionId: number | null;
+    editing?: { id: number; title: string; type: LessonType; embedUrl?: string | null; videoContent?: string | null; content?: string | null; durationMinutes?: number | null; isPreview?: boolean; lessonStatus?: string };
+  }>({ open: false, sectionId: null });
+  const [lessonTitle, setLessonTitle] = useState("");
+  const [lessonType, setLessonType] = useState<LessonType>("text");
+  const [lessonEmbed, setLessonEmbed] = useState("");
+  const [lessonVideo, setLessonVideo] = useState("");
+  const [lessonContent, setLessonContent] = useState("");
+  const [lessonDuration, setLessonDuration] = useState("");
+  const [lessonIsPreview, setLessonIsPreview] = useState(false);
+  const [lessonStatus, setLessonStatus] = useState<"draft" | "published">("draft");
+  const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
+
+  // Upload state
+  const [uploadDialog, setUploadDialog] = useState<{ open: boolean; lessonId: number | null; lessonTitle: string }>({
+    open: false, lessonId: null, lessonTitle: "",
+  });
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(false);
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+
+  function openAddSection() {
+    setSectionTitle("");
+    setSectionDialog({ open: true });
+  }
+
+  function openEditSection(s: { id: number; title: string }) {
+    setSectionTitle(s.title);
+    setSectionDialog({ open: true, editing: s });
+  }
+
+  function openAddLesson(sectionId: number | null) {
+    setLessonTitle(""); setLessonType("text"); setLessonEmbed(""); setLessonVideo("");
+    setLessonContent(""); setLessonDuration(""); setLessonIsPreview(false); setLessonStatus("draft");
+    setLessonDialog({ open: true, sectionId });
+  }
+
+  function openEditLesson(l: { id: number; title: string; type: string; embedUrl?: string | null; videoContent?: string | null; content?: string | null; durationMinutes?: number | null; isPreview?: boolean; lessonStatus?: string | null }, sectionId: number | null) {
+    setLessonTitle(l.title); setLessonType((l.type as LessonType) ?? "text");
+    setLessonEmbed(l.embedUrl ?? ""); setLessonVideo(l.videoContent ?? "");
+    setLessonContent(l.content ?? ""); setLessonDuration(l.durationMinutes ? String(l.durationMinutes) : "");
+    setLessonIsPreview(l.isPreview ?? false); setLessonStatus((l.lessonStatus as "draft" | "published") ?? "draft");
+    setLessonDialog({ open: true, sectionId, editing: { id: l.id, title: l.title, type: (l.type as LessonType), embedUrl: l.embedUrl, videoContent: l.videoContent, content: l.content, durationMinutes: l.durationMinutes, isPreview: l.isPreview, lessonStatus: l.lessonStatus ?? undefined } });
+  }
+
+  function handleSaveSection() {
+    if (!sectionTitle.trim() || !selectedCourseId) return;
+    if (sectionDialog.editing) {
+      updateSection.mutate({ id: sectionDialog.editing.id, courseId: selectedCourseId, title: sectionTitle.trim() });
+    } else {
+      createSection.mutate({ courseId: selectedCourseId, title: sectionTitle.trim() });
+    }
+    setSectionDialog({ open: false });
+  }
+
+  function handleSaveLesson() {
+    if (!lessonTitle.trim() || !selectedCourseId) return;
+    const payload = {
+      courseId: selectedCourseId,
+      sectionId: lessonDialog.sectionId,
+      title: lessonTitle.trim(),
+      type: lessonType,
+      embedUrl: lessonEmbed || null,
+      videoContent: lessonVideo || null,
+      content: lessonContent || null,
+      durationMinutes: lessonDuration ? parseInt(lessonDuration) : null,
+      isPreview: lessonIsPreview,
+    };
+    if (lessonDialog.editing) {
+      updateLesson.mutate({ ...payload, id: lessonDialog.editing.id, lessonStatus });
+    } else {
+      createLesson.mutate(payload);
+    }
+    setLessonDialog({ open: false, sectionId: null });
+  }
+
+  async function handleUpload() {
+    if (!uploadFile || !uploadDialog.lessonId || !selectedCourseId) return;
+    setUploadProgress(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(uploadFile);
+      });
+      const result = await uploadAsset.mutateAsync({
+        courseId: selectedCourseId,
+        lessonId: uploadDialog.lessonId,
+        fileName: uploadFile.name,
+        mimeType: uploadFile.type || "application/octet-stream",
+        base64Data: base64,
+      });
+      setUploadedUrl(result.url);
+      toast.success("File uploaded successfully");
+    } catch {
+      toast.error("Upload failed");
+    } finally {
+      setUploadProgress(false);
+    }
+  }
+
+  function toggleSection(id: number) {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  if (coursesLoading) {
+    return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}</div>;
+  }
+
+  if (!myCourses || myCourses.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <FolderOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <p className="font-medium">No courses assigned</p>
+        <p className="text-sm mt-1">Contact your administrator to be assigned to a course.</p>
+      </div>
+    );
+  }
+
+  const allSections = course?.sections ?? [];
+  const topLevelLessons = course?.topLevelLessons ?? [];
+
+  return (
+    <div className="space-y-6">
+      {/* Course selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex-1">
+          <Label className="text-sm mb-1 block">Course</Label>
+          <Select value={selectedCourseId ? String(selectedCourseId) : ""} onValueChange={v => setSelectedCourseId(parseInt(v))}>
+            <SelectTrigger className="w-full sm:w-80"><SelectValue placeholder="Select a course" /></SelectTrigger>
+            <SelectContent>
+              {myCourses.map(c => <SelectItem key={c.courseId} value={String(c.courseId)}>{c.courseTitle ?? `Course #${c.courseId}`}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        {course && (
+          <div className="flex items-center gap-2 sm:mt-5">
+            {statusBadge(course.status ?? "draft")}
+            {course.slug && (
+              <a href={`/learn/course/${course.slug}`} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline flex items-center gap-1">
+                <ExternalLink className="w-3 h-3" /> Preview
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
+      {courseLoading ? (
+        <div className="space-y-3">{[1, 2].map(i => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}</div>
+      ) : course ? (
+        <div className="space-y-4">
+          {/* Syllabus header */}
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-teal-600" /> Syllabus
+            </h3>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={openAddSection} className="gap-1">
+                <PlusCircle className="w-3.5 h-3.5" /> Add Section
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openAddLesson(null)} className="gap-1">
+                <PlusCircle className="w-3.5 h-3.5" /> Add Lesson
+              </Button>
+            </div>
+          </div>
+
+          {/* Sections */}
+          {allSections.length === 0 && topLevelLessons.length === 0 && (
+            <div className="text-center py-10 border-2 border-dashed rounded-xl text-muted-foreground">
+              <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No sections or lessons yet. Add a section or lesson to get started.</p>
+            </div>
+          )}
+
+          {allSections.map(section => (
+            <Card key={section.id} className="border">
+              <div
+                className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-gray-50 rounded-t-lg"
+                onClick={() => toggleSection(section.id)}
+              >
+                <GripVertical className="w-4 h-4 text-gray-300 shrink-0" />
+                <span className="flex-1 font-medium text-gray-800">{section.title}</span>
+                <span className="text-xs text-muted-foreground mr-2">{section.lessons.length} lesson{section.lessons.length !== 1 ? "s" : ""}</span>
+                <Button size="icon" variant="ghost" className="w-7 h-7" onClick={e => { e.stopPropagation(); openEditSection({ id: section.id, title: section.title }); }}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+                <Button size="icon" variant="ghost" className="w-7 h-7 text-red-500 hover:text-red-600" onClick={e => { e.stopPropagation(); if (confirm(`Delete section "${section.title}" and all its lessons?`)) deleteSection.mutate({ id: section.id, courseId: selectedCourseId! }); }}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+                {expandedSections.has(section.id) ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+              </div>
+
+              {expandedSections.has(section.id) && (
+                <CardContent className="pt-0 pb-3 px-4">
+                  <div className="space-y-1.5">
+                    {section.lessons.map(lesson => (
+                      <div key={lesson.id} className="flex items-center gap-2 py-2 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 group">
+                        <GripVertical className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                        <span className="flex-1 text-sm text-gray-700 truncate">{lesson.title}</span>
+                        {lessonTypeBadge(lesson.type)}
+                        {lesson.lessonStatus === "published"
+                          ? <span className="text-xs text-green-600 font-medium">Published</span>
+                          : <span className="text-xs text-gray-400">Draft</span>}
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button size="icon" variant="ghost" className="w-6 h-6" title="Upload file" onClick={() => { setUploadedUrl(null); setUploadFile(null); setUploadDialog({ open: true, lessonId: lesson.id, lessonTitle: lesson.title }); }}>
+                            <Upload className="w-3 h-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="w-6 h-6" onClick={() => openEditLesson(lesson, section.id)}>
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="w-6 h-6 text-red-500 hover:text-red-600" onClick={() => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id: lesson.id, courseId: selectedCourseId! }); }}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <Button size="sm" variant="ghost" className="w-full text-teal-600 hover:text-teal-700 hover:bg-teal-50 mt-1 gap-1" onClick={() => openAddLesson(section.id)}>
+                      <PlusCircle className="w-3.5 h-3.5" /> Add Lesson to Section
+                    </Button>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          ))}
+
+          {/* Top-level (unsectioned) lessons */}
+          {topLevelLessons.length > 0 && (
+            <Card className="border">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-sm text-muted-foreground">Unsectioned Lessons</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 pb-3 px-4">
+                <div className="space-y-1.5">
+                  {topLevelLessons.map(lesson => (
+                    <div key={lesson.id} className="flex items-center gap-2 py-2 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 group">
+                      <GripVertical className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                      <span className="flex-1 text-sm text-gray-700 truncate">{lesson.title}</span>
+                      {lessonTypeBadge(lesson.type)}
+                      {lesson.lessonStatus === "published"
+                        ? <span className="text-xs text-green-600 font-medium">Published</span>
+                        : <span className="text-xs text-gray-400">Draft</span>}
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button size="icon" variant="ghost" className="w-6 h-6" title="Upload file" onClick={() => { setUploadedUrl(null); setUploadFile(null); setUploadDialog({ open: true, lessonId: lesson.id, lessonTitle: lesson.title }); }}>
+                          <Upload className="w-3 h-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="w-6 h-6" onClick={() => openEditLesson(lesson, null)}>
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="w-6 h-6 text-red-500 hover:text-red-600" onClick={() => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id: lesson.id, courseId: selectedCourseId! }); }}>
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      ) : null}
+
+      {/* Section dialog */}
+      <Dialog open={sectionDialog.open} onOpenChange={o => setSectionDialog({ open: o })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{sectionDialog.editing ? "Edit Section" : "Add Section"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-sm mb-1 block">Section Title</Label>
+              <Input value={sectionTitle} onChange={e => setSectionTitle(e.target.value)} placeholder="e.g. Introduction" onKeyDown={e => e.key === "Enter" && handleSaveSection()} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSectionDialog({ open: false })}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSaveSection} disabled={!sectionTitle.trim() || createSection.isPending || updateSection.isPending}>
+              {createSection.isPending || updateSection.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (sectionDialog.editing ? "Save" : "Create")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lesson dialog */}
+      <Dialog open={lessonDialog.open} onOpenChange={o => setLessonDialog({ open: o, sectionId: lessonDialog.sectionId })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{lessonDialog.editing ? "Edit Lesson" : "Add Lesson"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm mb-1 block">Lesson Title *</Label>
+              <Input value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} placeholder="e.g. Introduction to Doppler" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm mb-1 block">Type</Label>
+                <Select value={lessonType} onValueChange={v => setLessonType(v as LessonType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(LESSON_TYPE_LABELS) as LessonType[]).map(t => <SelectItem key={t} value={t}>{LESSON_TYPE_LABELS[t]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm mb-1 block">Duration (min)</Label>
+                <Input type="number" min="0" value={lessonDuration} onChange={e => setLessonDuration(e.target.value)} placeholder="e.g. 15" />
+              </div>
+            </div>
+            {(lessonType === "video" || lessonType === "video_text") && (
+              <div>
+                <Label className="text-sm mb-1 block">Video URL / Embed Code</Label>
+                <Textarea value={lessonVideo} onChange={e => setLessonVideo(e.target.value)} placeholder="https://vimeo.com/... or embed code" rows={2} />
+              </div>
+            )}
+            {lessonType === "embed" && (
+              <div>
+                <Label className="text-sm mb-1 block">Embed URL</Label>
+                <Input value={lessonEmbed} onChange={e => setLessonEmbed(e.target.value)} placeholder="https://..." />
+              </div>
+            )}
+            {(lessonType === "text" || lessonType === "video_text") && (
+              <div>
+                <Label className="text-sm mb-1 block">Content (Markdown / HTML)</Label>
+                <Textarea value={lessonContent} onChange={e => setLessonContent(e.target.value)} placeholder="Lesson content..." rows={4} />
+              </div>
+            )}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Switch checked={lessonIsPreview} onCheckedChange={setLessonIsPreview} id="preview-toggle" />
+                <Label htmlFor="preview-toggle" className="text-sm cursor-pointer">Free Preview</Label>
+              </div>
+              {lessonDialog.editing && (
+                <div className="flex items-center gap-2">
+                  <Switch checked={lessonStatus === "published"} onCheckedChange={v => setLessonStatus(v ? "published" : "draft")} id="status-toggle" />
+                  <Label htmlFor="status-toggle" className="text-sm cursor-pointer">Published</Label>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLessonDialog({ open: false, sectionId: null })}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSaveLesson} disabled={!lessonTitle.trim() || createLesson.isPending || updateLesson.isPending}>
+              {createLesson.isPending || updateLesson.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (lessonDialog.editing ? "Save" : "Create")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* File upload dialog */}
+      <Dialog open={uploadDialog.open} onOpenChange={o => { if (!uploadProgress) setUploadDialog({ open: o, lessonId: null, lessonTitle: "" }); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload File — {uploadDialog.lessonTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm mb-1 block">Select File (max 16 MB)</Label>
+              <input
+                type="file"
+                className="block w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
+                onChange={e => { setUploadFile(e.target.files?.[0] ?? null); setUploadedUrl(null); }}
+                accept="video/*,audio/*,image/*,application/pdf,.zip,.mp4,.mov,.webm,.mp3,.wav"
+              />
+              {uploadFile && <p className="text-xs text-muted-foreground mt-1">{uploadFile.name} ({(uploadFile.size / 1024 / 1024).toFixed(2)} MB)</p>}
+            </div>
+            {uploadedUrl && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-xs font-medium text-green-700 mb-1">Uploaded successfully</p>
+                <a href={uploadedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline break-all flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3 shrink-0" /> {uploadedUrl}
+                </a>
+                <p className="text-xs text-muted-foreground mt-1">Copy this URL and paste it into the lesson's video or embed field.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadDialog({ open: false, lessonId: null, lessonTitle: "" })} disabled={uploadProgress}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleUpload} disabled={!uploadFile || uploadProgress || (uploadFile?.size ?? 0) > 16 * 1024 * 1024}>
+              {uploadProgress ? <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Uploading…</> : <><Upload className="w-4 h-4 mr-1" /> Upload</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
 // ─── My Courses Tab ───────────────────────────────────────────────────────────
@@ -672,6 +1142,10 @@ export default function InstructorPortal() {
               <BookOpen className="w-3.5 h-3.5" />
               <span>My Courses</span>
             </TabsTrigger>
+            <TabsTrigger value="course-management" className="flex items-center gap-1.5">
+              <Pencil className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Course</span> Management
+            </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-1.5">
               <BarChart2 className="w-3.5 h-3.5" />
               <span>Analytics</span>
@@ -688,6 +1162,10 @@ export default function InstructorPortal() {
 
           <TabsContent value="courses">
             <MyCoursesTab />
+          </TabsContent>
+
+          <TabsContent value="course-management">
+            <CourseManagementTab />
           </TabsContent>
 
           <TabsContent value="analytics">

@@ -2946,8 +2946,223 @@ CRITICAL REQUIREMENTS:
               .where(eq(instructorAnalyticsPermissions.instructorUserId, ins.userId))
               .then(r => r.map(x => x.metric))
           : [];
-        return { ...ins, linkedUser, courses, analyticsPerms };
+                return { ...ins, linkedUser, courses, analyticsPerms };
       }));
     }),
-});
 
+  // ─── Instructor Course Management ─────────────────────────────────────────
+
+  /** Get full course structure (sections + lessons) for an assigned instructor */
+  instructorGetCourse: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId)))
+        .limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Not assigned to this course" });
+      const [course] = await db.select({
+        id: lmsCourses.id, title: lmsCourses.title, status: lmsCourses.status,
+        thumbnailUrl: lmsCourses.thumbnailUrl, slug: lmsCourses.slug,
+      }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const [sections, allLessons] = await Promise.all([
+        db.select().from(lmsSections).where(eq(lmsSections.courseId, input.courseId)).orderBy(asc(lmsSections.position)),
+        db.select({
+          id: lmsLessons.id, courseId: lmsLessons.courseId, sectionId: lmsLessons.sectionId,
+          title: lmsLessons.title, type: lmsLessons.type, position: lmsLessons.position,
+          isPreview: lmsLessons.isPreview, dripDays: lmsLessons.dripDays,
+          durationMinutes: lmsLessons.durationMinutes, lessonStatus: lmsLessons.lessonStatus,
+          embedUrl: lmsLessons.embedUrl, videoContent: lmsLessons.videoContent,
+          content: lmsLessons.content, contentBlocks: lmsLessons.contentBlocks,
+          createdAt: lmsLessons.createdAt, updatedAt: lmsLessons.updatedAt,
+        }).from(lmsLessons).where(eq(lmsLessons.courseId, input.courseId)).orderBy(asc(lmsLessons.position)),
+      ]);
+      const lessonsBySectionId = new Map<number, typeof allLessons>();
+      const topLevelLessons: typeof allLessons = [];
+      for (const lesson of allLessons) {
+        if (lesson.sectionId) {
+          if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
+          lessonsBySectionId.get(lesson.sectionId)!.push(lesson);
+        } else { topLevelLessons.push(lesson); }
+      }
+      const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
+      return { ...course, sections: sectionsWithLessons, topLevelLessons };
+    }),
+
+  /** Instructor: create a section in an assigned course */
+  instructorCreateSection: protectedProcedure
+    .input(z.object({ courseId: z.number(), title: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const [pos] = await db.select({ maxPos: max(lmsSections.position) }).from(lmsSections).where(eq(lmsSections.courseId, input.courseId));
+      const nextPosition = (pos?.maxPos ?? -1) + 1;
+      const [result] = await db.insert(lmsSections).values({ courseId: input.courseId, title: input.title, position: nextPosition }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** Instructor: rename or reposition a section */
+  instructorUpdateSection: protectedProcedure
+    .input(z.object({ id: z.number(), courseId: z.number(), title: z.string().min(1).optional(), position: z.number().int().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const updates: Record<string, unknown> = {};
+      if (input.title !== undefined) updates.title = input.title;
+      if (input.position !== undefined) updates.position = input.position;
+      if (Object.keys(updates).length > 0) await db.update(lmsSections).set(updates as any).where(eq(lmsSections.id, input.id));
+      return { success: true };
+    }),
+
+  /** Instructor: delete a section and all its lessons */
+  instructorDeleteSection: protectedProcedure
+    .input(z.object({ id: z.number(), courseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await db.delete(lmsLessons).where(eq(lmsLessons.sectionId, input.id));
+      await db.delete(lmsSections).where(eq(lmsSections.id, input.id));
+      return { success: true };
+    }),
+
+  /** Instructor: reorder sections */
+  instructorReorderSections: protectedProcedure
+    .input(z.object({ courseId: z.number(), sections: z.array(z.object({ id: z.number(), position: z.number() })) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await Promise.all(input.sections.map(s => db.update(lmsSections).set({ position: s.position }).where(eq(lmsSections.id, s.id))));
+      return { success: true };
+    }),
+
+  /** Instructor: create a lesson in an assigned course */
+  instructorCreateLesson: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      sectionId: z.number().nullable().optional(),
+      title: z.string().min(1),
+      type: z.enum(["video", "text", "quiz", "download", "embed", "video_text"]).default("text"),
+      embedUrl: z.string().max(500).nullable().optional(),
+      videoContent: z.string().nullable().optional(),
+      content: z.string().nullable().optional(),
+      durationMinutes: z.number().int().nullable().optional(),
+      isPreview: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const scopeWhere = input.sectionId
+        ? and(eq(lmsLessons.courseId, input.courseId), eq(lmsLessons.sectionId, input.sectionId))
+        : and(eq(lmsLessons.courseId, input.courseId), isNull(lmsLessons.sectionId));
+      const [pos] = await db.select({ maxPos: max(lmsLessons.position) }).from(lmsLessons).where(scopeWhere);
+      const nextPosition = (pos?.maxPos ?? -1) + 1;
+      const defaultHeroBlock = JSON.stringify([{
+        id: `hero-auto-${Date.now()}`, type: "hero",
+        data: { headline: input.title, headline2: "", subheadline: "", hideButtons: true, buttons: [], bgType: "color", bgColor: "#149096", textColor: "#ffffff", align: "left", heroMinHeight: 150 },
+      }]);
+      const [result] = await db.insert(lmsLessons).values({
+        courseId: input.courseId, sectionId: input.sectionId ?? null,
+        title: input.title, type: input.type, position: nextPosition,
+        content: input.content ?? null, videoContent: input.videoContent ?? null,
+        embedUrl: input.embedUrl ?? null, isPreview: input.isPreview,
+        durationMinutes: input.durationMinutes ?? null,
+        contentBlocks: defaultHeroBlock, lessonStatus: "draft",
+      }).$returningId();
+      if (input.type === "quiz") {
+        await db.insert(lmsQuizzes).values({ lessonId: result.id, title: input.title });
+      }
+      return { id: result.id };
+    }),
+
+  /** Instructor: update lesson metadata */
+  instructorUpdateLesson: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      courseId: z.number(),
+      title: z.string().min(1).optional(),
+      type: z.enum(["video", "text", "quiz", "download", "embed", "video_text"]).optional(),
+      content: z.string().nullable().optional(),
+      videoContent: z.string().nullable().optional(),
+      embedUrl: z.string().max(500).nullable().optional(),
+      durationMinutes: z.number().int().nullable().optional(),
+      isPreview: z.boolean().optional(),
+      lessonStatus: z.enum(["published", "draft"]).optional(),
+      contentBlocks: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { id, courseId, ...rest } = input;
+      const updates: Record<string, unknown> = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+      if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates as any).where(eq(lmsLessons.id, id));
+      return { success: true };
+    }),
+
+  /** Instructor: delete a lesson */
+  instructorDeleteLesson: protectedProcedure
+    .input(z.object({ id: z.number(), courseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await db.delete(lmsLessons).where(eq(lmsLessons.id, input.id));
+      return { success: true };
+    }),
+
+  /** Instructor: reorder lessons within a section */
+  instructorReorderLessons: protectedProcedure
+    .input(z.object({ courseId: z.number(), lessons: z.array(z.object({ id: z.number(), position: z.number() })) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await Promise.all(input.lessons.map(l => db.update(lmsLessons).set({ position: l.position }).where(eq(lmsLessons.id, l.id))));
+      return { success: true };
+    }),
+
+  /** Instructor: upload a file to S3 and return the public URL */
+  instructorUploadLessonAsset: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      lessonId: z.number(),
+      fileName: z.string(),
+      mimeType: z.string(),
+      base64Data: z.string(), // base64-encoded file bytes
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [perm] = await db.select().from(instructorCoursePermissions)
+        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
+      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const buffer = Buffer.from(input.base64Data, "base64");
+      const ext = input.fileName.split(".").pop() ?? "bin";
+      const key = `instructor-uploads/${ctx.user.id}/${input.courseId}/${input.lessonId}-${Date.now()}.${ext}`;
+      const { url } = await storagePut(key, buffer, input.mimeType);
+      return { url, key };
+    }),
+});
