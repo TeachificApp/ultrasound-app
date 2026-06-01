@@ -4298,3 +4298,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix shared template pool: DownloadLandingPageBuilder now has unified Page Templates + Block Templates tab
 - [x] Fix shared template pool: ProductLandingPageBuilder now has unified Page Templates + Block Templates tab
 - [ ] Fix job scraper: ARDMS/BTI job board is a JS SPA - need headless browser or RSS feed approach to get descriptions + employer apply URLs
+
+## Apply Template Button (Jun 2026)
+- [x] Add dedicated "Apply Template" button to FunnelPageEditor top bar (opens standalone modal, separate from Add Block panel)
+- [x] Add dedicated "Apply Template" button to DownloadLandingPageBuilder top bar
+- [x] Add dedicated "Apply Template" button to ProductLandingPageBuilder top bar
+- [x] Remove page templates from the Add Block panel in FunnelPageEditor (templates now live in top-bar modal only)
+- [x] All Apply Template modals show all saved page templates from any editor (shared pool), with search and delete

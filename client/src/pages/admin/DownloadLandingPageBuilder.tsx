@@ -31,7 +31,7 @@ import { toast } from "sonner";
 import { type Block, type BlockType } from "@/components/BlockPreview";
 import { uid, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock } from "./LandingPageBuilder";
 import {
-  ArrowLeft, Save, Eye, Plus, Palette, X, Layers, BookOpen, Copy, Search, BookmarkPlus, Bookmark,
+  ArrowLeft, Save, Eye, Plus, Palette, X, Layers, BookOpen, Copy, Search, BookmarkPlus, Bookmark, FolderOpen, Trash2,
 } from "lucide-react";
 
 // ─── Main Editor ─────────────────────────────────────────────────────────────
@@ -47,6 +47,7 @@ export default function DownloadLandingPageBuilder() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [activeCat, setActiveCat] = useState<string>("Layout");
   const [productInfo, setProductInfo] = useState<{ title: string; slug: string } | null>(null);
+  const [showApplyTemplate, setShowApplyTemplate] = useState(false);
 
   // SEO / Link Preview state
   const [seoTitle, setSeoTitle] = useState("");
@@ -293,6 +294,13 @@ export default function DownloadLandingPageBuilder() {
               <Eye size={14} /> Preview
             </a>
           )}
+          <button
+            onClick={() => setShowApplyTemplate(true)}
+            className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 border border-teal-200 bg-teal-50 hover:bg-teal-100 rounded-lg px-3 py-1.5 transition-colors"
+            title="Apply a saved page template"
+          >
+            <FolderOpen size={14} /> Apply Template
+          </button>
           <Button
             onClick={handleSave}
             disabled={isSaving}
@@ -302,6 +310,20 @@ export default function DownloadLandingPageBuilder() {
           </Button>
         </div>
       </div>
+
+      {/* Apply Template Modal */}
+      {showApplyTemplate && (
+        <DownloadApplyTemplateModal
+          onClose={() => setShowApplyTemplate(false)}
+          onApply={(tplBlocks) => {
+            if (blocks.length > 0 && !confirm(`This will replace all ${blocks.length} block${blocks.length !== 1 ? 's' : ''} on this page with the template. Continue?`)) return;
+            setBlocks(tplBlocks.map(b => ({ ...b, id: uid() })));
+            setSelectedId(null);
+            setShowApplyTemplate(false);
+            toast.success("Template applied!");
+          }}
+        />
+      )}
 
       {/* Main Editor Area */}
       <div className="flex flex-1 overflow-hidden">
@@ -767,4 +789,65 @@ function getDefaultBlocks(title: string): Block[] {
       data: { headline: "Ready to Download?", subtext: "Get instant access to all files.", ctaText: "Buy Now", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#ffffff", showPrice: true },
     },
   ];
+}
+
+// ─── Apply Template Modal ─────────────────────────────────────────────────────
+function DownloadApplyTemplateModal({ onClose, onApply }: { onClose: () => void; onApply: (blocks: Block[]) => void }) {
+  const [search, setSearch] = useState("");
+  const utils = trpc.useUtils();
+  const { data: pageTemplates = [], isLoading } = trpc.lmsAdmin.listPageTemplates.useQuery({});
+  const deletePageTpl = trpc.lmsAdmin.deletePageTemplate.useMutation({
+    onSuccess: () => utils.lmsAdmin.listPageTemplates.invalidate(),
+  });
+
+  const filtered = (pageTemplates as any[]).filter((t: any) =>
+    !search || t.name.toLowerCase().includes(search.toLowerCase()) || (t.description ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-[640px] max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900 flex items-center gap-2"><FolderOpen size={18} className="text-teal-600" /> Apply Page Template</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-4 pt-3 pb-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search templates…" className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400" />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {isLoading ? (
+            <p className="text-sm text-gray-400 text-center py-8">Loading templates…</p>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400">
+              <FolderOpen className="w-10 h-10 opacity-30" />
+              <p className="text-sm">No page templates saved yet.</p>
+              <p className="text-xs text-gray-300">Use "Save as Template" in any page editor to create one.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {filtered.map((tpl: any) => {
+                const tplBlocks: Block[] = (() => {
+                  try { const b = typeof tpl.blocks === "string" ? JSON.parse(tpl.blocks) : tpl.blocks; return Array.isArray(b) ? b : []; } catch { return []; }
+                })();
+                return (
+                  <div key={tpl.id} className="border border-gray-200 rounded-xl p-4 hover:border-teal-300 hover:bg-teal-50/30 transition-colors group">
+                    <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">{tpl.name}</h3>
+                    {tpl.description && <p className="text-xs text-gray-500 mb-2 line-clamp-2">{tpl.description}</p>}
+                    <p className="text-xs text-gray-400 mb-3">{tplBlocks.length} block{tplBlocks.length !== 1 ? "s" : ""}</p>
+                    <div className="flex gap-2">
+                      <Button onClick={() => onApply(tplBlocks)} className="flex-1 h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white">Apply Template</Button>
+                      <button onClick={() => { if (confirm("Delete this template?")) deletePageTpl.mutate({ id: tpl.id }); }} className="w-7 h-7 border border-gray-200 rounded text-gray-400 hover:text-red-500 flex items-center justify-center flex-shrink-0"><Trash2 size={12} /></button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
