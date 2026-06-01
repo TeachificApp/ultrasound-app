@@ -403,7 +403,8 @@ export const embeddedCheckoutRouter = router({
       }
 
       // ── Brand Membership ──
-      if (input.fulfillmentBrand && userId) {
+      // SECURITY GUARD: Brand membership can only be granted for membership products.
+      if (input.fulfillmentBrand && userId && input.productType === "membership") {
         const brandsToGrant: ("aaus" | "iheartecho")[] =
           input.fulfillmentBrand === "both" ? ["aaus", "iheartecho"] : [input.fulfillmentBrand];
         for (const brand of brandsToGrant) {

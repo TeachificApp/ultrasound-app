@@ -251,7 +251,11 @@ export async function executeFulfillment(
   }
 
   // ── 4. Brand Membership ───────────────────────────────────────────────────
-  if (input.fulfillmentBrand) {
+  // SECURITY GUARD: Brand membership can ONLY be granted when productType is
+  // "membership". Courses, downloads, bundles, and all other product types
+  // must never trigger brand access — even if fulfillmentBrand is accidentally
+  // set on the checkout block.
+  if (input.fulfillmentBrand && input.productType === "membership") {
     const brandsToGrant: ("aaus" | "iheartecho")[] =
       input.fulfillmentBrand === "both" ? ["aaus", "iheartecho"] : [input.fulfillmentBrand];
     for (const brand of brandsToGrant) {
