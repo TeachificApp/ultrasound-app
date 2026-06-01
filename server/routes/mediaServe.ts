@@ -371,6 +371,55 @@ for (const slugPath of ["/api/media/:slug/scorm-launch", "/media/:slug/scorm-lau
   });
 } // end for slugPath (scorm-launch redirect)
 
+// ─── SCORM status page helpers ──────────────────────────────────────────────
+
+function scormStatusPage(status: "pending" | "processing" | "failed", errorMsg?: string | null): string {
+  const isPending = status === "pending" || status === "processing";
+  const icon = isPending ? "⏳" : "⚠️";
+  const title = isPending ? "Content Being Prepared" : "Content Unavailable";
+  const message = isPending
+    ? "Your SCORM content is being extracted and will be ready shortly. This page will refresh automatically."
+    : `Failed to prepare SCORM content: ${errorMsg || "Unknown error"}. Please contact support if this persists.`;
+  const refreshScript = isPending
+    ? `<script>setTimeout(function(){ window.location.reload(); }, 15000);</script>`
+    : "";
+  const progressBar = isPending ? `
+    <div style="width:200px;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden;margin:16px auto 0;">
+      <div style="height:100%;background:#189aa1;border-radius:2px;animation:progress 2s ease-in-out infinite alternate;"></div>
+    </div>
+    <style>@keyframes progress{from{width:20%}to{width:80%}}</style>` : "";
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${title}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center;
+           height: 100vh; margin: 0; background: #f9fafb; color: #374151; }
+    .box { text-align: center; padding: 32px; max-width: 420px; }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h2 { margin: 0 0 8px; font-size: 18px; color: #111827; }
+    p { margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6; }
+    .status-badge { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 999px;
+                    font-size: 12px; font-weight: 600; background: ${isPending ? "#d1fae5" : "#fee2e2"};
+                    color: ${isPending ? "#065f46" : "#991b1b"}; }
+  </style>
+  ${refreshScript}
+</head>
+<body>
+  <div class="box">
+    <div class="icon">${icon}</div>
+    <h2>${title}</h2>
+    <p>${message}</p>
+    ${progressBar}
+    <div class="status-badge">${status.toUpperCase()}</div>
+    ${isPending ? '<p style="margin-top:12px;font-size:12px;color:#9ca3af;">Auto-refreshing every 15 seconds&hellip;</p>' : ""}
+  </div>
+</body>
+</html>`;
+}
+
 // ─── GET /media/:slug/scorm/* — unified SCORM content server ─────────────────
 // Serves the SCORM launch file at /scorm/ and all assets at /scorm/path/to/asset.
 // Because all content is under the same URL prefix, relative paths in the SCORM
@@ -395,7 +444,24 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     const rawRelative = req.path.replace(prefix, "").replace(/^\//, "");
     const relativePath = decodeURIComponent(rawRelative);
 
-    // ─── Strategy 1: Serve from pre-extracted R2 files via authenticated proxy ───
+    // ─── Strategy 1a: Pre-extracted HTML (old-style iHeartEcho content) ───────────────
+    // The scormExtractedPrefix starts with '__direct_html__:' — the content is already
+    // hosted on CloudFront and we just need to redirect to the HTML URL directly.
+    if (version.scormExtractedPrefix?.startsWith("__direct_html__:")) {
+      const directUrl = version.scormExtractedPrefix.replace("__direct_html__:", "");
+      if (relativePath === "" || relativePath === (version.scormLaunchFile || "index.html")) {
+        // Root request or launch file — redirect to the CDN URL
+        res.redirect(302, directUrl);
+      } else {
+        // Asset request — derive the base URL and redirect to the asset
+        const lastSlash = directUrl.lastIndexOf("/");
+        const baseUrl = directUrl.substring(0, lastSlash + 1); // e.g. .../FolderName/
+        res.redirect(302, `${baseUrl}${relativePath}`);
+      }
+      return;
+    }
+
+    // ─── Strategy 1b: Serve from pre-extracted R2 files via authenticated proxy ───
     // We proxy through the app server (not redirect) because the R2 bucket is private.
     if (version.scormExtractedPrefix) {
       const extractedPrefix = version.scormExtractedPrefix;
@@ -412,20 +478,36 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       }
     }
 
-    // ─── Strategy 2: On-the-fly extraction (fallback for files not yet extracted) ───
-    // Extract SCORM ZIP on first request; subsequent requests use the cache.
+    // ─── Strategy 2: Check extraction status before attempting on-the-fly extraction ───
+    // If the heartbeat job has set a status, respect it instead of attempting on-the-fly extraction.
+    const extractionStatus = (version as any).scormExtractionStatus as string | null | undefined;
+    const extractionError = (version as any).scormExtractionError as string | null | undefined;
+
+    if (extractionStatus === "pending" || extractionStatus === "processing") {
+      // Job is queued or in progress — show a friendly waiting page that auto-refreshes
+      res.status(202).send(scormStatusPage(extractionStatus, null));
+      return;
+    }
+
+    if (extractionStatus === "failed") {
+      // Extraction failed — show error with the actual error message
+      res.status(503).send(scormStatusPage("failed", extractionError));
+      return;
+    }
+
+    // extractionStatus is 'done' or null (legacy) — attempt on-the-fly extraction as fallback
     const extracted = await extractScormZip(asset.slug, version.s3Url);
     if (!extracted) {
-      // If extraction fails (likely OOM for large files), show helpful message
-      const isLargeFile = version.fileSize && version.fileSize > 50 * 1024 * 1024;
-      if (isLargeFile) {
-        res.status(503).send(errorPage(
-          "SCORM package is being prepared. This large file is being extracted in the background. " +
-          "Please try again in a few minutes."
-        ));
-      } else {
-        res.status(500).send(errorPage("Failed to extract SCORM package."));
-      }
+      // On-the-fly extraction also failed — queue for heartbeat retry and show waiting page
+      try {
+        const db2 = await getDb();
+        if (db2) {
+          await db2.update(mediaVersions)
+            .set({ scormExtractionStatus: "pending" as any, scormExtractionError: null, scormExtractedPrefix: null, scormLaunchFile: null })
+            .where(eq(mediaVersions.id, version.id));
+        }
+      } catch { /* non-critical */ }
+      res.status(202).send(scormStatusPage("pending", null));
       return;
     }
 

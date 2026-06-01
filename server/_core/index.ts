@@ -37,6 +37,7 @@ import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
 import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
+import { scormExtractHeartbeatHandler } from "../routes/scormExtractor";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -224,6 +225,8 @@ async function startServer() {
   registerGoogleOAuthRoutes(app);
   // Heartbeat: Thinkific community sync (every 6 hours)
   app.post("/api/scheduled/thinkific-community-sync", thinkificCommunitySyncHandler);
+  // Heartbeat: SCORM extraction job (every 60s) — processes pending SCORM ZIP packages
+  app.post("/api/scheduled/scorm-extract", scormExtractHeartbeatHandler);
   // Public REST API: GET /api/forms/:formId/submissions (auth via Bearer apiToken)
   app.get("/api/forms/:formId/submissions", async (req: any, res: any) => {
     try {

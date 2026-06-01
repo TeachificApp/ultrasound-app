@@ -268,13 +268,21 @@ const deleteMembership = adminProcedure
 
 // ─── Item Bundling ────────────────────────────────────────────────────────────
 
+// All valid membership item types (including app-level access grants)
+const MEMBERSHIP_ITEM_TYPE = z.enum([
+  "course", "quiz", "bundle", "community", "webinar", "download", "product",
+  "all_courses", "all_downloads",
+  "ultrasoundassist_free", "ultrasoundassist_premium",
+  "echoassist_free", "echoassist_premium",
+]);
+
 const setMembershipItems = adminProcedure
   .input(
     z.object({
       planId: z.number(),
       items: z.array(
         z.object({
-          itemType: z.enum(["course", "quiz", "bundle", "community", "webinar", "download", "product", "all_courses", "all_downloads"]),
+          itemType: MEMBERSHIP_ITEM_TYPE,
           itemId: z.number().optional().nullable(),
           label: z.string().optional().nullable(),
           sortOrder: z.number().optional(),
@@ -304,7 +312,7 @@ const addMembershipItem = adminProcedure
   .input(
     z.object({
       planId: z.number(),
-      itemType: z.enum(["course", "quiz", "bundle", "community", "webinar", "download", "product", "all_courses", "all_downloads"]),
+      itemType: MEMBERSHIP_ITEM_TYPE,
       itemId: z.number().optional().nullable(),
       label: z.string().optional().nullable(),
     })

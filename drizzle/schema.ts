@@ -2660,6 +2660,12 @@ export const mediaVersions = mysqlTable("mediaVersions", {
   scormExtractedPrefix: text("scormExtractedPrefix"),
   // SCORM: relative path to the launch HTML file within the extracted package
   scormLaunchFile: varchar("scormLaunchFile", { length: 512 }),
+  // SCORM: extraction job status — pending | processing | done | failed
+  scormExtractionStatus: varchar("scormExtractionStatus", { length: 20 }).default("pending"),
+  // SCORM: error message if extraction failed
+  scormExtractionError: text("scormExtractionError"),
+  // SCORM: timestamp when extraction started (used to detect stalled jobs)
+  scormExtractionStartedAt: timestamp("scormExtractionStartedAt"),
   uploadedByUserId: int("uploadedByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

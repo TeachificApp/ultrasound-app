@@ -1021,9 +1021,9 @@ export const mediaRepoRouter = router({
     }),
 
   /**
-   * Re-trigger SCORM extraction to R2 for an existing asset.
-   * Useful when the original background extraction failed (e.g. due to URL encoding issues).
-   * Clears existing scormExtractedPrefix so the next embed request also falls back to fresh extraction.
+   * Re-trigger SCORM extraction for an existing asset.
+   * Resets status to 'pending' so the heartbeat cron picks it up within 60 seconds.
+   * Works for both failed extractions and re-uploads.
    */
   reExtractScorm: protectedProcedure
     .input(z.object({ assetId: z.number().int() }))
@@ -1039,16 +1039,43 @@ export const mediaRepoRouter = router({
       const [asset] = await db.select().from(mediaAssets)
         .where(eq(mediaAssets.id, input.assetId)).limit(1);
       if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
-      // Clear stale extraction data
+      // Reset to pending — heartbeat cron will pick this up within 60 seconds
       await db.update(mediaVersions)
-        .set({ scormExtractedPrefix: null, scormLaunchFile: null })
+        .set({
+          scormExtractionStatus: "pending" as any,
+          scormExtractionError: null,
+          scormExtractionStartedAt: null,
+          scormExtractedPrefix: null,
+          scormLaunchFile: null,
+        })
         .where(eq(mediaVersions.id, version.id));
-      // Fire-and-forget re-extraction
-      const { extractAndUploadScorm } = await import("../routes/scormExtractor");
-      extractAndUploadScorm(version.id, version.s3Url, asset.slug).catch((e: any) =>
-        console.error(`[ReExtract] Failed for asset ${input.assetId}:`, e)
-      );
-      return { ok: true, versionId: version.id };
+      console.log(`[ReExtractScorm] Queued asset ${input.assetId} (version ${version.id}) for heartbeat extraction`);
+      return { ok: true, versionId: version.id, status: "pending" };
+    }),
+
+  /**
+   * Get SCORM extraction status for an asset's current version.
+   * Used by admin UI to show extraction progress.
+   */
+  getScormStatus: protectedProcedure
+    .input(z.object({ assetId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [version] = await db.select({
+        id: mediaVersions.id,
+        scormExtractionStatus: (mediaVersions as any).scormExtractionStatus,
+        scormExtractionError: (mediaVersions as any).scormExtractionError,
+        scormExtractionStartedAt: (mediaVersions as any).scormExtractionStartedAt,
+        scormExtractedPrefix: mediaVersions.scormExtractedPrefix,
+      })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.assetId))
+        .orderBy(desc(mediaVersions.createdAt))
+        .limit(1);
+      if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found" });
+      return version;
     }),
 
 });

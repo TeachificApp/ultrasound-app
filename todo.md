@@ -4231,3 +4231,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Test upload flow: file uploads to S3 and URL is stored correctly
 - [ ] Test media repo picker: shows files from media repository
 - [ ] Test downloads library picker: shows files from digital downloads
+
+## SCORM + Membership Bug Fixes (Jun 2026)
+- [x] Fix SCORM heartbeat handler to detect pre-extracted HTML URLs (old iHeartEcho content with CloudFront index.html URLs) — mark as done with __direct_html__ prefix
+- [x] Fix SCORM serve route to redirect pre-extracted HTML content directly to CloudFront URL (Strategy 1a)
+- [x] Process all 8 pending SCORM versions: 6 pre-extracted HTML (iHeartEcho), 2 new ZIPs (AAUS)
+- [x] Mark version 350003 (Physics SPI quiz) as failed with clear error — file is 0 bytes on CloudFront, needs re-upload
+- [x] Fix membership addItem validation error — extend Zod enum to include ultrasoundassist_free, ultrasoundassist_premium, echoassist_free, echoassist_premium (all four app-tier access types)
