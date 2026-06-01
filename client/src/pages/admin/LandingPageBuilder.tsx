@@ -1072,6 +1072,10 @@ function CTAActionPicker({
   const isCheckoutBehavior = behavior === "direct_checkout" || behavior === "free_preview" || behavior === "group_purchase";
   // Pricing option picker state
   const [poCourseId, setPoCoursId] = React.useState<number | null>(pricingOptionCourseIdValue ?? null);
+  // Sync local poCourseId when the prop changes (e.g. switching between blocks or loading saved data)
+  React.useEffect(() => {
+    setPoCoursId(pricingOptionCourseIdValue ?? null);
+  }, [pricingOptionCourseIdValue]);
   const { data: poCoursesData } = trpc.lmsAdmin.listCourses.useQuery(
     { status: "all", type: "all", pageSize: 200 },
     { enabled: behavior === "pricing_option" }

@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, Clock, RefreshCw, Plus, RotateCcw } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -42,7 +42,6 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function FulfillmentAdmin() {
-  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "failed" | "completed">("all");
   const [manualGrantOpen, setManualGrantOpen] = useState(false);
   const [manualForm, setManualForm] = useState({
@@ -66,53 +65,44 @@ export default function FulfillmentAdmin() {
 
   const retryMutation = trpc.fulfillmentAdmin.retry.useMutation({
     onSuccess: (result) => {
-      toast({
-        title: result.success ? "Retry succeeded" : "Retry failed",
-        description: result.notes.join(", ") || result.error || "No details",
-        variant: result.success ? "default" : "destructive",
-      });
+      if (result.success) toast.success(result.notes.join(", ") || "Retry succeeded");
+      else toast.error(result.notes.join(", ") || result.error || "Retry failed");
       refetch();
       refetchStats();
     },
     onError: (err) => {
-      toast({ title: "Retry failed", description: err.message, variant: "destructive" });
+      toast.error(`Retry failed: ${err.message}`);
     },
   });
 
   const retryAllMutation = trpc.fulfillmentAdmin.retryAll.useMutation({
     onSuccess: (result) => {
-      toast({
-        title: `Batch retry complete`,
-        description: `${result.success} succeeded, ${result.failed} failed (${result.processed} total)`,
-      });
+      toast.success(`Batch retry complete: ${result.success} succeeded, ${result.failed} failed (${result.processed} total)`);
       refetch();
       refetchStats();
     },
     onError: (err) => {
-      toast({ title: "Batch retry failed", description: err.message, variant: "destructive" });
+      toast.error(`Batch retry failed: ${err.message}`);
     },
   });
 
   const manualGrantMutation = trpc.fulfillmentAdmin.manualGrant.useMutation({
     onSuccess: (result) => {
-      toast({
-        title: result.success ? "Access granted" : "Grant failed",
-        description: result.notes.join(", ") || result.error || "No details",
-        variant: result.success ? "default" : "destructive",
-      });
+      if (result.success) toast.success(result.notes.join(", ") || "Access granted");
+      else toast.error(result.notes.join(", ") || result.error || "Grant failed");
       setManualGrantOpen(false);
       setManualForm({ email: "", productType: "course", courseId: "", productId: "", fulfillmentBrand: "", productName: "Manual Grant", note: "" });
       refetch();
       refetchStats();
     },
     onError: (err) => {
-      toast({ title: "Grant failed", description: err.message, variant: "destructive" });
+      toast.error(`Grant failed: ${err.message}`);
     },
   });
 
   const handleManualGrant = () => {
     if (!manualForm.email) {
-      toast({ title: "Email required", variant: "destructive" });
+      toast.error("Email required");
       return;
     }
     manualGrantMutation.mutate({
