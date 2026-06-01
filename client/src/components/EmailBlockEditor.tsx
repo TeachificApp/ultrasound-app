@@ -1,0 +1,590 @@
+/**
+ * EmailBlockEditor — Drag-and-drop email block editor
+ *
+ * Reuses BLOCK_CATALOG, BlockSettings, SortableBlock, and Block types from
+ * LandingPageBuilder, filtered to email-safe blocks only.
+ *
+ * Converts blocks to email-safe inline-CSS HTML via emailBlockToHtml().
+ */
+import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  BLOCK_CATALOG,
+  BlockSettings,
+  SortableBlock,
+  uid,
+  type Block,
+  type BlockType,
+} from "@/pages/admin/LandingPageBuilder";
+import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search } from "lucide-react";
+
+// ─── Email-safe block types ───────────────────────────────────────────────────
+// These block types render correctly in email clients (no JS, no interactive)
+const EMAIL_SAFE_TYPES: BlockType[] = [
+  "hero",
+  "spacer",
+  "divider",
+  "text",
+  "image",
+  "gallery",
+  "bullets",
+  "numbered_list",
+  "checklist",
+  "icon_grid",
+  "testimonial",
+  "reviews",
+  "logos",
+  "instructor",
+  "faq",
+  "alert",
+  "flip_cards",
+  "cta_standalone",
+  "lead_capture",
+  "logo_strip",
+  "footer",
+  "data_table",
+  "two_column",
+  "three_column",
+  "divided_columns",
+];
+
+// Filter catalog to email-safe blocks only
+const EMAIL_BLOCK_CATALOG = BLOCK_CATALOG.filter((b) =>
+  EMAIL_SAFE_TYPES.includes(b.type)
+);
+
+// Categories that have at least one email-safe block
+const EMAIL_CATALOG_CATEGORIES = [
+  "Layout",
+  "Content",
+  "Marketing",
+  "Conversion",
+];
+
+// ─── Block → Email HTML renderer ─────────────────────────────────────────────
+// Converts the shared {id, type, data} block format to inline-CSS email HTML.
+export function emailBlockToHtml(block: Block): string {
+  const d = block.data ?? {};
+  const align = (d.align as string) ?? "left";
+
+  switch (block.type) {
+    case "text": {
+      const html = (d.html as string) ?? "";
+      const bg = (d.bgColor as string) ?? "";
+      const color = (d.textColor as string) ?? "#1a2e3b";
+      const bgStyle = bg && bg !== "#ffffff" ? `background:${bg};` : "";
+      return `<div style="${bgStyle}padding:8px 0;color:${color};font-size:15px;line-height:1.7;text-align:${align};">${html}</div>`;
+    }
+    case "image": {
+      const url = (d.url as string) ?? "";
+      if (!url) return "";
+      const alt = (d.alt as string) ?? "";
+      const maxWidth = (d.maxWidth as string) ?? "100%";
+      const link = (d.linkUrl as string) ?? "";
+      const shadow = d.showShadow ? "box-shadow:0 2px 8px rgba(0,0,0,0.12);" : "";
+      const img = `<img src="${url}" alt="${alt}" style="max-width:${maxWidth === "auto" ? "100%" : maxWidth};display:block;border-radius:8px;${shadow}" />`;
+      const wrapped = link ? `<a href="${link}" style="text-decoration:none;">${img}</a>` : img;
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;"><tr><td align="${align}">${wrapped}</td></tr></table>`;
+    }
+    case "hero": {
+      const headline = (d.headline as string) ?? "";
+      const subheadline = (d.subheadline as string) ?? "";
+      const bgColor = (d.bgColor as string) ?? "#179ca3";
+      const textColor = (d.textColor as string) ?? "#ffffff";
+      const buttons = (d.buttons as any[]) ?? [];
+      const btnHtml = buttons.map((btn: any) =>
+        btn.text ? `<a href="${btn.link || "#"}" style="display:inline-block;background:${btn.color || "#ffffff"};color:${btn.textColor || "#179ca3"};text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:15px;margin:4px;">${btn.text}</a>` : ""
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bgColor};border-radius:8px;margin:0 0 16px;"><tr><td style="padding:32px;text-align:${align};"><h1 style="color:${textColor};font-size:28px;font-weight:900;margin:0 0 12px;line-height:1.2;">${headline}</h1>${subheadline ? `<p style="color:${textColor};font-size:16px;margin:0 0 20px;opacity:0.9;">${subheadline}</p>` : ""}${btnHtml ? `<div style="margin-top:16px;">${btnHtml}</div>` : ""}</td></tr></table>`;
+    }
+    case "spacer": {
+      const height = (d.height as number) ?? 48;
+      return `<div style="height:${height}px;"></div>`;
+    }
+    case "divider": {
+      const color = (d.color as string) ?? "#e5eaec";
+      const thickness = (d.thickness as number) ?? 1;
+      const spacing = (d.spacing as number) ?? 32;
+      return `<hr style="border:none;border-top:${thickness}px solid ${color};margin:${spacing / 2}px 0;" />`;
+    }
+    case "bullets": {
+      const headline = (d.headline as string) ?? "";
+      const items = (d.items as string[]) ?? [];
+      const iconColor = (d.iconColor as string) ?? "#179ca3";
+      const bg = (d.bgColor as string) ?? "#f8fffe";
+      const itemsHtml = items.map((item) =>
+        `<tr><td style="padding:4px 0;"><table cellpadding="0" cellspacing="0"><tr><td style="width:20px;vertical-align:top;color:${iconColor};font-size:16px;font-weight:bold;">✓</td><td style="padding-left:8px;color:#1a2e3b;font-size:15px;line-height:1.6;">${item}</td></tr></table></td></tr>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:18px;font-weight:700;margin:0 0 16px;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${itemsHtml}</table></td></tr></table>`;
+    }
+    case "numbered_list": {
+      const headline = (d.headline as string) ?? "";
+      const items = (d.items as string[]) ?? [];
+      const accentColor = (d.accentColor as string) ?? "#179ca3";
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const itemsHtml = items.map((item, i) =>
+        `<tr><td style="padding:6px 0;"><table cellpadding="0" cellspacing="0"><tr><td style="width:28px;vertical-align:top;"><span style="display:inline-block;width:24px;height:24px;background:${accentColor};color:#fff;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;">${i + 1}</span></td><td style="padding-left:10px;color:#1a2e3b;font-size:15px;line-height:1.6;vertical-align:middle;">${item}</td></tr></table></td></tr>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:18px;font-weight:700;margin:0 0 16px;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${itemsHtml}</table></td></tr></table>`;
+    }
+    case "checklist": {
+      const headline = (d.headline as string) ?? "";
+      const items = (d.items as string[]) ?? [];
+      const accentColor = (d.accentColor as string) ?? "#179ca3";
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const itemsHtml = items.map((item) =>
+        `<tr><td style="padding:4px 0;"><table cellpadding="0" cellspacing="0"><tr><td style="width:20px;vertical-align:top;color:${accentColor};font-size:16px;">☑</td><td style="padding-left:8px;color:#1a2e3b;font-size:15px;line-height:1.6;">${item}</td></tr></table></td></tr>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:18px;font-weight:700;margin:0 0 16px;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${itemsHtml}</table></td></tr></table>`;
+    }
+    case "testimonial": {
+      const quote = (d.quote as string) ?? "";
+      const author = (d.author as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#f0fafa";
+      const accent = (d.accentColor as string) ?? "#179ca3";
+      const rating = (d.rating as number) ?? 0;
+      const stars = rating > 0 ? `<div style="color:#f59e0b;font-size:18px;margin-bottom:8px;">${"★".repeat(rating)}</div>` : "";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-left:4px solid ${accent};border-radius:0 8px 8px 0;margin:16px 0;"><tr><td style="padding:20px 24px;">${stars}<p style="color:#0e4a50;font-size:16px;font-style:italic;margin:0 0 12px;line-height:1.7;">"${quote}"</p>${author ? `<p style="color:#189aa1;font-size:13px;font-weight:600;margin:0;">— ${author}</p>` : ""}</td></tr></table>`;
+    }
+    case "cta_standalone": {
+      const headline = (d.headline as string) ?? "";
+      const subtext = (d.subtext as string) ?? "";
+      const ctaText = (d.ctaText as string) ?? "Get Started";
+      const ctaLink = (d.ctaLink as string) ?? "#";
+      const ctaColor = (d.ctaColor as string) ?? "#179ca3";
+      const ctaTextColor = (d.ctaTextColor as string) ?? "#ffffff";
+      const bg = (d.bgColor as string) ?? "#f0fafa";
+      const textAlign = (d.align as string) ?? "center";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;margin:16px 0;"><tr><td style="padding:32px;text-align:${textAlign};">${headline ? `<h2 style="color:#0e1e2e;font-size:22px;font-weight:700;margin:0 0 8px;">${headline}</h2>` : ""}${subtext ? `<p style="color:#4a6070;font-size:15px;margin:0 0 20px;">${subtext}</p>` : ""}<a href="${ctaLink}" style="display:inline-block;background:${ctaColor};color:${ctaTextColor};text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:16px;">${ctaText}</a></td></tr></table>`;
+    }
+    case "lead_capture": {
+      const headline = (d.headline as string) ?? "Stay in the loop";
+      const subtext = (d.subtext as string) ?? "";
+      const ctaText = (d.ctaText as string) ?? "Subscribe";
+      const bg = (d.bgColor as string) ?? "#179ca3";
+      const textColor = (d.textColor as string) ?? "#ffffff";
+      const btnBg = (d.btnBg as string) ?? "#ffffff";
+      const btnTextColor = (d.btnTextColor as string) ?? "#179ca3";
+      const showName = d.showNameField as boolean;
+      const nameField = showName ? `<tr><td style="padding-bottom:8px;"><input type="text" name="name" placeholder="${(d.namePlaceholder as string) ?? "Your name"}" style="width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid rgba(255,255,255,0.4);border-radius:8px;font-size:14px;background:rgba(255,255,255,0.15);color:${textColor};" /></td></tr>` : "";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr><td align="center"><table cellpadding="0" cellspacing="0" style="background:${bg};border-radius:12px;padding:32px;max-width:480px;width:100%;margin:0 auto;"><tr><td style="padding-bottom:8px;text-align:center;"><strong style="font-size:20px;color:${textColor};">${headline}</strong></td></tr>${subtext ? `<tr><td style="padding-bottom:16px;text-align:center;"><p style="color:${textColor};font-size:14px;margin:0;opacity:0.85;">${subtext}</p></td></tr>` : ""}${nameField}<tr><td style="padding-bottom:12px;"><input type="email" name="email" placeholder="${(d.emailPlaceholder as string) ?? "Your email address"}" style="width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid rgba(255,255,255,0.4);border-radius:8px;font-size:14px;background:rgba(255,255,255,0.15);color:${textColor};" /></td></tr><tr><td style="text-align:center;"><a href="#" style="display:inline-block;background:${btnBg};color:${btnTextColor};text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:700;font-size:15px;">${ctaText}</a></td></tr></table></td></tr></table>`;
+    }
+    case "alert": {
+      const text = (d.text as string) ?? "";
+      const alertType = (d.alertType as string) ?? "info";
+      const icon = (d.icon as string) ?? "💡";
+      const colors: Record<string, { bg: string; border: string; text: string }> = {
+        info: { bg: "#f0fbfc", border: "#189aa1", text: "#0e4a50" },
+        warning: { bg: "#fffbeb", border: "#f59e0b", text: "#92400e" },
+        success: { bg: "#f0fdf4", border: "#22c55e", text: "#166534" },
+        error: { bg: "#fef2f2", border: "#ef4444", text: "#991b1b" },
+      };
+      const c = colors[alertType] ?? colors.info;
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${c.bg};border-left:4px solid ${c.border};border-radius:0 8px 8px 0;margin:12px 0;"><tr><td style="padding:14px 18px;color:${c.text};font-size:15px;">${icon} ${text}</td></tr></table>`;
+    }
+    case "logo_strip": {
+      const logoUrl = (d.logoUrl as string) ?? "";
+      const maxWidth = (d.maxWidth as string) ?? "200px";
+      const link = (d.link as string) ?? "/";
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      if (!logoUrl) return "";
+      const img = `<img src="${logoUrl}" alt="Logo" style="max-width:${maxWidth};display:block;" />`;
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};margin:8px 0;"><tr><td align="${align}" style="padding:${d.padding ?? "16px 0"};">${link ? `<a href="${link}">${img}</a>` : img}</td></tr></table>`;
+    }
+    case "footer": {
+      const bg = (d.bgColor as string) ?? "#0e1e2e";
+      const textColor = (d.textColor as string) ?? "#ffffff";
+      const copyright = (d.copyrightText as string) ?? "";
+      const links = (d.links as { text: string; url: string }[]) ?? [];
+      const linksHtml = links.map((l) => `<a href="${l.url}" style="color:#189aa1;text-decoration:none;margin:0 8px;">${l.text}</a>`).join(" · ");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:0 0 8px 8px;"><tr><td style="padding:20px 32px;text-align:center;"><p style="color:${textColor};font-size:12px;margin:0 0 8px;">${copyright}</p>${linksHtml ? `<p style="margin:0;font-size:12px;">${linksHtml}</p>` : ""}</td></tr></table>`;
+    }
+    case "data_table": {
+      const rows = (d.rows as string[][]) ?? [];
+      const hasHeader = d.hasHeader as boolean;
+      const bordered = d.bordered as boolean;
+      const striped = d.striped as boolean;
+      const headerBg = (d.headerBg as string) ?? "#f0fafa";
+      const headerTextColor = (d.headerTextColor as string) ?? "#0e4a50";
+      const borderColor = (d.borderColor as string) ?? "#d1fae5";
+      const fontSize = (d.fontSize as number) ?? 14;
+      const borderStyle = bordered ? `border:1px solid ${borderColor};` : "";
+      const rowsHtml = rows.map((row, ri) => {
+        const isHeader = hasHeader && ri === 0;
+        const rowBg = isHeader ? headerBg : (striped && ri % 2 === 0 ? "#f9fafb" : "#ffffff");
+        const cellColor = isHeader ? headerTextColor : "#1a2e3b";
+        const tag = isHeader ? "th" : "td";
+        const cells = row.map((cell) => `<${tag} style="${borderStyle}padding:8px 12px;color:${cellColor};font-size:${fontSize}px;font-weight:${isHeader ? "600" : "400"};">${cell}</${tag}>`).join("");
+        return `<tr style="background:${rowBg};">${cells}</tr>`;
+      }).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:12px 0;font-size:${fontSize}px;">${rowsHtml}</table>`;
+    }
+    case "two_column": {
+      const leftHtml = (d.leftHtml as string) ?? "";
+      const rightHtml = (d.rightHtml as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const leftRatio = (d.leftRatio as number) ?? 50;
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};margin:12px 0;"><tr><td width="${leftRatio}%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${leftHtml}</td><td width="${100 - leftRatio}%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${rightHtml}</td></tr></table>`;
+    }
+    case "three_column": {
+      const col1 = (d.col1Html as string) ?? "";
+      const col2 = (d.col2Html as string) ?? "";
+      const col3 = (d.col3Html as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};margin:12px 0;"><tr><td width="33%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${col1}</td><td width="33%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${col2}</td><td width="34%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${col3}</td></tr></table>`;
+    }
+    case "divided_columns": {
+      const columns = (d.columns as { html: string }[]) ?? [];
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const cells = columns.map((col) => `<td style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;width:${Math.floor(100 / columns.length)}%;">${col.html}</td>`).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};margin:12px 0;"><tr>${cells}</tr></table>`;
+    }
+    case "instructor": {
+      const name = (d.name as string) ?? "";
+      const title = (d.title as string) ?? "";
+      const bio = (d.bio as string) ?? "";
+      const avatarUrl = (d.avatarUrl as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const avatar = avatarUrl ? `<img src="${avatarUrl}" alt="${name}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;display:block;" />` : "";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${avatar ? `<table cellpadding="0" cellspacing="0"><tr><td style="padding-right:16px;vertical-align:top;">${avatar}</td><td style="vertical-align:top;"><strong style="color:#0e1e2e;font-size:18px;">${name}</strong><br/><span style="color:#179ca3;font-size:13px;">${title}</span>${bio ? `<p style="color:#4a6070;font-size:14px;margin:8px 0 0;line-height:1.6;">${bio}</p>` : ""}</td></tr></table>` : `<strong style="color:#0e1e2e;font-size:18px;">${name}</strong><br/><span style="color:#179ca3;font-size:13px;">${title}</span>${bio ? `<p style="color:#4a6070;font-size:14px;margin:8px 0 0;line-height:1.6;">${bio}</p>` : ""}`}</td></tr></table>`;
+    }
+    case "faq": {
+      const headline = (d.headline as string) ?? "";
+      const items = (d.items as { q: string; a: string }[]) ?? [];
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const accent = (d.accentColor as string) ?? "#179ca3";
+      const itemsHtml = items.map((item) =>
+        `<tr><td style="padding:12px 0;border-bottom:1px solid #e5eaec;"><strong style="color:#0e1e2e;font-size:15px;">${item.q}</strong><p style="color:#4a6070;font-size:14px;margin:6px 0 0;line-height:1.6;">${item.a}</p></td></tr>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 16px;border-bottom:2px solid ${accent};padding-bottom:8px;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${itemsHtml}</table></td></tr></table>`;
+    }
+    case "reviews": {
+      const headline = (d.headline as string) ?? "";
+      const reviews = (d.reviews as { name: string; rating: number; text: string }[]) ?? [];
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const reviewsHtml = reviews.map((r) =>
+        `<tr><td style="padding:12px 0;border-bottom:1px solid #e5eaec;"><div style="color:#f59e0b;font-size:14px;margin-bottom:4px;">${"★".repeat(r.rating || 5)}</div><p style="color:#1a2e3b;font-size:14px;margin:0 0 4px;line-height:1.6;">${r.text}</p><span style="color:#189aa1;font-size:12px;font-weight:600;">— ${r.name}</span></td></tr>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 16px;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${reviewsHtml}</table></td></tr></table>`;
+    }
+    case "logos": {
+      const headline = (d.headline as string) ?? "";
+      const logos = (d.logos as { url: string; alt: string }[]) ?? [];
+      const bg = (d.bgColor as string) ?? "#f9fafb";
+      const logosHtml = logos.filter((l) => l.url).map((l) =>
+        `<td style="padding:8px 16px;text-align:center;"><img src="${l.url}" alt="${l.alt}" style="max-height:48px;max-width:120px;display:inline-block;" /></td>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td style="text-align:center;">${headline ? `<p style="color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 16px;">${headline}</p>` : ""}<table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>${logosHtml}</tr></table></td></tr></table>`;
+    }
+    case "icon_grid": {
+      const headline = (d.headline as string) ?? "";
+      const items = (d.items as { icon: string; title: string; text: string }[]) ?? [];
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const itemsHtml = items.map((item) =>
+        `<td style="padding:12px;text-align:center;vertical-align:top;width:${Math.floor(100 / Math.max(items.length, 1))}%;"><div style="font-size:28px;margin-bottom:8px;">${item.icon}</div><strong style="color:#0e1e2e;font-size:14px;display:block;margin-bottom:4px;">${item.title}</strong><p style="color:#4a6070;font-size:13px;margin:0;line-height:1.5;">${item.text}</p></td>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 20px;text-align:center;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0"><tr>${itemsHtml}</tr></table></td></tr></table>`;
+    }
+    case "flip_cards": {
+      const headline = (d.headline as string) ?? "";
+      const cards = (d.cards as { front: string; back: string }[]) ?? [];
+      const bg = (d.bgColor as string) ?? "#f8fffe";
+      const accent = (d.accentColor as string) ?? "#179ca3";
+      const cardsHtml = cards.map((card) =>
+        `<tr><td style="padding:8px 0;"><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${accent};border-radius:8px;overflow:hidden;"><tr><td style="background:${accent};padding:12px 16px;color:#ffffff;font-weight:600;font-size:14px;">${card.front}</td></tr><tr><td style="padding:12px 16px;color:#1a2e3b;font-size:14px;line-height:1.6;">${card.back}</td></tr></table></td></tr>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 16px;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${cardsHtml}</table></td></tr></table>`;
+    }
+    default:
+      return "";
+  }
+}
+
+export function emailBlocksToHtml(blocks: Block[]): string {
+  return blocks.map(emailBlockToHtml).filter(Boolean).join("\n");
+}
+
+// ─── Default block factory ────────────────────────────────────────────────────
+function defaultBlock(type: BlockType): Block {
+  const catalog = EMAIL_BLOCK_CATALOG.find((b) => b.type === type);
+  return {
+    id: uid(),
+    type,
+    data: catalog?.defaultData ?? {},
+  };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+interface EmailBlockEditorProps {
+  initialBlocks: Block[];
+  onChange: (blocks: Block[]) => void;
+}
+
+export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlockEditorProps) {
+  const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(EMAIL_CATALOG_CATEGORIES));
+  const [rightPanelWidth, setRightPanelWidth] = useState(300);
+  const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  // Sync initialBlocks when parent re-fetches (e.g. loading a draft)
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (!initialized.current && initialBlocks.length > 0) {
+      setBlocks(initialBlocks);
+      initialized.current = true;
+    }
+  }, [initialBlocks]);
+
+  // Notify parent whenever blocks change
+  useEffect(() => {
+    onChange(blocks);
+  }, [blocks, onChange]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null;
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setBlocks((prev) => {
+        const oldIdx = prev.findIndex((b) => b.id === active.id);
+        const newIdx = prev.findIndex((b) => b.id === over.id);
+        return arrayMove(prev, oldIdx, newIdx);
+      });
+    }
+  };
+
+  const addBlock = (type: BlockType) => {
+    const block = defaultBlock(type);
+    setBlocks((prev) => [...prev, block]);
+    setSelectedId(block.id);
+    setCatalogOpen(false);
+  };
+
+  const updateBlock = useCallback((id: string, data: Record<string, unknown>) => {
+    setBlocks((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, data: { ...b.data, ...data } } : b))
+    );
+  }, []);
+
+  const deleteBlock = (id: string) => {
+    setBlocks((prev) => prev.filter((b) => b.id !== id));
+    if (selectedId === id) setSelectedId(null);
+  };
+
+  const duplicateBlock = (id: string) => {
+    const block = blocks.find((b) => b.id === id);
+    if (!block) return;
+    const newBlock = { ...block, id: uid() };
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id);
+      const next = [...prev];
+      next.splice(idx + 1, 0, newBlock);
+      return next;
+    });
+    setSelectedId(newBlock.id);
+  };
+
+  const moveBlock = (id: string, dir: "up" | "down") => {
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id);
+      if (dir === "up" && idx === 0) return prev;
+      if (dir === "down" && idx === prev.length - 1) return prev;
+      return arrayMove(prev, idx, dir === "up" ? idx - 1 : idx + 1);
+    });
+  };
+
+  const handleRightPanelMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    rightPanelDragRef.current = { startX: e.clientX, startWidth: rightPanelWidth };
+    const onMove = (ev: MouseEvent) => {
+      if (!rightPanelDragRef.current) return;
+      const delta = rightPanelDragRef.current.startX - ev.clientX;
+      const newWidth = Math.min(700, Math.max(240, rightPanelDragRef.current.startWidth + delta));
+      setRightPanelWidth(newWidth);
+    };
+    const onUp = () => {
+      rightPanelDragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const filteredCatalog = EMAIL_BLOCK_CATALOG.filter(
+    (b) =>
+      !catalogSearch ||
+      b.label.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+      b.category.toLowerCase().includes(catalogSearch.toLowerCase())
+  );
+
+  const grouped = EMAIL_CATALOG_CATEGORIES.map((cat) => ({
+    cat,
+    items: filteredCatalog.filter((b) => b.category === cat),
+  })).filter((g) => g.items.length > 0);
+
+  return (
+    <div className="flex h-full min-h-[500px]">
+      {/* Block catalog sidebar */}
+      {catalogOpen && (
+        <div className="w-56 border-r border-gray-200 bg-gray-50 flex flex-col shrink-0 overflow-hidden">
+          <div className="p-2 border-b border-gray-200 flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-600">Add Block</span>
+            <button onClick={() => setCatalogOpen(false)} className="text-gray-400 hover:text-gray-700 text-xs">✕</button>
+          </div>
+          <div className="p-2 border-b border-gray-200">
+            <div className="relative">
+              <Search className="absolute left-2 top-2 w-3.5 h-3.5 text-gray-400" />
+              <Input
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                placeholder="Search blocks…"
+                className="pl-7 h-7 text-xs"
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {grouped.map(({ cat, items }) => (
+              <div key={cat}>
+                <button
+                  className="flex items-center gap-1 w-full text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-1 py-1 hover:text-gray-700"
+                  onClick={() =>
+                    setOpenCategories((prev) => {
+                      const next = new Set(prev);
+                      next.has(cat) ? next.delete(cat) : next.add(cat);
+                      return next;
+                    })
+                  }
+                >
+                  {openCategories.has(cat) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  {cat}
+                </button>
+                {openCategories.has(cat) && (
+                  <div className="space-y-0.5 ml-1">
+                    {items.map((b) => (
+                      <button
+                        key={b.type}
+                        className="flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-xs text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+                        onClick={() => addBlock(b.type)}
+                      >
+                        <span className="text-gray-400 shrink-0">{b.icon}</span>
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Canvas */}
+      <div
+        className="flex-1 overflow-y-auto bg-gray-100 p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setSelectedId(null);
+        }}
+      >
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 mb-3">
+          <Button
+            size="sm"
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+            onClick={() => setCatalogOpen((v) => !v)}
+          >
+            <Plus className="w-4 h-4 mr-1" /> Add Block
+          </Button>
+          <span className="text-xs text-gray-400 ml-auto">
+            {blocks.length} block{blocks.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {blocks.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 cursor-pointer hover:border-teal-400 hover:text-teal-500 transition-colors"
+            onClick={() => setCatalogOpen(true)}
+          >
+            <Plus className="w-8 h-8 mb-2" />
+            <p className="text-sm font-medium">Click to add your first block</p>
+            <p className="text-xs mt-1 opacity-70">Drag and drop to reorder</p>
+          </div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+              {blocks.map((block, idx) => (
+                <SortableBlock
+                  key={block.id}
+                  block={block}
+                  isSelected={selectedId === block.id}
+                  onSelect={() => setSelectedId(block.id)}
+                  onDelete={() => deleteBlock(block.id)}
+                  onDuplicate={() => duplicateBlock(block.id)}
+                  onMoveUp={idx > 0 ? () => moveBlock(block.id, "up") : undefined}
+                  onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, "down") : undefined}
+                  activeDragId={null}
+                  activeColumnTarget={null}
+                  onMoveBlockOutOfColumn={() => {}}
+                  onAddBlockToColumn={() => {}}
+                  onMoveChildToOtherColumn={() => {}}
+                  onDeleteChildFromColumn={() => {}}
+                  onReorderChildInColumn={() => {}}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
+
+      {/* Right panel — block settings */}
+      {selectedBlock && (
+        <>
+          <div
+            className="w-1 cursor-col-resize bg-gray-200 hover:bg-teal-400 transition-colors shrink-0"
+            onMouseDown={handleRightPanelMouseDown}
+          />
+          <div
+            className="border-l border-gray-200 bg-white overflow-y-auto shrink-0"
+            style={{ width: rightPanelWidth }}
+          >
+            <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                Block Settings
+              </span>
+              <button
+                className="text-gray-400 hover:text-gray-700 text-xs"
+                onClick={() => setSelectedId(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-3">
+              <BlockSettings
+                block={selectedBlock}
+                onChange={(data) => updateBlock(selectedBlock.id, data)}
+              />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

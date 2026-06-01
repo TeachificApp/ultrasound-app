@@ -2060,8 +2060,10 @@ export const emailTemplates = mysqlTable("emailTemplates", {
   createdByUserId: int("createdByUserId").notNull(),
   name: varchar("name", { length: 200 }).notNull(),
   subject: varchar("subject", { length: 500 }).notNull(),
-  // Rich HTML body (from TipTap editor)
+  // Rich HTML body (derived from blocks on save)
   htmlBody: longtext("htmlBody").notNull(),
+  // Block editor JSON — raw block data for re-editing
+  blocksJson: longtext("blocksJson"),
   // Optional plain-text version
   previewText: varchar("previewText", { length: 300 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -2077,6 +2079,8 @@ export const emailCampaigns = mysqlTable("emailCampaigns", {
   sentByUserId: int("sentByUserId").notNull(),
   subject: varchar("subject", { length: 500 }).notNull(),
   htmlBody: longtext("htmlBody").notNull(),
+  // Block editor JSON — raw block data for re-editing
+  blocksJson: longtext("blocksJson"),
   previewText: varchar("previewText", { length: 300 }),
   // Audience filter snapshot (JSON)
   // { interests: string[], roles: string[], subscriptionType: string, specificEmails: string[] }

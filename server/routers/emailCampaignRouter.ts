@@ -578,6 +578,7 @@ export const emailCampaignRouter = router({
         name: z.string().min(1).max(200),
         subject: z.string().min(1).max(500),
         htmlBody: z.string().min(1),
+        blocksJson: z.string().optional(),
         previewText: z.string().max(300).optional(),
       }),
     )
@@ -592,6 +593,7 @@ export const emailCampaignRouter = router({
             name: input.name,
             subject: input.subject,
             htmlBody: input.htmlBody,
+            blocksJson: input.blocksJson ?? null,
             previewText: input.previewText ?? null,
           })
           .where(eq(emailTemplates.id, input.id));
@@ -602,6 +604,7 @@ export const emailCampaignRouter = router({
           name: input.name,
           subject: input.subject,
           htmlBody: input.htmlBody,
+          blocksJson: input.blocksJson ?? null,
           previewText: input.previewText ?? null,
         });
         return { id: (result as any).insertId as number };
@@ -638,6 +641,7 @@ export const emailCampaignRouter = router({
       z.object({
         subject: z.string().min(1).max(500),
         htmlBody: z.string().min(1),
+        blocksJson: z.string().optional(),
         previewText: z.string().max(300).optional(),
         audienceFilter: AudienceFilterSchema,
       }),
@@ -661,6 +665,7 @@ export const emailCampaignRouter = router({
         sentByUserId: ctx.user.id,
         subject: input.subject,
         htmlBody: input.htmlBody,
+        blocksJson: input.blocksJson ?? null,
         previewText: input.previewText ?? null,
         audienceFilter: JSON.stringify(input.audienceFilter),
         recipientCount: recipients.length,
@@ -683,6 +688,7 @@ export const emailCampaignRouter = router({
       z.object({
         subject: z.string().min(1).max(500),
         htmlBody: z.string().min(1),
+        blocksJson: z.string().optional(),
         previewText: z.string().max(300).optional(),
         audienceFilter: AudienceFilterSchema,
         scheduledAt: z.date(),
@@ -707,6 +713,7 @@ export const emailCampaignRouter = router({
         sentByUserId: ctx.user.id,
         subject: input.subject,
         htmlBody: input.htmlBody,
+        blocksJson: input.blocksJson ?? null,
         previewText: input.previewText ?? null,
         audienceFilter: JSON.stringify(input.audienceFilter),
         recipientCount: recipients.length,
@@ -804,6 +811,17 @@ export const emailCampaignRouter = router({
   }),
 
   // ── Admin: list campaigns ─────────────────────────────────────────────────
+
+  getCampaign: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [campaign] = await db.select().from(emailCampaigns).where(eq(emailCampaigns.id, input.id)).limit(1);
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
+      return campaign;
+    }),
 
   listCampaigns: protectedProcedure.query(async ({ ctx }) => {
     await assertAdmin(ctx.user.id);
@@ -1016,6 +1034,7 @@ export const emailCampaignRouter = router({
       id: z.number().optional(),
       subject: z.string().max(500).default(""),
       htmlBody: z.string().default(""),
+      blocksJson: z.string().optional(),
       previewText: z.string().max(300).optional(),
       audienceFilter: AudienceFilterSchema.optional(),
       senderProfileId: z.number().optional(),
@@ -1029,6 +1048,7 @@ export const emailCampaignRouter = router({
       const vals = {
         subject: input.subject,
         htmlBody: input.htmlBody,
+        blocksJson: input.blocksJson ?? null,
         previewText: input.previewText ?? null,
         audienceFilter: JSON.stringify(input.audienceFilter ?? {}),
         status: "draft" as const,
