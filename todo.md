@@ -4240,3 +4240,22 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix membership addItem validation error — extend Zod enum to include ultrasoundassist_free, ultrasoundassist_premium, echoassist_free, echoassist_premium (all four app-tier access types)
 - [x] Create heartbeat cron (task_uid: K9r4A6Cxp6ybewJz4ptf6P) — fires every 2 min on deployed site, picks one pending SCORM version and extracts ZIP to R2
 - [x] Verified: all SCORM versions now have status=done (pre-extracted HTML → __direct_html__ redirect; ZIP → R2 proxy); only 350003 failed (0-byte file, superseded by 350007)
+
+## Employer Career Network (Paid)
+- [ ] Schema: add employer_profiles table (userId, companyName, companyLogoUrl, website, description, location, size, stripeCustomerId)
+- [ ] Schema: add employer_subscriptions table (employerId, plan: job_post|unlimited, status, currentPeriodEnd, stripeSubscriptionId, jobCredits)
+- [ ] Schema: update jobs table — add employerId FK (nullable, for employer-posted jobs vs scraped jobs), add status column (pending_payment|active|expired|closed)
+- [ ] Run migration SQL for new employer tables
+- [ ] Backend: createOrUpdateEmployerProfile, getMyEmployerProfile procedures
+- [ ] Backend: postJob procedure (requires active plan or job credit), editJob, deleteJob, listMyJobs
+- [ ] Backend: browseCandidates procedure — gated to unlimited plan subscribers only
+- [ ] Backend: employerJobPostCheckout — $39 single job post Stripe checkout
+- [ ] Backend: employerSubscriptionCheckout — $199/mo unlimited Stripe subscription checkout
+- [ ] Backend: Stripe webhook — handle job_post checkout (create job + set status=active) and subscription (create/update employer_subscription)
+- [ ] Stripe: define $39 job post price and $199/mo subscription price in products.ts
+- [ ] Frontend: EmployerDashboard page — profile setup, post jobs, manage listings, browse candidates (gated by unlimited plan)
+- [ ] Frontend: EmployerProfile public page — shows company info and open jobs
+- [ ] Frontend: CareerNetwork page — show employer-posted jobs with company logo/branding alongside scraped jobs
+- [ ] Frontend: add Employer Portal entry point to Career Network page
+- [ ] Wire /employer-dashboard and /employer/:id routes in all routers in App.tsx
+- [ ] Admin: add employer management tab to CareerNetworkAdmin (view profiles, subscriptions, manage jobs)

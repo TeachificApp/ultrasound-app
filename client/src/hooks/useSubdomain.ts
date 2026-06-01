@@ -35,7 +35,8 @@ const LEARN_HOSTNAMES = [
 const MEMBERS_HOSTNAMES = [
   "members.allaboutultrasound.com",
   "member.allaboutultrasound.com",
-  "app.allaboutultrasound.com",  // primary member dashboard domain
+  // NOTE: app.allaboutultrasound.com is the main clinical app domain — it uses Router(), NOT MembersRouter.
+  // MembersRouter is only for members.allaboutultrasound.com (profile/dashboard/subscriptions hub).
 ];
 
 const IHEARTECHO_HOSTNAMES = [

@@ -5759,6 +5759,7 @@ export const jobs = mysqlTable("jobs", {
   isInternal: boolean("is_internal").default(false),
   isFeatured: boolean("is_featured").default(false),
   postedById: int("posted_by_id"),
+  employerId: int("employer_id"), // FK to employer_profiles.id — null for scraped jobs
   expiresAt: timestamp("expires_at"),
   publishedAt: timestamp("published_at").defaultNow(),
   viewCount: int("view_count").default(0),
@@ -5838,3 +5839,38 @@ export const careerNetworkSettings = mysqlTable("career_network_settings", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type CareerNetworkSettings = typeof careerNetworkSettings.$inferSelect;
+
+/** Employer profiles — companies that post jobs and browse candidates */
+export const employerProfiles = mysqlTable("employer_profiles", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  companyName: varchar("company_name", { length: 200 }).notNull(),
+  companyLogoUrl: text("company_logo_url"),
+  website: varchar("website", { length: 500 }),
+  description: longtext("description"),
+  location: varchar("location", { length: 200 }),
+  companySize: varchar("company_size", { length: 50 }), // e.g. "1-10", "11-50", "51-200", "201-500", "500+"
+  industry: varchar("industry", { length: 100 }),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
+  isVerified: boolean("is_verified").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type EmployerProfile = typeof employerProfiles.$inferSelect;
+export type InsertEmployerProfile = typeof employerProfiles.$inferInsert;
+
+/** Employer subscriptions — tracks plan (job_post credit or unlimited monthly) */
+export const employerSubscriptions = mysqlTable("employer_subscriptions", {
+  id: int("id").primaryKey().autoincrement(),
+  employerId: int("employer_id").notNull(),
+  plan: varchar("plan", { length: 50 }).notNull(), // "job_post" | "unlimited"
+  status: varchar("status", { length: 50 }).notNull().default("active"), // "active" | "cancelled" | "expired"
+  jobCredits: int("job_credits").default(0), // for job_post plan: number of remaining posts
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 100 }),
+  currentPeriodEnd: timestamp("current_period_end"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type EmployerSubscription = typeof employerSubscriptions.$inferSelect;
+export type InsertEmployerSubscription = typeof employerSubscriptions.$inferInsert;
