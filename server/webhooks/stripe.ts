@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -722,6 +722,69 @@ async function handleDualMembershipCheckoutCompleted(session: Record<string, unk
 }
 
 /**
+ * Handle employer job post ($39) and employer subscription ($199/mo) purchases.
+ * Identified by metadata.product_type = 'employer_job_post' or 'employer_subscription'.
+ */
+async function handleEmployerCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  const productType = meta.product_type as string | undefined;
+  if (productType !== "employer_job_post" && productType !== "employer_subscription") return;
+
+  const userId = meta.user_id ? parseInt(meta.user_id) : null;
+  if (!userId) {
+    console.warn("[Stripe] Employer checkout missing user_id in metadata");
+    return;
+  }
+
+  const db = await getDb();
+
+  // Ensure employer profile exists
+  const [existingProfile] = await db.select({ id: employerProfiles.id })
+    .from(employerProfiles).where(eq(employerProfiles.userId, userId)).limit(1);
+  const profileId = existingProfile?.id ?? (
+    await db.insert(employerProfiles).values({ userId, companyName: meta.company_name ?? "My Company", status: "active" })
+      .then(([r]: any) => (r as { insertId: number }).insertId)
+  );
+
+  if (productType === "employer_job_post") {
+    // Add 1 job post credit
+    const [existing] = await db.select().from(employerSubscriptions)
+      .where(and(eq(employerSubscriptions.employerProfileId, profileId), eq(employerSubscriptions.plan, "job_post"))).limit(1);
+    if (existing) {
+      await db.update(employerSubscriptions)
+        .set({ jobCredits: sql`${employerSubscriptions.jobCredits} + 1`, status: "active" })
+        .where(eq(employerSubscriptions.id, existing.id));
+    } else {
+      await db.insert(employerSubscriptions).values({
+        employerProfileId: profileId, plan: "job_post", status: "active",
+        stripeSessionId: session.id as string, jobCredits: 1,
+      });
+    }
+    console.log(`[Stripe] Employer job post credit added for userId=${userId}`);
+  } else if (productType === "employer_subscription") {
+    // Upsert unlimited subscription
+    const [existing] = await db.select().from(employerSubscriptions)
+      .where(and(eq(employerSubscriptions.employerProfileId, profileId), eq(employerSubscriptions.plan, "unlimited"))).limit(1);
+    const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    if (existing) {
+      await db.update(employerSubscriptions)
+        .set({ status: "active", currentPeriodEnd: periodEnd, stripeSubscriptionId: meta.subscription_id ?? existing.stripeSubscriptionId })
+        .where(eq(employerSubscriptions.id, existing.id));
+    } else {
+      await db.insert(employerSubscriptions).values({
+        employerProfileId: profileId, plan: "unlimited", status: "active",
+        stripeSessionId: session.id as string,
+        stripeSubscriptionId: meta.subscription_id,
+        currentPeriodEnd: periodEnd,
+      });
+    }
+    console.log(`[Stripe] Employer unlimited subscription activated for userId=${userId}`);
+  }
+
+  await notifyOwner({ title: "New Employer Purchase", content: `userId=${userId} purchased ${productType}` });
+}
+
+/**
  * Handle subscription lifecycle events (cancellation, updates).
  * Updates the brandMemberships table when a subscription is cancelled or changes status.
  */
@@ -1357,6 +1420,7 @@ export function registerStripeWebhook(app: Express) {
         const sessionObj = (event.data as { object: Record<string, unknown> }).object;
         if (eventType === "checkout.session.completed") {
           await handleCheckoutSessionCompleted(sessionObj);
+          await handleEmployerCheckoutCompleted(sessionObj);
           await handleLmsCheckoutCompleted(sessionObj);
           await handleDigitalDownloadCheckoutCompleted(sessionObj);
           await handleDigitalBundleCheckoutCompleted(sessionObj);

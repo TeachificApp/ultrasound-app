@@ -85,7 +85,51 @@ export default function Profile() {
   const utils = trpc.useUtils();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeSection, setActiveSection] = useState<"info" | "password" | "notifications" | "interests">("info");
+  const [activeSection, setActiveSection] = useState<"info" | "password" | "notifications" | "interests" | "career">("info");
+
+  // ── Career Network — candidate profile ──────────────────────────────────────
+  const { data: candidateProfile, refetch: refetchCandidate } = trpc.careerNetwork.getMyCandidateProfile.useQuery(
+    undefined, { enabled: !!user }
+  );
+  const saveCandidateMutation = trpc.careerNetwork.saveCandidateProfile.useMutation({
+    onSuccess: () => { toast.success("Career profile saved!"); refetchCandidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const [careerHeadline, setCareerHeadline] = useState("");
+  const [careerBio, setCareerBio] = useState("");
+  const [careerLocation, setCareerLocation] = useState("");
+  const [careerPhone, setCareerPhone] = useState("");
+  const [careerLinkedin, setCareerLinkedin] = useState("");
+  const [careerPortfolio, setCareerPortfolio] = useState("");
+  const [careerYears, setCareerYears] = useState("");
+  const [careerSpecialties, setCareerSpecialties] = useState("");
+  const [careerCerts, setCareerCerts] = useState("");
+  const [careerAvailability, setCareerAvailability] = useState("not_looking");
+  const [careerSalary, setCareerSalary] = useState("");
+  const [careerLocType, setCareerLocType] = useState("any");
+  const [careerIsPublic, setCareerIsPublic] = useState(false);
+  const [careerOpenToTravel, setCareerOpenToTravel] = useState(false);
+
+  useEffect(() => {
+    if (candidateProfile) {
+      setCareerHeadline((candidateProfile as any).headline ?? "");
+      setCareerBio((candidateProfile as any).bio ?? "");
+      setCareerLocation((candidateProfile as any).location ?? "");
+      setCareerPhone((candidateProfile as any).phone ?? "");
+      setCareerLinkedin((candidateProfile as any).linkedinUrl ?? "");
+      setCareerPortfolio((candidateProfile as any).portfolioUrl ?? "");
+      setCareerYears((candidateProfile as any).yearsExperience?.toString() ?? "");
+      const sp = (candidateProfile as any).specialties;
+      setCareerSpecialties(Array.isArray(sp) ? sp.join(", ") : (typeof sp === "string" ? (sp.startsWith("[") ? JSON.parse(sp).join(", ") : sp) : ""));
+      const ce = (candidateProfile as any).certifications;
+      setCareerCerts(Array.isArray(ce) ? ce.join(", ") : (typeof ce === "string" ? (ce.startsWith("[") ? JSON.parse(ce).join(", ") : ce) : ""));
+      setCareerAvailability((candidateProfile as any).availability ?? "not_looking");
+      setCareerSalary((candidateProfile as any).desiredSalary ?? "");
+      setCareerLocType((candidateProfile as any).desiredLocationType ?? "any");
+      setCareerIsPublic((candidateProfile as any).isPublic ?? false);
+      setCareerOpenToTravel((candidateProfile as any).openToTravel ?? false);
+    }
+  }, [candidateProfile]);
 
   // Interest preferences (new system)
   const userBrand = (user as any)?.brand as string | undefined;
@@ -653,6 +697,13 @@ export default function Profile() {
               >
                 <Heart className="w-3.5 h-3.5" />
                 Interests
+              </button>
+              <button
+                onClick={() => setActiveSection("career")}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold transition-all ${activeSection === "career" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <Briefcase className="w-3.5 h-3.5" />
+                Career
               </button>
             </div>
 
@@ -1307,6 +1358,217 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* Career Network Section */}
+      {activeSection === "career" && (
+        <div className="container py-6">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h2 className="text-sm font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Career Network Profile</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Opt in to be discoverable by employers. Your profile is private by default.</p>
+              </div>
+              <div className="px-6 py-5 space-y-5">
+
+                {/* Opt-in toggle */}
+                <div className="flex items-center justify-between p-4 rounded-lg bg-[#189aa1]/5 border border-[#189aa1]/20">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Make my profile visible to employers</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Only employers with an active subscription can browse candidate profiles.</p>
+                  </div>
+                  <button
+                    onClick={() => setCareerIsPublic(!careerIsPublic)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      careerIsPublic ? "bg-[#189aa1]" : "bg-gray-300"
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      careerIsPublic ? "translate-x-6" : "translate-x-1"
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Travel opt-in */}
+                <div className="flex items-center justify-between p-4 rounded-lg bg-amber-50 border border-amber-200">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Open to travel contracts</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Let travel staffing agencies and hospitals know you're interested in travel assignments.</p>
+                  </div>
+                  <button
+                    onClick={() => setCareerOpenToTravel(!careerOpenToTravel)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      careerOpenToTravel ? "bg-amber-500" : "bg-gray-300"
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      careerOpenToTravel ? "translate-x-6" : "translate-x-1"
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Professional headline */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Professional Headline</label>
+                  <input
+                    type="text" maxLength={300} value={careerHeadline} onChange={e => setCareerHeadline(e.target.value)}
+                    placeholder="e.g. Registered Cardiac Sonographer | Adult Echo Specialist"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+                  />
+                </div>
+
+                {/* Bio */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Professional Summary</label>
+                  <textarea
+                    rows={3} value={careerBio} onChange={e => setCareerBio(e.target.value)}
+                    placeholder="Brief summary of your experience and career goals..."
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30 resize-none"
+                  />
+                </div>
+
+                {/* Location + Phone */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Location (City, State)</label>
+                    <input
+                      type="text" value={careerLocation} onChange={e => setCareerLocation(e.target.value)}
+                      placeholder="e.g. Dallas, TX"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Phone (optional)</label>
+                    <input
+                      type="tel" value={careerPhone} onChange={e => setCareerPhone(e.target.value)}
+                      placeholder="+1 (555) 000-0000"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+                    />
+                  </div>
+                </div>
+
+                {/* Years + Availability */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Years of Experience</label>
+                    <input
+                      type="number" min={0} max={60} value={careerYears} onChange={e => setCareerYears(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Availability</label>
+                    <select value={careerAvailability} onChange={e => setCareerAvailability(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30 bg-white">
+                      <option value="not_looking">Not currently looking</option>
+                      <option value="immediately">Immediately</option>
+                      <option value="2_weeks">Within 2 weeks</option>
+                      <option value="1_month">Within 1 month</option>
+                      <option value="3_months">Within 3 months</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Desired location type + salary */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Preferred Work Setting</label>
+                    <select value={careerLocType} onChange={e => setCareerLocType(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30 bg-white">
+                      <option value="any">Any</option>
+                      <option value="onsite">On-site</option>
+                      <option value="remote">Remote</option>
+                      <option value="hybrid">Hybrid</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Desired Salary / Rate</label>
+                    <input
+                      type="text" value={careerSalary} onChange={e => setCareerSalary(e.target.value)}
+                      placeholder="e.g. $80,000/yr or $45/hr"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+                    />
+                  </div>
+                </div>
+
+                {/* Specialties */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Specialties <span className="font-normal text-gray-400">(comma-separated)</span></label>
+                  <input
+                    type="text" value={careerSpecialties} onChange={e => setCareerSpecialties(e.target.value)}
+                    placeholder="e.g. Adult Echo, TEE, Structural Heart, Vascular"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+                  />
+                </div>
+
+                {/* Certifications */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Certifications <span className="font-normal text-gray-400">(comma-separated)</span></label>
+                  <input
+                    type="text" value={careerCerts} onChange={e => setCareerCerts(e.target.value)}
+                    placeholder="e.g. RCS, RDCS, FASE, CCI"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+                  />
+                </div>
+
+                {/* LinkedIn + Portfolio */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">LinkedIn URL</label>
+                    <input
+                      type="url" value={careerLinkedin} onChange={e => setCareerLinkedin(e.target.value)}
+                      placeholder="https://linkedin.com/in/..."
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Portfolio URL</label>
+                    <input
+                      type="url" value={careerPortfolio} onChange={e => setCareerPortfolio(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+                    />
+                  </div>
+                </div>
+
+                {/* Save button */}
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      saveCandidateMutation.mutate({
+                        headline: careerHeadline || undefined,
+                        bio: careerBio || undefined,
+                        location: careerLocation || undefined,
+                        phone: careerPhone || undefined,
+                        linkedinUrl: careerLinkedin || undefined,
+                        portfolioUrl: careerPortfolio || undefined,
+                        yearsExperience: careerYears ? parseInt(careerYears) : undefined,
+                        specialties: careerSpecialties ? careerSpecialties.split(",").map(s => s.trim()).filter(Boolean) : undefined,
+                        certifications: careerCerts ? careerCerts.split(",").map(s => s.trim()).filter(Boolean) : undefined,
+                        availability: careerAvailability as any,
+                        desiredSalary: careerSalary || undefined,
+                        desiredLocationType: careerLocType as any,
+                        isPublic: careerIsPublic,
+                        openToTravel: careerOpenToTravel,
+                      });
+                    }}
+                    disabled={saveCandidateMutation.isPending}
+                    className="flex items-center gap-2 px-5 py-2 bg-[#189aa1] text-white text-xs font-semibold rounded-lg hover:bg-[#147f85] transition-colors disabled:opacity-60"
+                  >
+                    {saveCandidateMutation.isPending ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5" />
+                    )}
+                    Save Career Profile
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </Layout>
   );
 }

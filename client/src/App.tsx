@@ -276,6 +276,7 @@ const CommunityAdmin = lazy(() => import("./pages/admin/CommunityAdmin"));
 const CareerNetwork = lazy(() => import("./pages/CareerNetwork"));
 const CareerProfile = lazy(() => import("./pages/CareerProfile"));
 const CareerNetworkAdmin = lazy(() => import("./pages/admin/CareerNetworkAdmin"));
+const EmployerDashboard = lazy(() => import("./pages/EmployerDashboard"));
 
 function Router() {
   usePageViewTracker();
@@ -448,6 +449,8 @@ function Router() {
         <Route path="/career/resumes">{() => <CareerProfile defaultTab="resumes" />}</Route>
         <Route path="/career/applications">{() => <CareerProfile defaultTab="applications" />}</Route>
         <Route path="/admin/career-network">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CareerNetworkAdmin /></RoleGuard>}</Route>
+        <Route path="/employer/dashboard" component={EmployerDashboard} />
+        <Route path="/employer" component={EmployerDashboard} />
 
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
         <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>

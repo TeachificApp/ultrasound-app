@@ -257,6 +257,8 @@ export default function CareerNetwork() {
   const [categoryId, setCategoryId] = useState<number | undefined>();
   const [locationType, setLocationType] = useState<string | undefined>();
   const [employmentType, setEmploymentType] = useState<string | undefined>();
+  const [locationText, setLocationText] = useState("");
+  const [debouncedLocationText, setDebouncedLocationText] = useState("");
   const [page, setPage] = useState(1);
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -268,6 +270,7 @@ export default function CareerNetwork() {
     categoryId,
     locationType: locationType as "remote" | "onsite" | "hybrid" | undefined,
     employmentType: employmentType as "full_time" | "part_time" | "contract" | "per_diem" | "travel" | "prn" | undefined,
+    locationText: debouncedLocationText || undefined,
     page,
     pageSize: 20,
   });
@@ -285,16 +288,27 @@ export default function CareerNetwork() {
     }, 400);
   };
 
+  const handleLocationSearch = (v: string) => {
+    setLocationText(v);
+    clearTimeout((window as unknown as { _locationTimer: ReturnType<typeof setTimeout> })._locationTimer);
+    (window as unknown as { _locationTimer: ReturnType<typeof setTimeout> })._locationTimer = setTimeout(() => {
+      setDebouncedLocationText(v);
+      setPage(1);
+    }, 400);
+  };
+
   const clearFilters = () => {
     setCategoryId(undefined);
     setLocationType(undefined);
     setEmploymentType(undefined);
+    setLocationText("");
+    setDebouncedLocationText("");
     setSearch("");
     setDebouncedSearch("");
     setPage(1);
   };
 
-  const hasFilters = !!(categoryId || locationType || employmentType || debouncedSearch);
+  const hasFilters = !!(categoryId || locationType || employmentType || debouncedSearch || debouncedLocationText);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -360,9 +374,28 @@ export default function CareerNetwork() {
                 </div>
               </div>
 
+              {/* Location text search */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Location</label>
+                <div className="relative">
+                  <MapPin className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                  <Input
+                    value={locationText}
+                    onChange={e => handleLocationSearch(e.target.value)}
+                    placeholder="City, state, zip..."
+                    className="h-8 text-sm pl-7"
+                  />
+                  {locationText && (
+                    <button onClick={() => { setLocationText(""); setDebouncedLocationText(""); setPage(1); }} className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <X className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Location type */}
               <div>
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Location Type</label>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Work Type</label>
                 <Select value={locationType ?? "all"} onValueChange={v => { setLocationType(v === "all" ? undefined : v); setPage(1); }}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -491,6 +524,115 @@ export default function CareerNetwork() {
           {selectedJobId && <JobDetailModal jobId={selectedJobId} onClose={() => setSelectedJobId(null)} />}
         </DialogContent>
       </Dialog>
+
+      {/* Employer Pricing Section */}
+      <EmployerPricingSection />
     </div>
+  );
+}
+
+// ─── Employer Pricing Section ─────────────────────────────────────────────────
+function EmployerPricingSection() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+
+  const handleGetStarted = (plan: "post" | "subscription") => {
+    if (!user) {
+      navigate("/login?returnTo=/employer/dashboard");
+      return;
+    }
+    navigate(`/employer/dashboard?plan=${plan}`);
+  };
+
+  return (
+    <section className="bg-white border-t mt-12">
+      <div className="max-w-6xl mx-auto px-4 py-16">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 bg-teal-50 text-teal-700 text-sm font-medium px-4 py-1.5 rounded-full mb-4">
+            <Building2 className="h-4 w-4" /> For Employers
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-3">Hire Ultrasound Professionals</h2>
+          <p className="text-gray-500 text-lg max-w-xl mx-auto">
+            Reach thousands of credentialed sonographers and echocardiographers. Post a job or get unlimited access to our candidate network.
+          </p>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+          {/* Single Post */}
+          <div className="border-2 border-gray-200 rounded-2xl p-8 flex flex-col hover:border-teal-300 transition-colors">
+            <div className="mb-6">
+              <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Single Job Post</div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold text-gray-900">$39</span>
+                <span className="text-gray-400 text-sm">/ post</span>
+              </div>
+              <p className="text-gray-500 text-sm mt-2">One-time payment. Post stays active for 30 days.</p>
+            </div>
+            <ul className="space-y-3 flex-1 mb-8">
+              {[
+                "1 active job listing",
+                "30-day visibility",
+                "Company logo & branding",
+                "Direct apply or external link",
+                "Email notifications on applications",
+              ].map(f => (
+                <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
+                  <span className="text-teal-500 mt-0.5 font-bold">✓</span> {f}
+                </li>
+              ))}
+            </ul>
+            <Button
+              onClick={() => handleGetStarted("post")}
+              variant="outline"
+              className="w-full border-teal-600 text-teal-700 hover:bg-teal-50 font-semibold h-11"
+            >
+              Post a Job
+            </Button>
+          </div>
+
+          {/* Unlimited Subscription */}
+          <div className="border-2 border-teal-500 rounded-2xl p-8 flex flex-col relative bg-gradient-to-br from-teal-50/50 to-white">
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+              <span className="bg-teal-600 text-white text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wide">Most Popular</span>
+            </div>
+            <div className="mb-6">
+              <div className="text-sm font-semibold text-teal-600 uppercase tracking-wide mb-2">Employer Subscription</div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold text-gray-900">$199</span>
+                <span className="text-gray-400 text-sm">/ month</span>
+              </div>
+              <p className="text-gray-500 text-sm mt-2">Cancel anytime. Billed monthly.</p>
+            </div>
+            <ul className="space-y-3 flex-1 mb-8">
+              {[
+                "Unlimited active job listings",
+                "Browse full candidate/resume database",
+                "Direct candidate outreach",
+                "Company profile page",
+                "Featured job placement",
+                "Priority support",
+              ].map(f => (
+                <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
+                  <span className="text-teal-500 mt-0.5 font-bold">✓</span> {f}
+                </li>
+              ))}
+            </ul>
+            <Button
+              onClick={() => handleGetStarted("subscription")}
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold h-11"
+            >
+              Start Subscription
+            </Button>
+          </div>
+        </div>
+
+        {/* Trust line */}
+        <p className="text-center text-sm text-gray-400 mt-8">
+          All payments processed securely via Stripe. &nbsp;·&nbsp; Questions? <a href="mailto:info@allaboutultrasound.com" className="text-teal-600 hover:underline">Contact us</a>
+        </p>
+      </div>
+    </section>
   );
 }

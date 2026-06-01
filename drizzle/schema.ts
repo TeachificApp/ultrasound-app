@@ -5787,6 +5787,7 @@ export const candidateProfiles = mysqlTable("candidate_profiles", {
   desiredSalary: varchar("desired_salary", { length: 100 }),
   desiredLocationType: mysqlEnum("desired_location_type", ["remote", "onsite", "hybrid", "any"]).default("any"),
   isPublic: boolean("is_public").default(false),
+  openToTravel: boolean("open_to_travel").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

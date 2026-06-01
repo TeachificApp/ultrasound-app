@@ -17,6 +17,8 @@ import {
   jobApplications,
   careerNetworkSettings,
   users,
+  employerProfiles,
+  employerSubscriptions,
 } from "../../drizzle/schema";
 import { invokeLLM } from "../_core/llm";
 import { storagePut } from "../storage";
@@ -117,6 +119,7 @@ export const careerNetworkRouter = router({
     categoryId: z.number().optional(),
     locationType: z.enum(["remote", "onsite", "hybrid"]).optional(),
     employmentType: z.enum(["full_time", "part_time", "contract", "per_diem", "travel", "prn"]).optional(),
+    locationText: z.string().optional(), // city/state text filter
     isInternal: z.boolean().optional(),
     isFeatured: z.boolean().optional(),
     page: z.number().default(1),
@@ -128,6 +131,7 @@ export const careerNetworkRouter = router({
     if (input.categoryId) conditions.push(eq(jobs.categoryId, input.categoryId));
     if (input.locationType) conditions.push(eq(jobs.locationType, input.locationType));
     if (input.employmentType) conditions.push(eq(jobs.employmentType, input.employmentType));
+    if (input.locationText) conditions.push(like(jobs.location, `%${input.locationText}%`));
     if (input.isInternal !== undefined) conditions.push(eq(jobs.isInternal, input.isInternal));
     if (input.isFeatured !== undefined) conditions.push(eq(jobs.isFeatured, input.isFeatured));
     if (input.search) {
@@ -210,6 +214,7 @@ export const careerNetworkRouter = router({
     desiredSalary: z.string().max(100).optional(),
     desiredLocationType: z.enum(["remote", "onsite", "hybrid", "any"]).optional(),
     isPublic: z.boolean().optional(),
+    openToTravel: z.boolean().optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     const existing = await db.select({ id: candidateProfiles.id }).from(candidateProfiles).where(eq(candidateProfiles.userId, ctx.user.id)).limit(1);
@@ -639,8 +644,201 @@ Return a JSON object with this exact structure:
       .where(eq(jobApplications.userId, ctx.user.id))
       .orderBy(desc(jobApplications.createdAt));
   }),
-});
 
+  // ── Employer: create checkout for single job post ($39) ─────────────────────
+  createJobPostCheckout: protectedProcedure.mutation(async ({ ctx }) => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+    const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      customer_email: ctx.user.email ?? undefined,
+      client_reference_id: ctx.user.id.toString(),
+      allow_promotion_codes: true,
+      line_items: [{
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "Job Post — Ultrasound Career Network",
+            description: "Post one job listing for 30 days on the Ultrasound Career Network",
+          },
+          unit_amount: 3900, // $39.00
+        },
+        quantity: 1,
+      }],
+      metadata: {
+        type: "employer_job_post",
+        user_id: ctx.user.id.toString(),
+        customer_email: ctx.user.email ?? "",
+        customer_name: ctx.user.name ?? "",
+      },
+      success_url: `${origin}/employer/dashboard?success=job_post`,
+      cancel_url: `${origin}/career-network`,
+    });
+    return { checkoutUrl: session.url };
+  }),
+
+  // ── Employer: create checkout for monthly subscription ($199/mo) ─────────────
+  createEmployerSubscriptionCheckout: protectedProcedure.mutation(async ({ ctx }) => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+    const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer_email: ctx.user.email ?? undefined,
+      client_reference_id: ctx.user.id.toString(),
+      allow_promotion_codes: true,
+      line_items: [{
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "Employer Subscription — Ultrasound Career Network",
+            description: "Unlimited job posts + full candidate/resume database access",
+          },
+          unit_amount: 19900, // $199.00
+          recurring: { interval: "month" },
+        },
+        quantity: 1,
+      }],
+      metadata: {
+        type: "employer_subscription",
+        user_id: ctx.user.id.toString(),
+        customer_email: ctx.user.email ?? "",
+        customer_name: ctx.user.name ?? "",
+      },
+      success_url: `${origin}/employer/dashboard?success=subscription`,
+      cancel_url: `${origin}/career-network`,
+    });
+    return { checkoutUrl: session.url };
+  }),
+
+  // ── Employer: get my employer profile ─────────────────────────────────────
+  getMyEmployerProfile: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    const [profile] = await db.select().from(employerProfiles).where(eq(employerProfiles.userId, ctx.user.id)).limit(1);
+    if (!profile) return null;
+    // Check active unlimited subscription
+    const [sub] = await db.select().from(employerSubscriptions)
+      .where(and(eq(employerSubscriptions.employerId, profile.id), eq(employerSubscriptions.status, "active"), eq(employerSubscriptions.plan, "unlimited")))
+      .limit(1);
+    // Check job post credits
+    const [creditSub] = await db.select().from(employerSubscriptions)
+      .where(and(eq(employerSubscriptions.employerId, profile.id), eq(employerSubscriptions.plan, "job_post"), sql`${employerSubscriptions.jobCredits} > 0`))
+      .limit(1);
+    return { ...profile, hasActiveSubscription: !!sub, subscription: sub ?? null, jobPostCredits: creditSub?.jobCredits ?? 0 };
+  }),
+
+  // ── Employer: upsert employer profile ─────────────────────────────────────
+  upsertEmployerProfile: protectedProcedure.input(z.object({
+    companyName: z.string().min(1).max(200),
+    companyWebsite: z.string().url().optional().or(z.literal("")),
+    companyDescription: z.string().max(2000).optional(),
+    companyLogoUrl: z.string().url().optional().or(z.literal("")),
+    contactEmail: z.string().email().optional().or(z.literal("")),
+    contactName: z.string().max(200).optional(),
+  })).mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    const [existing] = await db.select().from(employerProfiles).where(eq(employerProfiles.userId, ctx.user.id)).limit(1);
+    if (existing) {
+      await db.update(employerProfiles).set({
+        companyName: input.companyName,
+        website: input.companyWebsite || null,
+        description: input.companyDescription || null,
+        companyLogoUrl: input.companyLogoUrl || null,
+      }).where(eq(employerProfiles.id, existing.id));
+      return { id: existing.id };
+    }
+    const [inserted] = await db.insert(employerProfiles).values({
+      userId: ctx.user.id,
+      companyName: input.companyName,
+      website: input.companyWebsite || null,
+      description: input.companyDescription || null,
+      companyLogoUrl: input.companyLogoUrl || null,
+    }).$returningId();
+    return { id: inserted.id };
+  }),
+
+    // ── Employer: list my posted jobs ─────────────────────────────────────────
+  getMyPostedJobs: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    const [profile] = await db.select().from(employerProfiles).where(eq(employerProfiles.userId, ctx.user.id)).limit(1);
+    if (!profile) return [];
+    return db.select().from(jobs).where(eq(jobs.employerId, profile.id)).orderBy(desc(jobs.createdAt));
+  }),
+
+  // ── Employer: browse candidate profiles (subscription required) ────────────
+  listCandidates: protectedProcedure.input(z.object({
+    page: z.number().default(1),
+    pageSize: z.number().default(20),
+  })).query(async ({ ctx, input }) => {
+    const db = await getDb();
+    // Check if the user has an active employer subscription
+    const [profile] = await db.select().from(employerProfiles).where(eq(employerProfiles.userId, ctx.user.id)).limit(1);
+    if (!profile) throw new TRPCError({ code: "FORBIDDEN", message: "Employer profile required" });
+    const [sub] = await db.select().from(employerSubscriptions)
+      .where(and(eq(employerSubscriptions.employerId, profile.id), eq(employerSubscriptions.status, "active")))
+      .limit(1);
+    if (!sub) throw new TRPCError({ code: "FORBIDDEN", message: "Active employer subscription required to browse candidates" });
+    const offset = (input.page - 1) * input.pageSize;
+    return db.select().from(candidateProfiles)
+      .limit(input.pageSize).offset(offset)
+      .orderBy(desc(candidateProfiles.updatedAt));
+  }),
+
+  // ── Employer: post a job (requires active subscription OR credits from single post) ───
+  createJob: protectedProcedure.input(z.object({
+    title: z.string().min(1).max(300),
+    company: z.string().max(200).optional(),
+    location: z.string().max(200).optional(),
+    locationType: z.enum(["remote", "onsite", "hybrid"]).optional(),
+    employmentType: z.enum(["full_time", "part_time", "contract", "per_diem", "travel", "prn"]).optional(),
+    salary: z.string().max(200).optional(),
+    description: z.string().min(1),
+    applyUrl: z.string().url().optional(),
+    applyEmail: z.string().email().optional(),
+    categoryId: z.number().optional(),
+    tags: z.string().max(500).optional(),
+    isInternal: z.boolean().default(false),
+  })).mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    const [profile] = await db.select().from(employerProfiles).where(eq(employerProfiles.userId, ctx.user.id)).limit(1);
+    if (!profile) throw new TRPCError({ code: "FORBIDDEN", message: "Please create an employer profile first" });
+    // Check subscription or job post credits
+    const [sub] = await db.select().from(employerSubscriptions)
+      .where(and(eq(employerSubscriptions.employerId, profile.id), eq(employerSubscriptions.status, "active"), eq(employerSubscriptions.plan, "unlimited")))
+      .limit(1);
+    if (!sub) {
+      // Check if they have a paid single-post credit (job_post plan with jobCredits > 0)
+      const [creditSub] = await db.select().from(employerSubscriptions)
+        .where(and(eq(employerSubscriptions.employerId, profile.id), eq(employerSubscriptions.plan, "job_post"), sql`${employerSubscriptions.jobCredits} > 0`))
+        .limit(1);
+      if (!creditSub) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Please purchase a job post or subscribe to post jobs" });
+      }
+      // Deduct one credit
+      await db.update(employerSubscriptions).set({ jobCredits: (creditSub.jobCredits ?? 1) - 1 }).where(eq(employerSubscriptions.id, creditSub.id));
+    }
+    const [inserted] = await db.insert(jobs).values({
+      title: input.title,
+      company: input.company || profile.companyName,
+      location: input.location || null,
+      locationType: input.locationType || "onsite",
+      employmentType: input.employmentType || "full_time",
+      salary: input.salary || null,
+      description: input.description,
+      applyUrl: input.applyUrl || null,
+      applyEmail: input.applyEmail || null,
+      categoryId: input.categoryId || null,
+      tags: input.tags || null,
+      isInternal: input.isInternal,
+      status: "active",
+      postedById: ctx.user.id,
+      employerId: profile.id,
+      sourceId: null,
+    }).$returningId();
+    return { id: inserted.id };
+  }),
+});
 // ─── Helper: build plain text resume from JSON ────────────────────────────────
 function buildResumeText(r: { summary?: string; skills?: string[]; experience?: Array<{ title: string; company: string; dates: string; bullets: string[] }>; education?: Array<{ degree: string; institution: string; year: string }>; certifications?: Array<{ name: string; issuer: string; year: string }> }): string {
   const lines: string[] = [];
