@@ -109,22 +109,51 @@ async function scrapeJobPage(url: string): Promise<Array<{
   });
   const $ = cheerio.load(resp.data);
   const items: ReturnType<typeof scrapeJobPage> = [];
-  // Generic heuristic: look for job card patterns
+  const baseUrl = new URL(url).origin;
+
+  // Strategy 1: Naylor/BTI job boards (ARDMS, etc.) — [data-job] with numeric IDs
+  const naylorJobs = $('[data-job]').filter((_, el) => {
+    const jobId = $(el).attr('data-job');
+    return !!jobId && jobId !== '0' && /^\d+$/.test(jobId);
+  });
+  if (naylorJobs.length > 0) {
+    naylorJobs.each((_, el) => {
+      const $el = $(el);
+      const jobId = $el.attr('data-job') || '';
+      const titleEl = $el.find('.card-title a, h2 a, h3 a, .job-title a').first();
+      const title = titleEl.text().trim();
+      const relLink = titleEl.attr('href') || '';
+      const fullLink = relLink.startsWith('http') ? relLink : `${baseUrl}${relLink}`;
+      const company = $el.find('.card-subtitle, .company-name, .employer-name').first().text().trim() || 'Unknown';
+      const location = $el.find('.card-text, .location, .city').first().text().trim() || '';
+      const description = $el.find('.card-body, .description, .summary').first().text().trim() || '';
+      const salary = $el.find('.salary, .compensation, .pay').first().text().trim() || '';
+      const logoSrc = $el.find('.card-img-holder img, .company-logo img, img[itemprop="URL"]').first().attr('src') || null;
+      const companyLogoUrl = logoSrc ? (logoSrc.startsWith('http') ? logoSrc : `${baseUrl}${logoSrc}`) : getCompanyLogoUrl(company, fullLink);
+      if (title) {
+        items.push({ title, company, location, description, applyUrl: fullLink, externalId: jobId, publishedAt: null, salary, companyLogoUrl });
+      }
+    });
+    if (items.length > 0) return items;
+  }
+
+  // Strategy 2: Generic heuristic selectors
   const selectors = [
-    ".job-listing", ".job-card", ".job-post", "[data-job]",
+    ".job-listing", ".job-card", ".job-post",
     "article.job", ".position", ".opening", ".vacancy",
+    ".job-result", ".search-result-item", "li.job",
   ];
   for (const sel of selectors) {
     if ($(sel).length > 0) {
       $(sel).each((_, el) => {
         const $el = $(el);
-        const title = $el.find("h1,h2,h3,h4,.title,.job-title").first().text().trim();
+        const title = $el.find("h1,h2,h3,h4,.title,.job-title,.position-title").first().text().trim();
         const link = $el.find("a").first().attr("href") || url;
         const fullLink = link.startsWith("http") ? link : new URL(link, url).href;
-        const company = $el.find(".company,.employer,.organization").first().text().trim() || "Unknown";
-        const location = $el.find(".location,.city,.region").first().text().trim() || "";
-        const description = $el.find(".description,.summary,.details,.body").first().text().trim() || "";
-        const salary = $el.find(".salary,.compensation,.pay").first().text().trim() || "";
+        const company = $el.find(".company,.employer,.organization,.company-name").first().text().trim() || "Unknown";
+        const location = $el.find(".location,.city,.region,.address").first().text().trim() || "";
+        const description = $el.find(".description,.summary,.details,.body,.excerpt").first().text().trim() || "";
+        const salary = $el.find(".salary,.compensation,.pay,.rate").first().text().trim() || "";
         const logoImg = $el.find("img[class*='logo'], img[alt*='logo'], img[src*='logo']").first().attr("src") || null;
         const companyLogoUrl = logoImg ? (logoImg.startsWith("http") ? logoImg : new URL(logoImg, url).href) : getCompanyLogoUrl(company, fullLink);
         if (title) {

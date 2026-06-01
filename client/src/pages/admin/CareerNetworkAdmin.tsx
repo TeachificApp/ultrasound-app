@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import {
   Plus, Trash2, Edit2, Save, X, Loader2, RefreshCw, Rss, Globe, Briefcase,
   Users, Settings, Star, Eye, EyeOff, CheckCircle2, XCircle, FileText,
-  ChevronDown, ChevronUp, Tag, Search, ChevronRight
+  ChevronDown, ChevronUp, Tag, Search, ChevronRight, Pencil
 } from "lucide-react";
 import { Link } from "wouter";
 import { getAdminUrl } from "@/hooks/useSubdomain";
@@ -581,6 +581,8 @@ function CandidatesTab() {
 }
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
+type FullPageEditorField = "headerBadgeHtml" | "pageIntro" | "rightSideHtml" | "bottomHtml" | null;
+
 function SettingsTab() {
   const utils = trpc.useUtils();
   const { data: settings, isLoading } = trpc.careerNetwork.getSettings.useQuery();
@@ -590,6 +592,26 @@ function SettingsTab() {
     seoTitle: "", seoDescription: "",
   });
   const [loaded, setLoaded] = useState(false);
+  const [editingField, setEditingField] = useState<FullPageEditorField>(null);
+  const [editorDraft, setEditorDraft] = useState("");
+
+  const fieldLabels: Record<NonNullable<FullPageEditorField>, string> = {
+    headerBadgeHtml: "Header Badge / Announcement",
+    pageIntro: "Page Intro",
+    rightSideHtml: "Right Side Content",
+    bottomHtml: "Bottom Page Content",
+  };
+
+  function openEditor(field: NonNullable<FullPageEditorField>) {
+    setEditorDraft(form[field]);
+    setEditingField(field);
+  }
+
+  function saveEditor() {
+    if (!editingField) return;
+    setForm(f => ({ ...f, [editingField]: editorDraft }));
+    setEditingField(null);
+  }
 
   if (settings && !loaded) {
     setForm({
@@ -634,7 +656,12 @@ function SettingsTab() {
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Header Badge / Announcement</label>
             <p className="text-xs text-gray-400 mb-1">Optional banner inside the hero area (announcements, featured links).</p>
-            <RichTextEditor value={form.headerBadgeHtml} onChange={v => setForm(f => ({ ...f, headerBadgeHtml: v }))} placeholder="Optional announcement or badge..." />
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => openEditor("headerBadgeHtml")} className="gap-2">
+                <Pencil className="h-3.5 w-3.5" /> {form.headerBadgeHtml ? "Edit Content" : "Add Content"}
+              </Button>
+              {form.headerBadgeHtml && <span className="text-xs text-teal-600 font-medium">Content set</span>}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -650,17 +677,32 @@ function SettingsTab() {
         <CardContent className="space-y-5">
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Page Intro (shown below hero, above job listings)</label>
-            <RichTextEditor value={form.pageIntro} onChange={v => setForm(f => ({ ...f, pageIntro: v }))} placeholder="Brief intro text shown above the job listings..." />
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => openEditor("pageIntro")} className="gap-2">
+                <Pencil className="h-3.5 w-3.5" /> {form.pageIntro ? "Edit Content" : "Add Content"}
+              </Button>
+              {form.pageIntro && <span className="text-xs text-teal-600 font-medium">Content set</span>}
+            </div>
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Right Side Content</label>
             <p className="text-xs text-gray-400 mb-1">Appears in the right column on desktop — great for sponsor logos, CTAs, or resources.</p>
-            <RichTextEditor value={form.rightSideHtml} onChange={v => setForm(f => ({ ...f, rightSideHtml: v }))} placeholder="Sidebar content: sponsor logos, links, CTAs..." />
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => openEditor("rightSideHtml")} className="gap-2">
+                <Pencil className="h-3.5 w-3.5" /> {form.rightSideHtml ? "Edit Content" : "Add Content"}
+              </Button>
+              {form.rightSideHtml && <span className="text-xs text-teal-600 font-medium">Content set</span>}
+            </div>
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Bottom Page Content</label>
             <p className="text-xs text-gray-400 mb-1">Full-width section at the bottom — great for about text, employer info, or resources.</p>
-            <RichTextEditor value={form.bottomHtml} onChange={v => setForm(f => ({ ...f, bottomHtml: v }))} placeholder="Bottom section: about text, employer resources..." />
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => openEditor("bottomHtml")} className="gap-2">
+                <Pencil className="h-3.5 w-3.5" /> {form.bottomHtml ? "Edit Content" : "Add Content"}
+              </Button>
+              {form.bottomHtml && <span className="text-xs text-teal-600 font-medium">Content set</span>}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -690,6 +732,31 @@ function SettingsTab() {
           Save All Settings
         </Button>
       </div>
+
+      {/* Full-page content editor dialog */}
+      <Dialog open={!!editingField} onOpenChange={open => { if (!open) setEditingField(null); }}>
+        <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4 text-teal-600" />
+              {editingField ? fieldLabels[editingField] : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto p-6">
+            <RichTextEditor
+              value={editorDraft}
+              onChange={setEditorDraft}
+              placeholder="Enter content here..."
+            />
+          </div>
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t flex-shrink-0">
+            <Button variant="outline" onClick={() => setEditingField(null)}>Cancel</Button>
+            <Button onClick={saveEditor} className="bg-teal-600 hover:bg-teal-700 text-white gap-2">
+              <Save className="h-4 w-4" /> Save Content
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
