@@ -194,6 +194,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
   const [rawLocation] = useLocation();
+  // Admin routes (/admin/* and /platform-admin) should render without the
+  // clinical sidebar — they have their own navigation or are full-page tools.
+  const rawPath = rawLocation.split("?")[0];
+  if (rawPath.startsWith("/admin/") || rawPath === "/platform-admin") {
+    return <>{children}</>;
+  }
   const location = rawLocation.split("?")[0];
   const fullLocation = rawLocation; // includes query string, used for tab-specific active state
   const [sidebarOpen, setSidebarOpen] = useState(false);
