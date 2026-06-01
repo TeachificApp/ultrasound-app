@@ -12,8 +12,10 @@ import { toast } from "sonner";
 import {
   Plus, Trash2, Edit2, Save, X, Loader2, RefreshCw, Rss, Globe, Briefcase,
   Users, Settings, Star, Eye, EyeOff, CheckCircle2, XCircle, FileText,
-  ChevronDown, ChevronUp, Tag, Search
+  ChevronDown, ChevronUp, Tag, Search, ChevronRight
 } from "lucide-react";
+import { Link } from "wouter";
+import { getAdminUrl } from "@/hooks/useSubdomain";
 
 const EMPLOYMENT_TYPES = [
   { value: "full_time", label: "Full Time" }, { value: "part_time", label: "Part Time" },
@@ -581,6 +583,12 @@ function SettingsTab() {
 export default function CareerNetworkAdmin() {
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-sm text-gray-500">
+        <Link href={getAdminUrl("/admin")} className="hover:text-teal-600 transition-colors">Platform Admin</Link>
+        <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="text-gray-900 font-medium">Career Network</span>
+      </nav>
       <div>
         <h1 className="text-xl font-bold text-gray-900">Career Network</h1>
         <p className="text-sm text-gray-500">Manage job postings, RSS sources, candidate profiles, and page settings.</p>
