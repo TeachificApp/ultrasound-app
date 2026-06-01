@@ -1061,7 +1061,7 @@ function PayoutSettingsTab() {
                   {payoutHistory.map((p: any) => (
                     <tr key={p.id} className="hover:bg-muted/30">
                       <td className="px-3 py-2 font-medium">
-                        {p.amountCents ? `$${(p.amountCents / 100).toFixed(2)}` : "—"}
+                        {p.amountCents ? `$${Number(p.amountCents).toFixed(2)}` : "—"}
                       </td>
                       <td className="px-3 py-2">{statusBadge(p.status ?? "pending")}</td>
                       <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">{fmtDate(p.requestedAt)}</td>

@@ -5898,3 +5898,41 @@ export const employerSubscriptions = mysqlTable("employer_subscriptions", {
 });
 export type EmployerSubscription = typeof employerSubscriptions.$inferSelect;
 export type InsertEmployerSubscription = typeof employerSubscriptions.$inferInsert;
+
+// ─── Pending Fulfillments — Retry Queue ──────────────────────────────────────
+// Every paid order creates a pending_fulfillment record BEFORE fulfillment runs.
+// On success the status is set to "completed". On failure it stays "pending" or
+// becomes "failed" so an admin can retry. This is the safety net that ensures
+// no student ever loses access due to a transient DB error or webhook failure.
+
+export const pendingFulfillments = mysqlTable("pending_fulfillments", {
+  id: int("id").primaryKey().autoincrement(),
+  // Stripe payment intent ID — unique identifier for this payment
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 100 }),
+  // Resolved user ID (may be null if auto-account creation failed)
+  userId: int("user_id"),
+  // Buyer email — always present even if userId is null
+  email: varchar("email", { length: 320 }).notNull(),
+  customerName: varchar("customer_name", { length: 255 }),
+  // Product info
+  productName: varchar("product_name", { length: 500 }).notNull(),
+  productType: varchar("product_type", { length: 50 }).notNull(), // course | download | physical | membership | bundle | other
+  productId: int("product_id"), // download/physical/bundle product ID
+  courseId: int("course_id"), // LMS course to enroll in
+  fulfillmentBrand: varchar("fulfillment_brand", { length: 20 }), // aaus | iheartecho | both
+  additionalAccessJson: text("additional_access_json"), // JSON array of bonus access items
+  // Amount paid (stored in dollars, NOT cents)
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  // Fulfillment status
+  status: mysqlEnum("status", ["pending", "completed", "failed"]).notNull().default("pending"),
+  attempts: int("attempts").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  completedAt: timestamp("completed_at"),
+  errorMessage: text("error_message"),
+  // Fulfillment result notes (what was actually granted)
+  fulfillmentNotes: text("fulfillment_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type PendingFulfillment = typeof pendingFulfillments.$inferSelect;
+export type InsertPendingFulfillment = typeof pendingFulfillments.$inferInsert;

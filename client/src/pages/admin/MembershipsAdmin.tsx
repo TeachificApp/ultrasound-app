@@ -1010,7 +1010,7 @@ function MembershipDiscountCodesTab({
                       <span>
                         {code.discountType === "percent"
                           ? `${code.discountValue}% off`
-                          : `$${(code.discountValue / 100).toFixed(2)} off`}
+                          : `$${Number(code.discountValue).toFixed(2)} off`}
                       </span>
                       <span>{code.usedCount} used{code.maxUses ? ` / ${code.maxUses} max` : ""}</span>
                       {code.expiresAt && (

@@ -4305,3 +4305,19 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add dedicated "Apply Template" button to ProductLandingPageBuilder top bar
 - [x] Remove page templates from the Add Block panel in FunnelPageEditor (templates now live in top-bar modal only)
 - [x] All Apply Template modals show all saved page templates from any editor (shared pool), with search and delete
+
+## Price Standardization — All Dollars, No Cents (Jun 2026)
+- [ ] Remove / 100 from BlockPreview.tsx checkout_form product price display (line 702)
+- [ ] Remove / 100 from BlockPreview.tsx order bump price display (line 735)
+- [ ] Remove / 100 from BlockPreview.tsx urgency_offer block (originalPriceCents / discountedPrice)
+- [ ] Remove * 100 / / 100 from LandingPageBuilder.tsx checkout block settings (inline_checkout, embedded_checkout price inputs)
+- [ ] Remove * 100 from LandingPageBuilder.tsx "Add new product" default price values (9700, 99700, 199700, 29997)
+- [ ] Fix catalog sidebar price display in LandingPageBuilder (remove / 100 from toFixed display)
+- [ ] Fix Stripe checkout server router — multiply price by 100 ONLY at the stripe.checkout.sessions.create() call
+- [ ] Update schema comments to say "dollars" not "cents"
+- [ ] Update default block data in LandingPageBuilder to use dollar values (e.g. 997 not 99700)
+- [ ] Add drag-to-resize handle on left edge of block settings panel in all page editors (LandingPageBuilder, FunnelPageEditor, DownloadLandingPageBuilder, ProductLandingPageBuilder)
+
+## CRITICAL: Enrollment Bug (Jun 1 2026)
+- [ ] Fix webhook: embedded_checkout_purchase payment_intent.succeeded must enroll student in course (product_id = lms course id)
+- [ ] Manually enroll Alexis Dupree (user_id 4620004) in course 60001 (From Sonographer to CEO)

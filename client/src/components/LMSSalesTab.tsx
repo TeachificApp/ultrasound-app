@@ -24,8 +24,8 @@ import {
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtMoney(cents: number, currency = "usd") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
+function fmtMoney(dollars: number, currency = "usd") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(dollars);
 }
 function fmtDate(d: Date | string | null) {
   if (!d) return "—";

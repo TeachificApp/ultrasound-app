@@ -132,7 +132,7 @@ export const adminUserRouter = router({
         .select()
         .from(funnelPurchases)
         .where(eq(funnelPurchases.userId, input.userId))
-        .orderBy(desc(funnelPurchases.createdAt));
+        .orderBy(desc(funnelPurchases.purchasedAt));
 
       // Digital product purchases
       const digitalPurchaseList = await db.execute(sql`
@@ -658,7 +658,7 @@ export const adminUserRouter = router({
             COALESCE(u.name, '') AS name,
             COALESCE(prod.title, 'Download') AS productName,
             'download' AS productType,
-            COALESCE(prod.price, 0)/100.0 AS amountPaid,
+            COALESCE(prod.price, 0) AS amountPaid,
             COALESCE(prod.currency, 'usd') AS currency,
             'paid' AS status,
             dp.stripe_payment_intent_id AS stripePaymentIntentId,
@@ -679,7 +679,7 @@ export const adminUserRouter = router({
             COALESCE(u.name, '') AS name,
             COALESCE(b.title, 'Bundle') AS productName,
             'bundle' AS productType,
-            COALESCE(b.discount_price, b.original_price, 0)/100.0 AS amountPaid,
+            COALESCE(b.discount_price, b.original_price, 0) AS amountPaid,
             COALESCE(b.currency, 'usd') AS currency,
             'paid' AS status,
             NULL AS stripePaymentIntentId,
@@ -700,7 +700,7 @@ export const adminUserRouter = router({
             COALESCE(u.name, '') AS name,
             COALESCE(mp.title, 'Membership') AS productName,
             'membership' AS productType,
-            COALESCE(mp.price, 0)/100.0 AS amountPaid,
+            COALESCE(mp.price, 0) AS amountPaid,
             COALESCE(mp.currency, 'usd') AS currency,
             CASE ms.status WHEN 'active' THEN 'paid' WHEN 'cancelled' THEN 'refunded' ELSE ms.status END AS status,
             ms.stripe_subscription_id AS stripePaymentIntentId,
@@ -872,10 +872,10 @@ export const adminUserRouter = router({
           SELECT fp.product_name AS productName, fp.product_type AS productType, fp.amount_paid AS amountPaid, fp.purchased_at AS purchasedAt
           FROM funnel_purchases fp WHERE fp.status = 'paid'
           UNION ALL
-          SELECT COALESCE(c.title,'Course'), 'course', lo.amount, lo.created_at
+          SELECT COALESCE(c.title,'Course'), 'course', lo.amount/100.0, lo.created_at
           FROM lms_orders lo LEFT JOIN lms_courses c ON lo.course_id = c.id WHERE lo.status = 'paid'
           UNION ALL
-          SELECT COALESCE(prod.title,'Download'), 'download', COALESCE(prod.price,0)/100.0, dp.purchased_at
+          SELECT COALESCE(prod.title,'Download'), 'download', COALESCE(dp.amount_paid,0)/100.0, dp.purchased_at
           FROM digital_purchases dp LEFT JOIN digital_products prod ON dp.product_id = prod.id
           UNION ALL
           SELECT COALESCE(b.title,'Bundle'), 'bundle', COALESCE(b.discount_price, b.original_price, 0)/100.0, dbp.purchased_at
@@ -1522,21 +1522,21 @@ export const adminUserRouter = router({
       SELECT COALESCE(SUM(amount_paid), 0) as total FROM funnel_purchases WHERE status = 'paid'
     `) as any;
     const funnelRevenue = Number(toArr2(funnelRow)[0]?.total ?? 0);
-    // Revenue from LMS orders
+    // Revenue from LMS orders (amount_paid is in cents)
     const [lmsRow] = await db.execute(sql`
-      SELECT COALESCE(SUM(amount_paid), 0) as total FROM lms_orders WHERE status = 'paid'
+      SELECT COALESCE(SUM(amount_paid), 0) / 100.0 as total FROM lms_orders WHERE status = 'paid'
     `) as any;
     const lmsRevenue = Number(toArr2(lmsRow)[0]?.total ?? 0);
-    // Revenue from digital purchases
+    // Revenue from digital purchases (amount_paid is in cents)
     const [digitalRow] = await db.execute(sql`
-      SELECT COALESCE(SUM(dp.amount_paid), 0) as total FROM digital_purchases dp
+      SELECT COALESCE(SUM(dp.amount_paid), 0) / 100.0 as total FROM digital_purchases dp
     `) as any;
     const digitalRevenue = Number(toArr2(digitalRow)[0]?.total ?? 0);
     // Monthly revenue trend (last 6 months) from funnel_purchases
     const [monthlyRows] = await db.execute(sql`
-      SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COALESCE(SUM(amount_paid), 0) as revenue
+      SELECT DATE_FORMAT(purchased_at, '%Y-%m') as month, COALESCE(SUM(amount_paid), 0) as revenue
       FROM funnel_purchases
-      WHERE status = 'paid' AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+      WHERE status = 'paid' AND purchased_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
       GROUP BY month ORDER BY month ASC
     `) as any;
     const monthlyRevenue = toArr2(monthlyRows).map((r: any) => ({
@@ -1545,11 +1545,11 @@ export const adminUserRouter = router({
     }));
     // Recent purchases
     const [recentRows] = await db.execute(sql`
-      SELECT fp.id, fp.email, fp.name, fp.amount_paid AS amountPaid, fp.created_at AS createdAt,
+      SELECT fp.id, fp.email, fp.name, fp.amount_paid AS amountPaid, fp.purchased_at AS createdAt,
         fp.product_name AS productName, fp.status, u.id AS userId
       FROM funnel_purchases fp
       LEFT JOIN users u ON u.email = fp.email
-      ORDER BY fp.created_at DESC
+      ORDER BY fp.purchased_at DESC
       LIMIT 10
     `) as any;
     return {
@@ -1681,12 +1681,12 @@ export const adminUserRouter = router({
       // Funnel purchases
       const [funnelRows] = await db.execute(sql`
         SELECT id, product_name AS productName, amount_paid AS amountPaid, currency, status,
-          stripe_payment_intent_id AS stripePaymentIntentId, created_at AS createdAt
-        FROM funnel_purchases WHERE user_id = ${input.userId} ORDER BY created_at DESC
+          stripe_payment_intent_id AS stripePaymentIntentId, purchased_at AS createdAt
+        FROM funnel_purchases WHERE user_id = ${input.userId} ORDER BY purchased_at DESC
       `) as any;
       // LMS orders
       const [lmsRows] = await db.execute(sql`
-        SELECT lo.id, c.title AS productName, lo.amount_paid AS amountPaid, lo.currency, lo.status,
+        SELECT lo.id, c.title AS productName, lo.amount_paid/100.0 AS amountPaid, lo.currency, lo.status,
           lo.stripe_payment_intent_id AS stripePaymentIntentId, lo.created_at AS createdAt
         FROM lms_orders lo
         JOIN lms_courses c ON c.id = lo.course_id
@@ -1694,7 +1694,7 @@ export const adminUserRouter = router({
       `) as any;
       // Digital purchases
       const [digitalRows] = await db.execute(sql`
-        SELECT dp.id, dprod.title AS productName, dp.amount_paid AS amountPaid, 'usd' AS currency, 'paid' AS status,
+        SELECT dp.id, dprod.title AS productName, dp.amount_paid/100.0 AS amountPaid, 'usd' AS currency, 'paid' AS status,
           dp.stripe_payment_intent_id AS stripePaymentIntentId, dp.purchased_at AS createdAt
         FROM digital_purchases dp
         JOIN digital_products dprod ON dprod.id = dp.product_id
@@ -1702,7 +1702,7 @@ export const adminUserRouter = router({
       `) as any;
       // Physical orders
       const [physicalRows] = await db.execute(sql`
-        SELECT po.id, pp.title AS productName, po.amount_paid AS amountPaid, po.currency,
+        SELECT po.id, pp.title AS productName, po.amount_paid/100.0 AS amountPaid, po.currency,
           po.fulfillment_status AS status, po.stripe_payment_intent_id AS stripePaymentIntentId,
           po.created_at AS createdAt
         FROM physical_product_orders po

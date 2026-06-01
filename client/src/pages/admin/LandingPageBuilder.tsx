@@ -238,7 +238,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       collectShipping: false,
       showProductSelect: true,
       products: [
-        { name: "Product Name", description: "Full online access", price: 99700, imageUrl: "", type: "course" }
+        { name: "Product Name", description: "Full online access", price: 997, imageUrl: "", type: "course" }
       ],
       orderBumps: [],
       submitText: "Submit",
@@ -260,7 +260,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       collectShipping: false,
       collectBilling: false,
       products: [
-        { name: "Product Name", description: "Product description", price: 9700, imageUrl: "", type: "other" }
+        { name: "Product Name", description: "Product description", price: 97, imageUrl: "", type: "other" }
       ],
       orderBumps: [],
       submitText: "Complete Purchase",
@@ -283,10 +283,10 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       showBillingInfo: true,
       showProductSelect: true,
       products: [
-        { name: "Main Course", description: "Full access to the course", price: 199700, imageUrl: "", type: "course" }
+        { name: "Main Course", description: "Full access to the course", price: 1997, imageUrl: "", type: "course" }
       ],
       orderBumps: [
-        { title: "Workbook", headline: "Workbooks will arrive approximately 1 week prior to the start of the course.", description: "Your step-by-step companion to actually understand, retain, and apply everything you learn.", price: 29997, imageUrl: "", ctaText: "+ Add", ctaEmoji: "\uD83D\uDC4D", externalUrl: "" }
+        { title: "Workbook", headline: "Workbooks will arrive approximately 1 week prior to the start of the course.", description: "Your step-by-step companion to actually understand, retain, and apply everything you learn.", price: 29.97, imageUrl: "", ctaText: "+ Add", ctaEmoji: "\uD83D\uDC4D", externalUrl: "" }
       ],
       termsText: "I attest that I meet the pre-requisites for this course and I agree to the",
       termsLinkText: "TERMS OF SERVICE",
@@ -1317,7 +1317,7 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
     // Format price for display (price is stored in cents)
   const formatItemPrice = (item: typeof allItems[0]) => {
     if (item.isFree) return "Free";
-    const priceStr = `$${(Number(item.price) / 100).toFixed(2)}`;
+    const priceStr = `$${Number(item.price).toFixed(2)}`;
     if (item.pricingType === "subscription" && item.subscriptionInterval) {
       const intervalLabel: Record<string, string> = { monthly: "/ mo", quarterly: "/ qtr", annual: "/ yr" };
       return `${priceStr} ${intervalLabel[item.subscriptionInterval] ?? "/ period"}`;
@@ -2024,7 +2024,7 @@ function CheckoutFormBlockSettings({
                   className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                   {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                   <span className="flex-1 truncate">{item.name}</span>
-                  <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
+                  <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
                   <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
                 </button>
               ))}
@@ -2041,7 +2041,7 @@ function CheckoutFormBlockSettings({
                 <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                 <div className="relative flex-1">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                  <DebouncedInput type="number" value={(Number(p.price) / 100).toFixed(2)} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                  <DebouncedInput type="number" value={Number(p.price).toFixed(2)} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], price: parseFloat(v || "0") }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                 </div>
                 {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
                   <span className="text-xs text-gray-400 flex-shrink-0">orig ${(Number((p as any).catalogPrice) / 100).toFixed(2)}</span>
@@ -2082,7 +2082,7 @@ function CheckoutFormBlockSettings({
                   className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                   {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                   <span className="flex-1 truncate">{item.name}</span>
-                  <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
+                  <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
                 </button>
               ))}
             </div>
@@ -3635,7 +3635,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           </div>
           {/* Products */}
           <div className="border border-gray-200 rounded p-3 space-y-2">
-            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({icProds.length})</span><button onClick={() => set("products", [...icProds, { name: "New Product", description: "", price: 9700, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({icProds.length})</span><button onClick={() => set("products", [...icProds, { name: "New Product", description: "", price: 97, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
             {icCatalog && icCatalog.length > 0 && (
               <div className="bg-gray-50 rounded p-2 space-y-1">
                 <p className="text-xs text-gray-400 mb-1">Click to add from catalog:</p>
@@ -3645,7 +3645,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                       {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                       <span className="flex-1 truncate">{item.name}</span>
-                      <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
+                      <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
                       <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
                     </button>
                   ))}
@@ -3662,7 +3662,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                     <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                      <DebouncedInput type="number" value={(Number(p.price) / 100).toFixed(2)} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                      <DebouncedInput type="number" value={Number(p.price).toFixed(2)} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], price: parseFloat(v || "0") }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                     </div>
                     {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
                       <span className="text-xs text-gray-400 flex-shrink-0">orig ${(Number((p as any).catalogPrice) / 100).toFixed(2)}</span>
@@ -3753,7 +3753,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           </div>
           {/* Products */}
           <div className="border border-gray-200 rounded p-3 space-y-2">
-            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({ecProds.length})</span><button onClick={() => set("products", [...ecProds, { name: "New Product", description: "", price: 9700, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({ecProds.length})</span><button onClick={() => set("products", [...ecProds, { name: "New Product", description: "", price: 97, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
             {ecCatalog && ecCatalog.length > 0 && (
               <div className="bg-gray-50 rounded p-2 space-y-1">
                 <p className="text-xs text-gray-400 mb-1">Click to add from catalog:</p>
@@ -3763,7 +3763,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                       {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                       <span className="flex-1 truncate">{item.name}</span>
-                      <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
+                      <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
                       <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
                     </button>
                   ))}
@@ -3780,7 +3780,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                     <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                      <DebouncedInput type="number" value={(Number(p.price) / 100).toFixed(2)} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                      <DebouncedInput type="number" value={Number(p.price).toFixed(2)} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], price: parseFloat(v || "0") }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                     </div>
                     {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
                       <span className="text-xs text-gray-400 flex-shrink-0">orig ${(Number((p as any).catalogPrice) / 100).toFixed(2)}</span>
@@ -6176,13 +6176,20 @@ export default function LandingPageBuilder() {
         </div>
 
         {/* Right Panel: Block Settings / Page SEO */}
-        <div className="flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto relative" style={{ width: rightPanelWidth }}>
-          {/* Drag handle */}
+        <div className="flex-shrink-0 flex flex-row" style={{ width: rightPanelWidth }}>
+          {/* Drag handle — outside overflow container so it's never clipped */}
           <div
             onMouseDown={handleRightPanelMouseDown}
-            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-teal-400 active:bg-teal-500 z-10 transition-colors"
+            className="w-2 flex-shrink-0 cursor-col-resize bg-gray-100 hover:bg-teal-400 active:bg-teal-500 transition-colors flex items-center justify-center group border-l border-gray-200"
             title="Drag to resize panel"
-          />
+          >
+            <div className="flex flex-col gap-0.5 opacity-40 group-hover:opacity-80">
+              <div className="w-0.5 h-3 bg-gray-500 rounded" />
+              <div className="w-0.5 h-3 bg-gray-500 rounded" />
+              <div className="w-0.5 h-3 bg-gray-500 rounded" />
+            </div>
+          </div>
+          <div className="flex-1 bg-white overflow-y-auto min-w-0">
           {selectedBlock ? (
             <>
               <div className="flex items-center justify-between pl-4 pr-3 py-3 border-b border-gray-100">
@@ -6259,6 +6266,7 @@ export default function LandingPageBuilder() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
 

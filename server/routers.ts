@@ -45,6 +45,7 @@ import { productsPublicRouter, productsLearnerRouter, productsAdminRouter } from
 import { dashboardRouter } from "./routers/dashboardRouter";
 import { embeddedCheckoutRouter } from "./routers/embeddedCheckoutRouter";
 import { adminUserRouter } from "./routers/adminUserRouter";
+import { fulfillmentAdminRouter } from "./routers/fulfillmentAdminRouter";
 import { blockTemplatesRouter } from "./routers/blockTemplatesRouter";
 import { ssoRouter } from "./routers/ssoRouter";
 import { lessonCommentsRouter } from "./routers/lessonCommentsRouter";
@@ -2083,6 +2084,7 @@ export const appRouter = router({
   dashboard: dashboardRouter,
   embeddedCheckout: embeddedCheckoutRouter,
   adminUser: adminUserRouter,
+  fulfillmentAdmin: fulfillmentAdminRouter,
   productAnalytics: productAnalyticsRouter,
     lessonComments: lessonCommentsRouter,
   pageScraper: pageScraperRouter,

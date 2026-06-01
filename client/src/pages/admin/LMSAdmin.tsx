@@ -125,7 +125,7 @@ function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: 
       <span className="text-gray-400">{TYPE_ICONS[course.type]}</span>
       <div className="flex-1 min-w-0">
         <p className="font-medium text-gray-900 text-sm truncate">{course.title}</p>
-        <p className="text-xs text-gray-400">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type} · {course.isFree ? "Free" : `$${Number(course.price).toFixed(2)}`}</p>
+        <p className="text-xs text-gray-400">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type} · {course.isFree ? "Free" : `$${Number(course.price).toFixed(2)}`} · <span className="font-mono">ID: {course.id}</span></p>
       </div>
       <Badge className={`text-xs ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
       <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(course.id)}>
@@ -1142,6 +1142,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
         <h2 className="font-semibold text-gray-900 text-lg truncate flex-1">{course.title}</h2>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-600 select-all cursor-text" title="Course ID — use for manual grants & support">ID: {course.id}</span>
         <Badge className="text-xs bg-gray-100 text-gray-600 border border-gray-200 capitalize">{course.type}</Badge>
         <Badge className={`text-xs ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
         <Button
@@ -1604,8 +1605,13 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-      {/* Top Save Button */}
-      <div className="flex justify-end pb-2 border-b border-gray-100">
+      {/* Course ID Badge */}
+      <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+        <span className="text-xs text-gray-500 font-medium">Course ID:</span>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-700 select-all cursor-text" title="Copy this ID to use in funnels, manual grants, and support tickets">{course.id}</span>
+        <span className="text-xs text-gray-400">— use this ID for manual grants &amp; support</span>
+        <div className="flex-1" />
+        {/* Top Save Button */}
         <Button
           className="bg-teal-600 hover:bg-teal-700 text-white"
           disabled={saving}
@@ -5796,7 +5802,7 @@ function PayoutRequestsPanel() {
                     <p className="text-xs text-gray-500">{r.affiliateEmail ?? r.instructorEmail}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">${(r.amountCents / 100).toFixed(2)}</p>
+                    <p className="text-sm font-semibold text-gray-900">${Number(r.amountCents).toFixed(2)}</p>
                     <span className={`text-xs px-1.5 py-0.5 rounded border ${statusColors[r.status] ?? ""}`}>{r.status}</span>
                   </div>
                 </div>
@@ -5951,8 +5957,8 @@ function AffiliatesTab() {
                     </div>
                     <code className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono">{a.code}</code>
                     <span className="text-xs text-gray-600">{a.commissionPct}% commission</span>
-                    <span className="text-xs text-green-700 font-medium">${(a.totalEarned / 100).toFixed(2)} earned</span>
-                    <span className="text-xs text-gray-400">${(a.totalPaid / 100).toFixed(2)} paid</span>
+                    <span className="text-xs text-green-700 font-medium">${Number(a.totalEarned).toFixed(2)} earned</span>
+                    <span className="text-xs text-gray-400">${Number(a.totalPaid).toFixed(2)} paid</span>
                     <Badge variant="outline" className={`text-xs ${a.isActive ? "text-green-600 border-green-300" : "text-gray-400"}`}>{a.isActive ? "Active" : "Inactive"}</Badge>
                     <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                       {a.totalEarned > a.totalPaid && (
@@ -6296,7 +6302,7 @@ function AnalyticsTab() {
             { label: "Total Courses", value: data.totalCourses, icon: <BookOpen className="w-5 h-5 text-teal-500" /> },
             { label: "Enrollments", value: data.totalEnrollments, icon: <Users className="w-5 h-5 text-blue-500" /> },
             { label: "Completions", value: data.completions, icon: <CheckCircle className="w-5 h-5 text-green-500" /> },
-            { label: "Revenue", value: `$${(data.totalRevenue / 100).toFixed(0)}`, icon: <DollarSign className="w-5 h-5 text-yellow-500" /> },
+            { label: "Revenue", value: `$${Number(data.totalRevenue).toFixed(0)}`, icon: <DollarSign className="w-5 h-5 text-yellow-500" /> },
           ].map(stat => (
             <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
               {stat.icon}
@@ -8352,7 +8358,7 @@ function CourseAnalyticsTab({ courseId }: { courseId: number }) {
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-500 mb-1">Revenue</p>
-          <p className="text-2xl font-bold text-teal-600">${(data.totalRevenue / 100).toFixed(0)}</p>
+          <p className="text-2xl font-bold text-teal-600">${Number(data.totalRevenue).toFixed(0)}</p>
           <p className="text-xs text-gray-400 mt-0.5">{data.orders.length} orders</p>
         </div>
       </div>

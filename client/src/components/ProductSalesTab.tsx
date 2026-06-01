@@ -15,8 +15,8 @@ import { toast } from "sonner";
 import { DollarSign, Users, TrendingUp, RefreshCw, XCircle, ChevronLeft, ChevronRight, ShieldOff } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtMoney(cents: number, currency = "usd") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
+function fmtMoney(dollars: number, currency = "usd") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(dollars);
 }
 function fmtDate(d: Date | string | null | undefined) {
   if (!d) return "—";
@@ -80,7 +80,7 @@ function DownloadSalesTab({ productId }: { productId: number }) {
         </div>
         <div className="rounded-lg border bg-white p-4 text-center">
           <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1"><TrendingUp className="h-3 w-3" /> Avg. Order</div>
-          <div className="text-2xl font-bold text-teal-700">{total > 0 ? fmtMoney(Math.round(totalRevenue / total)) : "—"}</div>
+          <div className="text-2xl font-bold text-teal-700">{total > 0 ? fmtMoney(totalRevenue / total) : "—"}</div>
         </div>
       </div>
 
@@ -213,7 +213,7 @@ function BundleSalesTab({ bundleId }: { bundleId: number }) {
         </div>
         <div className="rounded-lg border bg-white p-4 text-center">
           <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1"><TrendingUp className="h-3 w-3" /> Avg. Order</div>
-          <div className="text-2xl font-bold text-teal-700">{total > 0 ? fmtMoney(Math.round(totalRevenue / total)) : "—"}</div>
+          <div className="text-2xl font-bold text-teal-700">{total > 0 ? fmtMoney(totalRevenue / total) : "—"}</div>
         </div>
       </div>
 

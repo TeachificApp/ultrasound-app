@@ -261,6 +261,7 @@ const AdminUserDetailPage = lazy(() => import("./pages/admin/AdminUserDetailPage
 const AdminSalesPage = lazy(() => import("./pages/admin/AdminSalesPage"));
 const AdminSalesDashboard = lazy(() => import("./pages/admin/AdminSalesDashboard"));
 const AdminDiscountCodesPage = lazy(() => import("./pages/admin/AdminDiscountCodesPage"));
+const FulfillmentAdmin = lazy(() => import("./pages/admin/FulfillmentAdmin"));
 const MembershipAdmin = lazy(() => import("./pages/admin/MembershipAdmin"));
 const MembershipPage = lazy(() => import("./pages/MembershipPage"));
 const MyMemberships = lazy(() => import("./pages/MyMemberships"));
@@ -485,6 +486,7 @@ function Router() {
         <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
+        <Route path="/admin/fulfillment">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FulfillmentAdmin /></RoleGuard>}</Route>
         <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
         <Route path="/admin">{() => { window.location.replace("/platform-admin"); return null; }}</Route>

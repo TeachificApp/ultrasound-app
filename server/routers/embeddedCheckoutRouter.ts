@@ -93,10 +93,10 @@ export const embeddedCheckoutRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      // All prices are in CENTS (productPrice and bump prices are stored as cents in the DB)
-      let totalAmountCents = Math.round(Number(input.productPrice));
+      // All prices are stored in DOLLARS. Multiply by 100 to get cents for Stripe API.
+      let totalAmountCents = Math.round(Number(input.productPrice) * 100);
       for (const bump of input.selectedBumps) {
-        if (bump.price > 0) totalAmountCents += Math.round(Number(bump.price));
+        if (bump.price > 0) totalAmountCents += Math.round(Number(bump.price) * 100);
       }
 
       // Apply promo code discount if provided

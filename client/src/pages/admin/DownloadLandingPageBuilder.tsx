@@ -391,9 +391,20 @@ export default function DownloadLandingPageBuilder() {
         </div>
 
         {/* Right Panel: Block Settings */}
-        <div className="flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto relative" style={{ width: rightPanelWidth }}>
-          {/* Drag handle */}
-          <div onMouseDown={handleRightPanelMouseDown} className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-teal-400 active:bg-teal-500 z-10 transition-colors" title="Drag to resize panel" />
+        <div className="flex-shrink-0 flex flex-row" style={{ width: rightPanelWidth }}>
+          {/* Drag handle — outside overflow container so it's never clipped */}
+          <div
+            onMouseDown={handleRightPanelMouseDown}
+            className="w-2 flex-shrink-0 cursor-col-resize bg-gray-100 hover:bg-teal-400 active:bg-teal-500 transition-colors flex items-center justify-center group border-l border-gray-200"
+            title="Drag to resize panel"
+          >
+            <div className="flex flex-col gap-0.5 opacity-40 group-hover:opacity-80">
+              <div className="w-0.5 h-3 bg-gray-500 rounded" />
+              <div className="w-0.5 h-3 bg-gray-500 rounded" />
+              <div className="w-0.5 h-3 bg-gray-500 rounded" />
+            </div>
+          </div>
+          <div className="flex-1 bg-white overflow-y-auto min-w-0">
           {selectedBlock ? (
             <>
               <div className="flex items-center justify-between p-3 border-b border-gray-100">
@@ -472,6 +483,7 @@ export default function DownloadLandingPageBuilder() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

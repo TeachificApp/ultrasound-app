@@ -100,6 +100,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
                     {p.compareAtPrice ? <span className="line-through ml-1 text-xs">${Number(p.compareAtPrice).toFixed(2)}</span> : null}
                     {" · "}/products/{p.slug}
                     {" · "}{p.orderCount} orders
+                    {" · "}<span className="font-mono text-xs">ID: {p.id}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -387,7 +388,7 @@ function AnalyticsTab({ productId }: { productId: number }) {
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="text-2xl font-bold text-teal-600">${(data.totalRevenue / 100).toFixed(2)}</div>
+            <div className="text-2xl font-bold text-teal-600">${Number(data.totalRevenue).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Total Revenue</div>
           </CardContent>
         </Card>
@@ -554,6 +555,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
         <h3 className="text-lg font-semibold flex-1 truncate">{product.title}</h3>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-600 select-all cursor-text" title="Product ID — use for manual grants & support">ID: {product.id}</span>
         <StatusBadge status={product.status} />
       </div>
 

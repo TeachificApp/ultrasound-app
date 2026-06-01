@@ -43,7 +43,7 @@ function SortableProductRow({ product, onEdit, onDuplicate, onDelete }: { produc
       )}
       <div className="flex-1 min-w-0">
         <p className="font-medium text-gray-900 text-sm truncate">{product.title}</p>
-        <p className="text-xs text-gray-400">{product.isFree ? "Free" : `$${Number(product.price).toFixed(2)}`} · /{product.slug}</p>
+        <p className="text-xs text-gray-400">{product.isFree ? "Free" : `$${Number(product.price).toFixed(2)}`} · /{product.slug} · <span className="font-mono">ID: {product.id}</span></p>
       </div>
       <Badge variant={product.status === "published" ? "default" : product.status === "archived" ? "secondary" : "outline"} className="text-xs">
         {product.status}
@@ -343,6 +343,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       <div className="flex items-center gap-3 pb-2 border-b">
         <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
         <h3 className="text-lg font-semibold flex-1">{product.title}</h3>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-600 select-all cursor-text" title="Product ID — use for manual grants & support">ID: {product.id}</span>
         <Badge variant={product.status === "published" ? "default" : "outline"}>{product.status}</Badge>
         {product.slug && (
           <a href={`/downloads/${product.slug}?preview=admin`} target="_blank" rel="noopener noreferrer">
@@ -801,7 +802,7 @@ function DownloadProductAnalytics({ productId, productTitle }: { productId: numb
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-4">
         <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{purchasers.length}</p><p className="text-xs text-muted-foreground mt-1">Total Buyers</p></CardContent></Card>
-        <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">${(totalRevenue / 100).toFixed(2)}</p><p className="text-xs text-muted-foreground mt-1">Total Revenue</p></CardContent></Card>
+        <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">${Number(totalRevenue).toFixed(2)}</p><p className="text-xs text-muted-foreground mt-1">Total Revenue</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{purchasers.length > 0 ? `$${(avgOrder / 100).toFixed(2)}` : '—'}</p><p className="text-xs text-muted-foreground mt-1">Avg. Order</p></CardContent></Card>
       </div>
       {purchasers.length > 0 && (

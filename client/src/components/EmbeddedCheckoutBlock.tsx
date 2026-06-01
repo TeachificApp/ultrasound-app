@@ -236,7 +236,7 @@ function AnimatedOrderBump({
         {/* Price + CTA */}
         <div className="flex-shrink-0 text-right">
           <p className="font-bold text-base" style={{ color: highlightColor }}>
-            +${(bump.price / 100).toFixed(2)}
+            +${Number(bump.price).toFixed(2)}
           </p>
           <button
             type="button"
@@ -367,7 +367,7 @@ function DetailsStep({
                   {p.strikethroughPrice && (
                     <div className="text-xs text-red-500 line-through font-medium">{p.strikethroughPrice}</div>
                   )}
-                  <span className="font-bold text-sm" style={{ color: accent }}>${(p.price / 100).toFixed(2)}</span>
+                  <span className="font-bold text-sm" style={{ color: accent }}>${Number(p.price).toFixed(2)}</span>
                 </div>
                 <input type="radio" className="sr-only" checked={selectedProductIdx === i} onChange={() => setSelectedProductIdx(i)} />
               </label>
@@ -390,7 +390,7 @@ function DetailsStep({
             {selectedProduct.strikethroughPrice && (
               <div className="text-sm text-red-500 line-through font-medium">{selectedProduct.strikethroughPrice}</div>
             )}
-            <span className="font-bold text-lg" style={{ color: accent }}>${(selectedProduct.price / 100).toFixed(2)}</span>
+            <span className="font-bold text-lg" style={{ color: accent }}>${Number(selectedProduct.price).toFixed(2)}</span>
           </div>
         </div>
       )}
@@ -498,7 +498,7 @@ function DetailsStep({
           {selectedProduct && (
             <div className="flex justify-between text-gray-600 mb-1">
               <span>{selectedProduct.name}</span>
-              <span>${(selectedProduct.price / 100).toFixed(2)}</span>
+              <span>${Number(selectedProduct.price).toFixed(2)}</span>
             </div>
           )}
           {Array.from(addedBumps).map((idx) => {
@@ -507,13 +507,13 @@ function DetailsStep({
             return (
               <div key={idx} className="flex justify-between text-gray-600 mb-1">
                 <span className="flex items-center gap-1"><Plus size={10} />{bump.title}</span>
-                <span>${(bump.price / 100).toFixed(2)}</span>
+                <span>${Number(bump.price).toFixed(2)}</span>
               </div>
             );
           })}
           <div className="flex justify-between font-bold border-t border-gray-200 pt-2 mt-2 text-gray-900">
             <span>Total</span>
-            <span style={{ color: accent }}>${(totalAmount / 100).toFixed(2)}</span>
+            <span style={{ color: accent }}>${Number(totalAmount).toFixed(2)}</span>
           </div>
         </div>
       )}
@@ -546,7 +546,7 @@ function DetailsStep({
         className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all hover:opacity-90 active:scale-[0.98] shadow-md"
         style={{ backgroundColor: accent }}
       >
-        Proceed to Payment — ${(totalAmount / 100).toFixed(2)}
+        Proceed to Payment — ${Number(totalAmount).toFixed(2)}
       </button>
     </form>
   );

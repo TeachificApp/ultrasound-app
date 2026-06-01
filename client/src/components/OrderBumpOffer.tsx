@@ -120,7 +120,7 @@ export default function OrderBumpOffer({ triggerType, triggerProductId, timing, 
           className="w-full py-3 text-white font-semibold shadow-md hover:shadow-lg transition-all"
           style={{ backgroundColor: bump.ctaColor }}
         >
-          {acceptBump.isPending ? "Adding..." : `${bump.ctaText} - $${(bump.bumpPrice / 100).toFixed(2)}`}
+          {acceptBump.isPending ? "Adding..." : `${bump.ctaText} - $${Number(bump.bumpPrice).toFixed(2)}`}
         </Button>
         <button onClick={handleDecline} className="text-xs text-gray-400 hover:text-gray-600 underline text-center py-1">
           {bump.skipText}

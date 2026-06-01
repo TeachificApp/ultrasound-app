@@ -50,7 +50,7 @@ export default function MembershipPage() {
         setCodError(null);
         const label = result.discountType === "percent"
           ? `${result.discountValue}% off`
-          : `$${(result.discountValue / 100).toFixed(2)} off`;
+          : `$${Number(result.discountValue).toFixed(2)} off`;
         toast.success(`Code applied: ${label}`);
       },
       onError: (e: any) => { setCodError(e.message); setAppliedCode(null); setAppliedCodeId(null); setCodeToValidate(null); toast.error(e.message); },
@@ -96,7 +96,7 @@ export default function MembershipPage() {
       discountLabel = `${discountValue}% off`;
     } else {
       displayPrice = Math.max(0, plan.price - discountValue);
-      discountLabel = `$${(discountValue / 100).toFixed(2)} off`;
+      discountLabel = `$${Number(discountValue).toFixed(2)} off`;
     }
   }
 

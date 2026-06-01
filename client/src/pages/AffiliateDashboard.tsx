@@ -327,8 +327,8 @@ export default function AffiliateDashboard() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard icon={<DollarSign size={18} />} label="Total Earnings" value={`$${(totalEarnings / 100).toFixed(2)}`} sub="All time" />
-          <StatCard icon={<Clock size={18} />} label="Unpaid" value={`$${(pendingEarnings / 100).toFixed(2)}`} sub="Awaiting payout" />
+          <StatCard icon={<DollarSign size={18} />} label="Total Earnings" value={`$${Number(totalEarnings).toFixed(2)}`} sub="All time" />
+          <StatCard icon={<Clock size={18} />} label="Unpaid" value={`$${Number(pendingEarnings).toFixed(2)}`} sub="Awaiting payout" />
           <StatCard icon={<TrendingUp size={18} />} label="Total Clicks" value={totalClicks} sub="Across all links" />
           <StatCard icon={<Users size={18} />} label="Conversions" value={totalConversions} sub="Completed sales" />
         </div>
