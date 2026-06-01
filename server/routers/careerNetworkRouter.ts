@@ -37,9 +37,26 @@ function randomSuffix() {
 }
 
 /** Parse an RSS feed XML string and return job-like items */
+/** Try to get a company logo URL from Clearbit's free logo API */
+function getCompanyLogoUrl(company: string, applyUrl: string): string | null {
+  try {
+    // Try to extract domain from applyUrl first
+    if (applyUrl) {
+      const domain = new URL(applyUrl).hostname.replace(/^www\./, "");
+      if (domain && domain !== "localhost") {
+        return `https://logo.clearbit.com/${domain}`;
+      }
+    }
+    // Fallback: guess domain from company name
+    const slug = company.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (slug.length > 2) return `https://logo.clearbit.com/${slug}.com`;
+  } catch { /* ignore */ }
+  return null;
+}
+
 function parseRssFeed(xml: string): Array<{
   title: string; company: string; location: string; description: string;
-  applyUrl: string; externalId: string; publishedAt: Date | null; salary: string;
+  applyUrl: string; externalId: string; publishedAt: Date | null; salary: string; companyLogoUrl: string | null;
 }> {
   const $ = cheerio.load(xml, { xmlMode: true });
   const items: ReturnType<typeof parseRssFeed> = [];
@@ -57,6 +74,13 @@ function parseRssFeed(xml: string): Array<{
       "Unknown";
     const location = $el.find("location, georss\\:point").first().text().trim() || "";
     const salary = $el.find("salary, compensation").first().text().trim() || "";
+    // Try to extract company logo from RSS media/enclosure fields
+    const logoFromFeed =
+      $el.find("media\\:thumbnail, media\\:content, enclosure[type^='image'], logo, image > url").first().attr("url") ||
+      $el.find("media\\:thumbnail, media\\:content").first().attr("url") ||
+      $el.find("company_logo, companyLogo, company-logo").first().text().trim() ||
+      null;
+    const companyLogoUrl = logoFromFeed || getCompanyLogoUrl(company, link);
     if (title) {
       items.push({
         title,
@@ -67,6 +91,7 @@ function parseRssFeed(xml: string): Array<{
         externalId: guid,
         publishedAt: pubDate ? new Date(pubDate) : null,
         salary,
+        companyLogoUrl,
       });
     }
   });
@@ -76,7 +101,7 @@ function parseRssFeed(xml: string): Array<{
 /** Scrape a web page for job listings using heuristics */
 async function scrapeJobPage(url: string): Promise<Array<{
   title: string; company: string; location: string; description: string;
-  applyUrl: string; externalId: string; publishedAt: Date | null; salary: string;
+  applyUrl: string; externalId: string; publishedAt: Date | null; salary: string; companyLogoUrl: string | null;
 }>> {
   const resp = await axios.get(url, {
     timeout: 15000,
@@ -100,8 +125,10 @@ async function scrapeJobPage(url: string): Promise<Array<{
         const location = $el.find(".location,.city,.region").first().text().trim() || "";
         const description = $el.find(".description,.summary,.details,.body").first().text().trim() || "";
         const salary = $el.find(".salary,.compensation,.pay").first().text().trim() || "";
+        const logoImg = $el.find("img[class*='logo'], img[alt*='logo'], img[src*='logo']").first().attr("src") || null;
+        const companyLogoUrl = logoImg ? (logoImg.startsWith("http") ? logoImg : new URL(logoImg, url).href) : getCompanyLogoUrl(company, fullLink);
         if (title) {
-          items.push({ title, company, location, description, applyUrl: fullLink, externalId: fullLink, publishedAt: null, salary });
+          items.push({ title, company, location, description, applyUrl: fullLink, externalId: fullLink, publishedAt: null, salary, companyLogoUrl });
         }
       });
       if (items.length > 0) break;
@@ -370,7 +397,14 @@ Return a JSON object with this exact structure:
   adminListSources: protectedProcedure.query(async ({ ctx }) => {
     assertAdmin(ctx.user.role);
     const db = await getDb();
-    return db.select().from(jobSources).orderBy(desc(jobSources.createdAt));
+    const sources = await db.select().from(jobSources).orderBy(desc(jobSources.createdAt));
+    // Count jobs per source
+    const counts = await db
+      .select({ sourceId: jobs.sourceId, count: sql<number>`count(*)` })
+      .from(jobs)
+      .groupBy(jobs.sourceId);
+    const countMap = Object.fromEntries(counts.map((c) => [c.sourceId, Number(c.count)]));
+    return sources.map((s) => ({ ...s, jobCount: countMap[s.id] ?? 0 }));
   }),
 
   adminSaveSource: protectedProcedure.input(z.object({
@@ -446,6 +480,7 @@ Return a JSON object with this exact structure:
         externalId: item.externalId,
         title: item.title,
         company: item.company,
+        companyLogoUrl: (item as any).companyLogoUrl ?? null,
         location: item.location,
         description: item.description,
         applyUrl: item.applyUrl,
@@ -493,7 +528,7 @@ Return a JSON object with this exact structure:
             if (keywords.some(kw => haystack.includes(kw.toLowerCase()))) { resolvedCategoryId = rule.categoryId; break; }
           }
         }
-        await db.insert(jobs).values({ sourceId: source.id, externalId: item.externalId, title: item.title, company: item.company, location: item.location, description: item.description, applyUrl: item.applyUrl, salary: item.salary, categoryId: resolvedCategoryId, status: "active", isInternal: false, publishedAt: item.publishedAt ?? new Date() });
+        await db.insert(jobs).values({ sourceId: source.id, externalId: item.externalId, title: item.title, company: item.company, companyLogoUrl: (item as any).companyLogoUrl ?? null, location: item.location, description: item.description, applyUrl: item.applyUrl, salary: item.salary, categoryId: resolvedCategoryId, status: "active", isInternal: false, publishedAt: item.publishedAt ?? new Date() });
         newCount++;
         total++;
       }
@@ -521,7 +556,33 @@ Return a JSON object with this exact structure:
       conditions.push(or(like(jobs.title, q), like(jobs.company, q))!);
     }
     const [rows, countRows] = await Promise.all([
-      db.select().from(jobs).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(desc(jobs.createdAt)).limit(input.pageSize).offset(offset),
+      db.select({
+        id: jobs.id,
+        title: jobs.title,
+        company: jobs.company,
+        companyLogoUrl: jobs.companyLogoUrl,
+        location: jobs.location,
+        locationType: jobs.locationType,
+        employmentType: jobs.employmentType,
+        status: jobs.status,
+        isInternal: jobs.isInternal,
+        isFeatured: jobs.isFeatured,
+        isHidden: jobs.isHidden,
+        categoryId: jobs.categoryId,
+        sourceId: jobs.sourceId,
+        externalId: jobs.externalId,
+        applyUrl: jobs.applyUrl,
+        salary: jobs.salary,
+        createdAt: jobs.createdAt,
+        expiresAt: jobs.expiresAt,
+        sourceName: jobSources.name,
+      })
+        .from(jobs)
+        .leftJoin(jobSources, eq(jobs.sourceId, jobSources.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(jobs.createdAt))
+        .limit(input.pageSize)
+        .offset(offset),
       db.select({ count: sql<number>`count(*)` }).from(jobs).where(conditions.length > 0 ? and(...conditions) : undefined),
     ]);
     return { jobs: rows, total: countRows[0]?.count ?? 0 };

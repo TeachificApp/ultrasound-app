@@ -141,7 +141,14 @@ function JobSourcesTab() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm text-gray-900 truncate">{source.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm text-gray-900 truncate">{source.name}</p>
+                      {(source as any).jobCount !== undefined && (
+                        <span className="text-xs font-medium bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full flex-shrink-0">
+                          {(source as any).jobCount} jobs
+                        </span>
+                      )}
+                    </div>
                     {!source.isActive && <Badge variant="secondary" className="text-xs">Paused</Badge>}
                   </div>
                   <p className="text-xs text-gray-400 truncate">{source.url}</p>
@@ -396,8 +403,14 @@ function JobPostingsTab() {
                       {job.blockedFromSource && <Badge className="bg-red-100 text-red-700 text-xs">Blocked</Badge>}
                       <Badge className={`text-xs ${job.status === "published" ? "bg-green-50 text-green-700" : job.status === "draft" ? "bg-gray-50 text-gray-600" : "bg-red-50 text-red-700"}`}>{job.status}</Badge>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{job.company}{job.location ? ` · ${job.location}` : ""}</p>
-                    {job.categoryId && <p className="text-xs text-teal-600 mt-0.5">{categories.find(c => c.id === job.categoryId)?.name ?? ""}</p>}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {job.companyLogoUrl && <img src={job.companyLogoUrl} alt="" className="h-4 w-4 rounded object-contain bg-gray-50" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                      <p className="text-xs text-gray-500">{job.company}{job.location ? ` · ${job.location}` : ""}</p>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {job.categoryId && <span className="text-xs text-teal-600">{categories.find(c => c.id === job.categoryId)?.name ?? ""}</span>}
+                      {(job as any).sourceName && <span className="text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">via {(job as any).sourceName}</span>}
+                    </div>
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit" onClick={() => startEdit(job)}><Edit2 className="h-4 w-4" /></Button>
