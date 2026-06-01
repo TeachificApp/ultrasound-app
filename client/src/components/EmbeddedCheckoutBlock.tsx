@@ -665,6 +665,41 @@ function EmbeddedCheckoutInner({
   const [successUrl, setSuccessUrl] = useState<string>("");
   const [paymentIntentId, setPaymentIntentId] = useState<string>("");
   const [isCreatingIntent, setIsCreatingIntent] = useState(false);
+  const [purchasedProductId, setPurchasedProductId] = useState<number | undefined>(undefined);
+  const [purchasedProductType, setPurchasedProductType] = useState<string | undefined>(undefined);
+  const [workflowMessage, setWorkflowMessage] = useState<string | null>(null);
+
+  // Fetch post-purchase workflow when success step is reached
+  const workflowQuery = trpc.embeddedCheckout.getPostPurchaseWorkflow.useQuery(
+    { productId: purchasedProductId, productType: purchasedProductType as any },
+    { enabled: step === "success" && !!purchasedProductId }
+  );
+
+  // Execute workflow actions when workflow data arrives
+  useEffect(() => {
+    if (step !== "success" || !workflowQuery.data?.workflow) return;
+    try {
+      const actions = JSON.parse(workflowQuery.data.workflow as string);
+      if (!Array.isArray(actions)) return;
+      let redirectDelay = 3000;
+      for (const action of actions) {
+        if (action.type === "message" && action.text) {
+          setWorkflowMessage(action.text);
+        } else if (action.type === "redirect" && action.url) {
+          const delay = (action.delaySeconds ?? 3) * 1000;
+          redirectDelay = delay;
+          setTimeout(() => { window.location.href = action.url; }, delay);
+        } else if (action.type === "email") {
+          // Email is sent server-side; no client action needed
+        } else if (action.type === "order_bump" && action.orderBumpId) {
+          // Show order bump upsell message
+          if (action.headline) setWorkflowMessage(action.headline);
+        }
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
+  }, [step, workflowQuery.data]);
 
   const createPaymentIntent = trpc.embeddedCheckout.createPaymentIntent.useMutation({
     onError: (e: any) => {
@@ -730,9 +765,13 @@ function EmbeddedCheckoutInner({
           additionalAccess: (d as any).additionalAccess ?? undefined,
         });
         setSuccessUrl(result.successUrl);
+        setPurchasedProductId((selectedProduct as any).productId ?? undefined);
+        setPurchasedProductType(selectedProduct.type);
         setStep("success");
+        // Only auto-redirect if no after-purchase workflow is configured
+        // (workflow actions handle redirect if present)
         if (result.successUrl && result.successUrl !== window.location.href) {
-          setTimeout(() => { window.location.href = result.successUrl; }, 2500);
+          setTimeout(() => { window.location.href = result.successUrl; }, 4000);
         }
       } finally {
         setIsCreatingIntent(false);
@@ -766,6 +805,8 @@ function EmbeddedCheckoutInner({
       setClientSecret(result.clientSecret);
       setSuccessUrl(result.successUrl);
       setPaymentIntentId(result.paymentIntentId);
+      setPurchasedProductId((selectedProduct as any).productId ?? undefined);
+      setPurchasedProductType(selectedProduct.type);
       setStep("payment");
     } finally {
       setIsCreatingIntent(false);
@@ -774,8 +815,10 @@ function EmbeddedCheckoutInner({
 
   const handleSuccess = () => {
     setStep("success");
+    // Workflow actions (if any) will handle redirect via useEffect
+    // Fallback: redirect to successUrl after 4s if no workflow redirect configured
     if (successUrl && successUrl !== window.location.href) {
-      setTimeout(() => { window.location.href = successUrl; }, 2500);
+      setTimeout(() => { window.location.href = successUrl; }, 4000);
     }
   };
 
@@ -859,7 +902,14 @@ function EmbeddedCheckoutInner({
         )}
 
         {step === "success" && (
-          <SuccessState message={d.successMessage} accent={accent} />
+          <>
+            <SuccessState message={workflowMessage ?? d.successMessage} accent={accent} />
+            {workflowMessage && workflowMessage !== d.successMessage && (
+              <div className="mt-4 p-4 rounded-xl text-sm text-center" style={{ backgroundColor: `${accent}15`, color: accent, border: `1px solid ${accent}30` }}>
+                {workflowMessage}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

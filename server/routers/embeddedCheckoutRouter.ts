@@ -10,7 +10,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb, getOrCreateUserByEmail } from "../db";
-import { funnelPurchases, lmsEnrollments, brandMemberships, digitalPurchases, lmsCourses } from "../../drizzle/schema";
+import { funnelPurchases, lmsEnrollments, brandMemberships, digitalPurchases, lmsCourses, digitalProducts, physicalProducts } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
@@ -515,5 +515,79 @@ export const embeddedCheckoutRouter = router({
       }
 
       return { success: true, successUrl };
+    }),
+
+  /**
+   * Get the after-purchase workflow for a product.
+   * Called by the success step in EmbeddedCheckoutBlock to execute workflow actions.
+   */
+  getPostPurchaseWorkflow: publicProcedure
+    .input(z.object({
+      productId: z.number().optional(),
+      productType: z.enum(["course", "download", "physical", "membership", "bundle", "other"]).optional(),
+    }))
+    .query(async ({ input }) => {
+      if (!input.productId || !input.productType) return { workflow: null };
+      const db = await getDb();
+      if (!db) return { workflow: null };
+      try {
+        if (input.productType === "download") {
+          const [row] = await db.select({ afterPurchaseWorkflow: digitalProducts.afterPurchaseWorkflow })
+            .from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
+          return { workflow: row?.afterPurchaseWorkflow ?? null };
+        }
+        if (input.productType === "physical") {
+          const [row] = await db.select({ afterPurchaseWorkflow: physicalProducts.afterPurchaseWorkflow })
+            .from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
+          return { workflow: row?.afterPurchaseWorkflow ?? null };
+        }
+        if (input.productType === "course") {
+          const [row] = await db.select({
+            postPurchaseRedirectUrl: lmsCourses.postPurchaseRedirectUrl,
+            welcomeEmailEnabled: lmsCourses.welcomeEmailEnabled,
+            welcomeEmailSubject: lmsCourses.welcomeEmailSubject,
+            welcomeEmailBody: lmsCourses.welcomeEmailBody,
+            upsellEnabled: lmsCourses.upsellEnabled,
+            upsellCourseId: lmsCourses.upsellCourseId,
+            upsellHeadline: lmsCourses.upsellHeadline,
+          }).from(lmsCourses).where(eq(lmsCourses.id, input.productId)).limit(1);
+          if (!row) return { workflow: null };
+          // Convert existing course fields to workflow action format
+          const actions: any[] = [];
+          if (row.postPurchaseRedirectUrl) {
+            actions.push({ type: "redirect", url: row.postPurchaseRedirectUrl, delaySeconds: 3 });
+          }
+          if (row.welcomeEmailEnabled && row.welcomeEmailSubject) {
+            actions.push({ type: "email", subject: row.welcomeEmailSubject, body: row.welcomeEmailBody ?? "" });
+          }
+          if (row.upsellEnabled && row.upsellCourseId) {
+            actions.push({ type: "order_bump", orderBumpId: row.upsellCourseId, headline: row.upsellHeadline ?? "" });
+          }
+          return { workflow: actions.length > 0 ? JSON.stringify(actions) : null };
+        }
+      } catch (err) {
+        console.error("[getPostPurchaseWorkflow] Error:", err);
+      }
+      return { workflow: null };
+    }),
+
+  /**
+   * Generate an auto-login URL for the current logged-in user.
+   * Used to bake auto-login into the success redirect URL.
+   */
+  generateAutoLoginUrl: publicProcedure
+    .input(z.object({
+      redirectUrl: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user?.id) return { url: input.redirectUrl };
+      try {
+        const token = await generateAutoLoginToken(ctx.user.id, input.redirectUrl);
+        const baseUrl = input.redirectUrl.startsWith("http") ? new URL(input.redirectUrl).origin : "";
+        return { url: `${baseUrl}/api/auth/auto-login?token=${token}` };
+      } catch (err) {
+        console.error("[generateAutoLoginUrl] Error:", err);
+        return { url: input.redirectUrl };
+      }
     }),
 });

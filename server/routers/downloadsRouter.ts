@@ -1323,6 +1323,34 @@ Make ALL content specific and compelling based on the product title and descript
         .where(where);
       return { files, total: count, page: input.page, pageSize: input.pageSize };
     }),
+
+  // ─── After Purchase Workflow ──────────────────────────────────────────────
+  getAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db
+        .select({ id: digitalProducts.id, afterPurchaseWorkflow: digitalProducts.afterPurchaseWorkflow })
+        .from(digitalProducts)
+        .where(eq(digitalProducts.id, input.productId))
+        .limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      return { afterPurchaseWorkflow: product.afterPurchaseWorkflow ?? null };
+    }),
+
+  updateAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ productId: z.number(), workflow: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(digitalProducts)
+        .set({ afterPurchaseWorkflow: input.workflow })
+        .where(eq(digitalProducts.id, input.productId));
+      return { success: true };
+    }),
 });
 
 // ─── Email Helper ───────────────────────────────────────────────────────────

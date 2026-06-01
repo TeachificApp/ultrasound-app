@@ -3267,6 +3267,8 @@ export const digitalProducts = mysqlTable("digital_products", {
   seoTitle: varchar("seo_title", { length: 255 }),
   seoDescription: text("seo_description"),
   seoImage: varchar("seo_image", { length: 512 }),
+  // After Purchase Workflow — JSON array of workflow action objects
+  afterPurchaseWorkflow: longtext("after_purchase_workflow"),
   // Show in Education Library — admin toggle to include/exclude from the public library
   showInLibrary: boolean("show_in_library").default(true).notNull(),
   // Stats
@@ -4037,6 +4039,8 @@ export const physicalProducts = mysqlTable("physical_products", {
   seoTitle: varchar("seo_title", { length: 255 }),
   seoDescription: text("seo_description"),
   seoImage: varchar("seo_image", { length: 512 }),
+  // After Purchase Workflow — JSON array of workflow action objects
+  afterPurchaseWorkflow: longtext("after_purchase_workflow"),
   // Stats
   orderCount: int("order_count").default(0).notNull(),
   // Per-product publish domain override (null = use global productPublishDomain)

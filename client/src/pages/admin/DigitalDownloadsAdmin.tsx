@@ -12,7 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
-import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate, BarChart3, ShoppingCart, Settings2, FolderOpen } from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate, BarChart3, ShoppingCart, Settings2, FolderOpen, Workflow } from "lucide-react";
+import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DownloadSalesTab } from "@/components/ProductSalesTab";
@@ -373,6 +374,9 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           <TabsTrigger value="sales" className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 px-4 py-2 text-sm font-medium bg-transparent hover:text-teal-600">
             <ShoppingCart className="w-3.5 h-3.5 mr-1.5" /> Sales
           </TabsTrigger>
+          <TabsTrigger value="after-purchase" className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 px-4 py-2 text-sm font-medium bg-transparent hover:text-teal-600">
+            <Workflow className="w-3.5 h-3.5 mr-1.5" /> After Purchase
+          </TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -588,6 +592,11 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           </div>
           <DownloadSalesTab productId={productId} />
           <GrantDownloadAccessDialog open={showGrantDialog} productId={productId} onClose={() => setShowGrantDialog(false)} />
+        </TabsContent>
+
+        {/* After Purchase Tab */}
+        <TabsContent value="after-purchase" className="mt-4">
+          <AfterPurchaseWorkflowTab productId={productId} />
         </TabsContent>
       </Tabs>
     </div>
@@ -818,6 +827,35 @@ function DownloadProductAnalytics({ productId, productTitle }: { productId: numb
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+// ─── After Purchase Workflow Tab ────────────────────────────────────────────
+function AfterPurchaseWorkflowTab({ productId }: { productId: number }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.downloadsAdmin.getAfterPurchaseWorkflow.useQuery({ productId });
+  const saveMut = trpc.downloadsAdmin.updateAfterPurchaseWorkflow.useMutation({
+    onSuccess: () => { utils.downloadsAdmin.getAfterPurchaseWorkflow.invalidate({ productId }); toast.success("After purchase workflow saved"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+        <Workflow className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-teal-800">After Purchase Workflow</p>
+          <p className="text-xs text-teal-600 mt-0.5">Configure what happens immediately after a customer completes their purchase. Actions run in order.</p>
+        </div>
+      </div>
+      <AfterPurchaseWorkflowEditor
+        value={data?.afterPurchaseWorkflow ?? null}
+        onChange={(workflow) => saveMut.mutate({ productId, workflow })}
+        isSaving={saveMut.isPending}
+      />
     </div>
   );
 }

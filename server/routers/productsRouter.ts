@@ -788,4 +788,32 @@ Make ALL content specific and compelling based on the product title and descript
 
       return { success: true, blockCount: blocks.length };
     }),
+
+  // ─── After Purchase Workflow ──────────────────────────────────────────────
+  getAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db
+        .select({ id: physicalProducts.id, afterPurchaseWorkflow: physicalProducts.afterPurchaseWorkflow })
+        .from(physicalProducts)
+        .where(eq(physicalProducts.id, input.productId))
+        .limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      return { afterPurchaseWorkflow: product.afterPurchaseWorkflow ?? null };
+    }),
+
+  updateAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ productId: z.number(), workflow: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(physicalProducts)
+        .set({ afterPurchaseWorkflow: input.workflow })
+        .where(eq(physicalProducts.id, input.productId));
+      return { success: true };
+    }),
 });

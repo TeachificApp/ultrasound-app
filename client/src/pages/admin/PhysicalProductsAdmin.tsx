@@ -17,8 +17,9 @@ import {
   Plus, Pencil, Trash2, Copy, Upload, ShoppingBag, ArrowLeft,
   ExternalLink, Eye, Image as ImageIcon, Link as LinkIcon,
   Users, UserPlus, Loader2, Package, BarChart2, Settings,
-  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate,
+  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow,
 } from "lucide-react";
+import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import RichTextEditor from "@/components/RichTextEditor";
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
@@ -595,6 +596,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           <TabsTrigger value="landing" className="text-xs"><Globe className="w-3 h-3 mr-1" />Sales Page</TabsTrigger>
           <TabsTrigger value="orders" className="text-xs"><Truck className="w-3 h-3 mr-1" />Orders</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs"><BarChart2 className="w-3 h-3 mr-1" />Analytics</TabsTrigger>
+          <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3 h-3 mr-1" />After Purchase</TabsTrigger>
         </TabsList>
 
         {/* ── Details Tab ── */}
@@ -876,6 +878,11 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
         <TabsContent value="analytics" className="mt-4">
           <AnalyticsTab productId={productId} />
         </TabsContent>
+
+        {/* ── After Purchase Tab ── */}
+        <TabsContent value="after-purchase" className="mt-4">
+          <ProductAfterPurchaseTab productId={productId} />
+        </TabsContent>
       </Tabs>
 
       {/* Bottom Save */}
@@ -887,6 +894,33 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       </div>
 
       <GrantAccessDialog open={showGrantDialog} productId={productId} onClose={() => setShowGrantDialog(false)} />
+    </div>
+  );
+}
+
+// ─── After Purchase Workflow Tab ────────────────────────────────────────────
+function ProductAfterPurchaseTab({ productId }: { productId: number }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.productsAdmin.getAfterPurchaseWorkflow.useQuery({ productId });
+  const saveMut = trpc.productsAdmin.updateAfterPurchaseWorkflow.useMutation({
+    onSuccess: () => { utils.productsAdmin.getAfterPurchaseWorkflow.invalidate({ productId }); toast.success("After purchase workflow saved"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
+  return (
+    <div className="space-y-4">
+      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+        <Workflow className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-teal-800">After Purchase Workflow</p>
+          <p className="text-xs text-teal-600 mt-0.5">Configure what happens immediately after a customer completes their purchase. Actions run in order.</p>
+        </div>
+      </div>
+      <AfterPurchaseWorkflowEditor
+        value={data?.afterPurchaseWorkflow ?? null}
+        onChange={(workflow) => saveMut.mutate({ productId, workflow })}
+        isSaving={saveMut.isPending}
+      />
     </div>
   );
 }
