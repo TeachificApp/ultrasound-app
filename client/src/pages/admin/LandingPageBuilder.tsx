@@ -5422,7 +5422,7 @@ function TemplateLibrary({ blocks, onInsert, onClose, initialTab }: {
   const [saveDesc, setSaveDesc] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  const { data: templates, refetch } = trpc.lmsAdmin.listPageTemplates.useQuery({ templateType: tab });
+  const { data: templates, refetch } = trpc.lmsAdmin.listPageTemplates.useQuery({});
   const saveMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
     onSuccess: () => { toast.success("Template saved!"); setSaveName(""); setSaveDesc(""); refetch(); },
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),

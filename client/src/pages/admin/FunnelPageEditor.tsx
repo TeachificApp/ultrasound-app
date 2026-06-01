@@ -1350,13 +1350,13 @@ export default function FunnelPageEditor() {
           </div>
         )}
 
-        {/* ── Block Templates tab ── */}
+        {/* ── Templates tab ── */}
         {pickerTab === "templates" && (
-          <FunnelBlockTemplatesTab
-            onInsert={(block) => {
-              setBlocks(prev => [...prev, block]);
+          <FunnelTemplatesTab
+            onInsertBlocks={(newBlocks) => {
+              setBlocks(prev => [...prev, ...newBlocks]);
               setAddMenuOpen(false);
-              toast.success("Block template inserted!");
+              toast.success(newBlocks.length === 1 ? "Template inserted!" : `${newBlocks.length} blocks inserted!`);
             }}
           />
         )}
@@ -1482,71 +1482,131 @@ export default function FunnelPageEditor() {
 
 // ─── Block Templates Tab (reused from LessonBlockEditor pattern) ─────────────────
 
-function FunnelBlockTemplatesTab({ onInsert }: { onInsert: (block: Block) => void }) {
+// ─── Unified Templates Tab (page + block templates, shared pool) ─────────────
+
+function FunnelTemplatesTab({ onInsertBlocks }: { onInsertBlocks: (blocks: Block[]) => void }) {
+  const [subTab, setSubTab] = useState<"page" | "block">("page");
   const [search, setSearch] = useState("");
-  const { data: templates, isLoading } = trpc.blockTemplates.list.useQuery({ search: search || undefined });
-  const deleteMutation = trpc.blockTemplates.delete.useMutation({
+
+  // Page templates (shared pool — includes funnel, landing, download, product pages)
+  const { data: pageTemplates, isLoading: pageLoading, refetch: refetchPage } = trpc.lmsAdmin.listPageTemplates.useQuery({});
+  const deletePageTpl = trpc.lmsAdmin.deletePageTemplate.useMutation({
+    onSuccess: () => { toast.success("Template deleted"); refetchPage(); },
+  });
+
+  // Block templates
+  const { data: blockTemplates, isLoading: blockLoading } = trpc.blockTemplates.list.useQuery({ search: search || undefined });
+  const deleteBlockTpl = trpc.blockTemplates.delete.useMutation({
     onSuccess: () => { toast.success("Template deleted"); },
   });
   const utils = trpc.useUtils();
 
-  const handleDelete = (id: number) => {
-    if (!confirm("Delete this template?")) return;
-    deleteMutation.mutate({ id }, {
-      onSuccess: () => utils.blockTemplates.list.invalidate(),
-    });
-  };
+  const filteredPageTemplates = (pageTemplates ?? []).filter((t: any) =>
+    !search || t.name?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden gap-3">
+      {/* Sub-tabs */}
+      <div className="flex border-b border-gray-100 shrink-0">
+        {(["page", "block"] as const).map(t => (
+          <button key={t} onClick={() => setSubTab(t)}
+            className={cn(
+              "flex-1 py-1.5 text-xs font-semibold capitalize transition-colors",
+              subTab === t ? "border-b-2 border-teal-500 text-teal-700" : "text-gray-400 hover:text-gray-600"
+            )}>
+            {t === "page" ? "Page Templates" : "Block Templates"}
+          </button>
+        ))}
+      </div>
+      {/* Search */}
       <div className="relative shrink-0">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-        <Input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search saved templates…"
-          className="pl-8 h-8 text-xs"
-        />
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search templates…" className="pl-8 h-8 text-xs" />
       </div>
-      {isLoading ? (
-        <p className="text-xs text-gray-400 text-center py-6">Loading templates…</p>
-      ) : !templates?.length ? (
-        <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400">
-          <Layers className="w-8 h-8 opacity-30" />
-          <p className="text-xs">No saved block templates yet.</p>
-          <p className="text-xs text-gray-300">Hover a block and click the bookmark icon to save it as a template.</p>
-        </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto space-y-2">
-          {templates.map((tpl: any) => {
-            let blockData: Record<string, any> = {};
-            try { blockData = typeof tpl.blockData === "string" ? JSON.parse(tpl.blockData) : (tpl.blockData ?? {}); } catch { /* ignore */ }
-            const catalogEntry = BLOCK_CATALOG.find(c => c.type === tpl.blockType);
-            const block: Block = { id: uid(), type: tpl.blockType as any, data: blockData };
-            return (
-              <div key={tpl.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group transition-colors">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {catalogEntry && <span className="shrink-0 text-teal-500" style={{ fontSize: 14 }}>{catalogEntry.icon}</span>}
+
+      {/* Page Templates */}
+      {subTab === "page" && (
+        pageLoading ? (
+          <p className="text-xs text-gray-400 text-center py-6">Loading templates…</p>
+        ) : !filteredPageTemplates.length ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400">
+            <FolderOpen className="w-8 h-8 opacity-30" />
+            <p className="text-xs">No page templates saved yet.</p>
+            <p className="text-xs text-gray-300">Use "Save as Template" in any page editor to create one.</p>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {filteredPageTemplates.map((tpl: any) => {
+              const tplBlocks: Block[] = (() => {
+                try { const b = typeof tpl.blocks === "string" ? JSON.parse(tpl.blocks) : tpl.blocks; return Array.isArray(b) ? b : []; } catch { return []; }
+              })();
+              return (
+                <div key={tpl.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group transition-colors">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-gray-700 truncate">{tpl.name}</p>
                     {tpl.description && <p className="text-xs text-gray-400 truncate">{tpl.description}</p>}
-                    <p className="text-xs text-gray-300">{catalogEntry?.label ?? tpl.blockType}</p>
+                    <p className="text-xs text-gray-300">{tplBlocks.length} block{tplBlocks.length !== 1 ? "s" : ""}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button size="sm" variant="outline" className="h-6 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => onInsertBlocks(tplBlocks.map(b => ({ ...b, id: uid() })))}>
+                      <Plus className="w-3 h-3 mr-1" /> Insert
+                    </Button>
+                    <button className="w-6 h-6 rounded text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      onClick={() => { if (confirm("Delete this template?")) deletePageTpl.mutate({ id: tpl.id }); }} title="Delete template">
+                      <X className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button size="sm" variant="outline" className="h-6 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => onInsert({ ...block, id: uid() })}>
-                    <Plus className="w-3 h-3 mr-1" /> Insert
-                  </Button>
-                  <button className="w-6 h-6 rounded text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    onClick={() => handleDelete(tpl.id)} title="Delete template">
-                    <X className="w-3 h-3" />
-                  </button>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* Block Templates */}
+      {subTab === "block" && (
+        blockLoading ? (
+          <p className="text-xs text-gray-400 text-center py-6">Loading templates…</p>
+        ) : !blockTemplates?.length ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400">
+            <Layers className="w-8 h-8 opacity-30" />
+            <p className="text-xs">No saved block templates yet.</p>
+            <p className="text-xs text-gray-300">Hover a block and click the bookmark icon to save it as a template.</p>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {blockTemplates.map((tpl: any) => {
+              let blockData: Record<string, any> = {};
+              try { blockData = typeof tpl.blockData === "string" ? JSON.parse(tpl.blockData) : (tpl.blockData ?? {}); } catch { /* ignore */ }
+              const catalogEntry = BLOCK_CATALOG.find(c => c.type === tpl.blockType);
+              const block: Block = { id: uid(), type: tpl.blockType as any, data: blockData };
+              return (
+                <div key={tpl.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {catalogEntry && <span className="shrink-0 text-teal-500" style={{ fontSize: 14 }}>{catalogEntry.icon}</span>}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-700 truncate">{tpl.name}</p>
+                      {tpl.description && <p className="text-xs text-gray-400 truncate">{tpl.description}</p>}
+                      <p className="text-xs text-gray-300">{catalogEntry?.label ?? tpl.blockType}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button size="sm" variant="outline" className="h-6 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => onInsertBlocks([{ ...block, id: uid() }])}>
+                      <Plus className="w-3 h-3 mr-1" /> Insert
+                    </Button>
+                    <button className="w-6 h-6 rounded text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      onClick={() => { if (confirm("Delete this template?")) deleteBlockTpl.mutate({ id: tpl.id }, { onSuccess: () => utils.blockTemplates.list.invalidate() }); }} title="Delete template">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )
       )}
     </div>
   );

@@ -4288,3 +4288,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix "View All" / "View All Members" links in MembersHub Overview — they navigate to ?tab=members but the tab is not switching, showing the same dashboard instead of the members list
 - [ ] Fix job scraper: use LLM to extract full job description from scraped HTML (currently only title is captured)
 - [ ] Fix "Apply Now" button: for external jobs, open applyUrl directly in new tab instead of showing detail modal; for internal jobs keep the modal/apply form
+
+## Template Pool & Domain Fixes (Jun 2026)
+- [x] Fix Product Analytics "Untitled" products: filter out products with NULL/empty titles in all 5 product type queries
+- [x] Fix domain dropdown in Funnel/Page settings: update custom_domains in DB to include all 8 active domains
+- [x] Add Domain Management UI in admin settings so new domains can be added without DB queries
+- [x] Fix shared template pool: LandingPageBuilder now shows all page templates regardless of source (no templateType filter)
+- [x] Fix shared template pool: FunnelPageEditor now has unified Page Templates + Block Templates tab
+- [x] Fix shared template pool: DownloadLandingPageBuilder now has unified Page Templates + Block Templates tab
+- [x] Fix shared template pool: ProductLandingPageBuilder now has unified Page Templates + Block Templates tab
+- [ ] Fix job scraper: ARDMS/BTI job board is a JS SPA - need headless browser or RSS feed approach to get descriptions + employer apply URLs

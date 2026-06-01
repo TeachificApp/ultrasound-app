@@ -55,7 +55,8 @@ export const productAnalyticsRouter = router({
             COALESCE(SUM(CASE WHEN lo.status = 'paid' THEN lo.amount ELSE 0 END), 0) AS revenue
           FROM lms_courses c
           LEFT JOIN lms_orders lo ON lo.course_id = c.id
-          ${search ? sql`WHERE LOWER(c.title) LIKE ${`%${search}%`}` : sql``}
+          WHERE c.title IS NOT NULL AND c.title != ''
+            ${search ? sql`AND LOWER(c.title) LIKE ${'%' + search + '%'}` : sql``}
           GROUP BY c.id, c.title, c.created_at
           ORDER BY purchaseCount DESC
         `) as any;
@@ -79,7 +80,8 @@ export const productAnalyticsRouter = router({
             COUNT(DISTINCT pur.id) AS purchaseCount
           FROM digital_products dp
           LEFT JOIN digital_purchases pur ON pur.product_id = dp.id
-          ${search ? sql`WHERE LOWER(dp.title) LIKE ${`%${search}%`}` : sql``}
+          WHERE dp.title IS NOT NULL AND dp.title != ''
+            ${search ? sql`AND LOWER(dp.title) LIKE ${'%' + search + '%'}` : sql``}
           GROUP BY dp.id, dp.title, dp.created_at, dp.price
           ORDER BY purchaseCount DESC
         `) as any;
@@ -104,7 +106,8 @@ export const productAnalyticsRouter = router({
             COALESCE(SUM(CASE WHEN po.fulfillment_status IN ('pending', 'processing', 'shipped', 'delivered') THEN po.amount_paid ELSE 0 END), 0) AS revenue
           FROM physical_products pp
           LEFT JOIN physical_product_orders po ON po.product_id = pp.id
-          ${search ? sql`WHERE LOWER(pp.title) LIKE ${`%${search}%`}` : sql``}
+          WHERE pp.title IS NOT NULL AND pp.title != ''
+            ${search ? sql`AND LOWER(pp.title) LIKE ${'%' + search + '%'}` : sql``}
           GROUP BY pp.id, pp.title, pp.created_at
           ORDER BY purchaseCount DESC
         `) as any;
@@ -128,7 +131,8 @@ export const productAnalyticsRouter = router({
             COUNT(DISTINCT bp.id) AS purchaseCount
           FROM digital_bundles b
           LEFT JOIN digital_bundle_purchases bp ON bp.bundle_id = b.id
-          ${search ? sql`WHERE LOWER(b.title) LIKE ${`%${search}%`}` : sql``}
+          WHERE b.title IS NOT NULL AND b.title != ''
+            ${search ? sql`AND LOWER(b.title) LIKE ${'%' + search + '%'}` : sql``}
           GROUP BY b.id, b.title, b.created_at, b.discount_price
           ORDER BY purchaseCount DESC
         `) as any;
@@ -153,7 +157,8 @@ export const productAnalyticsRouter = router({
             COALESCE(SUM(CASE WHEN fp2.status = 'paid' THEN fp2.amount_paid ELSE 0 END), 0) AS revenue
           FROM funnels f
           LEFT JOIN funnel_purchases fp2 ON fp2.source_funnel_id = f.id
-          ${search ? sql`WHERE LOWER(f.name) LIKE ${`%${search}%`}` : sql``}
+          WHERE f.name IS NOT NULL AND f.name != ''
+            ${search ? sql`AND LOWER(f.name) LIKE ${'%' + search + '%'}` : sql``}
           GROUP BY f.id, f.name, f.created_at
           ORDER BY purchaseCount DESC
         `) as any;
