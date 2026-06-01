@@ -4268,3 +4268,23 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix lmsEnrollmentAdminRouter.listEnrollments backend: also return users.name so fallback works
 - [x] Fix lmsEnrollmentAdminRouter.getOrders backend: also return users.name so fallback works
 - [x] Add /admin → /platform-admin redirect in App.tsx
+
+## Analytics Fixes & Job Board Features (Jun 2026)
+- [ ] Fix Enrollments Per-Course Breakdown: change WHERE c.status = 'published' to include 'public' status
+- [ ] Fix Sales analytics Invalid Date: serialize DATE from MySQL as ISO string before returning
+- [ ] Fix Sales analytics $0 revenue: check funnel_purchases status values and amount units
+- [ ] Fix Product Analytics "Untitled" products: audit listAllProductsWithStats query
+- [ ] Add multi-select checkboxes to job postings list in CareerNetworkAdmin
+- [ ] Add bulk action toolbar for selected jobs: bulk category edit, bulk delete, bulk reject
+- [ ] Add icon field to job_categories schema (varchar icon_name)
+- [ ] Add icon picker UI in category create/edit dialog (Lucide icon names)
+- [ ] Display category icon in category list and job posting category badges
+- [ ] Add email drill-down in Communications tab: clicking a row shows full email content (subject, body HTML, recipient, sent time) in a modal/drawer
+- [ ] Show teal letter-avatar fallback when job org logo fails to load (both in admin and public job board)
+- [ ] Upgrade Career Network page editor to full content-block builder (hero, text, image, CTA, etc.) matching the course/download landing page editor pattern
+- [ ] Add "job_postings" content block type to Career Network page builder with category filter and job count settings
+- [ ] Show a default job postings section on the Career Network page (below hero/content blocks)
+- [ ] Fix job importer: Indeed and other job board URLs not importing jobs (investigate scraping/RSS approach, fix URL-based source fetching)
+- [ ] Fix "View All" / "View All Members" links in MembersHub Overview — they navigate to ?tab=members but the tab is not switching, showing the same dashboard instead of the members list
+- [ ] Fix job scraper: use LLM to extract full job description from scraped HTML (currently only title is captured)
+- [ ] Fix "Apply Now" button: for external jobs, open applyUrl directly in new tab instead of showing detail modal; for internal jobs keep the modal/apply form

@@ -658,7 +658,7 @@ export const adminUserRouter = router({
             COALESCE(u.name, '') AS name,
             COALESCE(prod.title, 'Download') AS productName,
             'download' AS productType,
-            COALESCE(prod.price, 0) AS amountPaid,
+            COALESCE(prod.price, 0)/100.0 AS amountPaid,
             COALESCE(prod.currency, 'usd') AS currency,
             'paid' AS status,
             dp.stripe_payment_intent_id AS stripePaymentIntentId,
@@ -679,7 +679,7 @@ export const adminUserRouter = router({
             COALESCE(u.name, '') AS name,
             COALESCE(b.title, 'Bundle') AS productName,
             'bundle' AS productType,
-            COALESCE(b.discount_price, b.original_price, 0) AS amountPaid,
+            COALESCE(b.discount_price, b.original_price, 0)/100.0 AS amountPaid,
             COALESCE(b.currency, 'usd') AS currency,
             'paid' AS status,
             NULL AS stripePaymentIntentId,
@@ -700,7 +700,7 @@ export const adminUserRouter = router({
             COALESCE(u.name, '') AS name,
             COALESCE(mp.title, 'Membership') AS productName,
             'membership' AS productType,
-            COALESCE(mp.price, 0) AS amountPaid,
+            COALESCE(mp.price, 0)/100.0 AS amountPaid,
             COALESCE(mp.currency, 'usd') AS currency,
             CASE ms.status WHEN 'active' THEN 'paid' WHEN 'cancelled' THEN 'refunded' ELSE ms.status END AS status,
             ms.stripe_subscription_id AS stripePaymentIntentId,
@@ -721,12 +721,14 @@ export const adminUserRouter = router({
       const countResult = await db.execute(sql`
         SELECT COUNT(*) AS total FROM (
           SELECT id FROM funnel_purchases
-          ${statusFilter ? sql`WHERE status = ${statusFilter}` : sql``}
+          WHERE 1=1
+          ${statusFilter ? sql`AND status = ${statusFilter}` : sql``}
           ${dateFrom ? sql`AND purchased_at >= ${dateFrom}` : sql``}
           ${dateTo ? sql`AND purchased_at <= ${dateTo}` : sql``}
           UNION ALL
           SELECT id FROM lms_orders
-          ${statusFilter && statusFilter !== 'paid' ? sql`WHERE status = ${statusFilter}` : sql``}
+          WHERE 1=1
+          ${statusFilter && statusFilter !== 'paid' ? sql`AND status = ${statusFilter}` : sql``}
           UNION ALL
           SELECT id FROM digital_purchases
           UNION ALL
@@ -873,13 +875,13 @@ export const adminUserRouter = router({
           SELECT COALESCE(c.title,'Course'), 'course', lo.amount, lo.created_at
           FROM lms_orders lo LEFT JOIN lms_courses c ON lo.course_id = c.id WHERE lo.status = 'paid'
           UNION ALL
-          SELECT COALESCE(prod.title,'Download'), 'download', COALESCE(prod.price,0), dp.purchased_at
+          SELECT COALESCE(prod.title,'Download'), 'download', COALESCE(prod.price,0)/100.0, dp.purchased_at
           FROM digital_purchases dp LEFT JOIN digital_products prod ON dp.product_id = prod.id
           UNION ALL
-          SELECT COALESCE(b.title,'Bundle'), 'bundle', COALESCE(b.discount_price, b.original_price, 0), dbp.purchased_at
+          SELECT COALESCE(b.title,'Bundle'), 'bundle', COALESCE(b.discount_price, b.original_price, 0)/100.0, dbp.purchased_at
           FROM digital_bundle_purchases dbp LEFT JOIN digital_bundles b ON dbp.bundle_id = b.id
           UNION ALL
-          SELECT COALESCE(mp.title,'Membership'), 'membership', COALESCE(mp.price,0), ms.created_at
+          SELECT COALESCE(mp.title,'Membership'), 'membership', COALESCE(mp.price,0)/100.0, ms.created_at
           FROM membership_subscriptions ms LEFT JOIN membership_plans mp ON ms.plan_id = mp.id WHERE ms.status IN ('active','trialing')
         ) AS all_sales
         WHERE 1=1
@@ -917,7 +919,7 @@ export const adminUserRouter = router({
           sales: Number(r.sales ?? 0),
         })),
         dailySeries: toArr(dailyResult).map((r: any) => ({
-          date: r.date,
+          date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date ?? ''),
           revenue: Number(r.revenue ?? 0),
           sales: Number(r.sales ?? 0),
         })),
@@ -948,7 +950,7 @@ export const adminUserRouter = router({
     const totalCompletions = Number(toArr2(completionRow)[0]?.total ?? 0);
 
     // Revenue from all sources
-    const [revenueRow] = await db.execute(sql`SELECT COALESCE(SUM(amount_paid),0) as total FROM funnel_purchases WHERE status = 'completed'`) as any;
+    const [revenueRow] = await db.execute(sql`SELECT COALESCE(SUM(amount_paid),0) as total FROM funnel_purchases WHERE status = 'paid'`) as any;
     const totalRevenueCents = Number(toArr2(revenueRow)[0]?.total ?? 0);
 
     const [growthRows] = await db.execute(sql`
@@ -1122,7 +1124,7 @@ export const adminUserRouter = router({
           ROUND(AVG(e.progress_pct), 1) AS avgProgress
         FROM lms_courses c
         LEFT JOIN lms_enrollments e ON e.course_id = c.id AND ${dateFilter}
-        WHERE c.status = 'published'
+        WHERE c.status IN ('public', 'hidden', 'private', 'archived')
         GROUP BY c.id, c.title, c.slug, c.thumbnail_url
         ORDER BY COUNT(e.id) DESC
         LIMIT 50

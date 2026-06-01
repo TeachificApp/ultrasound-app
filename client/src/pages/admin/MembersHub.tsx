@@ -7,7 +7,7 @@
  *   Analytics: Sales, Product Analytics, Memberships, Contacts
  *   Settings
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -259,7 +259,7 @@ function OverviewPanel() {
         <Card className="xl:col-span-2 border border-slate-200 shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold text-slate-700">Recent Members</CardTitle>
-            <a href={getAdminUrl("/admin/members?tab=members")}>
+            <a href={getAdminUrl("/admin/members?tab=all-members")}>
               <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs h-7 px-2">
                 View all <ChevronRight size={13} className="ml-1" />
               </Button>
@@ -355,7 +355,7 @@ function OverviewPanel() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            <a href={getAdminUrl("/admin/members?tab=members")}>
+            <a href={getAdminUrl("/admin/members?tab=all-members")}>
               <Button variant="outline" size="sm" className="text-xs gap-1.5 border-slate-200">
                 <Users size={13} /> View All Members
               </Button>
@@ -1104,7 +1104,16 @@ function PlaceholderPanel({ title, description }: { title: string; description: 
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function MembersHub() {
-  const [activeNav, setActiveNav] = useState("overview");
+  const [activeNav, setActiveNav] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    return tab && NAV_ITEMS.some(n => n.id === tab) ? tab : "overview";
+  });
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab && NAV_ITEMS.some(n => n.id === tab)) setActiveNav(tab);
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const pageTitle = NAV_ITEMS.find(n => n.id === activeNav)?.label ?? "Members";
@@ -1208,7 +1217,7 @@ export default function MembersHub() {
               </Button>
             )}
             {activeNav === "overview" && (
-              <a href={getAdminUrl("/admin/members?tab=members")}>
+              <a href={getAdminUrl("/admin/members?tab=all-members")}>
                 <Button size="sm" className="text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 h-8">
                   <Users size={13} /> All Members
                 </Button>

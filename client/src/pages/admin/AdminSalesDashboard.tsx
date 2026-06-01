@@ -463,7 +463,7 @@ export default function AdminSalesDashboard() {
                   const dt = new Date(d + "T00:00:00");
                   return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
                 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 100).toFixed(0)}`} width={55} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${Number(v).toFixed(0)}`} width={55} />
                 <Tooltip
                   formatter={(v: number) => [fmtCurrency(v), "Revenue"]}
                   labelFormatter={d => new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
@@ -486,7 +486,7 @@ export default function AdminSalesDashboard() {
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={analytics.byType} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => `$${(v / 100).toFixed(0)}`} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => `$${Number(v).toFixed(0)}`} />
                   <YAxis type="category" dataKey="productType" tick={{ fontSize: 11 }} width={70}
                     tickFormatter={t => TYPE_LABELS[t] ?? t} />
                   <Tooltip formatter={(v: number) => [fmtCurrency(v), "Revenue"]} />
