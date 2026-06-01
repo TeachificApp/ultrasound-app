@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import RichTextEditor from "@/components/RichTextEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,33 +34,33 @@ const SALARY_PERIODS = [
 // ─── Job Source Manager ───────────────────────────────────────────────────────
 function JobSourcesTab() {
   const utils = trpc.useUtils();
-  const { data: sources = [], isLoading } = trpc.careerNetwork.adminListJobSources.useQuery();
+  const { data: sources = [], isLoading } = trpc.careerNetwork.adminListSources.useQuery();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: "", url: "", type: "rss" as "rss" | "web", isActive: true, refreshIntervalHours: 24, mapping: "" });
+  const [form, setForm] = useState({ name: "", url: "", type: "rss" as "rss" | "url", isActive: true, fetchIntervalHours: 24 });
 
-  const createMutation = trpc.careerNetwork.adminSaveJobSource.useMutation({
-    onSuccess: () => { toast.success("Source saved!"); utils.careerNetwork.adminListJobSources.invalidate(); setShowForm(false); resetForm(); },
+  const createMutation = trpc.careerNetwork.adminSaveSource.useMutation({
+    onSuccess: () => { toast.success("Source saved!"); utils.careerNetwork.adminListSources.invalidate(); setShowForm(false); resetForm(); },
     onError: (e) => { toast.error(e.message); },
   });
-  const deleteMutation = trpc.careerNetwork.adminDeleteJobSource.useMutation({
-    onSuccess: () => { toast.success("Source deleted."); utils.careerNetwork.adminListJobSources.invalidate(); },
+  const deleteMutation = trpc.careerNetwork.adminDeleteSource.useMutation({
+    onSuccess: () => { toast.success("Source deleted."); utils.careerNetwork.adminListSources.invalidate(); },
     onError: (e) => { toast.error(e.message); },
   });
-  const refreshMutation = trpc.careerNetwork.adminRefreshJobSource.useMutation({
-    onSuccess: (data) => { toast.success(`Fetched ${data.count} jobs from source.`); utils.careerNetwork.adminListJobSources.invalidate(); utils.careerNetwork.listJobs.invalidate(); },
+  const refreshMutation = trpc.careerNetwork.adminFetchSource.useMutation({
+    onSuccess: (data) => { toast.success(`Fetched ${data.newJobs} new jobs from source.`); utils.careerNetwork.adminListSources.invalidate(); utils.careerNetwork.listJobs.invalidate(); },
     onError: (e) => { toast.error(e.message); },
   });
-  const refreshAllMutation = trpc.careerNetwork.adminRefreshAllSources.useMutation({
-    onSuccess: (data) => { toast.success(`Refreshed all sources. ${data.total} jobs imported.`); utils.careerNetwork.adminListJobSources.invalidate(); utils.careerNetwork.listJobs.invalidate(); },
+  const refreshAllMutation = trpc.careerNetwork.adminFetchAllSources.useMutation({
+    onSuccess: (data) => { toast.success(`Refreshed all sources. ${data.total} new jobs imported.`); utils.careerNetwork.adminListSources.invalidate(); utils.careerNetwork.listJobs.invalidate(); },
     onError: (e) => { toast.error(e.message); },
   });
 
-  const resetForm = () => setForm({ name: "", url: "", type: "rss", isActive: true, refreshIntervalHours: 24, mapping: "" });
+  const resetForm = () => setForm({ name: "", url: "", type: "rss", isActive: true, fetchIntervalHours: 24 });
 
   const startEdit = (source: typeof sources[0]) => {
     setEditId(source.id);
-    setForm({ name: source.name, url: source.url, type: source.type as "rss" | "web", isActive: source.isActive ?? true, refreshIntervalHours: source.refreshIntervalHours ?? 24, mapping: source.mapping ?? "" });
+    setForm({ name: source.name, url: source.url, type: source.type as "rss" | "url", isActive: source.isActive ?? true, fetchIntervalHours: source.fetchIntervalHours ?? 24 });
     setShowForm(true);
   };
 
@@ -89,11 +90,11 @@ function JobSourcesTab() {
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Type</label>
-                <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v as "rss" | "web" }))}>
+                <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v as "rss" | "url" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="rss"><span className="flex items-center gap-2"><Rss className="h-3.5 w-3.5" />RSS Feed</span></SelectItem>
-                    <SelectItem value="web"><span className="flex items-center gap-2"><Globe className="h-3.5 w-3.5" />Web URL</span></SelectItem>
+                    <SelectItem value="url"><span className="flex items-center gap-2"><Globe className="h-3.5 w-3.5" />Web URL</span></SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -103,19 +104,13 @@ function JobSourcesTab() {
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Refresh Every (hours)</label>
-                <Input type="number" value={form.refreshIntervalHours} onChange={e => setForm(f => ({ ...f, refreshIntervalHours: Number(e.target.value) }))} min={1} max={168} />
+                <Input type="number" value={form.fetchIntervalHours} onChange={e => setForm(f => ({ ...f, fetchIntervalHours: Number(e.target.value) }))} min={1} max={168} />
               </div>
               <div className="flex items-center gap-2 pt-5">
                 <Switch checked={form.isActive} onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))} />
                 <span className="text-sm text-gray-600">Active</span>
               </div>
-              {form.type === "web" && (
-                <div className="col-span-2">
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">CSS Selector Mapping (JSON, optional)</label>
-                  <Input value={form.mapping} onChange={e => setForm(f => ({ ...f, mapping: e.target.value }))} placeholder='{"title": ".job-title", "company": ".company-name", "location": ".location"}' />
-                  <p className="text-xs text-gray-400 mt-1">Map CSS selectors to job fields. Leave empty for auto-detection.</p>
-                </div>
-              )}
+
             </div>
             <div className="flex gap-2">
               <Button onClick={() => createMutation.mutate({ ...form, id: editId ?? undefined })} disabled={createMutation.isPending} className="bg-teal-600 hover:bg-teal-700 text-white">
@@ -150,7 +145,7 @@ function JobSourcesTab() {
                     {!source.isActive && <Badge variant="secondary" className="text-xs">Paused</Badge>}
                   </div>
                   <p className="text-xs text-gray-400 truncate">{source.url}</p>
-                  <p className="text-xs text-gray-400">Refreshes every {source.refreshIntervalHours}h{source.lastFetchedAt ? ` · Last: ${new Date(source.lastFetchedAt).toLocaleDateString()}` : ""}{source.jobCount != null ? ` · ${source.jobCount} jobs` : ""}</p>
+                  <p className="text-xs text-gray-400">Refreshes every {source.fetchIntervalHours}h{source.lastFetchedAt ? ` · Last: ${new Date(source.lastFetchedAt).toLocaleDateString()}` : ""}{source.totalFetched ? ` · ${source.totalFetched} total imported` : ""}</p>
                 </div>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => refreshMutation.mutate({ id: source.id })} disabled={refreshMutation.isPending}>
@@ -176,9 +171,25 @@ function JobSourcesTab() {
 function JobPostingsTab() {
   const utils = trpc.useUtils();
   const { data: categories = [] } = trpc.careerNetwork.listCategories.useQuery();
-  const { data: jobsData, isLoading } = trpc.careerNetwork.listJobs.useQuery({ page: 1, pageSize: 100 });
+  const [adminSearch, setAdminSearch] = useState("");
+  const { data: jobsData, isLoading } = trpc.careerNetwork.adminListJobs.useQuery({ search: adminSearch || undefined, page: 1, pageSize: 100 });
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
+  const [recatJobId, setRecatJobId] = useState<number | null>(null);
+  const [recatCategoryId, setRecatCategoryId] = useState<string>("");
+
+  const moderateMutation = trpc.careerNetwork.adminModerateJob.useMutation({
+    onSuccess: () => { toast.success("Job updated."); utils.careerNetwork.adminListJobs.invalidate(); },
+    onError: (e) => { toast.error(e.message); },
+  });
+  const recatMutation = trpc.careerNetwork.adminRecategorizeJob.useMutation({
+    onSuccess: () => { toast.success("Category updated."); setRecatJobId(null); utils.careerNetwork.adminListJobs.invalidate(); },
+    onError: (e) => { toast.error(e.message); },
+  });
+  const autoCatMutation = trpc.careerNetwork.adminRunAutoCategorize.useMutation({
+    onSuccess: (r) => { toast.success(`Auto-categorized ${r.updated} job(s).`); utils.careerNetwork.adminListJobs.invalidate(); },
+    onError: (e) => { toast.error(e.message); },
+  });
   const [form, setForm] = useState({
     title: "", company: "", companyLogoUrl: "", location: "", locationType: "onsite",
     employmentType: "full_time", salary: "", salaryMin: "", salaryMax: "", salaryPeriod: "annual",
@@ -235,12 +246,20 @@ function JobPostingsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">{jobs.length} job posting{jobs.length !== 1 ? "s" : ""}</p>
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input value={adminSearch} onChange={e => setAdminSearch(e.target.value)} placeholder="Search jobs..." className="pl-8" />
+        </div>
+        <Button size="sm" variant="outline" onClick={() => autoCatMutation.mutate()} disabled={autoCatMutation.isPending} title="Auto-categorize uncategorized jobs based on keyword rules">
+          {autoCatMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tag className="h-4 w-4" />}
+          <span className="ml-1.5 hidden sm:inline">Auto-Categorize</span>
+        </Button>
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => { resetForm(); setEditId(null); setShowForm(true); }}>
           <Plus className="h-4 w-4 mr-1" /> New Posting
         </Button>
       </div>
+      <p className="text-xs text-gray-400">{jobsData?.total ?? 0} total jobs (showing {jobs.length})</p>
 
       {showForm && (
         <Card className="border-teal-200 bg-teal-50/30">
@@ -365,27 +384,47 @@ function JobPostingsTab() {
       ) : (
         <div className="space-y-2">
           {jobs.map(job => (
-            <Card key={job.id} className="border border-gray-200">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm text-gray-900 truncate">{job.title}</p>
-                    {job.isFeatured && <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />}
-                    {job.isInternal && <Badge className="bg-teal-50 text-teal-700 text-xs">Internal</Badge>}
-                    <Badge className={`text-xs ${job.status === "published" ? "bg-green-50 text-green-700" : job.status === "draft" ? "bg-gray-50 text-gray-600" : "bg-red-50 text-red-700"}`}>
-                      {job.status}
-                    </Badge>
+            <Card key={job.id} className={`border ${job.isHidden ? "border-orange-200 bg-orange-50/30 opacity-70" : "border-gray-200"}`}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-sm text-gray-900 truncate">{job.title}</p>
+                      {job.isFeatured && <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />}
+                      {job.isInternal && <Badge className="bg-teal-50 text-teal-700 text-xs">Internal</Badge>}
+                      {job.isHidden && <Badge className="bg-orange-100 text-orange-700 text-xs">Hidden</Badge>}
+                      {job.blockedFromSource && <Badge className="bg-red-100 text-red-700 text-xs">Blocked</Badge>}
+                      <Badge className={`text-xs ${job.status === "published" ? "bg-green-50 text-green-700" : job.status === "draft" ? "bg-gray-50 text-gray-600" : "bg-red-50 text-red-700"}`}>{job.status}</Badge>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{job.company}{job.location ? ` · ${job.location}` : ""}</p>
+                    {job.categoryId && <p className="text-xs text-teal-600 mt-0.5">{categories.find(c => c.id === job.categoryId)?.name ?? ""}</p>}
                   </div>
-                  <p className="text-xs text-gray-500">{job.company}{job.location ? ` · ${job.location}` : ""}</p>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit" onClick={() => startEdit(job)}><Edit2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title={job.isHidden ? "Unhide" : "Hide"} onClick={() => moderateMutation.mutate({ id: job.id, action: job.isHidden ? "unhide" : "hide" })}>
+                      {job.isHidden ? <Eye className="h-4 w-4 text-orange-500" /> : <EyeOff className="h-4 w-4 text-gray-400" />}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Recategorize" onClick={() => { setRecatJobId(job.id); setRecatCategoryId(String(job.categoryId ?? "")); }}><Tag className="h-4 w-4 text-blue-400" /></Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600" title="Block future imports of this job" onClick={() => { if (confirm("Block this job from being re-imported? It will be hidden and its external ID blocked.")) moderateMutation.mutate({ id: job.id, action: "block" }); }}><XCircle className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-700" title="Delete permanently" onClick={() => { if (confirm("Permanently delete this job?")) deleteMutation.mutate({ id: job.id }); }}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => startEdit(job)}>
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600" onClick={() => { if (confirm("Delete this job?")) deleteMutation.mutate({ id: job.id }); }}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                {recatJobId === job.id && (
+                  <div className="mt-3 flex items-center gap-2 bg-blue-50 rounded-lg p-3">
+                    <Tag className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                    <Select value={recatCategoryId || "none"} onValueChange={setRecatCategoryId}>
+                      <SelectTrigger className="h-8 text-sm flex-1"><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Category</SelectItem>
+                        {categories.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => recatMutation.mutate({ id: job.id, categoryId: recatCategoryId && recatCategoryId !== "none" ? Number(recatCategoryId) : null })} disabled={recatMutation.isPending}>
+                      {recatMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setRecatJobId(null)}><X className="h-3 w-3" /></Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -532,11 +571,24 @@ function CandidatesTab() {
 function SettingsTab() {
   const utils = trpc.useUtils();
   const { data: settings, isLoading } = trpc.careerNetwork.getSettings.useQuery();
-  const [form, setForm] = useState({ heroTitle: "", heroSubtitle: "", pageIntro: "", seoTitle: "", seoDescription: "" });
+  const [form, setForm] = useState({
+    heroTitle: "", heroSubtitle: "", pageIntro: "",
+    rightSideHtml: "", bottomHtml: "", headerBadgeHtml: "",
+    seoTitle: "", seoDescription: "",
+  });
   const [loaded, setLoaded] = useState(false);
 
   if (settings && !loaded) {
-    setForm({ heroTitle: settings.heroTitle ?? "", heroSubtitle: settings.heroSubtitle ?? "", pageIntro: settings.pageIntro ?? "", seoTitle: settings.seoTitle ?? "", seoDescription: settings.seoDescription ?? "" });
+    setForm({
+      heroTitle: settings.heroTitle ?? "",
+      heroSubtitle: settings.heroSubtitle ?? "",
+      pageIntro: settings.pageIntro ?? "",
+      rightSideHtml: (settings as Record<string, unknown>).rightSideHtml as string ?? "",
+      bottomHtml: (settings as Record<string, unknown>).bottomHtml as string ?? "",
+      headerBadgeHtml: (settings as Record<string, unknown>).headerBadgeHtml as string ?? "",
+      seoTitle: settings.seoTitle ?? "",
+      seoDescription: settings.seoDescription ?? "",
+    });
     setLoaded(true);
   }
 
@@ -545,36 +597,231 @@ function SettingsTab() {
     onError: (e) => { toast.error(e.message); },
   });
 
+  if (isLoading) return <div className="flex items-center justify-center h-24"><Loader2 className="h-6 w-6 animate-spin text-teal-600" /></div>;
+
   return (
-    <div className="space-y-4 max-w-xl">
-      {isLoading ? <div className="flex items-center justify-center h-24"><Loader2 className="h-6 w-6 animate-spin text-teal-600" /></div> : (
-        <div className="space-y-4">
+    <div className="space-y-6 max-w-3xl">
+      {/* Hero Section */}
+      <Card className="border border-gray-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-teal-500" /> Hero Section
+          </CardTitle>
+          <p className="text-xs text-gray-400">The banner shown at the top of the Career Network page.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Hero Title</label>
             <Input value={form.heroTitle} onChange={e => setForm(f => ({ ...f, heroTitle: e.target.value }))} placeholder="Ultrasound Career Network" />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Hero Subtitle</label>
-            <Input value={form.heroSubtitle} onChange={e => setForm(f => ({ ...f, heroSubtitle: e.target.value }))} placeholder="Find your next opportunity..." />
+            <Input value={form.heroSubtitle} onChange={e => setForm(f => ({ ...f, heroSubtitle: e.target.value }))} placeholder="Find your next opportunity in ultrasound and echocardiography" />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Page Intro (shown below hero)</label>
-            <textarea value={form.pageIntro} onChange={e => setForm(f => ({ ...f, pageIntro: e.target.value }))} rows={3} className="w-full rounded-lg border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Header Badge / Announcement</label>
+            <p className="text-xs text-gray-400 mb-1">Optional banner inside the hero area (announcements, featured links).</p>
+            <RichTextEditor value={form.headerBadgeHtml} onChange={v => setForm(f => ({ ...f, headerBadgeHtml: v }))} placeholder="Optional announcement or badge..." />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Page Content */}
+      <Card className="border border-gray-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500" /> Page Content
+          </CardTitle>
+          <p className="text-xs text-gray-400">Content areas shown below the hero on the job listing page.</p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Page Intro (shown below hero, above job listings)</label>
+            <RichTextEditor value={form.pageIntro} onChange={v => setForm(f => ({ ...f, pageIntro: v }))} placeholder="Brief intro text shown above the job listings..." />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Right Side Content</label>
+            <p className="text-xs text-gray-400 mb-1">Appears in the right column on desktop — great for sponsor logos, CTAs, or resources.</p>
+            <RichTextEditor value={form.rightSideHtml} onChange={v => setForm(f => ({ ...f, rightSideHtml: v }))} placeholder="Sidebar content: sponsor logos, links, CTAs..." />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Bottom Page Content</label>
+            <p className="text-xs text-gray-400 mb-1">Full-width section at the bottom — great for about text, employer info, or resources.</p>
+            <RichTextEditor value={form.bottomHtml} onChange={v => setForm(f => ({ ...f, bottomHtml: v }))} placeholder="Bottom section: about text, employer resources..." />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SEO */}
+      <Card className="border border-gray-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-purple-500" /> SEO
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">SEO Title</label>
             <Input value={form.seoTitle} onChange={e => setForm(f => ({ ...f, seoTitle: e.target.value }))} placeholder="Ultrasound Jobs | Career Network" />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">SEO Description</label>
-            <textarea value={form.seoDescription} onChange={e => setForm(f => ({ ...f, seoDescription: e.target.value }))} rows={2} className="w-full rounded-lg border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
+            <textarea value={form.seoDescription} onChange={e => setForm(f => ({ ...f, seoDescription: e.target.value }))} rows={2} className="w-full rounded-lg border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" placeholder="A brief description for search engines..." />
           </div>
-          <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} className="bg-teal-600 hover:bg-teal-700 text-white">
-            {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Save Settings
-          </Button>
-        </div>
-      )}
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} className="bg-teal-600 hover:bg-teal-700 text-white px-6">
+          {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+          Save All Settings
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+
+// ─── Moderation / Auto-Categorization Tab ──────────────────────────────────────
+function ModerationTab() {
+  const utils = trpc.useUtils();
+  const { data: categories = [] } = trpc.careerNetwork.listCategories.useQuery();
+  const { data: rules = [], isLoading } = trpc.careerNetwork.adminListCategoryRules.useQuery();
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [form, setForm] = useState({ categoryId: "", keywords: "", matchField: "both", priority: "0" });
+
+  const saveMutation = trpc.careerNetwork.adminSaveCategoryRule.useMutation({
+    onSuccess: () => { toast.success("Rule saved!"); utils.careerNetwork.adminListCategoryRules.invalidate(); setShowForm(false); resetForm(); },
+    onError: (e) => { toast.error(e.message); },
+  });
+  const deleteMutation = trpc.careerNetwork.adminDeleteCategoryRule.useMutation({
+    onSuccess: () => { toast.success("Rule deleted."); utils.careerNetwork.adminListCategoryRules.invalidate(); },
+    onError: (e) => { toast.error(e.message); },
+  });
+  const autoCatMutation = trpc.careerNetwork.adminRunAutoCategorize.useMutation({
+    onSuccess: (r) => { toast.success(`Auto-categorized ${r.updated} job(s).`); },
+    onError: (e) => { toast.error(e.message); },
+  });
+
+  const resetForm = () => { setForm({ categoryId: "", keywords: "", matchField: "both", priority: "0" }); setEditId(null); };
+
+  const handleSave = () => {
+    const keywords = form.keywords.split(",").map(k => k.trim()).filter(Boolean);
+    if (!form.categoryId || keywords.length === 0) { toast.error("Category and at least one keyword are required."); return; }
+    saveMutation.mutate({ id: editId ?? undefined, categoryId: Number(form.categoryId), keywords, matchField: form.matchField as "title" | "description" | "both", priority: Number(form.priority) });
+  };
+
+  const startEdit = (rule: (typeof rules)[0]) => {
+    setEditId(rule.id);
+    let kws: string[] = [];
+    try { kws = JSON.parse(rule.keywords); } catch { kws = []; }
+    setForm({ categoryId: String(rule.categoryId), keywords: kws.join(", "), matchField: rule.matchField ?? "both", priority: String(rule.priority ?? 0) });
+    setShowForm(true);
+  };
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <Card className="border border-gray-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <Tag className="h-4 w-4 text-blue-500" /> Auto-Categorization Rules
+          </CardTitle>
+          <p className="text-xs text-gray-400">Define keyword rules to automatically assign categories to imported jobs. Higher priority rules are checked first.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { resetForm(); setShowForm(true); }}>
+              <Plus className="h-4 w-4 mr-1" /> Add Rule
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => autoCatMutation.mutate()} disabled={autoCatMutation.isPending}>
+              {autoCatMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+              Run Auto-Categorize Now
+            </Button>
+          </div>
+
+          {showForm && (
+            <Card className="border-blue-200 bg-blue-50/30">
+              <CardContent className="p-4 space-y-3">
+                <h4 className="text-sm font-semibold text-gray-900">{editId ? "Edit Rule" : "New Rule"}</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Category *</label>
+                    <Select value={form.categoryId || "none"} onValueChange={v => setForm(f => ({ ...f, categoryId: v === "none" ? "" : v }))}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select category</SelectItem>
+                        {categories.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Match In</label>
+                    <Select value={form.matchField} onValueChange={v => setForm(f => ({ ...f, matchField: v }))}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="both">Title &amp; Description</SelectItem>
+                        <SelectItem value="title">Title Only</SelectItem>
+                        <SelectItem value="description">Description Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Keywords (comma-separated) *</label>
+                    <Input value={form.keywords} onChange={e => setForm(f => ({ ...f, keywords: e.target.value }))} placeholder="echo, echocardiography, cardiac sonographer" />
+                    <p className="text-xs text-gray-400 mt-1">If any keyword matches, the category is assigned.</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Priority (higher = checked first)</label>
+                    <Input type="number" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} placeholder="0" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSave} disabled={saveMutation.isPending}>
+                    {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />} Save Rule
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center h-24"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
+          ) : rules.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed">
+              <Tag className="h-8 w-8 text-gray-200 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">No rules yet. Add a rule to start auto-categorizing imported jobs.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {rules.map(rule => {
+                let kws: string[] = [];
+                try { kws = JSON.parse(rule.keywords); } catch { kws = []; }
+                const cat = categories.find(c => c.id === rule.categoryId);
+                return (
+                  <Card key={rule.id} className="border border-gray-200">
+                    <CardContent className="p-3 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm text-gray-900">{cat?.name ?? "Unknown"}</span>
+                          <Badge className="bg-blue-50 text-blue-700 text-xs">{rule.matchField ?? "both"}</Badge>
+                          {rule.priority !== 0 && <Badge className="bg-gray-50 text-gray-600 text-xs">Priority {rule.priority}</Badge>}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{kws.join(", ")}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEdit(rule)}><Edit2 className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-400 hover:text-red-600" onClick={() => { if (confirm("Delete this rule?")) deleteMutation.mutate({ id: rule.id }); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -582,16 +829,24 @@ function SettingsTab() {
 // ─── Main Admin Page ──────────────────────────────────────────────────────────
 export default function CareerNetworkAdmin() {
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50/50">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-gray-500">
-        <Link href={getAdminUrl("/admin")} className="hover:text-teal-600 transition-colors">Platform Admin</Link>
-        <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
-        <span className="text-gray-900 font-medium">Career Network</span>
+        <Link href={getAdminUrl("/admin")} className="hover:text-teal-600 transition-colors font-medium">Platform Admin</Link>
+        <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-gray-300" />
+        <span className="text-gray-700 font-medium">Career Network</span>
       </nav>
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Career Network</h1>
-        <p className="text-sm text-gray-500">Manage job postings, RSS sources, candidate profiles, and page settings.</p>
+
+      {/* Page Header */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4 shadow-sm">
+        <div className="h-10 w-10 rounded-lg bg-teal-600 flex items-center justify-center flex-shrink-0">
+          <Briefcase className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Career Network</h1>
+          <p className="text-sm text-gray-500">Manage job postings, RSS sources, candidate profiles, and page settings.</p>
+        </div>
       </div>
 
       <Tabs defaultValue="postings">
@@ -600,14 +855,17 @@ export default function CareerNetworkAdmin() {
           <TabsTrigger value="sources"><Rss className="h-4 w-4 mr-1.5" />Feed Sources</TabsTrigger>
           <TabsTrigger value="categories"><Tag className="h-4 w-4 mr-1.5" />Categories</TabsTrigger>
           <TabsTrigger value="candidates"><Users className="h-4 w-4 mr-1.5" />Candidates</TabsTrigger>
+          <TabsTrigger value="moderation"><EyeOff className="h-4 w-4 mr-1.5" />Moderation</TabsTrigger>
           <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1.5" />Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="postings" className="mt-4"><JobPostingsTab /></TabsContent>
         <TabsContent value="sources" className="mt-4"><JobSourcesTab /></TabsContent>
         <TabsContent value="categories" className="mt-4"><CategoriesTab /></TabsContent>
         <TabsContent value="candidates" className="mt-4"><CandidatesTab /></TabsContent>
+        <TabsContent value="moderation" className="mt-4"><ModerationTab /></TabsContent>
         <TabsContent value="settings" className="mt-4"><SettingsTab /></TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

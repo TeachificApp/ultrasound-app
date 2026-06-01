@@ -5708,11 +5708,24 @@ export const jobCategories = mysqlTable("job_categories", {
   slug: varchar("slug", { length: 100 }).notNull().unique(),
   color: varchar("color", { length: 20 }).default("#0d9488"),
   icon: varchar("icon", { length: 50 }),
+  description: text("description"),
   sortOrder: int("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type JobCategory = typeof jobCategories.$inferSelect;
 export type InsertJobCategory = typeof jobCategories.$inferInsert;
+
+/** Keyword-based auto-categorization rules */
+export const jobCategoryRules = mysqlTable("job_category_rules", {
+  id: int("id").primaryKey().autoincrement(),
+  categoryId: int("category_id").notNull(),
+  keywords: text("keywords").notNull(), // JSON array of keyword strings
+  matchField: varchar("match_field", { length: 20 }).default("both").notNull(), // "title" | "description" | "both"
+  priority: int("priority").default(0).notNull(), // higher = checked first
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type JobCategoryRule = typeof jobCategoryRules.$inferSelect;
+export type InsertJobCategoryRule = typeof jobCategoryRules.$inferInsert;
 
 /** RSS feeds and web URLs to scrape for job postings */
 export const jobSources = mysqlTable("job_sources", {
@@ -5758,6 +5771,8 @@ export const jobs = mysqlTable("jobs", {
   status: mysqlEnum("status", ["active", "expired", "draft", "closed"]).default("active"),
   isInternal: boolean("is_internal").default(false),
   isFeatured: boolean("is_featured").default(false),
+  isHidden: boolean("is_hidden").default(false).notNull(), // admin-hidden from public listing
+  blockedFromSource: boolean("blocked_from_source").default(false).notNull(), // block re-import of this externalId
   postedById: int("posted_by_id"),
   employerId: int("employer_id"), // FK to employer_profiles.id — null for scraped jobs
   expiresAt: timestamp("expires_at"),
@@ -5835,6 +5850,10 @@ export const careerNetworkSettings = mysqlTable("career_network_settings", {
   featuredBannerHtml: longtext("featured_banner_html"),
   seoTitle: varchar("seo_title", { length: 300 }),
   seoDescription: text("seo_description"),
+  pageIntro: longtext("page_intro"),
+  rightSideHtml: longtext("right_side_html"),
+  bottomHtml: longtext("bottom_html"),
+  headerBadgeHtml: text("header_badge_html"),
   showCandidateProfiles: boolean("show_candidate_profiles").default(true),
   allowGuestApply: boolean("allow_guest_apply").default(false),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

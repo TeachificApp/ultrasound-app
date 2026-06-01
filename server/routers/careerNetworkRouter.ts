@@ -11,6 +11,7 @@ import { getDb } from "../db";
 import {
   jobs,
   jobCategories,
+  jobCategoryRules,
   jobSources,
   candidateProfiles,
   resumes,
@@ -127,7 +128,7 @@ export const careerNetworkRouter = router({
   })).query(async ({ input }) => {
     const db = await getDb();
     const offset = (input.page - 1) * input.pageSize;
-    const conditions = [eq(jobs.status, "active")];
+    const conditions = [eq(jobs.status, "active"), eq(jobs.isHidden, false)];
     if (input.categoryId) conditions.push(eq(jobs.categoryId, input.categoryId));
     if (input.locationType) conditions.push(eq(jobs.locationType, input.locationType));
     if (input.employmentType) conditions.push(eq(jobs.employmentType, input.employmentType));
@@ -155,7 +156,17 @@ export const careerNetworkRouter = router({
   // ── Public: get single job ─────────────────────────────────────────────────
   getJob: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
     const db = await getDb();
-    const [job] = await db.select().from(jobs).where(eq(jobs.id, input.id)).limit(1);
+    const [job] = await db.select({
+      id: jobs.id, title: jobs.title, company: jobs.company, companyLogoUrl: jobs.companyLogoUrl,
+      location: jobs.location, locationType: jobs.locationType, employmentType: jobs.employmentType,
+      description: jobs.description, descriptionHtml: jobs.descriptionHtml,
+      applyUrl: jobs.applyUrl, applyEmail: jobs.applyEmail,
+      salary: jobs.salary, salaryMin: jobs.salaryMin, salaryMax: jobs.salaryMax, salaryPeriod: jobs.salaryPeriod,
+      categoryId: jobs.categoryId, tags: jobs.tags, isInternal: jobs.isInternal, isFeatured: jobs.isFeatured,
+      publishedAt: jobs.publishedAt, expiresAt: jobs.expiresAt,
+      viewCount: jobs.viewCount, applyCount: jobs.applyCount,
+      status: jobs.status,
+    }).from(jobs).where(eq(jobs.id, input.id)).limit(1);
     if (!job) throw new TRPCError({ code: "NOT_FOUND" });
     // Increment view count
     await db.update(jobs).set({ viewCount: sql`${jobs.viewCount} + 1` }).where(eq(jobs.id, input.id));
@@ -408,28 +419,87 @@ Return a JSON object with this exact structure:
       errorMsg = e instanceof Error ? e.message : String(e);
     }
     let newCount = 0;
+    // Load category rules once for auto-categorization
+    const categoryRules = await db.select().from(jobCategoryRules).orderBy(desc(jobCategoryRules.priority));
     for (const item of items) {
-      const existing = await db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.sourceId, source.id), eq(jobs.externalId, item.externalId))).limit(1);
-      if (existing.length === 0) {
-        await db.insert(jobs).values({
-          sourceId: source.id,
-          externalId: item.externalId,
-          title: item.title,
-          company: item.company,
-          location: item.location,
-          description: item.description,
-          applyUrl: item.applyUrl,
-          salary: item.salary,
-          categoryId: source.categoryId,
-          status: "active",
-          isInternal: false,
-          publishedAt: item.publishedAt ?? new Date(),
-        });
-        newCount++;
+      // Skip if this externalId was previously blocked by admin
+      const existing = await db.select({ id: jobs.id, blockedFromSource: jobs.blockedFromSource }).from(jobs).where(and(eq(jobs.sourceId, source.id), eq(jobs.externalId, item.externalId))).limit(1);
+      if (existing.length > 0) continue; // already imported (blocked or not)
+      // Auto-categorize using keyword rules
+      let resolvedCategoryId: number | null = source.categoryId ?? null;
+      if (!resolvedCategoryId && categoryRules.length > 0) {
+        for (const rule of categoryRules) {
+          let keywords: string[] = [];
+          try { keywords = JSON.parse(rule.keywords); } catch { continue; }
+          const haystack = [
+            rule.matchField !== "description" ? item.title : "",
+            rule.matchField !== "title" ? item.description : "",
+          ].join(" ").toLowerCase();
+          if (keywords.some(kw => haystack.includes(kw.toLowerCase()))) {
+            resolvedCategoryId = rule.categoryId;
+            break;
+          }
+        }
       }
+      await db.insert(jobs).values({
+        sourceId: source.id,
+        externalId: item.externalId,
+        title: item.title,
+        company: item.company,
+        location: item.location,
+        description: item.description,
+        applyUrl: item.applyUrl,
+        salary: item.salary,
+        categoryId: resolvedCategoryId,
+        status: "active",
+        isInternal: false,
+        publishedAt: item.publishedAt ?? new Date(),
+      });
+      newCount++;
     }
     await db.update(jobSources).set({ lastFetchedAt: new Date(), totalFetched: sql`${jobSources.totalFetched} + ${newCount}`, lastError: errorMsg }).where(eq(jobSources.id, source.id));
     return { fetched: items.length, newJobs: newCount, error: errorMsg };
+  }),
+
+  adminFetchAllSources: protectedProcedure.mutation(async ({ ctx }) => {
+    assertAdmin(ctx.user.role);
+    const db = await getDb();
+    const allSources = await db.select().from(jobSources).where(eq(jobSources.isActive, true));
+    let total = 0;
+    const categoryRules = await db.select().from(jobCategoryRules).orderBy(desc(jobCategoryRules.priority));
+    for (const source of allSources) {
+      let items: Array<{ title: string; company: string; location: string; description: string; applyUrl: string; externalId: string; publishedAt: Date | null; salary: string }> = [];
+      let errorMsg: string | null = null;
+      try {
+        if (source.type === "rss") {
+          const resp = await axios.get(source.url, { timeout: 15000, headers: { "User-Agent": "Mozilla/5.0 (compatible; UltrasoundAssistJobBot/1.0)" } });
+          items = parseRssFeed(resp.data);
+        } else {
+          items = await scrapeJobPage(source.url);
+        }
+      } catch (e: unknown) {
+        errorMsg = e instanceof Error ? e.message : String(e);
+      }
+      let newCount = 0;
+      for (const item of items) {
+        const existing = await db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.sourceId, source.id), eq(jobs.externalId, item.externalId))).limit(1);
+        if (existing.length > 0) continue;
+        let resolvedCategoryId: number | null = source.categoryId ?? null;
+        if (!resolvedCategoryId && categoryRules.length > 0) {
+          for (const rule of categoryRules) {
+            let keywords: string[] = [];
+            try { keywords = JSON.parse(rule.keywords); } catch { continue; }
+            const haystack = [rule.matchField !== "description" ? item.title : "", rule.matchField !== "title" ? item.description : ""].join(" ").toLowerCase();
+            if (keywords.some(kw => haystack.includes(kw.toLowerCase()))) { resolvedCategoryId = rule.categoryId; break; }
+          }
+        }
+        await db.insert(jobs).values({ sourceId: source.id, externalId: item.externalId, title: item.title, company: item.company, location: item.location, description: item.description, applyUrl: item.applyUrl, salary: item.salary, categoryId: resolvedCategoryId, status: "active", isInternal: false, publishedAt: item.publishedAt ?? new Date() });
+        newCount++;
+        total++;
+      }
+      await db.update(jobSources).set({ lastFetchedAt: new Date(), totalFetched: sql`${jobSources.totalFetched} + ${newCount}`, lastError: errorMsg }).where(eq(jobSources.id, source.id));
+    }
+    return { total };
   }),
 
   // ── Admin: manage jobs ────────────────────────────────────────────────────
@@ -508,18 +578,20 @@ Return a JSON object with this exact structure:
   adminSaveCategory: protectedProcedure.input(z.object({
     id: z.number().optional(),
     name: z.string().min(1).max(100),
-    slug: z.string().min(1).max(100),
+    slug: z.string().max(100).optional(),
     color: z.string().optional(),
     icon: z.string().optional(),
+    description: z.string().optional(),
     sortOrder: z.number().optional(),
   })).mutation(async ({ ctx, input }) => {
     assertAdmin(ctx.user.role);
     const db = await getDb();
+    const slug = input.slug || input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     if (input.id) {
-      await db.update(jobCategories).set({ name: input.name, slug: input.slug, color: input.color, icon: input.icon, sortOrder: input.sortOrder }).where(eq(jobCategories.id, input.id));
+      await db.update(jobCategories).set({ name: input.name, slug, color: input.color, icon: input.icon, sortOrder: input.sortOrder, description: input.description }).where(eq(jobCategories.id, input.id));
       return { id: input.id };
     } else {
-      const [result] = await db.insert(jobCategories).values({ name: input.name, slug: input.slug, color: input.color, icon: input.icon, sortOrder: input.sortOrder });
+      const [result] = await db.insert(jobCategories).values({ name: input.name, slug, color: input.color, icon: input.icon, sortOrder: input.sortOrder, description: input.description });
       return { id: (result as { insertId: number }).insertId };
     }
   }),
@@ -537,6 +609,10 @@ Return a JSON object with this exact structure:
     heroSubtitle: z.string().optional(),
     heroImageUrl: z.string().url().optional().or(z.literal("")),
     featuredBannerHtml: z.string().optional(),
+    pageIntro: z.string().optional(),
+    rightSideHtml: z.string().optional(),
+    bottomHtml: z.string().optional(),
+    headerBadgeHtml: z.string().optional(),
     seoTitle: z.string().max(300).optional(),
     seoDescription: z.string().optional(),
     showCandidateProfiles: z.boolean().optional(),
@@ -837,6 +913,97 @@ Return a JSON object with this exact structure:
       sourceId: null,
     }).$returningId();
     return { id: inserted.id };
+  }),
+
+  // ── Admin: job moderation ─────────────────────────────────────────────────
+  adminModerateJob: protectedProcedure.input(z.object({
+    id: z.number(),
+    action: z.enum(["hide", "unhide", "delete", "block"]),
+  })).mutation(async ({ ctx, input }) => {
+    assertAdmin(ctx.user.role);
+    const db = await getDb();
+    if (input.action === "delete") {
+      await db.delete(jobs).where(eq(jobs.id, input.id));
+    } else if (input.action === "hide") {
+      await db.update(jobs).set({ isHidden: true }).where(eq(jobs.id, input.id));
+    } else if (input.action === "unhide") {
+      await db.update(jobs).set({ isHidden: false }).where(eq(jobs.id, input.id));
+    } else if (input.action === "block") {
+      // Hide and mark as blocked so re-import of this externalId is skipped
+      await db.update(jobs).set({ isHidden: true, blockedFromSource: true }).where(eq(jobs.id, input.id));
+    }
+    return { ok: true };
+  }),
+
+  adminRecategorizeJob: protectedProcedure.input(z.object({
+    id: z.number(),
+    categoryId: z.number().nullable(),
+  })).mutation(async ({ ctx, input }) => {
+    assertAdmin(ctx.user.role);
+    const db = await getDb();
+    await db.update(jobs).set({ categoryId: input.categoryId }).where(eq(jobs.id, input.id));
+    return { ok: true };
+  }),
+
+  adminRunAutoCategorize: protectedProcedure.mutation(async ({ ctx }) => {
+    assertAdmin(ctx.user.role);
+    const db = await getDb();
+    const [allRules, uncategorized] = await Promise.all([
+      db.select().from(jobCategoryRules).orderBy(desc(jobCategoryRules.priority)),
+      db.select({ id: jobs.id, title: jobs.title, description: jobs.description })
+        .from(jobs).where(isNull(jobs.categoryId)),
+    ]);
+    let updated = 0;
+    for (const job of uncategorized) {
+      for (const rule of allRules) {
+        let keywords: string[] = [];
+        try { keywords = JSON.parse(rule.keywords); } catch { continue; }
+        const haystack = [
+          rule.matchField !== "description" ? (job.title ?? "") : "",
+          rule.matchField !== "title" ? (job.description ?? "") : "",
+        ].join(" ").toLowerCase();
+        const matched = keywords.some(kw => haystack.includes(kw.toLowerCase()));
+        if (matched) {
+          await db.update(jobs).set({ categoryId: rule.categoryId }).where(eq(jobs.id, job.id));
+          updated++;
+          break;
+        }
+      }
+    }
+    return { updated };
+  }),
+
+  // ── Admin: category keyword rules ─────────────────────────────────────────
+  adminListCategoryRules: protectedProcedure.query(async ({ ctx }) => {
+    assertAdmin(ctx.user.role);
+    const db = await getDb();
+    return db.select().from(jobCategoryRules).orderBy(desc(jobCategoryRules.priority));
+  }),
+
+  adminSaveCategoryRule: protectedProcedure.input(z.object({
+    id: z.number().optional(),
+    categoryId: z.number(),
+    keywords: z.array(z.string().min(1)),
+    matchField: z.enum(["title", "description", "both"]).default("both"),
+    priority: z.number().default(0),
+  })).mutation(async ({ ctx, input }) => {
+    assertAdmin(ctx.user.role);
+    const db = await getDb();
+    const data = { categoryId: input.categoryId, keywords: JSON.stringify(input.keywords), matchField: input.matchField, priority: input.priority };
+    if (input.id) {
+      await db.update(jobCategoryRules).set(data).where(eq(jobCategoryRules.id, input.id));
+      return { id: input.id };
+    } else {
+      const [result] = await db.insert(jobCategoryRules).values(data);
+      return { id: (result as { insertId: number }).insertId };
+    }
+  }),
+
+  adminDeleteCategoryRule: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    assertAdmin(ctx.user.role);
+    const db = await getDb();
+    await db.delete(jobCategoryRules).where(eq(jobCategoryRules.id, input.id));
+    return { ok: true };
   }),
 });
 // ─── Helper: build plain text resume from JSON ────────────────────────────────

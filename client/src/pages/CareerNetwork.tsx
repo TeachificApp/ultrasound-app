@@ -248,6 +248,84 @@ function JobCard({ job, categories, onClick }: {
   );
 }
 
+// ─── Filter Content (shared between sidebar and mobile overlay) ─────────────
+function FilterContent({ categories, categoryId, setCategoryId, locationText, handleLocationSearch, locationType, setLocationType, employmentType, setEmploymentType, hasFilters, clearFilters, user }: {
+  categories: Array<{ id: number; name: string; color: string | null }>;
+  categoryId: number | undefined;
+  setCategoryId: (v: number | undefined) => void;
+  locationText: string;
+  handleLocationSearch: (v: string) => void;
+  locationType: string | undefined;
+  setLocationType: (v: string | undefined) => void;
+  employmentType: string | undefined;
+  setEmploymentType: (v: string | undefined) => void;
+  hasFilters: boolean;
+  clearFilters: () => void;
+  user: { id: number } | null | undefined;
+}) {
+  return (
+    <>
+      <div className="space-y-4">
+        {hasFilters && <button onClick={clearFilters} className="text-xs text-teal-600 hover:underline flex items-center gap-1"><X className="h-3 w-3" />Clear all filters</button>}
+        <div>
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Category</label>
+          <div className="space-y-1">
+            <button onClick={() => setCategoryId(undefined)} className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${!categoryId ? "bg-teal-50 text-teal-700 font-medium" : "text-gray-600 hover:bg-gray-50"}`}>All Categories</button>
+            {categories.map(cat => (
+              <button key={cat.id} onClick={() => setCategoryId(cat.id)} className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 ${categoryId === cat.id ? "bg-teal-50 text-teal-700 font-medium" : "text-gray-600 hover:bg-gray-50"}`}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color ?? "#0d9488" }} />{cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Location</label>
+          <div className="relative">
+            <MapPin className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <Input value={locationText} onChange={e => handleLocationSearch(e.target.value)} placeholder="City, state, zip..." className="h-8 text-sm pl-7" />
+            {locationText && <button onClick={() => handleLocationSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="h-3 w-3 text-gray-400 hover:text-gray-600" /></button>}
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Work Type</label>
+          <Select value={locationType ?? "all"} onValueChange={v => setLocationType(v === "all" ? undefined : v)}>
+            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any</SelectItem>
+              <SelectItem value="remote">Remote</SelectItem>
+              <SelectItem value="onsite">On-site</SelectItem>
+              <SelectItem value="hybrid">Hybrid</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Employment Type</label>
+          <Select value={employmentType ?? "all"} onValueChange={v => setEmploymentType(v === "all" ? undefined : v)}>
+            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any</SelectItem>
+              <SelectItem value="full_time">Full Time</SelectItem>
+              <SelectItem value="part_time">Part Time</SelectItem>
+              <SelectItem value="contract">Contract</SelectItem>
+              <SelectItem value="per_diem">Per Diem</SelectItem>
+              <SelectItem value="travel">Travel</SelectItem>
+              <SelectItem value="prn">PRN</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {user && (
+        <div className="pt-4 border-t space-y-1">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">My Career</p>
+          <Link href="/career/profile"><button className="w-full text-left text-sm px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-2"><User className="h-4 w-4 text-teal-500" /> My Profile</button></Link>
+          <Link href="/career/resumes"><button className="w-full text-left text-sm px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-2"><FileText className="h-4 w-4 text-teal-500" /> My Resumes</button></Link>
+          <Link href="/career/applications"><button className="w-full text-left text-sm px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-2"><Briefcase className="h-4 w-4 text-teal-500" /> My Applications</button></Link>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function CareerNetwork() {
   const { user } = useAuth();
@@ -341,119 +419,41 @@ export default function CareerNetwork() {
         </div>
       </div>
 
+      {/* Mobile filter overlay */}
+      {showFilters && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowFilters(false)} />
+          <div className="absolute left-0 top-0 bottom-0 w-72 bg-white overflow-y-auto shadow-xl p-4 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-gray-900">Filters</h3>
+              <button onClick={() => setShowFilters(false)} className="p-1 rounded hover:bg-gray-100"><X className="h-5 w-5" /></button>
+            </div>
+            <FilterContent
+              categories={categories} categoryId={categoryId} setCategoryId={v => { setCategoryId(v); setPage(1); }}
+              locationText={locationText} handleLocationSearch={handleLocationSearch}
+              locationType={locationType} setLocationType={v => { setLocationType(v); setPage(1); }}
+              employmentType={employmentType} setEmploymentType={v => { setEmploymentType(v); setPage(1); }}
+              hasFilters={hasFilters} clearFilters={clearFilters}
+              user={user}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex gap-6">
-          {/* Sidebar filters */}
-          <aside className={`${showFilters ? "block" : "hidden lg:block"} w-56 flex-shrink-0 space-y-4`}>
+          {/* Sidebar filters - desktop only */}
+          <aside className="hidden lg:block w-56 flex-shrink-0">
             <div className="bg-white rounded-xl border p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-sm text-gray-700">Filters</h3>
-                {hasFilters && <button onClick={clearFilters} className="text-xs text-teal-600 hover:underline flex items-center gap-1"><X className="h-3 w-3" />Clear</button>}
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Category</label>
-                <div className="space-y-1">
-                  <button
-                    onClick={() => { setCategoryId(undefined); setPage(1); }}
-                    className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${!categoryId ? "bg-teal-50 text-teal-700 font-medium" : "text-gray-600 hover:bg-gray-50"}`}
-                  >
-                    All Categories
-                  </button>
-                  {categories.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => { setCategoryId(cat.id); setPage(1); }}
-                      className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 ${categoryId === cat.id ? "bg-teal-50 text-teal-700 font-medium" : "text-gray-600 hover:bg-gray-50"}`}
-                    >
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color ?? "#0d9488" }} />
-                      {cat.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Location text search */}
-              <div>
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Location</label>
-                <div className="relative">
-                  <MapPin className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                  <Input
-                    value={locationText}
-                    onChange={e => handleLocationSearch(e.target.value)}
-                    placeholder="City, state, zip..."
-                    className="h-8 text-sm pl-7"
-                  />
-                  {locationText && (
-                    <button onClick={() => { setLocationText(""); setDebouncedLocationText(""); setPage(1); }} className="absolute right-2 top-1/2 -translate-y-1/2">
-                      <X className="h-3 w-3 text-gray-400 hover:text-gray-600" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Location type */}
-              <div>
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Work Type</label>
-                <Select value={locationType ?? "all"} onValueChange={v => { setLocationType(v === "all" ? undefined : v); setPage(1); }}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Any</SelectItem>
-                    <SelectItem value="remote">Remote</SelectItem>
-                    <SelectItem value="onsite">On-site</SelectItem>
-                    <SelectItem value="hybrid">Hybrid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Employment type */}
-              <div>
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Employment Type</label>
-                <Select value={employmentType ?? "all"} onValueChange={v => { setEmploymentType(v === "all" ? undefined : v); setPage(1); }}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Any</SelectItem>
-                    <SelectItem value="full_time">Full Time</SelectItem>
-                    <SelectItem value="part_time">Part Time</SelectItem>
-                    <SelectItem value="contract">Contract</SelectItem>
-                    <SelectItem value="per_diem">Per Diem</SelectItem>
-                    <SelectItem value="travel">Travel</SelectItem>
-                    <SelectItem value="prn">PRN</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Quick links */}
-            <div className="bg-white rounded-xl border p-4 space-y-2">
-              <h3 className="font-semibold text-sm text-gray-700 mb-3">My Career</h3>
-              {user ? (
-                <>
-                  <Link href="/career/profile">
-                    <button className="w-full text-left text-sm px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-                      <User className="h-4 w-4 text-teal-500" /> My Profile
-                    </button>
-                  </Link>
-                  <Link href="/career/resumes">
-                    <button className="w-full text-left text-sm px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-teal-500" /> My Resumes
-                    </button>
-                  </Link>
-                  <Link href="/career/applications">
-                    <button className="w-full text-left text-sm px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-                      <Briefcase className="h-4 w-4 text-teal-500" /> My Applications
-                    </button>
-                  </Link>
-                  <Link href="/admin/career-network">
-                    <button className="w-full text-left text-sm px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-                      <Settings className="h-4 w-4 text-teal-500" /> Manage Jobs (Admin)
-                    </button>
-                  </Link>
-                </>
-              ) : (
-                <p className="text-xs text-gray-400">Log in to manage your career profile and applications.</p>
-              )}
+              <h3 className="font-semibold text-sm text-gray-700">Filters</h3>
+              <FilterContent
+                categories={categories} categoryId={categoryId} setCategoryId={v => { setCategoryId(v); setPage(1); }}
+                locationText={locationText} handleLocationSearch={handleLocationSearch}
+                locationType={locationType} setLocationType={v => { setLocationType(v); setPage(1); }}
+                employmentType={employmentType} setEmploymentType={v => { setEmploymentType(v); setPage(1); }}
+                hasFilters={hasFilters} clearFilters={clearFilters}
+                user={user}
+              />
             </div>
           </aside>
 
