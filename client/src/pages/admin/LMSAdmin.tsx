@@ -4868,7 +4868,7 @@ function EnrollmentsTab() {
               {(data?.enrollments ?? []).map((e: any) => (
                 <tr key={e.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2.5">
-                    <p className="font-medium text-gray-900">{e.user?.displayName ?? "Unknown"}</p>
+                    <p className="font-medium text-gray-900">{e.user?.displayName || e.user?.name || e.user?.email || "Unknown"}</p>
                     <p className="text-xs text-gray-400">{e.user?.email}</p>
                   </td>
                   <td className="px-4 py-2.5 text-gray-700">{e.course?.title ?? "—"}</td>
@@ -6344,7 +6344,7 @@ function AnalyticsTab() {
               <tr><td colSpan={5} className="px-4 py-4 text-center text-gray-400 text-xs">Loading...</td></tr>
             ) : (orders?.orders ?? []).map((o: any) => (
               <tr key={o.id} className="hover:bg-gray-50">
-                <td className="px-4 py-2.5 text-gray-700">{o.user?.displayName ?? o.user?.email ?? "—"}</td>
+                <td className="px-4 py-2.5 text-gray-700">{o.user?.displayName || o.user?.name || o.user?.email || "—"}</td>
                 <td className="px-4 py-2.5 text-gray-700 truncate max-w-[160px]">{o.course?.title ?? "—"}</td>
                 <td className="px-4 py-2.5 font-medium text-gray-900">${Number(o.amount).toFixed(2)}</td>
                 <td className="px-4 py-2.5">

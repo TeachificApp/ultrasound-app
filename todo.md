@@ -4259,3 +4259,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Frontend: add Employer Portal entry point to Career Network page
 - [ ] Wire /employer-dashboard and /employer/:id routes in all routers in App.tsx
 - [ ] Admin: add employer management tab to CareerNetworkAdmin (view profiles, subscriptions, manage jobs)
+
+## Analytics & User Display Fixes (Jun 2026)
+- [x] Fix "Unknown" student names in DigitalDownloadsAdmin Students tab (customerName→userName, customerEmail→userEmail)
+- [x] Fix "Unknown" student names in DigitalDownloadsAdmin Analytics tab (same field mismatch)
+- [x] Fix LMSAdmin Enrollments tab: add name fallback chain (displayName || name || email || "Unknown")
+- [x] Fix LMSAdmin getOrders display: add name fallback chain (displayName || name || email || "—")
+- [x] Fix lmsEnrollmentAdminRouter.listEnrollments backend: also return users.name so fallback works
+- [x] Fix lmsEnrollmentAdminRouter.getOrders backend: also return users.name so fallback works
+- [x] Add /admin → /platform-admin redirect in App.tsx

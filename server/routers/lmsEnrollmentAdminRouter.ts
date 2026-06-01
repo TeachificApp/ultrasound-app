@@ -101,7 +101,7 @@ export const lmsEnrollmentAdminRouter = router({
       const offset = (input.page - 1) * input.pageSize;
       const rows = await db.select().from(lmsEnrollments).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(lmsEnrollments.enrolledAt)).limit(input.pageSize).offset(offset);
       const enriched = await Promise.all(rows.map(async (e) => {
-        const [u] = await db.select({ id: users.id, displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, e.userId)).limit(1);
+        const [u] = await db.select({ id: users.id, displayName: users.displayName, name: users.name, email: users.email }).from(users).where(eq(users.id, e.userId)).limit(1);
         const [c] = await db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, e.courseId)).limit(1);
         return { ...e, user: u ?? null, course: c ?? null };
       }));
@@ -749,7 +749,7 @@ export const lmsEnrollmentAdminRouter = router({
       const offset = (input.page - 1) * input.pageSize;
       const orders = await db.select().from(lmsOrders).orderBy(desc(lmsOrders.createdAt)).limit(input.pageSize).offset(offset);
       const enriched = await Promise.all(orders.map(async (o) => {
-        const [u] = await db.select({ displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, o.userId)).limit(1);
+        const [u] = await db.select({ displayName: users.displayName, name: users.name, email: users.email }).from(users).where(eq(users.id, o.userId)).limit(1);
         const [c] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, o.courseId)).limit(1);
         return { ...o, user: u ?? null, course: c ?? null };
       }));

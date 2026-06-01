@@ -764,11 +764,11 @@ function DownloadStudentsTab({ productId, onGrantAccess }: { productId: number; 
             </thead>
             <tbody>
               {purchasers.map((p: any) => (
-                <tr key={p.transactionId ?? p.customerEmail} className="border-t hover:bg-muted/30">
+                <tr key={p.transactionId ?? p.userEmail} className="border-t hover:bg-muted/30">
                   <td className="px-4 py-2.5">
                     <div>
-                      <p className="font-medium">{p.customerName || 'Unknown'}</p>
-                      <p className="text-xs text-muted-foreground">{p.customerEmail}</p>
+                      <p className="font-medium">{p.userName || p.userEmail || 'Unknown'}</p>
+                      <p className="text-xs text-muted-foreground">{p.userEmail}</p>
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground">{p.purchasedAt ? new Date(p.purchasedAt).toLocaleDateString() : '—'}</td>
@@ -816,8 +816,8 @@ function DownloadProductAnalytics({ productId, productTitle }: { productId: numb
               </tr></thead>
               <tbody>
                 {purchasers.slice(0, 10).map((p: any) => (
-                  <tr key={p.transactionId ?? p.customerEmail} className="border-t">
-                    <td className="px-4 py-2.5"><p className="font-medium">{p.customerName || 'Unknown'}</p><p className="text-xs text-muted-foreground">{p.customerEmail}</p></td>
+                  <tr key={p.transactionId ?? p.userEmail} className="border-t">
+                    <td className="px-4 py-2.5"><p className="font-medium">{p.userName || p.userEmail || 'Unknown'}</p><p className="text-xs text-muted-foreground">{p.userEmail}</p></td>
                     <td className="px-4 py-2.5 text-muted-foreground">{p.purchasedAt ? new Date(p.purchasedAt).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-2.5">{p.amountPaid != null ? `$${(Number(p.amountPaid) / 100).toFixed(2)}` : '—'}</td>
                   </tr>
