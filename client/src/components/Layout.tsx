@@ -11,7 +11,7 @@ import {
   Stethoscope, Zap, ExternalLink, ShoppingBag, FlaskConical, MessageCircle, Award, Shield, GraduationCap,
   BookMarked, Library, Plus, Crown, Droplets, Building2, Users, UserPlus,
   LogIn, LogOut, ChevronDown, Webhook, Layers, Lock, ClipboardCheck, Brain,
-  DollarSign
+  DollarSign, Briefcase
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -97,6 +97,12 @@ const BASE_NAV_GROUPS = [
     label: "Community",
     items: [
       { path: "/community", label: "Community Hub", icon: Users },
+    ],
+  },
+  {
+    label: "Career",
+    items: [
+      { path: "/career-network", label: "Career Network", icon: Briefcase },
     ],
   },
   {

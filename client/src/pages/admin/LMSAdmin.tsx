@@ -42,7 +42,7 @@ import {
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
   Layout as LayoutTemplate, Database,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
-  Repeat, Film, CalendarRange, ExternalLink, Link2, Mail, Activity,
+  Repeat, Film, CalendarRange, ExternalLink, Link2, Mail, Activity, Briefcase,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -6395,6 +6395,7 @@ const LMS_NAV_GROUPS = [
     color: "teal",
     items: [
       { value: "members_hub", label: "Members Hub ↗", icon: Users, href: getAdminUrl("/admin/members") },
+      { value: "career_network", label: "Career Network ↗", icon: Briefcase, href: getAdminUrl("/admin/career-network") },
       { value: "groups",      label: "Teams",      icon: Users },
       { value: "instructors", label: "Instructors", icon: GraduationCap },
       { value: "certificates",label: "Certificates",icon: CheckCircle },

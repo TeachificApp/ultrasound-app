@@ -273,6 +273,9 @@ const CommunityProfile = lazy(() => import("./pages/CommunityProfile"));
 const CommunityDMs = lazy(() => import("./pages/CommunityDMs"));
 const CommunityLeaderboard = lazy(() => import("./pages/CommunityLeaderboard"));
 const CommunityAdmin = lazy(() => import("./pages/admin/CommunityAdmin"));
+const CareerNetwork = lazy(() => import("./pages/CareerNetwork"));
+const CareerProfile = lazy(() => import("./pages/CareerProfile"));
+const CareerNetworkAdmin = lazy(() => import("./pages/admin/CareerNetworkAdmin"));
 
 function Router() {
   usePageViewTracker();
@@ -437,6 +440,14 @@ function Router() {
         {/* Product landing → root domain */}
         <Route path="/product/:slug" component={ProductLanding} />
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
+
+        {/* ── Career Network ─────────────────────────────────────────────────── */}
+        <Route path="/career-network" component={CareerNetwork} />
+        <Route path="/careernetwork" component={CareerNetwork} />
+        <Route path="/career/profile">{() => <CareerProfile defaultTab="profile" />}</Route>
+        <Route path="/career/resumes">{() => <CareerProfile defaultTab="resumes" />}</Route>
+        <Route path="/career/applications">{() => <CareerProfile defaultTab="applications" />}</Route>
+        <Route path="/admin/career-network">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CareerNetworkAdmin /></RoleGuard>}</Route>
 
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
         <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
@@ -668,6 +679,14 @@ function LMSRouter() {
         <Route path="/downloads" component={DownloadsBrowse} />
         <Route path="/bundles/:slug" component={BundleLanding} />
 
+        {/* ── Career Network ─────────────────────────────────────────────── */}
+        <Route path="/career-network" component={CareerNetwork} />
+        <Route path="/careernetwork" component={CareerNetwork} />
+        <Route path="/career/profile">{() => <CareerProfile defaultTab="profile" />}</Route>
+        <Route path="/career/resumes">{() => <CareerProfile defaultTab="resumes" />}</Route>
+        <Route path="/career/applications">{() => <CareerProfile defaultTab="applications" />}</Route>
+        <Route path="/admin/career-network">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CareerNetworkAdmin /></RoleGuard>}</Route>
+
         {/* Admin (platform_admin only) */}
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
@@ -832,6 +851,14 @@ function IHeartEchoRouter() {
         <Route path="/accreditation-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]} teaserHeight={0}><AccreditationNavigator /></RoleGuard>}</Route>
         <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false} teaserHeight={0}><AccreditationTool /></RoleGuard>}</Route>
         <Route path="/lab-admin">{() => <RoleGuard roles={["diy_admin"]} allowAdmin={false}><LabAdmin /></RoleGuard>}</Route>
+
+        {/* ── Career Network ─────────────────────────────────────────────────── */}
+        <Route path="/career-network" component={CareerNetwork} />
+        <Route path="/careernetwork" component={CareerNetwork} />
+        <Route path="/career/profile">{() => <CareerProfile defaultTab="profile" />}</Route>
+        <Route path="/career/resumes">{() => <CareerProfile defaultTab="resumes" />}</Route>
+        <Route path="/career/applications">{() => <CareerProfile defaultTab="applications" />}</Route>
+        <Route path="/admin/career-network">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CareerNetworkAdmin /></RoleGuard>}</Route>
 
         {/* ── Admin ──────────────────────────────────────────────────── */}
         <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>

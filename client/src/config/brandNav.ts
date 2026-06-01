@@ -6,7 +6,8 @@ import type { Brand } from "@/hooks/useBrand";
 import {
   Heart, Calculator, ClipboardList, Activity,
   BookOpen, Stethoscope, Zap, ExternalLink, MessageCircle, Award, Shield, GraduationCap,
-  BookMarked, Library, Crown, Layers, ClipboardCheck, Brain, Trophy, Volume2, FileText, BookCheck
+  BookMarked, Library, Crown, Layers, ClipboardCheck, Brain, Trophy, Volume2, FileText, BookCheck,
+  Briefcase
 } from "lucide-react";
 
 export interface NavItem {
@@ -70,6 +71,12 @@ const AAUS_NAV_GROUPS: NavGroup[] = [
     label: "Community",
     items: [
       { path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community", label: "Community Hub", icon: MessageCircle, external: true },
+    ],
+  },
+  {
+    label: "Career",
+    items: [
+      { path: "/career-network", label: "Career Network", icon: Briefcase },
     ],
   },
   {
@@ -197,6 +204,12 @@ const IHE_NAV_GROUPS: NavGroup[] = [
     label: "Community",
     items: [
       { path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community", label: "iHeartEcho\u2122 Community", icon: MessageCircle, external: true },
+    ],
+  },
+  {
+    label: "Career",
+    items: [
+      { path: "/career-network", label: "Career Network", icon: Briefcase },
     ],
   },
   {

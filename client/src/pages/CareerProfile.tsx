@@ -170,7 +170,7 @@ function AiResumeBuilderDialog({ onClose, onCreated }: { onClose: () => void; on
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function CareerProfile() {
+export default function CareerProfile({ defaultTab = "profile" }: { defaultTab?: string }) {
   const { user } = useAuth();
   const utils = trpc.useUtils();
   const [showAiBuilder, setShowAiBuilder] = useState(false);
@@ -257,7 +257,7 @@ export default function CareerProfile() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/careernetwork">
+          <Link href="/career-network">
             <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-teal-600 transition-colors">
               <ArrowLeft className="h-4 w-4" /> Career Network
             </button>
@@ -268,7 +268,7 @@ export default function CareerProfile() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
-        <Tabs defaultValue="profile">
+        <Tabs defaultValue={defaultTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="profile"><User className="h-4 w-4 mr-1.5" />Profile</TabsTrigger>
             <TabsTrigger value="resumes"><FileText className="h-4 w-4 mr-1.5" />Resumes ({myResumes.length})</TabsTrigger>
@@ -480,7 +480,7 @@ export default function CareerProfile() {
               <div className="text-center py-12 bg-white rounded-xl border">
                 <Briefcase className="h-10 w-10 text-gray-200 mx-auto mb-3" />
                 <p className="text-sm text-gray-500">No applications yet.</p>
-                <Link href="/careernetwork">
+                <Link href="/career-network">
                   <Button variant="outline" className="mt-3 text-sm">Browse Jobs</Button>
                 </Link>
               </div>

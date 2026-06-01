@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import {
   Search, MapPin, Briefcase, Clock, DollarSign, ExternalLink, Building2,
   Filter, ChevronRight, Star, User, FileText, Loader2, X, Globe, Mail,
-  ArrowLeft, Send
+  ArrowLeft, Send, Settings
 } from "lucide-react";
 
 const EMPLOYMENT_LABELS: Record<string, string> = {
@@ -410,6 +410,11 @@ export default function CareerNetwork() {
                   <Link href="/career/applications">
                     <button className="w-full text-left text-sm px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-2">
                       <Briefcase className="h-4 w-4 text-teal-500" /> My Applications
+                    </button>
+                  </Link>
+                  <Link href="/admin/career-network">
+                    <button className="w-full text-left text-sm px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-2">
+                      <Settings className="h-4 w-4 text-teal-500" /> Manage Jobs (Admin)
                     </button>
                   </Link>
                 </>
