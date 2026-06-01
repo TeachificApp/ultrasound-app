@@ -4,6 +4,7 @@
  * Supports granting access and refunding from within.
  */
 import { useState, useMemo } from "react";
+import { UserSearchCombobox, type SelectedUser } from "@/components/UserSearchCombobox";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,16 +54,16 @@ function GrantAccessDialog({ productId, productType, productTitle, open, onClose
   productId: number; productType: string; productTitle: string;
   open: boolean; onClose: () => void; onDone: () => void;
 }) {
-  const [email, setEmail] = useState("");
+  const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const grantMutation = trpc.productAnalytics.grantProductAccess.useMutation({
-    onSuccess: (data) => { toast.success(data.message); setEmail(""); onDone(); onClose(); },
+    onSuccess: (data) => { toast.success(data.message); setSelectedUser(null); onDone(); onClose(); },
     onError: e => toast.error(e.message),
   });
 
   if (!["course", "download", "bundle"].includes(productType)) return null;
 
   return (
-    <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
+    <Dialog open={open} onOpenChange={o => { if (!o) { setSelectedUser(null); onClose(); } }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -71,25 +72,22 @@ function GrantAccessDialog({ productId, productType, productTitle, open, onClose
         </DialogHeader>
         <div className="space-y-4 py-2">
           <p className="text-sm text-gray-600">
-            Grant access to <strong>{productTitle}</strong> for a user. If the email doesn't exist, a new account will be created.
+            Grant access to <strong>{productTitle}</strong> for a user.
           </p>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">User Email</label>
-            <Input
-              type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="user@example.com"
-            />
+            <label className="text-sm font-medium text-gray-700 block mb-1">Search User</label>
+            <UserSearchCombobox onSelect={setSelectedUser} placeholder="Search by name or email…" />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={() => { setSelectedUser(null); onClose(); }}>Cancel</Button>
           <Button
             className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
-            disabled={!email || grantMutation.isPending}
-            onClick={() => grantMutation.mutate({ productId, productType: productType as any, userEmail: email })}
+            disabled={!selectedUser || grantMutation.isPending}
+            onClick={() => selectedUser && grantMutation.mutate({ productId, productType: productType as any, userEmail: selectedUser.email })}
           >
             {grantMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-            Grant Access
+            {selectedUser?.isNew ? "Create & Grant Access" : "Grant Access"}
           </Button>
         </DialogFooter>
       </DialogContent>

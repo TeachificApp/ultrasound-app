@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
+import { UserSearchCombobox, type SelectedUser } from "@/components/UserSearchCombobox";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -411,49 +412,30 @@ function AnalyticsTab({ productId }: { productId: number }) {
 
 // ─── Grant Access Dialog ──────────────────────────────────────────────────────
 function GrantAccessDialog({ open, productId, onClose }: { open: boolean; productId: number; onClose: () => void }) {
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [searchResult, setSearchResult] = useState<{ id: number; name: string | null; email: string | null } | null | undefined>(undefined);
+  const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const utils = trpc.useUtils();
-  const findUser = trpc.platformAdmin.findUserByEmail.useMutation({
-    onSuccess: (data) => setSearchResult(data as any ?? null),
-    onError: () => setSearchResult(null),
-  });
   const grantMut = trpc.productsAdmin.grantAccess.useMutation({
     onSuccess: () => {
       toast.success("Access granted");
       utils.productsAdmin.listOrders.invalidate({ productId });
-      setEmail(""); setName(""); setSearchResult(undefined); onClose();
+      setSelectedUser(null); onClose();
     },
     onError: (e) => toast.error(e.message),
   });
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { setSelectedUser(null); onClose(); } }}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5 text-teal-600" /> Grant Product Access</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-1">
-            <Label>User Email</Label>
-            <div className="flex gap-2">
-              <Input type="email" placeholder="user@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setSearchResult(undefined); }} />
-              <Button size="sm" variant="outline" onClick={() => findUser.mutate({ email: email.trim() })} disabled={findUser.isPending}>
-                {findUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
-              </Button>
-            </div>
+            <Label>Search User</Label>
+            <UserSearchCombobox onSelect={setSelectedUser} placeholder="Search by name or email…" existingOnly />
           </div>
-          {searchResult === null && (
-            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">User not found.</p>
-          )}
-          {searchResult && (
-            <div className="bg-teal-50 border border-teal-200 rounded p-2">
-              <p className="text-sm text-teal-800 font-medium">Found: {searchResult.name ?? searchResult.email}</p>
-            </div>
-          )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!searchResult || grantMut.isPending}
-            onClick={() => searchResult && grantMut.mutate({ productId, userId: searchResult.id })}>
+          <Button variant="outline" onClick={() => { setSelectedUser(null); onClose(); }}>Cancel</Button>
+          <Button disabled={!selectedUser || grantMut.isPending}
+            onClick={() => selectedUser?.id && grantMut.mutate({ productId, userId: selectedUser.id })}>
             {grantMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <UserPlus className="w-4 h-4 mr-1" />}
             Grant Access
           </Button>

@@ -2,6 +2,7 @@
  * BundlesAdmin.tsx — Admin CRUD for digital product bundles
  */
 import { useState } from "react";
+import { UserSearchCombobox, type SelectedUser } from "@/components/UserSearchCombobox";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -342,13 +343,8 @@ export default function BundlesAdmin() {
 
 // ─── Grant Bundle Access Dialog ──────────────────────────────────────────────
 function GrantBundleAccessDialog({ open, bundleId, onClose }: { open: boolean; bundleId: number; onClose: () => void }) {
-  const [email, setEmail] = useState("");
+  const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const [name, setName] = useState("");
-  const [searchResult, setSearchResult] = useState<{ id: number; name: string | null; email: string | null } | null | undefined>(undefined);
-  const findUser = trpc.platformAdmin.findUserByEmail.useMutation({
-    onSuccess: (data) => setSearchResult(data as any ?? null),
-    onError: () => setSearchResult(null),
-  });
   const grantAccess = trpc.downloadsAdmin.createAndGrantBundleAccess.useMutation({
     onSuccess: (data) => {
       if (data.alreadyGranted) {
@@ -356,55 +352,37 @@ function GrantBundleAccessDialog({ open, bundleId, onClose }: { open: boolean; b
       } else {
         toast.success(data.isNewUser ? "New account created and bundle access granted! Invitation email sent." : "Bundle access granted and notification email sent.");
       }
-      setEmail(""); setName(""); setSearchResult(undefined); onClose();
+      setSelectedUser(null); setName(""); onClose();
     },
     onError: (e) => toast.error(e.message),
   });
-  const handleSearch = () => {
-    if (!email.trim() || !email.includes("@")) { toast.error("Enter a valid email"); return; }
-    findUser.mutate({ email: email.trim() });
-  };
   const handleGrant = () => {
-    if (!email.trim()) { toast.error("Email is required"); return; }
-    if (searchResult === null && !name.trim()) { toast.error("Name is required for new accounts"); return; }
-    const resolvedName = (searchResult?.name ?? name.trim()) || email.split("@")[0];
-    grantAccess.mutate({ bundleId, email: email.trim(), name: resolvedName });
+    if (!selectedUser) { toast.error("Select a user first"); return; }
+    if (selectedUser.isNew && !name.trim()) { toast.error("Name is required for new accounts"); return; }
+    const resolvedName = (selectedUser.name ?? name.trim()) || selectedUser.email.split("@")[0];
+    grantAccess.mutate({ bundleId, email: selectedUser.email, name: resolvedName });
   };
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { setSelectedUser(null); setName(""); onClose(); } }}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5 text-teal-600" /> Grant Bundle Access</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-1">
-            <Label>Student Email</Label>
-            <div className="flex gap-2">
-              <Input type="email" placeholder="student@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setSearchResult(undefined); }} />
-              <Button size="sm" variant="outline" onClick={handleSearch} disabled={findUser.isPending}>
-                {findUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
-              </Button>
-            </div>
+            <Label>Search Student</Label>
+            <UserSearchCombobox onSelect={setSelectedUser} placeholder="Search by name or email…" />
           </div>
-          {searchResult === null && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-3">
-              <p className="text-sm text-amber-800 font-medium">No account found. A new account will be created.</p>
-              <div className="space-y-1">
-                <Label>Full Name (for new account)</Label>
-                <Input placeholder="Jane Smith" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-            </div>
-          )}
-          {searchResult && (
-            <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
-              <p className="text-sm text-teal-800 font-medium">Found: {searchResult.name ?? searchResult.email}</p>
-              <p className="text-xs text-teal-600">{searchResult.email}</p>
+          {selectedUser?.isNew && (
+            <div className="space-y-1">
+              <Label>Full Name (for new account)</Label>
+              <Input placeholder="Jane Smith" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleGrant} disabled={grantAccess.isPending || searchResult === undefined}>
+          <Button variant="outline" onClick={() => { setSelectedUser(null); setName(""); onClose(); }}>Cancel</Button>
+          <Button onClick={handleGrant} disabled={grantAccess.isPending || !selectedUser}>
             {grantAccess.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <UserPlus className="w-4 h-4 mr-1" />}
-            {searchResult === null ? "Create & Grant Access" : "Grant Access"}
+            {selectedUser?.isNew ? "Create & Grant Access" : "Grant Access"}
           </Button>
         </DialogFooter>
       </DialogContent>

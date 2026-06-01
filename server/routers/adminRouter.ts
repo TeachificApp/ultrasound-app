@@ -10,6 +10,7 @@ import {
   getDiyUsersForLab,
   getLabByAdmin,
   findUserByEmailWithRoles,
+  searchUsersByQuery,
   createPendingUser,
   countPendingUsers,
   cleanupUserRolesDb,
@@ -201,6 +202,20 @@ export const platformAdminRouter = router({
         lastSignedIn: found.lastSignedIn,
         isPending: found.isPending,
       };
+    }),
+
+  /**
+   * Search users by partial name, displayName, or email.
+   * Returns up to 10 matching users. Used by Grant Access dialogs.
+   */
+  searchUsers: protectedProcedure
+    .input(z.object({ query: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const myRoles = await getUserRoles(ctx.user.id);
+      if (ctx.user.role !== "admin" && !myRoles.includes("platform_admin")) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
+      }
+      return searchUsersByQuery(input.query, 10);
     }),
 
   /**

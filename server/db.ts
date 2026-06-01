@@ -3007,3 +3007,27 @@ export async function cleanupUserRolesDb(): Promise<{ deduped: number; backfille
 
   return { deduped: toDelete.length, backfilled };
 }
+
+/**
+ * Search users by partial name, displayName, or email.
+ * Returns up to 10 matching users.
+ */
+export async function searchUsersByQuery(query: string, limit = 10): Promise<Array<{
+  id: number;
+  name: string | null;
+  displayName: string | null;
+  email: string | null;
+}>> {
+  const db = await getDb();
+  if (!db) return [];
+  const q = `%${query.trim()}%`;
+  return db.select({
+    id: users.id,
+    name: users.name,
+    displayName: users.displayName,
+    email: users.email,
+  }).from(users)
+    .where(sql`(${users.name} LIKE ${q} OR ${users.displayName} LIKE ${q} OR ${users.email} LIKE ${q})`)
+    .limit(limit);
+}
+

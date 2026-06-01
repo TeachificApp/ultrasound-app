@@ -2,6 +2,7 @@
  * MembershipAdmin.tsx — Admin management for brand memberships (AAUS + iHeartEcho)
  */
 import { useState } from "react";
+import { UserSearchCombobox, type SelectedUser } from "@/components/UserSearchCombobox";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,44 +87,35 @@ function GrantMembershipDialog({
   onClose: () => void;
   defaultBrand: Brand;
 }) {
-  const [email, setEmail] = useState("");
+  const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const [brand, setBrand] = useState<Brand>(defaultBrand);
   const utils = trpc.useUtils();
 
-  const findUser = trpc.platformAdmin.findUserByEmail.useMutation();
   const grantMut = trpc.brandMembership.adminGrant.useMutation({
     onSuccess: () => {
       toast.success("Membership granted");
       utils.brandMembership.adminList.invalidate();
       onClose();
-      setEmail("");
+      setSelectedUser(null);
     },
     onError: (e) => toast.error(e.message),
   });
 
   const handleGrant = async () => {
-    const user = await findUser.mutateAsync({ email });
-    if (!user) {
-      toast.error("User not found");
-      return;
-    }
-    await grantMut.mutateAsync({ userId: user.id, brand });
+    if (!selectedUser || selectedUser.isNew || !selectedUser.id) { toast.error("Select an existing user"); return; }
+    await grantMut.mutateAsync({ userId: selectedUser.id, brand });
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { setSelectedUser(null); onClose(); } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Grant Membership</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div>
-            <Label>Email</Label>
-            <Input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@example.com"
-            />
+            <Label>Search User</Label>
+            <UserSearchCombobox onSelect={setSelectedUser} placeholder="Search by name or email…" existingOnly />
           </div>
           <div>
             <Label>Brand</Label>
@@ -139,10 +131,10 @@ function GrantMembershipDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={() => { setSelectedUser(null); onClose(); }}>Cancel</Button>
           <Button
             onClick={handleGrant}
-            disabled={!email || grantMut.isPending || findUser.isPending}
+            disabled={!selectedUser || grantMut.isPending}
           >
             {grantMut.isPending ? "Granting..." : "Grant Access"}
           </Button>
