@@ -4238,3 +4238,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Process all 8 pending SCORM versions: 6 pre-extracted HTML (iHeartEcho), 2 new ZIPs (AAUS)
 - [x] Mark version 350003 (Physics SPI quiz) as failed with clear error — file is 0 bytes on CloudFront, needs re-upload
 - [x] Fix membership addItem validation error — extend Zod enum to include ultrasoundassist_free, ultrasoundassist_premium, echoassist_free, echoassist_premium (all four app-tier access types)
+- [x] Create heartbeat cron (task_uid: K9r4A6Cxp6ybewJz4ptf6P) — fires every 2 min on deployed site, picks one pending SCORM version and extracts ZIP to R2
+- [x] Verified: all SCORM versions now have status=done (pre-extracted HTML → __direct_html__ redirect; ZIP → R2 proxy); only 350003 failed (0-byte file, superseded by 350007)
