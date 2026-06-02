@@ -89,6 +89,8 @@ import {
   Tag,
   TrendingUp,
   Briefcase,
+  ArrowLeft,
+  Home,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1410,6 +1412,30 @@ export default function PlatformAdmin() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Sticky navigation header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div className="container max-w-6xl flex items-center gap-3 h-14">
+          <a
+            href="/my-dashboard"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            My Dashboard
+          </a>
+          <span className="text-gray-300">|</span>
+          <a
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <Home className="w-4 h-4" />
+            Home
+          </a>
+          <span className="flex-1" />
+          <span className="text-xs font-semibold text-[#189aa1] bg-[#189aa1]/10 px-2.5 py-1 rounded-full">
+            Platform Admin
+          </span>
+        </div>
+      </div>
       <div className="container py-8 max-w-6xl">
 
         {/* Header */}

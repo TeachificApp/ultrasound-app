@@ -4490,3 +4490,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add First Name (required) and Last Name (required) fields to StudentDashboardPage Basic Information section
 - [x] Add firstName/lastName to dashboard.getProfile query in dashboardRouter.ts
 - [x] Set displayName = 'Lara Williams' in DB for owner user (id=1) via direct SQL
+
+## Instructor Dashboard + Navigation Fixes (2026-06-02)
+- [x] Add Instructor tab to My Dashboard (StudentDashboardPage) — shows courses user instructs with Manage Lessons links and Full Instructor Portal button; tab only visible for admin/instructor/platform_admin roles
+- [x] Add sticky navigation header to PlatformAdmin page — Back to My Dashboard + Home links with Platform Admin badge
+- [x] Fix /admin/community 404 on app.allaboutultrasound.com — added route to main Router() before /:slug/:pageSlug catch-all
+- [x] Fix community profile badge — show "Platform Owner" + "All About Ultrasound™" badge for admin/owner users instead of "Newcomer" XP level

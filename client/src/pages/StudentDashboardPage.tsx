@@ -18,6 +18,7 @@ import {
   User, BookOpen, CreditCard, Award, Camera, Save, Lock, Eye, EyeOff,
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
   Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart, BarChart2, Bell,
+  GraduationCap, BookMarked, PenLine, ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Layout from "@/components/Layout";
-import { isMembersDomain, isLearnDomain } from "@/hooks/useSubdomain";
+import { isMembersDomain, isLearnDomain, LEARN_APP_URL } from "@/hooks/useSubdomain";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 
@@ -98,8 +99,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "subscriptions" | "certificates";
-const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "certificates"];
+type Tab = "profile" | "content" | "subscriptions" | "certificates" | "instructor";
+const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "certificates", "instructor"];
 
 // ─── Profile Tab ─────────────────────────────────────────────────────────────
 
@@ -662,7 +663,13 @@ function ProfileTab() {
 const LEARN_URL = "https://learn.allaboutultrasound.com";
 
 function CommunityProfileSection({ userId }: { userId: number }) {
+  const { user } = useAuth();
   const { data: xpData, isLoading } = trpc.community.myXP.useQuery();
+
+  // Check if user is platform owner or admin — show special badge instead of XP level
+  const isOwnerOrAdmin = (user as any)?.role === "admin" ||
+    (user as any)?.appRoles?.includes("platform_admin") ||
+    (user as any)?.appRoles?.includes("platform_owner");
 
   function getLevel(xp: number) {
     if (xp >= 5000) return { level: 5, title: "Expert", color: "#f59e0b", next: null };
@@ -675,6 +682,10 @@ function CommunityProfileSection({ userId }: { userId: number }) {
   const totalXP = xpData?.xp?.totalXp ?? 0;
   const levelInfo = getLevel(totalXP);
   const progressPct = levelInfo.next ? Math.min(100, Math.round((totalXP / levelInfo.next) * 100)) : 100;
+  // Admin/Owner override — show distinguished badge instead of XP level
+  const displayLevel = isOwnerOrAdmin
+    ? { level: "★", title: "Platform Owner", color: "#189aa1", next: null as number | null }
+    : levelInfo;
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
@@ -700,25 +711,33 @@ function CommunityProfileSection({ userId }: { userId: number }) {
           {/* XP + Level */}
           <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-[#189aa1]/5 to-[#4ad9e0]/5 border border-[#189aa1]/10">
             <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-              style={{ background: `linear-gradient(135deg, ${levelInfo.color}, ${levelInfo.color}99)` }}>
-              {levelInfo.level}
+              style={{ background: `linear-gradient(135deg, ${displayLevel.color}, ${displayLevel.color}99)` }}>
+              {displayLevel.level}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-bold text-gray-800">{levelInfo.title}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: `${levelInfo.color}15`, color: levelInfo.color }}>
-                  {totalXP.toLocaleString()} XP
-                </span>
+                <span className="text-sm font-bold text-gray-800">{displayLevel.title}</span>
+                {!isOwnerOrAdmin && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: `${displayLevel.color}15`, color: displayLevel.color }}>
+                    {totalXP.toLocaleString()} XP
+                  </span>
+                )}
+                {isOwnerOrAdmin && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-teal-50 text-[#189aa1] border border-teal-200">
+                    All About Ultrasound™
+                  </span>
+                )}
               </div>
-              {levelInfo.next && (
+              {!isOwnerOrAdmin && displayLevel.next && (
                 <>
                   <div className="w-full bg-gray-100 rounded-full h-1.5">
-                    <div className="h-1.5 rounded-full transition-all" style={{ width: `${progressPct}%`, background: levelInfo.color }} />
+                    <div className="h-1.5 rounded-full transition-all" style={{ width: `${progressPct}%`, background: displayLevel.color }} />
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{totalXP.toLocaleString()} / {levelInfo.next.toLocaleString()} XP to next level</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{totalXP.toLocaleString()} / {displayLevel.next.toLocaleString()} XP to next level</p>
                 </>
               )}
-              {!levelInfo.next && <p className="text-xs text-gray-400">Maximum level reached!</p>}
+              {!isOwnerOrAdmin && !displayLevel.next && <p className="text-xs text-gray-400">Maximum level reached!</p>}
+              {isOwnerOrAdmin && <p className="text-xs text-gray-400">Platform Owner &amp; Educator</p>}
             </div>
           </div>
 
@@ -1507,20 +1526,136 @@ function AnalyticsTab() {
   );
 }
 
+// ─── Instructor Tab ──────────────────────────────────────────────────────────
+
+function InstructorTab() {
+  const { data: courses, isLoading } = trpc.lms.getMyInstructorCourses.useQuery();
+
+  const instructorPortalUrl = `${LEARN_APP_URL}/instructor-portal`;
+
+  function statusColor(status: string | null | undefined) {
+    if (status === "public") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    if (status === "private") return "bg-blue-100 text-blue-700 border-blue-200";
+    if (status === "draft") return "bg-gray-100 text-gray-500 border-gray-200";
+    return "bg-amber-100 text-amber-700 border-amber-200";
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-[#189aa1]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header card */}
+      <div className="bg-white rounded-xl border border-[#189aa1]/20 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#189aa1" }}>
+            <GraduationCap className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-gray-800">Instructor Dashboard</h2>
+            <p className="text-xs text-gray-500">Manage your courses, lessons, and content</p>
+          </div>
+        </div>
+        <a
+          href={instructorPortalUrl}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
+          style={{ background: "#189aa1" }}
+        >
+          Full Instructor Portal
+          <ArrowRight className="w-4 h-4" />
+        </a>
+      </div>
+
+      {/* Courses list */}
+      {!courses || courses.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-10 text-center">
+          <BookMarked className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-500">No courses assigned yet</p>
+          <p className="text-xs text-gray-400 mt-1">Contact your platform admin to be assigned as an instructor.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {courses.map((course: any) => (
+            <div key={course.permId} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                {/* Thumbnail */}
+                {course.courseThumbnail ? (
+                  <img src={course.courseThumbnail} alt={course.courseTitle ?? ""} className="w-16 h-12 object-cover rounded-lg flex-shrink-0" />
+                ) : (
+                  <div className="w-16 h-12 rounded-lg bg-[#189aa1]/10 flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-6 h-6 text-[#189aa1]" />
+                  </div>
+                )}
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{course.courseTitle ?? "Untitled Course"}</p>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor(course.courseStatus)}`}>
+                      {course.courseStatus ?? "draft"}
+                    </span>
+                    {course.canSelfPublish && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-teal-50 text-teal-700 border-teal-200">
+                        Can Self-Publish
+                      </span>
+                    )}
+                  </div>
+                  {course.revenueSharePct > 0 && (
+                    <p className="text-xs text-gray-400 mt-0.5">{course.revenueSharePct}% revenue share</p>
+                  )}
+                </div>
+                {/* Actions */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <a
+                    href={`${instructorPortalUrl}?courseId=${course.courseId}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#189aa1] text-[#189aa1] hover:bg-[#189aa1]/5 transition-colors"
+                  >
+                    <PenLine className="w-3.5 h-3.5" />
+                    Manage Lessons
+                  </a>
+                  {course.courseSlug && (
+                    <a
+                      href={`${LEARN_APP_URL}/courses/${course.courseSlug}/overview`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      View Course
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Dashboard Page ──────────────────────────────────────────────────────
 
-const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: "content",       label: "My Content",    icon: BookOpen },
-  { key: "profile",       label: "Profile",       icon: User },
-  { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
-  { key: "certificates",  label: "Certificates",  icon: Award },
-];
+// TABS is built dynamically in the component based on user roles (see below)
 
 export default function StudentDashboardPage() {
   const { isAuthenticated, loading, user } = useAuth();
   const [, navigate] = useLocation();
   const search = useSearch();
   const isAdmin = (user as any)?.role === "admin";
+  const isInstructor = isAdmin || (user as any)?.appRoles?.includes("instructor") || (user as any)?.appRoles?.includes("platform_admin") || (user as any)?.appRoles?.includes("platform_owner");
+
+  const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
+    { key: "content",       label: "My Content",    icon: BookOpen },
+    { key: "profile",       label: "Profile",       icon: User },
+    { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
+    { key: "certificates",  label: "Certificates",  icon: Award },
+    ...(isInstructor ? [{ key: "instructor" as Tab, label: "Instructor", icon: GraduationCap }] : []),
+  ];
 
   // Parse ?tab= from URL
   const urlTab = new URLSearchParams(search).get("tab") as Tab | null;
@@ -1605,6 +1740,7 @@ export default function StudentDashboardPage() {
           {activeTab === "content"       && <MyContentTab />}
           {activeTab === "subscriptions" && <SubscriptionsTab />}
           {activeTab === "certificates"  && <CertificatesTab />}
+          {activeTab === "instructor"    && <InstructorTab />}
         </div>
       </div>
   );
