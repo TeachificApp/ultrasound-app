@@ -354,10 +354,11 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
       .where(
         and(
           eq(mediaVersions.scormExtractionStatus as any, "pending"),
-          // Only process SCORM and zip types
+          // Only process SCORM, zip, and lms types
           or(
             eq(mediaAssets.mediaType, "scorm"),
-            eq(mediaAssets.mediaType, "zip")
+            eq(mediaAssets.mediaType, "zip"),
+            eq(mediaAssets.mediaType, "lms")
           )
         )
       )

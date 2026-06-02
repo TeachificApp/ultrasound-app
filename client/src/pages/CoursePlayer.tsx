@@ -849,9 +849,20 @@ export default function CoursePlayer() {
       // Check for ?lesson=<id> URL param first
       const params = new URLSearchParams(searchString);
       const lessonParam = params.get("lesson");
-      const topLevel = (data as any).topLevelLessons ?? [];
-      const allL = [...topLevel, ...data.sections.flatMap((s: any) => s.lessons)];
       const isEnrolled = !!data.enrollment;
+      // Filter out preview_hide_after_purchase lessons for enrolled users (same logic as sidebar)
+      const topLevel = ((data as any).topLevelLessons ?? []).filter((l: any) => {
+        if (!isEnrolled) return true;
+        const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+        return pm !== "preview_hide_after_purchase";
+      });
+      const allL = [...topLevel, ...(data.sections ?? []).flatMap((s: any) =>
+        (s.lessons ?? []).filter((l: any) => {
+          if (!isEnrolled) return true;
+          const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+          return pm !== "preview_hide_after_purchase";
+        })
+      )];
       if (lessonParam) {
         const paramId = parseInt(lessonParam);
         const found = allL.find((l: any) => l.id === paramId);
@@ -883,7 +894,7 @@ export default function CoursePlayer() {
           return;
         }
       }
-      const first = topLevel[0] ?? data.sections[0]?.lessons[0];
+      const first = allL[0];
       if (first) setSelectedLessonId(first.id);
     }
   }, [data]);

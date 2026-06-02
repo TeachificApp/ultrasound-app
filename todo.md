@@ -4431,6 +4431,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Schedule hourly-backup Heartbeat cron (requires deploy first)
 - [ ] Fix video player: no-download controlsList on media_repo blocks in BlockPreview/CoursePlayer
 
+## Bug Fixes (Jun 2, 2026)
+- [x] Fix deployment build error: correct useAuth import path in MyTeamPage.tsx
+- [x] Fix course player sidebar missing lessons and Next Lesson skipping lessons (preview_hide_after_purchase filter not applied to initial lesson selection useEffect)
+- [x] Fix SCORM content stuck on "Content Being Prepared" — heartbeat now processes lms-type assets in addition to scorm/zip; re-queued stuck assets (IDs 290001, 350007)
+- [x] Fix landing page editor preview link showing /courses/undefined (getCourse query passed wrong param name)
+- [x] Add TM symbol to All About Ultrasound™ and iHeartEcho™ throughout UI, emails, and server strings
+
 ## Team Manager Feature
 - [ ] Schema: add lmsGroupManagers table (groupId, userId, email, role: "manager", hasSeat: bool, inviteToken, status, createdAt)
 - [ ] Schema: enforce max 5 managers per group (checked at procedure level)
