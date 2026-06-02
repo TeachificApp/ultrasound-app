@@ -216,6 +216,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     }
     case "video": {
       const isDirectVideo = d.embedUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);
+      const isMediaRepo = d.source === "media_repo";
       const videoAccent = d.accentColor ?? "#189aa1";
       const containerStyle: React.CSSProperties = { maxWidth: d.maxWidth ?? "100%", height: d.height || undefined, paddingBottom: d.height ? undefined : (isDirectVideo ? undefined : "56.25%"), borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       const videoId = `aaus-vid-${block.id ?? 'v'}`;
@@ -223,6 +224,27 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const trimEnd = d.trimEnd ?? 0;
       // Build the trimmed embed URL using platform-aware logic
       const trimmedEmbedUrl = d.embedUrl ? applyVideoTrim(d.embedUrl, trimStart, trimEnd) : "";
+
+      // Media repo videos: render full-width/height with no padding, no max-width restriction
+      if (isMediaRepo && d.embedUrl) {
+        return (
+          <div className="w-full">
+            <style>{`.${videoId} { accent-color: ${videoAccent}; } .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }`}</style>
+            <video
+              src={trimmedEmbedUrl}
+              autoPlay={d.autoplay ?? false}
+              muted={d.muted ?? false}
+              loop={d.loop ?? false}
+              controls={d.controls ?? true}
+              playsInline
+              className={`w-full block ${videoId}`}
+              style={{ display: "block", width: "100%", height: d.height ? `${d.height}px` : "auto", accentColor: videoAccent }}
+            />
+            {d.caption && <p className="text-sm text-gray-500 mt-2 text-center px-4 pb-2">{d.caption}</p>}
+          </div>
+        );
+      }
+
       return (
         <div className="px-8 py-6">
           {d.embedUrl ? (
