@@ -1081,7 +1081,11 @@ export const mediaRepoRouter = router({
         .orderBy(sql`${mediaVersions.versionNumber} DESC`)
         .limit(1);
       if (!version?.s3Url) throw new TRPCError({ code: "NOT_FOUND", message: "No file found for this asset" });
-      return { zipUrl: version.s3Url, title: asset.title };
+      // Return a signed proxy URL — the raw S3 URL is never exposed to the client.
+      // The /api/media/:slug/scorm-zip route validates the ?access= token and proxies the ZIP.
+      const access = signMediaViewerToken(asset.slug, ctx.user.id, input.courseId ?? null);
+      const authQuery = buildMediaAuthQuery({ access });
+      return { zipUrl: `/api/media/${asset.slug}/scorm-zip${authQuery}`, title: asset.title };
     }),
 
   // ─── Folder CRUD ──────────────────────────────────────────────────────────────

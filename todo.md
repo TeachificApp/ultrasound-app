@@ -4458,3 +4458,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Client: Admin GroupsTab — show "has seat" toggle per manager
 - [ ] Client: Route /my-team guarded by team_admin or team_manager role
 - [ ] Client: Navigation — add "My Team" link for team_admin and team_manager roles
+
+## URL Parameters & SCORM Fixes (Jun 2026)
+- [x] URL parameter tags changed to {{first_name}}, {{last_name}}, {{email}}, {{name}} format
+- [x] Copy button for URL parameters now copies only the value (e.g. {{first_name}}), not the key= prefix
+- [x] Full URL preview updated to use {{first_name}} etc. in encoded form
+- [x] scorm_embed block in BlockPreview.tsx fixed to use /scorm path instead of /embed so MediaEmbedIframe routes through ScormPlayer (client-side JSZip extraction)
+- [x] LandingPageBuilder scorm_embed URL preview label updated to /scorm

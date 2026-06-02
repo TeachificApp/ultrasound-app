@@ -592,6 +592,57 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
   });
 } // end for slugPath (scorm)
 
+// ─── GET /media/:slug/scorm-zip — proxy SCORM ZIP to client (hides S3 URL) ───
+// ScormPlayer calls this route to download the ZIP for client-side extraction.
+// Auth is validated the same way as the /scorm route (?access= token or grant token).
+for (const slugPath of ["/api/media/:slug/scorm-zip", "/media/:slug/scorm-zip"]) {
+  router.options(slugPath, (req: Request, res: Response) => {
+    setCorsHeaders(res);
+    res.status(204).end();
+  });
+  router.get(slugPath, async (req: Request, res: Response) => {
+    setCorsHeaders(res);
+    const auth = readMediaAuth(req);
+    const result = await resolveMedia(req.params.slug, auth);
+    if (!result) return res.status(404).json({ error: "Asset not found" });
+    if (!result.allowed) return res.status(403).json({ error: "Forbidden" });
+    const { asset, version } = result;
+    if (!version?.s3Url) return res.status(404).json({ error: "No file found for this asset" });
+    // Only allow ZIP-based SCORM types
+    const mt = asset?.mediaType ?? "";
+    if (mt !== "scorm" && mt !== "zip" && mt !== "lms") {
+      return res.status(400).json({ error: "Not a SCORM package" });
+    }
+    // Proxy the ZIP from S3 so the raw CDN URL is never sent to the browser
+    const fileName = (version as any).fileName ?? `${req.params.slug}.zip`;
+    const safeFileName = encodeURIComponent(fileName);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}"`);
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Cache-Control", "private, max-age=300");
+    let zipUrl = version.s3Url;
+    // URL-encode the path portion to handle filenames with spaces
+    try {
+      const parsed = new URL(zipUrl);
+      parsed.pathname = parsed.pathname.split("/").map((seg) => encodeURIComponent(decodeURIComponent(seg))).join("/");
+      zipUrl = parsed.toString();
+    } catch { /* leave as-is */ }
+    const protocol = zipUrl.startsWith("https") ? https : http;
+    protocol
+      .get(zipUrl, (upstream) => {
+        const cl = upstream.headers["content-length"];
+        if (cl) res.setHeader("Content-Length", cl);
+        if (upstream.statusCode && upstream.statusCode >= 400) {
+          return res.status(502).json({ error: "Failed to fetch SCORM package" });
+        }
+        res.status(upstream.statusCode ?? 200);
+        upstream.pipe(res);
+      })
+      .on("error", () => {
+        if (!res.headersSent) res.status(502).send("Failed to fetch SCORM package.");
+      });
+  });
+}
+
 // ─── GET /media/:slug — serve content inline (no forced download) ────────────
 
 /**

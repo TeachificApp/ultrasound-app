@@ -4341,10 +4341,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             <p className="text-[10px] text-gray-400 mb-2">Append user data to the iframe URL as query parameters. Copy the parameter string and paste it into your form's field-mapping URL.</p>
             <div className="space-y-2">
               {([
-                { key: "passFirstName", label: "First Name", param: "first_name", value: "{user.firstName}" },
-                { key: "passLastName",  label: "Last Name",  param: "last_name",  value: "{user.lastName}" },
-                { key: "passEmail",     label: "Email",      param: "email",      value: "{user.email}" },
-                { key: "passName",      label: "Full Name",  param: "name",       value: "{user.name}" },
+                { key: "passFirstName", label: "First Name", param: "first_name", value: "{{first_name}}" },
+                { key: "passLastName",  label: "Last Name",  param: "last_name",  value: "{{last_name}}" },
+                { key: "passEmail",     label: "Email",      param: "email",      value: "{{email}}" },
+                { key: "passName",      label: "Full Name",  param: "name",       value: "{{name}}" },
               ] as const).map(({ key, label, param, value }) => (
                 <div key={key} className="flex items-center gap-2">
                   <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
@@ -4353,8 +4353,8 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   </label>
                   <button
                     type="button"
-                    title={`Copy ?${param}=${value}`}
-                    onClick={() => { navigator.clipboard.writeText(`${param}=${encodeURIComponent(value)}`); }}
+                    title={`Copy {{${param}}}`}
+                    onClick={() => { navigator.clipboard.writeText(value); }}
                     className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-gray-100 hover:bg-teal-50 hover:text-teal-700 text-gray-500 border border-gray-200 transition-colors font-mono"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
@@ -4371,10 +4371,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     type="button"
                     onClick={() => {
                       const params = [
-                        d.passFirstName && `first_name=${encodeURIComponent("{user.firstName}")}`,
-                        d.passLastName  && `last_name=${encodeURIComponent("{user.lastName}")}`,
-                        d.passEmail     && `email=${encodeURIComponent("{user.email}")}`,
-                        d.passName      && `name=${encodeURIComponent("{user.name}")}`,
+                        d.passFirstName && `first_name=${encodeURIComponent("{{first_name}}")}`,
+                        d.passLastName  && `last_name=${encodeURIComponent("{{last_name}}")}`,
+                        d.passEmail     && `email=${encodeURIComponent("{{email}}")}`,
+                        d.passName      && `name=${encodeURIComponent("{{name}}")}`,
                       ].filter(Boolean).join("&");
                       const full = `${d.url}${d.url.includes("?") ? "&" : "?"}${params}`;
                       navigator.clipboard.writeText(full);
@@ -4388,10 +4388,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 <p className="text-[10px] text-gray-400 break-all font-mono">
                   {d.url}{d.url.includes('?') ? '&' : '?'}
                   {[
-                    d.passFirstName && `first_name=%7Buser.firstName%7D`,
-                    d.passLastName  && `last_name=%7Buser.lastName%7D`,
-                    d.passEmail     && `email=%7Buser.email%7D`,
-                    d.passName      && `name=%7Buser.name%7D`,
+                    d.passFirstName && `first_name=%7B%7Bfirst_name%7D%7D`,
+                    d.passLastName  && `last_name=%7B%7Blast_name%7D%7D`,
+                    d.passEmail     && `email=%7B%7Bemail%7D%7D`,
+                    d.passName      && `name=%7B%7Bname%7D%7D`,
                   ].filter(Boolean).join('&')}
                 </p>
               </div>
@@ -7073,7 +7073,7 @@ function ScormEmbedBlockSettings({ d, set, dataRef, onChangeRef }: {
       {/* Embed URL preview */}
       {d.mediaAssetSlug && (
         <div className="text-[10px] text-gray-400 bg-gray-50 rounded p-2 font-mono break-all">
-          /api/media/{d.mediaAssetSlug}/embed
+          /api/media/{d.mediaAssetSlug}/scorm
         </div>
       )}
     </div>
