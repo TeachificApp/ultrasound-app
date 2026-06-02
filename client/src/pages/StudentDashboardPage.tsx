@@ -184,6 +184,8 @@ function ProfileTab() {
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [specialty, setSpecialty] = useState("");
@@ -208,6 +210,8 @@ function ProfileTab() {
     const profileId = (profile as any).id ?? 0;
     if (profileId === syncedProfileIdRef.current) return;
     syncedProfileIdRef.current = profileId;
+    setFirstName((profile as any).firstName ?? "");
+    setLastName((profile as any).lastName ?? "");
     setDisplayName(profile.displayName ?? profile.name ?? "");
     setBio(profile.bio ?? "");
     setSpecialty(profile.specialty ?? "");
@@ -266,6 +270,14 @@ function ProfileTab() {
         <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Basic Information</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
+            <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
+            <Input id="firstName" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name" required />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="lastName">Last Name <span className="text-red-500">*</span></Label>
+            <Input id="lastName" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name" required />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="displayName">Display Name</Label>
             <Input id="displayName" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your name" />
           </div>
@@ -295,7 +307,12 @@ function ProfileTab() {
           <Textarea id="bio" value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell us about yourself..." rows={3} />
         </div>
         <Button
-          onClick={() => updateProfile.mutate({ displayName, bio, specialty, credentials: credentials || undefined, yearsExperience: yearsExperience ? parseInt(yearsExperience, 10) : null, location: locationVal, website: website || undefined })}
+          onClick={() => {
+            if (!firstName.trim()) { toast.error("First name is required."); return; }
+            if (!lastName.trim()) { toast.error("Last name is required."); return; }
+            if (!displayName.trim()) { toast.error("Display name cannot be empty."); return; }
+            updateProfile.mutate({ firstName: firstName.trim(), lastName: lastName.trim(), displayName: displayName.trim(), bio, specialty, credentials: credentials || undefined, yearsExperience: yearsExperience ? parseInt(yearsExperience, 10) : null, location: locationVal, website: website || undefined });
+          }}
           disabled={updateProfile.isPending}
           className="bg-[#189aa1] hover:bg-[#157f85] text-white"
         >

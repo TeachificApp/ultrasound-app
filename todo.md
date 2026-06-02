@@ -4483,3 +4483,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix course player defaulting to preview_hide_after_purchase lesson for enrolled users — now skips hidden lessons when picking default
 - [x] Fix empty sections still showing in sidebar after all lessons filtered out — now removes sections with 0 visible lessons
 - [x] Fix discussion/community/cohort posts showing old profile details — invalidate community, lmsLearner, lmsCohortAdmin caches after profile update/avatar upload
+
+## Display Name + First/Last Name Fixes (2026-06-02)
+- [x] Fix auth.me to return firstName, lastName, bio, credentials, specialty, yearsExperience, location, website, isPublicProfile from fullUser (fresh DB, not stale session token)
+- [x] Fix Profile.tsx handleSave to always send firstName, lastName, displayName (remove "only if changed" optimization that silently blocked saves)
+- [x] Add First Name (required) and Last Name (required) fields to StudentDashboardPage Basic Information section
+- [x] Add firstName/lastName to dashboard.getProfile query in dashboardRouter.ts
+- [x] Set displayName = 'Lara Williams' in DB for owner user (id=1) via direct SQL

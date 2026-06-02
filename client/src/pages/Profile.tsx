@@ -379,17 +379,18 @@ export default function Profile() {
     const currentEmail = (u.email || "").toLowerCase();
     const emailChanged = emailTrimmed !== currentEmail && emailTrimmed !== "";
 
-    // Update all non-email fields immediately
+    // Update all non-email fields — always send firstName, lastName, displayName so they
+    // are never silently skipped due to stale comparison values in the session token.
     updateProfile.mutate({
-      firstName: trimmedFirst !== (u.firstName || "") ? trimmedFirst : undefined,
-      lastName: trimmedLast !== (u.lastName || "") ? trimmedLast : undefined,
-      displayName: trimmedName !== (u.displayName || u.name || "") ? trimmedName : undefined,
-      bio: bio.trim() !== (u.bio || "") ? bio.trim() : undefined,
-      credentials: credentials.trim() !== (u.credentials || "") ? credentials.trim() : undefined,
-      specialty: specialty !== (u.specialty || "") ? specialty : undefined,
-      yearsExperience: yearsNum !== (u.yearsExperience ?? null) ? yearsNum : undefined,
-      location: location.trim() !== (u.location || "") ? location.trim() : undefined,
-      website: websiteTrimmed !== (u.website || "") ? websiteTrimmed : undefined,
+      firstName: trimmedFirst,
+      lastName: trimmedLast,
+      displayName: trimmedName,
+      bio: bio.trim() || undefined,
+      credentials: credentials.trim() || undefined,
+      specialty: specialty || undefined,
+      yearsExperience: yearsNum ?? undefined,
+      location: location.trim() || undefined,
+      website: websiteTrimmed || undefined,
     });
 
     // If email changed, separately trigger the verification email
