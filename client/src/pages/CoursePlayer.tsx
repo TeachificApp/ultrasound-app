@@ -761,10 +761,22 @@ export default function CoursePlayer() {
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradePromptReason, setUpgradePromptReason] = useState<"entry" | "exit" | "locked_lesson">("entry");
+  const [upgradeCheckoutUrl, setUpgradeCheckoutUrl] = useState<string | null>(null);
   const [instructorPopup, setInstructorPopup] = useState<any>(null);
   const [contentFullscreen, setContentFullscreen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const utils = trpc.useUtils();
+
+  const createUpgradeLink = trpc.lmsLearner.getUpgradeCheckoutUrl.useMutation({
+    onSuccess: (data) => {
+      setUpgradeCheckoutUrl(data.url);
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    },
+    onError: () => {
+      // Fallback to course landing page if Stripe link fails
+      navigate(`/courses/${slug}`);
+    },
+  });
 
   const { data, isLoading } = trpc.lmsLearner.getCoursePlayer.useQuery(
     { slug: slug!, preview: isPreviewMode || adminPreviewStudent || isAdmin },
@@ -1170,9 +1182,17 @@ export default function CoursePlayer() {
               <Button
                 className="flex-1 text-white"
                 style={{ backgroundColor: primaryColor }}
-                onClick={() => { setShowUpgradePrompt(false); navigate(`/courses/${slug}`); }}
+                disabled={createUpgradeLink.isPending}
+                onClick={() => {
+                  setShowUpgradePrompt(false);
+                  if (upgradeCheckoutUrl) {
+                    window.open(upgradeCheckoutUrl, "_blank", "noopener,noreferrer");
+                  } else {
+                    createUpgradeLink.mutate({ courseSlug: slug! });
+                  }
+                }}
               >
-                View Course &amp; Enroll
+                {createUpgradeLink.isPending ? "Preparing checkout..." : "Enroll Now — Full Access"}
               </Button>
               <Button variant="outline" className="flex-1" onClick={() => setShowUpgradePrompt(false)}>
                 {upgradePromptReason === "locked_lesson" ? "Stay in Preview" : "Continue Preview"}

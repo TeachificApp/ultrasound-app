@@ -1449,6 +1449,33 @@ CRITICAL REQUIREMENTS:
       }));
       // Average progress
       const [{ avgProgress }] = await db.select({ avgProgress: sql<number>`AVG(${lmsEnrollments.progressPct})` }).from(lmsEnrollments).where(eq(lmsEnrollments.courseId, input.courseId));
+      // Free preview conversion metrics
+      const [{ freePreviewEnrollments }] = await db.select({ freePreviewEnrollments: sql<number>`count(*)` })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, input.courseId), eq(lmsEnrollments.enrollmentType, "free_preview")));
+      // Users who had a free_preview enrollment and now have a full enrollment (upgraded)
+      // We detect this by finding users who have BOTH a full enrollment AND previously had a free_preview
+      // Since we upgrade in-place, we track via enrollmentType history — count full enrollments that came from free_preview
+      // We use the lmsOrders table to find paid orders where the user also has a full enrollment
+      const fullEnrollments = await db.select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, input.courseId), eq(lmsEnrollments.enrollmentType, "full")));
+      const fullUserIds = fullEnrollments.map(e => e.userId);
+      // Count full enrollees who came from a paid order (i.e., upgraded from free preview)
+      let upgradedFromPreview = 0;
+      if (fullUserIds.length > 0) {
+        const [{ upgrades }] = await db.select({ upgrades: sql<number>`count(distinct ${lmsOrders.userId})` })
+          .from(lmsOrders)
+          .where(and(
+            eq(lmsOrders.courseId, input.courseId),
+            eq(lmsOrders.status, "paid"),
+            sql`${lmsOrders.userId} IN (${sql.join(fullUserIds.map(id => sql`${id}`), sql`, `)})`
+          ));
+        upgradedFromPreview = Number(upgrades);
+      }
+      const previewConversionRate = Number(freePreviewEnrollments) + upgradedFromPreview > 0
+        ? Math.round((upgradedFromPreview / (Number(freePreviewEnrollments) + upgradedFromPreview)) * 100)
+        : 0;
       return {
         totalEnrollments: Number(totalEnrollments),
         completedEnrollments: Number(completedEnrollments),
@@ -1458,6 +1485,9 @@ CRITICAL REQUIREMENTS:
         monthlyEnrollments,
         lessonStats,
         avgProgress: Math.round(Number(avgProgress ?? 0)),
+        freePreviewEnrollments: Number(freePreviewEnrollments),
+        upgradedFromPreview,
+        previewConversionRate,
       };
     }),
   /** Create a new user account and immediately enroll them in a course */

@@ -2766,6 +2766,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   installmentIntervalDays: int("installment_interval_days").default(30), // days between installments
   // Stripe IDs for subscription/payment-plan products (created on first checkout)
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  // Cached Stripe Payment Link for the primary pricing (reused to avoid creating duplicates)
+  stripePaymentLinkId: varchar("stripe_payment_link_id", { length: 255 }),
   // SEO / landing page
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),

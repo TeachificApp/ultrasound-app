@@ -1756,20 +1756,24 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
       <div className="border border-gray-200 rounded-lg p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-700">Pricing</h3>
-          {firstActivePricingOption ? (
+          {(firstActivePricingOption || course.price) ? (
             <button
-              onClick={() => coursePaymentLink.mutate({ pricingOptionId: firstActivePricingOption.id })}
+              onClick={() => firstActivePricingOption
+                ? coursePaymentLink.mutate({ pricingOptionId: firstActivePricingOption.id })
+                : coursePaymentLink.mutate({ courseId: course.id })
+              }
               disabled={coursePaymentLink.isPending}
               className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 transition-colors disabled:opacity-50"
-              title={`Generate & copy direct Stripe checkout link for "${firstActivePricingOption.label}"`}
+              title={firstActivePricingOption
+                ? `Generate & copy Stripe checkout link for "${firstActivePricingOption.label}"`
+                : `Generate & copy Stripe checkout link for primary pricing ($${Number(course.price).toFixed(2)})`
+              }
             >
               {coursePaymentLink.isPending
                 ? <span className="w-3 h-3 block animate-spin border border-blue-400 border-t-transparent rounded-full" />
                 : <Link2 className="w-3 h-3" />}
               {coursePaymentLink.isPending ? "Generating..." : "Copy Stripe Checkout Link"}
             </button>
-          ) : course.slug ? (
-            <span className="text-xs text-gray-400 italic">Add a pricing option to generate a Stripe link</span>
           ) : null}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -8483,6 +8487,32 @@ function CourseAnalyticsTab({ courseId }: { courseId: number }) {
           <p className="text-xs text-gray-400 mt-0.5">{data.orders.length} orders</p>
         </div>
       </div>
+
+      {/* Free Preview Conversion Metrics */}
+      {(data.freePreviewEnrollments > 0 || data.upgradedFromPreview > 0) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm font-semibold text-amber-800 mb-3">Free Preview Conversion</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-amber-600 mb-0.5">Free Preview Students</p>
+              <p className="text-2xl font-bold text-amber-700">{data.freePreviewEnrollments}</p>
+              <p className="text-xs text-amber-500 mt-0.5">currently in preview</p>
+            </div>
+            <div>
+              <p className="text-xs text-amber-600 mb-0.5">Upgraded to Full</p>
+              <p className="text-2xl font-bold text-green-700">{data.upgradedFromPreview}</p>
+              <p className="text-xs text-amber-500 mt-0.5">paid after preview</p>
+            </div>
+            <div>
+              <p className="text-xs text-amber-600 mb-0.5">Conversion Rate</p>
+              <p className="text-2xl font-bold text-teal-700">{data.previewConversionRate}%</p>
+              <div className="mt-1 bg-amber-200 rounded-full h-1.5">
+                <div className="h-1.5 bg-teal-500 rounded-full" style={{ width: `${data.previewConversionRate}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Avg Progress */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
