@@ -1035,7 +1035,9 @@ export default function CheckoutPageEditorPage() {
                 .sort((a, b) => a.order - b.order)
                 .map((section, sortedIdx) => {
                   const originalIdx = config.sections.indexOf(section);
-                  const meta = SECTION_META[section.type];
+                  const meta = section.type === "content_block"
+                    ? { label: section.label || (section as ContentBlockSection).blockType || "Content Block", icon: <Code2 className="h-4 w-4" />, description: "Saved block", color: "text-indigo-600" }
+                    : SECTION_META[section.type as Exclude<CheckoutSectionType, 'content_block'>];
                   const isSelected = selectedIdx === originalIdx;
                   return (
                     <div

@@ -4423,3 +4423,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Frontend: Checkout.tsx — show order bump toggles (add-on products with price, description, image) before Stripe embed
 - [ ] Frontend: Checkout.tsx — re-initialize Stripe embedded checkout when pricing option, team tier, or order bumps change
 - [ ] Frontend: Checkout.tsx — show correct billing disclosure text per selected pricing option type
+
+## Backup & Video Fixes (Jun 2026)
+- [x] Create hourlyBackupHandler: git archive → R2 upload → SendGrid email with download link
+- [x] Register /api/scheduled/hourly-backup route in index.ts
+- [x] Fix CheckoutPageEditorPage crash: meta undefined when section.type === "content_block"
+- [ ] Schedule hourly-backup Heartbeat cron (requires deploy first)
+- [ ] Fix video player: no-download controlsList on media_repo blocks in BlockPreview/CoursePlayer
