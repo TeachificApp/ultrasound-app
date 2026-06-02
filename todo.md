@@ -4496,3 +4496,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add sticky navigation header to PlatformAdmin page — Back to My Dashboard + Home links with Platform Admin badge
 - [x] Fix /admin/community 404 on app.allaboutultrasound.com — added route to main Router() before /:slug/:pageSlug catch-all
 - [x] Fix community profile badge — show "Platform Owner" + "All About Ultrasound™" badge for admin/owner users instead of "Newcomer" XP level
+
+## SCORM Quiz Importer
+- [x] iSpring SCORM quiz parser (server/lib/iSpringQuizParser.ts) - parses base64 data blob from index.html
+- [x] previewScormImport tRPC procedure - download ZIP, parse, return preview without writing to DB
+- [x] confirmScormImport tRPC procedure - commit questions to question bank with group tags
+- [x] Import from SCORM button in Question Bank admin UI
+- [x] SCORM asset picker with search
+- [x] Group selection with question preview
+- [x] Extra tag assignment on import

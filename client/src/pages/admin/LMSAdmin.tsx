@@ -9266,6 +9266,13 @@ function QuestionBankAdmin() {
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [aiType, setAIType] = useState<"mcq" | "truefalse" | "mixed">("mcq");
   const [aiTagIds, setAITagIds] = useState<number[]>([]);
+  // SCORM import state
+  const [showScormImport, setShowScormImport] = useState(false);
+  const [scormSearch, setScormSearch] = useState("");
+  const [scormPreview, setScormPreview] = useState<any | null>(null);
+  const [scormAssetId, setScormAssetId] = useState<number | null>(null);
+  const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
+  const [scormExtraTagIds, setScormExtraTagIds] = useState<number[]>([]);
 
   // Debounce search
   useEffect(() => {
@@ -9289,6 +9296,24 @@ function QuestionBankAdmin() {
   const aiGenerate = trpc.questionBank.aiGenerateToBank.useMutation({ onSuccess: () => { refetch(); setShowAIPanel(false); setAITopic(""); } });
   const createTag = trpc.questionBank.createTag.useMutation({ onSuccess: () => refetch() });
   const deleteTag = trpc.questionBank.deleteTag.useMutation({ onSuccess: () => refetch() });
+  const scormPreviewMut = trpc.questionBank.previewScormImport.useMutation({
+    onSuccess: (data) => { setScormPreview(data); setScormSelectedGroups(new Set(data.groups.map((g: any) => g.id))); },
+    onError: (e) => alert(`Preview failed: ${e.message}`),
+  });
+  const scormConfirmMut = trpc.questionBank.confirmScormImport.useMutation({
+    onSuccess: (data) => {
+      refetch();
+      setShowScormImport(false);
+      setScormPreview(null);
+      setScormAssetId(null);
+      alert(`Imported ${data.totalInserted} questions from ${data.results.length} group(s)!`);
+    },
+    onError: (e) => alert(`Import failed: ${e.message}`),
+  });
+  const { data: scormAssetsData } = trpc.mediaRepo.listAssets.useQuery(
+    { mediaType: "scorm", search: scormSearch || undefined, pageSize: 50 },
+    { enabled: showScormImport }
+  );
 
   const questions = data?.questions ?? [];
   const total = data?.total ?? 0;
@@ -9312,6 +9337,7 @@ function QuestionBankAdmin() {
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setShowTagManager(p => !p)} className="gap-1.5"><Tag className="w-3.5 h-3.5" /> Tags</Button>
+          <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1.5" onClick={() => { setShowScormImport(p => !p); setShowAIPanel(false); setScormPreview(null); }}><Upload className="w-3.5 h-3.5" /> Import from SCORM</Button>
           <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-50 gap-1.5" onClick={() => setShowAIPanel(p => !p)}><Sparkles className="w-3.5 h-3.5" /> AI Generate</Button>
           <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" onClick={() => setShowCreate(true)}><Plus className="w-3.5 h-3.5" /> Add Question</Button>
         </div>
@@ -9395,6 +9421,118 @@ function QuestionBankAdmin() {
               {aiGenerate.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate & Add to Bank</>}
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* SCORM Import Panel */}
+      {showScormImport && (
+        <div className="border border-orange-200 rounded-xl p-5 bg-orange-50 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-orange-800 flex items-center gap-2"><Upload className="w-4 h-4" /> Import Questions from iSpring SCORM Quiz</h3>
+            <Button size="sm" variant="ghost" onClick={() => { setShowScormImport(false); setScormPreview(null); setScormAssetId(null); }}><X className="w-3.5 h-3.5" /></Button>
+          </div>
+
+          {!scormPreview ? (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs font-medium text-orange-700 mb-1 block">Search SCORM Assets</Label>
+                <Input value={scormSearch} onChange={e => setScormSearch(e.target.value)} placeholder="Search by title..." className="bg-white border-orange-200" />
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {(scormAssetsData?.assets ?? []).length === 0 && (
+                  <p className="text-sm text-orange-600 text-center py-4">No SCORM assets found. Upload SCORM ZIPs in the Media Repository first.</p>
+                )}
+                {(scormAssetsData?.assets ?? []).map((asset: any) => (
+                  <div key={asset.id} className={cn("flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all", scormAssetId === asset.id ? "border-orange-400 bg-orange-100" : "border-orange-200 bg-white hover:border-orange-300")}
+                    onClick={() => setScormAssetId(asset.id)}>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{asset.title}</p>
+                      <p className="text-xs text-gray-500">{asset.folder ?? "No folder"} · {asset.slug}</p>
+                    </div>
+                    {scormAssetId === asset.id && <CheckCircle className="w-4 h-4 text-orange-600 flex-shrink-0" />}
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-1.5" disabled={!scormAssetId || scormPreviewMut.isPending}
+                  onClick={() => scormPreviewMut.mutate({ mediaAssetId: scormAssetId! })}>
+                  {scormPreviewMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Parsing SCORM...</> : <><Eye className="w-3.5 h-3.5" /> Preview Questions</>}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-white rounded-lg p-3 border border-orange-200">
+                <p className="text-sm font-semibold text-gray-800">{scormPreview.quizTitle}</p>
+                <p className="text-xs text-gray-500">{scormPreview.totalQuestions} questions across {scormPreview.groups.length} group(s)</p>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-xs font-medium text-orange-700 block">Select Groups to Import</Label>
+                {scormPreview.groups.map((group: any) => (
+                  <div key={group.id} className="border border-orange-200 rounded-lg bg-white overflow-hidden">
+                    <div className="flex items-center gap-3 p-3 cursor-pointer hover:bg-orange-50"
+                      onClick={() => setScormSelectedGroups(prev => {
+                        const next = new Set(prev);
+                        if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
+                        return next;
+                      })}>
+                      <input type="checkbox" checked={scormSelectedGroups.has(group.id)} readOnly className="w-4 h-4 accent-orange-600" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-800">{group.name}</p>
+                        <p className="text-xs text-gray-500">{group.questionCount} question{group.questionCount !== 1 ? "s" : ""}</p>
+                      </div>
+                    </div>
+                    {scormSelectedGroups.has(group.id) && (
+                      <div className="border-t border-orange-100 divide-y divide-orange-50 max-h-48 overflow-y-auto">
+                        {group.questions.slice(0, 5).map((q: any, qi: number) => (
+                          <div key={q.id} className="px-4 py-2.5">
+                            <p className="text-xs text-gray-600 font-medium mb-1">Q{qi + 1} · {q.ispringType}</p>
+                            <div className="text-xs text-gray-700" dangerouslySetInnerHTML={{ __html: q.questionHtml || q.questionText }} />
+                            <div className="mt-1.5 space-y-0.5">
+                              {q.answers.map((a: any, ai: number) => (
+                                <div key={ai} className={cn("text-xs px-2 py-0.5 rounded", a.isCorrect ? "bg-green-100 text-green-700 font-medium" : "text-gray-500")}>
+                                  {a.isCorrect ? "✓ " : ""}{a.text}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {group.questions.length > 5 && (
+                          <p className="text-xs text-gray-400 px-4 py-2">...and {group.questions.length - 5} more questions</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium text-orange-700 mb-1 block">Additional Tags (optional)</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.map(tag => (
+                    <button key={tag.id} onClick={() => setScormExtraTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                      className={cn("px-2 py-0.5 rounded-full text-xs font-medium border transition-all", scormExtraTagIds.includes(tag.id) ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200")}
+                      style={scormExtraTagIds.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color } : {}}>
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <Button variant="outline" size="sm" onClick={() => { setScormPreview(null); setScormAssetId(null); }}>← Back to Asset List</Button>
+                <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-1.5" disabled={scormSelectedGroups.size === 0 || scormConfirmMut.isPending}
+                  onClick={() => scormConfirmMut.mutate({
+                    mediaAssetId: scormAssetId!,
+                    groupIds: Array.from(scormSelectedGroups),
+                    extraTagIds: scormExtraTagIds.length > 0 ? scormExtraTagIds : undefined,
+                  })}>
+                  {scormConfirmMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing...</> : <><Upload className="w-3.5 h-3.5" /> Import {Array.from(scormSelectedGroups).reduce((sum, gid) => sum + (scormPreview.groups.find((g: any) => g.id === gid)?.questionCount ?? 0), 0)} Questions</>}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

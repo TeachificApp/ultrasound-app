@@ -16,7 +16,16 @@ import {
   questionBankTagMap,
   lmsQuizQuestions,
   users,
+  mediaAssets,
+  mediaVersions,
 } from "../../drizzle/schema";
+import { parseISpringQuizFromBuffer } from "../lib/iSpringQuizParser";
+import { storagePut } from "../storage";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import https from "https";
+import http from "http";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -430,4 +439,203 @@ export const questionBankRouter = router({
 
       return { id: result.id, alreadyExisted: false };
     }),
+
+  // ─── iSpring SCORM Quiz Import ────────────────────────────────────────────
+
+  /**
+   * previewScormImport — download and parse a SCORM ZIP from the media library,
+   * return a preview of groups + questions WITHOUT writing to the DB.
+   * The admin can review and then call confirmScormImport to commit.
+   */
+  previewScormImport: protectedProcedure
+    .input(z.object({ mediaAssetId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Get the asset + latest version
+      const [asset] = await db
+        .select({ id: mediaAssets.id, title: mediaAssets.title, slug: mediaAssets.slug, mediaType: mediaAssets.mediaType })
+        .from(mediaAssets)
+        .where(eq(mediaAssets.id, input.mediaAssetId))
+        .limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
+
+      const [version] = await db
+        .select({ s3Url: mediaVersions.s3Url })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.mediaAssetId))
+        .orderBy(sql`${mediaVersions.versionNumber} DESC`)
+        .limit(1);
+      if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found for this asset" });
+
+      // Download the ZIP to a temp buffer
+      const zipBuffer = await downloadToBuffer(version.s3Url);
+
+      // Parse the iSpring quiz
+      let parsed;
+      try {
+        parsed = await parseISpringQuizFromBuffer(zipBuffer);
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
+      }
+
+      return {
+        assetTitle: asset.title,
+        quizTitle: parsed.title,
+        groups: parsed.groups.map(g => ({
+          id: g.id,
+          name: g.name,
+          questionCount: g.questions.length,
+          questions: g.questions.map(q => ({
+            id: q.id,
+            type: q.type,
+            ispringType: q.ispringType,
+            questionText: q.questionText,
+            questionHtml: q.questionHtml,
+            answers: q.answers.map(a => ({ text: a.text, html: a.html, isCorrect: a.isCorrect })),
+            correctAnswer: q.correctAnswer,
+            explanationText: q.explanationText,
+            explanationHtml: q.explanationHtml,
+          })),
+        })),
+        totalQuestions: parsed.groups.reduce((sum, g) => sum + g.questions.length, 0),
+      };
+    }),
+
+  /**
+   * confirmScormImport — commit the parsed quiz to the question bank.
+   * Creates one tag per iSpring group (or reuses existing tag with same name).
+   * Each question is inserted with its group tag attached.
+   * Returns counts of inserted questions per group.
+   */
+  confirmScormImport: protectedProcedure
+    .input(z.object({
+      mediaAssetId: z.number().int(),
+      /** Optional: override which groups to import (all if omitted) */
+      groupIds: z.array(z.string()).optional(),
+      /** Optional: additional tag IDs to attach to all imported questions */
+      extraTagIds: z.array(z.number().int()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Get the latest version URL
+      const [version] = await db
+        .select({ s3Url: mediaVersions.s3Url })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.mediaAssetId))
+        .orderBy(sql`${mediaVersions.versionNumber} DESC`)
+        .limit(1);
+      if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found for this asset" });
+
+      const zipBuffer = await downloadToBuffer(version.s3Url);
+      let parsed;
+      try {
+        parsed = await parseISpringQuizFromBuffer(zipBuffer);
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
+      }
+
+      // Filter groups if requested
+      const groups = input.groupIds && input.groupIds.length > 0
+        ? parsed.groups.filter(g => input.groupIds!.includes(g.id))
+        : parsed.groups;
+
+      const results: { groupName: string; inserted: number; tagId: number }[] = [];
+
+      for (const group of groups) {
+        // Find or create a tag for this group
+        const tagName = group.name.trim();
+        let tagId: number;
+        const [existingTag] = await db
+          .select({ id: questionBankTags.id })
+          .from(questionBankTags)
+          .where(eq(questionBankTags.name, tagName))
+          .limit(1);
+        if (existingTag) {
+          tagId = existingTag.id;
+        } else {
+          const [newTag] = await db.insert(questionBankTags).values({
+            name: tagName,
+            color: "#179ca3",
+          }).$returningId();
+          tagId = newTag.id;
+        }
+
+        // All tag IDs for this group's questions
+        const allTagIds = [tagId, ...(input.extraTagIds ?? [])];
+
+        let inserted = 0;
+        for (const q of group.questions) {
+          // Use HTML for question text to preserve iSpring formatting
+          const questionText = q.questionHtml || q.questionText;
+
+          // Build options array — use HTML for rich rendering
+          const options = q.answers.map(a => ({
+            text: a.html || a.text,
+            ...(a.imageRef ? { imageUrl: a.imageRef } : {}),
+          }));
+
+          // correctAnswer: use plain text for matching
+          const correctAnswer = q.correctAnswer;
+
+          const [result] = await db.insert(questionBank).values({
+            question: questionText,
+            type: q.type,
+            options: JSON.stringify(options),
+            correctAnswer,
+            explanation: q.explanationHtml || q.explanationText || null,
+            createdByAdminId: ctx.user.id,
+          }).$returningId();
+
+          // Attach all tags
+          await db.insert(questionBankTagMap).values(
+            allTagIds.map(tid => ({ questionId: result.id, tagId: tid }))
+          );
+
+          inserted++;
+        }
+
+        results.push({ groupName: tagName, inserted, tagId });
+      }
+
+      const totalInserted = results.reduce((sum, r) => sum + r.inserted, 0);
+      return { results, totalInserted };
+    }),
 });
+
+// ─── Download helper ──────────────────────────────────────────────────────────
+
+function downloadToBuffer(url: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const follow = (targetUrl: string, redirects = 0): void => {
+      if (redirects > 10) { reject(new Error("Too many redirects")); return; }
+      const proto = targetUrl.startsWith("https") ? https : http;
+      proto.get(targetUrl, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          follow(res.headers.location, redirects + 1);
+          return;
+        }
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`Download failed: HTTP ${res.statusCode}`));
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => resolve(Buffer.concat(chunks)));
+        res.on("error", reject);
+      }).on("error", reject);
+    };
+    try {
+      const u = new URL(url);
+      u.pathname = u.pathname.split("/").map(p => encodeURIComponent(decodeURIComponent(p))).join("/");
+      follow(u.toString());
+    } catch {
+      follow(url);
+    }
+  });
+}
