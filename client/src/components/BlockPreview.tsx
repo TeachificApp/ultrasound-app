@@ -15,6 +15,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
+import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.

@@ -24,7 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
-
+import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 import LessonCommentSection from "@/components/LessonCommentSection";
 
 // Lazy-load the heavy editor so it doesn't bloat the initial bundle
