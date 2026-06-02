@@ -636,6 +636,8 @@ function MobileSidebarContent({
               );
             })}
             {sections.map((section: any, sIdx: number) => {
+              // Hide section entirely if it has no visible lessons (all were preview_hide_after_purchase or draft)
+              if (section.lessons.length === 0) return null;
               const sectionLocked = !dripBypassed && (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
               const unlockDate = sectionLocked ? new Date(enrolledAt.getTime() + section.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
               const sectionNum = topLevelLessons.length + sIdx + 1;
@@ -1587,6 +1589,8 @@ export default function CoursePlayer() {
 
             {/* Sections */}
             {sections.map((section: any, sIdx: number) => {
+              // Hide section entirely if it has no visible lessons (all were preview_hide_after_purchase or draft)
+              if (section.lessons.length === 0) return null;
               const sectionLocked = !dripBypassed && (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
               const unlockDate = sectionLocked
                 ? new Date(enrolledAt.getTime() + section.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
