@@ -38,7 +38,7 @@ import {
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle, AlertTriangle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, EyeOff, Save, X, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
-  User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus, RefreshCw,
+  User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus, UserX, RefreshCw,
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
   Layout as LayoutTemplate, Database,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
@@ -5443,6 +5443,8 @@ function GroupsTab() {
                     <GroupSeatAssignPanel group={g} onRefetch={refetch} />
                   </div>
 
+                  {/* ── Managers Section ─────────────────────────────────── */}
+                  <TeamManagersSection groupId={g.id} onRefresh={refetch} />
                   {g.notes && (
                     <div className="bg-slate-50 rounded-lg p-3 text-xs text-gray-600">
                       <span className="font-medium text-gray-500">Notes:</span> {g.notes}
@@ -5458,6 +5460,134 @@ function GroupsTab() {
       <CreateTeamDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); refetch(); }} />
       {editTeam && (
         <EditTeamDialog team={editTeam} onClose={() => setEditTeam(null)} onSaved={() => { setEditTeam(null); refetch(); }} />
+      )}
+    </div>
+  );
+}
+
+
+// ─── TeamManagersSection ─────────────────────────────────────────────────────
+function TeamManagersSection({ groupId, onRefresh }: { groupId: number; onRefresh: () => void }) {
+  const [addEmail, setAddEmail] = useState("");
+  const [hasSeat, setHasSeat] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+
+  const { data: managers = [], refetch } = trpc.lmsTeamManager.listManagers.useQuery({ groupId });
+
+  const addManager = trpc.lmsTeamManager.addManager.useMutation({
+    onSuccess: () => {
+      toast.success("Manager added");
+      setAddEmail("");
+      setHasSeat(false);
+      setShowAdd(false);
+      refetch();
+      onRefresh();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeManager = trpc.lmsTeamManager.removeManager.useMutation({
+    onSuccess: () => { toast.success("Manager removed"); refetch(); onRefresh(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const setManagerSeat = trpc.lmsTeamManager.setManagerSeat.useMutation({
+    onSuccess: () => { refetch(); onRefresh(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const activeManagers = managers.filter((m: any) => m.status !== "revoked");
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 text-teal-500" />
+          Managers
+          <span className="text-gray-400 font-normal normal-case">({activeManagers.length}/5)</span>
+        </p>
+        {activeManagers.length < 5 && !showAdd && (
+          <button
+            className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium"
+            onClick={() => setShowAdd(true)}
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Manager
+          </button>
+        )}
+      </div>
+
+      {activeManagers.length === 0 && !showAdd && (
+        <p className="text-xs text-gray-400 italic mb-2">No managers assigned yet</p>
+      )}
+
+      <div className="space-y-1.5 mb-2">
+        {managers
+          .filter((m: any) => m.status !== "revoked")
+          .map((m: any) => (
+            <div key={m.id} className="flex items-center gap-2 text-sm bg-white border border-gray-100 rounded-lg px-3 py-2">
+              <Shield className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-gray-800 truncate text-xs font-medium">{m.managerName || m.email}</p>
+                {m.managerName && <p className="text-gray-400 truncate text-xs">{m.email}</p>}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {m.status === "pending" && (
+                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5">Pending</span>
+                )}
+                <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer select-none" title="Assign a seat to this manager">
+                  <input
+                    type="checkbox"
+                    checked={!!m.hasSeat}
+                    onChange={(e) => setManagerSeat.mutate({ managerId: m.id, hasSeat: e.target.checked })}
+                    className="w-3 h-3 accent-teal-600"
+                  />
+                  Seat
+                </label>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                  onClick={() => {
+                    if (confirm(`Remove ${m.email} as manager?`)) removeManager.mutate({ managerId: m.id });
+                  }}
+                >
+                  <UserX className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+      </div>
+
+      {showAdd && (
+        <div className="flex items-center gap-2 bg-teal-50 border border-teal-100 rounded-lg p-2 mb-2">
+          <Input
+            type="email"
+            placeholder="manager@example.com"
+            value={addEmail}
+            onChange={(e) => setAddEmail(e.target.value)}
+            className="h-8 text-xs flex-1 bg-white"
+          />
+          <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer select-none shrink-0">
+            <input
+              type="checkbox"
+              checked={hasSeat}
+              onChange={(e) => setHasSeat(e.target.checked)}
+              className="w-3 h-3 accent-teal-600"
+            />
+            Seat
+          </label>
+          <Button
+            size="sm"
+            className="bg-teal-600 hover:bg-teal-700 text-white h-8 text-xs shrink-0"
+            disabled={!addEmail || addManager.isPending}
+            onClick={() => addManager.mutate({ groupId, email: addEmail, hasSeat })}
+          >
+            {addManager.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add"}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 shrink-0" onClick={() => setShowAdd(false)}>
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       )}
     </div>
   );

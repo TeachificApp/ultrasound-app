@@ -4430,3 +4430,24 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix CheckoutPageEditorPage crash: meta undefined when section.type === "content_block"
 - [ ] Schedule hourly-backup Heartbeat cron (requires deploy first)
 - [ ] Fix video player: no-download controlsList on media_repo blocks in BlockPreview/CoursePlayer
+
+## Team Manager Feature
+- [ ] Schema: add lmsGroupManagers table (groupId, userId, email, role: "manager", hasSeat: bool, inviteToken, status, createdAt)
+- [ ] Schema: enforce max 5 managers per group (checked at procedure level)
+- [ ] Migration: run SQL for lmsGroupManagers table
+- [ ] Server: addGroupManager procedure (admin only — invite by email, max 5 check)
+- [ ] Server: removeGroupManager procedure (admin or manager self-remove)
+- [ ] Server: listGroupManagers procedure (admin + team_admin)
+- [ ] Server: assertGroupManager helper (checks lmsGroupManagers OR lmsGroups.teamAdminId)
+- [ ] Server: manager getMyManagedGroups procedure
+- [ ] Server: manager assignSeat procedure (manager can assign seats for their group)
+- [ ] Server: manager revokeSeat procedure (manager can revoke seats for their group)
+- [ ] Server: manager resendInvite procedure
+- [ ] Server: manager getGroupAnalytics procedure (seat usage, completion rates, active members)
+- [ ] Client: Team Manager Dashboard page (/my-team) — list managed groups, seat table, analytics
+- [ ] Client: Seat assignment UI for managers (invite by email, revoke, resend)
+- [ ] Client: Analytics panel for managers (seats used/total, active/pending/revoked breakdown)
+- [ ] Client: Admin GroupsTab — show managers slot (0–5) per team with add/remove controls
+- [ ] Client: Admin GroupsTab — show "has seat" toggle per manager
+- [ ] Client: Route /my-team guarded by team_admin or team_manager role
+- [ ] Client: Navigation — add "My Team" link for team_admin and team_manager roles

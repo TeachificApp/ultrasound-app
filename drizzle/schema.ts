@@ -6005,3 +6005,35 @@ export const lmsDefaultTeamTiers = mysqlTable("lms_default_team_tiers", {
 });
 export type LmsDefaultTeamTier = typeof lmsDefaultTeamTiers.$inferSelect;
 export type InsertLmsDefaultTeamTier = typeof lmsDefaultTeamTiers.$inferInsert;
+
+// ─── Team Managers ────────────────────────────────────────────────────────────
+/**
+ * Up to 5 managers per team (lmsGroups row).
+ * Managers do NOT consume a seat by default; hasSeat=true means they also
+ * occupy one of the group's paid seats and get course access like a regular member.
+ * Managers can: assign/revoke seats, resend invites, view team analytics.
+ */
+export const lmsGroupManagers = mysqlTable("lms_group_managers", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  /** Resolved user ID once the manager accepts the invite and logs in */
+  userId: int("user_id"),
+  /** Email address the invite was sent to */
+  email: varchar("email", { length: 320 }).notNull(),
+  /** Display name (optional, filled from user profile on accept) */
+  managerName: varchar("manager_name", { length: 255 }),
+  /** Whether this manager also occupies a paid seat in the group */
+  hasSeat: boolean("has_seat").default(false).notNull(),
+  /** pending = invite sent, active = accepted, revoked = removed */
+  status: mysqlEnum("status", ["pending", "active", "revoked"]).default("pending").notNull(),
+  /** One-time token for the invite email */
+  inviteToken: varchar("invite_token", { length: 128 }),
+  acceptedAt: timestamp("accepted_at"),
+  lastInviteSentAt: timestamp("last_invite_sent_at"),
+  /** Admin user who added this manager */
+  addedByUserId: int("added_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsGroupManager = typeof lmsGroupManagers.$inferSelect;
+export type InsertLmsGroupManager = typeof lmsGroupManagers.$inferInsert;

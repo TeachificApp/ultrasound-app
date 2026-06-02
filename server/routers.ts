@@ -25,6 +25,7 @@ import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import { menuLinksRouter } from "./routers/menuLinksRouter";
 import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
 import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
+import { lmsTeamManagerRouter } from "./routers/lmsTeamManagerRouter";
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
 import { careerNetworkRouter } from "./routers/careerNetworkRouter";
 import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter, webinarCheckoutPublicRouter } from "./routers/webinarRouter";
@@ -2049,6 +2050,7 @@ export const appRouter = router({
   lmsEnrollmentAdmin: lmsEnrollmentAdminRouter,
   careerNetwork: careerNetworkRouter,
   lmsGroup: lmsGroupRouter,
+  lmsTeamManager: lmsTeamManagerRouter,
   webinar: webinarPublicRouter,
   webinarLearner: webinarLearnerRouter,
   webinarAdmin: webinarAdminRouter,

@@ -250,6 +250,7 @@ const LabAdmin = lazy(() => import("./pages/iheartecho/LabAdmin"));
 const EducatorAdmin = lazy(() => import("./pages/iheartecho/EducatorAdmin"));
 const StudentDashboard = lazy(() => import("./pages/iheartecho/StudentDashboard"));
 const StudentDashboardPage = lazy(() => import("./pages/StudentDashboardPage"));
+const MyTeamPage = lazy(() => import("./pages/MyTeamPage"));
 const SoundBytesPage = lazy(() => import("./pages/SoundBytes"));
 
 // ── CME Hub ─────────────────────────────────────────────────────────────────────────
@@ -314,6 +315,7 @@ function Router() {
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
 
@@ -607,6 +609,7 @@ function MembersRouter() {
           <Suspense fallback={pageFallback}>
             <Switch>
               <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
@@ -740,6 +743,7 @@ function LMSRouter() {
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
@@ -795,6 +799,7 @@ function IHeartEchoRouter() {
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
 
