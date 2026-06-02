@@ -151,7 +151,7 @@ export function defaultCheckoutPageConfig(): CheckoutPageConfig {
     sections: [
       {
         type: "trust_seals",
-        enabled: true,
+        enabled: false,
         order: 0,
         layout: "row",
         seals: [
@@ -163,7 +163,7 @@ export function defaultCheckoutPageConfig(): CheckoutPageConfig {
       },
       {
         type: "course_includes",
-        enabled: true,
+        enabled: false,
         order: 1,
         headline: "What's included",
       },

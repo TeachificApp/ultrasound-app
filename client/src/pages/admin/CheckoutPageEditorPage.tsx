@@ -12,7 +12,22 @@
  *   entityType = course | download | physical | webinar | membership
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -732,6 +747,66 @@ function CustomHtmlPanel({ section, onChange }: { section: CustomHtmlSection; on
   );
 }
 
+// ─── Sortable section row (sidebar drag-to-reorder) ─────────────────────────
+
+function SortableSectionRow({
+  dragId, section, originalIdx, isSelected, onSelect, onToggle,
+  getSectionColor, getSectionIcon, getSectionLabel,
+}: {
+  dragId: string;
+  section: CheckoutSection;
+  originalIdx: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  onToggle: () => void;
+  getSectionColor: (s: CheckoutSection) => string;
+  getSectionIcon: (s: CheckoutSection) => React.ReactNode;
+  getSectionLabel: (s: CheckoutSection) => string;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dragId });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={onSelect}
+      className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+        !section.enabled ? "opacity-50" : ""
+      } ${
+        isSelected
+          ? "border-teal-400 bg-teal-50"
+          : "border-gray-100 bg-gray-50 hover:bg-teal-50 hover:border-teal-200"
+      }`}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        onClick={e => e.stopPropagation()}
+        className="cursor-grab active:cursor-grabbing touch-none flex-shrink-0 p-0.5 rounded hover:bg-gray-200 transition-colors"
+        title="Drag to reorder"
+      >
+        <GripVertical className="h-3.5 w-3.5 text-gray-400" />
+      </button>
+      <Switch
+        checked={section.enabled}
+        onCheckedChange={() => onToggle()}
+        className="scale-75 flex-shrink-0"
+        onClick={e => e.stopPropagation()}
+      />
+      <span className={`flex-shrink-0 ${getSectionColor(section)}`}>{getSectionIcon(section)}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-gray-700 truncate">{getSectionLabel(section)}</p>
+      </div>
+      <ChevronRight className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CheckoutPageEditorPage() {
@@ -793,6 +868,10 @@ export default function CheckoutPageEditorPage() {
   const [templateDesc, setTemplateDesc] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  // dnd-kit sensors
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // Initialise config from loaded data
   if (!isLoading && config === null && configData !== undefined) {
@@ -1104,7 +1183,7 @@ export default function CheckoutPageEditorPage() {
                 </p>
               </div>
 
-              {/* Section list */}
+              {/* Section list — drag-to-reorder */}
               <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
                 {config.sections.length === 0 ? (
                   <div className="text-center py-8 text-gray-400">
@@ -1115,33 +1194,72 @@ export default function CheckoutPageEditorPage() {
                       Add your first section
                     </button>
                   </div>
-                ) : (
-                  config.sections
-                    .slice()
-                    .sort((a, b) => a.order - b.order)
-                    .map((section) => {
-                      const originalIdx = config.sections.indexOf(section);
-                      return (
-                        <div
-                          key={`list-${section.type}-${originalIdx}`}
-                          onClick={() => setSelectedIdx(originalIdx)}
-                          className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
-                            !section.enabled ? "opacity-50" : ""
-                          } border-gray-100 bg-gray-50 hover:bg-teal-50 hover:border-teal-200`}
-                        >
-                          <GripVertical className="h-3.5 w-3.5 text-gray-300 flex-shrink-0" />
-                          <Switch checked={section.enabled} onCheckedChange={e => { e.stopPropagation?.(); toggleSection(originalIdx); }}
-                            className="scale-75 flex-shrink-0"
-                            onClick={e => e.stopPropagation()} />
-                          <span className={`flex-shrink-0 ${getSectionColor(section)}`}>{getSectionIcon(section)}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-700 truncate">{getSectionLabel(section)}</p>
-                          </div>
-                          <ChevronRight className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                ) : (() => {
+                  // Build a stable sorted list with unique drag IDs
+                  const sortedSections = config.sections
+                    .map((s, originalIdx) => ({ section: s, originalIdx, dragId: `sec-${originalIdx}-${s.type}` }))
+                    .sort((a, b) => a.section.order - b.section.order);
+                  const dragIds = sortedSections.map(s => s.dragId);
+                  return (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragStart={({ active }) => setActiveDragId(active.id as string)}
+                      onDragEnd={({ active, over }) => {
+                        setActiveDragId(null);
+                        if (!over || active.id === over.id) return;
+                        const oldPos = sortedSections.findIndex(s => s.dragId === active.id);
+                        const newPos = sortedSections.findIndex(s => s.dragId === over.id);
+                        if (oldPos === -1 || newPos === -1) return;
+                        const reordered = arrayMove(sortedSections, oldPos, newPos);
+                        const newSections = reordered.map((item, i) => ({ ...item.section, order: i }));
+                        updateConfig({ ...config, sections: newSections });
+                        // Update selectedIdx to follow the moved item
+                        if (selectedIdx !== null) {
+                          const movedOriginalIdx = sortedSections[oldPos].originalIdx;
+                          if (selectedIdx === movedOriginalIdx) {
+                            setSelectedIdx(reordered.findIndex(s => s.originalIdx === movedOriginalIdx));
+                          }
+                        }
+                      }}
+                      onDragCancel={() => setActiveDragId(null)}
+                    >
+                      <SortableContext items={dragIds} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-1.5">
+                          {sortedSections.map(({ section, originalIdx, dragId }) => (
+                            <SortableSectionRow
+                              key={dragId}
+                              dragId={dragId}
+                              section={section}
+                              originalIdx={originalIdx}
+                              isSelected={selectedIdx === originalIdx}
+                              onSelect={() => setSelectedIdx(originalIdx)}
+                              onToggle={() => toggleSection(originalIdx)}
+                              getSectionColor={getSectionColor}
+                              getSectionIcon={getSectionIcon}
+                              getSectionLabel={getSectionLabel}
+                            />
+                          ))}
                         </div>
-                      );
-                    })
-                )}
+                      </SortableContext>
+                      <DragOverlay>
+                        {activeDragId ? (() => {
+                          const item = sortedSections.find(s => s.dragId === activeDragId);
+                          if (!item) return null;
+                          return (
+                            <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-teal-400 bg-white shadow-xl opacity-95">
+                              <GripVertical className="h-3.5 w-3.5 text-teal-400 flex-shrink-0" />
+                              <span className={`flex-shrink-0 ${getSectionColor(item.section)}`}>{getSectionIcon(item.section)}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-gray-700 truncate">{getSectionLabel(item.section)}</p>
+                              </div>
+                            </div>
+                          );
+                        })() : null}
+                      </DragOverlay>
+                    </DndContext>
+                  );
+                })()}
 
                 <button
                   onClick={() => setAddSectionOpen(true)}
