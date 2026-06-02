@@ -20,7 +20,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, gte, isNull, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, like, or, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -1287,11 +1287,11 @@ export const mediaRepoRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Find all SCORM/ZIP asset IDs
+      // Find all SCORM/ZIP/LMS/HTML asset IDs (all types that may need SCORM extraction)
       const scormAssets = await db
         .select({ id: mediaAssets.id })
         .from(mediaAssets)
-        .where(and(eq(mediaAssets.mediaType, "scorm_package" as any), isNull(mediaAssets.deletedAt)));
+        .where(and(inArray(mediaAssets.mediaType, ["scorm", "zip", "lms", "html"] as any), isNull(mediaAssets.deletedAt)));
 
       if (scormAssets.length === 0) return { ok: true, count: 0 };
 

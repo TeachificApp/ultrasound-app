@@ -848,8 +848,15 @@ export default function CoursePlayer() {
           return;
         }
       }
-      // Skip draft/hidden lessons when picking the default first lesson
-      const isVisible = (l: any) => !l.lessonStatus || l.lessonStatus === "published";
+      // Skip draft/hidden lessons AND preview_hide_after_purchase lessons (for enrolled users) when picking the default first lesson
+      const isVisible = (l: any) => {
+        if (l.lessonStatus && l.lessonStatus !== "published") return false;
+        if (isEnrolled) {
+          const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+          if (pm === "preview_hide_after_purchase") return false;
+        }
+        return true;
+      };
       const first = topLevel.find(isVisible) ?? data.sections.flatMap((s: any) => s.lessons).find(isVisible);
       if (first) setSelectedLessonId(first.id);
     }
@@ -977,7 +984,7 @@ export default function CoursePlayer() {
 
   if (!data) return null;
   const { course } = data;
-  // Filter out preview_hide_after_purchase lessons for enrolled students
+  // Filter out preview_hide_after_purchase lessons for enrolled students, then remove empty sections
   const sections: any[] = (data.sections ?? []).map((s: any) => ({
     ...s,
     lessons: s.lessons.filter((l: any) => {
@@ -985,7 +992,7 @@ export default function CoursePlayer() {
       const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
       return pm !== "preview_hide_after_purchase";
     }),
-  }));
+  })).filter((s: any) => s.lessons.length > 0);
   // ── Course Color Scheme ──────────────────────────────────────────────────────
   const primaryColor = course.primaryColor ?? "#0d9488";
   const accentColor = course.accentColor ?? "#0f766e";

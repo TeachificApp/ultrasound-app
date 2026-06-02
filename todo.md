@@ -4475,3 +4475,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix /embed SCORM redirect using internal Railway hostname — now redirects directly to R2 CDN URL (Strategy A) when scormExtractedPrefix is set, shows waiting page inline (Strategy B) when pending/processing, and uses x-app-hostname/Origin/Referer priority for fallback /scorm redirect (Strategy D)
 - [x] Add reExtractAllScorm tRPC procedure (resets all SCORM assets to pending for heartbeat re-extraction)
 - [x] Add "Re-extract All SCORM" button to MediaRepository admin UI toolbar
+
+## Bug Fixes (June 2, 2026)
+- [x] Fix /embed SCORM redirect using internal Railway hostname — now redirects to R2 CDN URL directly (Strategy A)
+- [x] Fix "Re-extract All SCORM" button finding 0 assets — was filtering by non-existent "scorm_package" type, now uses correct types (scorm, zip, lms, html)
+- [x] Fix stuck SCORM extraction for asset 800002 (UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO) — manually set to done with existing extracted prefix
+- [x] Fix course player defaulting to preview_hide_after_purchase lesson for enrolled users — now skips hidden lessons when picking default
+- [x] Fix empty sections still showing in sidebar after all lessons filtered out — now removes sections with 0 visible lessons
+- [ ] Investigate discussion comments showing old profile details (display name and avatar not updating)
