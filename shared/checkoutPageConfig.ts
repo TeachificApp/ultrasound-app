@@ -3,6 +3,12 @@
  *
  * Type definitions for the configurable checkout page section system.
  * Used by both the server (routers) and the client (editor + renderer).
+ *
+ * Sections fall into two categories:
+ *   1. Checkout-native sections (trust_seals, guarantee, testimonials, faq, custom_html, course_includes)
+ *   2. Landing-page content blocks (any BlockType from BlockPreview.tsx) wrapped in a ContentBlockSection
+ *
+ * Saved blocks from the block library (blockTemplates) are also supported as ContentBlockSection.
  */
 
 // ─── Trust Seal ──────────────────────────────────────────────────────────────
@@ -47,7 +53,7 @@ export interface FaqItem {
   enabled: boolean;
 }
 
-// ─── Section Types ────────────────────────────────────────────────────────────
+// ─── Checkout-Native Section Types ───────────────────────────────────────────
 
 export interface TrustSealsSection {
   type: "trust_seals";
@@ -99,13 +105,36 @@ export interface CourseIncludesSection {
   items?: Array<{ icon: string; text: string }>;
 }
 
+// ─── Content Block Section (wraps any landing-page block type) ────────────────
+//
+// This allows any block from the BLOCK_CATALOG (text, image, video, hero, CTA,
+// testimonial, divider, spacer, etc.) or a saved block template to be added
+// to the checkout page as a section.
+
+export interface ContentBlockSection {
+  type: "content_block";
+  enabled: boolean;
+  order: number;
+  /** The landing-page block type (e.g. "text", "image", "video", "hero", etc.) */
+  blockType: string;
+  /** The block's data payload — same shape as Block.data in BlockPreview.tsx */
+  blockData: Record<string, any>;
+  /** Optional: if this was inserted from a saved block template, store the template id */
+  savedBlockTemplateId?: number;
+  /** Human-readable label shown in the editor section list */
+  label?: string;
+}
+
+// ─── Union ────────────────────────────────────────────────────────────────────
+
 export type CheckoutSection =
   | TrustSealsSection
   | GuaranteeSection
   | TestimonialsSection
   | FaqSection
   | CustomHtmlSection
-  | CourseIncludesSection;
+  | CourseIncludesSection
+  | ContentBlockSection;
 
 export type CheckoutSectionType = CheckoutSection["type"];
 

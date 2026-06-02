@@ -49,9 +49,15 @@ import {
 import {
   CheckoutPageConfig, CheckoutSection, CheckoutSectionType, TrustSeal,
   Testimonial, FaqItem, TrustSealsSection, GuaranteeSection, TestimonialsSection,
-  FaqSection, CustomHtmlSection, CourseIncludesSection, PresetSealId,
+  FaqSection, CustomHtmlSection, CourseIncludesSection, ContentBlockSection, PresetSealId,
   defaultCheckoutPageConfig, parseCheckoutPageConfig,
 } from "@/../../shared/checkoutPageConfig";
+import {
+  BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, BlockPreview,
+} from "@/pages/admin/LandingPageBuilder";
+import type { Block } from "@/pages/admin/LandingPageBuilder";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export type CheckoutEntityType = "course" | "download" | "physical" | "webinar" | "membership";
 
@@ -82,7 +88,7 @@ const PRESET_SEALS: Array<{ id: PresetSealId; label: string; description: string
 ];
 
 // ─── Section metadata ─────────────────────────────────────────────────────────
-const SECTION_META: Record<CheckoutSectionType, { label: string; icon: React.ReactNode; description: string; color: string }> = {
+const SECTION_META: Record<Exclude<CheckoutSectionType, 'content_block'>, { label: string; icon: React.ReactNode; description: string; color: string }> = {
   trust_seals: { label: "Trust Seals & Badges", icon: <ShieldCheck className="h-4 w-4" />, description: "Security badges and guarantee icons", color: "text-teal-600" },
   guarantee: { label: "Money-Back Guarantee", icon: <Award className="h-4 w-4" />, description: "Refund policy with icon and text", color: "text-amber-600" },
   testimonials: { label: "Testimonials", icon: <MessageSquare className="h-4 w-4" />, description: "Student reviews and ratings", color: "text-blue-600" },
@@ -91,7 +97,31 @@ const SECTION_META: Record<CheckoutSectionType, { label: string; icon: React.Rea
   course_includes: { label: "What's Included", icon: <BookOpen className="h-4 w-4" />, description: "Course content highlights", color: "text-green-600" },
 };
 
-const ALL_SECTION_TYPES: CheckoutSectionType[] = ["trust_seals", "course_includes", "guarantee", "testimonials", "faq", "custom_html"];
+const NATIVE_SECTION_TYPES: Exclude<CheckoutSectionType, 'content_block'>[] = ["trust_seals", "course_includes", "guarantee", "testimonials", "faq", "custom_html"];
+const ALL_SECTION_TYPES: CheckoutSectionType[] = [...NATIVE_SECTION_TYPES, "content_block"];
+
+/** Get display label for any section including content_block */
+function getSectionLabel(section: CheckoutSection): string {
+  if (section.type === "content_block") {
+    if (section.label) return section.label;
+    const entry = BLOCK_CATALOG.find(b => b.type === section.blockType);
+    return entry ? entry.label : section.blockType;
+  }
+  return SECTION_META[section.type as Exclude<CheckoutSectionType, 'content_block'>].label;
+}
+
+function getSectionIcon(section: CheckoutSection): React.ReactNode {
+  if (section.type === "content_block") {
+    const entry = BLOCK_CATALOG.find(b => b.type === section.blockType);
+    return entry ? entry.icon : <Code2 className="h-4 w-4" />;
+  }
+  return SECTION_META[section.type as Exclude<CheckoutSectionType, 'content_block'>].icon;
+}
+
+function getSectionColor(section: CheckoutSection): string {
+  if (section.type === "content_block") return "text-indigo-600";
+  return SECTION_META[section.type as Exclude<CheckoutSectionType, 'content_block'>].color;
+}
 
 // ─── Built-in templates ───────────────────────────────────────────────────────
 const BUILT_IN_TEMPLATES: Array<{ id: string; name: string; description: string; emoji: string; config: CheckoutPageConfig }> = [
@@ -279,6 +309,144 @@ function CanvasCustomHtml({ section }: { section: CustomHtmlSection }) {
         <p className="text-xs text-gray-400 italic">No HTML content yet</p>
       )}
     </div>
+  );
+}
+
+function CanvasContentBlock({ section }: { section: ContentBlockSection }) {
+  const block: Block = { id: `cb-${section.order}`, type: section.blockType as any, data: section.blockData };
+  return (
+    <div className="pointer-events-none overflow-hidden rounded-lg">
+      <BlockPreview block={block} />
+    </div>
+  );
+}
+
+// ─── Add Section Dialog ─────────────────────────────────────────────────────
+
+function AddSectionDialog({
+  open, onOpenChange, existingSections, onAddNative, onAddBlock
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  existingSections: CheckoutSection[];
+  onAddNative: (type: Exclude<CheckoutSectionType, 'content_block'>) => void;
+  onAddBlock: (blockType: string, defaultData: Record<string, any>, label: string) => void;
+}) {
+  const [tab, setTab] = useState<"checkout" | "blocks" | "saved">("checkout");
+  const [blockSearch, setBlockSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(CATALOG_CATEGORIES[0]);
+  const { data: savedBlocks = [] } = trpc.blockTemplates.list.useQuery();
+
+  const filteredBlocks = BLOCK_CATALOG.filter(b => {
+    const matchCat = b.category === selectedCategory;
+    const matchSearch = !blockSearch || b.label.toLowerCase().includes(blockSearch.toLowerCase());
+    return matchCat && matchSearch;
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Plus className="h-4 w-4 text-teal-600" /> Add Section
+          </DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={tab} onValueChange={v => setTab(v as any)} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="flex-shrink-0 w-full grid grid-cols-3">
+            <TabsTrigger value="checkout">Checkout Sections</TabsTrigger>
+            <TabsTrigger value="blocks">Content Blocks</TabsTrigger>
+            <TabsTrigger value="saved">Saved Blocks</TabsTrigger>
+          </TabsList>
+
+          {/* ── Checkout-native sections ── */}
+          <TabsContent value="checkout" className="flex-1 overflow-y-auto mt-0 pt-3">
+            <div className="space-y-1.5">
+              {NATIVE_SECTION_TYPES.map(type => {
+                const meta = SECTION_META[type];
+                const exists = existingSections.some(s => s.type === type);
+                return (
+                  <button key={type} onClick={() => onAddNative(type)} disabled={exists}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
+                      exists ? "opacity-40 cursor-not-allowed bg-gray-50 border-gray-100" : "bg-white border-gray-200 hover:border-teal-400 hover:bg-teal-50"
+                    }`}>
+                    <span className={meta.color}>{meta.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{meta.label}</p>
+                      <p className="text-xs text-gray-500">{meta.description}</p>
+                    </div>
+                    {exists && <Badge variant="secondary" className="text-[10px]">Added</Badge>}
+                  </button>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          {/* ── Content blocks ── */}
+          <TabsContent value="blocks" className="flex-1 flex flex-col min-h-0 mt-0 pt-3">
+            <div className="flex gap-2 mb-3 flex-shrink-0">
+              <Input
+                placeholder="Search blocks…"
+                value={blockSearch}
+                onChange={e => setBlockSearch(e.target.value)}
+                className="h-8 text-xs flex-1"
+              />
+            </div>
+            {!blockSearch && (
+              <div className="flex gap-1.5 flex-wrap mb-3 flex-shrink-0">
+                {CATALOG_CATEGORIES.map(cat => (
+                  <button key={cat} onClick={() => setSelectedCategory(cat)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      selectedCategory === cat ? "bg-teal-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-teal-50"
+                    }`}>
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+            <ScrollArea className="flex-1">
+              <div className="grid grid-cols-2 gap-2 pr-2">
+                {(blockSearch ? BLOCK_CATALOG.filter(b => b.label.toLowerCase().includes(blockSearch.toLowerCase())) : filteredBlocks).map(entry => (
+                  <button key={entry.type}
+                    onClick={() => onAddBlock(entry.type, entry.defaultData, entry.label)}
+                    className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-left transition-colors bg-white">
+                    <span className="text-teal-600 flex-shrink-0">{entry.icon}</span>
+                    <p className="text-xs font-medium text-gray-800 truncate">{entry.label}</p>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          {/* ── Saved blocks ── */}
+          <TabsContent value="saved" className="flex-1 overflow-y-auto mt-0 pt-3">
+            {savedBlocks.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p className="text-xs">No saved blocks yet</p>
+                <p className="text-xs mt-1">Save blocks from the landing page builder to reuse them here</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {savedBlocks.map((tpl: any) => {
+                  let blockData: Record<string, any> = {};
+                  try { blockData = JSON.parse(tpl.blockData); } catch {}
+                  return (
+                    <button key={tpl.id}
+                      onClick={() => onAddBlock(tpl.blockType, blockData, tpl.name)}
+                      className="flex flex-col gap-1 p-3 rounded-xl border border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-left transition-colors bg-white">
+                      <p className="text-xs font-semibold text-gray-800 truncate">{tpl.name}</p>
+                      {tpl.description && <p className="text-xs text-gray-500 line-clamp-2">{tpl.description}</p>}
+                      <Badge variant="secondary" className="text-[10px] mt-1 self-start">{tpl.blockType}</Badge>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -825,6 +993,7 @@ export default function CheckoutPageEditorPage() {
                       {section.type === "faq" && <CanvasFaq section={section} />}
                       {section.type === "custom_html" && <CanvasCustomHtml section={section} />}
                       {section.type === "course_includes" && <CanvasCourseIncludes section={section} />}
+                      {section.type === "content_block" && <CanvasContentBlock section={section} />}
                     </div>
                   </div>
                 );
@@ -847,8 +1016,8 @@ export default function CheckoutPageEditorPage() {
               {/* Section config header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className={SECTION_META[selectedSection.type].color}>{SECTION_META[selectedSection.type].icon}</span>
-                  <p className="text-xs font-semibold text-gray-700">{SECTION_META[selectedSection.type].label}</p>
+                  <span className={getSectionColor(selectedSection)}>{getSectionIcon(selectedSection)}</span>
+                  <p className="text-xs font-semibold text-gray-700">{getSectionLabel(selectedSection)}</p>
                 </div>
                 <button onClick={() => setSelectedIdx(null)} className="text-gray-400 hover:text-gray-600">
                   <X size={14} />
@@ -897,6 +1066,16 @@ export default function CheckoutPageEditorPage() {
                 {selectedSection.type === "course_includes" && (
                   <CourseIncludesPanel section={selectedSection} onChange={s => updateSection(selectedIdx, s)} />
                 )}
+                {selectedSection.type === "content_block" && (() => {
+                  const cb = selectedSection as ContentBlockSection;
+                  const block: Block = { id: `cb-${selectedIdx}`, type: cb.blockType as any, data: cb.blockData };
+                  return (
+                    <BlockSettings
+                      block={block}
+                      onChange={data => updateSection(selectedIdx, { ...cb, blockData: data })}
+                    />
+                  );
+                })()}
               </div>
             </>
           ) : (
@@ -925,7 +1104,6 @@ export default function CheckoutPageEditorPage() {
                     .sort((a, b) => a.order - b.order)
                     .map((section) => {
                       const originalIdx = config.sections.indexOf(section);
-                      const meta = SECTION_META[section.type];
                       return (
                         <div
                           key={`list-${section.type}-${originalIdx}`}
@@ -938,9 +1116,9 @@ export default function CheckoutPageEditorPage() {
                           <Switch checked={section.enabled} onCheckedChange={e => { e.stopPropagation?.(); toggleSection(originalIdx); }}
                             className="scale-75 flex-shrink-0"
                             onClick={e => e.stopPropagation()} />
-                          <span className={`flex-shrink-0 ${meta.color}`}>{meta.icon}</span>
+                          <span className={`flex-shrink-0 ${getSectionColor(section)}`}>{getSectionIcon(section)}</span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-700 truncate">{meta.label}</p>
+                            <p className="text-xs font-medium text-gray-700 truncate">{getSectionLabel(section)}</p>
                           </div>
                           <ChevronRight className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
                         </div>
@@ -961,34 +1139,26 @@ export default function CheckoutPageEditorPage() {
       </div>
 
       {/* ── Add section dialog ───────────────────────────────────────────────── */}
-      <Dialog open={addSectionOpen} onOpenChange={setAddSectionOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Plus className="h-4 w-4 text-teal-600" /> Add Section
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-1.5 py-2">
-            {ALL_SECTION_TYPES.map(type => {
-              const meta = SECTION_META[type];
-              const exists = config.sections.some(s => s.type === type);
-              return (
-                <button key={type} onClick={() => addSection(type)} disabled={exists}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
-                    exists ? "opacity-40 cursor-not-allowed bg-gray-50 border-gray-100" : "bg-white border-gray-200 hover:border-teal-400 hover:bg-teal-50"
-                  }`}>
-                  <span className={meta.color}>{meta.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800">{meta.label}</p>
-                    <p className="text-xs text-gray-500">{meta.description}</p>
-                  </div>
-                  {exists && <Badge variant="secondary" className="text-[10px]">Added</Badge>}
-                </button>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AddSectionDialog
+        open={addSectionOpen}
+        onOpenChange={setAddSectionOpen}
+        existingSections={config.sections}
+        onAddNative={type => addSection(type as Exclude<CheckoutSectionType, 'content_block'>)}
+        onAddBlock={(blockType, defaultData, label) => {
+          if (!config) return;
+          const newSection: ContentBlockSection = {
+            type: "content_block",
+            enabled: true,
+            order: config.sections.length,
+            blockType,
+            blockData: defaultData,
+            label,
+          };
+          updateConfig({ ...config, sections: [...config.sections, newSection] });
+          setSelectedIdx(config.sections.length);
+          setAddSectionOpen(false);
+        }}
+      />
 
       {/* ── Template picker dialog ───────────────────────────────────────────── */}
       <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>

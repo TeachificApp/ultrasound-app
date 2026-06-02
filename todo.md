@@ -4404,3 +4404,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Click section in canvas highlights it and opens its config panel in the sidebar
 - [ ] "Checkout Page" tab in all admin editors opens the full-screen editor (not inline panel)
 - [ ] Wire route in App.tsx
+
+## Checkout Page Editor — Content Blocks (Jun 2026)
+- [x] Audit landing page block types and saved blocks schema/procedures
+- [x] Extend CheckoutPageConfig shared types to include all landing-page block types as valid section types
+- [x] Update CheckoutPageEditorPage Add Section panel: show all block categories + Saved Blocks tab
+- [x] Add canvas renderers for all new block types in CheckoutPageEditorPage
+- [x] Add per-block settings panels in the right sidebar for all new block types
+- [x] Update Checkout.tsx CheckoutSections renderer to render all new block types inline

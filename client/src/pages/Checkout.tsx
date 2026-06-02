@@ -39,8 +39,11 @@ import {
   FaqSection,
   CustomHtmlSection,
   CourseIncludesSection,
+  ContentBlockSection,
   PresetSealId,
 } from "@/../../shared/checkoutPageConfig";
+import { BlockPreview } from "@/pages/admin/LandingPageBuilder";
+import type { Block } from "@/pages/admin/LandingPageBuilder";
 
 // Initialise Stripe once outside the component to avoid re-creating on every render
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "");
@@ -338,6 +341,15 @@ function CheckoutSections({
           }
           if (section.type === "course_includes") {
             return <CourseIncludesRenderer key={idx} section={section} courseStats={stats} primary={primary} primaryLight={primaryLight} isDark={isDark} />;
+          }
+          if (section.type === "content_block") {
+            const cb = section as ContentBlockSection;
+            const block: Block = { id: `checkout-cb-${idx}`, type: cb.blockType as any, data: cb.blockData };
+            return (
+              <div key={idx} className="rounded-xl overflow-hidden">
+                <BlockPreview block={block} />
+              </div>
+            );
           }
           return null;
         })}
