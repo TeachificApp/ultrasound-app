@@ -2507,7 +2507,7 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
   const [, setLocation] = useLocation();
   const navigate = setLocation;
   const openLearnLink = useOpenLearnLink();
-  const { data: course } = trpc.lmsAdmin.getCourse.useQuery({ courseId });
+  const { data: course } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
   const aiGenerateLandingPage = trpc.lmsAdmin.aiGenerateLandingPage.useMutation({
     onSuccess: () => {
       toast.success("Landing page generated! Opening builder...");
@@ -2546,8 +2546,9 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
           </div>
         </button>
         <button
-          onClick={() => openLearnLink(`/courses/${course?.slug}?preview=admin`)}
-          className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors text-left"
+          onClick={() => course?.slug ? openLearnLink(`/courses/${course.slug}?preview=admin`) : undefined}
+          disabled={!course?.slug}
+          className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
             <Eye className="w-5 h-5 text-blue-600" />
