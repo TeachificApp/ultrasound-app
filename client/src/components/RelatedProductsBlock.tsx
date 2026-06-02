@@ -45,7 +45,7 @@ interface Props {
 
 function formatPrice(price: number, isFree: boolean): string {
   if (isFree || price === 0) return "Free";
-  return `$${(price / 100).toFixed(2)}`;
+  return `$${Number(price).toFixed(2)}`;
 }
 
 type ProductItem = {
