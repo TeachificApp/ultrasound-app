@@ -985,6 +985,8 @@ export default function CourseLanding() {
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const isPreview = _urlSearchParams.get("preview") === "admin";
   const autoCheckout = _urlSearchParams.get("checkout") === "1";
+  // ?open_preview=1 — auto-opens the free preview registration modal on page load
+  const autoOpenPreview = _urlSearchParams.get("open_preview") === "1";
   // Guest checkout modal state (for unauthenticated users clicking CTA)
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestPricingOptionId, setGuestPricingOptionId] = useState<number | undefined>();
@@ -1144,6 +1146,29 @@ export default function CourseLanding() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCheckout, course?.id, isLoading]);
+
+  // Auto-open free preview registration modal when ?open_preview=1 is in the URL
+  useEffect(() => {
+    if (!autoOpenPreview || !course || isLoading) return;
+    // If user is already logged in, navigate directly to the player
+    if (user) {
+      const allLessons = (course.sections ?? []).flatMap((s: any) => s.lessons ?? []);
+      const firstPreview = allLessons.find((l: any) => l.isPreview || l.previewMode === "preview") ?? allLessons[0];
+      if (firstPreview) navigate(`/courses/${course.slug}/player?lesson=${firstPreview.id}`);
+      return;
+    }
+    // Guest: open the registration modal with the first preview lesson
+    const allLessons = (course.sections ?? []).flatMap((s: any) => s.lessons ?? []);
+    const firstPreview = allLessons.find((l: any) => l.isPreview || l.previewMode === "preview") ?? allLessons[0];
+    if (firstPreview) {
+      setFreePreviewLessonId(firstPreview.id);
+      setFpFirstName("");
+      setFpLastName("");
+      setFpEmail("");
+      setFreePreviewOpen(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenPreview, course?.id, isLoading, user?.id]);
 
   if (isLoading) {
     return (

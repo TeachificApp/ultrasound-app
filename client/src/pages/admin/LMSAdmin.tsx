@@ -1901,6 +1901,8 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
 
         {/* Additional Pricing Options */}
         <CoursePricingOptionsEditor courseId={course.id} courseSlug={course.slug} />
+        {/* Free Preview Enrollment Link — only shown when the course has preview lessons */}
+        <FreePreviewLinkPanel courseId={course.id} />
       </div>
 
             <div className="flex items-center gap-2">
@@ -2291,18 +2293,21 @@ function FreePreviewLinkPanel({ courseId }: { courseId: number }) {
   const [copied, setCopied] = useState(false);
   if (isLoading) return null;
   if (!data || data.lessons.length === 0) return null;
-  const previewUrl = `https://learn.allaboutultrasound.com/courses/${data.courseSlug}/player?preview=1`;
+  // Use ?open_preview=1 so the registration modal auto-opens when the visitor lands on the page
+  const previewUrl = `https://learn.allaboutultrasound.com/courses/${data.courseSlug}?open_preview=1`;
   const handleCopy = () => {
-    navigator.clipboard.writeText(previewUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+    navigator.clipboard.writeText(previewUrl)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
+      .catch(() => { toast.success(`Free Preview Link: ${previewUrl}`); });
   };
   return (
     <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <PlayCircle className="w-4 h-4 text-green-700" />
-        <h3 className="text-sm font-semibold text-green-800">Free Preview Registration Link</h3>
+        <h3 className="text-sm font-semibold text-green-800">Free Preview Enrollment Link</h3>
         <span className="ml-auto text-xs text-green-600 font-medium">{data.lessons.length} preview lesson{data.lessons.length !== 1 ? 's' : ''}</span>
       </div>
-      <p className="text-xs text-green-700">Share this link so students can register and access the free preview lessons without purchasing the full course.</p>
+      <p className="text-xs text-green-700">Share this link — visitors will see a registration form that auto-enrolls them into the free preview. Logged-in users go straight to the player.</p>
       <div className="space-y-1">
         {data.lessons.map((l: any) => (
           <div key={l.id} className="flex items-center gap-2 text-xs text-green-800">
