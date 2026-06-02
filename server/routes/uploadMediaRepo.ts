@@ -662,6 +662,7 @@ router.post(
           assetId: existingAssetId, versionNumber: nextVersion, s3Key, s3Url,
           fileName: originalname, fileSize: size, mimeType: mimetype, notes,
           uploadedByUserId: user.id,
+          scormExtractionStatus: initialScormExtractionStatus({ mediaType, mimeType: mimetype, fileName: originalname }),
         });
 
         await db.update(mediaAssets)
@@ -669,6 +670,20 @@ router.post(
           .where(eq(mediaAssets.id, existingAssetId));
 
         res.json({ assetId: existingAssetId, versionNumber: nextVersion, s3Url });
+
+        if (needsScormExtraction({ mediaType, mimeType: mimetype, fileName: originalname, s3Url })) {
+          const { extractAndUploadScorm } = await import("./scormExtractor");
+          const [insertedVersion] = await db
+            .select({ id: mediaVersions.id })
+            .from(mediaVersions)
+            .where(and(eq(mediaVersions.assetId, existingAssetId), eq(mediaVersions.versionNumber, nextVersion)))
+            .limit(1);
+          if (insertedVersion) {
+            extractAndUploadScorm(insertedVersion.id, s3Url, asset.slug).catch((e: any) =>
+              console.error("[ScormExtractor] Legacy upload extraction queue failed:", e.message)
+            );
+          }
+        }
       } else {
         const slug = generateSlug(title);
         const s3Key = `media-repo/${slug}/v1-${originalname}`;
@@ -684,9 +699,24 @@ router.post(
           assetId, versionNumber: 1, s3Key, s3Url,
           fileName: originalname, fileSize: size, mimeType: mimetype, notes,
           uploadedByUserId: user.id,
+          scormExtractionStatus: initialScormExtractionStatus({ mediaType, mimeType: mimetype, fileName: originalname }),
         });
 
         res.json({ assetId, slug, versionNumber: 1, s3Url });
+
+        if (needsScormExtraction({ mediaType, mimeType: mimetype, fileName: originalname, s3Url })) {
+          const { extractAndUploadScorm } = await import("./scormExtractor");
+          const [insertedVersion] = await db
+            .select({ id: mediaVersions.id })
+            .from(mediaVersions)
+            .where(and(eq(mediaVersions.assetId, assetId), eq(mediaVersions.versionNumber, 1)))
+            .limit(1);
+          if (insertedVersion) {
+            extractAndUploadScorm(insertedVersion.id, s3Url, slug).catch((e: any) =>
+              console.error("[ScormExtractor] Legacy upload extraction queue failed:", e.message)
+            );
+          }
+        }
       }
     } catch (err: any) {
       console.error("[upload-media-repo]", err);
