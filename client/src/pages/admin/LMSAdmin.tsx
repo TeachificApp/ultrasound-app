@@ -9273,6 +9273,7 @@ function QuestionBankAdmin() {
   const [scormAssetId, setScormAssetId] = useState<number | null>(null);
   const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
   const [scormExtraTagIds, setScormExtraTagIds] = useState<number[]>([]);
+  const [scormGroupPrefix, setScormGroupPrefix] = useState("");
 
   // Debounce search
   useEffect(() => {
@@ -9434,9 +9435,16 @@ function QuestionBankAdmin() {
 
           {!scormPreview ? (
             <div className="space-y-3">
-              <div>
-                <Label className="text-xs font-medium text-orange-700 mb-1 block">Search SCORM Assets</Label>
-                <Input value={scormSearch} onChange={e => setScormSearch(e.target.value)} placeholder="Search by title..." className="bg-white border-orange-200" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-medium text-orange-700 mb-1 block">Search SCORM Assets</Label>
+                  <Input value={scormSearch} onChange={e => setScormSearch(e.target.value)} placeholder="Search by title..." className="bg-white border-orange-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-orange-700 mb-1 block">Group Name Prefix <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Input value={scormGroupPrefix} onChange={e => setScormGroupPrefix(e.target.value)} placeholder="e.g. OB-GYN" className="bg-white border-orange-200" />
+                  {scormGroupPrefix && <p className="text-xs text-orange-600 mt-1">Groups will be tagged as: <strong>{scormGroupPrefix}_TRUE-FALSE</strong>, <strong>{scormGroupPrefix}_Image Questions</strong>, etc.</p>}
+                </div>
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {(scormAssetsData?.assets ?? []).length === 0 && (
@@ -9479,7 +9487,9 @@ function QuestionBankAdmin() {
                       })}>
                       <input type="checkbox" checked={scormSelectedGroups.has(group.id)} readOnly className="w-4 h-4 accent-orange-600" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">{group.name}</p>
+                        <p className="text-sm font-medium text-gray-800">
+                          {scormGroupPrefix ? <><span className="text-orange-600">{scormGroupPrefix}_</span>{group.name}</> : group.name}
+                        </p>
                         <p className="text-xs text-gray-500">{group.questionCount} question{group.questionCount !== 1 ? "s" : ""}</p>
                       </div>
                     </div>
@@ -9527,6 +9537,7 @@ function QuestionBankAdmin() {
                     mediaAssetId: scormAssetId!,
                     groupIds: Array.from(scormSelectedGroups),
                     extraTagIds: scormExtraTagIds.length > 0 ? scormExtraTagIds : undefined,
+                    groupPrefix: scormGroupPrefix.trim() || undefined,
                   })}>
                   {scormConfirmMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing...</> : <><Upload className="w-3.5 h-3.5" /> Import {Array.from(scormSelectedGroups).reduce((sum, gid) => sum + (scormPreview.groups.find((g: any) => g.id === gid)?.questionCount ?? 0), 0)} Questions</>}
                 </Button>

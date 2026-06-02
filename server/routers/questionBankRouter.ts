@@ -517,6 +517,8 @@ export const questionBankRouter = router({
       groupIds: z.array(z.string()).optional(),
       /** Optional: additional tag IDs to attach to all imported questions */
       extraTagIds: z.array(z.number().int()).optional(),
+      /** Optional: prefix to prepend to each group tag name, e.g. "OB-GYN" → "OB-GYN_TRUE-FALSE" */
+      groupPrefix: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -548,8 +550,9 @@ export const questionBankRouter = router({
       const results: { groupName: string; inserted: number; tagId: number }[] = [];
 
       for (const group of groups) {
-        // Find or create a tag for this group
-        const tagName = group.name.trim();
+        // Find or create a tag for this group — apply prefix if provided
+        const rawName = group.name.trim();
+        const tagName = input.groupPrefix ? `${input.groupPrefix.trim()}_${rawName}` : rawName;
         let tagId: number;
         const [existingTag] = await db
           .select({ id: questionBankTags.id })
