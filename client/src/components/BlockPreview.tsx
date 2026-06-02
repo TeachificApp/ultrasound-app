@@ -237,6 +237,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
               loop={d.loop ?? false}
               controls={d.controls ?? true}
               playsInline
+              controlsList="nodownload"
+              onContextMenu={e => e.preventDefault()}
               className={`w-full block ${videoId}`}
               style={{ display: "block", width: "100%", height: d.height ? `${d.height}px` : "auto", accentColor: videoAccent }}
             />
@@ -258,6 +260,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
                   loop={d.loop ?? false}
                   controls={d.controls ?? true}
                   playsInline
+                  controlsList="nodownload"
+                  onContextMenu={e => e.preventDefault()}
                   className={`w-full h-full object-cover ${videoId}`}
                   style={{ height: d.height || undefined, accentColor: videoAccent }}
                 />
@@ -1046,7 +1050,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             {/* Use viewUrl (inline endpoint) for rendering — no Content-Disposition: attachment */}
             {isPdf && <iframe src={viewUrl} className="w-full rounded-lg border border-gray-200" style={{ height: `${d.inlineHeight ?? 600}px` }} title={fileName} />}
             {isImage && <img src={viewUrl} alt={fileName} className="max-w-full rounded-lg shadow" />}
-            {isVideo && <video src={viewUrl} controls className="w-full rounded-lg shadow" style={{ maxHeight: `${d.inlineHeight ?? 400}px` }} />}
+            {isVideo && <video src={viewUrl} controls controlsList="nodownload" onContextMenu={e => e.preventDefault()} className="w-full rounded-lg shadow" style={{ maxHeight: `${d.inlineHeight ?? 400}px` }} />}
             {isAudio && <audio src={viewUrl} controls className="w-full" />}
             {/* Download button uses the /download endpoint to force save-to-disk */}
             <div className="mt-3 flex justify-end">

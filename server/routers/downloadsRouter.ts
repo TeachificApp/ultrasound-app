@@ -1393,7 +1393,7 @@ Make ALL content specific and compelling based on the product title and descript
         if (!existing) {
           await db.insert(digitalPurchases).values({ userId: ctx.user.id, productId: product.id });
         }
-        return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null };
+        return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null, brand: "aaus" };
       }
       const [existing] = await db.select().from(digitalPurchases)
         .where(and(eq(digitalPurchases.userId, ctx.user.id), eq(digitalPurchases.productId, product.id))).limit(1);
@@ -1447,6 +1447,7 @@ Make ALL content specific and compelling based on the product title and descript
         currency: product.currency,
         minSeats: null,
         discountPercent: null,
+        brand: "aaus",
       };
     }),
 });

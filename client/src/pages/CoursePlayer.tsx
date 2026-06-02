@@ -1814,6 +1814,8 @@ export default function CoursePlayer() {
                           ref={videoRef}
                           src={lessonData.content}
                           controls
+                          controlsList="nodownload"
+                          onContextMenu={e => e.preventDefault()}
                           className="w-full h-full"
                           onEnded={() => setVideoWatched(true)}
                         />

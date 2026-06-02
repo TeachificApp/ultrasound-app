@@ -374,6 +374,7 @@ export default function Checkout() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [subscriptionAcknowledged, setSubscriptionAcknowledged] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [seatCount, setSeatCount] = useState<number>(searchParams.teamTierId ? 3 : 1);
   const [sessionMeta, setSessionMeta] = useState<{
     courseTitle: string;
     courseSubtitle: string | null;
@@ -403,6 +404,10 @@ export default function Checkout() {
     const { clientSecret: cs, ...meta } = data;
     setClientSecret(cs);
     setSessionMeta(meta);
+    // Sync seatCount to the tier's minimum on first load
+    if (meta.minSeats && seatCount < meta.minSeats) {
+      setSeatCount(meta.minSeats);
+    }
   };
 
   const createCourseSession = trpc.lmsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
@@ -434,6 +439,7 @@ export default function Checkout() {
         courseSlug: slug,
         pricingOptionId: searchParams.pricingOptionId,
         teamTierId: searchParams.teamTierId,
+        seatCount: searchParams.teamTierId ? seatCount : undefined,
         origin: window.location.origin,
       });
     }
@@ -608,12 +614,51 @@ export default function Checkout() {
                     )}
                   </div>
 
-                  {/* Team tier info */}
-                  {sessionMeta.minSeats && (
-                    <p className={`text-xs mt-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                      Minimum {sessionMeta.minSeats} seats
-                      {sessionMeta.discountPercent ? ` · ${sessionMeta.discountPercent}% team discount` : ""}
-                    </p>
+                  {/* Team tier seat stepper */}
+                  {sessionMeta.minSeats && searchParams.teamTierId && (
+                    <div className={`mt-3 p-3 rounded-xl border ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                      <p className={`text-xs font-semibold mb-2 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                        Number of seats
+                        {sessionMeta.discountPercent ? (
+                          <span className="ml-2 font-normal" style={{ color: primary }}>{sessionMeta.discountPercent}% team discount applied</span>
+                        ) : null}
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            const next = Math.max(sessionMeta.minSeats!, seatCount - 1);
+                            if (next === seatCount) return;
+                            setSeatCount(next);
+                            setClientSecret(null);
+                            setSessionMeta(null);
+                            setSessionRequested(false);
+                          }}
+                          className="w-8 h-8 rounded-lg border flex items-center justify-center text-lg font-bold transition-colors hover:bg-gray-200 disabled:opacity-40"
+                          style={{ borderColor: primary, color: primary }}
+                          disabled={seatCount <= sessionMeta.minSeats}
+                        >
+                          −
+                        </button>
+                        <span className={`text-xl font-bold w-8 text-center ${isDark ? "text-white" : "text-gray-900"}`}>{seatCount}</span>
+                        <button
+                          onClick={() => {
+                            const next = seatCount + 1;
+                            setSeatCount(next);
+                            setClientSecret(null);
+                            setSessionMeta(null);
+                            setSessionRequested(false);
+                          }}
+                          className="w-8 h-8 rounded-lg border flex items-center justify-center text-lg font-bold transition-colors hover:bg-gray-200"
+                          style={{ borderColor: primary, color: primary }}
+                        >
+                          +
+                        </button>
+                        <span className={`text-xs ml-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                          × {new Intl.NumberFormat("en-US", { style: "currency", currency: sessionMeta.currency }).format(sessionMeta.displayPrice / 100)}/seat
+                          {sessionMeta.minSeats > 1 ? ` (min ${sessionMeta.minSeats})` : ""}
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </>
               ) : null}

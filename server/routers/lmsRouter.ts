@@ -2102,6 +2102,7 @@ export const lmsLearnerRouter = router({
       courseSlug: z.string(),
       pricingOptionId: z.number().int().positive().optional(),
       teamTierId: z.number().int().positive().optional(),
+      seatCount: z.number().int().positive().optional(),
       origin: z.string().url(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -2155,10 +2156,11 @@ export const lmsLearnerRouter = router({
           await db.update(lmsDefaultTeamTiers).set({ stripePriceId }).where(eq(lmsDefaultTeamTiers.id, tier.id));
         }
 
+        const requestedSeats = input.seatCount && input.seatCount >= tier.minSeats ? input.seatCount : tier.minSeats;
         const session = await stripe.checkout.sessions.create({
           ui_mode: "embedded",
           mode: "payment",
-          line_items: [{ price: stripePriceId, quantity: tier.minSeats, adjustable_quantity: { enabled: true, minimum: tier.minSeats } }],
+          line_items: [{ price: stripePriceId, quantity: requestedSeats, adjustable_quantity: { enabled: true, minimum: tier.minSeats } }],
           return_url: returnUrl,
           customer_email: ctx.user?.email ?? undefined,
           allow_promotion_codes: true,
@@ -2186,6 +2188,7 @@ export const lmsLearnerRouter = router({
           currency,
           minSeats: tier.minSeats,
           discountPercent: Number(tier.discountPercent),
+          brand: course.brand ?? "aaus",
         };
       }
 
@@ -2263,6 +2266,7 @@ export const lmsLearnerRouter = router({
           currency,
           minSeats: null,
           discountPercent: null,
+          brand: course.brand ?? "aaus",
         };
       }
 
@@ -2338,6 +2342,7 @@ export const lmsLearnerRouter = router({
         currency,
         minSeats: null,
         discountPercent: null,
+        brand: course.brand ?? "aaus",
       };
     }),
 

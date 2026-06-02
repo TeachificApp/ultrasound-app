@@ -308,7 +308,7 @@ export const webinarSessionRouter = router({
       if (!webinar) throw new TRPCError({ code: "NOT_FOUND", message: "Webinar not found" });
       const isFree = !webinar.price || Number(webinar.price) === 0;
       if (isFree) {
-        return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: webinar.subtitle ?? null, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: null };
+        return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: webinar.subtitle ?? null, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: null, brand: webinar.brand ?? "all_about_ultrasound" };
       }
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
@@ -358,6 +358,7 @@ export const webinarSessionRouter = router({
         currency: "usd",
         minSeats: null,
         discountPercent: null,
+        brand: webinar.brand ?? "all_about_ultrasound",
       };
     }),
 });
