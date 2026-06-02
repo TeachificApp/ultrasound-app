@@ -2145,6 +2145,40 @@ export const lmsGroupRouter = router({
       return { success: true };
     }),
 
+  /** Create a Stripe Payment Link for a pricing option — returns a permanent buy.stripe.com URL */
+  createPaymentLink: protectedProcedure
+    .input(z.object({ pricingOptionId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Load the pricing option
+      const [opt] = await db.select().from(lmsPricingOptions).where(eq(lmsPricingOptions.id, input.pricingOptionId)).limit(1);
+      if (!opt) throw new TRPCError({ code: "NOT_FOUND", message: "Pricing option not found" });
+      if (!opt.stripePriceId) throw new TRPCError({ code: "BAD_REQUEST", message: "This pricing option has no Stripe Price ID configured. Please add a Stripe Price ID in the pricing option settings first." });
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      // Check if a payment link already exists for this pricing option (stored in metadata)
+      // Create a new Stripe Payment Link
+      const paymentLink = await stripe.paymentLinks.create({
+        line_items: [{ price: opt.stripePriceId, quantity: 1 }],
+        metadata: {
+          pricing_option_id: String(opt.id),
+          course_id: String(opt.courseId ?? ""),
+          source: "lms_admin_copy_link",
+        },
+        after_completion: {
+          type: "redirect",
+          redirect: { url: `${process.env.CANONICAL_ROOT_DOMAIN ?? "https://learn.allaboutultrasound.com"}/library` },
+        },
+      });
+
+      return { url: paymentLink.url };
+    }),
+
   // ─── Platform Settings ────────────────────────────────────────────────────
 
   /** Get platform settings (admin) */

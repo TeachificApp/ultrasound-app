@@ -8746,6 +8746,13 @@ function PricingOptionRow({ opt, editingId, setEditingId, setShowAdd, updateOpti
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
+  // Stripe Payment Link mutation
+  const createPaymentLink = trpc.lmsAdmin.createPaymentLink.useMutation({
+    onSuccess: (data) => {
+      navigator.clipboard.writeText(data.url).then(() => toast.success("Stripe Payment Link copied!"));
+    },
+    onError: (err) => toast.error(err.message),
+  });
   if (editingId === opt.id) {
     return (
       <div ref={setNodeRef} style={style}>
@@ -8773,21 +8780,17 @@ function PricingOptionRow({ opt, editingId, setEditingId, setShowAdd, updateOpti
       <button onClick={() => updateOption.mutate({ id: opt.id, isActive: !opt.isActive })} className="text-xs text-gray-400 hover:text-gray-600 p-1 flex-shrink-0" title={opt.isActive ? "Hide" : "Show"}>
         {opt.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
       </button>
-            <button onClick={() => { setEditingId(opt.id); setShowAdd(false); }} className="text-xs text-teal-500 hover:text-teal-700 p-1 flex-shrink-0">
+      <button onClick={() => { setEditingId(opt.id); setShowAdd(false); }} className="text-xs text-teal-500 hover:text-teal-700 p-1 flex-shrink-0">
         <Edit2 className="w-3.5 h-3.5" />
       </button>
-      {courseSlug && (
-        <button
-          onClick={() => {
-            const url = `${window.location.origin}/courses/${courseSlug}?pricingOptionId=${opt.id}&checkout=1`;
-            navigator.clipboard.writeText(url).then(() => toast.success("Checkout link copied!"));
-          }}
-          className="text-xs text-blue-400 hover:text-blue-600 p-1 flex-shrink-0"
-          title={`Copy direct checkout link\n${window.location.origin}/courses/${courseSlug}?pricingOptionId=${opt.id}&checkout=1`}
-        >
-          <Link2 className="w-3.5 h-3.5" />
-        </button>
-      )}
+      <button
+        onClick={() => createPaymentLink.mutate({ pricingOptionId: opt.id })}
+        disabled={createPaymentLink.isPending}
+        className="text-xs text-blue-400 hover:text-blue-600 p-1 flex-shrink-0 disabled:opacity-50"
+        title={opt.stripePriceId ? "Copy Stripe Payment Link (direct checkout)" : "No Stripe Price ID — add one in settings first"}
+      >
+        {createPaymentLink.isPending ? <span className="w-3.5 h-3.5 block animate-spin border border-blue-400 border-t-transparent rounded-full" /> : <Link2 className="w-3.5 h-3.5" />}
+      </button>
       <button onClick={() => { if (confirm("Delete this pricing option?")) deleteOption.mutate({ id: opt.id }); }} className="text-xs text-red-400 hover:text-red-600 p-1 flex-shrink-0">
         <Trash2 className="w-3.5 h-3.5" />
       </button>
