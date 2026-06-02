@@ -15,6 +15,8 @@ import { eq, and } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
+import { assertFreeOrderEligible, resolveEmbeddedCheckoutExpectedCents } from "../lib/checkoutPricing";
+import { getStripeClient } from "../lib/stripeClient";
 
 const billingAddressSchema = z.object({
   address: z.string(),
@@ -93,18 +95,21 @@ export const embeddedCheckoutRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      // All prices are in CENTS (productPrice and bump prices are stored as cents in the DB)
-      let totalAmountCents = Math.round(Number(input.productPrice));
-      for (const bump of input.selectedBumps) {
-        if (bump.price > 0) totalAmountCents += Math.round(Number(bump.price));
-      }
+      let totalAmountCents = await resolveEmbeddedCheckoutExpectedCents(db, {
+        productName: input.productName,
+        productPrice: input.productPrice,
+        productType: input.productType,
+        productId: input.productId,
+        lmsCourseId: input.lmsCourseId,
+        sourceFunnelPageId: input.sourceFunnelPageId,
+        selectedBumps: input.selectedBumps,
+      });
 
       // Apply promo code discount if provided
       let discountAppliedCents = 0;
       let promoCodeId: string | undefined;
       if (input.promoCode) {
-        const Stripe2 = (await import("stripe")).default;
-        const stripe2 = new Stripe2(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+        const stripe2 = getStripeClient();
         try {
           const promoCodes = await stripe2.promotionCodes.list({ code: input.promoCode, active: true, limit: 1 });
           if (promoCodes.data.length > 0) {
@@ -132,11 +137,9 @@ export const embeddedCheckoutRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
       }
 
-      // totalAmountCents is already in cents for Stripe API
-      const totalAmount = totalAmountCents / 100; // dollars, for display and DB storage
+      const totalAmount = totalAmountCents / 100; // dollars, for display only
 
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       const customerName = [input.firstName, input.lastName].filter(Boolean).join(" ") || undefined;
 
@@ -228,7 +231,7 @@ export const embeddedCheckoutRouter = router({
         productName: input.productName,
         productType: input.productType,
         orderBumps: input.selectedBumps.length > 0 ? JSON.stringify(input.selectedBumps.map(b => ({ title: b.title, price: b.price }))) : null,
-        amountPaid: totalAmount, // stored in dollars
+        amountPaid: totalAmountCents,
         currency: "usd",
         stripePaymentIntentId: paymentIntent.id,
         sourceType: input.sourceType,
@@ -266,8 +269,17 @@ export const embeddedCheckoutRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
+      const stripe = getStripeClient();
+      const paymentIntent = await stripe.paymentIntents.retrieve(input.paymentIntentId);
+      if (paymentIntent.status !== "succeeded") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Payment not completed (status: ${paymentIntent.status})`,
+        });
+      }
+
       await db.update(funnelPurchases)
-        .set({ status: "paid" })
+        .set({ status: "paid", amountPaid: paymentIntent.amount })
         .where(eq(funnelPurchases.stripePaymentIntentId, input.paymentIntentId));
 
       return { success: true };
@@ -306,6 +318,15 @@ export const embeddedCheckoutRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await assertFreeOrderEligible(db, {
+        productName: input.productName,
+        productType: input.productType,
+        productId: input.productId,
+        lmsCourseId: input.lmsCourseId,
+        sourceFunnelPageId: input.sourceFunnelPageId,
+        sourceFunnelId: input.sourceFunnelId,
+      });
 
       const customerName = [input.firstName, input.lastName].filter(Boolean).join(" ") || undefined;
       let userId = ctx.user?.id ?? null;

@@ -28,9 +28,7 @@ import {
   funnelPurchases,
 } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
-import Stripe from "stripe";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", { apiVersion: "2024-06-20" as any });
+import { getStripeClient } from "../lib/stripeClient";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -210,7 +208,7 @@ export const dashboardRouter = router({
 
         if (m.stripeSubscriptionId && m.source && ["stripe", "stripe_dual"].includes(m.source)) {
           try {
-            const sub = await stripe.subscriptions.retrieve(m.stripeSubscriptionId) as any;
+            const sub = await getStripeClient().subscriptions.retrieve(m.stripeSubscriptionId) as any;
             const item = sub.items?.data?.[0];
             stripeData = {
               status: sub.status,
@@ -274,7 +272,7 @@ export const dashboardRouter = router({
       }
 
       // Cancel at period end (not immediately)
-      await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+      await getStripeClient().subscriptions.update(membership.stripeSubscriptionId, {
         cancel_at_period_end: true,
       });
 
@@ -305,7 +303,7 @@ export const dashboardRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "This subscription cannot be managed here." });
       }
 
-      await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+      await getStripeClient().subscriptions.update(membership.stripeSubscriptionId, {
         cancel_at_period_end: false,
       });
 

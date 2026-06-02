@@ -834,6 +834,36 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
  * This is triggered when a user pays inline via Stripe Elements (PaymentIntent flow)
  * instead of being redirected to Stripe Checkout.
  */
+
+/**
+ * Handle checkout.session.completed for funnel redirect checkout (Stripe Checkout).
+ */
+async function handleFunnelCheckoutSessionCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  if (meta.type !== "funnel_form_purchase") return;
+
+  const sessionId = session.id as string;
+  const db = await getDb();
+  if (!db) return;
+
+  const [existingBySession] = await db.select({ id: funnelPurchases.id })
+    .from(funnelPurchases)
+    .where(eq(funnelPurchases.stripeCheckoutSessionId, sessionId))
+    .limit(1);
+  if (existingBySession) {
+    console.log(`[Stripe] Funnel checkout session already processed: ${sessionId}`);
+    return;
+  }
+
+  const piId = (session.payment_intent as string) || sessionId;
+  await handleFunnelPaymentIntentSucceeded({
+    metadata: meta,
+    amount: session.amount_total,
+    id: piId,
+    checkout_session_id: sessionId,
+  });
+}
+
 async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, unknown>) {
   const meta = (paymentIntent.metadata ?? {}) as Record<string, string>;
   // Handle both funnel_form_purchase and embedded_checkout_purchase
@@ -980,7 +1010,20 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   }
   // ── END AUTO-ACCOUNT CREATION ────────────────────────────────────────────
 
+  const checkoutSessionId = paymentIntent.checkout_session_id as string | undefined;
+
   // Idempotency check
+  if (checkoutSessionId) {
+    const [existingBySession] = await db.select({ id: funnelPurchases.id })
+      .from(funnelPurchases)
+      .where(eq(funnelPurchases.stripeCheckoutSessionId, checkoutSessionId))
+      .limit(1);
+    if (existingBySession) {
+      console.log(`[Stripe] Funnel purchase already recorded for checkout session ${checkoutSessionId}`);
+      return;
+    }
+  }
+
   const [existingPurchase] = await db.select({ id: funnelPurchases.id })
     .from(funnelPurchases)
     .where(eq(funnelPurchases.stripePaymentIntentId, piId))
@@ -1010,6 +1053,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       amountPaid: amount,
       currency: "usd",
       stripePaymentIntentId: piId,
+      stripeCheckoutSessionId: checkoutSessionId ?? null,
       sourceType: sourceType as any,
       sourceFunnelId: funnelId,
       sourceFunnelPageId: funnelPageId,
@@ -1341,117 +1385,103 @@ async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
   }
 }
 
-export function registerStripeWebhook(app: Express) {
-  // Raw body needed for Stripe signature verification
-  app.post(
-    "/api/webhooks/stripe",
-    // Express raw body middleware for this route only
-    (req: Request, res: Response, next) => {
-      let data = "";
-      req.setEncoding("utf8");
-      req.on("data", (chunk: string) => { data += chunk; });
-      req.on("end", () => {
-        (req as Request & { rawBody: string }).rawBody = data;
-        next();
-      });
-    },
-    async (req: Request & { rawBody?: string }, res: Response) => {
-      const rawBody = req.rawBody ?? "";
-      const sig = req.headers["stripe-signature"] as string | undefined;
-
-      let event: Record<string, unknown>;
-
-      // Verify signature if secret is configured
-      if (STRIPE_WEBHOOK_SECRET && sig) {
-        try {
-          // Simple HMAC verification without the Stripe SDK
-          const crypto = await import("crypto");
-          const parts = sig.split(",");
-          const tPart = parts.find((p) => p.startsWith("t="));
-          const v1Part = parts.find((p) => p.startsWith("v1="));
-          if (!tPart || !v1Part) throw new Error("Invalid signature format");
-          const timestamp = tPart.slice(2);
-          const expectedSig = v1Part.slice(3);
-          const payload = `${timestamp}.${rawBody}`;
-          const hmac = crypto
-            .createHmac("sha256", STRIPE_WEBHOOK_SECRET)
-            .update(payload)
-            .digest("hex");
-          if (hmac !== expectedSig) throw new Error("Signature mismatch");
-          event = JSON.parse(rawBody) as Record<string, unknown>;
-        } catch (err) {
-          console.error("[Stripe] Webhook signature verification failed:", err);
-          res.status(400).json({ error: "Invalid signature" });
-          return;
-        }
-      } else {
-        // No secret configured — accept without verification (dev mode)
-        try {
-          event = JSON.parse(rawBody) as Record<string, unknown>;
-        } catch {
-          res.status(400).json({ error: "Invalid JSON" });
-          return;
-        }
-      }
-
-      const eventType = event.type as string;
-      const eventId = event.id as string;
-
-      // Log the event
-      const logDb = await getDb();
-      try {
-        if (logDb) {
-          await logDb.insert(webhookEvents).values({
-            source: "stripe",
-            resource: eventType.split(".")[0] ?? "checkout",
-            action: eventType.split(".").slice(1).join(".") ?? eventType,
-            email: undefined,
-            outcome: "ignored",
-            message: `Stripe event received: ${eventType} (${eventId})`,
-            rawPayload: rawBody,
-          });
-        }
-      } catch (err) {
-        console.warn("[Stripe] Failed to log webhook event:", err);
-      }
-
-      // Handle events
-      try {
-        const sessionObj = (event.data as { object: Record<string, unknown> }).object;
-        if (eventType === "checkout.session.completed") {
-          await handleCheckoutSessionCompleted(sessionObj);
-          await handleEmployerCheckoutCompleted(sessionObj);
-          await handleLmsCheckoutCompleted(sessionObj);
-          await handleDigitalDownloadCheckoutCompleted(sessionObj);
-          await handleDigitalBundleCheckoutCompleted(sessionObj);
-          await handleBrandMembershipCheckoutCompleted(sessionObj);
-          await handleDualMembershipCheckoutCompleted(sessionObj);
-          await handlePhysicalProductCheckoutCompleted(sessionObj);
-          await handleMembershipCheckoutCompleted(sessionObj);
-        } else if (eventType === "payment_intent.succeeded") {
-          await handleFunnelPaymentIntentSucceeded(sessionObj);
-        } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
-          await handleBrandSubscriptionLifecycle(sessionObj, eventType);
-        } else if (eventType === "invoice.payment_failed") {
-          await handleInvoicePaymentFailed(sessionObj);
-        } else {
-          console.log(`[Stripe] Unhandled event type: ${eventType}`);
-        }
-      } catch (err) {
-        console.error(`[Stripe] Error handling event ${eventType}:`, err);
-        // Still return 200 to prevent Stripe retries for handled errors
-      }
-
-      res.json({ received: true });
-    }
-  );
-
-  // Also register at /api/stripe/webhook (production webhook URL)
-  app.post("/api/stripe/webhook", (req: Request, res: Response) => {
-    // Forward to the main webhook handler by re-emitting the request
-    req.url = "/api/webhooks/stripe";
-    (app as any).handle(req, res);
+function stripeWebhookRawBody(req: Request, res: Response, next: () => void) {
+  let data = "";
+  req.setEncoding("utf8");
+  req.on("data", (chunk: string) => { data += chunk; });
+  req.on("end", () => {
+    (req as Request & { rawBody: string }).rawBody = data;
+    next();
   });
+}
 
+async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Response) {
+  const rawBody = req.rawBody ?? "";
+  const sig = req.headers["stripe-signature"] as string | undefined;
+  let event: Record<string, unknown>;
+
+  if (STRIPE_WEBHOOK_SECRET) {
+    if (!sig) {
+      console.error("[Stripe] Webhook rejected: missing stripe-signature header");
+      res.status(400).json({ error: "Missing stripe-signature header" });
+      return;
+    }
+    try {
+      const crypto = await import("crypto");
+      const parts = sig.split(",");
+      const tPart = parts.find((p) => p.startsWith("t="));
+      const v1Part = parts.find((p) => p.startsWith("v1="));
+      if (!tPart || !v1Part) throw new Error("Invalid signature format");
+      const timestamp = tPart.slice(2);
+      const expectedSig = v1Part.slice(3);
+      const payload = `${timestamp}.${rawBody}`;
+      const hmac = crypto.createHmac("sha256", STRIPE_WEBHOOK_SECRET).update(payload).digest("hex");
+      if (hmac !== expectedSig) throw new Error("Signature mismatch");
+      event = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch (err) {
+      console.error("[Stripe] Webhook signature verification failed:", err);
+      res.status(400).json({ error: "Invalid signature" });
+      return;
+    }
+  } else {
+    try {
+      event = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      res.status(400).json({ error: "Invalid JSON" });
+      return;
+    }
+  }
+
+  const eventType = event.type as string;
+  const eventId = event.id as string;
+  const logDb = await getDb();
+  try {
+    if (logDb) {
+      await logDb.insert(webhookEvents).values({
+        source: "stripe",
+        resource: eventType.split(".")[0] ?? "checkout",
+        action: eventType.split(".").slice(1).join(".") ?? eventType,
+        email: undefined,
+        outcome: "ignored",
+        message: `Stripe event received: ${eventType} (${eventId})`,
+        rawPayload: rawBody,
+      });
+    }
+  } catch (err) {
+    console.warn("[Stripe] Failed to log webhook event:", err);
+  }
+
+  try {
+    const sessionObj = (event.data as { object: Record<string, unknown> }).object;
+    if (eventType === "checkout.session.completed") {
+      await handleFunnelCheckoutSessionCompleted(sessionObj);
+      await handleCheckoutSessionCompleted(sessionObj);
+      await handleEmployerCheckoutCompleted(sessionObj);
+      await handleLmsCheckoutCompleted(sessionObj);
+      await handleDigitalDownloadCheckoutCompleted(sessionObj);
+      await handleDigitalBundleCheckoutCompleted(sessionObj);
+      await handleBrandMembershipCheckoutCompleted(sessionObj);
+      await handleDualMembershipCheckoutCompleted(sessionObj);
+      await handlePhysicalProductCheckoutCompleted(sessionObj);
+      await handleMembershipCheckoutCompleted(sessionObj);
+    } else if (eventType === "payment_intent.succeeded") {
+      await handleFunnelPaymentIntentSucceeded(sessionObj);
+    } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
+      await handleBrandSubscriptionLifecycle(sessionObj, eventType);
+    } else if (eventType === "invoice.payment_failed") {
+      await handleInvoicePaymentFailed(sessionObj);
+    } else {
+      console.log(`[Stripe] Unhandled event type: ${eventType}`);
+    }
+  } catch (err) {
+    console.error(`[Stripe] Error handling event ${eventType}:`, err);
+  }
+
+  res.json({ received: true });
+}
+
+export function registerStripeWebhook(app: Express) {
+  app.post("/api/webhooks/stripe", stripeWebhookRawBody, stripeWebhookHandler);
+  app.post("/api/stripe/webhook", stripeWebhookRawBody, stripeWebhookHandler);
   console.log("[Stripe] Webhook registered at /api/webhooks/stripe and /api/stripe/webhook");
 }
