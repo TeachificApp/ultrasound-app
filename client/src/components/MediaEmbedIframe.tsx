@@ -18,11 +18,9 @@ type MediaEmbedIframeProps = {
 /**
  * Resolves private media repository embed URLs.
  *
- * For SCORM assets (/api/media/:slug/scorm), uses client-side ZIP extraction
- * via ScormPlayer (iSpring-style) — no server-side extraction job needed.
- *
- * For all other media types, resolves a signed ?access= token and renders
- * a standard iframe.
+ * SCORM (/api/media/:slug/scorm): uses server /scorm/ when content is already
+ * extracted or the current version points at HTML; otherwise client-side ZIP
+ * extraction via ScormPlayer.
  */
 export function MediaEmbedIframe({
   src,
@@ -37,14 +35,12 @@ export function MediaEmbedIframe({
   const parsed = useMemo(() => (src.startsWith("/") ? parseMediaRepoUrl(src) : null), [src]);
   const isScormPath = parsed?.path === "scorm";
 
-  // ── SCORM path: fetch ZIP URL and render client-side player ──────────────────
   const { data: scormData, isLoading: scormLoading, isError: scormError } =
     trpc.mediaRepo.getScormZipUrl.useQuery(
       { slug: parsed!.slug, courseId },
       { enabled: !!parsed && isScormPath && !!user }
     );
 
-  // ── Non-SCORM path: resolve signed embed URL ───────────────────────────
   const { data: embedData, isLoading: embedLoading, isError: embedError } =
     trpc.mediaRepo.getMediaEmbedUrl.useQuery(
       { slug: parsed!.slug, courseId, path: parsed!.path },
@@ -59,9 +55,19 @@ export function MediaEmbedIframe({
     return `${window.location.origin}${src}`;
   }, [src, parsed, embedData?.url]);
 
+  const serverScormSrc = useMemo(() => {
+    if (scormData?.mode !== "server" || !scormData.embedUrl) return "";
+    return `${window.location.origin}${scormData.embedUrl}`;
+  }, [scormData]);
+
+  const clientZipUrl = useMemo(() => {
+    if (scormData?.mode !== "clientZip" || !scormData.zipUrl) return "";
+    const url = scormData.zipUrl;
+    return url.startsWith("/") ? `${window.location.origin}${url}` : url;
+  }, [scormData]);
+
   if (!src) return null;
 
-  // ── SCORM rendering ──────────────────────────────────────────────────────────────────
   if (isScormPath) {
     if (!user || scormLoading) {
       return (
@@ -73,7 +79,7 @@ export function MediaEmbedIframe({
         </div>
       );
     }
-    if (scormError || !scormData?.zipUrl) {
+    if (scormError || !scormData) {
       return (
         <div
           className={className}
@@ -83,17 +89,38 @@ export function MediaEmbedIframe({
         </div>
       );
     }
+    if (scormData.mode === "server" && serverScormSrc) {
+      return (
+        <iframe
+          src={serverScormSrc}
+          className={className}
+          style={style}
+          title={scormData.title ?? title}
+          allow={allow}
+          allowFullScreen={allowFullScreen}
+        />
+      );
+    }
+    if (scormData.mode === "clientZip" && clientZipUrl) {
+      return (
+        <ScormPlayer
+          zipUrl={clientZipUrl}
+          title={scormData.title ?? title}
+          className={className}
+          style={style}
+        />
+      );
+    }
     return (
-      <ScormPlayer
-        zipUrl={scormData.zipUrl}
-        title={scormData.title ?? title}
+      <div
         className={className}
-        style={style}
-      />
+        style={{ ...style, display: "flex", alignItems: "center", justifyContent: "center", background: "#fef2f2", color: "#991b1b", fontSize: 14, padding: 16 }}
+      >
+        Unable to load this content. No playable SCORM file was found.
+      </div>
     );
   }
 
-  // ── Non-SCORM rendering ─────────────────────────────────────────────────────────────
   if (parsed && user && embedLoading) {
     return (
       <div

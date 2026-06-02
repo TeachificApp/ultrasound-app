@@ -22,7 +22,7 @@
 import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
-import { findScormLaunchFile, needsScormExtraction, shouldShowScormWaitingPage } from "../lib/scormPackage";
+import { findScormLaunchFile, needsScormExtraction, shouldShowScormWaitingPage, pickScormPlaybackMode, encodeStorageFetchUrl } from "../lib/scormPackage";
 import { buildMediaAuthQuery, verifyMediaViewerToken } from "../lib/mediaEmbedAccess";
 import { createHash } from "crypto";
 import https from "https";
@@ -625,18 +625,29 @@ for (const slugPath of ["/api/media/:slug/scorm-zip", "/media/:slug/scorm-zip"])
       res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}"`);
       res.setHeader("Content-Type", "application/zip");
       res.setHeader("Cache-Control", "private, max-age=300");
-      let zipUrl = version.s3Url;
-      // URL-encode the path portion to handle filenames with spaces or special chars.
-      // Pre-encode spaces before passing to new URL() since raw spaces are invalid in URLs.
-      try {
-        const preEncoded = zipUrl.replace(/ /g, "%20");
-        const parsed = new URL(preEncoded);
-        parsed.pathname = parsed.pathname.split("/").map((seg) => encodeURIComponent(decodeURIComponent(seg))).join("/");
-        zipUrl = parsed.toString();
-      } catch {
-        // Fallback: just replace spaces with %20 directly
-        zipUrl = zipUrl.replace(/ /g, "%20");
+      const db = await getDb();
+      if (!db) return res.status(503).json({ error: "DB unavailable" });
+      const allVersions = await db
+        .select({
+          s3Url: mediaVersions.s3Url,
+          fileName: mediaVersions.fileName,
+          mimeType: mediaVersions.mimeType,
+          s3Key: mediaVersions.s3Key,
+          versionNumber: mediaVersions.versionNumber,
+          scormExtractedPrefix: mediaVersions.scormExtractedPrefix,
+        })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, asset.id))
+        .orderBy(desc(mediaVersions.versionNumber));
+
+      const strategy = pickScormPlaybackMode(version, allVersions);
+      if (strategy.mode !== "clientZip" || !strategy.zipS3Url) {
+        return res.status(400).json({
+          error: "This SCORM package is served from extracted files, not a ZIP. Use /scorm instead of /scorm-zip.",
+        });
       }
+
+      const zipUrl = encodeStorageFetchUrl(strategy.zipS3Url);
       const protocol = zipUrl.startsWith("https") ? https : http;
       protocol
         .get(zipUrl, (upstream) => {
@@ -645,6 +656,17 @@ for (const slugPath of ["/api/media/:slug/scorm-zip", "/media/:slug/scorm-zip"])
           if (upstream.statusCode && upstream.statusCode >= 400) {
             console.error(`[scorm-zip] Upstream S3 error ${upstream.statusCode} for ${zipUrl}`);
             if (!res.headersSent) return res.status(502).json({ error: "Failed to fetch SCORM package from storage" });
+          }
+          const ct = (upstream.headers["content-type"] ?? "").toLowerCase();
+          if (ct.includes("text/html") || ct.includes("application/json")) {
+            console.error(`[scorm-zip] Upstream returned ${ct} instead of ZIP for ${zipUrl}`);
+            upstream.resume();
+            if (!res.headersSent) {
+              return res.status(502).json({
+                error: "Storage returned non-ZIP content (likely an extracted HTML file). Re-upload the ZIP or use server playback.",
+              });
+            }
+            return;
           }
           res.status(upstream.statusCode ?? 200);
           upstream.pipe(res);

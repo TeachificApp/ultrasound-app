@@ -77,6 +77,85 @@ export function findScormLaunchFile(manifestXml: string): string {
   return "index.html";
 }
 
+
+/** True when the stored file reference points at a ZIP archive (not extracted HTML). */
+export function isZipStorageRef(params: {
+  s3Url?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  s3Key?: string | null;
+}): boolean {
+  const url = (params.s3Url ?? "").toLowerCase().split("?")[0];
+  const name = (params.fileName ?? params.s3Key ?? "").toLowerCase();
+  const mime = (params.mimeType ?? "").toLowerCase();
+  if (url.endsWith(".zip")) return true;
+  if (name.endsWith(".zip")) return true;
+  if (mime.includes("zip") && !mime.includes("html")) return true;
+  return false;
+}
+
+/** Encode storage/CDN URLs so paths with spaces and special chars fetch reliably. */
+export function encodeStorageFetchUrl(rawUrl: string): string {
+  try {
+    const preEncoded = rawUrl.replace(/ /g, "%20");
+    const parsed = new URL(preEncoded);
+    parsed.pathname = parsed.pathname
+      .split("/")
+      .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
+      .join("/");
+    return parsed.toString();
+  } catch {
+    return rawUrl.replace(/ /g, "%20");
+  }
+}
+
+export type ScormPlaybackMode = "clientZip" | "server";
+
+export type MediaVersionZipRef = {
+  s3Url: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  s3Key?: string | null;
+  versionNumber?: number;
+  scormExtractedPrefix?: string | null;
+};
+
+/**
+ * Choose client-side ZIP extraction vs server /scorm/ serving.
+ * Many legacy assets point the "current" version at extracted index.html — not the ZIP.
+ */
+export function pickScormPlaybackMode(
+  current: MediaVersionZipRef,
+  allVersions: MediaVersionZipRef[] = []
+): { mode: ScormPlaybackMode; zipS3Url?: string } {
+  if (current.scormExtractedPrefix) {
+    return { mode: "server" };
+  }
+
+  if (isZipStorageRef(current) && current.s3Url) {
+    return { mode: "clientZip", zipS3Url: current.s3Url };
+  }
+
+  const sorted = [...allVersions].sort(
+    (a, b) => (b.versionNumber ?? 0) - (a.versionNumber ?? 0)
+  );
+  for (const v of sorted) {
+    if (isZipStorageRef(v) && v.s3Url) {
+      return { mode: "clientZip", zipS3Url: v.s3Url };
+    }
+  }
+
+  if (current.s3Url && !isZipStorageRef(current)) {
+    return { mode: "server" };
+  }
+
+  if (current.s3Url) {
+    return { mode: "clientZip", zipS3Url: current.s3Url };
+  }
+
+  return { mode: "server" };
+}
+
 /** Queue background extraction (sets status=pending; heartbeat does the work). */
 export async function queueScormExtractionIfNeeded(
   versionId: number,

@@ -4,6 +4,8 @@ import {
   initialScormExtractionStatus,
   needsScormExtraction,
   shouldShowScormWaitingPage,
+  isZipStorageRef,
+  pickScormPlaybackMode,
 } from "./scormPackage";
 
 describe("scormPackage", () => {
@@ -49,3 +51,43 @@ describe("scormPackage", () => {
     ).toBe(true);
   });
 });
+describe("isZipStorageRef", () => {
+  it("detects zip by url and filename", () => {
+    expect(isZipStorageRef({ s3Url: "https://cdn/x/file.zip" })).toBe(true);
+    expect(isZipStorageRef({ s3Url: "https://cdn/x/index.html" })).toBe(false);
+    expect(isZipStorageRef({ fileName: "quiz.zip" })).toBe(true);
+  });
+});
+
+describe("pickScormPlaybackMode", () => {
+  it("uses server mode when current points at HTML but prefix exists", () => {
+    expect(
+      pickScormPlaybackMode(
+        { s3Url: "https://cdn/index.html", scormExtractedPrefix: "scorm-extracted/foo" },
+        []
+      ).mode
+    ).toBe("server");
+  });
+
+  it("finds zip from an older version when current is HTML", () => {
+    const r = pickScormPlaybackMode(
+      { s3Url: "https://cdn/index.html", versionNumber: 2 },
+      [
+        { s3Url: "https://cdn/quiz.zip", versionNumber: 2 },
+        { s3Url: "https://cdn/old.zip", versionNumber: 1 },
+      ]
+    );
+    expect(r.mode).toBe("clientZip");
+    expect(r.zipS3Url).toContain(".zip");
+  });
+
+  it("uses server when current is HTML and no zip in history", () => {
+    expect(
+      pickScormPlaybackMode(
+        { s3Url: "https://cdn/folder/index.html", versionNumber: 1 },
+        [{ s3Url: "https://cdn/folder/index.html", versionNumber: 1 }]
+      ).mode
+    ).toBe("server");
+  });
+});
+

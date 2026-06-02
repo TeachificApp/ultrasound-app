@@ -205,8 +205,16 @@ export function ScormPlayer({ zipUrl, title = "SCORM Content", className, style,
 
     try {
       // 1. Download the ZIP with progress tracking
-      const response = await fetch(zipUrl);
+      const fetchUrl = zipUrl.startsWith("/") ? `${window.location.origin}${zipUrl}` : zipUrl;
+      const response = await fetch(fetchUrl, { credentials: "same-origin" });
       if (!response.ok) throw new Error(`Failed to fetch ZIP: ${response.status} ${response.statusText}`);
+
+      const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+      if (contentType.includes("text/html") || contentType.includes("application/json")) {
+        throw new Error(
+          "Server returned an error page instead of a ZIP file. The package may need to be re-uploaded or served via server extraction."
+        );
+      }
 
       const contentLength = Number(response.headers.get("content-length") ?? 0);
       let loaded = 0;
@@ -230,9 +238,37 @@ export function ScormPlayer({ zipUrl, title = "SCORM Content", className, style,
         offset += chunk.length;
       }
 
+      // Reject HTML/JSON masquerading as ZIP (common when s3Url points at index.html)
+      if (buffer.length >= 2) {
+        const isZipMagic = buffer[0] === 0x50 && buffer[1] === 0x4b; // PK
+        const looksLikeHtml =
+          buffer[0] === 0x3c ||
+          (buffer.length >= 5 &&
+            buffer[0] === 0xef &&
+            buffer[1] === 0xbb &&
+            buffer[2] === 0xbf &&
+            buffer[3] === 0x3c);
+        if (!isZipMagic && looksLikeHtml) {
+          throw new Error(
+            "Downloaded file is not a ZIP archive (received HTML). Ask an admin to re-upload the SCORM package or use Re-extract in the media library."
+          );
+        }
+      }
+
       // 2. Extract the ZIP
       setState({ phase: "extracting" });
-      const zip = await JSZip.loadAsync(buffer);
+      let zip;
+      try {
+        zip = await JSZip.loadAsync(buffer);
+      } catch (zipErr: any) {
+        const msg = zipErr?.message ?? "";
+        if (msg.includes("end of central directory")) {
+          throw new Error(
+            "Invalid or incomplete ZIP file. The stored file may be an extracted HTML page — try Re-extract in the media library or re-upload the package."
+          );
+        }
+        throw zipErr;
+      }
 
       // 3. Build a blob URL map for all files
       const blobMap = new Map<string, string>(); // normalised path → blob URL

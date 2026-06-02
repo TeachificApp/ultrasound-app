@@ -35,7 +35,7 @@ import {
   mediaFolders,
   lmsEnrollments,
 } from "../../drizzle/schema";
-import { initialScormExtractionStatus, needsScormExtraction, queueScormExtractionIfNeeded } from "../lib/scormPackage";
+import { initialScormExtractionStatus, needsScormExtraction, queueScormExtractionIfNeeded, pickScormPlaybackMode } from "../lib/scormPackage";
 import { buildMediaAuthQuery, signMediaViewerToken } from "../lib/mediaEmbedAccess";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1073,19 +1073,38 @@ export const mediaRepoRouter = router({
         }
       }
       if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "No access to this media asset" });
-      // Get the latest version's S3 URL
-      const [version] = await db
-        .select({ s3Url: mediaVersions.s3Url })
+      const versions = await db
+        .select({
+          s3Url: mediaVersions.s3Url,
+          fileName: mediaVersions.fileName,
+          mimeType: mediaVersions.mimeType,
+          s3Key: mediaVersions.s3Key,
+          versionNumber: mediaVersions.versionNumber,
+          scormExtractedPrefix: mediaVersions.scormExtractedPrefix,
+        })
         .from(mediaVersions)
         .where(eq(mediaVersions.assetId, asset.id))
-        .orderBy(sql`${mediaVersions.versionNumber} DESC`)
-        .limit(1);
-      if (!version?.s3Url) throw new TRPCError({ code: "NOT_FOUND", message: "No file found for this asset" });
-      // Return a signed proxy URL — the raw S3 URL is never exposed to the client.
-      // The /api/media/:slug/scorm-zip route validates the ?access= token and proxies the ZIP.
+        .orderBy(desc(mediaVersions.versionNumber));
+      const current = versions[0];
+      if (!current?.s3Url) throw new TRPCError({ code: "NOT_FOUND", message: "No file found for this asset" });
+
       const access = signMediaViewerToken(asset.slug, ctx.user.id, input.courseId ?? null);
       const authQuery = buildMediaAuthQuery({ access });
-      return { zipUrl: `/api/media/${asset.slug}/scorm-zip${authQuery}`, title: asset.title };
+      const strategy = pickScormPlaybackMode(current, versions);
+
+      if (strategy.mode === "server") {
+        return {
+          mode: "server" as const,
+          embedUrl: `/api/media/${asset.slug}/scorm${authQuery}`,
+          title: asset.title,
+        };
+      }
+
+      return {
+        mode: "clientZip" as const,
+        zipUrl: `/api/media/${asset.slug}/scorm-zip${authQuery}`,
+        title: asset.title,
+      };
     }),
 
   // ─── Folder CRUD ──────────────────────────────────────────────────────────────
