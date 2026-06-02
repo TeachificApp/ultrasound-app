@@ -100,17 +100,17 @@ const LESSON_TYPE_LABELS: Record<string, string> = {
   download: "Download / File",
 };
 
-// ─── SSO-aware link button for course list ───────────────────────────────────
+// ─── Direct landing page link button for course list ─────────────────────────
 /** @param slug - either a bare slug ("my-course") or a full path ("my-course/overview") */
 function SsoLearnLinkButton({ slug, label }: { slug: string; label?: string }) {
-  const { openLearnLink } = useLearnLink();
   const path = slug.startsWith("/") ? slug : `/courses/${slug}`;
+  const url = `https://learn.allaboutultrasound.com${path}`;
   return (
-    <Button size="sm" variant="ghost" className="h-7 text-xs text-gray-500 hover:bg-gray-50"
-      onClick={() => openLearnLink(path)}
-    >
-      <LinkIcon className="w-3 h-3" />{label && <span className="ml-1">{label}</span>}
-    </Button>
+    <a href={url} target="_blank" rel="noopener noreferrer">
+      <Button size="sm" variant="ghost" className="h-7 text-xs text-gray-500 hover:bg-gray-50" title="View landing page">
+        <ExternalLink className="w-3 h-3" />{label && <span className="ml-1">{label}</span>}
+      </Button>
+    </a>
   );
 }
 
