@@ -2145,7 +2145,10 @@ export const lmsGroupRouter = router({
       return { success: true };
     }),
 
-  /** Create a Stripe Payment Link for a pricing option — returns a permanent buy.stripe.com URL */
+  /** Create a Stripe Payment Link for a pricing option — returns a permanent buy.stripe.com URL.
+   * Works for all pricing types (one_time, subscription, payment_plan).
+   * Auto-creates a Stripe Product+Price if none exists. Caches the result.
+   */
   createPaymentLink: protectedProcedure
     .input(z.object({ pricingOptionId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
@@ -2153,28 +2156,95 @@ export const lmsGroupRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // Load the pricing option
+      // Load pricing option + its course
       const [opt] = await db.select().from(lmsPricingOptions).where(eq(lmsPricingOptions.id, input.pricingOptionId)).limit(1);
       if (!opt) throw new TRPCError({ code: "NOT_FOUND", message: "Pricing option not found" });
-      if (!opt.stripePriceId) throw new TRPCError({ code: "BAD_REQUEST", message: "This pricing option has no Stripe Price ID configured. Please add a Stripe Price ID in the pricing option settings first." });
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, opt.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
-      // Check if a payment link already exists for this pricing option (stored in metadata)
-      // Create a new Stripe Payment Link
+      // ── Return cached payment link if it still exists in Stripe ──────────────
+      const cachedLinkId = (opt as any).stripePaymentLinkId as string | null;
+      if (cachedLinkId) {
+        try {
+          const existing = await stripe.paymentLinks.retrieve(cachedLinkId);
+          if (existing.active) return { url: existing.url };
+        } catch { /* link deleted or invalid — fall through to create a new one */ }
+      }
+
+      // ── Resolve or auto-create the Stripe Price ID ────────────────────────────
+      const pricingType = opt.pricingType ?? "one_time";
+      const currency = course.currency ?? "usd";
+      const productName = `${course.title}${opt.label ? ` — ${opt.label}` : ""}`;
+      let stripePriceId = opt.stripePriceId ?? null;
+
+      if (!stripePriceId) {
+        // Create a dedicated Stripe Product for this pricing option
+        const product = await stripe.products.create({
+          name: productName,
+          description: course.subtitle ?? undefined,
+          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id) },
+        });
+        const stripeProductId = product.id;
+
+        if (pricingType === "one_time" || pricingType === "free") {
+          const price = await stripe.prices.create({
+            product: stripeProductId,
+            unit_amount: Math.round(Number(opt.price) * 100),
+            currency,
+          });
+          stripePriceId = price.id;
+        } else if (pricingType === "subscription") {
+          const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
+          const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
+          const interval = opt.subscriptionInterval ?? "monthly";
+          const price = await stripe.prices.create({
+            product: stripeProductId,
+            unit_amount: Math.round(Number(opt.price) * 100),
+            currency,
+            recurring: { interval: intervalMap[interval] ?? "month", interval_count: intervalCountMap[interval] ?? 1 },
+          });
+          stripePriceId = price.id;
+        } else if (pricingType === "payment_plan") {
+          // Use the installment amount as the recurring price
+          const installmentAmt = opt.installmentAmount && opt.installmentAmount > 0 ? opt.installmentAmount : opt.price;
+          const intervalMonths = Math.round((opt.installmentIntervalDays ?? 30) / 30) || 1;
+          const price = await stripe.prices.create({
+            product: stripeProductId,
+            unit_amount: Math.round(Number(installmentAmt) * 100),
+            currency,
+            recurring: { interval: "month", interval_count: intervalMonths },
+          });
+          stripePriceId = price.id;
+        } else {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported pricing type: ${pricingType}` });
+        }
+
+        // Cache the Stripe Price ID on the pricing option for future checkouts
+        await db.update(lmsPricingOptions).set({ stripePriceId }).where(eq(lmsPricingOptions.id, opt.id));
+      }
+
+      // ── Create the Stripe Payment Link ────────────────────────────────────────
       const paymentLink = await stripe.paymentLinks.create({
-        line_items: [{ price: opt.stripePriceId, quantity: 1 }],
+        line_items: [{ price: stripePriceId, quantity: 1 }],
+        allow_promotion_codes: true,
         metadata: {
           pricing_option_id: String(opt.id),
-          course_id: String(opt.courseId ?? ""),
-          source: "lms_admin_copy_link",
+          course_id: String(course.id),
+          source: "lms_admin_payment_link",
         },
         after_completion: {
           type: "redirect",
           redirect: { url: `${process.env.CANONICAL_ROOT_DOMAIN ?? "https://learn.allaboutultrasound.com"}/library` },
         },
       });
+
+      // Cache the payment link ID so we reuse it next time instead of creating a new one
+      await db.update(lmsPricingOptions)
+        .set({ stripePaymentLinkId: paymentLink.id } as any)
+        .where(eq(lmsPricingOptions.id, opt.id));
 
       return { url: paymentLink.url };
     }),

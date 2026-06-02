@@ -8749,7 +8749,10 @@ function PricingOptionRow({ opt, editingId, setEditingId, setShowAdd, updateOpti
   // Stripe Payment Link mutation
   const createPaymentLink = trpc.lmsAdmin.createPaymentLink.useMutation({
     onSuccess: (data) => {
-      navigator.clipboard.writeText(data.url).then(() => toast.success("Stripe Payment Link copied!"));
+      navigator.clipboard.writeText(data.url)
+        .then(() => toast.success("Stripe Payment Link copied to clipboard!"))
+        .catch(() => toast.success(`Stripe Payment Link: ${data.url}`));
+      window.open(data.url, "_blank", "noopener,noreferrer");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -8787,7 +8790,7 @@ function PricingOptionRow({ opt, editingId, setEditingId, setShowAdd, updateOpti
         onClick={() => createPaymentLink.mutate({ pricingOptionId: opt.id })}
         disabled={createPaymentLink.isPending}
         className="text-xs text-blue-400 hover:text-blue-600 p-1 flex-shrink-0 disabled:opacity-50"
-        title={opt.stripePriceId ? "Copy Stripe Payment Link (direct checkout)" : "No Stripe Price ID — add one in settings first"}
+        title="Generate & copy Stripe Payment Link (opens in new tab)"
       >
         {createPaymentLink.isPending ? <span className="w-3.5 h-3.5 block animate-spin border border-blue-400 border-t-transparent rounded-full" /> : <Link2 className="w-3.5 h-3.5" />}
       </button>

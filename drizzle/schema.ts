@@ -3989,6 +3989,8 @@ export const lmsPricingOptions = mysqlTable("lms_pricing_options", {
   ctaLabel: varchar("cta_label", { length: 100 }),
   // Optional external URL — if set, the CTA button links here instead of triggering Stripe checkout
   ctaUrl: varchar("cta_url", { length: 2048 }),
+  // Cached Stripe Payment Link ID (plink_...) — created on demand by admin, reused on subsequent requests
+  stripePaymentLinkId: varchar("stripe_payment_link_id", { length: 255 }),
   // Sort order in the pricing options list (lower = shown first)
   sortOrder: int("sort_order").default(0).notNull(),
   // Whether this option is currently shown on the landing page
