@@ -229,7 +229,13 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       if (isMediaRepo && d.embedUrl) {
         return (
           <div className="w-full">
-            <style>{`.${videoId} { accent-color: ${videoAccent}; } .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }`}</style>
+            <style>{`
+              .${videoId} { accent-color: ${videoAccent}; }
+              .${videoId}::-webkit-media-controls-panel { background: linear-gradient(transparent 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.72) 100%); }
+              .${videoId}::-webkit-media-controls-play-button { filter: none; }
+              .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }
+              .${videoId}::-webkit-media-controls-volume-slider { accent-color: ${videoAccent}; }
+            `}</style>
             <video
               src={trimmedEmbedUrl}
               autoPlay={d.autoplay ?? false}
@@ -252,7 +258,13 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           {d.embedUrl ? (
             isDirectVideo ? (
               <div className="mx-auto overflow-hidden shadow" style={containerStyle}>
-                <style>{`.${videoId} { accent-color: ${videoAccent}; } .${videoId}::-webkit-media-controls-play-button { filter: none; } .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }`}</style>
+                <style>{`
+                  .${videoId} { accent-color: ${videoAccent}; }
+                  .${videoId}::-webkit-media-controls-panel { background: linear-gradient(transparent 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.72) 100%); }
+                  .${videoId}::-webkit-media-controls-play-button { filter: none; }
+                  .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }
+                  .${videoId}::-webkit-media-controls-volume-slider { accent-color: ${videoAccent}; }
+                `}</style>
                 <video
                   src={trimmedEmbedUrl}
                   autoPlay={d.autoplay ?? false}

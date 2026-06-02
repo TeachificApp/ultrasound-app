@@ -595,6 +595,9 @@ export default function Checkout() {
                       <span className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
                         {formatPrice(sessionMeta.displayPrice, sessionMeta.currency)}
                       </span>
+                      {searchParams.teamTierId && sessionMeta.minSeats && (
+                        <span className="ml-2 text-base font-semibold" style={{ color: primary }}>per seat</span>
+                      )}
                       {sessionMeta.pricingType === "subscription" && sessionMeta.billingLabel && (
                         <span className={`text-sm ml-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                           /{sessionMeta.billingLabel.split("/")[1]?.split("—")[0]?.trim() ?? "month"}
@@ -654,7 +657,7 @@ export default function Checkout() {
                           +
                         </button>
                         <span className={`text-xs ml-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                          × {new Intl.NumberFormat("en-US", { style: "currency", currency: sessionMeta.currency }).format(sessionMeta.displayPrice / 100)}/seat
+                          × {formatPrice(sessionMeta.displayPrice, sessionMeta.currency)}/seat
                           {sessionMeta.minSeats > 1 ? ` (min ${sessionMeta.minSeats})` : ""}
                         </span>
                       </div>

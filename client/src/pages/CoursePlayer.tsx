@@ -1810,13 +1810,24 @@ export default function CoursePlayer() {
                   {(lessonData.type === "video" || lessonData.type === "video_text") && lessonData.content && contentBlocks.length === 0 && (
                     <div className="mb-5">
                       <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200">
+                        <style>{`
+                          #cp-video-${course.id} { accent-color: ${primaryColor}; }
+                          #cp-video-${course.id}::-webkit-media-controls-panel {
+                            background: linear-gradient(transparent 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.72) 100%);
+                          }
+                          #cp-video-${course.id}::-webkit-media-controls-play-button { filter: none; }
+                          #cp-video-${course.id}::-webkit-media-controls-timeline { accent-color: ${primaryColor}; }
+                          #cp-video-${course.id}::-webkit-media-controls-volume-slider { accent-color: ${primaryColor}; }
+                        `}</style>
                         <video
+                          id={`cp-video-${course.id}`}
                           ref={videoRef}
                           src={lessonData.content}
                           controls
                           controlsList="nodownload"
                           onContextMenu={e => e.preventDefault()}
                           className="w-full h-full"
+                          style={{ accentColor: primaryColor }}
                           onEnded={() => setVideoWatched(true)}
                         />
                       </div>
