@@ -39,6 +39,7 @@ export function handleCtaBtnClick(
   e: React.MouseEvent<HTMLElement>,
   onEnroll?: () => void,
   onEnrollWithOption?: (pricingOptionId: number | undefined) => void,
+  onCheckoutPage?: (pricingOptionId?: number) => void,
 ) {
   const target = (e.target as HTMLElement).closest("[data-cta-btn]") as HTMLElement | null;
   if (!target) return;
@@ -71,13 +72,15 @@ export function handleCtaBtnClick(
   } else if (action === "download_file") {
     const dl = target.dataset.download;
     if (dl) window.open(dl, "_blank", "noopener,noreferrer");
-  } else if (action === "direct_checkout") {
-    onEnroll?.();
+  } else if (action === "direct_checkout" || action === "group_purchase") {
+    if (onCheckoutPage) onCheckoutPage(undefined);
+    else onEnroll?.();
   } else if (action === "pricing_option") {
-    // Pass the pricing option ID directly to avoid React state closure issues
     const rawId = target.dataset.pricingOption;
     const poId = rawId ? Number(rawId) : undefined;
-    if (onEnrollWithOption) {
+    if (onCheckoutPage) {
+      onCheckoutPage(poId);
+    } else if (onEnrollWithOption) {
       onEnrollWithOption(poId);
     } else {
       onEnroll?.();
@@ -196,6 +199,7 @@ function resolveBtnAction(
   onEnrollWithOption?: (pricingOptionId: number | undefined) => void,
   pricingOptionId?: number,
   onFreePreview?: () => void,
+  onCheckoutPage?: (pricingOptionId?: number) => void,
 ): () => void {
   const b = behavior ?? (link ? "url" : "");
   if (b === "url" && link) return () => window.open(link, "_blank", "noopener,noreferrer");
@@ -203,19 +207,27 @@ function resolveBtnAction(
   if (b === "scroll_to_section" && scrollAnchor) return () => { const el = document.getElementById(scrollAnchor.replace(/^#/, "")); if (el) el.scrollIntoView({ behavior: "smooth" }); };
   if (b === "open_popup" && popupUrl) return () => { const w = 800, h = 600; const left = window.screenX + (window.outerWidth - w) / 2; const top = window.screenY + (window.outerHeight - h) / 2; window.open(popupUrl, "_blank", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`); };
   if (b === "download_file" && downloadUrl) return () => window.open(downloadUrl, "_blank", "noopener,noreferrer");
-  // pricing_option → enroll with specific pricing option
-  if (b === "pricing_option" && onEnrollWithOption) return () => onEnrollWithOption(pricingOptionId);
+  // pricing_option → go to checkout page with specific pricing option pre-selected
+  if (b === "pricing_option") {
+    if (onCheckoutPage) return () => onCheckoutPage(pricingOptionId);
+    if (onEnrollWithOption) return () => onEnrollWithOption(pricingOptionId);
+  }
   // free_preview → open free preview flow (not checkout)
   if (b === "free_preview" && onFreePreview) return onFreePreview;
-  // direct_checkout, group_purchase, next_funnel_step, or default → onEnroll
+  // direct_checkout, group_purchase → go to checkout page
+  if (b === "direct_checkout" || b === "group_purchase") {
+    if (onCheckoutPage) return () => onCheckoutPage(undefined);
+  }
+  // next_funnel_step, or default → onEnroll (free courses, already enrolled, etc.)
   return onEnroll;
 }
 
-function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick }: {
+function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage }: {
   block: Block; course: any; onEnroll: () => void; onEnrollWithOption?: (pricingOptionId: number | undefined) => void; enrolling: boolean; ctaText: string; price: string;
   selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
   slug?: string; enrollment?: any; user?: UserParamSource | null;
   onFreePreviewClick?: (lessonId: number) => void;
+  onCheckoutPage?: (pricingOptionId?: number) => void;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -265,7 +277,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn, i) => (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined)}
+                    <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined, onCheckoutPage)}
                       className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
@@ -296,7 +308,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     case "text":
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, handleEnroll, onEnrollWithOption)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
         </div>
       );
@@ -602,7 +614,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               </p>
             </div>
           )}
-          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined)} disabled={enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage)} disabled={enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {enrolling ? "Processing…" : (d.ctaText ?? ctaText)}
           </button>
           {/* Price below button */}
@@ -623,7 +635,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined)} disabled={enrolling}
+          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage)} disabled={enrolling}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {d.ctaText ?? ctaText}
           </button>
@@ -762,6 +774,8 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                 () => { onSelectPricingOption?.(opt.id); onEnroll(); },
                 onEnrollWithOption,
                 opt.ctaPricingOptionId ? Number(opt.ctaPricingOptionId) : opt.id,
+                undefined,
+                onCheckoutPage,
               );
               const isExternalAction = cardBehavior && ["url", "send_email", "download_file", "open_popup", "scroll_to_section"].includes(cardBehavior);
               const handleCardClick = () => { if (isExternalAction) { cardCtaAction(); } else { onSelectPricingOption?.(opt.id); } };
@@ -833,7 +847,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     case "two_column":
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           <div className="flex gap-8">
             <div className="prose" style={{ flex: d.leftRatio ?? 50 }} dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
             <div className="prose" style={{ flex: 100 - (d.leftRatio ?? 50) }} dangerouslySetInnerHTML={{ __html: d.rightHtml ?? "" }} />
@@ -844,7 +858,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           <div className="max-w-5xl mx-auto grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
@@ -857,7 +871,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const divStyle3 = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: (d.dividerStyle ?? "solid") as any, borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
             <div className="prose prose-lg pr-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-lg px-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
@@ -921,7 +935,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       };
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {!d.subtext && d.headline && <div className="mb-8" />}
@@ -1099,6 +1113,14 @@ export default function CourseLanding() {
     }
   };
 
+  /** Navigate to the dedicated checkout page for this course, optionally pre-selecting a pricing option */
+  const handleGoToCheckoutPage = (pricingOptionId?: number) => {
+    const base = `/checkout/${slug}`;
+    const params = new URLSearchParams();
+    if (pricingOptionId) params.set("option", String(pricingOptionId));
+    navigate(`${base}${params.toString() ? `?${params.toString()}` : ""}`);
+  };
+
   const handleEnroll = async () => {
     if (!user) {
       openGuestCheckoutModal(selectedPricingOptionId);
@@ -1251,10 +1273,10 @@ export default function CourseLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
                 <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} />
+                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} />
                 </div>
               ) : (
-                <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} />
+                <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} />
               )}
             </div>
           );
