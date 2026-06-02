@@ -95,7 +95,7 @@ export interface Block {
   data: Record<string, any>;
 }
 
-export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; coursePrice?: number; courseTitle?: string }) {
+export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number }) {
   const { user } = useAuth();
   const d = block.data ?? {};
   // Pre-compute pass-through URL for url_embed blocks (hooks must be at top level, not inside switch)

@@ -1840,7 +1840,7 @@ export default function CoursePlayer() {
                           <InlineLiveSession key={block.id} data={block.data as any} />
                         ) : (
                           <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-lg">
-                            <BlockPreview block={block} />
+                            <BlockPreview block={block} courseId={data?.course?.id} />
                           </div>
                         )
                       ))}
