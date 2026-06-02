@@ -4321,3 +4321,22 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## CRITICAL: Enrollment Bug (Jun 1 2026)
 - [ ] Fix webhook: embedded_checkout_purchase payment_intent.succeeded must enroll student in course (product_id = lms course id)
 - [ ] Manually enroll Alexis Dupree (user_id 4620004) in course 60001 (From Sonographer to CEO)
+
+## Thinkific-Style Hosted Checkout Page (Jun 2026)
+- [ ] Backend: createEmbeddedCheckoutSession tRPC procedure (lmsLearner) — creates Stripe Checkout Session with ui_mode: 'embedded', returns clientSecret + course metadata
+- [ ] Backend: getCheckoutSessionStatus tRPC procedure (lmsPublic) — verifies session after payment completes
+- [ ] Frontend: /checkout/:courseSlug page with course summary, subscription billing disclosure, required terms checkbox, embedded Stripe Checkout
+- [ ] Frontend: /checkout/complete page — verifies session, shows success/failure, redirects to course
+- [ ] Wire routes in App.tsx (LMSRouter) for /checkout/:courseSlug and /checkout/complete
+- [ ] Update upgrade prompt buttons in CoursePlayer to use hosted /checkout/:courseSlug instead of buy.stripe.com
+- [ ] Update admin "Copy Checkout Link" to generate /checkout/:courseSlug URL (hosted page) instead of buy.stripe.com
+- [ ] Support pricingOptionId query param: /checkout/:courseSlug?option=<id> for secondary pricing options
+- [ ] Support teamTierId query param: /checkout/:courseSlug?tier=<id> for team tier pricing
+
+## Checkout Page — Org-Level Terms & Privacy URLs (Jun 2026)
+- [x] Add termsUrl and privacyUrl varchar fields to platform_settings schema
+- [x] Run migration SQL to add columns
+- [x] Add termsUrl/privacyUrl to updatePlatformSettings input schema (returned via getPlatformSettings)
+- [x] Add termsUrl/privacyUrl fields to admin Platform Settings UI (LMSPublishDomainSettings)
+- [x] Update createEmbeddedCheckoutSession to return termsUrl and privacyUrl from platform_settings
+- [x] Rewrite Checkout.tsx with course theme colors, course image/description, org-level terms/privacy URLs, subscription disclosure, and required agreement checkboxes

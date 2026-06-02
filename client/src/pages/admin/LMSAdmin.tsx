@@ -1499,15 +1499,15 @@ function CertTemplateSelector({ value, onChange }: { value: number | null; onCha
 function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (data: any) => void; saving: boolean }) {
   const { data: settingsPricingOptions = [] } = trpc.lmsGroup.listPricingOptions.useQuery({ courseId: course.id });
   const firstActivePricingOption = (settingsPricingOptions as any[]).find((o: any) => o.isActive);
-  const coursePaymentLink = trpc.lmsGroup.createPaymentLink.useMutation({
-    onSuccess: (data) => {
-      navigator.clipboard.writeText(data.url)
-        .then(() => toast.success("Stripe Payment Link copied!"))
-        .catch(() => toast.success(`Stripe Payment Link: ${data.url}`));
-      window.open(data.url, "_blank", "noopener,noreferrer");
-    },
-    onError: (err) => toast.error(`Failed: ${err.message}`),
-  });
+  const copyHostedCheckoutLink = () => {
+    const base = window.location.origin;
+    const url = firstActivePricingOption
+      ? `${base}/checkout/${course.slug}?option=${firstActivePricingOption.id}`
+      : `${base}/checkout/${course.slug}`;
+    navigator.clipboard.writeText(url)
+      .then(() => toast.success("Hosted checkout link copied!"))
+      .catch(() => toast.success(`Checkout link: ${url}`));
+  };
    const [uploadingCover, setUploadingCover] = useState(false);
   const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1759,21 +1759,15 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           <h3 className="text-sm font-semibold text-gray-700">Pricing</h3>
           {(firstActivePricingOption || course.price) ? (
             <button
-              onClick={() => firstActivePricingOption
-                ? coursePaymentLink.mutate({ pricingOptionId: firstActivePricingOption.id })
-                : coursePaymentLink.mutate({ courseId: course.id })
-              }
-              disabled={coursePaymentLink.isPending}
-              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 transition-colors disabled:opacity-50"
+              onClick={copyHostedCheckoutLink}
+              className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-800 px-2 py-1 rounded border border-teal-200 hover:bg-teal-50 transition-colors"
               title={firstActivePricingOption
-                ? `Generate & copy Stripe checkout link for "${firstActivePricingOption.label}"`
-                : `Generate & copy Stripe checkout link for primary pricing ($${Number(course.price).toFixed(2)})`
+                ? `Copy hosted checkout link for "${firstActivePricingOption.label}"`
+                : `Copy hosted checkout link for primary pricing ($${Number(course.price).toFixed(2)})`
               }
             >
-              {coursePaymentLink.isPending
-                ? <span className="w-3 h-3 block animate-spin border border-blue-400 border-t-transparent rounded-full" />
-                : <Link2 className="w-3 h-3" />}
-              {coursePaymentLink.isPending ? "Generating..." : "Copy Stripe Checkout Link"}
+              <Link2 className="w-3 h-3" />
+              Copy Checkout Link
             </button>
           ) : null}
         </div>
@@ -1922,7 +1916,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         {/* Free Preview Enrollment Link — only shown when the course has preview lessons */}
         <FreePreviewLinkPanel courseId={course.id} />
         {/* Default Team Pricing Tiers */}
-        <DefaultTeamPricingPanel courseId={course.id} primaryPrice={Number(course.price ?? 0)} />
+        <DefaultTeamPricingPanel courseId={course.id} primaryPrice={Number(course.price ?? 0)} courseSlug={course.slug} />
       </div>
 
             <div className="flex items-center gap-2">
@@ -2349,7 +2343,7 @@ function FreePreviewLinkPanel({ courseId }: { courseId: number }) {
 
 // ─── Default Team Pricing Panel ─────────────────────────────────────────────
 
-function DefaultTeamPricingPanel({ courseId, primaryPrice }: { courseId: number; primaryPrice: number }) {
+function DefaultTeamPricingPanel({ courseId, primaryPrice, courseSlug }: { courseId: number; primaryPrice: number; courseSlug?: string }) {
   const utils = trpc.useUtils();
   const { data: tiers = [], isLoading } = trpc.lmsGroup.listDefaultTeamTiers.useQuery({ courseId });
   const [newMinSeats, setNewMinSeats] = useState("");
@@ -2366,18 +2360,13 @@ function DefaultTeamPricingPanel({ courseId, primaryPrice }: { courseId: number;
     onSuccess: () => { utils.lmsGroup.listDefaultTeamTiers.invalidate({ courseId }); toast.success("Tier removed"); },
     onError: e => toast.error(`Failed: ${e.message}`),
   });
-  const createLink = trpc.lmsGroup.createTeamTierPaymentLink.useMutation({
-    onSuccess: (data, vars) => {
-      setLoadingTierId(null);
-      navigator.clipboard.writeText(data.url)
-        .then(() => { setCopiedTierId(vars.tierId); setTimeout(() => setCopiedTierId(null), 2500); })
-        .catch(() => {});
-      window.open(data.url, "_blank");
-      toast.success("Team Stripe link copied!");
-      utils.lmsGroup.listDefaultTeamTiers.invalidate({ courseId });
-    },
-    onError: (e, vars) => { setLoadingTierId(null); toast.error(`Stripe error: ${e.message}`); },
-  });
+  const copyTeamCheckoutLink = (tierId: number) => {
+    if (!courseSlug) { toast.error("Course slug not available"); return; }
+    const url = `${window.location.origin}/checkout/${courseSlug}?tier=${tierId}`;
+    navigator.clipboard.writeText(url)
+      .then(() => { setCopiedTierId(tierId); setTimeout(() => setCopiedTierId(null), 2500); toast.success("Team checkout link copied!"); })
+      .catch(() => toast.success(`Team checkout link: ${url}`));
+  };
 
   const handleAddTier = () => {
     const seats = parseInt(newMinSeats, 10);
@@ -2421,9 +2410,9 @@ function DefaultTeamPricingPanel({ courseId, primaryPrice }: { courseId: number;
                 <div className="flex-1" />
                 <Button size="sm" variant="outline" className={`h-7 text-xs shrink-0 ${isCopied ? 'border-green-400 text-green-700' : 'border-blue-300 text-blue-700 hover:bg-blue-100'}`}
                   disabled={isLoading2}
-                  onClick={() => { setLoadingTierId(tier.id); createLink.mutate({ tierId: tier.id }); }}
+                  onClick={() => copyTeamCheckoutLink(tier.id)}
                 >
-                  {isLoading2 ? <Loader2 className="w-3 h-3 animate-spin" /> : isCopied ? <><CheckCircle className="w-3 h-3 mr-1" />Copied!</> : <><Link2 className="w-3 h-3 mr-1" />Copy Stripe Link</>}
+                  {isCopied ? <><CheckCircle className="w-3 h-3 mr-1" />Copied!</> : <><Link2 className="w-3 h-3 mr-1" />Copy Checkout Link</>}
                 </Button>
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 shrink-0"
                   onClick={() => { if (confirm(`Remove ${tier.minSeats}+ seats tier?`)) deleteTier.mutate({ tierId: tier.id }); }}
@@ -8911,16 +8900,13 @@ function PricingOptionRow({ opt, editingId, setEditingId, setShowAdd, updateOpti
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
-  // Stripe Payment Link mutation
-  const createPaymentLink = trpc.lmsGroup.createPaymentLink.useMutation({
-    onSuccess: (data) => {
-      navigator.clipboard.writeText(data.url)
-        .then(() => toast.success("Stripe Payment Link copied to clipboard!"))
-        .catch(() => toast.success(`Stripe Payment Link: ${data.url}`));
-      window.open(data.url, "_blank", "noopener,noreferrer");
-    },
-    onError: (err) => toast.error(err.message),
-  });
+  const copyHostedCheckoutLink = () => {
+    if (!courseSlug) { toast.error("Course slug not available"); return; }
+    const url = `${window.location.origin}/checkout/${courseSlug}?option=${opt.id}`;
+    navigator.clipboard.writeText(url)
+      .then(() => toast.success("Hosted checkout link copied!"))
+      .catch(() => toast.success(`Checkout link: ${url}`));
+  };
   if (editingId === opt.id) {
     return (
       <div ref={setNodeRef} style={style}>
@@ -8952,12 +8938,11 @@ function PricingOptionRow({ opt, editingId, setEditingId, setShowAdd, updateOpti
         <Edit2 className="w-3.5 h-3.5" />
       </button>
       <button
-        onClick={() => createPaymentLink.mutate({ pricingOptionId: opt.id })}
-        disabled={createPaymentLink.isPending}
-        className="text-xs text-blue-400 hover:text-blue-600 p-1 flex-shrink-0 disabled:opacity-50"
-        title="Generate & copy Stripe Payment Link (opens in new tab)"
+        onClick={copyHostedCheckoutLink}
+        className="text-xs text-teal-500 hover:text-teal-700 p-1 flex-shrink-0"
+        title="Copy hosted checkout link for this pricing option"
       >
-        {createPaymentLink.isPending ? <span className="w-3.5 h-3.5 block animate-spin border border-blue-400 border-t-transparent rounded-full" /> : <Link2 className="w-3.5 h-3.5" />}
+        <Link2 className="w-3.5 h-3.5" />
       </button>
       <button onClick={() => { if (confirm("Delete this pricing option?")) deleteOption.mutate({ id: opt.id }); }} className="text-xs text-red-400 hover:text-red-600 p-1 flex-shrink-0">
         <Trash2 className="w-3.5 h-3.5" />
@@ -11332,6 +11317,8 @@ function LMSPublishDomainSettings() {
   const [downloadDomain, setDownloadDomain] = useState<string>("");
   const [productDomain,  setProductDomain]  = useState<string>("");
   const [formDomain,     setFormDomain]     = useState<string>("");
+  const [termsUrl,       setTermsUrl]       = useState<string>("");
+  const [privacyUrl,     setPrivacyUrl]     = useState<string>("");
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
@@ -11341,12 +11328,14 @@ function LMSPublishDomainSettings() {
       setDownloadDomain(settings.downloadPublishDomain          ?? "");
       setProductDomain( settings.productPublishDomain           ?? "");
       setFormDomain(    (settings as any).formPublishDomain     ?? "");
+      setTermsUrl(      (settings as any).termsUrl              ?? "");
+      setPrivacyUrl(    (settings as any).privacyUrl            ?? "");
       setDirty(false);
     }
   }, [settings]);
 
   const updateSettings = trpc.lmsGroup.updatePlatformSettings.useMutation({
-    onSuccess: () => { toast.success("Publish domain defaults saved."); setDirty(false); refetch(); },
+    onSuccess: () => { toast.success("Settings saved."); setDirty(false); refetch(); },
     onError:   (e: { message: string }) => toast.error(e.message),
   });
 
@@ -11357,6 +11346,8 @@ function LMSPublishDomainSettings() {
       downloadPublishDomain: downloadDomain || null,
       productPublishDomain:  productDomain  || null,
       formPublishDomain:     formDomain     || null,
+      termsUrl:              termsUrl       || null,
+      privacyUrl:            privacyUrl     || null,
     });
   };
 
@@ -11432,6 +11423,37 @@ function LMSPublishDomainSettings() {
                 label="Forms Default Domain"
                 description="Public form pages will be served at this domain (e.g. yourdomain.com/form/slug)."
               />
+              {/* Legal URLs */}
+              <div className="pt-4 border-t border-gray-100 space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <span className="w-5 h-5 rounded bg-teal-100 flex items-center justify-center text-teal-600 text-xs">⚖️</span>
+                    Legal &amp; Compliance URLs
+                  </p>
+                  <p className="text-xs text-gray-400 mb-4">These links appear on the hosted checkout page as required agreement checkboxes. Leave blank to use the default All About Ultrasound links.</p>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium text-gray-700">Terms of Service URL</Label>
+                      <Input
+                        value={termsUrl}
+                        onChange={e => { setTermsUrl(e.target.value); setDirty(true); }}
+                        placeholder="https://www.allaboutultrasound.com/terms"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium text-gray-700">Privacy Policy URL</Label>
+                      <Input
+                        value={privacyUrl}
+                        onChange={e => { setPrivacyUrl(e.target.value); setDirty(true); }}
+                        placeholder="https://www.allaboutultrasound.com/privacy-policy.html"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end pt-2 border-t border-gray-100">
                 <Button
                   onClick={handleSave}
@@ -11439,7 +11461,7 @@ function LMSPublishDomainSettings() {
                   className="bg-teal-600 hover:bg-teal-700 text-white"
                   size="sm"
                 >
-                  {updateSettings.isPending ? "Saving…" : "Save Defaults"}
+                  {updateSettings.isPending ? "Saving…" : "Save Settings"}
                 </Button>
               </div>
             </>

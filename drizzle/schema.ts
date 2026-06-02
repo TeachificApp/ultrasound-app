@@ -3957,6 +3957,10 @@ export const platformSettings = mysqlTable("platform_settings", {
   productPublishDomain: varchar("product_publish_domain", { length: 255 }),
   coursePublishDomain: varchar("course_publish_domain", { length: 255 }),
   formPublishDomain: varchar("form_publish_domain", { length: 255 }),
+  // ── Legal / Compliance URLs ──
+  // Shown on the hosted checkout page as required agreement links
+  termsUrl: varchar("terms_url", { length: 2048 }),
+  privacyUrl: varchar("privacy_url", { length: 2048 }),
   // ── Future platform-wide toggles go here ──
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

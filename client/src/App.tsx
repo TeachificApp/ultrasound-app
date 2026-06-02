@@ -44,6 +44,8 @@ const UpgradeSuccess = lazy(() => import("./pages/UpgradeSuccess"));
 const Premium = lazy(() => import("./pages/Premium"));
 
 // ── LMS — LMS Management ─────────────────────────────────────────────────
+const Checkout = lazy(() => import("./pages/Checkout"));
+const CheckoutComplete = lazy(() => import("./pages/CheckoutComplete"));
 const EducationLibrary = lazy(() => import("./pages/EducationLibrary"));
 const LMSHome = lazy(() => import("./pages/LMSHome"));
 const CollectionDetail = lazy(() => import("./pages/CollectionDetail"));
@@ -648,6 +650,13 @@ function LMSRouter() {
         </Suspense>
       </Route>
       <Route path="/downloads/:slug/files" component={DownloadFiles} />
+      {/* Hosted checkout pages — outside LMSLayout (full-screen, no nav) */}
+      <Route path="/checkout/complete">
+        <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
+      </Route>
+      <Route path="/checkout/:slug">
+        <Suspense fallback={pageFallback}><Checkout /></Suspense>
+      </Route>
       {/* Course/download landing pages render directly on learn subdomain */}
       <Route path="/cohort/:courseId/assignment/:assignmentId" component={AssignmentDetail} />
       <Route path="/cohort/:courseId" component={CohortSchedule} />

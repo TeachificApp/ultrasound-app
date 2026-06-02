@@ -2090,6 +2090,274 @@ export const lmsLearnerRouter = router({
       await db.update(lmsCourses).set({ stripePaymentLinkId: paymentLink.id } as any).where(eq(lmsCourses.id, course.id));
       return { url: paymentLink.url };
     }),
+
+  /**
+   * Create a Stripe Embedded Checkout Session for the hosted /checkout/:courseSlug page.
+   * Supports primary pricing, a specific pricing option, or a team tier.
+   * Returns clientSecret + course/pricing metadata for the frontend to display
+   * the billing disclosure and terms agreement before Stripe loads.
+   */
+  createEmbeddedCheckoutSession: publicProcedure
+    .input(z.object({
+      courseSlug: z.string(),
+      pricingOptionId: z.number().int().positive().optional(),
+      teamTierId: z.number().int().positive().optional(),
+      origin: z.string().url(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+      if (course.status === "draft" || course.status === "archived") throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Fetch org-level legal URLs from platform_settings
+      const [orgSettings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+      const termsUrl = orgSettings?.termsUrl ?? "https://www.allaboutultrasound.com/terms";
+      const privacyUrl = orgSettings?.privacyUrl ?? "https://www.allaboutultrasound.com/privacy-policy.html";
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const learnDomain = "https://learn.allaboutultrasound.com";
+      const returnUrl = `${learnDomain}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&slug=${course.slug}`;
+
+      const currency = course.currency ?? "usd";
+      let stripePriceId: string | null = null;
+      let pricingType: string = "one_time";
+      let displayPrice: number = 0;
+      let subscriptionInterval: string | null = null;
+      let productName: string = course.title;
+      let isSubscription = false;
+      let billingLabel: string | null = null;
+
+      // ── TEAM TIER MODE ────────────────────────────────────────────────────────
+      if (input.teamTierId) {
+        const [tier] = await db.select().from(lmsDefaultTeamTiers).where(eq(lmsDefaultTeamTiers.id, input.teamTierId)).limit(1);
+        if (!tier || tier.courseId !== course.id) throw new TRPCError({ code: "NOT_FOUND", message: "Team tier not found" });
+        const primaryPrice = Number(course.price ?? 0);
+        const discountPct = Number(tier.discountPercent ?? 0);
+        const perSeatPrice = Math.max(0.5, Math.round(primaryPrice * (1 - discountPct / 100) * 100) / 100);
+        displayPrice = perSeatPrice;
+        pricingType = "one_time";
+        productName = `${course.title} — Team (${tier.minSeats}+ seats, ${discountPct}% off)`;
+        billingLabel = `$${perSeatPrice.toFixed(2)}/seat × ${tier.minSeats} seats minimum`;
+
+        // Reuse or create Stripe Price
+        stripePriceId = tier.stripePriceId ?? null;
+        if (!stripePriceId) {
+          const product = await stripe.products.create({
+            name: productName,
+            metadata: { course_id: String(course.id), team_tier_id: String(tier.id) },
+          });
+          const price = await stripe.prices.create({ product: product.id, unit_amount: Math.round(perSeatPrice * 100), currency });
+          stripePriceId = price.id;
+          await db.update(lmsDefaultTeamTiers).set({ stripePriceId }).where(eq(lmsDefaultTeamTiers.id, tier.id));
+        }
+
+        const session = await stripe.checkout.sessions.create({
+          ui_mode: "embedded",
+          mode: "payment",
+          line_items: [{ price: stripePriceId, quantity: tier.minSeats, adjustable_quantity: { enabled: true, minimum: tier.minSeats } }],
+          return_url: returnUrl,
+          customer_email: ctx.user?.email ?? undefined,
+          allow_promotion_codes: true,
+          metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "" },
+        });
+        return {
+          clientSecret: session.client_secret!,
+          courseTitle: course.title,
+          courseSubtitle: course.subtitle ?? null,
+          courseDescription: course.description ?? null,
+          courseThumbnail: course.thumbnailUrl ?? null,
+          primaryColor: course.primaryColor ?? "#179ca3",
+          accentColor: course.accentColor ?? "#0d9488",
+          gradientFrom: course.gradientFrom ?? "#179ca3",
+          gradientTo: course.gradientTo ?? "#0d9488",
+          gradientDirection: course.gradientDirection ?? "135deg",
+          playerTheme: course.playerTheme ?? "light",
+          termsUrl,
+          privacyUrl,
+          productName,
+          displayPrice,
+          pricingType,
+          isSubscription: false,
+          billingLabel,
+          currency,
+          minSeats: tier.minSeats,
+          discountPercent: Number(tier.discountPercent),
+        };
+      }
+
+      // ── PRICING OPTION MODE ───────────────────────────────────────────────────
+      if (input.pricingOptionId) {
+        const [opt] = await db.select().from(lmsPricingOptions).where(eq(lmsPricingOptions.id, input.pricingOptionId)).limit(1);
+        if (!opt || opt.courseId !== course.id) throw new TRPCError({ code: "NOT_FOUND", message: "Pricing option not found" });
+        pricingType = opt.pricingType;
+        displayPrice = Number(opt.price ?? 0);
+        subscriptionInterval = opt.subscriptionInterval ?? null;
+        productName = `${course.title}${opt.label ? ` — ${opt.label}` : ""}`;
+        isSubscription = pricingType === "subscription" || pricingType === "payment_plan";
+        stripePriceId = opt.stripePriceId ?? null;
+
+        if (!stripePriceId) {
+          const product = await stripe.products.create({
+            name: productName,
+            description: course.subtitle ?? undefined,
+            metadata: { course_id: String(course.id), pricing_option_id: String(opt.id) },
+          });
+          if (pricingType === "one_time" || pricingType === "free") {
+            const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(displayPrice * 100), currency });
+            stripePriceId = p.id;
+          } else if (pricingType === "subscription") {
+            const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
+            const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
+            const interval = opt.subscriptionInterval ?? "monthly";
+            const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(displayPrice * 100), currency, recurring: { interval: intervalMap[interval] ?? "month", interval_count: intervalCountMap[interval] ?? 1 } });
+            stripePriceId = p.id;
+          } else if (pricingType === "payment_plan") {
+            const installmentAmt = opt.installmentAmount && opt.installmentAmount > 0 ? opt.installmentAmount : displayPrice;
+            const intervalMonths = Math.round((opt.installmentIntervalDays ?? 30) / 30) || 1;
+            const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(Number(installmentAmt) * 100), currency, recurring: { interval: "month", interval_count: intervalMonths } });
+            stripePriceId = p.id;
+          }
+          if (stripePriceId) await db.update(lmsPricingOptions).set({ stripePriceId }).where(eq(lmsPricingOptions.id, opt.id));
+        }
+
+        const intervalLabels: Record<string, string> = { monthly: "month", quarterly: "3 months", annual: "year" };
+        if (pricingType === "subscription" && subscriptionInterval) {
+          billingLabel = `$${displayPrice.toFixed(2)} / ${intervalLabels[subscriptionInterval] ?? subscriptionInterval} — recurring, cancel anytime`;
+        } else if (pricingType === "payment_plan") {
+          billingLabel = `${opt.installmentCount ?? ""} payments of $${Number(opt.installmentAmount ?? displayPrice).toFixed(2)}`;
+        }
+
+        const sessionMode = (pricingType === "subscription" || pricingType === "payment_plan") ? "subscription" : "payment";
+        const session = await stripe.checkout.sessions.create({
+          ui_mode: "embedded",
+          mode: sessionMode,
+          line_items: [{ price: stripePriceId!, quantity: 1 }],
+          return_url: returnUrl,
+          customer_email: ctx.user?.email ?? undefined,
+          allow_promotion_codes: true,
+          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "" },
+        });
+        return {
+          clientSecret: session.client_secret!,
+          courseTitle: course.title,
+          courseSubtitle: course.subtitle ?? null,
+          courseDescription: course.description ?? null,
+          courseThumbnail: course.thumbnailUrl ?? null,
+          primaryColor: course.primaryColor ?? "#179ca3",
+          accentColor: course.accentColor ?? "#0d9488",
+          gradientFrom: course.gradientFrom ?? "#179ca3",
+          gradientTo: course.gradientTo ?? "#0d9488",
+          gradientDirection: course.gradientDirection ?? "135deg",
+          playerTheme: course.playerTheme ?? "light",
+          termsUrl,
+          privacyUrl,
+          productName,
+          displayPrice,
+          pricingType,
+          isSubscription,
+          billingLabel,
+          currency,
+          minSeats: null,
+          discountPercent: null,
+        };
+      }
+
+      // ── PRIMARY PRICING MODE (default) ────────────────────────────────────────
+      pricingType = course.pricingType ?? "one_time";
+      displayPrice = Number(course.price ?? 0);
+      subscriptionInterval = course.subscriptionInterval ?? null;
+      isSubscription = pricingType === "subscription" || pricingType === "payment_plan";
+      stripePriceId = course.stripePriceId ?? null;
+
+      if (!stripePriceId) {
+        const product = await stripe.products.create({
+          name: course.title,
+          description: course.subtitle ?? undefined,
+          metadata: { course_id: String(course.id), source: "hosted_checkout_primary" },
+        });
+        if (pricingType === "one_time" || pricingType === "free") {
+          const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(displayPrice * 100), currency });
+          stripePriceId = p.id;
+        } else if (pricingType === "subscription") {
+          const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
+          const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
+          const interval = course.subscriptionInterval ?? "monthly";
+          const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(displayPrice * 100), currency, recurring: { interval: intervalMap[interval] ?? "month", interval_count: intervalCountMap[interval] ?? 1 } });
+          stripePriceId = p.id;
+        } else if (pricingType === "payment_plan") {
+          const installmentAmt = course.installmentAmount && course.installmentAmount > 0 ? course.installmentAmount : displayPrice;
+          const intervalMonths = Math.round((course.installmentIntervalDays ?? 30) / 30) || 1;
+          const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(Number(installmentAmt) * 100), currency, recurring: { interval: "month", interval_count: intervalMonths } });
+          stripePriceId = p.id;
+        } else {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported pricing type: ${pricingType}` });
+        }
+        if (stripePriceId) await db.update(lmsCourses).set({ stripePriceId } as any).where(eq(lmsCourses.id, course.id));
+      }
+
+      const intervalLabels: Record<string, string> = { monthly: "month", quarterly: "3 months", annual: "year" };
+      if (pricingType === "subscription" && subscriptionInterval) {
+        billingLabel = `$${displayPrice.toFixed(2)} / ${intervalLabels[subscriptionInterval] ?? subscriptionInterval} — recurring, cancel anytime`;
+      } else if (pricingType === "payment_plan") {
+        billingLabel = `${course.installmentCount ?? ""} payments of $${Number(course.installmentAmount ?? displayPrice).toFixed(2)}`;
+      }
+
+      const sessionMode = (pricingType === "subscription" || pricingType === "payment_plan") ? "subscription" : "payment";
+      const session = await stripe.checkout.sessions.create({
+        ui_mode: "embedded",
+        mode: sessionMode,
+        line_items: [{ price: stripePriceId!, quantity: 1 }],
+        return_url: returnUrl,
+        customer_email: ctx.user?.email ?? undefined,
+        allow_promotion_codes: true,
+        metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "" },
+      });
+      return {
+        clientSecret: session.client_secret!,
+        courseTitle: course.title,
+        courseSubtitle: course.subtitle ?? null,
+        courseDescription: course.description ?? null,
+        courseThumbnail: course.thumbnailUrl ?? null,
+        primaryColor: course.primaryColor ?? "#179ca3",
+        accentColor: course.accentColor ?? "#0d9488",
+        gradientFrom: course.gradientFrom ?? "#179ca3",
+        gradientTo: course.gradientTo ?? "#0d9488",
+        gradientDirection: course.gradientDirection ?? "135deg",
+        playerTheme: course.playerTheme ?? "light",
+        termsUrl,
+        privacyUrl,
+        productName: course.title,
+        displayPrice,
+        pricingType,
+        isSubscription,
+        billingLabel,
+        currency,
+        minSeats: null,
+        discountPercent: null,
+      };
+    }),
+
+  /**
+   * Verify a Stripe Checkout Session after the buyer returns to the completion page.
+   * Public procedure — the session_id is in the URL and not sensitive.
+   */
+  getCheckoutSessionStatus: publicProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ input }) => {
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const session = await stripe.checkout.sessions.retrieve(input.sessionId);
+      return {
+        status: session.status, // 'open' | 'complete' | 'expired'
+        paymentStatus: session.payment_status, // 'paid' | 'unpaid' | 'no_payment_required'
+        customerEmail: session.customer_details?.email ?? null,
+        courseSlug: (session.metadata as any)?.course_slug ?? null,
+      };
+    }),
 });
 // ─── Group Manager Router ─────────────────────────────────────────────────
 
@@ -2404,6 +2672,8 @@ export const lmsGroupRouter = router({
       productPublishDomain: z.string().max(255).nullable().optional(),
       coursePublishDomain: z.string().max(255).nullable().optional(),
       formPublishDomain: z.string().max(255).nullable().optional(),
+      termsUrl: z.string().max(2048).nullable().optional(),
+      privacyUrl: z.string().max(2048).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

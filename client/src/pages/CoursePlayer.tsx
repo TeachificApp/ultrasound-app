@@ -1195,17 +1195,12 @@ export default function CoursePlayer() {
               <Button
                 className="flex-1 text-white"
                 style={{ backgroundColor: primaryColor }}
-                disabled={createUpgradeLink.isPending}
                 onClick={() => {
                   setShowUpgradePrompt(false);
-                  if (upgradeCheckoutUrl) {
-                    window.open(upgradeCheckoutUrl, "_blank", "noopener,noreferrer");
-                  } else {
-                    createUpgradeLink.mutate({ courseSlug: slug! });
-                  }
+                  navigate(`/checkout/${slug}`);
                 }}
               >
-                {createUpgradeLink.isPending ? "Preparing checkout..." : "Enroll Now — Full Access"}
+                Enroll Now — Full Access
               </Button>
               <Button variant="outline" className="flex-1" onClick={() => setShowUpgradePrompt(false)}>
                 {upgradePromptReason === "locked_lesson" ? "Stay in Preview" : "Continue Preview"}
