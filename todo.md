@@ -4396,3 +4396,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Bug: Video Block Media Repo Picker (Jun 2026)
 - [x] Fix video block "Pick from Media Library" — selecting a video shows success toast but block settings panel and canvas preview do not update (root cause: sequential set() calls read stale dataRef; fixed by passing setMany to VideoBlockSettings and batching all 4 field updates in one call)
+
+## Checkout Page Full-Screen Editor (Jun 2026)
+- [ ] Build /admin/checkout-editor/:entityType/:entityId full-screen split-pane editor page
+- [ ] Left sidebar: section list with toggle/reorder/add, template picker, save button
+- [ ] Right canvas: live preview of the checkout left panel (course info + configured sections) rendered directly (not iframe)
+- [ ] Click section in canvas highlights it and opens its config panel in the sidebar
+- [ ] "Checkout Page" tab in all admin editors opens the full-screen editor (not inline panel)
+- [ ] Wire route in App.tsx

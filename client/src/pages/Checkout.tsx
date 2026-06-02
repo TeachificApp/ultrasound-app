@@ -669,7 +669,7 @@ export default function Checkout() {
                   htmlFor="terms"
                   className={`text-sm leading-relaxed cursor-pointer ${isDark ? "text-gray-300" : "text-gray-700"}`}
                 >
-                  I agree to the{" "}
+                  I have reviewed and agree to the{" "}
                   <a
                     href={sessionMeta.termsUrl}
                     target="_blank"

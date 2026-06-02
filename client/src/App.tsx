@@ -59,6 +59,7 @@ const LandingPageBuilder = lazy(() => import("./pages/admin/LandingPageBuilder")
 const FunnelBuilder = lazy(() => import("./pages/admin/FunnelBuilder"));
 const FunnelPageEditor = lazy(() => import("./pages/admin/FunnelPageEditor"));
 const ContactsAdmin = lazy(() => import("./pages/admin/ContactsAdmin"));
+const CheckoutPageEditorPage = lazy(() => import("./pages/admin/CheckoutPageEditorPage"));
 const AdminLessonComments = lazy(() => import("./pages/admin/AdminLessonComments"));
 const SharingMonitor = lazy(() => import("./pages/admin/SharingMonitor"));
 const PublicFunnelPage = lazy(() => import("./pages/PublicFunnelPage"));
@@ -438,6 +439,7 @@ function Router() {
         <Route path="/bundles/:slug" component={BundleLanding} />
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         {/* ── Physical Products ────────────────────────────────────────────────────────────────────────────── */}
@@ -705,6 +707,7 @@ function LMSRouter() {
         {/* Admin (platform_admin only) */}
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         {/* ── Physical Products ───────────────────────────────────────────────── */}
@@ -897,6 +900,7 @@ function IHeartEchoRouter() {
         <Route path="/admin/social-content">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard>}</Route>
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
