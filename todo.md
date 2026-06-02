@@ -4482,4 +4482,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix stuck SCORM extraction for asset 800002 (UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO) — manually set to done with existing extracted prefix
 - [x] Fix course player defaulting to preview_hide_after_purchase lesson for enrolled users — now skips hidden lessons when picking default
 - [x] Fix empty sections still showing in sidebar after all lessons filtered out — now removes sections with 0 visible lessons
-- [ ] Investigate discussion comments showing old profile details (display name and avatar not updating)
+- [x] Fix discussion/community/cohort posts showing old profile details — invalidate community, lmsLearner, lmsCohortAdmin caches after profile update/avatar upload

@@ -278,6 +278,10 @@ export default function Profile() {
       setEditMode(false);
       resyncAfterSave(); // allow effect to re-sync once invalidate completes
       utils.auth.me.invalidate();
+      // Invalidate community/cohort caches so discussion posts show updated profile
+      utils.community.invalidate();
+      utils.lmsCohortAdmin.invalidate();
+      utils.lmsLearner.invalidate();
     },
     onError: (err) => {
       toast.error(err.message || "Failed to update profile.");
@@ -316,6 +320,10 @@ export default function Profile() {
       setAvatarMime(null);
       setAvatarUploading(false);
       utils.auth.me.invalidate();
+      // Invalidate community/cohort caches so discussion posts show updated avatar
+      utils.community.invalidate();
+      utils.lmsCohortAdmin.invalidate();
+      utils.lmsLearner.invalidate();
     },
     onError: (err) => {
       toast.error(err.message || "Failed to upload photo.");

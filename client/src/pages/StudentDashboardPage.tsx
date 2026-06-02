@@ -148,6 +148,10 @@ function ProfileTab() {
       syncedProfileIdRef.current = null;
       utils.dashboard.getProfile.invalidate();
       utils.auth.me.invalidate();
+      // Invalidate community/cohort caches so discussion posts show updated profile
+      utils.community.invalidate();
+      utils.lmsCohortAdmin.invalidate();
+      utils.lmsLearner.invalidate();
     },
     onError: (e) => toast.error(e.message),
   });
@@ -156,6 +160,10 @@ function ProfileTab() {
       toast.success("Avatar updated.");
       utils.dashboard.getProfile.invalidate();
       utils.auth.me.invalidate();
+      // Invalidate community/cohort caches so discussion posts show updated avatar
+      utils.community.invalidate();
+      utils.lmsCohortAdmin.invalidate();
+      utils.lmsLearner.invalidate();
     },
     onError: (e) => toast.error(e.message),
   });
