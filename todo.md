@@ -4465,3 +4465,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Full URL preview updated to use {{first_name}} etc. in encoded form
 - [x] scorm_embed block in BlockPreview.tsx fixed to use /scorm path instead of /embed so MediaEmbedIframe routes through ScormPlayer (client-side JSZip extraction)
 - [x] LandingPageBuilder scorm_embed URL preview label updated to /scorm
+
+## SCORM ZIP URL Space Encoding Fix (Jun 2026)
+- [x] Fixed "Failed to fetch ZIP: 500" error caused by filenames with spaces in S3 URLs (e.g. "UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO.zip")
+- [x] Pre-encode spaces as %20 before passing to new URL() in scorm-zip route, proxyInline, downloadToFile, and download route
+- [x] Added try/catch error handling to scorm-zip route with proper error logging

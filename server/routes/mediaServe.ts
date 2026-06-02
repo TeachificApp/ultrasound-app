@@ -220,14 +220,19 @@ function downloadToFile(url: string, destPath: string): Promise<void> {
       // URL-encode the path portion to handle filenames with spaces and special chars
       let safeUrl = targetUrl;
       try {
-        const parsed = new URL(targetUrl);
+        // Pre-encode spaces before passing to new URL() since raw spaces are invalid in URLs
+        const preEncoded = targetUrl.replace(/ /g, "%20");
+        const parsed = new URL(preEncoded);
         // Re-encode only the pathname — preserve existing %xx sequences by decoding first
         parsed.pathname = parsed.pathname
           .split("/")
           .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
           .join("/");
         safeUrl = parsed.toString();
-      } catch { /* leave safeUrl as-is if URL parsing fails */ }
+      } catch {
+        // Fallback: just replace spaces with %20 directly
+        safeUrl = targetUrl.replace(/ /g, "%20");
+      }
       const proto = safeUrl.startsWith("https") ? https : http;
       proto.get(safeUrl, (res) => {
         // Follow redirects
@@ -602,44 +607,56 @@ for (const slugPath of ["/api/media/:slug/scorm-zip", "/media/:slug/scorm-zip"])
   });
   router.get(slugPath, async (req: Request, res: Response) => {
     setCorsHeaders(res);
-    const auth = readMediaAuth(req);
-    const result = await resolveMedia(req.params.slug, auth);
-    if (!result) return res.status(404).json({ error: "Asset not found" });
-    if (!result.allowed) return res.status(403).json({ error: "Forbidden" });
-    const { asset, version } = result;
-    if (!version?.s3Url) return res.status(404).json({ error: "No file found for this asset" });
-    // Only allow ZIP-based SCORM types
-    const mt = asset?.mediaType ?? "";
-    if (mt !== "scorm" && mt !== "zip" && mt !== "lms") {
-      return res.status(400).json({ error: "Not a SCORM package" });
-    }
-    // Proxy the ZIP from S3 so the raw CDN URL is never sent to the browser
-    const fileName = (version as any).fileName ?? `${req.params.slug}.zip`;
-    const safeFileName = encodeURIComponent(fileName);
-    res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}"`);
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Cache-Control", "private, max-age=300");
-    let zipUrl = version.s3Url;
-    // URL-encode the path portion to handle filenames with spaces
     try {
-      const parsed = new URL(zipUrl);
-      parsed.pathname = parsed.pathname.split("/").map((seg) => encodeURIComponent(decodeURIComponent(seg))).join("/");
-      zipUrl = parsed.toString();
-    } catch { /* leave as-is */ }
-    const protocol = zipUrl.startsWith("https") ? https : http;
-    protocol
-      .get(zipUrl, (upstream) => {
-        const cl = upstream.headers["content-length"];
-        if (cl) res.setHeader("Content-Length", cl);
-        if (upstream.statusCode && upstream.statusCode >= 400) {
-          return res.status(502).json({ error: "Failed to fetch SCORM package" });
-        }
-        res.status(upstream.statusCode ?? 200);
-        upstream.pipe(res);
-      })
-      .on("error", () => {
-        if (!res.headersSent) res.status(502).send("Failed to fetch SCORM package.");
-      });
+      const auth = readMediaAuth(req);
+      const result = await resolveMedia(req.params.slug, auth);
+      if (!result) return res.status(404).json({ error: "Asset not found" });
+      if (!result.allowed) return res.status(403).json({ error: "Forbidden" });
+      const { asset, version } = result;
+      if (!version?.s3Url) return res.status(404).json({ error: "No file found for this asset" });
+      // Only allow ZIP-based SCORM types
+      const mt = asset?.mediaType ?? "";
+      if (mt !== "scorm" && mt !== "zip" && mt !== "lms") {
+        return res.status(400).json({ error: "Not a SCORM package" });
+      }
+      // Proxy the ZIP from S3 so the raw CDN URL is never sent to the browser
+      const fileName = (version as any).fileName ?? `${req.params.slug}.zip`;
+      const safeFileName = encodeURIComponent(fileName);
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}"`);
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Cache-Control", "private, max-age=300");
+      let zipUrl = version.s3Url;
+      // URL-encode the path portion to handle filenames with spaces or special chars.
+      // Pre-encode spaces before passing to new URL() since raw spaces are invalid in URLs.
+      try {
+        const preEncoded = zipUrl.replace(/ /g, "%20");
+        const parsed = new URL(preEncoded);
+        parsed.pathname = parsed.pathname.split("/").map((seg) => encodeURIComponent(decodeURIComponent(seg))).join("/");
+        zipUrl = parsed.toString();
+      } catch {
+        // Fallback: just replace spaces with %20 directly
+        zipUrl = zipUrl.replace(/ /g, "%20");
+      }
+      const protocol = zipUrl.startsWith("https") ? https : http;
+      protocol
+        .get(zipUrl, (upstream) => {
+          const cl = upstream.headers["content-length"];
+          if (cl) res.setHeader("Content-Length", cl);
+          if (upstream.statusCode && upstream.statusCode >= 400) {
+            console.error(`[scorm-zip] Upstream S3 error ${upstream.statusCode} for ${zipUrl}`);
+            if (!res.headersSent) return res.status(502).json({ error: "Failed to fetch SCORM package from storage" });
+          }
+          res.status(upstream.statusCode ?? 200);
+          upstream.pipe(res);
+        })
+        .on("error", (err) => {
+          console.error(`[scorm-zip] Network error fetching ${zipUrl}:`, err.message);
+          if (!res.headersSent) res.status(502).send("Failed to fetch SCORM package.");
+        });
+    } catch (err: any) {
+      console.error(`[scorm-zip] Unhandled error for slug ${req.params.slug}:`, err?.message ?? err);
+      if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+    }
   });
 }
 
@@ -677,9 +694,10 @@ function proxyInline(
   res.setHeader("Content-Type", mimeType);
   res.setHeader("Cache-Control", "public, max-age=3600");
 
-  const protocol = fileUrl.startsWith("https") ? https : http;
+  const safeFileUrl = fileUrl.replace(/ /g, "%20");
+  const protocol = safeFileUrl.startsWith("https") ? https : http;
   protocol
-    .get(fileUrl, (upstream) => {
+    .get(safeFileUrl, (upstream) => {
       // Forward content-length if available so the browser shows progress
       const cl = upstream.headers["content-length"];
       if (cl) res.setHeader("Content-Length", cl);
@@ -782,9 +800,10 @@ router.get(slugPath, async (req: Request, res: Response) => {
   res.setHeader("Content-Type", mimeType);
   res.setHeader("Cache-Control", "public, max-age=3600");
 
-  const protocol = version.s3Url.startsWith("https") ? https : http;
+  let dlUrl = version.s3Url.replace(/ /g, "%20");
+  const protocol = dlUrl.startsWith("https") ? https : http;
   protocol
-    .get(version.s3Url, (upstream) => {
+    .get(dlUrl, (upstream) => {
       const cl = upstream.headers["content-length"];
       if (cl) res.setHeader("Content-Length", cl);
       res.status(upstream.statusCode ?? 200);
