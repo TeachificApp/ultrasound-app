@@ -107,6 +107,7 @@ interface AudienceFilter {
   inCohortGroupIds: number[];
   submittedFormIds: number[];
   completedCourseIds: number[];
+  freePreviewCourseIds: number[];
   logic: "and" | "or";
 }
 
@@ -114,7 +115,7 @@ const DEFAULT_FILTER: AudienceFilter = {
   interests: [], roles: [], subscriptionType: "all", userStatus: "active",
   specificEmails: [], enrolledInCourseIds: [], purchasedProductIds: [],
   downloadedProductIds: [], inGroupIds: [], inCohortGroupIds: [],
-  submittedFormIds: [], completedCourseIds: [], logic: "and",
+  submittedFormIds: [], completedCourseIds: [], freePreviewCourseIds: [], logic: "and",
 };
 
 function MultiSelect({ label, options, selected, onChange }: {
@@ -240,7 +241,10 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
 
           {/* Course enrollment */}
           {options && (
-            <MultiSelect label="Enrolled in Course" options={options.courses} selected={filter.enrolledInCourseIds} onChange={(v) => update({ enrolledInCourseIds: v })} />
+            <MultiSelect label="Enrolled in Course (any type)" options={options.courses} selected={filter.enrolledInCourseIds} onChange={(v) => update({ enrolledInCourseIds: v })} />
+          )}
+          {options && (
+            <MultiSelect label="Free Preview Enrollees" options={options.courses} selected={filter.freePreviewCourseIds} onChange={(v) => update({ freePreviewCourseIds: v })} />
           )}
           {options && (
             <MultiSelect label="Completed Course" options={options.courses} selected={filter.completedCourseIds} onChange={(v) => update({ completedCourseIds: v })} />

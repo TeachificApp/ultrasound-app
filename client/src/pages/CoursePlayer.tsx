@@ -562,11 +562,13 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl }: {
 function MobileSidebarContent({
   data, sidebarTab, setSidebarTab, selectedLessonId, setSelectedLessonId,
   completedIds, notesData, bookmarksData, slug, course, prereqLockedIds, lbl,
+  isFreePreviewEnrollment, adminBypass,
 }: {
   data: any; sidebarTab: string; setSidebarTab: (t: any) => void;
   selectedLessonId: number | null; setSelectedLessonId: (id: number) => void;
   completedIds: Set<number>; notesData: any; bookmarksData: any;
   slug: string; course: any; prereqLockedIds: Set<number>; lbl: Record<string, string>;
+  isFreePreviewEnrollment: boolean; adminBypass: boolean;
 }) {
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
   const topLevelLessons = (data?.topLevelLessons ?? []).filter((l: any) => {
@@ -598,20 +600,24 @@ function MobileSidebarContent({
               const active = lesson.id === selectedLessonId;
               const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
               const prereqLocked = prereqLockedIds.has(lesson.id);
+              const mpm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+              const freePreviewLocked = isFreePreviewEnrollment && !adminBypass && mpm === "none";
               const lessonLocked = dripLocked || prereqLocked;
+              const anyLocked = lessonLocked || freePreviewLocked;
               const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
               return (
-                <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
+                <button key={lesson.id} onClick={() => setSelectedLessonId(lesson.id)} disabled={lessonLocked}
                   className={cn("w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
-                    active ? "bg-teal-50 text-teal-900 border-teal-500" : lessonLocked ? "text-gray-400 cursor-not-allowed border-transparent" : done ? "text-gray-500 hover:bg-gray-50 border-transparent" : "text-gray-700 hover:bg-gray-50 border-transparent")}>
+                    active ? "bg-teal-50 text-teal-900 border-teal-500" : anyLocked ? "text-gray-400 cursor-pointer border-transparent hover:bg-amber-50" : done ? "text-gray-500 hover:bg-gray-50 border-transparent" : "text-gray-700 hover:bg-gray-50 border-transparent")}>
                   <span className={cn("w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                    active ? "bg-teal-500 text-white" : lessonLocked ? "bg-gray-100 text-gray-400" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500")}>
-                    {lessonLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
+                    active ? "bg-teal-500 text-white" : anyLocked ? "bg-gray-100 text-gray-400" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500")}>
+                    {anyLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
                   </span>
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
                     {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
                     {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete prerequisite lesson first</span>}
+                    {freePreviewLocked && !dripLocked && !prereqLocked && <span className="text-[10px] text-amber-500 font-normal normal-case">Full access required</span>}
                   </div>
                 </button>
               );
@@ -659,20 +665,24 @@ function MobileSidebarContent({
                         const active = lesson.id === selectedLessonId;
                         const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
                         const prereqLocked = prereqLockedIds.has(lesson.id);
+                        const mlpm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+                        const freePreviewLocked = isFreePreviewEnrollment && !adminBypass && mlpm === "none";
                         const lessonLocked = dripLocked || prereqLocked;
+                        const anyLocked = lessonLocked || freePreviewLocked;
                         const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                         return (
-                          <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
+                          <button key={lesson.id} onClick={() => setSelectedLessonId(lesson.id)} disabled={lessonLocked}
                             className={cn("w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
-                              active ? "font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")}
+                              active ? "font-semibold" : anyLocked ? "text-gray-400 cursor-pointer hover:bg-amber-50" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")}
                             style={active ? { color: primaryColor, backgroundColor: `${primaryColor}12` } : undefined}>
-                            <LessonIcon type={lesson.type} done={done} locked={lessonLocked} color={primaryColor} />
+                            <LessonIcon type={lesson.type} done={done} locked={anyLocked} color={primaryColor} />
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
                               {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete prerequisite lesson first</span>}
+                              {freePreviewLocked && !dripLocked && !prereqLocked && <span className="text-[10px] text-amber-500">Full access required</span>}
                             </div>
-                            {lesson.durationMinutes && !lessonLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
+                            {lesson.durationMinutes && !anyLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>
                         );
                       })}
@@ -1358,6 +1368,8 @@ export default function CoursePlayer() {
             course={course}
             prereqLockedIds={prereqLockedIds}
             lbl={lbl}
+            isFreePreviewEnrollment={isFreePreviewEnrollment}
+            adminBypass={adminBypass}
           />
         </aside>
 
@@ -1483,19 +1495,22 @@ export default function CoursePlayer() {
               const active = lesson.id === selectedLessonId;
               const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
               const prereqLocked = prereqLockedIds.has(lesson.id);
+              const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+              const freePreviewLocked = isFreePreviewEnrollment && !adminBypass && pm === "none";
               const lessonLocked = dripLocked || prereqLocked;
+              const anyLocked = lessonLocked || freePreviewLocked;
               const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
               return (
                 <button
                   key={lesson.id}
-                  onClick={() => { if (!lessonLocked) handleLessonSelect(lesson.id); }}
+                  onClick={() => handleLessonSelect(lesson.id)}
                   disabled={lessonLocked}
                   className={cn(
                     "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
                     active
                       ? "text-gray-900"
-                      : lessonLocked
-                        ? "text-gray-400 cursor-not-allowed border-transparent"
+                      : anyLocked
+                        ? "text-gray-400 cursor-pointer border-transparent hover:bg-amber-50"
                         : done
                           ? "text-gray-500 hover:bg-gray-50 border-transparent"
                           : "text-gray-700 hover:bg-gray-50 border-transparent",
@@ -1504,15 +1519,16 @@ export default function CoursePlayer() {
                 >
                   <span className={cn(
                     "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                    active ? "text-white" : lessonLocked ? "bg-gray-100 text-gray-400" : done ? "" : "bg-gray-100 text-gray-500"
+                    active ? "text-white" : anyLocked ? "bg-gray-100 text-gray-400" : done ? "" : "bg-gray-100 text-gray-500"
                   )}
                   style={active ? primaryBg : done ? { backgroundColor: `${primaryColor}25`, color: primaryColor } : undefined}>
-                    {lessonLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
+                    {anyLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
                   </span>
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
                     {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
                     {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete prerequisite lesson first</span>}
+                    {freePreviewLocked && !dripLocked && !prereqLocked && <span className="text-[10px] text-amber-500 font-normal normal-case">Full access required</span>}
                   </div>
                 </button>
               );
@@ -1587,26 +1603,30 @@ export default function CoursePlayer() {
                         const active = lesson.id === selectedLessonId;
                         const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
                         const prereqLocked = prereqLockedIds.has(lesson.id);
+                        const lpm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+                        const freePreviewLocked = isFreePreviewEnrollment && !adminBypass && lpm === "none";
                         const lessonLocked = dripLocked || prereqLocked;
+                        const anyLocked = lessonLocked || freePreviewLocked;
                         const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                         return (
                           <button
                             key={lesson.id}
-                            onClick={() => { if (!lessonLocked) handleLessonSelect(lesson.id); }}
+                            onClick={() => handleLessonSelect(lesson.id)}
                             disabled={lessonLocked}
                             className={cn(
                               "w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
-                              active ? "font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
+                              active ? "font-semibold" : anyLocked ? "text-gray-400 cursor-pointer hover:bg-amber-50" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
                             )}
                             style={active ? { color: primaryColor, backgroundColor: `${primaryColor}12` } : undefined}
                           >
-                            <LessonIcon type={lesson.type} done={done} locked={lessonLocked} color={primaryColor} />
+                            <LessonIcon type={lesson.type} done={done} locked={anyLocked} color={primaryColor} />
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
                               {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete prerequisite lesson first</span>}
+                              {freePreviewLocked && !dripLocked && !prereqLocked && <span className="text-[10px] text-amber-500">Full access required</span>}
                             </div>
-                            {lesson.durationMinutes && !lessonLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
+                            {lesson.durationMinutes && !anyLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>
                         );
                       })}

@@ -78,6 +78,8 @@ const AudienceFilterSchema = z.object({
   submittedFormIds: z.array(z.number().int()).default([]),
   /** Filter to users who completed a course (progressPct = 100) */
   completedCourseIds: z.array(z.number().int()).default([]),
+  /** Filter to users enrolled as free_preview in specific course IDs */
+  freePreviewCourseIds: z.array(z.number().int()).default([]),
   /** AND/OR logic between filter groups: "and" = must match all, "or" = match any */
   logic: z.enum(["and", "or"]).default("and"),
 });
@@ -318,6 +320,19 @@ async function resolveRecipients(
       rows.forEach(r => cohortUserIds.add(r.userId));
     }
     allUsers = allUsers.filter(u => cohortUserIds.has(u.id));
+  }
+
+  // Apply free preview enrollment filter
+  if (filter.freePreviewCourseIds && filter.freePreviewCourseIds.length > 0) {
+    const freePreviewUserIds = new Set<number>();
+    for (const courseId of filter.freePreviewCourseIds) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, courseId), eq(lmsEnrollments.enrollmentType, "free_preview")));
+      rows.forEach(r => freePreviewUserIds.add(r.userId));
+    }
+    allUsers = allUsers.filter(u => freePreviewUserIds.has(u.id));
   }
 
   // Apply form submission filter
