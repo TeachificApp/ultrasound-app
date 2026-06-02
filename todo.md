@@ -4393,3 +4393,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire CheckoutPageEditor into WebinarsAdmin item editor
 - [x] Wire CheckoutPageEditor into MembershipsAdmin item editor
 - [x] Update all admin "Copy Checkout Link" buttons for non-course types to use /checkout/:slug?type=X
+
+## Bug: Video Block Media Repo Picker (Jun 2026)
+- [x] Fix video block "Pick from Media Library" — selecting a video shows success toast but block settings panel and canvas preview do not update (root cause: sequential set() calls read stale dataRef; fixed by passing setMany to VideoBlockSettings and batching all 4 field updates in one call)

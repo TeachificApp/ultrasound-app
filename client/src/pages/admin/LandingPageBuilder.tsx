@@ -2839,7 +2839,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           </div>
         );
     case "video":
-      return <VideoBlockSettings d={d} set={set} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
+      return <VideoBlockSettings d={d} set={set} setMany={setMany} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
     case "audio":
       return (
         <AudioBlockEditor
@@ -7145,9 +7145,10 @@ function LandingBlockTemplatesTab({ onInsert }: { onInsert: (block: Block) => vo
 }
 
 // ─── Video Block Settings ──────────────────────────────────────────────────────
-export function VideoBlockSettings({ d, set, uploading, setUploading, uploadMedia }: {
+export function VideoBlockSettings({ d, set, setMany, uploading, setUploading, uploadMedia }: {
   d: Record<string, any>;
   set: (key: string, val: any) => void;
+  setMany?: (patch: Record<string, any>) => void;
   uploading: string | null;
   setUploading: (v: string | null) => void;
   uploadMedia: any;
@@ -7184,10 +7185,22 @@ export function VideoBlockSettings({ d, set, uploading, setUploading, uploadMedi
 
   const selectMediaAsset = (asset: any) => {
     const url = asset.currentVersion?.s3Url ?? "";
-    set("embedUrl", url);
-    set("source", "media_repo");
-    set("mediaAssetId", asset.id);
-    set("mediaAssetTitle", asset.title ?? asset.currentVersion?.fileName ?? "Video");
+    // Use setMany to batch all fields in one update — avoids stale dataRef reads
+    // when multiple set() calls happen synchronously before a re-render.
+    if (setMany) {
+      setMany({
+        embedUrl: url,
+        source: "media_repo",
+        mediaAssetId: asset.id,
+        mediaAssetTitle: asset.title ?? asset.currentVersion?.fileName ?? "Video",
+      });
+    } else {
+      // Fallback: sequential set (may lose fields if dataRef is stale)
+      set("embedUrl", url);
+      set("source", "media_repo");
+      set("mediaAssetId", asset.id);
+      set("mediaAssetTitle", asset.title ?? asset.currentVersion?.fileName ?? "Video");
+    }
     setShowMediaPicker(false);
     toast.success("Video selected from media repository");
   };
