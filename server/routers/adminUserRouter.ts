@@ -152,17 +152,17 @@ export const adminUserRouter = router({
       const physicalOrderList = await db.execute(sql`
         SELECT
           po.id,
-          po.created_at AS createdAt,
+          po.ordered_at AS createdAt,
           po.amount_paid AS amountPaid,
           po.currency,
           po.fulfillment_status AS fulfillmentStatus,
-          po.shipping_address AS shippingAddress,
+          CONCAT_WS(', ', po.shipping_name, po.shipping_line1, po.shipping_line2, po.shipping_city, po.shipping_state, po.shipping_postal_code, po.shipping_country) AS shippingAddress,
           pp.title AS productTitle,
           pp.slug AS productSlug
         FROM physical_product_orders po
         JOIN physical_products pp ON pp.id = po.product_id
         WHERE po.user_id = ${input.userId}
-        ORDER BY po.created_at DESC
+        ORDER BY po.ordered_at DESC
       `);
 
       // Team / group memberships — find all groups this user has a seat in
@@ -1704,10 +1704,10 @@ export const adminUserRouter = router({
       const [physicalRows] = await db.execute(sql`
         SELECT po.id, pp.title AS productName, po.amount_paid/100.0 AS amountPaid, po.currency,
           po.fulfillment_status AS status, po.stripe_payment_intent_id AS stripePaymentIntentId,
-          po.created_at AS createdAt
+          po.ordered_at AS createdAt
         FROM physical_product_orders po
         JOIN physical_products pp ON pp.id = po.product_id
-        WHERE po.user_id = ${input.userId} ORDER BY po.created_at DESC
+        WHERE po.user_id = ${input.userId} ORDER BY po.ordered_at DESC
       `) as any;
       const toList = (rows: any, type: string) =>
         (Array.isArray(rows) ? rows : []).map((r: any) => ({
