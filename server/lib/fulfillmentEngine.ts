@@ -153,7 +153,7 @@ export async function executeFulfillment(
   if (courseId) {
     try {
       const [existing] = await db
-        .select({ id: lmsEnrollments.id })
+        .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
         .from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId)))
         .limit(1);
@@ -163,9 +163,17 @@ export async function executeFulfillment(
           courseId,
           orderId: null,
           affiliateCode: null,
+          enrollmentType: "full",
         });
         notes.push(`Enrolled in course #${courseId}`);
         console.log(`[FulfillmentEngine] Enrolled user ${userId} in course ${courseId}`);
+      } else if (existing.enrollmentType === "free_preview") {
+        // Upgrade free preview enrollment to full access
+        await db.update(lmsEnrollments)
+          .set({ enrollmentType: "full" })
+          .where(eq(lmsEnrollments.id, existing.id));
+        notes.push(`Upgraded free preview enrollment to full access for course #${courseId}`);
+        console.log(`[FulfillmentEngine] Upgraded user ${userId} from free_preview to full enrollment in course ${courseId}`);
       } else {
         notes.push(`Already enrolled in course #${courseId} (idempotent)`);
         console.log(`[FulfillmentEngine] User ${userId} already enrolled in course ${courseId} — skipping`);
@@ -297,7 +305,7 @@ export async function executeFulfillment(
     try {
       if (item.type === "course" && item.productId) {
         const [existing] = await db
-          .select({ id: lmsEnrollments.id })
+          .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
           .from(lmsEnrollments)
           .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, item.productId)))
           .limit(1);
@@ -307,8 +315,14 @@ export async function executeFulfillment(
             courseId: item.productId,
             orderId: null,
             affiliateCode: null,
+            enrollmentType: "full",
           });
           notes.push(`Bonus course: ${item.label}`);
+        } else if (existing.enrollmentType === "free_preview") {
+          await db.update(lmsEnrollments)
+            .set({ enrollmentType: "full" })
+            .where(eq(lmsEnrollments.id, existing.id));
+          notes.push(`Upgraded free preview to full for bonus course: ${item.label}`);
         }
       } else if (item.type === "download" && item.productId) {
         const [existing] = await db

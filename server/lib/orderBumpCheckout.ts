@@ -141,7 +141,7 @@ export async function fulfillOrderBumpPurchase(
     }
   } else if (bumpType === "course" && bumpProductId) {
     const [existing] = await db
-      .select()
+      .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
       .from(lmsEnrollments)
       .where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, bumpProductId)))
       .limit(1);
@@ -150,7 +150,13 @@ export async function fulfillOrderBumpPurchase(
         userId: input.userId,
         courseId: bumpProductId,
         affiliateCode: null,
+        enrollmentType: "full",
       });
+    } else if (existing.enrollmentType === "free_preview") {
+      // Upgrade free preview to full access on order bump purchase
+      await db.update(lmsEnrollments)
+        .set({ enrollmentType: "full" })
+        .where(eq(lmsEnrollments.id, existing.id));
     }
   } else if (bumpType === "bundle" && bumpProductId) {
     const [existingBundle] = await db

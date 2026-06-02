@@ -11,8 +11,14 @@ import "./index.css";
 const queryClient = new QueryClient();
 
 // ─── Copy & Right-Click Protection ───────────────────────────────────────────
-// Disable right-click context menu, copy, cut, and drag site-wide.
-// Input/textarea interactions are not affected (browser handles those natively).
+// Disable right-click context menu, copy, cut, and drag on public-facing pages.
+// Admin routes (/admin/*) are fully exempt so editors can work normally.
+// Input/textarea interactions are never blocked (browser handles those natively).
+
+function isAdminRoute(): boolean {
+  return window.location.pathname.startsWith("/admin");
+}
+
 function isFormElement(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false;
   const tag = target.tagName.toLowerCase();
@@ -20,14 +26,17 @@ function isFormElement(target: EventTarget | null): boolean {
 }
 
 document.addEventListener("contextmenu", (e) => {
+  if (isAdminRoute()) return; // allow on admin pages
   if (!isFormElement(e.target)) e.preventDefault();
 });
 
 document.addEventListener("copy", (e) => {
+  if (isAdminRoute()) return; // allow on admin pages
   if (!isFormElement(e.target)) e.preventDefault();
 });
 
 document.addEventListener("cut", (e) => {
+  if (isAdminRoute()) return; // allow on admin pages
   if (!isFormElement(e.target)) e.preventDefault();
 });
 

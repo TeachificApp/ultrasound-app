@@ -321,14 +321,23 @@ export const adminUserRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [existing] = await db
-        .select({ id: lmsEnrollments.id })
+        .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
         .from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, input.courseId)))
         .limit(1);
-      if (existing) return { enrollmentId: existing.id, alreadyEnrolled: true };
+      if (existing) {
+        // If admin manually enrolls someone who only had free preview, upgrade to full
+        if (existing.enrollmentType === "free_preview") {
+          await db.update(lmsEnrollments)
+            .set({ enrollmentType: "full" })
+            .where(eq(lmsEnrollments.id, existing.id));
+          return { enrollmentId: existing.id, alreadyEnrolled: false };
+        }
+        return { enrollmentId: existing.id, alreadyEnrolled: true };
+      }
       const [result] = await db
         .insert(lmsEnrollments)
-        .values({ userId: input.userId, courseId: input.courseId })
+        .values({ userId: input.userId, courseId: input.courseId, enrollmentType: "full" })
         .$returningId();
       return { enrollmentId: result.id, alreadyEnrolled: false };
     }),

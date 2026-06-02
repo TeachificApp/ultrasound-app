@@ -851,13 +851,20 @@ export const lmsLearnerRouter = router({
       if (!course.isFree) throw new TRPCError({ code: "BAD_REQUEST", message: "This course requires payment" });
       if (course.status !== "public") throw new TRPCError({ code: "FORBIDDEN" });
 
-      const [existing] = await db.select().from(lmsEnrollments)
+      const [existing] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType }).from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
-      if (existing) return { enrollmentId: existing.id, alreadyEnrolled: true };
+      if (existing) {
+        if (existing.enrollmentType === "free_preview") {
+          await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existing.id));
+          return { enrollmentId: existing.id, alreadyEnrolled: false };
+        }
+        return { enrollmentId: existing.id, alreadyEnrolled: true };
+      }
 
       const [result] = await db.insert(lmsEnrollments).values({
         userId: ctx.user.id, courseId: course.id,
         affiliateCode: input.affiliateCode ?? null,
+        enrollmentType: "full",
       }).$returningId();
       // Log free enrollment to unified activity log (fire-and-forget)
       db.insert(userActivityLogs).values({
@@ -1184,11 +1191,13 @@ export const lmsLearnerRouter = router({
 
       if (pricingType === "free") {
         // Free course — just enroll directly
-        const existing = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+        const [existingFree] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType }).from(lmsEnrollments)
           .where(and(eq(lmsEnrollments.userId, user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
-        if (!existing[0]) {
-          await db.insert(lmsEnrollments).values({ userId: user.id, courseId: course.id, status: "active", progressPct: 0 });
+        if (!existingFree) {
+          await db.insert(lmsEnrollments).values({ userId: user.id, courseId: course.id, status: "active", progressPct: 0, enrollmentType: "full" });
           try { await sendEnrollmentEmail({ userId: user.id, courseId: course.id }); } catch {}
+        } else if (existingFree.enrollmentType === "free_preview") {
+          await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existingFree.id));
         }
         return { checkoutUrl: null, enrolled: true };
       }
@@ -1313,11 +1322,15 @@ export const lmsLearnerRouter = router({
         if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "productSlug required for course" });
         const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, slug)).limit(1);
         if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-        const [existing] = await db.select().from(lmsEnrollments)
+        const [existing] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType }).from(lmsEnrollments)
           .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
-        if (existing) return { checkoutUrl: null, alreadyEnrolled: true };
+        if (existing && existing.enrollmentType !== "free_preview") return { checkoutUrl: null, alreadyEnrolled: true };
         if (course.isFree || !course.price) {
-          await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id });
+          if (existing?.enrollmentType === "free_preview") {
+            await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existing.id));
+          } else {
+            await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id, enrollmentType: "full" });
+          }
           return { checkoutUrl: null, alreadyEnrolled: false, free: true };
         }
         const session = await stripe.checkout.sessions.create({
@@ -1403,16 +1416,19 @@ export const lmsLearnerRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "This invite was sent to a different email address" });
       }
 
-      // Check not already enrolled
-      const [existing] = await db.select().from(lmsEnrollments)
+            // Check not already enrolled
+      const [existing] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType }).from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, group.courseId))).limit(1);
       if (existing) {
+        if (existing.enrollmentType === "free_preview") {
+          // Upgrade free preview to full when accepting a group seat
+          await db.update(lmsEnrollments).set({ enrollmentType: "full", groupId: group.id }).where(eq(lmsEnrollments.id, existing.id));
+        }
         await db.update(lmsGroupSeats).set({ acceptedAt: new Date(), enrollmentId: existing.id }).where(eq(lmsGroupSeats.id, seat.id));
         return { enrollmentId: existing.id };
       }
-
       const [result] = await db.insert(lmsEnrollments).values({
-        userId: ctx.user.id, courseId: group.courseId, groupId: group.id,
+        userId: ctx.user.id, courseId: group.courseId, groupId: group.id, enrollmentType: "full",
       }).$returningId();
       await db.update(lmsGroupSeats).set({ acceptedAt: new Date(), enrollmentId: result.id }).where(eq(lmsGroupSeats.id, seat.id));
       return { enrollmentId: result.id };

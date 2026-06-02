@@ -8752,7 +8752,7 @@ function PricingOptionRow({ opt, editingId, setEditingId, setShowAdd, updateOpti
     zIndex: isDragging ? 10 : undefined,
   };
   // Stripe Payment Link mutation
-  const createPaymentLink = trpc.lmsAdmin.createPaymentLink.useMutation({
+  const createPaymentLink = trpc.lmsGroup.createPaymentLink.useMutation({
     onSuccess: (data) => {
       navigator.clipboard.writeText(data.url)
         .then(() => toast.success("Stripe Payment Link copied to clipboard!"))
