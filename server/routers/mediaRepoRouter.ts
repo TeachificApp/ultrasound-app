@@ -34,6 +34,7 @@ import {
   mediaViewEvents,
   mediaFolders,
 } from "../../drizzle/schema";
+import { initialScormExtractionStatus, needsScormExtraction, queueScormExtractionIfNeeded } from "../lib/scormPackage";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -161,7 +162,25 @@ export const mediaRepoRouter = router({
         mimeType: input.mimeType,
         notes: input.notes ?? null,
         uploadedByUserId: ctx.user.id,
+        scormExtractionStatus: initialScormExtractionStatus({
+          mediaType,
+          mimeType: input.mimeType,
+          fileName: input.fileName,
+        }),
       });
+
+      const [insertedVersion] = await db
+        .select({ id: mediaVersions.id })
+        .from(mediaVersions)
+        .where(and(eq(mediaVersions.assetId, assetId), eq(mediaVersions.versionNumber, 1)))
+        .limit(1);
+      if (insertedVersion) {
+        await queueScormExtractionIfNeeded(insertedVersion.id, s3Url, slug, {
+          mediaType,
+          mimeType: input.mimeType,
+          fileName: input.fileName,
+        });
+      }
 
       return { id: assetId, slug, s3Url };
     }),
@@ -495,18 +514,6 @@ export const mediaRepoRouter = router({
       const s3Key = `media-repo/${asset.slug}/v${nextVersion}-${input.fileName}`;
       const { url: s3Url } = await storagePut(s3Key, buffer, input.mimeType);
 
-      await db.insert(mediaVersions).values({
-        assetId: input.assetId,
-        versionNumber: nextVersion,
-        s3Key,
-        s3Url,
-        fileName: input.fileName,
-        fileSize: input.fileSize,
-        mimeType: input.mimeType,
-        notes: input.notes ?? null,
-        uploadedByUserId: ctx.user.id,
-      });
-
       // Detect SCORM for ZIP files (inspect manifest)
       let detectedType = detectMediaType(input.mimeType);
       if (detectedType === "zip") {
@@ -517,21 +524,55 @@ export const mediaRepoRouter = router({
         } catch {}
       }
 
+      await db.insert(mediaVersions).values({
+        assetId: input.assetId,
+        versionNumber: nextVersion,
+        s3Key,
+        s3Url,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
+        mimeType: input.mimeType,
+        notes: input.notes ?? null,
+        uploadedByUserId: ctx.user.id,
+        scormExtractionStatus: initialScormExtractionStatus({
+          mediaType: detectedType,
+          mimeType: input.mimeType,
+          fileName: input.fileName,
+        }),
+      });
+
       // Update asset mimeType to reflect new version
       await db
         .update(mediaAssets)
         .set({ mimeType: input.mimeType, mediaType: detectedType as any })
         .where(eq(mediaAssets.id, input.assetId));
 
-      // Invalidate SCORM cache so the new ZIP is extracted on next request
-      if (detectedType === "scorm" || detectedType === "zip") {
+      const [insertedVersion] = await db
+        .select({ id: mediaVersions.id })
+        .from(mediaVersions)
+        .where(and(eq(mediaVersions.assetId, input.assetId), eq(mediaVersions.versionNumber, nextVersion)))
+        .limit(1);
+      if (insertedVersion) {
+        await queueScormExtractionIfNeeded(insertedVersion.id, s3Url, asset.slug, {
+          mediaType: detectedType,
+          mimeType: input.mimeType,
+          fileName: input.fileName,
+        });
+      }
+
+      // Invalidate on-the-fly SCORM cache for this slug
+      if (needsScormExtraction({ mediaType: detectedType, mimeType: input.mimeType, fileName: input.fileName })) {
         try {
           const os = await import("os");
           const pathMod = await import("path");
           const fsMod = await import("fs");
-          const cacheDir = pathMod.join(os.tmpdir(), "scorm-cache", asset.slug);
-          if (fsMod.existsSync(cacheDir)) {
-            fsMod.rmSync(cacheDir, { recursive: true, force: true });
+          const cacheRoot = pathMod.join(os.tmpdir(), "scorm-cache");
+          if (fsMod.existsSync(cacheRoot)) {
+            for (const entry of fsMod.readdirSync(cacheRoot)) {
+              if (entry.startsWith(`${asset.slug}-`)) {
+                fsMod.rmSync(pathMod.join(cacheRoot, entry), { recursive: true, force: true });
+              }
+            }
             console.log(`[SCORM] Cache invalidated for slug=${asset.slug}`);
           }
         } catch (e) {
@@ -1033,12 +1074,15 @@ export const mediaRepoRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [version] = await db.select().from(mediaVersions)
         .where(eq(mediaVersions.assetId, input.assetId))
-        .orderBy(desc(mediaVersions.createdAt))
+        .orderBy(desc(mediaVersions.versionNumber))
         .limit(1);
       if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found for asset" });
       const [asset] = await db.select().from(mediaAssets)
         .where(eq(mediaAssets.id, input.assetId)).limit(1);
       if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+      if (!needsScormExtraction({ mediaType: asset.mediaType, mimeType: version.mimeType, fileName: version.fileName, s3Url: version.s3Url })) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This asset is not a SCORM/LMS/ZIP package" });
+      }
       // Reset to pending — heartbeat cron will pick this up within 60 seconds
       await db.update(mediaVersions)
         .set({
@@ -1072,7 +1116,7 @@ export const mediaRepoRouter = router({
       })
         .from(mediaVersions)
         .where(eq(mediaVersions.assetId, input.assetId))
-        .orderBy(desc(mediaVersions.createdAt))
+        .orderBy(desc(mediaVersions.versionNumber))
         .limit(1);
       if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found" });
       return version;

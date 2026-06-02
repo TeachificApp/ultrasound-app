@@ -26,6 +26,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import unzipper from "unzipper";
+import { needsScormExtraction, initialScormExtractionStatus } from "../lib/scormPackage";
 import {
   S3Client,
   CreateMultipartUploadCommand,
@@ -530,6 +531,7 @@ async function finalizeUpload(
         mimeType,
         notes: notes || null,
         uploadedByUserId: userId,
+        scormExtractionStatus: initialScormExtractionStatus({ mediaType, mimeType, fileName }),
       });
 
       await db
@@ -541,7 +543,7 @@ async function finalizeUpload(
       res.json({ done: true, assetId: existingAssetId, versionNumber: nextVersion, s3Url });
 
       // Fire-and-forget: extract SCORM/ZIP package to R2 for fast serving
-      if (mediaType === "scorm" || mediaType === "zip") {
+      if (needsScormExtraction({ mediaType, mimeType, fileName, s3Url })) {
         const { extractAndUploadScorm } = await import("./scormExtractor");
         const [insertedVersion] = await db
           .select({ id: mediaVersions.id })
@@ -582,13 +584,14 @@ async function finalizeUpload(
         mimeType,
         notes: notes || null,
         uploadedByUserId: userId,
+        scormExtractionStatus: initialScormExtractionStatus({ mediaType, mimeType, fileName }),
       });
 
       await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
       res.json({ done: true, assetId, slug, versionNumber: 1, s3Url });
 
       // Fire-and-forget: extract SCORM/ZIP package to R2 for fast serving
-      if (mediaType === "scorm" || mediaType === "zip") {
+      if (needsScormExtraction({ mediaType, mimeType, fileName, s3Url })) {
         const { extractAndUploadScorm } = await import("./scormExtractor");
         const [insertedVersion] = await db
           .select({ id: mediaVersions.id })

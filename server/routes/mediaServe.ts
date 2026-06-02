@@ -21,6 +21,7 @@
 import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
+import { findScormLaunchFile, needsScormExtraction, shouldShowScormWaitingPage } from "../lib/scormPackage";
 import { createHash } from "crypto";
 import https from "https";
 import http from "http";
@@ -232,24 +233,6 @@ function downloadToFile(url: string, destPath: string): Promise<void> {
 }
 
 /**
- * Parse imsmanifest.xml to find the SCO launch file (href of the first <resource>
- * with type containing "sco"). Falls back to the first resource href, then index.html.
- */
-function findScormLaunchFile(manifestXml: string): string {
-  // Try SCO resource first
-  const scoMatch =
-    manifestXml.match(/<resource[^>]+type=['"'][^'"]*sco[^'"]*['"'][^>]*href=['"']([^'"]+)['"']/i) ||
-    manifestXml.match(/<resource[^>]+href=['"']([^'"]+)['"'][^>]*type=['"'][^'"]*sco[^'"]*['"']/i);
-  if (scoMatch) return scoMatch[1].split("?")[0];
-
-  // Fallback: first resource with any href
-  const anyMatch = manifestXml.match(/<resource[^>]+href=['"']([^'"]+)['"']/i);
-  if (anyMatch) return anyMatch[1].split("?")[0];
-
-  return "index.html";
-}
-
-/**
  * Extract a SCORM ZIP to the cache directory and return the launch file path.
  * Uses streaming download to disk + disk-based extraction to avoid OOM on large ZIPs.
  * Returns null if extraction fails.
@@ -284,8 +267,10 @@ async function extractScormZip(
       if (entry.type === "File") {
         const destPath = path.join(cacheDir, entry.path);
         fs.mkdirSync(path.dirname(destPath), { recursive: true });
-        const content = await entry.buffer();
-        fs.writeFileSync(destPath, content);
+        await new Promise<void>((resolve, reject) => {
+          const ws = fs.createWriteStream(destPath);
+          entry.stream().pipe(ws).on("finish", resolve).on("error", reject);
+        });
       }
     }
 
@@ -483,9 +468,8 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     const extractionStatus = (version as any).scormExtractionStatus as string | null | undefined;
     const extractionError = (version as any).scormExtractionError as string | null | undefined;
 
-    if (extractionStatus === "pending" || extractionStatus === "processing") {
-      // Job is queued or in progress — show a friendly waiting page that auto-refreshes
-      res.status(202).send(scormStatusPage(extractionStatus, null));
+    if (shouldShowScormWaitingPage(extractionStatus, version as any)) {
+      res.status(202).send(scormStatusPage(extractionStatus as "pending" | "processing", null));
       return;
     }
 
@@ -887,11 +871,7 @@ const mobileBannerScript = `
 function buildEmbedPage(opts: EmbedPageOptions): string {
   const { slug, asset, version, fileUrl, mimeType, mediaType, tokenParam } = opts;
   const fileName = version.fileName ?? "";
-  const isZipFile = mediaType === "scorm" || mediaType === "lms" || mediaType === "zip" ||
-    mimeType === "application/zip" || mimeType === "application/x-zip-compressed" ||
-    mimeType === "application/x-zip" ||
-    fileName.toLowerCase().endsWith(".zip") ||
-    fileUrl.toLowerCase().includes(".zip");
+  const isZipFile = needsScormExtraction({ mediaType, mimeType, fileName, s3Url: fileUrl });
 
   let contentHtml = "";
   let needsMobileBanner = false;
