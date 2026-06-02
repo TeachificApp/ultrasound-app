@@ -79,8 +79,8 @@ async function sendVerificationEmail(to: string, token: string, name: string, br
   }
 }
 
-async function sendPasswordResetEmail(to: string, token: string, name: string, brandMode?: BrandMode) {
-  const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
+async function sendPasswordResetEmail(to: string, token: string, name: string, brandMode?: BrandMode, origin?: string) {
+  const appUrl = origin ?? process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
   const resetUrl = `${appUrl}/reset-password?token=${token}`;
   const firstName = name || "there";
   const { subject, htmlBody, previewText } = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
@@ -379,7 +379,7 @@ export const emailAuthRouter = router({
    * Request a password reset email.
    */
   forgotPassword: publicProcedure
-    .input(z.object({ email: z.string().email() }))
+    .input(z.object({ email: z.string().email(), origin: z.string().url().optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
@@ -404,7 +404,7 @@ export const emailAuthRouter = router({
           .where(eq(users.id, user.id));
         const firstName = (user.name ?? "").split(" ")[0] ?? "there";
         const bm = detectBrandMode(ctx.req.hostname || "");
-        await sendPasswordResetEmail(email, resetToken, firstName, bm);
+        await sendPasswordResetEmail(email, resetToken, firstName, bm, input.origin);
       }
 
       return { success: true };
