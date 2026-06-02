@@ -6,6 +6,8 @@ import {
   shouldShowScormWaitingPage,
   isZipStorageRef,
   pickScormPlaybackMode,
+  isDirectHtmlScormVersion,
+  resolveZipDownloadUrl,
 } from "./scormPackage";
 
 describe("scormPackage", () => {
@@ -90,4 +92,19 @@ describe("pickScormPlaybackMode", () => {
     ).toBe("server");
   });
 });
-
+describe("isDirectHtmlScormVersion", () => {
+  it("detects CDN index.html packages", () => {
+    expect(
+      isDirectHtmlScormVersion({
+        s3Url: "https://cdn.example.com/My Quiz (Published)/index.html",
+        fileName: "index.html",
+      })
+    ).toBe(true);
+    expect(
+      isDirectHtmlScormVersion({
+        s3Url: "https://cdn.example.com/quiz.zip",
+        fileName: "quiz.zip",
+      })
+    ).toBe(false);
+  });
+});

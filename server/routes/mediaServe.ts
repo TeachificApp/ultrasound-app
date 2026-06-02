@@ -22,7 +22,7 @@
 import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
-import { findScormLaunchFile, needsScormExtraction, shouldShowScormWaitingPage, pickScormPlaybackMode, encodeStorageFetchUrl } from "../lib/scormPackage";
+import { findScormLaunchFile, needsScormExtraction, shouldShowScormWaitingPage, pickScormPlaybackMode, encodeStorageFetchUrl, resolveZipDownloadUrl, isDirectHtmlScormVersion, isScormPackageMediaType } from "../lib/scormPackage";
 import { buildMediaAuthQuery, verifyMediaViewerToken } from "../lib/mediaEmbedAccess";
 import { createHash } from "crypto";
 import https from "https";
@@ -435,6 +435,7 @@ function scormStatusPage(status: "pending" | "processing" | "failed", errorMsg?:
 for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
   router.get([slugPath, `${slugPath}/*`], async (req: Request, res: Response) => {
     setCorsHeaders(res);
+    try {
     const auth = readMediaAuth(req);
     const result = await resolveMedia(req.params.slug, auth);
 
@@ -443,6 +444,23 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     if (!result.version) { res.status(404).send(errorPage("No file available.")); return; }
 
     const { asset, version } = result;
+
+    const dbScorm = await getDb();
+    const allVersions =
+      dbScorm
+        ? await dbScorm
+            .select({
+              s3Url: mediaVersions.s3Url,
+              fileName: mediaVersions.fileName,
+              mimeType: mediaVersions.mimeType,
+              s3Key: mediaVersions.s3Key,
+              versionNumber: mediaVersions.versionNumber,
+              scormExtractedPrefix: mediaVersions.scormExtractedPrefix,
+            })
+            .from(mediaVersions)
+            .where(eq(mediaVersions.assetId, asset.id))
+            .orderBy(desc(mediaVersions.versionNumber))
+        : [];
 
     // Determine which file to serve:
     // - /scorm/  or  /scorm  → serve the launch file
@@ -459,12 +477,12 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       const directUrl = version.scormExtractedPrefix.replace("__direct_html__:", "");
       if (relativePath === "" || relativePath === (version.scormLaunchFile || "index.html")) {
         // Root request or launch file — redirect to the CDN URL
-        res.redirect(302, directUrl);
+        res.redirect(302, encodeStorageFetchUrl(directUrl));
       } else {
         // Asset request — derive the base URL and redirect to the asset
         const lastSlash = directUrl.lastIndexOf("/");
         const baseUrl = directUrl.substring(0, lastSlash + 1); // e.g. .../FolderName/
-        res.redirect(302, `${baseUrl}${relativePath}`);
+        res.redirect(302, encodeStorageFetchUrl(`${baseUrl}${relativePath}`));
       }
       return;
     }
@@ -502,8 +520,31 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       return;
     }
 
+    // Legacy: current version points at extracted HTML on CDN (not a ZIP file)
+    if (isDirectHtmlScormVersion(version)) {
+      const launch = version.scormLaunchFile || "index.html";
+      const htmlUrl = version.s3Url!;
+      if (relativePath === "" || relativePath === launch) {
+        res.redirect(302, encodeStorageFetchUrl(htmlUrl));
+        return;
+      }
+      const base = htmlUrl.includes("/")
+        ? htmlUrl.replace(/[^/]+$/, relativePath)
+        : relativePath;
+      res.redirect(302, encodeStorageFetchUrl(base));
+      return;
+    }
+
+    const zipDownloadUrl = resolveZipDownloadUrl(version, allVersions);
+    if (!zipDownloadUrl) {
+      res.status(503).send(
+        scormStatusPage("failed", "No ZIP file found for this package. Re-upload the SCORM ZIP or use Re-extract in the media library.")
+      );
+      return;
+    }
+
     // extractionStatus is 'done' or null (legacy) — attempt on-the-fly extraction as fallback
-    const extracted = await extractScormZip(asset.slug, version.s3Url);
+    const extracted = await extractScormZip(asset.slug, encodeStorageFetchUrl(zipDownloadUrl));
     if (!extracted) {
       // On-the-fly extraction also failed — queue for heartbeat retry and show waiting page
       try {
@@ -594,6 +635,12 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
 
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.sendFile(fullPath);
+    } catch (err: any) {
+      console.error(`[ScormServe] Unhandled error for slug=${req.params.slug}:`, err?.message ?? err);
+      if (!res.headersSent) {
+        res.status(500).send(errorPage("Failed to load SCORM content. Please try again or contact support."));
+      }
+    }
   });
 } // end for slugPath (scorm)
 
@@ -879,6 +926,17 @@ router.get(slugPath, async (req: Request, res: Response) => {
   const mimeType = version.mimeType ?? asset.mimeType ?? "application/octet-stream";
   const mediaType = asset.mediaType;
   const tokenParam = buildMediaAuthQuery(auth);
+
+  // SCORM/ZIP/LMS: /embed links should use /scorm (avoids broken nested iframe + wrong ZIP url)
+  if (
+    isScormPackageMediaType(mediaType) ||
+    needsScormExtraction({ mediaType, mimeType, fileName: version.fileName ?? "", s3Url: fileUrl })
+  ) {
+    const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    const scormPath = req.path.replace(/\/embed\/?$/, "/scorm") + q;
+    res.redirect(302, scormPath);
+    return;
+  }
 
   // Record view event (fire-and-forget)
   recordView(asset.id, "embed", req);

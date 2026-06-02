@@ -15,7 +15,6 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
-import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
@@ -95,7 +94,7 @@ export interface Block {
   data: Record<string, any>;
 }
 
-export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number }) {
+export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; coursePrice?: number; courseTitle?: string }) {
   const { user } = useAuth();
   const d = block.data ?? {};
   // Pre-compute pass-through URL for url_embed blocks (hooks must be at top level, not inside switch)
@@ -217,7 +216,6 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     }
     case "video": {
       const isDirectVideo = d.embedUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);
-      const isMediaRepo = d.source === "media_repo";
       const videoAccent = d.accentColor ?? "#189aa1";
       const containerStyle: React.CSSProperties = { maxWidth: d.maxWidth ?? "100%", height: d.height || undefined, paddingBottom: d.height ? undefined : (isDirectVideo ? undefined : "56.25%"), borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       const videoId = `aaus-vid-${block.id ?? 'v'}`;
@@ -225,47 +223,12 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const trimEnd = d.trimEnd ?? 0;
       // Build the trimmed embed URL using platform-aware logic
       const trimmedEmbedUrl = d.embedUrl ? applyVideoTrim(d.embedUrl, trimStart, trimEnd) : "";
-
-      // Media repo videos: render full-width/height with no padding, no max-width restriction
-      if (isMediaRepo && d.embedUrl) {
-        return (
-          <div className="w-full">
-            <style>{`
-              .${videoId} { accent-color: ${videoAccent}; }
-              .${videoId}::-webkit-media-controls-panel { background: linear-gradient(transparent 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.72) 100%); }
-              .${videoId}::-webkit-media-controls-play-button { filter: none; }
-              .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }
-              .${videoId}::-webkit-media-controls-volume-slider { accent-color: ${videoAccent}; }
-            `}</style>
-            <video
-              src={trimmedEmbedUrl}
-              autoPlay={d.autoplay ?? false}
-              muted={d.muted ?? false}
-              loop={d.loop ?? false}
-              controls={d.controls ?? true}
-              playsInline
-              controlsList="nodownload"
-              onContextMenu={e => e.preventDefault()}
-              className={`w-full block ${videoId}`}
-              style={{ display: "block", width: "100%", height: d.height ? `${d.height}px` : "auto", accentColor: videoAccent }}
-            />
-            {d.caption && <p className="text-sm text-gray-500 mt-2 text-center px-4 pb-2">{d.caption}</p>}
-          </div>
-        );
-      }
-
       return (
         <div className="px-8 py-6">
           {d.embedUrl ? (
             isDirectVideo ? (
               <div className="mx-auto overflow-hidden shadow" style={containerStyle}>
-                <style>{`
-                  .${videoId} { accent-color: ${videoAccent}; }
-                  .${videoId}::-webkit-media-controls-panel { background: linear-gradient(transparent 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.72) 100%); }
-                  .${videoId}::-webkit-media-controls-play-button { filter: none; }
-                  .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }
-                  .${videoId}::-webkit-media-controls-volume-slider { accent-color: ${videoAccent}; }
-                `}</style>
+                <style>{`.${videoId} { accent-color: ${videoAccent}; } .${videoId}::-webkit-media-controls-play-button { filter: none; } .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }`}</style>
                 <video
                   src={trimmedEmbedUrl}
                   autoPlay={d.autoplay ?? false}
@@ -273,8 +236,6 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                   loop={d.loop ?? false}
                   controls={d.controls ?? true}
                   playsInline
-                  controlsList="nodownload"
-                  onContextMenu={e => e.preventDefault()}
                   className={`w-full h-full object-cover ${videoId}`}
                   style={{ height: d.height || undefined, accentColor: videoAccent }}
                 />
@@ -738,7 +699,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                   <div className="flex-1"><div className="font-semibold text-sm">{p.name}</div><div className="text-xs text-gray-500">{p.description}</div></div>
                   <div className="text-right">
                     {(p as any).strikethroughPrice && <div className="text-xs text-gray-400 line-through">{(p as any).strikethroughPrice}</div>}
-                    <span className="text-sm font-medium">${Number(p.price).toFixed(2)}</span>
+                    <span className="text-sm font-medium">${(p.price / 100).toFixed(2)}</span>
                   </div>
                 </div>
               ))}
@@ -771,7 +732,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
               <div className="text-right flex-shrink-0">
                 {(bump as any).strikethroughPrice && <div className="text-xs text-gray-400 line-through">{(bump as any).strikethroughPrice}</div>}
-                <div className="text-sm font-bold" style={{ color: d.accentColor ?? "#179ca3" }}>${Number(bump.price).toFixed(2)}</div>
+                <div className="text-sm font-bold" style={{ color: d.accentColor ?? "#179ca3" }}>${(bump.price / 100).toFixed(2)}</div>
                 <button className="mt-2 px-4 py-1 border-2 rounded font-semibold text-sm" style={{ borderColor: d.accentColor ?? "#179ca3", color: d.accentColor ?? "#179ca3" }}>{bump.ctaText || "+ Add"}</button>
               </div>
             </div>
@@ -1035,22 +996,16 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       );
     }
     case "file_download": {
-      // Resolve file URLs based on source type:
-      // - media_repo: use /api/media/:slug for inline viewing (Content-Disposition: inline)
-      //               use /api/media/:slug/download for the download button (Content-Disposition: attachment)
-      // - download_library / upload: use stored fileUrl (S3 URL) for both
-      const isMediaRepo = d.source === "media_repo";
-      const viewUrl = isMediaRepo
-        ? (d.mediaAssetUrl || d.fileUrl || (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}` : ""))
+      // Resolve file URL based on source type:
+      // - media_repo: use stored mediaAssetUrl or slug-based serve endpoint
+      // - download_library: use stored fileUrl directly (S3 URL from digital product files)
+      // - upload: use stored fileUrl (S3 URL from page media upload)
+      const fileUrl = d.source === "media_repo"
+        ? (d.mediaAssetUrl || d.fileUrl || (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}/download` : ""))
         : (d.fileUrl || "");
-      const downloadUrl = isMediaRepo
-        ? (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}/download` : (d.mediaAssetUrl || d.fileUrl || ""))
-        : (d.fileUrl || "");
-      // fileUrl is used for card mode (direct download)
-      const fileUrl = downloadUrl;
-      const fileName = isMediaRepo ? (d.mediaAssetTitle || d.fileName || "File") : (d.fileName || "File");
+      const fileName = d.source === "media_repo" ? (d.mediaAssetTitle || d.fileName || "File") : (d.fileName || "File");
       const displayMode = d.displayMode ?? "card";
-      if (displayMode === "inline" && viewUrl) {
+      if (displayMode === "inline" && fileUrl) {
         const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
         const isPdf = ext === "pdf";
         const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
@@ -1060,14 +1015,13 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
             {d.label && <h3 className="text-lg font-semibold text-gray-800 mb-2">{d.label}</h3>}
             {d.description && <p className="text-sm text-gray-500 mb-3">{d.description}</p>}
-            {/* Use viewUrl (inline endpoint) for rendering — no Content-Disposition: attachment */}
-            {isPdf && <iframe src={viewUrl} className="w-full rounded-lg border border-gray-200" style={{ height: `${d.inlineHeight ?? 600}px` }} title={fileName} />}
-            {isImage && <img src={viewUrl} alt={fileName} className="max-w-full rounded-lg shadow" />}
-            {isVideo && <video src={viewUrl} controls controlsList="nodownload" onContextMenu={e => e.preventDefault()} className="w-full rounded-lg shadow" style={{ maxHeight: `${d.inlineHeight ?? 400}px` }} />}
-            {isAudio && <audio src={viewUrl} controls className="w-full" />}
-            {/* Download button uses the /download endpoint to force save-to-disk */}
+            {isPdf && <iframe src={fileUrl} className="w-full rounded-lg border border-gray-200" style={{ height: `${d.inlineHeight ?? 600}px` }} title={fileName} />}
+            {isImage && <img src={fileUrl} alt={fileName} className="max-w-full rounded-lg shadow" />}
+            {isVideo && <video src={fileUrl} controls className="w-full rounded-lg shadow" style={{ maxHeight: `${d.inlineHeight ?? 400}px` }} />}
+            {isAudio && <audio src={fileUrl} controls className="w-full" />}
+            {/* Always show download button in inline mode */}
             <div className="mt-3 flex justify-end">
-              <a href={downloadUrl} download={fileName}
+              <a href={fileUrl} download={fileName}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
                 style={{ backgroundColor: d.buttonColor ?? "#179ca3", color: d.buttonTextColor ?? "#fff" }}>
                 <Upload size={14} />{d.buttonText ?? "Download"}
@@ -1105,7 +1059,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const slug = d.mediaAssetSlug ?? "";
       const title = d.mediaAssetTitle ?? "Interactive Content";
       const height = d.height ?? 600;
-      const embedUrl = slug ? `/api/media/${slug}/scorm` : "";
+      const embedUrl = slug ? `/api/media/${slug}/embed` : "";
       const scormAlign = d.align ?? "center";
       const scormJustify = scormAlign === "left" ? "flex-start" : scormAlign === "right" ? "flex-end" : "center";
       const scormMaxWidth = d.maxWidth ?? "100%";
@@ -2354,11 +2308,11 @@ function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
   const ctaText: string = d.ctaText ?? "Upgrade Now";
   const dismissText: string = d.dismissText ?? "No thanks";
   const showDismiss: boolean = d.showDismiss !== false && displayMode !== "inline";
-  const originalPrice: number = d.originalPrice ?? 0;
+  const originalPrice: number = d.originalPriceCents ?? 0;
   const discountedPrice: number = discountType === "percent" && originalPrice > 0
     ? Math.round(originalPrice * (1 - discountValue / 100))
     : discountType === "fixed" && originalPrice > 0
-    ? Math.max(0, originalPrice - discountValue)
+    ? Math.max(0, originalPrice - discountValue * 100)
     : originalPrice;
 
   const createCheckout = trpc.lms.upgradePromptCheckout.useMutation();
@@ -2454,10 +2408,10 @@ function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
       {originalPrice > 0 && discountType !== "none" && (
         <div className="flex items-center gap-3">
           <span className="text-2xl font-black" style={{ color: accentColor }}>
-            ${Number(discountedPrice).toFixed(2)}
+            ${(discountedPrice / 100).toFixed(discountedPrice % 100 === 0 ? 0 : 2)}
           </span>
           {discountedPrice < originalPrice && (
-            <span className="text-base text-gray-400 line-through">${Number(originalPrice).toFixed(2)}</span>
+            <span className="text-base text-gray-400 line-through">${(originalPrice / 100).toFixed(originalPrice % 100 === 0 ? 0 : 2)}</span>
           )}
           {discountType === "percent" && discountValue > 0 && (
             <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: "#ef4444" }}>{discountValue}% OFF</span>

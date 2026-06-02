@@ -156,6 +156,23 @@ export function pickScormPlaybackMode(
   return { mode: "server" };
 }
 
+
+export function isDirectHtmlScormVersion(version: MediaVersionZipRef): boolean {
+  if (!version.s3Url || isZipStorageRef(version)) return false;
+  const url = version.s3Url.toLowerCase().split("?")[0];
+  return url.endsWith(".html") || url.endsWith(".htm");
+}
+
+/** ZIP URL for server-side extraction, or null when content should be served as HTML/R2. */
+export function resolveZipDownloadUrl(
+  current: MediaVersionZipRef,
+  allVersions: MediaVersionZipRef[] = []
+): string | null {
+  const strategy = pickScormPlaybackMode(current, allVersions);
+  if (strategy.mode === "clientZip" && strategy.zipS3Url) return strategy.zipS3Url;
+  return null;
+}
+
 /** Queue background extraction (sets status=pending; heartbeat does the work). */
 export async function queueScormExtractionIfNeeded(
   versionId: number,

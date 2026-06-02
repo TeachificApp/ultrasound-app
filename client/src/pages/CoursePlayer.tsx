@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   Award, BookOpen, Bookmark, BookmarkCheck, CalendarDays, CheckCircle, ChevronLeft, ChevronRight,
@@ -25,8 +24,6 @@ import {
 import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
-import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
-import { isMediaRepoEmbedUrl } from "@/lib/mediaEmbedUrl";
 
 import LessonCommentSection from "@/components/LessonCommentSection";
 
@@ -565,13 +562,11 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl }: {
 function MobileSidebarContent({
   data, sidebarTab, setSidebarTab, selectedLessonId, setSelectedLessonId,
   completedIds, notesData, bookmarksData, slug, course, prereqLockedIds, lbl,
-  isFreePreviewEnrollment, adminBypass,
 }: {
   data: any; sidebarTab: string; setSidebarTab: (t: any) => void;
   selectedLessonId: number | null; setSelectedLessonId: (id: number) => void;
   completedIds: Set<number>; notesData: any; bookmarksData: any;
   slug: string; course: any; prereqLockedIds: Set<number>; lbl: Record<string, string>;
-  isFreePreviewEnrollment: boolean; adminBypass: boolean;
 }) {
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
   const topLevelLessons = (data?.topLevelLessons ?? []).filter((l: any) => {
@@ -603,46 +598,28 @@ function MobileSidebarContent({
               const active = lesson.id === selectedLessonId;
               const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
               const prereqLocked = prereqLockedIds.has(lesson.id);
-              const mpm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
-              const freePreviewLocked = isFreePreviewEnrollment && !adminBypass && mpm === "none";
               const lessonLocked = dripLocked || prereqLocked;
-              const anyLocked = lessonLocked || freePreviewLocked;
               const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
               return (
-                <button key={lesson.id} onClick={() => setSelectedLessonId(lesson.id)} disabled={lessonLocked}
+                <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
                   className={cn("w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
-                    active ? "bg-teal-50 text-teal-900 border-teal-500" : anyLocked ? "text-gray-400 cursor-pointer border-transparent hover:bg-amber-50" : done ? "text-gray-500 hover:bg-gray-50 border-transparent" : "text-gray-700 hover:bg-gray-50 border-transparent")}>
-                  <TooltipProvider delayDuration={300}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className={cn("w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                          active ? "bg-teal-500 text-white" : anyLocked ? "bg-gray-100 text-gray-400" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500")}>
-                          {anyLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "00")}
-                        </span>
-                      </TooltipTrigger>
-                      {freePreviewLocked && !dripLocked && !prereqLocked && (
-                        <TooltipContent side="right" className="max-w-[200px] text-center">
-                          <p className="text-xs font-semibold">Full Access Required</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">Upgrade to unlock all lessons and earn your certificate.</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
+                    active ? "bg-teal-50 text-teal-900 border-teal-500" : lessonLocked ? "text-gray-400 cursor-not-allowed border-transparent" : done ? "text-gray-500 hover:bg-gray-50 border-transparent" : "text-gray-700 hover:bg-gray-50 border-transparent")}>
+                  <span className={cn("w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
+                    active ? "bg-teal-500 text-white" : lessonLocked ? "bg-gray-100 text-gray-400" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500")}>
+                    {lessonLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
+                  </span>
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
                     {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
                     {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete prerequisite lesson first</span>}
-                    {freePreviewLocked && !dripLocked && !prereqLocked && <span className="text-[10px] text-amber-500 font-normal normal-case">Full access required</span>}
                   </div>
                 </button>
               );
             })}
             {sections.map((section: any, sIdx: number) => {
-              // Hide section entirely if it has no visible lessons (all were preview_hide_after_purchase or draft)
-              if (section.lessons.length === 0) return null;
               const sectionLocked = !dripBypassed && (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
               const unlockDate = sectionLocked ? new Date(enrolledAt.getTime() + section.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
-              const sectionNum = topLevelLessons.length + sections.filter((s: any) => s.lessons.length > 0).indexOf(section) + 1;
+              const sectionNum = topLevelLessons.length + sIdx + 1;
               const allSectionDone = section.lessons.every((l: any) => completedIds.has(l.id)) && section.lessons.length > 0;
               const isSectionActive = section.lessons.some((l: any) => l.id === selectedLessonId);
               const isExpanded = isSectionActive || !collapsedSections.has(section.id);
@@ -682,24 +659,20 @@ function MobileSidebarContent({
                         const active = lesson.id === selectedLessonId;
                         const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
                         const prereqLocked = prereqLockedIds.has(lesson.id);
-                        const mlpm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
-                        const freePreviewLocked = isFreePreviewEnrollment && !adminBypass && mlpm === "none";
                         const lessonLocked = dripLocked || prereqLocked;
-                        const anyLocked = lessonLocked || freePreviewLocked;
                         const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                         return (
-                          <button key={lesson.id} onClick={() => setSelectedLessonId(lesson.id)} disabled={lessonLocked}
+                          <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
                             className={cn("w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
-                              active ? "font-semibold" : anyLocked ? "text-gray-400 cursor-pointer hover:bg-amber-50" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")}
+                              active ? "font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")}
                             style={active ? { color: primaryColor, backgroundColor: `${primaryColor}12` } : undefined}>
-                            <LessonIcon type={lesson.type} done={done} locked={anyLocked} color={primaryColor} />
+                            <LessonIcon type={lesson.type} done={done} locked={lessonLocked} color={primaryColor} />
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
                               {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete prerequisite lesson first</span>}
-                              {freePreviewLocked && !dripLocked && !prereqLocked && <span className="text-[10px] text-amber-500">Full access required</span>}
                             </div>
-                            {lesson.durationMinutes && !anyLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
+                            {lesson.durationMinutes && !lessonLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>
                         );
                       })}
@@ -778,22 +751,10 @@ export default function CoursePlayer() {
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradePromptReason, setUpgradePromptReason] = useState<"entry" | "exit" | "locked_lesson">("entry");
-  const [upgradeCheckoutUrl, setUpgradeCheckoutUrl] = useState<string | null>(null);
   const [instructorPopup, setInstructorPopup] = useState<any>(null);
   const [contentFullscreen, setContentFullscreen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const utils = trpc.useUtils();
-
-  const createUpgradeLink = trpc.lmsLearner.getUpgradeCheckoutUrl.useMutation({
-    onSuccess: (data) => {
-      setUpgradeCheckoutUrl(data.url);
-      window.open(data.url, "_blank", "noopener,noreferrer");
-    },
-    onError: () => {
-      // Fallback to course landing page if Stripe link fails
-      navigate(`/courses/${slug}`);
-    },
-  });
 
   const { data, isLoading } = trpc.lmsLearner.getCoursePlayer.useQuery(
     { slug: slug!, preview: isPreviewMode || adminPreviewStudent || isAdmin },
@@ -853,20 +814,9 @@ export default function CoursePlayer() {
       // Check for ?lesson=<id> URL param first
       const params = new URLSearchParams(searchString);
       const lessonParam = params.get("lesson");
+      const topLevel = (data as any).topLevelLessons ?? [];
+      const allL = [...topLevel, ...data.sections.flatMap((s: any) => s.lessons)];
       const isEnrolled = !!data.enrollment;
-      // Filter out preview_hide_after_purchase lessons for enrolled users (same logic as sidebar)
-      const topLevel = ((data as any).topLevelLessons ?? []).filter((l: any) => {
-        if (!isEnrolled) return true;
-        const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
-        return pm !== "preview_hide_after_purchase";
-      });
-      const allL = [...topLevel, ...(data.sections ?? []).flatMap((s: any) =>
-        (s.lessons ?? []).filter((l: any) => {
-          if (!isEnrolled) return true;
-          const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
-          return pm !== "preview_hide_after_purchase";
-        })
-      )];
       if (lessonParam) {
         const paramId = parseInt(lessonParam);
         const found = allL.find((l: any) => l.id === paramId);
@@ -898,7 +848,7 @@ export default function CoursePlayer() {
           return;
         }
       }
-      const first = allL[0];
+      const first = topLevel[0] ?? data.sections[0]?.lessons[0];
       if (first) setSelectedLessonId(first.id);
     }
   }, [data]);
@@ -1210,12 +1160,9 @@ export default function CoursePlayer() {
               <Button
                 className="flex-1 text-white"
                 style={{ backgroundColor: primaryColor }}
-                onClick={() => {
-                  setShowUpgradePrompt(false);
-                  navigate(`/checkout/${slug}`);
-                }}
+                onClick={() => { setShowUpgradePrompt(false); navigate(`/courses/${slug}`); }}
               >
-                Enroll Now — Full Access
+                View Course &amp; Enroll
               </Button>
               <Button variant="outline" className="flex-1" onClick={() => setShowUpgradePrompt(false)}>
                 {upgradePromptReason === "locked_lesson" ? "Stay in Preview" : "Continue Preview"}
@@ -1295,7 +1242,7 @@ export default function CoursePlayer() {
           </button>
           {LOGO
             ? <img src={LOGO} alt="Logo" className="h-7 sm:h-8 w-auto flex-shrink-0" />
-            : <span className="font-bold text-sm sm:text-base truncate" style={{ color: primaryColor }}>All About Ultrasound™</span>
+            : <span className="font-bold text-sm sm:text-base truncate" style={{ color: primaryColor }}>All About Ultrasound</span>
           }
         </div>
         <div className="flex items-center gap-2 sm:gap-5 flex-shrink-0">
@@ -1411,8 +1358,6 @@ export default function CoursePlayer() {
             course={course}
             prereqLockedIds={prereqLockedIds}
             lbl={lbl}
-            isFreePreviewEnrollment={isFreePreviewEnrollment}
-            adminBypass={adminBypass}
           />
         </aside>
 
@@ -1538,52 +1483,36 @@ export default function CoursePlayer() {
               const active = lesson.id === selectedLessonId;
               const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
               const prereqLocked = prereqLockedIds.has(lesson.id);
-              const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
-              const freePreviewLocked = isFreePreviewEnrollment && !adminBypass && pm === "none";
               const lessonLocked = dripLocked || prereqLocked;
-              const anyLocked = lessonLocked || freePreviewLocked;
               const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
               return (
                 <button
                   key={lesson.id}
-                  onClick={() => handleLessonSelect(lesson.id)}
+                  onClick={() => { if (!lessonLocked) handleLessonSelect(lesson.id); }}
                   disabled={lessonLocked}
                   className={cn(
                     "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
                     active
                       ? "text-gray-900"
-                      : anyLocked
-                        ? "text-gray-400 cursor-pointer border-transparent hover:bg-amber-50"
+                      : lessonLocked
+                        ? "text-gray-400 cursor-not-allowed border-transparent"
                         : done
                           ? "text-gray-500 hover:bg-gray-50 border-transparent"
                           : "text-gray-700 hover:bg-gray-50 border-transparent",
                   )}
                   style={active ? { backgroundColor: `${primaryColor}12`, borderColor: primaryColor } : undefined}
                 >
-                  <TooltipProvider delayDuration={300}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className={cn(
-                          "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                          active ? "text-white" : anyLocked ? "bg-gray-100 text-gray-400" : done ? "" : "bg-gray-100 text-gray-500"
-                        )}
-                        style={active ? primaryBg : done ? { backgroundColor: `${primaryColor}25`, color: primaryColor } : undefined}>
-                          {anyLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
-                        </span>
-                      </TooltipTrigger>
-                      {freePreviewLocked && !dripLocked && !prereqLocked && (
-                        <TooltipContent side="right" className="max-w-[200px] text-center">
-                          <p className="text-xs font-semibold">Full Access Required</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">Upgrade to unlock all lessons and earn your certificate.</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
+                  <span className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
+                    active ? "text-white" : lessonLocked ? "bg-gray-100 text-gray-400" : done ? "" : "bg-gray-100 text-gray-500"
+                  )}
+                  style={active ? primaryBg : done ? { backgroundColor: `${primaryColor}25`, color: primaryColor } : undefined}>
+                    {lessonLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
+                  </span>
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
                     {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
                     {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete prerequisite lesson first</span>}
-                    {freePreviewLocked && !dripLocked && !prereqLocked && <span className="text-[10px] text-amber-500 font-normal normal-case">Full access required</span>}
                   </div>
                 </button>
               );
@@ -1591,13 +1520,11 @@ export default function CoursePlayer() {
 
             {/* Sections */}
             {sections.map((section: any, sIdx: number) => {
-              // Hide section entirely if it has no visible lessons (all were preview_hide_after_purchase or draft)
-              if (section.lessons.length === 0) return null;
               const sectionLocked = !dripBypassed && (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
               const unlockDate = sectionLocked
                 ? new Date(enrolledAt.getTime() + section.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
                 : null;
-              const sectionNum = topLevelLessons.length + sections.filter((s: any) => s.lessons.length > 0).indexOf(section) + 1;
+              const sectionNum = topLevelLessons.length + sIdx + 1;
               const allSectionDone = section.lessons.every((l: any) => completedIds.has(l.id)) && section.lessons.length > 0;
               const isSectionActive = section.lessons.some((l: any) => l.id === selectedLessonId);
               // A section is expanded if it has NOT been explicitly collapsed.
@@ -1660,44 +1587,26 @@ export default function CoursePlayer() {
                         const active = lesson.id === selectedLessonId;
                         const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
                         const prereqLocked = prereqLockedIds.has(lesson.id);
-                        const lpm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
-                        const freePreviewLocked = isFreePreviewEnrollment && !adminBypass && lpm === "none";
                         const lessonLocked = dripLocked || prereqLocked;
-                        const anyLocked = lessonLocked || freePreviewLocked;
                         const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                         return (
                           <button
                             key={lesson.id}
-                            onClick={() => handleLessonSelect(lesson.id)}
+                            onClick={() => { if (!lessonLocked) handleLessonSelect(lesson.id); }}
                             disabled={lessonLocked}
                             className={cn(
                               "w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
-                              active ? "font-semibold" : anyLocked ? "text-gray-400 cursor-pointer hover:bg-amber-50" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
+                              active ? "font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
                             )}
                             style={active ? { color: primaryColor, backgroundColor: `${primaryColor}12` } : undefined}
                           >
-                            <TooltipProvider delayDuration={300}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="shrink-0">
-                                    <LessonIcon type={lesson.type} done={done} locked={anyLocked} color={primaryColor} />
-                                  </span>
-                                </TooltipTrigger>
-                                {freePreviewLocked && !dripLocked && !prereqLocked && (
-                                  <TooltipContent side="right" className="max-w-[200px] text-center">
-                                    <p className="text-xs font-semibold">Full Access Required</p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">Upgrade to unlock all lessons and earn your certificate.</p>
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider>
+                            <LessonIcon type={lesson.type} done={done} locked={lessonLocked} color={primaryColor} />
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
                               {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete prerequisite lesson first</span>}
-                              {freePreviewLocked && !dripLocked && !prereqLocked && <span className="text-[10px] text-amber-500">Full access required</span>}
                             </div>
-                            {lesson.durationMinutes && !anyLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
+                            {lesson.durationMinutes && !lessonLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>
                         );
                       })}
@@ -1827,24 +1736,11 @@ export default function CoursePlayer() {
                   {(lessonData.type === "video" || lessonData.type === "video_text") && lessonData.content && contentBlocks.length === 0 && (
                     <div className="mb-5">
                       <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200">
-                        <style>{`
-                          #cp-video-${course.id} { accent-color: ${primaryColor}; }
-                          #cp-video-${course.id}::-webkit-media-controls-panel {
-                            background: linear-gradient(transparent 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.72) 100%);
-                          }
-                          #cp-video-${course.id}::-webkit-media-controls-play-button { filter: none; }
-                          #cp-video-${course.id}::-webkit-media-controls-timeline { accent-color: ${primaryColor}; }
-                          #cp-video-${course.id}::-webkit-media-controls-volume-slider { accent-color: ${primaryColor}; }
-                        `}</style>
                         <video
-                          id={`cp-video-${course.id}`}
                           ref={videoRef}
                           src={lessonData.content}
                           controls
-                          controlsList="nodownload"
-                          onContextMenu={e => e.preventDefault()}
                           className="w-full h-full"
-                          style={{ accentColor: primaryColor }}
                           onEnded={() => setVideoWatched(true)}
                         />
                       </div>
@@ -1870,14 +1766,18 @@ export default function CoursePlayer() {
 
                   {/* ── Embed lesson — only show if no content blocks override ── */}
                   {lessonData.type === "embed" && lessonData.embedUrl && contentBlocks.length === 0 && (() => {
-                    const embedUrl = lessonData.embedUrl;
-                    const isScormEmbed = isMediaRepoEmbedUrl(embedUrl);
+                    let embedSrc = lessonData.embedUrl;
+                    const parsed = embedSrc.startsWith("/") ? parseMediaRepoUrl(embedSrc) : null;
+                    if (parsed?.path === "embed") {
+                      embedSrc = embedSrc.replace(/\/embed(\?|$)/, "/scorm$1");
+                    }
+                    const isScormEmbed = isMediaRepoEmbedUrl(embedSrc) || embedSrc.includes("/scorm");
                     return (
                       <div className="mb-5">
                         <div className={`bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 ${isScormEmbed ? 'min-h-[600px] h-[75vh]' : 'aspect-video'}`}>
                           {isScormEmbed ? (
                             <MediaEmbedIframe
-                              src={embedUrl}
+                              src={embedSrc}
                               courseId={data?.course?.id}
                               title={lessonData.title}
                               className="w-full h-full"
@@ -1886,7 +1786,7 @@ export default function CoursePlayer() {
                             />
                           ) : (
                             <iframe
-                              src={embedUrl.startsWith('/') ? `${window.location.origin}${embedUrl}` : embedUrl}
+                              src={embedSrc.startsWith('/') ? `${window.location.origin}${embedSrc}` : embedSrc}
                               className="w-full h-full"
                               allowFullScreen
                               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
@@ -1940,7 +1840,7 @@ export default function CoursePlayer() {
                           <InlineLiveSession key={block.id} data={block.data as any} />
                         ) : (
                           <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-lg">
-                            <BlockPreview block={block} courseId={data?.course?.id} />
+                            <BlockPreview block={block} />
                           </div>
                         )
                       ))}
