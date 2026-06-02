@@ -18,6 +18,7 @@ import {
   BookOpen, Download, Globe, Lock, Settings, FileText, Award, Search
 } from "lucide-react";
 import MembershipPageBuilder from "@/components/MembershipPageBuilder";
+import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -337,6 +338,18 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
         <Button
           size="sm"
           variant="outline"
+          className="text-xs gap-1"
+          onClick={() => {
+            const url = `${window.location.origin}/checkout/${plan.slug}?type=membership`;
+            navigator.clipboard.writeText(url);
+            toast.success("Checkout link copied");
+          }}
+        >
+          <Copy className="w-3.5 h-3.5" /> Copy Checkout Link
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
           onClick={() => updateMutation.mutate({ id: planId, status: plan.status === "published" ? "draft" : "published" })}
         >
           {plan.status === "published" ? <><EyeOff className="w-3.5 h-3.5 mr-1" /> Unpublish</> : <><Eye className="w-3.5 h-3.5 mr-1" /> Publish</>}
@@ -363,6 +376,9 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
           </TabsTrigger>
           <TabsTrigger value="members" className="text-xs data-[state=active]:bg-white">
             <Users className="w-3.5 h-3.5 mr-1" /> Members ({subscribers?.length ?? 0})
+          </TabsTrigger>
+          <TabsTrigger value="checkout-page" className="text-xs data-[state=active]:bg-white">
+            <DollarSign className="w-3.5 h-3.5 mr-1" /> Checkout Page
           </TabsTrigger>
         </TabsList>
 
@@ -399,6 +415,15 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
 
           <TabsContent value="members" className="m-0 p-6">
             <MembershipMembersTab planId={planId} subscribers={subscribers ?? []} onRefetch={refetch} />
+          </TabsContent>
+
+          <TabsContent value="checkout-page" className="m-0 p-6">
+            <CheckoutPageEditor
+              entityType="membership"
+              entityId={planId}
+              entitySlug={plan.slug}
+              previewQuery="type=membership"
+            />
           </TabsContent>
         </div>
       </Tabs>

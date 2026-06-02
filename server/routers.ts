@@ -27,9 +27,9 @@ import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
 import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
 import { careerNetworkRouter } from "./routers/careerNetworkRouter";
-import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter } from "./routers/webinarRouter";
+import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter, webinarCheckoutPublicRouter } from "./routers/webinarRouter";
 import { thinkificImportRouter } from "./routers/thinkificImportRouter";
-import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter } from "./routers/downloadsRouter";
+import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter, downloadsCheckoutPublicRouter } from "./routers/downloadsRouter";
 import { orderBumpsAdminRouter, orderBumpsPublicRouter } from "./routers/orderBumpsRouter";
 import { socialContentRouter } from "./routers/socialContentRouter";
 import { funnelRouter, funnelPublicRouter, funnelAdminRouter } from "./routers/funnelRouter";
@@ -41,7 +41,7 @@ import { abTestRouter } from "./routers/abTestRouter";
 import { engagementRouter } from "./routers/engagementRouter";
 import { brandMembershipRouter } from "./routers/brandMembershipRouter";
 import { membershipRouter } from "./routers/membershipRouter";
-import { productsPublicRouter, productsLearnerRouter, productsAdminRouter } from "./routers/productsRouter";
+import { productsPublicRouter, productsLearnerRouter, productsAdminRouter, productsCheckoutPublicRouter } from "./routers/productsRouter";
 import { dashboardRouter } from "./routers/dashboardRouter";
 import { embeddedCheckoutRouter } from "./routers/embeddedCheckoutRouter";
 import { adminUserRouter } from "./routers/adminUserRouter";
@@ -2053,14 +2053,17 @@ export const appRouter = router({
   webinarLearner: webinarLearnerRouter,
   webinarAdmin: webinarAdminRouter,
   webinarSession: webinarSessionRouter,
+  webinarCheckout: webinarCheckoutPublicRouter,
   questionBank: questionBankRouter,
   thinkificImport: thinkificImportRouter,
   downloads: downloadsPublicRouter,
   downloadsLearner: downloadsLearnerRouter,
   downloadsAdmin: downloadsAdminRouter,
+  downloadsCheckout: downloadsCheckoutPublicRouter,
   products: productsPublicRouter,
   productsLearner: productsLearnerRouter,
   productsAdmin: productsAdminRouter,
+  productsCheckout: productsCheckoutPublicRouter,
   orderBumpsAdmin: orderBumpsAdminRouter,
   orderBumps: orderBumpsPublicRouter,
   socialContent: socialContentRouter,

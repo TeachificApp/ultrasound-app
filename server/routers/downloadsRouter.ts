@@ -1351,6 +1351,125 @@ Make ALL content specific and compelling based on the product title and descript
         .where(eq(digitalProducts.id, input.productId));
       return { success: true };
     }),
+
+  // ─── Checkout Page Config ──────────────────────────────────────────────────
+  getCheckoutPageConfig: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db.select({ checkoutPageConfig: digitalProducts.checkoutPageConfig })
+        .from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      return { config: product.checkoutPageConfig ?? null };
+    }),
+
+  saveCheckoutPageConfig: protectedProcedure
+    .input(z.object({ productId: z.number(), config: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      try { JSON.parse(input.config); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid JSON config" }); }
+      await db.update(digitalProducts).set({ checkoutPageConfig: input.config }).where(eq(digitalProducts.id, input.productId));
+      return { success: true };
+    }),
+
+  // ─── Embedded Checkout Session ────────────────────────────────────────────
+  createEmbeddedCheckoutSession: protectedProcedure
+    .input(z.object({ productSlug: z.string(), origin: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db.select().from(digitalProducts)
+        .where(eq(digitalProducts.slug, input.productSlug)).limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+      if ((product as any).bundleOnly) throw new TRPCError({ code: "FORBIDDEN", message: "This product is only available as part of a bundle." });
+      if (product.isFree) {
+        // Auto-grant free product
+        const [existing] = await db.select().from(digitalPurchases)
+          .where(and(eq(digitalPurchases.userId, ctx.user.id), eq(digitalPurchases.productId, product.id))).limit(1);
+        if (!existing) {
+          await db.insert(digitalPurchases).values({ userId: ctx.user.id, productId: product.id });
+        }
+        return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null };
+      }
+      const [existing] = await db.select().from(digitalPurchases)
+        .where(and(eq(digitalPurchases.userId, ctx.user.id), eq(digitalPurchases.productId, product.id))).limit(1);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "You already own this product." });
+      // Fetch platform settings for terms/privacy URLs
+      const { platformSettings } = await import("../../drizzle/schema");
+      const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const session = await stripe.checkout.sessions.create({
+        ui_mode: "embedded",
+        mode: "payment",
+        customer_email: ctx.user.email ?? undefined,
+        client_reference_id: ctx.user.id.toString(),
+        allow_promotion_codes: true,
+        line_items: [{
+          price_data: {
+            currency: product.currency,
+            product_data: {
+              name: product.title,
+              description: product.subtitle ?? undefined,
+              images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
+            },
+            unit_amount: Math.round(Number(product.price)),
+          },
+          quantity: 1,
+        }],
+        metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=download`,
+      });
+      return {
+        clientSecret: session.client_secret!,
+        free: false,
+        courseTitle: product.title,
+        courseSubtitle: product.subtitle ?? null,
+        courseDescription: product.description ?? null,
+        courseThumbnail: product.thumbnailUrl ?? null,
+        primaryColor: "#189aa1",
+        accentColor: "#4ad9e0",
+        gradientFrom: "#189aa1",
+        gradientTo: "#4ad9e0",
+        gradientDirection: "135deg",
+        playerTheme: "light",
+        termsUrl: settings?.termsUrl ?? "",
+        privacyUrl: settings?.privacyUrl ?? "",
+        productName: product.title,
+        displayPrice: Math.round(Number(product.price)),
+        pricingType: "one_time",
+        isSubscription: false,
+        billingLabel: null,
+        currency: product.currency,
+        minSeats: null,
+        discountPercent: null,
+      };
+    }),
+});
+
+// ─── Public: checkout page config for download products ───────────────────────
+export const downloadsCheckoutPublicRouter = router({
+  getPublicCheckoutPageConfig: publicProcedure
+    .input(z.object({ productSlug: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db.select({
+        checkoutPageConfig: digitalProducts.checkoutPageConfig,
+        id: digitalProducts.id,
+        title: digitalProducts.title,
+        description: digitalProducts.description,
+      }).from(digitalProducts).where(eq(digitalProducts.slug, input.productSlug)).limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        config: product.checkoutPageConfig ?? null,
+        courseStats: { totalLessons: 0, totalSections: 0, hasCertificate: false },
+      };
+    }),
 });
 
 // ─── Email Helper ───────────────────────────────────────────────────────────

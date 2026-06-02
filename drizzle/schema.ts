@@ -3299,6 +3299,11 @@ export const digitalProducts = mysqlTable("digital_products", {
   libraryOrder: int("library_order").default(0).notNull(),
   // Per-download publish domain override (null = use global downloadPublishDomain)
   publishDomain: varchar("publish_domain", { length: 255 }),
+  // Stripe product/price IDs for embedded checkout
+  stripeProductId: varchar("stripe_product_id", { length: 128 }),
+  stripePriceId: varchar("stripe_price_id", { length: 128 }),
+  // Configurable checkout page sections (JSON)
+  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4073,6 +4078,11 @@ export const physicalProducts = mysqlTable("physical_products", {
   orderCount: int("order_count").default(0).notNull(),
   // Per-product publish domain override (null = use global productPublishDomain)
   publishDomain: varchar("publish_domain", { length: 255 }),
+  // Stripe product/price IDs for embedded checkout
+  stripeProductId: varchar("stripe_product_id", { length: 128 }),
+  stripePriceId: varchar("stripe_price_id", { length: 128 }),
+  // Configurable checkout page sections (JSON)
+  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4501,6 +4511,11 @@ export const webinars = mysqlTable("webinars", {
   postWebinarMessage: text("post_webinar_message"),
   postWebinarDelaySeconds: int("post_webinar_delay_seconds").default(0),
   publishDomain: varchar("publish_domain", { length: 255 }),
+  // Stripe product/price IDs for embedded checkout
+  stripeProductId: varchar("stripe_product_id", { length: 128 }),
+  stripePriceId: varchar("stripe_price_id", { length: 128 }),
+  // Configurable checkout page sections (JSON)
+  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4634,6 +4649,8 @@ export const membershipPlans = mysqlTable("membership_plans", {
   publishDomain: varchar("publish_domain", { length: 255 }),
   /** JSON: { maxMembers, requireApproval, welcomeEmailSubject, welcomeEmailBody } */
   settings: longtext("settings"),
+  // Configurable checkout page sections (JSON)
+  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

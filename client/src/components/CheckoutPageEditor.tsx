@@ -831,27 +831,106 @@ function SectionRow({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+export type CheckoutEntityType = "course" | "download" | "physical" | "webinar" | "membership";
+
 interface CheckoutPageEditorProps {
-  courseId: number;
-  courseSlug: string;
+  entityType: CheckoutEntityType;
+  entityId: number;
+  entitySlug: string;
+  /** Optional query param appended to the preview URL, e.g. "type=webinar" */
+  previewQuery?: string;
+  // Legacy compat — if provided, entityType defaults to "course"
+  courseId?: number;
+  courseSlug?: string;
 }
 
-export default function CheckoutPageEditor({ courseId, courseSlug }: CheckoutPageEditorProps) {
+export default function CheckoutPageEditor({
+  entityType = "course",
+  entityId,
+  entitySlug,
+  previewQuery,
+  // Legacy props
+  courseId,
+  courseSlug,
+}: CheckoutPageEditorProps) {
+  // Support legacy call sites that pass courseId/courseSlug directly
+  const resolvedType: CheckoutEntityType = entityType;
+  const resolvedId = entityId ?? courseId ?? 0;
+  const resolvedSlug = entitySlug ?? courseSlug ?? "";
+  const previewUrl = previewQuery
+    ? `/checkout/${resolvedSlug}?${previewQuery}`
+    : `/checkout/${resolvedSlug}`;
+
   const utils = trpc.useUtils();
 
-  // Load current config
-  const { data: configData, isLoading } = trpc.lmsAdmin.getCheckoutPageConfig.useQuery({ courseId });
+  // ─── Load current config (type-switched) ────────────────────────────────────
+  const lmsQuery = trpc.lmsAdmin.getCheckoutPageConfig.useQuery(
+    { courseId: resolvedId },
+    { enabled: resolvedType === "course" }
+  );
+  const dlQuery = trpc.downloadsAdmin.getCheckoutPageConfig.useQuery(
+    { productId: resolvedId },
+    { enabled: resolvedType === "download" }
+  );
+  const physQuery = trpc.productsAdmin.getCheckoutPageConfig.useQuery(
+    { productId: resolvedId },
+    { enabled: resolvedType === "physical" }
+  );
+  const webQuery = trpc.webinarAdmin.getCheckoutPageConfig.useQuery(
+    { webinarId: resolvedId },
+    { enabled: resolvedType === "webinar" }
+  );
+  const memQuery = trpc.membership.getCheckoutPageConfig.useQuery(
+    { planId: resolvedId },
+    { enabled: resolvedType === "membership" }
+  );
+
+  const configData = resolvedType === "course" ? lmsQuery.data
+    : resolvedType === "download" ? dlQuery.data
+    : resolvedType === "physical" ? physQuery.data
+    : resolvedType === "webinar" ? webQuery.data
+    : memQuery.data;
+  const isLoading = resolvedType === "course" ? lmsQuery.isLoading
+    : resolvedType === "download" ? dlQuery.isLoading
+    : resolvedType === "physical" ? physQuery.isLoading
+    : resolvedType === "webinar" ? webQuery.isLoading
+    : memQuery.isLoading;
+
+  // ─── Save config (type-switched) ────────────────────────────────────────────
+  const saveLms = trpc.lmsAdmin.saveCheckoutPageConfig.useMutation({
+    onSuccess: () => { toast.success("Checkout page saved"); utils.lmsAdmin.getCheckoutPageConfig.invalidate({ courseId: resolvedId }); },
+    onError: (e) => toast.error(`Save failed: ${e.message}`),
+  });
+  const saveDl = trpc.downloadsAdmin.saveCheckoutPageConfig.useMutation({
+    onSuccess: () => { toast.success("Checkout page saved"); utils.downloadsAdmin.getCheckoutPageConfig.invalidate({ productId: resolvedId }); },
+    onError: (e) => toast.error(`Save failed: ${e.message}`),
+  });
+  const savePhys = trpc.productsAdmin.saveCheckoutPageConfig.useMutation({
+    onSuccess: () => { toast.success("Checkout page saved"); utils.productsAdmin.getCheckoutPageConfig.invalidate({ productId: resolvedId }); },
+    onError: (e) => toast.error(`Save failed: ${e.message}`),
+  });
+  const saveWeb = trpc.webinarAdmin.saveCheckoutPageConfig.useMutation({
+    onSuccess: () => { toast.success("Checkout page saved"); utils.webinarAdmin.getCheckoutPageConfig.invalidate({ webinarId: resolvedId }); },
+    onError: (e) => toast.error(`Save failed: ${e.message}`),
+  });
+  const saveMem = trpc.membership.saveCheckoutPageConfig.useMutation({
+    onSuccess: () => { toast.success("Checkout page saved"); utils.membership.getCheckoutPageConfig.invalidate({ planId: resolvedId }); },
+    onError: (e) => toast.error(`Save failed: ${e.message}`),
+  });
+
+  const saveConfig = {
+    isPending: saveLms.isPending || saveDl.isPending || savePhys.isPending || saveWeb.isPending || saveMem.isPending,
+    mutate: (args: { config: string }) => {
+      if (resolvedType === "course") saveLms.mutate({ courseId: resolvedId, config: args.config });
+      else if (resolvedType === "download") saveDl.mutate({ productId: resolvedId, config: args.config });
+      else if (resolvedType === "physical") savePhys.mutate({ productId: resolvedId, config: args.config });
+      else if (resolvedType === "webinar") saveWeb.mutate({ webinarId: resolvedId, config: args.config });
+      else saveMem.mutate({ planId: resolvedId, config: args.config });
+    },
+  };
 
   // Load saved templates
   const { data: savedTemplates = [], refetch: refetchTemplates } = trpc.lmsAdmin.listCheckoutTemplates.useQuery();
-
-  const saveConfig = trpc.lmsAdmin.saveCheckoutPageConfig.useMutation({
-    onSuccess: () => {
-      toast.success("Checkout page saved");
-      utils.lmsAdmin.getCheckoutPageConfig.invalidate({ courseId });
-    },
-    onError: (e) => toast.error(`Save failed: ${e.message}`),
-  });
 
   const saveTemplate = trpc.lmsAdmin.saveCheckoutTemplate.useMutation({
     onSuccess: () => {
@@ -897,7 +976,7 @@ export default function CheckoutPageEditor({ courseId, courseSlug }: CheckoutPag
 
   const handleSave = () => {
     if (!config) return;
-    saveConfig.mutate({ courseId, config: JSON.stringify(config) });
+    saveConfig.mutate({ config: JSON.stringify(config) });
     setDirty(false);
   };
 
@@ -975,7 +1054,7 @@ export default function CheckoutPageEditor({ courseId, courseSlug }: CheckoutPag
             Save as Template
           </Button>
           <a
-            href={`/checkout/${courseSlug}`}
+            href={previewUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-gray-200 text-xs text-gray-600 hover:text-teal-700 hover:border-teal-400 transition-colors"

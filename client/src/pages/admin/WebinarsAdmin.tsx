@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
+import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function fmtDate(ts: number | null | undefined) {
@@ -307,6 +308,16 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
             >
               <Copy className="w-3 h-3" /> Copy URL
             </button>
+            <button
+              className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1 font-medium"
+              onClick={() => {
+                const checkoutUrl = `${window.location.origin}/checkout/${webinar.slug}?type=webinar`;
+                navigator.clipboard.writeText(checkoutUrl);
+                toast.success("Checkout link copied");
+              }}
+            >
+              <Copy className="w-3 h-3" /> Copy Checkout Link
+            </button>
           </div>
         </div>
         <Button
@@ -349,6 +360,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
           <TabsTrigger value="attendees" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Attendees</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs"><BarChart2 className="w-3.5 h-3.5 mr-1" />Analytics</TabsTrigger>
           <TabsTrigger value="domain" className="text-xs"><Globe className="w-3.5 h-3.5 mr-1" />Domain</TabsTrigger>
+          <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -622,6 +634,16 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
               </Card>
             ))}
           </div>
+        </TabsContent>
+
+        {/* Checkout Page Tab */}
+        <TabsContent value="checkout-page" className="pt-2">
+          <CheckoutPageEditor
+            entityType="webinar"
+            entityId={webinar.id}
+            entitySlug={webinar.slug}
+            previewQuery="type=webinar"
+          />
         </TabsContent>
 
         {/* Domain Tab */}

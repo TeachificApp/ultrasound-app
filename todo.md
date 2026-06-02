@@ -4375,3 +4375,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Backend: deleteCheckoutTemplate procedure (admin) — delete a custom template
 - [x] Frontend: "Save as Template" button in CheckoutPageEditor opens name/description dialog
 - [x] Frontend: template picker shows built-in presets + saved custom templates with delete option on custom ones
+
+## Checkout Page Editor — All Content Types (Jun 2026)
+- [x] Audit schema tables for digital_products, physical_products, webinars, memberships slug/id fields
+- [x] Add checkoutPageConfig JSON column to digital_products table + migration
+- [x] Add checkoutPageConfig JSON column to physical_products table + migration
+- [x] Add checkoutPageConfig JSON column to webinars table + migration
+- [x] Add checkoutPageConfig JSON column to memberships table + migration
+- [x] Backend: getCheckoutPageConfig + saveCheckoutPageConfig + getPublicCheckoutPageConfig for digital_products
+- [x] Backend: getCheckoutPageConfig + saveCheckoutPageConfig + getPublicCheckoutPageConfig for physical_products
+- [x] Backend: getCheckoutPageConfig + saveCheckoutPageConfig + getPublicCheckoutPageConfig for webinars
+- [x] Backend: getCheckoutPageConfig + saveCheckoutPageConfig + getPublicCheckoutPageConfig for memberships
+- [x] Update CheckoutPageEditor to accept entityType ('course'|'download'|'physical'|'webinar'|'membership') + entityId + entitySlug
+- [x] Update Checkout.tsx CheckoutSections to call the correct public config procedure based on entityType query param
+- [x] Wire CheckoutPageEditor into DigitalDownloadsAdmin item editor
+- [x] Wire CheckoutPageEditor into PhysicalProductsAdmin item editor
+- [x] Wire CheckoutPageEditor into WebinarsAdmin item editor
+- [x] Wire CheckoutPageEditor into MembershipsAdmin item editor
+- [x] Update all admin "Copy Checkout Link" buttons for non-course types to use /checkout/:slug?type=X

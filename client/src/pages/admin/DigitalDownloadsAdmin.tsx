@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate, BarChart3, ShoppingCart, Settings2, FolderOpen, Workflow } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
+import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DownloadSalesTab } from "@/components/ProductSalesTab";
@@ -352,6 +353,17 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
             </Button>
           </a>
         )}
+        {product.slug && (
+          <Button size="sm" variant="outline" className="text-xs gap-1 text-teal-600 border-teal-300 hover:bg-teal-50"
+            onClick={() => {
+              const url = `${window.location.origin}/checkout/${product.slug}?type=download`;
+              navigator.clipboard.writeText(url);
+              toast.success("Checkout link copied");
+            }}
+          >
+            <Copy className="w-3 h-3" /> Copy Checkout Link
+          </Button>
+        )}
       </div>
 
       {/* Top Tabs — like Course admin */}
@@ -377,6 +389,9 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           </TabsTrigger>
           <TabsTrigger value="after-purchase" className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 px-4 py-2 text-sm font-medium bg-transparent hover:text-teal-600">
             <Workflow className="w-3.5 h-3.5 mr-1.5" /> After Purchase
+          </TabsTrigger>
+          <TabsTrigger value="checkout-page" className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 px-4 py-2 text-sm font-medium bg-transparent hover:text-teal-600">
+            <ShoppingCart className="w-3.5 h-3.5 mr-1.5" /> Checkout Page
           </TabsTrigger>
         </TabsList>
 
@@ -598,6 +613,17 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
         {/* After Purchase Tab */}
         <TabsContent value="after-purchase" className="mt-4">
           <AfterPurchaseWorkflowTab productId={productId} />
+        </TabsContent>
+
+        <TabsContent value="checkout-page" className="mt-4">
+          {product.slug && (
+            <CheckoutPageEditor
+              entityType="download"
+              entityId={productId}
+              entitySlug={product.slug}
+              previewQuery="type=download"
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>

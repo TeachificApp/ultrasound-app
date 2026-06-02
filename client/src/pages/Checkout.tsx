@@ -290,15 +290,25 @@ function contrastText(hex: string): string {
 // ─── CheckoutSections: fetches config and renders all enabled sections ────────────────────
 
 function CheckoutSections({
-  courseSlug, primary, primaryLight, isDark, courseStats,
+  entitySlug, entityType, primary, primaryLight, isDark, courseStats,
 }: {
-  courseSlug: string;
+  entitySlug: string;
+  entityType: "course" | "download" | "physical" | "webinar" | "membership";
   primary: string;
   primaryLight: string;
   isDark: boolean;
   courseStats: { totalLessons: number; totalSections: number; hasCertificate: boolean } | null;
 }) {
-  const { data } = trpc.lmsAdmin.getPublicCheckoutPageConfig.useQuery({ courseSlug });
+  const lmsData = trpc.lmsAdmin.getPublicCheckoutPageConfig.useQuery({ courseSlug: entitySlug }, { enabled: entityType === "course" });
+  const dlData = trpc.downloadsCheckout.getPublicCheckoutPageConfig.useQuery({ productSlug: entitySlug }, { enabled: entityType === "download" });
+  const physData = trpc.productsCheckout.getPublicCheckoutPageConfig.useQuery({ productSlug: entitySlug }, { enabled: entityType === "physical" });
+  const webData = trpc.webinarCheckout.getPublicCheckoutPageConfig.useQuery({ webinarSlug: entitySlug }, { enabled: entityType === "webinar" });
+  const memData = trpc.membership.getPublicCheckoutPageConfig.useQuery({ planSlug: entitySlug }, { enabled: entityType === "membership" });
+  const data = entityType === "course" ? lmsData.data
+    : entityType === "download" ? dlData.data
+    : entityType === "physical" ? physData.data
+    : entityType === "webinar" ? webData.data
+    : memData.data;
 
   const config = data ? parseCheckoutPageConfig(data.config) : null;
   const stats = data?.courseStats ?? courseStats;
@@ -345,6 +355,7 @@ export default function Checkout() {
     return {
       pricingOptionId: url.searchParams.get("option") ? Number(url.searchParams.get("option")) : undefined,
       teamTierId: url.searchParams.get("tier") ? Number(url.searchParams.get("tier")) : undefined,
+      entityType: (url.searchParams.get("type") ?? "course") as "course" | "download" | "physical" | "webinar" | "membership",
     };
   }, [location]);
 
@@ -374,24 +385,46 @@ export default function Checkout() {
     discountPercent: number | null;
   } | null>(null);
 
-  const createSession = trpc.lmsLearner.createEmbeddedCheckoutSession.useMutation({
-    onSuccess(data) {
-      const { clientSecret: cs, ...meta } = data;
-      setClientSecret(cs);
-      setSessionMeta(meta);
-    },
-  });
+  const entityType = searchParams.entityType;
+
+  const onSessionSuccess = (data: any) => {
+    const { clientSecret: cs, ...meta } = data;
+    setClientSecret(cs);
+    setSessionMeta(meta);
+  };
+
+  const createCourseSession = trpc.lmsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
+  const createDownloadSession = trpc.downloadsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
+  const createPhysicalSession = trpc.productsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
+  const createWebinarSession = trpc.webinarAdmin.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
+  const createMembershipSession = trpc.membership.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
+
+  const createSession = {
+    isPending: createCourseSession.isPending || createDownloadSession.isPending || createPhysicalSession.isPending || createWebinarSession.isPending || createMembershipSession.isPending,
+    isError: createCourseSession.isError || createDownloadSession.isError || createPhysicalSession.isError || createWebinarSession.isError || createMembershipSession.isError,
+    error: createCourseSession.error ?? createDownloadSession.error ?? createPhysicalSession.error ?? createWebinarSession.error ?? createMembershipSession.error,
+  };
 
   // Trigger session creation once on mount
   const [sessionRequested, setSessionRequested] = useState(false);
   if (!sessionRequested && slug) {
     setSessionRequested(true);
-    createSession.mutate({
-      courseSlug: slug,
-      pricingOptionId: searchParams.pricingOptionId,
-      teamTierId: searchParams.teamTierId,
-      origin: window.location.origin,
-    });
+    if (entityType === "download") {
+      createDownloadSession.mutate({ productSlug: slug, origin: window.location.origin });
+    } else if (entityType === "physical") {
+      createPhysicalSession.mutate({ productSlug: slug, origin: window.location.origin });
+    } else if (entityType === "webinar") {
+      createWebinarSession.mutate({ webinarSlug: slug, origin: window.location.origin });
+    } else if (entityType === "membership") {
+      createMembershipSession.mutate({ planSlug: slug, origin: window.location.origin });
+    } else {
+      createCourseSession.mutate({
+        courseSlug: slug,
+        pricingOptionId: searchParams.pricingOptionId,
+        teamTierId: searchParams.teamTierId,
+        origin: window.location.origin,
+      });
+    }
   }
 
   // ── Derived theme values ──────────────────────────────────────────────────
@@ -671,7 +704,7 @@ export default function Checkout() {
           )}
 
           {/* ── Configurable checkout page sections ──────────────────────── */}
-          {slug && <CheckoutSections courseSlug={slug} primary={primary} primaryLight={primaryLight} isDark={isDark} courseStats={null} />}
+          {slug && <CheckoutSections entitySlug={slug} entityType={entityType} primary={primary} primaryLight={primaryLight} isDark={isDark} courseStats={null} />}
         </div>
 
         {/* ── Right column: Embedded Stripe Checkout ──────────────────────── */}

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import RichTextEditor from "@/components/RichTextEditor";
+import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -579,6 +580,17 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
             </Button>
           </a>
         )}
+        {product.slug && (
+          <Button size="sm" variant="outline" className="text-xs gap-1 text-teal-600 border-teal-300 hover:bg-teal-50"
+            onClick={() => {
+              const url = `${window.location.origin}/checkout/${product.slug}?type=physical`;
+              navigator.clipboard.writeText(url);
+              toast.success("Checkout link copied");
+            }}
+          >
+            <Copy className="w-3 h-3" /> Copy Checkout Link
+          </Button>
+        )}
         <Button size="sm" variant="outline" className="text-xs text-teal-600 border-teal-300 hover:bg-teal-50"
           onClick={() => setShowGrantDialog(true)}>
           <UserPlus className="w-3 h-3 mr-1" /> Grant Access
@@ -599,6 +611,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           <TabsTrigger value="orders" className="text-xs"><Truck className="w-3 h-3 mr-1" />Orders</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs"><BarChart2 className="w-3 h-3 mr-1" />Analytics</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3 h-3 mr-1" />After Purchase</TabsTrigger>
+          <TabsTrigger value="checkout-page" className="text-xs"><ShoppingBag className="w-3 h-3 mr-1" />Checkout Page</TabsTrigger>
         </TabsList>
 
         {/* ── Details Tab ── */}
@@ -884,6 +897,17 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
         {/* ── After Purchase Tab ── */}
         <TabsContent value="after-purchase" className="mt-4">
           <ProductAfterPurchaseTab productId={productId} />
+        </TabsContent>
+
+        <TabsContent value="checkout-page" className="mt-4">
+          {product.slug && (
+            <CheckoutPageEditor
+              entityType="physical"
+              entityId={productId}
+              entitySlug={product.slug}
+              previewQuery="type=physical"
+            />
+          )}
         </TabsContent>
       </Tabs>
 

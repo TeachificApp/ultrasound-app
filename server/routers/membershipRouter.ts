@@ -587,6 +587,113 @@ const createMembershipCheckout = protectedProcedure
     return { checkoutUrl: session.url };
   });
 
+// ─── Checkout Page Config ───────────────────────────────────────────────────
+
+const getMembershipCheckoutPageConfig = protectedProcedure
+  .input(z.object({ planId: z.number() }))
+  .query(async ({ ctx, input }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [plan] = await db.select({ checkoutPageConfig: membershipPlans.checkoutPageConfig }).from(membershipPlans).where(eq(membershipPlans.id, input.planId)).limit(1);
+    if (!plan) throw new TRPCError({ code: "NOT_FOUND" });
+    return { config: plan.checkoutPageConfig ?? null };
+  });
+
+const saveMembershipCheckoutPageConfig = protectedProcedure
+  .input(z.object({ planId: z.number(), config: z.string() }))
+  .mutation(async ({ ctx, input }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    try { JSON.parse(input.config); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid JSON config" }); }
+    await db.update(membershipPlans).set({ checkoutPageConfig: input.config }).where(eq(membershipPlans.id, input.planId));
+    return { success: true };
+  });
+
+const getPublicMembershipCheckoutPageConfig = publicProcedure
+  .input(z.object({ planSlug: z.string() }))
+  .query(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [plan] = await db.select({ checkoutPageConfig: membershipPlans.checkoutPageConfig }).from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
+    if (!plan) throw new TRPCError({ code: "NOT_FOUND" });
+    return { config: plan.checkoutPageConfig ?? null, courseStats: { totalLessons: 0, totalSections: 0, hasCertificate: false } };
+  });
+
+const createMembershipEmbeddedCheckoutSession = protectedProcedure
+  .input(z.object({ planSlug: z.string(), origin: z.string(), discountCodeId: z.number().optional() }))
+  .mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
+    if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+    const isFree = !plan.price || Number(plan.price) === 0;
+    if (isFree) {
+      return { clientSecret: null, free: true, courseTitle: plan.title, courseSubtitle: null, courseDescription: plan.description ?? null, courseThumbnail: plan.coverImage ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: plan.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: plan.currency ?? "usd", minSeats: null, discountPercent: null };
+    }
+    const { platformSettings } = await import("../../drizzle/schema");
+    const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" as any });
+    const isRecurring = plan.billingInterval !== "one_time" && plan.billingInterval !== "lifetime";
+    let lineItem: any;
+    if (plan.stripePriceId) {
+      lineItem = { price: plan.stripePriceId, quantity: 1 };
+    } else {
+      lineItem = {
+        price_data: {
+          currency: plan.currency ?? "usd",
+          unit_amount: plan.price,
+          product_data: { name: plan.title, description: plan.description ?? undefined, images: plan.coverImage ? [plan.coverImage] : [] },
+          ...(isRecurring ? { recurring: { interval: plan.billingInterval === "annual" ? "year" : "month" } } : {}),
+        },
+        quantity: 1,
+      };
+    }
+    let discounts: any[] = [];
+    if (input.discountCodeId) {
+      const [dc] = await db.select().from(membershipDiscountCodes).where(eq(membershipDiscountCodes.id, input.discountCodeId));
+      if (dc?.stripePromotionCodeId) discounts = [{ promotion_code: dc.stripePromotionCodeId }];
+    }
+    const session = await stripe.checkout.sessions.create({
+      ui_mode: "embedded",
+      mode: isRecurring ? "subscription" : "payment",
+      line_items: [lineItem],
+      customer_email: ctx.user.email ?? undefined,
+      allow_promotion_codes: discounts.length === 0,
+      ...(discounts.length > 0 ? { discounts } : {}),
+      client_reference_id: ctx.user.id.toString(),
+      metadata: { type: "membership", plan_id: plan.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", customer_name: ctx.user.name ?? "" },
+      return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=membership`,
+    });
+    const billingLabel = isRecurring ? (plan.billingInterval === "annual" ? "per year" : "per month") : null;
+    return {
+      clientSecret: session.client_secret!,
+      free: false,
+      courseTitle: plan.title,
+      courseSubtitle: null,
+      courseDescription: plan.description ?? null,
+      courseThumbnail: plan.coverImage ?? null,
+      primaryColor: "#189aa1",
+      accentColor: "#4ad9e0",
+      gradientFrom: "#189aa1",
+      gradientTo: "#4ad9e0",
+      gradientDirection: "135deg",
+      playerTheme: "light",
+      termsUrl: settings?.termsUrl ?? "",
+      privacyUrl: settings?.privacyUrl ?? "",
+      productName: plan.title,
+      displayPrice: Number(plan.price),
+      pricingType: isRecurring ? "subscription" : "one_time",
+      isSubscription: isRecurring,
+      billingLabel,
+      currency: plan.currency ?? "usd",
+      minSeats: null,
+      discountPercent: null,
+    };
+  });
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const membershipRouter = router({
@@ -617,4 +724,8 @@ export const membershipRouter = router({
   updateMemberPageBlocks: updateMemberPageBlocks,
   manualEnroll: manualEnroll,
   cancelEnrollment: cancelEnrollment,
+  getCheckoutPageConfig: getMembershipCheckoutPageConfig,
+  saveCheckoutPageConfig: saveMembershipCheckoutPageConfig,
+  getPublicCheckoutPageConfig: getPublicMembershipCheckoutPageConfig,
+  createEmbeddedCheckoutSession: createMembershipEmbeddedCheckoutSession,
 });
