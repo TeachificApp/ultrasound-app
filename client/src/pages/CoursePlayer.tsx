@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   Award, BookOpen, Bookmark, BookmarkCheck, CalendarDays, CheckCircle, ChevronLeft, ChevronRight,
@@ -609,10 +610,22 @@ function MobileSidebarContent({
                 <button key={lesson.id} onClick={() => setSelectedLessonId(lesson.id)} disabled={lessonLocked}
                   className={cn("w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
                     active ? "bg-teal-50 text-teal-900 border-teal-500" : anyLocked ? "text-gray-400 cursor-pointer border-transparent hover:bg-amber-50" : done ? "text-gray-500 hover:bg-gray-50 border-transparent" : "text-gray-700 hover:bg-gray-50 border-transparent")}>
-                  <span className={cn("w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                    active ? "bg-teal-500 text-white" : anyLocked ? "bg-gray-100 text-gray-400" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500")}>
-                    {anyLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
-                  </span>
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className={cn("w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
+                          active ? "bg-teal-500 text-white" : anyLocked ? "bg-gray-100 text-gray-400" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500")}>
+                          {anyLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "00")}
+                        </span>
+                      </TooltipTrigger>
+                      {freePreviewLocked && !dripLocked && !prereqLocked && (
+                        <TooltipContent side="right" className="max-w-[200px] text-center">
+                          <p className="text-xs font-semibold">Full Access Required</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Upgrade to unlock all lessons and earn your certificate.</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
                     {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
@@ -1537,13 +1550,25 @@ export default function CoursePlayer() {
                   )}
                   style={active ? { backgroundColor: `${primaryColor}12`, borderColor: primaryColor } : undefined}
                 >
-                  <span className={cn(
-                    "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                    active ? "text-white" : anyLocked ? "bg-gray-100 text-gray-400" : done ? "" : "bg-gray-100 text-gray-500"
-                  )}
-                  style={active ? primaryBg : done ? { backgroundColor: `${primaryColor}25`, color: primaryColor } : undefined}>
-                    {anyLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
-                  </span>
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className={cn(
+                          "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
+                          active ? "text-white" : anyLocked ? "bg-gray-100 text-gray-400" : done ? "" : "bg-gray-100 text-gray-500"
+                        )}
+                        style={active ? primaryBg : done ? { backgroundColor: `${primaryColor}25`, color: primaryColor } : undefined}>
+                          {anyLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
+                        </span>
+                      </TooltipTrigger>
+                      {freePreviewLocked && !dripLocked && !prereqLocked && (
+                        <TooltipContent side="right" className="max-w-[200px] text-center">
+                          <p className="text-xs font-semibold">Full Access Required</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Upgrade to unlock all lessons and earn your certificate.</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
                     {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
@@ -1639,7 +1664,21 @@ export default function CoursePlayer() {
                             )}
                             style={active ? { color: primaryColor, backgroundColor: `${primaryColor}12` } : undefined}
                           >
-                            <LessonIcon type={lesson.type} done={done} locked={anyLocked} color={primaryColor} />
+                            <TooltipProvider delayDuration={300}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="shrink-0">
+                                    <LessonIcon type={lesson.type} done={done} locked={anyLocked} color={primaryColor} />
+                                  </span>
+                                </TooltipTrigger>
+                                {freePreviewLocked && !dripLocked && !prereqLocked && (
+                                  <TooltipContent side="right" className="max-w-[200px] text-center">
+                                    <p className="text-xs font-semibold">Full Access Required</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">Upgrade to unlock all lessons and earn your certificate.</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}

@@ -2018,7 +2018,8 @@ export const lmsLearnerRouter = router({
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
-      const learnDomain = process.env.CANONICAL_ROOT_DOMAIN ?? "https://learn.allaboutultrasound.com";
+      // Always use the learn subdomain for Stripe redirects (not the main app domain)
+      const learnDomain = "https://learn.allaboutultrasound.com";
 
       // Return cached payment link if still active
       const cachedLinkId = (course as any).stripePaymentLinkId as string | null;
@@ -2263,7 +2264,8 @@ export const lmsGroupRouter = router({
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
-      const learnDomain = process.env.CANONICAL_ROOT_DOMAIN ?? "https://learn.allaboutultrasound.com";
+      // Always use the learn subdomain for Stripe redirects (not the main app domain)
+      const learnDomain = "https://learn.allaboutultrasound.com";
 
       // ── MODE A: Pricing Option link ───────────────────────────────────────────
       if (input.pricingOptionId) {
