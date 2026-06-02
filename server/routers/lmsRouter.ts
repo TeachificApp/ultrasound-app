@@ -86,6 +86,7 @@ import {
   instructorPublishRequests,
   userRoles,
   userActivityLogs,
+  lmsDefaultTeamTiers,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
@@ -2989,5 +2990,137 @@ export const lmsGroupRouter = router({
         .leftJoin(lmsCourses, eq(lmsCourses.id, instructorPublishRequests.courseId))
         .where(eq(instructorPublishRequests.instructorId, ctx.user.id))
         .orderBy(desc(instructorPublishRequests.requestedAt));
+    }),
+
+  // ─── Default Team Pricing Tiers ───────────────────────────────────────────
+  /** List all default team tiers for a course */
+  listDefaultTeamTiers: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const tiers = await db.select().from(lmsDefaultTeamTiers)
+        .where(eq(lmsDefaultTeamTiers.courseId, input.courseId))
+        .orderBy(asc(lmsDefaultTeamTiers.minSeats));
+      // Compute per-seat price for each tier
+      const primaryPrice = Number(course.price ?? 0);
+      return tiers.map(t => ({
+        ...t,
+        perSeatPrice: primaryPrice > 0
+          ? Math.round(primaryPrice * (1 - Number(t.discountPercent) / 100) * 100) / 100
+          : 0,
+        primaryPrice,
+      }));
+    }),
+
+  /** Upsert a default team tier (create or update by courseId+minSeats) */
+  upsertDefaultTeamTier: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      minSeats: z.number().int().min(2).max(10000),
+      discountPercent: z.number().min(0).max(100),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Check if a tier with this courseId+minSeats already exists
+      const [existing] = await db.select().from(lmsDefaultTeamTiers)
+        .where(and(eq(lmsDefaultTeamTiers.courseId, input.courseId), eq(lmsDefaultTeamTiers.minSeats, input.minSeats)))
+        .limit(1);
+      if (existing) {
+        // If discount changed, clear cached Stripe IDs so a new link is generated
+        const discountChanged = Number(existing.discountPercent) !== input.discountPercent;
+        await db.update(lmsDefaultTeamTiers).set({
+          discountPercent: String(input.discountPercent),
+          ...(discountChanged ? { stripePriceId: null, stripePaymentLinkId: null, stripePaymentLinkUrl: null } : {}),
+        }).where(eq(lmsDefaultTeamTiers.id, existing.id));
+        return { id: existing.id };
+      }
+      const [inserted] = await db.insert(lmsDefaultTeamTiers).values({
+        courseId: input.courseId,
+        minSeats: input.minSeats,
+        discountPercent: String(input.discountPercent),
+      }).$returningId();
+      return { id: inserted.id };
+    }),
+
+  /** Delete a default team tier */
+  deleteDefaultTeamTier: protectedProcedure
+    .input(z.object({ tierId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsDefaultTeamTiers).where(eq(lmsDefaultTeamTiers.id, input.tierId));
+      return { success: true };
+    }),
+
+  /** Generate (or retrieve cached) Stripe Payment Link for a team tier */
+  createTeamTierPaymentLink: protectedProcedure
+    .input(z.object({ tierId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [tier] = await db.select().from(lmsDefaultTeamTiers).where(eq(lmsDefaultTeamTiers.id, input.tierId)).limit(1);
+      if (!tier) throw new TRPCError({ code: "NOT_FOUND", message: "Team tier not found" });
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, tier.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const learnDomain = "https://learn.allaboutultrasound.com";
+
+      // Return cached link if still active
+      if (tier.stripePaymentLinkId) {
+        try {
+          const existing = await stripe.paymentLinks.retrieve(tier.stripePaymentLinkId);
+          if (existing.active) {
+            return { url: existing.url };
+          }
+        } catch { /* fall through to recreate */ }
+      }
+
+      // Compute per-seat price
+      const primaryPrice = Number(course.price ?? 0);
+      const discountPct = Number(tier.discountPercent ?? 0);
+      const perSeatPrice = Math.max(0.5, Math.round(primaryPrice * (1 - discountPct / 100) * 100) / 100);
+      const currency = course.currency ?? "usd";
+
+      // Create or reuse Stripe Price
+      let stripePriceId = tier.stripePriceId ?? null;
+      if (!stripePriceId) {
+        const product = await stripe.products.create({
+          name: `${course.title} — Team (${tier.minSeats}+ seats, ${discountPct}% off)`,
+          description: course.subtitle ?? undefined,
+          metadata: { course_id: String(course.id), team_tier_id: String(tier.id), min_seats: String(tier.minSeats) },
+        });
+        const price = await stripe.prices.create({
+          product: product.id,
+          unit_amount: Math.round(perSeatPrice * 100),
+          currency,
+        });
+        stripePriceId = price.id;
+        await db.update(lmsDefaultTeamTiers).set({ stripePriceId }).where(eq(lmsDefaultTeamTiers.id, tier.id));
+      }
+
+      // Create Payment Link with adjustable quantity (min = minSeats)
+      const paymentLink = await stripe.paymentLinks.create({
+        line_items: [{ price: stripePriceId, quantity: tier.minSeats, adjustable_quantity: { enabled: true, minimum: tier.minSeats } }],
+        allow_promotion_codes: true,
+        metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "lms_team_tier_payment_link" },
+        after_completion: { type: "redirect", redirect: { url: `${learnDomain}/library` } },
+      });
+
+      await db.update(lmsDefaultTeamTiers).set({
+        stripePaymentLinkId: paymentLink.id,
+        stripePaymentLinkUrl: paymentLink.url,
+      }).where(eq(lmsDefaultTeamTiers.id, tier.id));
+
+      return { url: paymentLink.url };
     }),
 });

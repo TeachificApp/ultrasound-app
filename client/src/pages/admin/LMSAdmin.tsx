@@ -43,6 +43,7 @@ import {
   Layout as LayoutTemplate, Database,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
   Repeat, Film, CalendarRange, ExternalLink, Link2, Mail, Activity, Briefcase,
+  Percent,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -1920,6 +1921,8 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         <CoursePricingOptionsEditor courseId={course.id} courseSlug={course.slug} />
         {/* Free Preview Enrollment Link — only shown when the course has preview lessons */}
         <FreePreviewLinkPanel courseId={course.id} />
+        {/* Default Team Pricing Tiers */}
+        <DefaultTeamPricingPanel courseId={course.id} primaryPrice={Number(course.price ?? 0)} />
       </div>
 
             <div className="flex items-center gap-2">
@@ -2338,6 +2341,120 @@ function FreePreviewLinkPanel({ courseId }: { courseId: number }) {
         <input readOnly value={previewUrl} className="flex-1 text-xs bg-white border border-green-300 rounded-md px-3 py-1.5 text-green-900 font-mono truncate focus:outline-none" onClick={e => (e.target as HTMLInputElement).select()} />
         <Button size="sm" variant="outline" className="border-green-400 text-green-700 hover:bg-green-100 shrink-0 h-8" onClick={handleCopy}>
           {copied ? <><CheckCircle className="w-3 h-3 mr-1" /> Copied!</> : <><Copy className="w-3 h-3 mr-1" /> Copy</>}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Default Team Pricing Panel ─────────────────────────────────────────────
+
+function DefaultTeamPricingPanel({ courseId, primaryPrice }: { courseId: number; primaryPrice: number }) {
+  const utils = trpc.useUtils();
+  const { data: tiers = [], isLoading } = trpc.lmsGroup.listDefaultTeamTiers.useQuery({ courseId });
+  const [newMinSeats, setNewMinSeats] = useState("");
+  const [newDiscount, setNewDiscount] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [loadingTierId, setLoadingTierId] = useState<number | null>(null);
+  const [copiedTierId, setCopiedTierId] = useState<number | null>(null);
+
+  const upsert = trpc.lmsGroup.upsertDefaultTeamTier.useMutation({
+    onSuccess: () => { utils.lmsGroup.listDefaultTeamTiers.invalidate({ courseId }); setAdding(false); setNewMinSeats(""); setNewDiscount(""); toast.success("Team tier saved"); },
+    onError: e => toast.error(`Failed: ${e.message}`),
+  });
+  const deleteTier = trpc.lmsGroup.deleteDefaultTeamTier.useMutation({
+    onSuccess: () => { utils.lmsGroup.listDefaultTeamTiers.invalidate({ courseId }); toast.success("Tier removed"); },
+    onError: e => toast.error(`Failed: ${e.message}`),
+  });
+  const createLink = trpc.lmsGroup.createTeamTierPaymentLink.useMutation({
+    onSuccess: (data, vars) => {
+      setLoadingTierId(null);
+      navigator.clipboard.writeText(data.url)
+        .then(() => { setCopiedTierId(vars.tierId); setTimeout(() => setCopiedTierId(null), 2500); })
+        .catch(() => {});
+      window.open(data.url, "_blank");
+      toast.success("Team Stripe link copied!");
+      utils.lmsGroup.listDefaultTeamTiers.invalidate({ courseId });
+    },
+    onError: (e, vars) => { setLoadingTierId(null); toast.error(`Stripe error: ${e.message}`); },
+  });
+
+  const handleAddTier = () => {
+    const seats = parseInt(newMinSeats, 10);
+    const disc = parseFloat(newDiscount);
+    if (!seats || seats < 2 || isNaN(disc) || disc < 0 || disc > 100) {
+      toast.error("Enter valid seats (≥2) and discount (0–100%)");
+      return;
+    }
+    upsert.mutate({ courseId, minSeats: seats, discountPercent: disc });
+  };
+
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Users className="w-4 h-4 text-blue-700" />
+        <h3 className="text-sm font-semibold text-blue-800">Default Team Pricing</h3>
+        <span className="ml-auto text-xs text-blue-500">per-seat price · adjustable quantity at checkout</span>
+      </div>
+      <p className="text-xs text-blue-700">Set volume discount tiers. Each tier generates a Stripe Payment Link with adjustable quantity (minimum = tier seat count). These are defaults — content block group pricing overrides them.</p>
+
+      {isLoading ? (
+        <div className="text-xs text-blue-400">Loading tiers…</div>
+      ) : tiers.length === 0 ? (
+        <div className="text-xs text-blue-400 italic">No team tiers yet. Add one below.</div>
+      ) : (
+        <div className="space-y-2">
+          {tiers.map((tier: any) => {
+            const perSeat = primaryPrice > 0
+              ? Math.round(primaryPrice * (1 - Number(tier.discountPercent) / 100) * 100) / 100
+              : 0;
+            const isCopied = copiedTierId === tier.id;
+            const isLoading2 = loadingTierId === tier.id;
+            return (
+              <div key={tier.id} className="flex items-center gap-2 bg-white rounded-lg border border-blue-200 px-3 py-2">
+                <Users className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <span className="text-xs font-medium text-blue-900">{tier.minSeats}+ seats</span>
+                <Percent className="w-3 h-3 text-blue-400" />
+                <span className="text-xs text-blue-700">{Number(tier.discountPercent).toFixed(0)}% off</span>
+                <span className="text-xs text-gray-400 mx-1">→</span>
+                <span className="text-xs font-semibold text-blue-900">${perSeat.toFixed(2)}/seat</span>
+                <div className="flex-1" />
+                <Button size="sm" variant="outline" className={`h-7 text-xs shrink-0 ${isCopied ? 'border-green-400 text-green-700' : 'border-blue-300 text-blue-700 hover:bg-blue-100'}`}
+                  disabled={isLoading2}
+                  onClick={() => { setLoadingTierId(tier.id); createLink.mutate({ tierId: tier.id }); }}
+                >
+                  {isLoading2 ? <Loader2 className="w-3 h-3 animate-spin" /> : isCopied ? <><CheckCircle className="w-3 h-3 mr-1" />Copied!</> : <><Link2 className="w-3 h-3 mr-1" />Copy Stripe Link</>}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 shrink-0"
+                  onClick={() => { if (confirm(`Remove ${tier.minSeats}+ seats tier?`)) deleteTier.mutate({ tierId: tier.id }); }}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add new tier */}
+      <div className="flex items-center gap-2 pt-1">
+        <Input
+          type="number" min={2} placeholder="Min seats (e.g. 5)"
+          value={newMinSeats} onChange={e => setNewMinSeats(e.target.value)}
+          className="h-8 text-xs w-36"
+        />
+        <Input
+          type="number" min={0} max={100} step={1} placeholder="Discount %"
+          value={newDiscount} onChange={e => setNewDiscount(e.target.value)}
+          className="h-8 text-xs w-28"
+        />
+        {newMinSeats && newDiscount && primaryPrice > 0 && (
+          <span className="text-xs text-blue-600 font-medium">
+            = ${Math.round(primaryPrice * (1 - parseFloat(newDiscount || "0") / 100) * 100) / 100}/seat
+          </span>
+        )}
+        <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs shrink-0" onClick={handleAddTier} disabled={upsert.isPending}>
+          {upsert.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Plus className="w-3 h-3 mr-1" />Add Tier</>}
         </Button>
       </div>
     </div>

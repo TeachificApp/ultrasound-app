@@ -5944,3 +5944,27 @@ export const pendingFulfillments = mysqlTable("pending_fulfillments", {
 });
 export type PendingFulfillment = typeof pendingFulfillments.$inferSelect;
 export type InsertPendingFulfillment = typeof pendingFulfillments.$inferInsert;
+
+// ─── Default Team Pricing Tiers ───────────────────────────────────────────────
+/** Volume discount tiers for a course — "X+ seats = Y% off primary price".
+ *  Each tier generates its own Stripe Payment Link (per-seat price).
+ *  These are defaults that can be overridden by content-block group pricing. */
+export const lmsDefaultTeamTiers = mysqlTable("lms_default_team_tiers", {
+  id: int("id").autoincrement().primaryKey(),
+  /** The course/quiz/cohort/download this tier applies to */
+  courseId: int("course_id").notNull(),
+  /** Minimum number of seats to qualify for this tier */
+  minSeats: int("min_seats").notNull().default(2),
+  /** Discount percentage off the primary course price (0–100) */
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }).notNull().default("0.00"),
+  /** Cached Stripe Price ID for the per-seat price at this tier */
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  /** Cached Stripe Payment Link ID for this tier */
+  stripePaymentLinkId: varchar("stripe_payment_link_id", { length: 255 }),
+  /** Cached Stripe Payment Link URL for quick copy */
+  stripePaymentLinkUrl: varchar("stripe_payment_link_url", { length: 1024 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsDefaultTeamTier = typeof lmsDefaultTeamTiers.$inferSelect;
+export type InsertLmsDefaultTeamTier = typeof lmsDefaultTeamTiers.$inferInsert;
