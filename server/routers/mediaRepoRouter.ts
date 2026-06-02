@@ -1033,6 +1033,56 @@ export const mediaRepoRouter = router({
       return { url: `${basePath}${authQuery}`, isPublic: false as const };
     }),
 
+  /**
+   * Returns the direct S3/CDN URL for a SCORM ZIP so the browser can fetch and
+   * extract it client-side (iSpring-style).  Access is gated the same way as
+   * getMediaEmbedUrl: enrolled learners or platform admins only.
+   */
+  getScormZipUrl: protectedProcedure
+    .input(z.object({
+      slug: z.string().min(1),
+      courseId: z.number().int().positive().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [asset] = await db
+        .select()
+        .from(mediaAssets)
+        .where(and(eq(mediaAssets.slug, input.slug), isNull(mediaAssets.deletedAt)))
+        .limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
+      // Access check
+      let allowed = false;
+      try {
+        await assertPlatformAdmin(ctx);
+        allowed = true;
+      } catch {
+        if (asset.access === "public") {
+          allowed = true;
+        } else if (input.courseId) {
+          const [enrollment] = await db
+            .select({ id: lmsEnrollments.id })
+            .from(lmsEnrollments)
+            .where(and(
+              eq(lmsEnrollments.userId, ctx.user.id),
+              eq(lmsEnrollments.courseId, input.courseId)
+            ))
+            .limit(1);
+          allowed = !!enrollment;
+        }
+      }
+      if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "No access to this media asset" });
+      // Get the latest version's S3 URL
+      const [version] = await db
+        .select({ s3Url: mediaVersions.s3Url })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, asset.id))
+        .orderBy(sql`${mediaVersions.versionNumber} DESC`)
+        .limit(1);
+      if (!version?.s3Url) throw new TRPCError({ code: "NOT_FOUND", message: "No file found for this asset" });
+      return { zipUrl: version.s3Url, title: asset.title };
+    }),
 
   // ─── Folder CRUD ──────────────────────────────────────────────────────────────
 
