@@ -58,6 +58,7 @@ import {
   platformSettings,
   digitalProducts,
   lmsThinkificImports,
+  lmsCheckoutTemplates,
   lmsArchive,
   sonoQuizzes,
   physicalProducts,
@@ -1146,6 +1147,122 @@ export const lmsCourseBuilderRouter = router({
       if (Object.keys(filtered).length > 0) {
         await db.update(lmsCourses).set(filtered).where(eq(lmsCourses.id, courseId));
       }
+      return { success: true };
+    }),
+
+  /** Get the checkout page config for a course (admin) */
+  getCheckoutPageConfig: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db
+        .select({ checkoutPageConfig: lmsCourses.checkoutPageConfig })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, input.courseId))
+        .limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      return { config: course.checkoutPageConfig ?? null };
+    }),
+
+  /** Save the checkout page config for a course (admin) */
+  saveCheckoutPageConfig: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      config: z.string(), // JSON string of CheckoutPageConfig
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Validate JSON
+      try { JSON.parse(input.config); } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid JSON config" });
+      }
+      await db.update(lmsCourses)
+        .set({ checkoutPageConfig: input.config })
+        .where(eq(lmsCourses.id, input.courseId));
+      return { success: true };
+    }),
+
+  /** Get checkout page config for public rendering (no auth required) */
+  getPublicCheckoutPageConfig: publicProcedure
+    .input(z.object({ courseSlug: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db
+        .select({
+          checkoutPageConfig: lmsCourses.checkoutPageConfig,
+          totalLessons: sql<number>`(SELECT COUNT(*) FROM lms_lessons WHERE course_id = ${lmsCourses.id} AND is_deleted = 0)`,
+          totalSections: sql<number>`(SELECT COUNT(*) FROM lms_sections WHERE course_id = ${lmsCourses.id})`,
+          hasCertificate: lmsCourses.hasCertificate,
+        })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.slug, input.courseSlug))
+        .limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        config: course.checkoutPageConfig ?? null,
+        courseStats: {
+          totalLessons: Number(course.totalLessons ?? 0),
+          totalSections: Number(course.totalSections ?? 0),
+          hasCertificate: course.hasCertificate,
+        },
+      };
+    }),
+
+  /** List all saved checkout page templates (admin) */
+  listCheckoutTemplates: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const templates = await db
+        .select({
+          id: lmsCheckoutTemplates.id,
+          name: lmsCheckoutTemplates.name,
+          description: lmsCheckoutTemplates.description,
+          config: lmsCheckoutTemplates.config,
+          createdAt: lmsCheckoutTemplates.createdAt,
+        })
+        .from(lmsCheckoutTemplates)
+        .orderBy(desc(lmsCheckoutTemplates.createdAt));
+      return templates;
+    }),
+
+  /** Save current config as a named reusable template (admin) */
+  saveCheckoutTemplate: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(255),
+      description: z.string().max(1000).optional(),
+      config: z.string(), // JSON string of CheckoutPageConfig
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      try { JSON.parse(input.config); } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid JSON config" });
+      }
+      const [result] = await db.insert(lmsCheckoutTemplates).values({
+        name: input.name,
+        description: input.description ?? null,
+        config: input.config,
+        createdByUserId: ctx.user.id,
+      });
+      return { id: (result as any).insertId as number, success: true };
+    }),
+
+  /** Delete a saved checkout template (admin) */
+  deleteCheckoutTemplate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCheckoutTemplates).where(eq(lmsCheckoutTemplates.id, input.id));
       return { success: true };
     }),
 });

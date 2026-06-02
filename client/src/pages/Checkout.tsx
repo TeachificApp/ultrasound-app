@@ -25,10 +25,239 @@ import { trpc } from "@/lib/trpc";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ShieldCheck, RefreshCw, Lock, AlertCircle, ArrowLeft, CheckCircle2, BookOpen } from "lucide-react";
+import {
+  ShieldCheck, RefreshCw, Lock, AlertCircle, ArrowLeft, CheckCircle2, BookOpen,
+  Award, Star, Heart, Zap, Shield, BadgeCheck, ChevronDown, ChevronRight,
+  MessageSquare, HelpCircle, Code2,
+} from "lucide-react";
+import {
+  parseCheckoutPageConfig,
+  CheckoutSection,
+  TrustSealsSection,
+  GuaranteeSection,
+  TestimonialsSection,
+  FaqSection,
+  CustomHtmlSection,
+  CourseIncludesSection,
+  PresetSealId,
+} from "@/../../shared/checkoutPageConfig";
 
 // Initialise Stripe once outside the component to avoid re-creating on every render
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "");
+
+// ─── Preset seal icon map ─────────────────────────────────────────────────────
+const SEAL_ICONS: Record<PresetSealId, React.ReactNode> = {
+  stripe_secure: <Lock className="h-4 w-4" />,
+  ssl_encrypted: <ShieldCheck className="h-4 w-4" />,
+  money_back_30: <RefreshCw className="h-4 w-4" />,
+  money_back_14: <RefreshCw className="h-4 w-4" />,
+  satisfaction_guaranteed: <Star className="h-4 w-4" />,
+  hipaa_compliant: <Shield className="h-4 w-4" />,
+  accredited_cme: <BadgeCheck className="h-4 w-4" />,
+  secure_payment: <Lock className="h-4 w-4" />,
+  privacy_protected: <Shield className="h-4 w-4" />,
+};
+
+const GUARANTEE_ICONS: Record<string, React.ReactNode> = {
+  ShieldCheck: <ShieldCheck className="h-8 w-8" />,
+  Award: <Award className="h-8 w-8" />,
+  Star: <Star className="h-8 w-8" />,
+  Heart: <Heart className="h-8 w-8" />,
+  Zap: <Zap className="h-8 w-8" />,
+  CheckCircle2: <CheckCircle2 className="h-8 w-8" />,
+  BadgeCheck: <BadgeCheck className="h-8 w-8" />,
+  RefreshCw: <RefreshCw className="h-8 w-8" />,
+};
+
+// ─── Section renderers ────────────────────────────────────────────────────────
+
+function TrustSealsRenderer({
+  section, primary, primaryLight, isDark,
+}: { section: TrustSealsSection; primary: string; primaryLight: string; isDark: boolean }) {
+  const enabled = section.seals.filter((s) => s.enabled);
+  if (!enabled.length) return null;
+  return (
+    <div className={`rounded-xl border p-4 ${
+      isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
+    }`}>
+      <div className={section.layout === "grid" ? "grid grid-cols-2 gap-3" : "flex flex-wrap gap-3 justify-center"}>
+        {enabled.map((seal) => (
+          <div
+            key={seal.id}
+            className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg"
+            style={{ backgroundColor: primaryLight, color: primary, border: `1px solid ${primary}33` }}
+          >
+            {seal.preset && SEAL_ICONS[seal.preset as PresetSealId]
+              ? SEAL_ICONS[seal.preset as PresetSealId]
+              : <ShieldCheck className="h-4 w-4" />}
+            {seal.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GuaranteeRenderer({
+  section, primary, primaryLight, isDark,
+}: { section: GuaranteeSection; primary: string; primaryLight: string; isDark: boolean }) {
+  return (
+    <div
+      className="rounded-xl p-4 flex gap-4"
+      style={{ backgroundColor: primaryLight, border: `1px solid ${primary}44` }}
+    >
+      <div
+        className="h-14 w-14 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ backgroundColor: `${primary}22`, color: primary }}
+      >
+        {GUARANTEE_ICONS[section.icon] ?? <ShieldCheck className="h-8 w-8" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        {section.badgeLabel && (
+          <span
+            className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full mb-2"
+            style={{ backgroundColor: `${primary}22`, color: primary }}
+          >
+            {section.badgeLabel}
+          </span>
+        )}
+        <p className="text-sm font-bold mb-1" style={{ color: primary }}>{section.headline}</p>
+        <p className={`text-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-600"}`}>{section.body}</p>
+      </div>
+    </div>
+  );
+}
+
+function TestimonialsRenderer({
+  section, primary, isDark,
+}: { section: TestimonialsSection; primary: string; isDark: boolean }) {
+  const enabled = section.testimonials.filter((t) => t.enabled);
+  if (!enabled.length) return null;
+  return (
+    <div className={`rounded-xl border p-4 space-y-3 ${
+      isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
+    }`}>
+      {section.headline && (
+        <p className={`text-sm font-semibold ${isDark ? "text-white" : "text-gray-800"}`}>{section.headline}</p>
+      )}
+      {enabled.map((t) => (
+        <div key={t.id} className={`p-3 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-50"}`}>
+          {t.rating && (
+            <div className="flex gap-0.5 mb-1.5">
+              {[1,2,3,4,5].map((r) => (
+                <span key={r} className={`text-sm ${(t.rating ?? 5) >= r ? "text-yellow-400" : "text-gray-200"}`}>★</span>
+              ))}
+            </div>
+          )}
+          <p className={`text-xs leading-relaxed italic mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            "{t.quote}"
+          </p>
+          <div className="flex items-center gap-2">
+            {t.avatarUrl ? (
+              <img src={t.avatarUrl} alt={t.name} className="h-6 w-6 rounded-full object-cover" />
+            ) : (
+              <div className="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: primary }}>
+                {t.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className={`text-xs font-semibold ${isDark ? "text-white" : "text-gray-800"}`}>{t.name}</p>
+              {t.role && <p className={`text-[10px] ${isDark ? "text-gray-500" : "text-gray-500"}`}>{t.role}</p>}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FaqRenderer({
+  section, primary, isDark,
+}: { section: FaqSection; primary: string; isDark: boolean }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const enabled = section.items.filter((i) => i.enabled);
+  if (!enabled.length) return null;
+  return (
+    <div className={`rounded-xl border overflow-hidden ${
+      isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
+    }`}>
+      {section.headline && (
+        <div className={`px-4 py-3 border-b ${isDark ? "border-gray-800" : "border-gray-100"}`}>
+          <p className={`text-sm font-semibold ${isDark ? "text-white" : "text-gray-800"}`}>{section.headline}</p>
+        </div>
+      )}
+      {enabled.map((item, idx) => (
+        <div key={item.id} className={idx > 0 ? `border-t ${isDark ? "border-gray-800" : "border-gray-100"}` : ""}>
+          <button
+            className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
+              isDark ? "hover:bg-gray-800" : "hover:bg-gray-50"
+            }`}
+            onClick={() => setOpenId(openId === item.id ? null : item.id)}
+          >
+            <span className={`text-xs font-medium ${isDark ? "text-white" : "text-gray-800"}`}>{item.question}</span>
+            <ChevronDown
+              className={`h-4 w-4 flex-shrink-0 transition-transform ${openId === item.id ? "rotate-180" : ""}`}
+              style={{ color: primary }}
+            />
+          </button>
+          {openId === item.id && (
+            <div className={`px-4 pb-3 text-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+              {item.answer}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CourseIncludesRenderer({
+  section, courseStats, primary, primaryLight, isDark,
+}: {
+  section: CourseIncludesSection;
+  courseStats: { totalLessons: number; totalSections: number; hasCertificate: boolean } | null;
+  primary: string;
+  primaryLight: string;
+  isDark: boolean;
+}) {
+  const items = section.items ?? (
+    courseStats ? [
+      courseStats.totalLessons > 0 ? { icon: "BookOpen", text: `${courseStats.totalLessons} lesson${courseStats.totalLessons !== 1 ? "s" : ""}` } : null,
+      courseStats.totalSections > 0 ? { icon: "BookOpen", text: `${courseStats.totalSections} section${courseStats.totalSections !== 1 ? "s" : ""}` } : null,
+      courseStats.hasCertificate ? { icon: "Award", text: "Certificate of completion" } : null,
+      { icon: "CheckCircle2", text: "Lifetime access" },
+    ].filter(Boolean) as Array<{ icon: string; text: string }>
+    : []
+  );
+  if (!items.length) return null;
+  return (
+    <div className={`rounded-xl border p-4 ${
+      isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
+    }`}>
+      {section.headline && (
+        <p className={`text-sm font-semibold mb-3 ${isDark ? "text-white" : "text-gray-800"}`}>{section.headline}</p>
+      )}
+      <div className="space-y-2">
+        {items.map((item, idx) => (
+          <div key={idx} className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: primary }} />
+            <span className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>{item.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CustomHtmlRenderer({ section }: { section: CustomHtmlSection }) {
+  if (!section.html.trim()) return null;
+  return (
+    <div
+      className="checkout-custom-html text-sm"
+      dangerouslySetInnerHTML={{ __html: section.html }}
+    />
+  );
+}
 
 function formatPrice(amount: number, currency = "usd"): string {
   return new Intl.NumberFormat("en-US", {
@@ -56,6 +285,54 @@ function contrastText(hex: string): string {
   const b = parseInt(hex.slice(5, 7), 16);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.55 ? "#1a2e2e" : "#ffffff";
+}
+
+// ─── CheckoutSections: fetches config and renders all enabled sections ────────────────────
+
+function CheckoutSections({
+  courseSlug, primary, primaryLight, isDark, courseStats,
+}: {
+  courseSlug: string;
+  primary: string;
+  primaryLight: string;
+  isDark: boolean;
+  courseStats: { totalLessons: number; totalSections: number; hasCertificate: boolean } | null;
+}) {
+  const { data } = trpc.lmsAdmin.getPublicCheckoutPageConfig.useQuery({ courseSlug });
+
+  const config = data ? parseCheckoutPageConfig(data.config) : null;
+  const stats = data?.courseStats ?? courseStats;
+
+  if (!config) return null;
+
+  return (
+    <div className="space-y-4">
+      {config.sections
+        .filter((s) => s.enabled)
+        .sort((a, b) => a.order - b.order)
+        .map((section, idx) => {
+          if (section.type === "trust_seals") {
+            return <TrustSealsRenderer key={idx} section={section} primary={primary} primaryLight={primaryLight} isDark={isDark} />;
+          }
+          if (section.type === "guarantee") {
+            return <GuaranteeRenderer key={idx} section={section} primary={primary} primaryLight={primaryLight} isDark={isDark} />;
+          }
+          if (section.type === "testimonials") {
+            return <TestimonialsRenderer key={idx} section={section} primary={primary} isDark={isDark} />;
+          }
+          if (section.type === "faq") {
+            return <FaqRenderer key={idx} section={section} primary={primary} isDark={isDark} />;
+          }
+          if (section.type === "custom_html") {
+            return <CustomHtmlRenderer key={idx} section={section} />;
+          }
+          if (section.type === "course_includes") {
+            return <CourseIncludesRenderer key={idx} section={section} courseStats={stats} primary={primary} primaryLight={primaryLight} isDark={isDark} />;
+          }
+          return null;
+        })}
+    </div>
+  );
 }
 
 export default function Checkout() {
@@ -393,15 +670,8 @@ export default function Checkout() {
             </div>
           )}
 
-          {/* Trust badges */}
-          <div className={`flex items-center justify-center gap-6 text-xs py-2 ${isDark ? "text-gray-600" : "text-gray-400"}`}>
-            <span className="flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5" /> SSL Encrypted
-            </span>
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5" /> Powered by Stripe
-            </span>
-          </div>
+          {/* ── Configurable checkout page sections ──────────────────────── */}
+          {slug && <CheckoutSections courseSlug={slug} primary={primary} primaryLight={primaryLight} isDark={isDark} courseStats={null} />}
         </div>
 
         {/* ── Right column: Embedded Stripe Checkout ──────────────────────── */}

@@ -2846,11 +2846,27 @@ export const lmsCourses = mysqlTable("lms_courses", {
   publishDomain: varchar("publish_domain", { length: 255 }),
   // Multi-cohort mode: when true, live sessions/assignments/recordings are scoped per cohort group
   multiCohortMode: boolean("multi_cohort_mode").default(false).notNull(),
+  // Checkout page configuration — JSON array of CheckoutSection objects
+  // Sections: trust_seals, guarantee, testimonials, faq, custom_html, course_includes, instructor_bio
+  // null = use platform defaults
+  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LmsCourse = typeof lmsCourses.$inferSelect;
 export type InsertLmsCourse = typeof lmsCourses.$inferInsert;
+
+// Saved checkout page templates (admin-created, reusable across courses)
+export const lmsCheckoutTemplates = mysqlTable("lms_checkout_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  config: longtext("config").notNull(), // JSON string of CheckoutPageConfig
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCheckoutTemplate = typeof lmsCheckoutTemplates.$inferSelect;
 
 export const lmsSections = mysqlTable("lms_sections", {
   id: int("id").autoincrement().primaryKey(),

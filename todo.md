@@ -4340,3 +4340,38 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add termsUrl/privacyUrl fields to admin Platform Settings UI (LMSPublishDomainSettings)
 - [x] Update createEmbeddedCheckoutSession to return termsUrl and privacyUrl from platform_settings
 - [x] Rewrite Checkout.tsx with course theme colors, course image/description, org-level terms/privacy URLs, subscription disclosure, and required agreement checkboxes
+
+## Checkout Page Editor (Jun 2026)
+- [ ] Add checkoutPageConfig JSON column to lmsCourses schema + migration
+- [ ] Add getCheckoutPageConfig and saveCheckoutPageConfig tRPC procedures (lmsGroup/admin)
+- [ ] Define CheckoutPageConfig type: sections array with type, enabled, order, data fields
+- [ ] Section types: trust_seals, guarantee, testimonials, faq, custom_html, course_includes, instructor_bio
+- [ ] Trust seal types: stripe_secure, ssl, money_back, satisfaction, hipaa, accredited, custom (with icon upload + label)
+- [ ] Build CheckoutPageEditor admin component with section list, toggle enable/disable, drag-to-reorder, per-section config panel
+- [ ] Trust seal picker: grid of preset seals (checkmark + label) + custom seal builder
+- [ ] Guarantee section editor: icon picker, headline, body text, duration (e.g. "30-day money-back")
+- [ ] Testimonials section editor: add/edit/remove testimonials (name, role, avatar, quote, rating)
+- [ ] FAQ section editor: add/edit/remove Q&A pairs
+- [ ] Custom HTML section editor: raw HTML textarea
+- [ ] Course includes section: auto-populated from course data (lessons, duration, certificate) with optional overrides
+- [ ] Wire CheckoutPageEditor into LMSAdmin course settings tab (new "Checkout Page" tab)
+- [ ] Update Checkout.tsx left panel to render configured sections below course summary
+- [ ] Default sections applied when no config saved: trust_seals (stripe_secure, ssl, money_back), course_includes
+- [ ] Live preview link in admin editor that opens /checkout/:slug in new tab
+
+## Checkout Page Editor — Templates (Jun 2026)
+- [ ] Define 5 built-in checkout page templates: Simple, High-Trust Medical, Subscription Focus, Course Bundle, Minimal
+- [ ] Template picker modal: grid of template cards with preview thumbnail description and Apply button
+- [ ] Applying a template replaces current config (with confirmation dialog)
+- [ ] "Save as Template" option to save current config as a named custom template (stored per-course or globally)
+- [ ] Backend: getCheckoutPageConfig and saveCheckoutPageConfig procedures in lmsCourseBuilderRouter
+- [ ] Backend: listCheckoutTemplates public procedure returning built-in + custom templates
+
+## Checkout Page Templates — Save & Manage (Jun 2026)
+- [x] Add lms_checkout_templates table (id, name, description, config JSON, createdByUserId, createdAt)
+- [x] Run migration SQL for lms_checkout_templates
+- [x] Backend: saveCheckoutTemplate procedure (admin) — save named template to DB
+- [x] Backend: listCheckoutTemplates procedure (admin) — return built-in + saved custom templates
+- [x] Backend: deleteCheckoutTemplate procedure (admin) — delete a custom template
+- [x] Frontend: "Save as Template" button in CheckoutPageEditor opens name/description dialog
+- [x] Frontend: template picker shows built-in presets + saved custom templates with delete option on custom ones

@@ -63,6 +63,7 @@ import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { WebinarsAdmin } from "./WebinarsAdmin";
 import MembershipsAdmin from "./MembershipsAdmin";
+import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -1176,6 +1177,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
           <TabsTrigger value="sales" className="text-xs">Sales</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs">After Purchase</TabsTrigger>
+          <TabsTrigger value="checkout-page" className="text-xs">Checkout Page</TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -1337,6 +1339,30 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         <TabsContent value="after-purchase" className="mt-4">
           <AfterPurchaseTab courseId={courseId} />
         </TabsContent>
+
+        {/* Checkout Page Tab */}
+        <TabsContent value="checkout-page" className="mt-4">
+          {visitedTabs.has("checkout-page") && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex items-start justify-between gap-4 mb-5">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900">Checkout Page Editor</h3>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Customise the sections shown on the hosted checkout page at{" "}
+                      <a href={`/checkout/${course.slug}`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+                        /checkout/{course.slug}
+                      </a>.
+                      Changes are saved independently of course settings.
+                    </p>
+                  </div>
+                </div>
+                <CheckoutPageEditor courseId={courseId} courseSlug={course.slug} />
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
         {/* Cohort Tab — only visible for cohort type */}
         <TabsContent value="cohort" className="mt-4">
           <CohortTab courseId={courseId} />
