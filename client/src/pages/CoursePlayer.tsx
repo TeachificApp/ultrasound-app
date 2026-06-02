@@ -848,7 +848,9 @@ export default function CoursePlayer() {
           return;
         }
       }
-      const first = topLevel[0] ?? data.sections[0]?.lessons[0];
+      // Skip draft/hidden lessons when picking the default first lesson
+      const isVisible = (l: any) => !l.lessonStatus || l.lessonStatus === "published";
+      const first = topLevel.find(isVisible) ?? data.sections.flatMap((s: any) => s.lessons).find(isVisible);
       if (first) setSelectedLessonId(first.id);
     }
   }, [data]);
@@ -1096,8 +1098,10 @@ export default function CoursePlayer() {
   };
 
   const currentIdx = allLessons.findIndex((l: any) => l.id === selectedLessonId);
-  const prevLesson = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
-  const nextLesson = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
+  const isLessonVisible = (l: any) => !l.lessonStatus || l.lessonStatus === "published";
+  // Skip draft/hidden lessons in Prev/Next navigation
+  const prevLesson = (() => { for (let i = currentIdx - 1; i >= 0; i--) { if (isLessonVisible(allLessons[i])) return allLessons[i]; } return null; })();
+  const nextLesson = (() => { for (let i = currentIdx + 1; i < allLessons.length; i++) { if (isLessonVisible(allLessons[i])) return allLessons[i]; } return null; })();
 
   const currentSection = sections.find((s: any) => s.lessons.some((l: any) => l.id === selectedLessonId));
   const currentSectionIdx = currentSection ? sections.indexOf(currentSection) : -1;
