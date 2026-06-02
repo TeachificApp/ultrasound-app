@@ -732,8 +732,8 @@ export default function Checkout() {
               </h3>
               <p className={`text-sm max-w-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                 {requiresSubscriptionAck && !subscriptionAcknowledged
-                  ? "Please acknowledge the recurring billing terms on the left to unlock payment."
-                  : "Please agree to the Terms of Service and Privacy Policy on the left to unlock payment."}
+                  ? "Please acknowledge the recurring billing terms above to unlock payment."
+                  : "Please agree to the Terms of Service and Privacy Policy above to unlock payment."}
               </p>
               {/* Visual CTA hint */}
               <div
