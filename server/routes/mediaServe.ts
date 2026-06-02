@@ -5,9 +5,10 @@
  * in iframes on third-party sites (third-party cookies are blocked by
  * Chrome, Safari, Firefox, and Brave by default).
  *
- * Access control is enforced via a URL query parameter `?token=<grant_token>`.
- * Public assets require no token. Private assets require a valid, non-revoked,
- * non-expired grant token that was issued by a platform admin.
+ * Access control uses cookieless query params:
+ *   `?token=<grant_token>` — email invite grants (private assets)
+ *   `?access=<signed>` — short-lived viewer token (enrolled learners / admins)
+ * Public assets require neither.
  *
  * Routes:
  *   GET /media/:slug              — serve content inline (or embed viewer for HTML/SCORM/ZIP)
@@ -21,6 +22,8 @@
 import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
+import { findScormLaunchFile, needsScormExtraction, shouldShowScormWaitingPage } from "../lib/scormPackage";
+import { buildMediaAuthQuery, verifyMediaViewerToken } from "../lib/mediaEmbedAccess";
 import { createHash } from "crypto";
 import https from "https";
 import http from "http";
@@ -119,7 +122,16 @@ async function recordView(
   }
 }
 
-async function resolveMedia(slug: string, token?: string) {
+type MediaAuthQuery = { token?: string; access?: string };
+
+function readMediaAuth(req: Request): MediaAuthQuery {
+  return {
+    token: (req.query.token as string) || undefined,
+    access: (req.query.access as string) || undefined,
+  };
+}
+
+async function resolveMedia(slug: string, auth?: MediaAuthQuery) {
   const db = await getDb();
   if (!db) return null;
 
@@ -142,35 +154,42 @@ async function resolveMedia(slug: string, token?: string) {
     return { asset, version: version ?? null, allowed: true };
   }
 
-  // Private: token required
-  if (!token) return { asset, version: null, allowed: false };
+  const token = auth?.token;
+  const access = auth?.access;
 
-  const [grant] = await db
-    .select()
-    .from(mediaAccessGrants)
-    .where(
-      and(
-        eq(mediaAccessGrants.assetId, asset.id),
-        eq(mediaAccessGrants.token, token),
-        isNull(mediaAccessGrants.revokedAt)
+  if (token) {
+    const [grant] = await db
+      .select()
+      .from(mediaAccessGrants)
+      .where(
+        and(
+          eq(mediaAccessGrants.assetId, asset.id),
+          eq(mediaAccessGrants.token, token),
+          isNull(mediaAccessGrants.revokedAt)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (!grant) return { asset, version: null, allowed: false };
-  if (grant.expiresAt && grant.expiresAt < new Date()) {
-    return { asset, version: null, allowed: false };
+    if (!grant) return { asset, version: null, allowed: false };
+    if (grant.expiresAt && grant.expiresAt < new Date()) {
+      return { asset, version: null, allowed: false };
+    }
+
+    if (!grant.firstUsedAt) {
+      db.update(mediaAccessGrants)
+        .set({ firstUsedAt: new Date() })
+        .where(eq(mediaAccessGrants.id, grant.id))
+        .catch(() => {});
+    }
+
+    return { asset, version: version ?? null, allowed: true };
   }
 
-  // Record first use (fire-and-forget)
-  if (!grant.firstUsedAt) {
-    db.update(mediaAccessGrants)
-      .set({ firstUsedAt: new Date() })
-      .where(eq(mediaAccessGrants.id, grant.id))
-      .catch(() => {});
+  if (access && verifyMediaViewerToken(access, slug)) {
+    return { asset, version: version ?? null, allowed: true };
   }
 
-  return { asset, version: version ?? null, allowed: true };
+  return { asset, version: null, allowed: false };
 }
 
 // ─── CORS headers for embed use ───────────────────────────────────────────────
@@ -232,24 +251,6 @@ function downloadToFile(url: string, destPath: string): Promise<void> {
 }
 
 /**
- * Parse imsmanifest.xml to find the SCO launch file (href of the first <resource>
- * with type containing "sco"). Falls back to the first resource href, then index.html.
- */
-function findScormLaunchFile(manifestXml: string): string {
-  // Try SCO resource first
-  const scoMatch =
-    manifestXml.match(/<resource[^>]+type=['"'][^'"]*sco[^'"]*['"'][^>]*href=['"']([^'"]+)['"']/i) ||
-    manifestXml.match(/<resource[^>]+href=['"']([^'"]+)['"'][^>]*type=['"'][^'"]*sco[^'"]*['"']/i);
-  if (scoMatch) return scoMatch[1].split("?")[0];
-
-  // Fallback: first resource with any href
-  const anyMatch = manifestXml.match(/<resource[^>]+href=['"']([^'"]+)['"']/i);
-  if (anyMatch) return anyMatch[1].split("?")[0];
-
-  return "index.html";
-}
-
-/**
  * Extract a SCORM ZIP to the cache directory and return the launch file path.
  * Uses streaming download to disk + disk-based extraction to avoid OOM on large ZIPs.
  * Returns null if extraction fails.
@@ -284,8 +285,10 @@ async function extractScormZip(
       if (entry.type === "File") {
         const destPath = path.join(cacheDir, entry.path);
         fs.mkdirSync(path.dirname(destPath), { recursive: true });
-        const content = await entry.buffer();
-        fs.writeFileSync(destPath, content);
+        await new Promise<void>((resolve, reject) => {
+          const ws = fs.createWriteStream(destPath);
+          entry.stream().pipe(ws).on("finish", resolve).on("error", reject);
+        });
       }
     }
 
@@ -365,9 +368,9 @@ for (const prefix of ["/api/media", "/media"]) {
 // The /scorm/* route below handles everything; this keeps old links working.
 for (const slugPath of ["/api/media/:slug/scorm-launch", "/media/:slug/scorm-launch"]) {
   router.get(slugPath, (req: Request, res: Response) => {
-    const token = (req.query.token as string) || undefined;
-    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
-    res.redirect(302, `/api/media/${req.params.slug}/scorm/${tokenParam}`);
+    const auth = readMediaAuth(req);
+    const authQuery = buildMediaAuthQuery(auth);
+    res.redirect(302, `/api/media/${req.params.slug}/scorm${authQuery}`);
   });
 } // end for slugPath (scorm-launch redirect)
 
@@ -427,8 +430,8 @@ function scormStatusPage(status: "pending" | "processing" | "failed", errorMsg?:
 for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
   router.get([slugPath, `${slugPath}/*`], async (req: Request, res: Response) => {
     setCorsHeaders(res);
-    const token = (req.query.token as string) || undefined;
-    const result = await resolveMedia(req.params.slug, token);
+    const auth = readMediaAuth(req);
+    const result = await resolveMedia(req.params.slug, auth);
 
     if (!result) { res.status(404).send(errorPage("Media not found.")); return; }
     if (!result.allowed) { res.status(403).send(errorPage("Access denied.")); return; }
@@ -483,9 +486,8 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     const extractionStatus = (version as any).scormExtractionStatus as string | null | undefined;
     const extractionError = (version as any).scormExtractionError as string | null | undefined;
 
-    if (extractionStatus === "pending" || extractionStatus === "processing") {
-      // Job is queued or in progress — show a friendly waiting page that auto-refreshes
-      res.status(202).send(scormStatusPage(extractionStatus, null));
+    if (shouldShowScormWaitingPage(extractionStatus, version as any)) {
+      res.status(202).send(scormStatusPage(extractionStatus as "pending" | "processing", null));
       return;
     }
 
@@ -642,8 +644,8 @@ function proxyInline(
 for (const slugPath of ["/api/media/:slug", "/media/:slug"]) {
 router.get(slugPath, async (req: Request, res: Response) => {
   setCorsHeaders(res);
-  const token = (req.query.token as string) || undefined;
-  const result = await resolveMedia(req.params.slug, token);
+  const auth = readMediaAuth(req);
+  const result = await resolveMedia(req.params.slug, auth);
 
   if (!result) {
     res.status(404).send(errorPage("Media not found."));
@@ -661,7 +663,7 @@ router.get(slugPath, async (req: Request, res: Response) => {
   const { asset, version } = result;
   const mimeType = version.mimeType ?? asset.mimeType ?? "application/octet-stream";
   const mediaType = asset.mediaType;
-  const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+  const tokenParam = buildMediaAuthQuery(auth);
 
   // Record view event (fire-and-forget)
   recordView(asset.id, "direct", req);
@@ -700,8 +702,8 @@ router.get(slugPath, async (req: Request, res: Response) => {
 for (const slugPath of ["/api/media/:slug/download", "/media/:slug/download"]) {
 router.get(slugPath, async (req: Request, res: Response) => {
   setCorsHeaders(res);
-  const token = (req.query.token as string) || undefined;
-  const result = await resolveMedia(req.params.slug, token);
+  const auth = readMediaAuth(req);
+  const result = await resolveMedia(req.params.slug, auth);
 
   if (!result) {
     res.status(404).send(errorPage("Media not found."));
@@ -748,8 +750,8 @@ router.get(slugPath, async (req: Request, res: Response) => {
 for (const slugPath of ["/api/media/:slug/info", "/media/:slug/info"]) {
 router.get(slugPath, async (req: Request, res: Response) => {
   setCorsHeaders(res);
-  const token = (req.query.token as string) || undefined;
-  const result = await resolveMedia(req.params.slug, token);
+  const auth = readMediaAuth(req);
+  const result = await resolveMedia(req.params.slug, auth);
 
   if (!result) { res.status(404).json({ error: "Not found" }); return; }
   if (!result.allowed) { res.status(403).json({ error: "Access denied" }); return; }
@@ -773,8 +775,8 @@ router.get(slugPath, async (req: Request, res: Response) => {
 for (const slugPath of ["/api/media/:slug/embed", "/media/:slug/embed"]) {
 router.get(slugPath, async (req: Request, res: Response) => {
   setCorsHeaders(res);
-  const token = (req.query.token as string) || undefined;
-  const result = await resolveMedia(req.params.slug, token);
+  const auth = readMediaAuth(req);
+  const result = await resolveMedia(req.params.slug, auth);
 
   if (!result) { res.status(404).send(errorPage("Media not found")); return; }
   if (!result.allowed) { res.status(403).send(errorPage("Access denied — a valid access token is required to view this content.")); return; }
@@ -784,7 +786,7 @@ router.get(slugPath, async (req: Request, res: Response) => {
   const fileUrl = version.s3Url;
   const mimeType = version.mimeType ?? asset.mimeType ?? "application/octet-stream";
   const mediaType = asset.mediaType;
-  const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+  const tokenParam = buildMediaAuthQuery(auth);
 
   // Record view event (fire-and-forget)
   recordView(asset.id, "embed", req);
@@ -887,11 +889,7 @@ const mobileBannerScript = `
 function buildEmbedPage(opts: EmbedPageOptions): string {
   const { slug, asset, version, fileUrl, mimeType, mediaType, tokenParam } = opts;
   const fileName = version.fileName ?? "";
-  const isZipFile = mediaType === "scorm" || mediaType === "lms" || mediaType === "zip" ||
-    mimeType === "application/zip" || mimeType === "application/x-zip-compressed" ||
-    mimeType === "application/x-zip" ||
-    fileName.toLowerCase().endsWith(".zip") ||
-    fileUrl.toLowerCase().includes(".zip");
+  const isZipFile = needsScormExtraction({ mediaType, mimeType, fileName, s3Url: fileUrl });
 
   let contentHtml = "";
   let needsMobileBanner = false;
@@ -975,7 +973,7 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
     needsMobileBanner = true;
     // SCORM/LMS/ZIP content: always render in an iframe via the scorm-launch route.
     // The server extracts the ZIP, parses imsmanifest.xml, and serves the HTML entry point.
-    const iframeSrc = `/api/media/${escHtml(slug)}/scorm/${escHtml(tokenParam)}`;
+    const iframeSrc = `/api/media/${escHtml(slug)}/scorm${escHtml(tokenParam)}`;
     contentHtml = `
       ${mobileBanner}
       <iframe src="${iframeSrc}" style="width:100%;height:100%;border:none;"

@@ -25,6 +25,8 @@ import {
 import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
+import { isMediaRepoEmbedUrl } from "@/lib/mediaEmbedUrl";
 
 import LessonCommentSection from "@/components/LessonCommentSection";
 
@@ -1870,23 +1872,30 @@ export default function CoursePlayer() {
 
                   {/* ── Embed lesson — only show if no content blocks override ── */}
                   {lessonData.type === "embed" && lessonData.embedUrl && contentBlocks.length === 0 && (() => {
-                    // Resolve relative embed URLs (e.g. /api/media/:slug/embed) to absolute
-                    const resolvedEmbedUrl = lessonData.embedUrl.startsWith('/')
-                      ? `${window.location.origin}${lessonData.embedUrl}`
-                      : lessonData.embedUrl;
-                    // SCORM/HTML packages need full height — use min-h-[600px] instead of fixed aspect-video
-                    const isScormEmbed = lessonData.embedUrl.includes('/api/media/') || lessonData.embedUrl.includes('/media/');
+                    const embedUrl = lessonData.embedUrl;
+                    const isScormEmbed = isMediaRepoEmbedUrl(embedUrl);
                     return (
                       <div className="mb-5">
                         <div className={`bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 ${isScormEmbed ? 'min-h-[600px] h-[75vh]' : 'aspect-video'}`}>
-                          <iframe
-                            src={resolvedEmbedUrl}
-                            className="w-full h-full"
-                            allowFullScreen
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                            title={lessonData.title}
-                            style={{ border: 'none', minHeight: isScormEmbed ? '600px' : undefined }}
-                          />
+                          {isScormEmbed ? (
+                            <MediaEmbedIframe
+                              src={embedUrl}
+                              courseId={data?.course?.id}
+                              title={lessonData.title}
+                              className="w-full h-full"
+                              style={{ border: 'none', minHeight: '600px' }}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            />
+                          ) : (
+                            <iframe
+                              src={embedUrl.startsWith('/') ? `${window.location.origin}${embedUrl}` : embedUrl}
+                              className="w-full h-full"
+                              allowFullScreen
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                              title={lessonData.title}
+                              style={{ border: 'none' }}
+                            />
+                          )}
                         </div>
                       </div>
                     );
@@ -1933,7 +1942,7 @@ export default function CoursePlayer() {
                           <InlineLiveSession key={block.id} data={block.data as any} />
                         ) : (
                           <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-lg">
-                            <BlockPreview block={block} />
+                            <BlockPreview block={block} courseId={data?.course?.id} />
                           </div>
                         )
                       ))}

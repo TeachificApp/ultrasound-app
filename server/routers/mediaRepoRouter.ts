@@ -33,7 +33,10 @@ import {
   mediaAccessGrants,
   mediaViewEvents,
   mediaFolders,
+  lmsEnrollments,
 } from "../../drizzle/schema";
+import { initialScormExtractionStatus, needsScormExtraction, queueScormExtractionIfNeeded } from "../lib/scormPackage";
+import { buildMediaAuthQuery, signMediaViewerToken } from "../lib/mediaEmbedAccess";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -161,7 +164,25 @@ export const mediaRepoRouter = router({
         mimeType: input.mimeType,
         notes: input.notes ?? null,
         uploadedByUserId: ctx.user.id,
+        scormExtractionStatus: initialScormExtractionStatus({
+          mediaType,
+          mimeType: input.mimeType,
+          fileName: input.fileName,
+        }),
       });
+
+      const [insertedVersion] = await db
+        .select({ id: mediaVersions.id })
+        .from(mediaVersions)
+        .where(and(eq(mediaVersions.assetId, assetId), eq(mediaVersions.versionNumber, 1)))
+        .limit(1);
+      if (insertedVersion) {
+        await queueScormExtractionIfNeeded(insertedVersion.id, s3Url, slug, {
+          mediaType,
+          mimeType: input.mimeType,
+          fileName: input.fileName,
+        });
+      }
 
       return { id: assetId, slug, s3Url };
     }),
@@ -436,6 +457,13 @@ export const mediaRepoRouter = router({
       const nextVersion = (maxRow?.max ?? 0) + 1;
 
       // Insert a new version row copying the target's S3 key/url/size/mime
+      const [asset] = await db
+        .select({ slug: mediaAssets.slug, mediaType: mediaAssets.mediaType, mimeType: mediaAssets.mimeType })
+        .from(mediaAssets)
+        .where(eq(mediaAssets.id, input.assetId))
+        .limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+
       await db.insert(mediaVersions).values({
         assetId: input.assetId,
         versionNumber: nextVersion,
@@ -447,9 +475,26 @@ export const mediaRepoRouter = router({
         notes: `Reverted to v${target.versionNumber}`,
         uploadedByUserId: ctx.user.id,
         createdAt: new Date(),
+        scormExtractionStatus: initialScormExtractionStatus({
+          mediaType: asset.mediaType,
+          mimeType: target.mimeType,
+          fileName: target.fileName,
+        }),
       });
 
-      // Update asset's updatedAt so the grid reflects the change
+      const [insertedVersion] = await db
+        .select({ id: mediaVersions.id })
+        .from(mediaVersions)
+        .where(and(eq(mediaVersions.assetId, input.assetId), eq(mediaVersions.versionNumber, nextVersion)))
+        .limit(1);
+      if (insertedVersion) {
+        await queueScormExtractionIfNeeded(insertedVersion.id, target.s3Url, asset.slug, {
+          mediaType: asset.mediaType,
+          mimeType: target.mimeType,
+          fileName: target.fileName,
+        });
+      }
+
       await db
         .update(mediaAssets)
         .set({ updatedAt: new Date() })
@@ -495,18 +540,6 @@ export const mediaRepoRouter = router({
       const s3Key = `media-repo/${asset.slug}/v${nextVersion}-${input.fileName}`;
       const { url: s3Url } = await storagePut(s3Key, buffer, input.mimeType);
 
-      await db.insert(mediaVersions).values({
-        assetId: input.assetId,
-        versionNumber: nextVersion,
-        s3Key,
-        s3Url,
-        fileName: input.fileName,
-        fileSize: input.fileSize,
-        mimeType: input.mimeType,
-        notes: input.notes ?? null,
-        uploadedByUserId: ctx.user.id,
-      });
-
       // Detect SCORM for ZIP files (inspect manifest)
       let detectedType = detectMediaType(input.mimeType);
       if (detectedType === "zip") {
@@ -517,21 +550,55 @@ export const mediaRepoRouter = router({
         } catch {}
       }
 
+      await db.insert(mediaVersions).values({
+        assetId: input.assetId,
+        versionNumber: nextVersion,
+        s3Key,
+        s3Url,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
+        mimeType: input.mimeType,
+        notes: input.notes ?? null,
+        uploadedByUserId: ctx.user.id,
+        scormExtractionStatus: initialScormExtractionStatus({
+          mediaType: detectedType,
+          mimeType: input.mimeType,
+          fileName: input.fileName,
+        }),
+      });
+
       // Update asset mimeType to reflect new version
       await db
         .update(mediaAssets)
         .set({ mimeType: input.mimeType, mediaType: detectedType as any })
         .where(eq(mediaAssets.id, input.assetId));
 
-      // Invalidate SCORM cache so the new ZIP is extracted on next request
-      if (detectedType === "scorm" || detectedType === "zip") {
+      const [insertedVersion] = await db
+        .select({ id: mediaVersions.id })
+        .from(mediaVersions)
+        .where(and(eq(mediaVersions.assetId, input.assetId), eq(mediaVersions.versionNumber, nextVersion)))
+        .limit(1);
+      if (insertedVersion) {
+        await queueScormExtractionIfNeeded(insertedVersion.id, s3Url, asset.slug, {
+          mediaType: detectedType,
+          mimeType: input.mimeType,
+          fileName: input.fileName,
+        });
+      }
+
+      // Invalidate on-the-fly SCORM cache for this slug
+      if (needsScormExtraction({ mediaType: detectedType, mimeType: input.mimeType, fileName: input.fileName })) {
         try {
           const os = await import("os");
           const pathMod = await import("path");
           const fsMod = await import("fs");
-          const cacheDir = pathMod.join(os.tmpdir(), "scorm-cache", asset.slug);
-          if (fsMod.existsSync(cacheDir)) {
-            fsMod.rmSync(cacheDir, { recursive: true, force: true });
+          const cacheRoot = pathMod.join(os.tmpdir(), "scorm-cache");
+          if (fsMod.existsSync(cacheRoot)) {
+            for (const entry of fsMod.readdirSync(cacheRoot)) {
+              if (entry.startsWith(`${asset.slug}-`)) {
+                fsMod.rmSync(pathMod.join(cacheRoot, entry), { recursive: true, force: true });
+              }
+            }
             console.log(`[SCORM] Cache invalidated for slug=${asset.slug}`);
           }
         } catch (e) {
@@ -585,6 +652,13 @@ export const mediaRepoRouter = router({
         .where(eq(mediaVersions.assetId, input.assetId));
       const nextVersion = (maxVer ?? 0) + 1;
 
+      const [asset] = await db
+        .select({ slug: mediaAssets.slug, mediaType: mediaAssets.mediaType })
+        .from(mediaAssets)
+        .where(eq(mediaAssets.id, input.assetId))
+        .limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+
       await db.insert(mediaVersions).values({
         assetId: input.assetId,
         versionNumber: nextVersion,
@@ -595,7 +669,25 @@ export const mediaRepoRouter = router({
         mimeType: version.mimeType,
         notes: `Restored from v${version.versionNumber}`,
         uploadedByUserId: ctx.user.id,
+        scormExtractionStatus: initialScormExtractionStatus({
+          mediaType: asset.mediaType,
+          mimeType: version.mimeType,
+          fileName: version.fileName,
+        }),
       });
+
+      const [insertedVersion] = await db
+        .select({ id: mediaVersions.id })
+        .from(mediaVersions)
+        .where(and(eq(mediaVersions.assetId, input.assetId), eq(mediaVersions.versionNumber, nextVersion)))
+        .limit(1);
+      if (insertedVersion) {
+        await queueScormExtractionIfNeeded(insertedVersion.id, version.s3Url, asset.slug, {
+          mediaType: asset.mediaType,
+          mimeType: version.mimeType,
+          fileName: version.fileName,
+        });
+      }
 
       return { restored: true, newVersionNumber: nextVersion };
     }),
@@ -887,6 +979,61 @@ export const mediaRepoRouter = router({
       return { allowed: true, asset, version: version ?? null };
     }),
 
+  /**
+   * Resolve a cookieless embed URL for SCORM/HTML media (adds ?access= for private assets).
+   * Allowed for platform admins, public assets, or enrolled learners when courseId is provided.
+   */
+  getMediaEmbedUrl: protectedProcedure
+    .input(z.object({
+      slug: z.string().min(1),
+      courseId: z.number().int().positive().optional(),
+      path: z.enum(["embed", "download", "scorm"]).default("embed"),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [asset] = await db
+        .select()
+        .from(mediaAssets)
+        .where(and(eq(mediaAssets.slug, input.slug), isNull(mediaAssets.deletedAt)))
+        .limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
+
+      const basePath = `/api/media/${asset.slug}/${input.path}`;
+
+      if (asset.access === "public") {
+        return { url: basePath, isPublic: true as const };
+      }
+
+      let allowed = false;
+      try {
+        await assertPlatformAdmin(ctx);
+        allowed = true;
+      } catch {
+        if (input.courseId) {
+          const [enrollment] = await db
+            .select({ id: lmsEnrollments.id })
+            .from(lmsEnrollments)
+            .where(and(
+              eq(lmsEnrollments.userId, ctx.user.id),
+              eq(lmsEnrollments.courseId, input.courseId)
+            ))
+            .limit(1);
+          allowed = !!enrollment;
+        }
+      }
+
+      if (!allowed) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "No access to this media asset" });
+      }
+
+      const access = signMediaViewerToken(asset.slug, ctx.user.id, input.courseId ?? null);
+      const authQuery = buildMediaAuthQuery({ access });
+      return { url: `${basePath}${authQuery}`, isPublic: false as const };
+    }),
+
+
   // ─── Folder CRUD ──────────────────────────────────────────────────────────────
 
   /**
@@ -1033,12 +1180,15 @@ export const mediaRepoRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [version] = await db.select().from(mediaVersions)
         .where(eq(mediaVersions.assetId, input.assetId))
-        .orderBy(desc(mediaVersions.createdAt))
+        .orderBy(desc(mediaVersions.versionNumber))
         .limit(1);
       if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found for asset" });
       const [asset] = await db.select().from(mediaAssets)
         .where(eq(mediaAssets.id, input.assetId)).limit(1);
       if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+      if (!needsScormExtraction({ mediaType: asset.mediaType, mimeType: version.mimeType, fileName: version.fileName, s3Url: version.s3Url })) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This asset is not a SCORM/LMS/ZIP package" });
+      }
       // Reset to pending — heartbeat cron will pick this up within 60 seconds
       await db.update(mediaVersions)
         .set({
@@ -1072,7 +1222,7 @@ export const mediaRepoRouter = router({
       })
         .from(mediaVersions)
         .where(eq(mediaVersions.assetId, input.assetId))
-        .orderBy(desc(mediaVersions.createdAt))
+        .orderBy(desc(mediaVersions.versionNumber))
         .limit(1);
       if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found" });
       return version;

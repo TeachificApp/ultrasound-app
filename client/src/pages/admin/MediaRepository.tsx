@@ -1003,7 +1003,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
                   <p className="text-xs text-muted-foreground">{versions.length} version{versions.length !== 1 ? 's' : ''} · links always point to the current version</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {(asset.mediaType === "scorm" || asset.mediaType === "zip") && (
+                  {(asset.mediaType === "scorm" || asset.mediaType === "zip" || asset.mediaType === "lms") && (
                     <Button
                       size="sm"
                       variant="outline"

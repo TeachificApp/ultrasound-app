@@ -23,11 +23,12 @@ import https from "https";
 import http from "http";
 import { createHash } from "crypto";
 import unzipper from "unzipper";
-import { eq, and, or, lt, isNull } from "drizzle-orm";
+import { eq, and, lt, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import { mediaVersions, mediaAssets } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 import type { Request, Response } from "express";
+import { findScormLaunchFile, SCORM_PACKAGE_MEDIA_TYPES } from "../lib/scormPackage";
 
 const SCORM_EXTRACT_DIR = path.join(os.tmpdir(), "scorm-extract-job");
 // If a job has been "processing" for more than 10 minutes, consider it stalled and retry
@@ -65,18 +66,6 @@ function downloadToFile(url: string, destPath: string): Promise<void> {
       follow(url);
     }
   });
-}
-
-// ─── SCORM manifest parser ────────────────────────────────────────────────────
-
-function findScormLaunchFile(manifestXml: string): string {
-  const scoMatch =
-    manifestXml.match(/<resource[^>]+type=['"'][^'"]*sco[^'"]*['"'][^>]*href=['"']([^'"]+)['"']/i) ||
-    manifestXml.match(/<resource[^>]+href=['"']([^'"]+)['"'][^>]*type=['"'][^'"]*sco[^'"]*['"']/i);
-  if (scoMatch) return scoMatch[1].split("?")[0];
-  const anyMatch = manifestXml.match(/<resource[^>]+href=['"']([^'"]+)['"']/i);
-  if (anyMatch) return anyMatch[1].split("?")[0];
-  return "index.html";
 }
 
 // ─── MIME type helper ─────────────────────────────────────────────────────────
@@ -354,12 +343,7 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
       .where(
         and(
           eq(mediaVersions.scormExtractionStatus as any, "pending"),
-          // Only process SCORM, zip, and lms types
-          or(
-            eq(mediaAssets.mediaType, "scorm"),
-            eq(mediaAssets.mediaType, "zip"),
-            eq(mediaAssets.mediaType, "lms")
-          )
+          inArray(mediaAssets.mediaType, [...SCORM_PACKAGE_MEDIA_TYPES])
         )
       )
       .limit(1);
