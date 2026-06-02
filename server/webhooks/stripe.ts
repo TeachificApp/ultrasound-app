@@ -887,12 +887,10 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         name: customerName || undefined,
       });
       resolvedUserId = autoUser.id;
-      if (isNew && resetToken) {
-        // Determine login URL from success_url or brand
+        if (isNew && resetToken) {
+        // Always use canonical brand URL — never derive from success_url (which may contain sandbox/dev ports)
         const brandMode = (meta.brand_mode as string) || "aaus";
-        const baseUrl = meta.success_url
-          ? meta.success_url.split("/").slice(0, 3).join("/")
-          : brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
+        const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
         const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
         const firstName = autoUser.firstName || nameParts[0] || "there";
         // Generate persistent access token for the new account
