@@ -414,8 +414,14 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     // Ensure unsubscribe token exists for this user
     const token = await ensureUnsubscribeToken(recipient.id);
     const unsubscribeUrl = buildUnsubscribeUrl(token);
-    // Inject footer, tracking pixel, and wrap links
-    let html = injectUnsubscribeFooter(campaign.htmlBody, unsubscribeUrl);
+    // Replace the {{UNSUBSCRIBE_URL}} placeholder in the branded wrapper (set by EmailCampaignEditor)
+    // If the placeholder is not present (legacy HTML), fall back to injecting a footer
+    let html = campaign.htmlBody;
+    if (html.includes("{{UNSUBSCRIBE_URL}}")) {
+      html = html.replaceAll("{{UNSUBSCRIBE_URL}}", unsubscribeUrl);
+    } else {
+      html = injectUnsubscribeFooter(html, unsubscribeUrl);
+    }
     html = injectTrackingPixel(html, campaignId, recipient.id);
     html = wrapLinksForTracking(html, campaignId, recipient.id);
 
