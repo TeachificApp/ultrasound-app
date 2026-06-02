@@ -349,8 +349,12 @@ function AddSectionDialog({
 }) {
   const [tab, setTab] = useState<"checkout" | "blocks" | "saved">("checkout");
   const [blockSearch, setBlockSearch] = useState("");
+  const [savedSearch, setSavedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(CATALOG_CATEGORIES[0]);
-  const { data: savedBlocks = [] } = trpc.blockTemplates.list.useQuery();
+  const { data: savedBlocks = [] } = trpc.blockTemplates.list.useQuery(
+    { search: savedSearch || undefined },
+    { enabled: true }
+  );
 
   const filteredBlocks = BLOCK_CATALOG.filter(b => {
     const matchCat = b.category === selectedCategory;
@@ -434,7 +438,15 @@ function AddSectionDialog({
           </TabsContent>
 
           {/* ── Saved blocks ── */}
-          <TabsContent value="saved" className="flex-1 overflow-y-auto mt-0 pt-3">
+          <TabsContent value="saved" className="flex-1 flex flex-col min-h-0 mt-0 pt-3">
+            <div className="mb-3 flex-shrink-0">
+              <Input
+                placeholder="Search saved blocks…"
+                value={savedSearch}
+                onChange={e => setSavedSearch(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
             {savedBlocks.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-40" />
