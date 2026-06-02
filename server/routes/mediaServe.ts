@@ -23,6 +23,7 @@ import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import { findScormLaunchFile, needsScormExtraction, shouldShowScormWaitingPage, pickScormPlaybackMode, encodeStorageFetchUrl, resolveZipDownloadUrl, isDirectHtmlScormVersion, isScormPackageMediaType } from "../lib/scormPackage";
+import { ENV } from "../_core/env";
 import { buildMediaAuthQuery, verifyMediaViewerToken } from "../lib/mediaEmbedAccess";
 import { createHash } from "crypto";
 import https from "https";
@@ -929,18 +930,79 @@ router.get(slugPath, async (req: Request, res: Response) => {
   const mediaType = asset.mediaType;
   const tokenParam = buildMediaAuthQuery(auth);
 
-  // SCORM/ZIP/LMS: /embed links should use /scorm (avoids broken nested iframe + wrong ZIP url)
+  // SCORM/ZIP/LMS: serve directly without redirecting through /scorm
+  // (redirecting via /scorm breaks on Railway/Cloud Run because x-forwarded-host
+  //  returns the internal hostname, not the public domain)
   if (
     isScormPackageMediaType(mediaType) ||
     needsScormExtraction({ mediaType, mimeType, fileName: version.fileName ?? "", s3Url: fileUrl })
   ) {
+    const extractionStatus = (version as any).scormExtractionStatus as string | null | undefined;
+    const extractionError = (version as any).scormExtractionError as string | null | undefined;
+
+    // Strategy A: Already extracted — redirect directly to the R2/CDN launch file URL
+    // This mirrors what Thinkific does: iframe src points straight to the CDN HTML file.
+    if (version.scormExtractedPrefix?.startsWith("__direct_html__:")) {
+      const directUrl = version.scormExtractedPrefix.replace("__direct_html__:", "");
+      res.redirect(302, encodeStorageFetchUrl(directUrl));
+      return;
+    }
+
+    if (version.scormExtractedPrefix) {
+      // Build the R2 public CDN URL for the launch file
+      const r2PublicUrl = process.env.CF_R2_PUBLIC_URL?.replace(/\/+$/, "");
+      const launchFile = (version as any).scormLaunchFile || "index.html";
+      if (r2PublicUrl) {
+        const cdnUrl = `${r2PublicUrl}/${version.scormExtractedPrefix}/${launchFile}`;
+        res.redirect(302, encodeStorageFetchUrl(cdnUrl));
+        return;
+      }
+      // R2 public URL not configured — fall through to /scorm proxy using canonical host
+    }
+
+    // Strategy B: Extraction pending/processing — show waiting page inline
+    if (shouldShowScormWaitingPage(extractionStatus, version as any)) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.status(202).send(scormStatusPage(extractionStatus as "pending" | "processing", null));
+      return;
+    }
+
+    if (extractionStatus === "failed") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.status(503).send(scormStatusPage("failed", extractionError));
+      return;
+    }
+
+    // Strategy C: Legacy direct HTML (s3Url points to an HTML file, not a ZIP)
+    if (isDirectHtmlScormVersion(version)) {
+      res.redirect(302, encodeStorageFetchUrl(version.s3Url!));
+      return;
+    }
+
+    // Strategy D: Fall back to /scorm route using the correct public hostname.
+    // Use the same header priority as context.ts to avoid Railway/Cloud Run
+    // internal hostnames (x-forwarded-host can be the internal hostname on Railway).
     const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
     const scormRelPath = req.path.replace(/\/embed\/?$/, "/scorm") + q;
-    // Use absolute URL so the redirect works even when the iframe is on a different subdomain
-    const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
-    const host = req.headers["x-forwarded-host"] || req.headers.host || req.hostname;
-    const scormAbsUrl = `${proto}://${host}${scormRelPath}`;
-    res.redirect(302, scormAbsUrl);
+    const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+    function extractHostnameFromUrl(url: string): string {
+      try { return new URL(url).hostname; } catch { return ""; }
+    }
+    const appHostname = req.headers["x-app-hostname"];
+    const fwdHost = req.headers["x-forwarded-host"];
+    const originHostname = extractHostnameFromUrl((req.headers["origin"] as string) || "");
+    const refererHostname = extractHostnameFromUrl((req.headers["referer"] as string) || "");
+    const resolvedHost =
+      (typeof appHostname === "string" && appHostname.trim()) ||
+      (Array.isArray(appHostname) && appHostname[0]) ||
+      (typeof fwdHost === "string" && !fwdHost.includes(".run.app") && !fwdHost.includes(".railway.app") && fwdHost.trim()) ||
+      (Array.isArray(fwdHost) && !fwdHost[0].includes(".run.app") && !fwdHost[0].includes(".railway.app") && fwdHost[0]) ||
+      originHostname ||
+      refererHostname ||
+      ENV.canonicalRootDomain ||
+      req.headers.host ||
+      req.hostname;
+    res.redirect(302, `${proto}://${resolvedHost}${scormRelPath}`);
     return;
   }
 

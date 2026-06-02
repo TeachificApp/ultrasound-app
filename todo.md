@@ -4470,3 +4470,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fixed "Failed to fetch ZIP: 500" error caused by filenames with spaces in S3 URLs (e.g. "UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO.zip")
 - [x] Pre-encode spaces as %20 before passing to new URL() in scorm-zip route, proxyInline, downloadToFile, and download route
 - [x] Added try/catch error handling to scorm-zip route with proper error logging
+
+## SCORM Redirect Fix (Jun 2026)
+- [x] Fix /embed SCORM redirect using internal Railway hostname — now redirects directly to R2 CDN URL (Strategy A) when scormExtractedPrefix is set, shows waiting page inline (Strategy B) when pending/processing, and uses x-app-hostname/Origin/Referer priority for fallback /scorm redirect (Strategy D)
+- [x] Add reExtractAllScorm tRPC procedure (resets all SCORM assets to pending for heartbeat re-extraction)
+- [x] Add "Re-extract All SCORM" button to MediaRepository admin UI toolbar

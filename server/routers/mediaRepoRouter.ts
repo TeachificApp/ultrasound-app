@@ -1277,6 +1277,53 @@ export const mediaRepoRouter = router({
     }),
 
   /**
+   * Re-extract ALL SCORM/ZIP assets — resets every version to pending so the
+   * heartbeat cron re-processes them. Use when bulk storage migration or R2
+   * key changes have broken existing extracted prefixes.
+   */
+  reExtractAllScorm: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Find all SCORM/ZIP asset IDs
+      const scormAssets = await db
+        .select({ id: mediaAssets.id })
+        .from(mediaAssets)
+        .where(and(eq(mediaAssets.mediaType, "scorm_package" as any), isNull(mediaAssets.deletedAt)));
+
+      if (scormAssets.length === 0) return { ok: true, count: 0 };
+
+      const assetIds = scormAssets.map(a => a.id);
+
+      // For each asset, reset the latest version to pending
+      let count = 0;
+      for (const { id: assetId } of scormAssets) {
+        const [version] = await db
+          .select({ id: mediaVersions.id })
+          .from(mediaVersions)
+          .where(eq(mediaVersions.assetId, assetId))
+          .orderBy(desc(mediaVersions.versionNumber))
+          .limit(1);
+        if (!version) continue;
+        await db.update(mediaVersions)
+          .set({
+            scormExtractionStatus: "pending" as any,
+            scormExtractionError: null,
+            scormExtractionStartedAt: null,
+            scormExtractedPrefix: null,
+            scormLaunchFile: null,
+          })
+          .where(eq(mediaVersions.id, version.id));
+        count++;
+      }
+
+      console.log(`[ReExtractAllScorm] Queued ${count} SCORM assets for heartbeat extraction`);
+      return { ok: true, count };
+    }),
+
+  /**
    * Get SCORM extraction status for an asset's current version.
    * Used by admin UI to show extraction progress.
    */

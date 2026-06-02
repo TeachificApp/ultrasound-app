@@ -1282,6 +1282,16 @@ export default function MediaRepository() {
     onError: (e) => toast.error(e.message),
   });
 
+  const reExtractAllMutation = trpc.mediaRepo.reExtractAllScorm.useMutation({
+    onSuccess: (result) => toast.success(`Re-extraction queued for ${result.count} SCORM asset${result.count === 1 ? "" : "s"}. The heartbeat cron will process them within 60 seconds each.`),
+    onError: (e) => toast.error(`Re-extract all failed: ${e.message}`),
+  });
+
+  function handleReExtractAll() {
+    if (!window.confirm("Re-extract ALL SCORM/ZIP assets?\n\nThis will reset every SCORM asset to \"pending\" so the heartbeat cron re-processes them. Use this after a storage migration or if most SCORM files show errors.")) return;
+    reExtractAllMutation.mutate();
+  }
+
   return (
     <div className="flex h-full min-h-screen relative">
       {/* Mobile sidebar overlay */}
@@ -1493,6 +1503,17 @@ export default function MediaRepository() {
               onClick={() => setShowTrash(v => !v)}
             >
               <Trash2 className="w-4 h-4 mr-1" /><span className="hidden sm:inline">{showTrash ? "Hide Trash" : "Trash"}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReExtractAll}
+              disabled={reExtractAllMutation.isPending}
+              title="Reset all SCORM/ZIP assets to pending so the heartbeat cron re-extracts them"
+            >
+              <RefreshCw className={`w-4 h-4 mr-1 sm:mr-2 ${reExtractAllMutation.isPending ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">{reExtractAllMutation.isPending ? "Queuing…" : "Re-extract All SCORM"}</span>
+              <span className="sm:hidden">Re-extract</span>
             </Button>
             <Button onClick={() => setUploadOpen(true)} size="sm">
               <Upload className="w-4 h-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">Upload File</span><span className="sm:hidden">Upload</span>
