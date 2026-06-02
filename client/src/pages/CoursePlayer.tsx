@@ -635,12 +635,13 @@ function MobileSidebarContent({
                 </button>
               );
             })}
-            {sections.map((section: any, sIdx: number) => {
+            {(() => { let _vsc = 0; return sections.map((section: any, sIdx: number) => {
               // Hide section entirely if it has no visible lessons (all were preview_hide_after_purchase or draft)
               if (section.lessons.length === 0) return null;
+              _vsc++;
               const sectionLocked = !dripBypassed && (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
               const unlockDate = sectionLocked ? new Date(enrolledAt.getTime() + section.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
-              const sectionNum = topLevelLessons.length + sIdx + 1;
+              const sectionNum = topLevelLessons.length + _vsc;
               const allSectionDone = section.lessons.every((l: any) => completedIds.has(l.id)) && section.lessons.length > 0;
               const isSectionActive = section.lessons.some((l: any) => l.id === selectedLessonId);
               const isExpanded = isSectionActive || !collapsedSections.has(section.id);
@@ -705,7 +706,7 @@ function MobileSidebarContent({
                   )}
                 </div>
               );
-            })}
+            })()}
           </>
         )}
         {sidebarTab === "notes" && (
@@ -1588,14 +1589,15 @@ export default function CoursePlayer() {
             })}
 
             {/* Sections */}
-            {sections.map((section: any, sIdx: number) => {
+            {(() => { let _vsc2 = 0; return sections.map((section: any, sIdx: number) => {
               // Hide section entirely if it has no visible lessons (all were preview_hide_after_purchase or draft)
               if (section.lessons.length === 0) return null;
+              _vsc2++;
               const sectionLocked = !dripBypassed && (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
               const unlockDate = sectionLocked
                 ? new Date(enrolledAt.getTime() + section.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
                 : null;
-              const sectionNum = topLevelLessons.length + sIdx + 1;
+              const sectionNum = topLevelLessons.length + _vsc2;
               const allSectionDone = section.lessons.every((l: any) => completedIds.has(l.id)) && section.lessons.length > 0;
               const isSectionActive = section.lessons.some((l: any) => l.id === selectedLessonId);
               // A section is expanded if it has NOT been explicitly collapsed.
@@ -1703,7 +1705,7 @@ export default function CoursePlayer() {
                   )}
                 </div>
               );
-            })}
+            })()}
           </div>}
           {/* Sidebar Footer Tabs */}
           <div className="flex border-t border-gray-200 shrink-0">
