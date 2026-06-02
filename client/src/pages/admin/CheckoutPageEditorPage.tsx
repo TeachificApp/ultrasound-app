@@ -917,95 +917,112 @@ export default function CheckoutPageEditorPage() {
 
         {/* ── Canvas (center) ─────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
-          <div className="max-w-[420px] mx-auto space-y-4">
+          {/* Two-column layout mirroring the real checkout page */}
+          <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 items-start">
 
-            {/* Fixed course card (non-editable) */}
-            <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden opacity-60">
-              <div className="h-20 w-full" style={{ background: `linear-gradient(135deg, ${primary}, #0d9488)` }} />
-              <div className="p-4 space-y-2">
-                <div className="h-4 bg-gray-100 rounded w-3/4" />
-                <div className="h-3 bg-gray-100 rounded w-1/2" />
-                <div className="h-3 bg-gray-100 rounded w-full" />
-                <div className="h-3 bg-gray-100 rounded w-5/6" />
-                <div className="mt-3 h-8 bg-gray-100 rounded w-1/3" />
-              </div>
-              <div className="px-4 pb-3">
-                <p className="text-xs text-gray-400 italic text-center">Course card (populated at checkout)</p>
-              </div>
-            </div>
+            {/* ── Left column: Course card + configurable sections ── */}
+            <div className="space-y-4">
 
-            {/* Terms card (non-editable) */}
-            <div className="rounded-2xl bg-white border border-gray-200 shadow-sm p-4 opacity-60">
-              <div className="flex items-center gap-2 mb-3">
-                <ShieldCheck className="h-4 w-4" style={{ color: primary }} />
-                <p className="text-sm font-semibold text-gray-800">Before you proceed</p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 rounded border-2 border-gray-200 flex-shrink-0" />
-                  <p className="text-xs text-gray-500">I agree to the Terms of Service and Privacy Policy</p>
+              {/* Fixed course card (non-editable) */}
+              <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden opacity-60">
+                <div className="h-20 w-full" style={{ background: `linear-gradient(135deg, ${primary}, #0d9488)` }} />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 bg-gray-100 rounded w-3/4" />
+                  <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  <div className="h-3 bg-gray-100 rounded w-full" />
+                  <div className="h-3 bg-gray-100 rounded w-5/6" />
+                  <div className="mt-3 h-8 bg-gray-100 rounded w-1/3" />
+                </div>
+                <div className="px-4 pb-3">
+                  <p className="text-xs text-gray-400 italic text-center">Course card (populated at checkout)</p>
                 </div>
               </div>
-              <p className="text-xs text-gray-400 italic text-center mt-2">Terms agreement (always shown)</p>
+
+              {/* Configurable sections */}
+              {config.sections
+                .slice()
+                .sort((a, b) => a.order - b.order)
+                .map((section, sortedIdx) => {
+                  const originalIdx = config.sections.indexOf(section);
+                  const meta = SECTION_META[section.type];
+                  const isSelected = selectedIdx === originalIdx;
+                  return (
+                    <div
+                      key={`${section.type}-${originalIdx}`}
+                      onClick={() => setSelectedIdx(isSelected ? null : originalIdx)}
+                      className={`rounded-2xl border-2 transition-all cursor-pointer ${
+                        !section.enabled ? "opacity-40" : ""
+                      } ${
+                        isSelected
+                          ? "border-teal-500 shadow-lg shadow-teal-100"
+                          : "border-transparent hover:border-teal-300 hover:shadow-md"
+                      } bg-white`}
+                    >
+                      {/* Section header bar */}
+                      <div className={`flex items-center justify-between px-3 py-2 rounded-t-2xl border-b ${
+                        isSelected ? "bg-teal-50 border-teal-200" : "bg-gray-50 border-gray-100"
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          <span className={meta.color}>{meta.icon}</span>
+                          <span className="text-xs font-semibold text-gray-700">{meta.label}</span>
+                          {!section.enabled && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Hidden</Badge>}
+                        </div>
+                        {isSelected && (
+                          <span className="text-xs text-teal-600 font-medium flex items-center gap-1">
+                            <Settings2 className="h-3 w-3" /> Editing
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Section preview */}
+                      <div className="p-4">
+                        {section.type === "trust_seals" && <CanvasTrustSeals section={section} primary={primary} />}
+                        {section.type === "guarantee" && <CanvasGuarantee section={section} primary={primary} />}
+                        {section.type === "testimonials" && <CanvasTestimonials section={section} />}
+                        {section.type === "faq" && <CanvasFaq section={section} />}
+                        {section.type === "custom_html" && <CanvasCustomHtml section={section} />}
+                        {section.type === "course_includes" && <CanvasCourseIncludes section={section} />}
+                        {section.type === "content_block" && <CanvasContentBlock section={section} />}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {/* Add section button */}
+              <button
+                onClick={() => setAddSectionOpen(true)}
+                className="w-full border-2 border-dashed border-teal-300 hover:border-teal-500 rounded-2xl py-4 text-teal-600 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors bg-white"
+              >
+                <Plus size={16} /> Add Section
+              </button>
             </div>
 
-            {/* Configurable sections */}
-            {config.sections
-              .slice()
-              .sort((a, b) => a.order - b.order)
-              .map((section, sortedIdx) => {
-                const originalIdx = config.sections.indexOf(section);
-                const meta = SECTION_META[section.type];
-                const isSelected = selectedIdx === originalIdx;
-                return (
-                  <div
-                    key={`${section.type}-${originalIdx}`}
-                    onClick={() => setSelectedIdx(isSelected ? null : originalIdx)}
-                    className={`rounded-2xl border-2 transition-all cursor-pointer ${
-                      !section.enabled ? "opacity-40" : ""
-                    } ${
-                      isSelected
-                        ? "border-teal-500 shadow-lg shadow-teal-100"
-                        : "border-transparent hover:border-teal-300 hover:shadow-md"
-                    } bg-white`}
-                  >
-                    {/* Section header bar */}
-                    <div className={`flex items-center justify-between px-3 py-2 rounded-t-2xl border-b ${
-                      isSelected ? "bg-teal-50 border-teal-200" : "bg-gray-50 border-gray-100"
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        <span className={meta.color}>{meta.icon}</span>
-                        <span className="text-xs font-semibold text-gray-700">{meta.label}</span>
-                        {!section.enabled && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Hidden</Badge>}
-                      </div>
-                      {isSelected && (
-                        <span className="text-xs text-teal-600 font-medium flex items-center gap-1">
-                          <Settings2 className="h-3 w-3" /> Editing
-                        </span>
-                      )}
-                    </div>
+            {/* ── Right column: Terms card + Stripe embed placeholder ── */}
+            <div className="space-y-4">
 
-                    {/* Section preview */}
-                    <div className="p-4">
-                      {section.type === "trust_seals" && <CanvasTrustSeals section={section} primary={primary} />}
-                      {section.type === "guarantee" && <CanvasGuarantee section={section} primary={primary} />}
-                      {section.type === "testimonials" && <CanvasTestimonials section={section} />}
-                      {section.type === "faq" && <CanvasFaq section={section} />}
-                      {section.type === "custom_html" && <CanvasCustomHtml section={section} />}
-                      {section.type === "course_includes" && <CanvasCourseIncludes section={section} />}
-                      {section.type === "content_block" && <CanvasContentBlock section={section} />}
-                    </div>
+              {/* Terms agreement card (non-editable, always shown above Stripe) */}
+              <div className="rounded-2xl bg-white border border-gray-200 shadow-sm p-4 opacity-60">
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldCheck className="h-4 w-4" style={{ color: primary }} />
+                  <p className="text-sm font-semibold text-gray-800">Before you proceed</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 rounded border-2 border-gray-200 flex-shrink-0" />
+                    <p className="text-xs text-gray-500">I have reviewed and agree to the Terms of Service and Privacy Policy</p>
                   </div>
-                );
-              })}
+                </div>
+                <p className="text-xs text-gray-400 italic text-center mt-2">Terms agreement (always shown)</p>
+              </div>
 
-            {/* Add section button */}
-            <button
-              onClick={() => setAddSectionOpen(true)}
-              className="w-full border-2 border-dashed border-teal-300 hover:border-teal-500 rounded-2xl py-4 text-teal-600 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors bg-white"
-            >
-              <Plus size={16} /> Add Section
-            </button>
+              {/* Stripe embed placeholder */}
+              <div className="rounded-2xl bg-white border-2 border-dashed border-gray-200 min-h-[320px] flex flex-col items-center justify-center gap-3 opacity-50">
+                <Lock className="h-8 w-8 text-gray-300" />
+                <p className="text-sm font-medium text-gray-400">Stripe Payment Form</p>
+                <p className="text-xs text-gray-300 text-center px-4">Embedded Stripe Checkout appears here after terms are accepted</p>
+              </div>
+            </div>
+
           </div>
         </div>
 

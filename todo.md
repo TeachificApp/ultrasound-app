@@ -4412,3 +4412,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add canvas renderers for all new block types in CheckoutPageEditorPage
 - [x] Add per-block settings panels in the right sidebar for all new block types
 - [x] Update Checkout.tsx CheckoutSections renderer to render all new block types inline
+
+## Checkout Page — Order Bumps + Pricing Options + Team Tiers (Jun 2026)
+- [ ] Audit lmsPricingOptions, lmsTeamTiers, lmsOrderBumps schema and existing procedures
+- [ ] Backend: update createEmbeddedCheckoutSession to return all pricing options, team tiers, and order bumps for the entity
+- [ ] Backend: handle order bump Stripe price IDs as additional line items in the embedded checkout session
+- [ ] Backend: handle team tier seat counts and Stripe pricing in the embedded checkout session
+- [ ] Frontend: Checkout.tsx — show pricing option selector card (one-time/subscription/payment plan/free) before Stripe embed
+- [ ] Frontend: Checkout.tsx — show team/group tier selector (seat count picker) when team tiers exist
+- [ ] Frontend: Checkout.tsx — show order bump toggles (add-on products with price, description, image) before Stripe embed
+- [ ] Frontend: Checkout.tsx — re-initialize Stripe embedded checkout when pricing option, team tier, or order bumps change
+- [ ] Frontend: Checkout.tsx — show correct billing disclosure text per selected pricing option type

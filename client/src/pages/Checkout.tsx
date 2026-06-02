@@ -519,7 +519,7 @@ export default function Checkout() {
 
       <div className="max-w-5xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8 items-start">
 
-        {/* ── Left column: Course info + terms ────────────────────────────── */}
+        {/* ── Left column: Course info ────────────────────────────── */}
         <div className="space-y-5">
 
           {/* Course card */}
@@ -637,7 +637,14 @@ export default function Checkout() {
             </div>
           )}
 
-          {/* Terms agreement card */}
+          {/* ── Configurable checkout page sections ──────────────────────── */}
+          {slug && <CheckoutSections entitySlug={slug} entityType={entityType} primary={primary} primaryLight={primaryLight} isDark={isDark} courseStats={null} />}
+        </div>
+
+        {/* ── Right column: Terms agreement + Embedded Stripe Checkout ──────────────────────── */}
+        <div className="space-y-4">
+
+          {/* Terms agreement card — above Stripe embed */}
           {sessionMeta && (
             <div className={`rounded-2xl shadow-sm border p-5 space-y-4 ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
               <h3 className={`text-sm font-semibold flex items-center gap-2 ${isDark ? "text-white" : "text-gray-800"}`}>
@@ -715,12 +722,7 @@ export default function Checkout() {
             </div>
           )}
 
-          {/* ── Configurable checkout page sections ──────────────────────── */}
-          {slug && <CheckoutSections entitySlug={slug} entityType={entityType} primary={primary} primaryLight={primaryLight} isDark={isDark} courseStats={null} />}
-        </div>
-
-        {/* ── Right column: Embedded Stripe Checkout ──────────────────────── */}
-        <div className={`rounded-2xl shadow-sm border overflow-hidden min-h-[400px] ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
+          <div className={`rounded-2xl shadow-sm border overflow-hidden min-h-[400px] ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
           {!sessionMeta || createSession.isPending ? (
             /* Loading skeleton */
             <div className="p-8 space-y-4 animate-pulse">
@@ -771,6 +773,7 @@ export default function Checkout() {
               />
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
