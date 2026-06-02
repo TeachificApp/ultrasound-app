@@ -722,7 +722,9 @@ export default function Checkout() {
                   >
                     I understand this is a <strong>recurring subscription</strong>.{" "}
                     {sessionMeta.billingLabel && (
-                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>{sessionMeta.billingLabel}. </span>
+                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>
+                        {sessionMeta.billingLabel.replace(/,?\s*cancel anytime/i, "").trim()}.{" "}
+                      </span>
                     )}
                     I can cancel anytime from my account.
                   </Label>
