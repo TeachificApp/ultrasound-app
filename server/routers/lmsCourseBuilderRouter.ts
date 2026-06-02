@@ -735,6 +735,42 @@ export const lmsCourseBuilderRouter = router({
       return courses.map(c => ({ ...c, sections: sectionsByCourse.get(c.id) ?? [] }));
     }),
 
+  /** List all courses with their sections AND lessons (for copy-lesson picker) */
+  listCoursesWithLessons: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const courses = await db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type })
+        .from(lmsCourses).orderBy(asc(lmsCourses.title));
+      const sections = await db.select({ id: lmsSections.id, courseId: lmsSections.courseId, title: lmsSections.title, position: lmsSections.position })
+        .from(lmsSections).orderBy(asc(lmsSections.courseId), asc(lmsSections.position));
+      const lessons = await db.select({ id: lmsLessons.id, courseId: lmsLessons.courseId, sectionId: lmsLessons.sectionId, title: lmsLessons.title, type: lmsLessons.type, position: lmsLessons.position })
+        .from(lmsLessons).orderBy(asc(lmsLessons.courseId), asc(lmsLessons.position));
+      const sectionsByCourse = new Map<number, (typeof sections[0] & { lessons: typeof lessons })[]>();
+      for (const s of sections) {
+        if (!sectionsByCourse.has(s.courseId)) sectionsByCourse.set(s.courseId, []);
+        sectionsByCourse.get(s.courseId)!.push({ ...s, lessons: [] });
+      }
+      // Attach lessons to sections
+      const topLevelByCourse = new Map<number, typeof lessons>();
+      for (const l of lessons) {
+        if (l.sectionId) {
+          const courseSections = sectionsByCourse.get(l.courseId) ?? [];
+          const sec = courseSections.find(s => s.id === l.sectionId);
+          if (sec) sec.lessons.push(l);
+        } else {
+          if (!topLevelByCourse.has(l.courseId)) topLevelByCourse.set(l.courseId, []);
+          topLevelByCourse.get(l.courseId)!.push(l);
+        }
+      }
+      return courses.map(c => ({
+        ...c,
+        sections: sectionsByCourse.get(c.id) ?? [],
+        topLevelLessons: topLevelByCourse.get(c.id) ?? [],
+      }));
+    }),
+
   // ── Lessons ──
   createLesson: protectedProcedure
     .input(z.object({

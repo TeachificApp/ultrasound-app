@@ -996,16 +996,22 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       );
     }
     case "file_download": {
-      // Resolve file URL based on source type:
-      // - media_repo: use stored mediaAssetUrl or slug-based serve endpoint
-      // - download_library: use stored fileUrl directly (S3 URL from digital product files)
-      // - upload: use stored fileUrl (S3 URL from page media upload)
-      const fileUrl = d.source === "media_repo"
-        ? (d.mediaAssetUrl || d.fileUrl || (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}/download` : ""))
+      // Resolve file URLs based on source type:
+      // - media_repo: use /api/media/:slug for inline viewing (Content-Disposition: inline)
+      //               use /api/media/:slug/download for the download button (Content-Disposition: attachment)
+      // - download_library / upload: use stored fileUrl (S3 URL) for both
+      const isMediaRepo = d.source === "media_repo";
+      const viewUrl = isMediaRepo
+        ? (d.mediaAssetUrl || d.fileUrl || (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}` : ""))
         : (d.fileUrl || "");
-      const fileName = d.source === "media_repo" ? (d.mediaAssetTitle || d.fileName || "File") : (d.fileName || "File");
+      const downloadUrl = isMediaRepo
+        ? (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}/download` : (d.mediaAssetUrl || d.fileUrl || ""))
+        : (d.fileUrl || "");
+      // fileUrl is used for card mode (direct download)
+      const fileUrl = downloadUrl;
+      const fileName = isMediaRepo ? (d.mediaAssetTitle || d.fileName || "File") : (d.fileName || "File");
       const displayMode = d.displayMode ?? "card";
-      if (displayMode === "inline" && fileUrl) {
+      if (displayMode === "inline" && viewUrl) {
         const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
         const isPdf = ext === "pdf";
         const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
@@ -1015,13 +1021,14 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
             {d.label && <h3 className="text-lg font-semibold text-gray-800 mb-2">{d.label}</h3>}
             {d.description && <p className="text-sm text-gray-500 mb-3">{d.description}</p>}
-            {isPdf && <iframe src={fileUrl} className="w-full rounded-lg border border-gray-200" style={{ height: `${d.inlineHeight ?? 600}px` }} title={fileName} />}
-            {isImage && <img src={fileUrl} alt={fileName} className="max-w-full rounded-lg shadow" />}
-            {isVideo && <video src={fileUrl} controls className="w-full rounded-lg shadow" style={{ maxHeight: `${d.inlineHeight ?? 400}px` }} />}
-            {isAudio && <audio src={fileUrl} controls className="w-full" />}
-            {/* Always show download button in inline mode */}
+            {/* Use viewUrl (inline endpoint) for rendering — no Content-Disposition: attachment */}
+            {isPdf && <iframe src={viewUrl} className="w-full rounded-lg border border-gray-200" style={{ height: `${d.inlineHeight ?? 600}px` }} title={fileName} />}
+            {isImage && <img src={viewUrl} alt={fileName} className="max-w-full rounded-lg shadow" />}
+            {isVideo && <video src={viewUrl} controls className="w-full rounded-lg shadow" style={{ maxHeight: `${d.inlineHeight ?? 400}px` }} />}
+            {isAudio && <audio src={viewUrl} controls className="w-full" />}
+            {/* Download button uses the /download endpoint to force save-to-disk */}
             <div className="mt-3 flex justify-end">
-              <a href={fileUrl} download={fileName}
+              <a href={downloadUrl} download={fileName}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
                 style={{ backgroundColor: d.buttonColor ?? "#179ca3", color: d.buttonTextColor ?? "#fff" }}>
                 <Upload size={14} />{d.buttonText ?? "Download"}

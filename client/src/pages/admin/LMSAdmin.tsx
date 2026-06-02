@@ -3413,6 +3413,9 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   onCreated: (lesson: any) => void;
 }) {
   type LessonType = "text" | "video" | "video_text" | "embed" | "quiz" | "download";
+  const [mode, setMode] = useState<"new" | "copy">("new");
+
+  // ── New Lesson state ──
   const [title, setTitle] = useState("");
   const [type, setType] = useState<LessonType>("text");
   const [isPreview, setIsPreview] = useState(false);
@@ -3421,10 +3424,24 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   const [embedUrl, setEmbedUrl] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [requireVideoCompletion, setRequireVideoCompletion] = useState(false);
-  // null = inherit from course default, true = always show, false = always hide
   const [requireManualComplete, setRequireManualComplete] = useState<boolean | null>(null);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
+
+  // ── Copy Lesson state ──
+  const [copySourceCourseId, setCopySourceCourseId] = useState<number | null>(null);
+  const [copySourceLessonId, setCopySourceLessonId] = useState<number | null>(null);
+  const { data: coursesWithLessons, isLoading: coursesLoading } = trpc.lmsAdmin.listCoursesWithLessons.useQuery(
+    undefined, { enabled: mode === "copy" }
+  );
+  const selectedCourseData = coursesWithLessons?.find((c: any) => c.id === copySourceCourseId);
+  // Flatten all lessons from selected course: top-level + all section lessons
+  const allLessonsInCourse = selectedCourseData ? [
+    ...(selectedCourseData.topLevelLessons ?? []).map((l: any) => ({ ...l, sectionTitle: null })),
+    ...(selectedCourseData.sections ?? []).flatMap((s: any) =>
+      (s.lessons ?? []).map((l: any) => ({ ...l, sectionTitle: s.title }))
+    ),
+  ] : [];
 
   const create = trpc.lmsAdmin.createLesson.useMutation({
     onSuccess: (data) => {
@@ -3440,6 +3457,14 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
+  const copyLesson = trpc.lmsAdmin.copyLesson.useMutation({
+    onSuccess: (data) => {
+      toast.success("Lesson copied successfully");
+      onCreated({ id: data.id, title: allLessonsInCourse.find((l: any) => l.id === copySourceLessonId)?.title ?? "Copied Lesson", type: "text", contentBlocks: null });
+    },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+
   const handleSelectAsset = (asset: { id: number; title: string; s3Url: string; mediaType: string }) => {
     setSelectedAsset(asset);
     setContent(asset.s3Url);
@@ -3447,6 +3472,11 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   };
 
   const handleCreate = () => {
+    if (mode === "copy") {
+      if (!copySourceLessonId) return;
+      copyLesson.mutate({ lessonId: copySourceLessonId, targetCourseId: courseId, targetSectionId: sectionId ?? null });
+      return;
+    }
     create.mutate({
       courseId,
       sectionId,
@@ -3463,6 +3493,9 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
     });
   };
 
+  const canSubmit = mode === "new" ? !!title.trim() : !!copySourceLessonId;
+  const isPending = create.isPending || copyLesson.isPending;
+
   return (
     <>
     <Dialog open={true} onOpenChange={onClose}>
@@ -3471,48 +3504,118 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
           <DialogTitle>Add Lesson{!sectionId ? " (Course Level)" : ""}</DialogTitle>
           {!sectionId && <p className="text-xs text-teal-600 mt-1">This lesson will appear at the top level, not inside any section.</p>}
         </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div>
-            <Label className="text-sm">Title *</Label>
-            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Lesson title" className="mt-1" />
-          </div>
 
-          <div>
-            <Label className="text-sm">Duration (min)</Label>
-            <Input value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} type="number" min="0" className="mt-1" />
-          </div>
-
-          {/* Preview toggle */}
-          <div className="flex items-center gap-2">
-            <Switch checked={isPreview} onCheckedChange={setIsPreview} id="add-preview-switch" />
-            <Label htmlFor="add-preview-switch" className="text-sm">Free preview (requires login)</Label>
-          </div>
-
-
-          {/* Mark Complete override — 3-state: inherit / show / hide */}
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-gray-700">"Mark Complete" button</p>
-            <div className="flex gap-1 border rounded-lg p-1 bg-gray-50 w-fit">
-              {([null, true, false] as const).map(v => (
-                <button key={String(v)} onClick={() => setRequireManualComplete(v)}
-                  className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
-                    requireManualComplete === v ? "bg-white shadow text-teal-700 border border-gray-200" : "text-gray-500 hover:text-gray-700"
-                  }`}>
-                  {v === null ? "Inherit from course" : v ? "Always show" : "Always hide"}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400">"Inherit from course" uses the course-level default setting.</p>
-          </div>
+        {/* Mode tabs */}
+        <div className="flex gap-1 border rounded-lg p-1 bg-gray-50 mb-2">
+          {(["new", "copy"] as const).map(m => (
+            <button key={m} onClick={() => setMode(m)}
+              className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors ${
+                mode === m ? "bg-white shadow text-teal-700 border border-gray-200" : "text-gray-500 hover:text-gray-700"
+              }`}>
+              {m === "new" ? "New Lesson" : "Copy Lesson"}
+            </button>
+          ))}
         </div>
+
+        {/* ── New Lesson ── */}
+        {mode === "new" && (
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm">Title *</Label>
+              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Lesson title" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Duration (min)</Label>
+              <Input value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} type="number" min="0" className="mt-1" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={isPreview} onCheckedChange={setIsPreview} id="add-preview-switch" />
+              <Label htmlFor="add-preview-switch" className="text-sm">Free preview (requires login)</Label>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-gray-700">"Mark Complete" button</p>
+              <div className="flex gap-1 border rounded-lg p-1 bg-gray-50 w-fit">
+                {([null, true, false] as const).map(v => (
+                  <button key={String(v)} onClick={() => setRequireManualComplete(v)}
+                    className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                      requireManualComplete === v ? "bg-white shadow text-teal-700 border border-gray-200" : "text-gray-500 hover:text-gray-700"
+                    }`}>
+                    {v === null ? "Inherit from course" : v ? "Always show" : "Always hide"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400">"Inherit from course" uses the course-level default setting.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Copy Lesson ── */}
+        {mode === "copy" && (
+          <div className="space-y-3 py-2">
+            {coursesLoading ? (
+              <p className="text-sm text-gray-400">Loading courses…</p>
+            ) : (
+              <>
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">Source Course / Quiz / Cohort</Label>
+                  <Select
+                    value={copySourceCourseId?.toString() ?? ""}
+                    onValueChange={v => { setCopySourceCourseId(Number(v)); setCopySourceLessonId(null); }}
+                  >
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Choose a course…" /></SelectTrigger>
+                    <SelectContent>
+                      {(coursesWithLessons ?? []).map((c: any) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>
+                          <span className="flex items-center gap-2">
+                            <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-teal-100 text-teal-700">{c.type ?? "course"}</span>
+                            <span>{c.title}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {copySourceCourseId && (
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">Select Lesson to Copy</Label>
+                    {allLessonsInCourse.length === 0 ? (
+                      <p className="text-xs text-gray-400">This course has no lessons.</p>
+                    ) : (
+                      <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+                        {allLessonsInCourse.map((l: any) => (
+                          <button key={l.id} onClick={() => setCopySourceLessonId(l.id)}
+                            className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                              copySourceLessonId === l.id ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                            }`}>
+                            <span className="font-medium text-gray-800">{l.title}</span>
+                            {l.sectionTitle && <span className="ml-2 text-xs text-gray-400">{l.sectionTitle}</span>}
+                            <span className="ml-2 text-xs text-gray-400 capitalize">{l.type}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {copySourceLessonId && (
+                  <p className="text-xs text-teal-600 bg-teal-50 border border-teal-200 rounded px-3 py-2">
+                    A full copy of the selected lesson (including all content blocks, quiz questions, and settings) will be added{sectionId ? " to this section" : " at course level"}.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             className="bg-teal-600 hover:bg-teal-700 text-white"
-            disabled={!title.trim() || create.isPending}
+            disabled={!canSubmit || isPending}
             onClick={handleCreate}
           >
-            {create.isPending ? "Adding..." : "Add Lesson"}
+            {isPending ? (mode === "copy" ? "Copying…" : "Adding...") : (mode === "copy" ? "Copy Lesson" : "Add Lesson")}
           </Button>
         </DialogFooter>
       </DialogContent>
