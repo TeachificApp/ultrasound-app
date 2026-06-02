@@ -667,7 +667,10 @@ export const lmsLearnerRouter = router({
           topLevelLessons.push(lesson);
         }
       }
-      const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
+      // For non-admin-preview, filter out sections that have no published lessons
+      const sectionsWithLessons = sections
+        .map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }))
+        .filter(s => isAdminPreview || s.lessons.length > 0);
 
       // Progress
       let progress: typeof lmsLessonProgress.$inferSelect[] = [];
@@ -1617,7 +1620,10 @@ export const lmsLearnerRouter = router({
           topLevelLessons.push(lesson);
         }
       }
-      const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
+      // For non-admin-preview, filter out sections that have no published lessons
+      const sectionsWithLessons = sections
+        .map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }))
+        .filter(s => isAdminPreview || s.lessons.length > 0);
 
       // Progress
       let progress: typeof lmsLessonProgress.$inferSelect[] = [];

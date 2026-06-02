@@ -375,7 +375,9 @@ for (const slugPath of ["/api/media/:slug/scorm-launch", "/media/:slug/scorm-lau
   router.get(slugPath, (req: Request, res: Response) => {
     const auth = readMediaAuth(req);
     const authQuery = buildMediaAuthQuery(auth);
-    res.redirect(302, `/api/media/${req.params.slug}/scorm${authQuery}`);
+    const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+    const host = req.headers["x-forwarded-host"] || req.headers.host || req.hostname;
+    res.redirect(302, `${proto}://${host}/api/media/${req.params.slug}/scorm${authQuery}`);
   });
 } // end for slugPath (scorm-launch redirect)
 
@@ -933,8 +935,12 @@ router.get(slugPath, async (req: Request, res: Response) => {
     needsScormExtraction({ mediaType, mimeType, fileName: version.fileName ?? "", s3Url: fileUrl })
   ) {
     const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
-    const scormPath = req.path.replace(/\/embed\/?$/, "/scorm") + q;
-    res.redirect(302, scormPath);
+    const scormRelPath = req.path.replace(/\/embed\/?$/, "/scorm") + q;
+    // Use absolute URL so the redirect works even when the iframe is on a different subdomain
+    const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+    const host = req.headers["x-forwarded-host"] || req.headers.host || req.hostname;
+    const scormAbsUrl = `${proto}://${host}${scormRelPath}`;
+    res.redirect(302, scormAbsUrl);
     return;
   }
 

@@ -132,11 +132,15 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                   onClick={() => { setAccountOpen(!accountOpen); setMobileMenuOpen(false); }}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}>
-                    {(user as any)?.name?.charAt(0)?.toUpperCase() || "U"}
-                  </div>
+                  {(user as any)?.avatarUrl ? (
+                    <img src={(user as any).avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover shrink-0 border border-[#189aa1]/30" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}>
+                      {((user as any)?.displayName || (user as any)?.name || "U").charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <span className="hidden sm:block text-sm text-gray-700 max-w-[120px] truncate">
-                    {(user as any)?.name || (user as any)?.email || "Account"}
+                    {(user as any)?.displayName || (user as any)?.name || (user as any)?.email || "Account"}
                   </span>
                   <ChevronDown className="w-3 h-3 text-gray-500" />
                 </button>
@@ -147,7 +151,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                       {/* User info */}
                       <div className="px-3 py-2 border-b border-gray-100 mb-1">
                         <p className="text-sm font-semibold text-gray-800 truncate">
-                          {(user as any)?.name || "Account"}
+                          {(user as any)?.displayName || (user as any)?.name || "Account"}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
                           {(user as any)?.email || ""}
