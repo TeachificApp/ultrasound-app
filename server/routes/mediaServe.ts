@@ -940,11 +940,19 @@ router.get(slugPath, async (req: Request, res: Response) => {
     const extractionStatus = (version as any).scormExtractionStatus as string | null | undefined;
     const extractionError = (version as any).scormExtractionError as string | null | undefined;
 
-    // Strategy A: Already extracted — redirect directly to the R2/CDN launch file URL
-    // This mirrors what Thinkific does: iframe src points straight to the CDN HTML file.
+    // Strategy A: Already extracted — serve an HTML redirect page so iframes follow it correctly.
+    // Using res.redirect(302) causes iframes to render the "Found. Redirecting to..." text.
+    // Instead, we send a minimal HTML page with window.location.replace() so the iframe
+    // navigates to the SCORM content properly.
+    const sendHtmlRedirect = (targetUrl: string) => {
+      const safeUrl = targetUrl.replace(/'/g, "%27");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.status(200).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Loading...</title></head><body><script>window.location.replace('${safeUrl}');</script></body></html>`);
+    };
+
     if (version.scormExtractedPrefix?.startsWith("__direct_html__:")) {
       const directUrl = version.scormExtractedPrefix.replace("__direct_html__:", "");
-      res.redirect(302, encodeStorageFetchUrl(directUrl));
+      sendHtmlRedirect(encodeStorageFetchUrl(directUrl));
       return;
     }
 
@@ -954,7 +962,7 @@ router.get(slugPath, async (req: Request, res: Response) => {
       const launchFile = (version as any).scormLaunchFile || "index.html";
       if (r2PublicUrl) {
         const cdnUrl = `${r2PublicUrl}/${version.scormExtractedPrefix}/${launchFile}`;
-        res.redirect(302, encodeStorageFetchUrl(cdnUrl));
+        sendHtmlRedirect(encodeStorageFetchUrl(cdnUrl));
         return;
       }
       // R2 public URL not configured — fall through to /scorm proxy using canonical host
@@ -975,7 +983,7 @@ router.get(slugPath, async (req: Request, res: Response) => {
 
     // Strategy C: Legacy direct HTML (s3Url points to an HTML file, not a ZIP)
     if (isDirectHtmlScormVersion(version)) {
-      res.redirect(302, encodeStorageFetchUrl(version.s3Url!));
+      sendHtmlRedirect(encodeStorageFetchUrl(version.s3Url!));
       return;
     }
 
@@ -1002,7 +1010,7 @@ router.get(slugPath, async (req: Request, res: Response) => {
       ENV.canonicalRootDomain ||
       req.headers.host ||
       req.hostname;
-    res.redirect(302, `${proto}://${resolvedHost}${scormRelPath}`);
+    sendHtmlRedirect(`${proto}://${resolvedHost}${scormRelPath}`);
     return;
   }
 
