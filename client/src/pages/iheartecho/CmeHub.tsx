@@ -276,7 +276,7 @@ export default function CmeHub() {
             <h1 className="text-3xl md:text-4xl font-black text-white leading-tight mb-2" style={{ fontFamily: "Merriweather, serif" }}>
               CME &amp; E-Learning Courses
             </h1>
-            <p className="text-[#4ad9e0] font-semibold text-base mb-3">All About Ultrasound — E-Learning & CME</p>
+            <p className="text-[#4ad9e0] font-semibold text-base mb-3">All About Ultrasound™ — E-Learning & CME</p>
             <p className="text-white/70 text-sm leading-relaxed max-w-lg">
               Browse accredited continuing medical education courses from All About Ultrasound. Click "Learn More" to view course details or "Enroll" to go directly to checkout — your email is pre-filled.
             </p>
@@ -467,7 +467,7 @@ export default function CmeHub() {
         <div className="mt-10 p-4 rounded-xl bg-[#f0fbfc] border border-[#189aa1]/20 flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <Clock className="w-4 h-4 text-[#189aa1] flex-shrink-0 mt-0.5 sm:mt-0" />
           <p className="text-xs text-gray-600 leading-relaxed">
-            All courses are from <strong>All About Ultrasound</strong>. "Learn More" opens the course details page; "Enroll" opens the checkout page
+            All courses are from <strong>All About Ultrasound™</strong>. "Learn More" opens the course details page; "Enroll" opens the checkout page
             {user?.email ? ` with your email (${user.email}) pre-filled` : " — log in to iHeartEcho™ to have your email pre-filled automatically"}.
             SDMS CME credits are awarded upon course completion and post-test.
           </p>

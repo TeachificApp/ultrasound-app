@@ -124,8 +124,8 @@ function GrantMembershipDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="aaus">All About Ultrasound</SelectItem>
-                <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                <SelectItem value="aaus">All About Ultrasound™</SelectItem>
+                <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -236,8 +236,8 @@ export default function MembershipAdmin() {
       </div>
 
       <div className="grid gap-6">
-        <BrandMembersPanel brand="aaus" label="All About Ultrasound — Premium Members" />
-        <BrandMembersPanel brand="iheartecho" label="iHeartEcho — Premium Members" />
+        <BrandMembersPanel brand="aaus" label="All About Ultrasound™ — Premium Members" />
+        <BrandMembersPanel brand="iheartecho" label="iHeartEcho™ — Premium Members" />
       </div>
     </div>
   );

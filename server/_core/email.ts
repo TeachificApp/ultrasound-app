@@ -869,7 +869,7 @@ export function buildUltrasoundAssistFreeWelcomeEmail(opts: {
       <ul style="margin:0;padding-left:20px;font-size:14px;color:#475569;">
         <li style="margin:4px 0;">ACR TI-RADS Thyroid Nodule Assessment</li>
         <li style="margin:4px 0;">Daily Challenge - Thyroid category</li>
-        <li style="margin:4px 0;">Access to the All About Ultrasound community</li>
+        <li style="margin:4px 0;">Access to the All About Ultrasound™ community</li>
       </ul>
     </div>
     <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">

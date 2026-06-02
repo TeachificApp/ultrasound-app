@@ -37,13 +37,13 @@ import { isMembersDomain, isLearnDomain } from "@/hooks/useSubdomain";
 
 const BRAND_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   aaus: {
-    label: "All About Ultrasound - UltrasoundAssist",
+    label: "All About Ultrasound™",
     color: "#189aa1",
     bg: "bg-teal-50",
     border: "border-teal-200",
   },
   iheartecho: {
-    label: "iHeartEcho - EchoAssist",
+    label: "iHeartEcho™",
     color: "#e05c8a",
     bg: "bg-pink-50",
     border: "border-pink-200",
@@ -420,7 +420,7 @@ function ProfileTab() {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
         <div className="px-6 py-4 border-b border-gray-100">
           <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Notification Preferences</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Control when All About Ultrasound - UltrasoundAssist sends you email reminders.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Control when All About Ultrasound™ sends you email reminders.</p>
         </div>
         <div className="p-6 space-y-6">
           {notifLoading ? (

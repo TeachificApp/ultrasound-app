@@ -1280,7 +1280,7 @@ export default function CoursePlayer() {
           </button>
           {LOGO
             ? <img src={LOGO} alt="Logo" className="h-7 sm:h-8 w-auto flex-shrink-0" />
-            : <span className="font-bold text-sm sm:text-base truncate" style={{ color: primaryColor }}>All About Ultrasound</span>
+            : <span className="font-bold text-sm sm:text-base truncate" style={{ color: primaryColor }}>All About Ultrasound™</span>
           }
         </div>
         <div className="flex items-center gap-2 sm:gap-5 flex-shrink-0">

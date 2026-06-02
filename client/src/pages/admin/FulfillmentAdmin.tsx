@@ -215,8 +215,8 @@ export default function FulfillmentAdmin() {
                     >
                       <SelectTrigger><SelectValue placeholder="Select brand..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="aaus">All About Ultrasound</SelectItem>
-                        <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                        <SelectItem value="aaus">All About Ultrasound™</SelectItem>
+                        <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
                         <SelectItem value="both">Both</SelectItem>
                       </SelectContent>
                     </Select>

@@ -19,8 +19,8 @@ export interface BrandConfig {
 const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   aaus: {
     brand: "aaus",
-    name: "All About Ultrasound - UltrasoundAssist",
-    shortName: "UltrasoundAssist",
+    name: "All About Ultrasound™",
+    shortName: "All About Ultrasound",
     tagline: "General & Vascular Ultrasound Clinical Intelligence",
     primaryColor: "#0d9488", // teal-600
     accentColor: "#14b8a6", // teal-500
@@ -29,8 +29,8 @@ const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   },
   iheartecho: {
     brand: "iheartecho",
-    name: "iHeartEcho - EchoAssist",
-    shortName: "EchoAssist",
+    name: "iHeartEcho™",
+    shortName: "iHeartEcho",
     tagline: "Echocardiography Clinical Intelligence",
     primaryColor: "#189aa1", // teal brand
     accentColor: "#4ad9e0", // aqua accent

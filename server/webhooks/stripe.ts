@@ -361,7 +361,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
             to: { name: customerName || firstName, email: customerEmail },
             subject,
             htmlBody: enhancedBody,
-            previewText: `Access your download on All About Ultrasound`,
+            previewText: `Access your download on All About Ultrasound™`,
           });
           console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${userId}) and sent welcome email`);
         } catch (emailErr) {
@@ -716,7 +716,7 @@ async function handleDualMembershipCheckoutCompleted(session: Record<string, unk
 
   await notifyOwner({
     title: "⭐⭐ New Dual Membership Subscription",
-    content: `User ID ${userId} (${meta.customer_email}) subscribed to the All Access Dual Membership ($12.99/mo). Both AAUS + iHeartEcho premium granted. Subscription: ${subscriptionId ?? "N/A"}.`,
+    content: `User ID ${userId} (${meta.customer_email}) subscribed to the All Access Dual Membership ($12.99/mo). Both AAUS + iHeartEcho™ premium granted. Subscription: ${subscriptionId ?? "N/A"}.`,
   });
 
   console.log(`[Stripe] Dual membership recorded: user ${userId}, both brands, subscription ${subscriptionId}`);
@@ -927,7 +927,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
             to: { name: customerName || firstName, email: customerEmail },
             subject,
             htmlBody: enhancedBody,
-            previewText: `Access your ${meta.product_name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
+            previewText: `Access your ${meta.product_name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™"}`,
           });
           console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${resolvedUserId}) and sent welcome email with access token`);
         } catch (emailErr) {
@@ -1194,7 +1194,7 @@ async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
   const updatePaymentUrl = `${baseUrl}/dashboard`;
 
   // Send payment failed email
-  const productName = membership ? `Your ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"} Membership` : "Your Subscription";
+  const productName = membership ? `Your ${brandMode === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™"} Membership` : "Your Subscription";
   try {
     const { subject, htmlBody, previewText } = buildPaymentFailedEmail({
       firstName,

@@ -37,8 +37,8 @@ import Layout from "@/components/Layout";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 const BRAND_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  aaus:       { label: "All About Ultrasound - UltrasoundAssist", color: "#189aa1", bg: "bg-teal-50",  border: "border-teal-200" },
-  iheartecho: { label: "iHeartEcho - EchoAssist",                  color: "#e05c8a", bg: "bg-pink-50",  border: "border-pink-200" },
+  aaus:       { label: "All About Ultrasound™", color: "#189aa1", bg: "bg-teal-50",  border: "border-teal-200" },
+  iheartecho: { label: "iHeartEcho™",           color: "#e05c8a", bg: "bg-pink-50",  border: "border-pink-200" },
 };
 
 function BrandBadge({ brand }: { brand?: string | null }) {
@@ -371,7 +371,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
         <DialogContent>
           <DialogHeader><DialogTitle>Grant Brand Membership</DialogTitle><DialogDescription>Manually grant access to a brand app for this user.</DialogDescription></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-1.5"><Label>Brand</Label><Select value={grantBrand} onValueChange={(v) => setGrantBrand(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem><SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1.5"><Label>Brand</Label><Select value={grantBrand} onValueChange={(v) => setGrantBrand(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="aaus">All About Ultrasound™</SelectItem><SelectItem value="iheartecho">iHeartEcho™</SelectItem></SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Tier</Label><Select value={grantTier} onValueChange={(v) => setGrantTier(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="premium">Premium</SelectItem><SelectItem value="free">Free</SelectItem></SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Expiry Date (optional)</Label><Input type="date" value={grantExpiry} onChange={e => setGrantExpiry(e.target.value)} /></div>
           </div>
@@ -833,8 +833,8 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
               <Select value={grantBrand} onValueChange={(v) => setGrantBrand(v as any)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem>
-                  <SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem>
+                  <SelectItem value="aaus">All About Ultrasound™</SelectItem>
+                  <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
                 </SelectContent>
               </Select>
             </div>
