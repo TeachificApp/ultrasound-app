@@ -1496,6 +1496,17 @@ function CertTemplateSelector({ value, onChange }: { value: number | null; onCha
 }
 
 function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (data: any) => void; saving: boolean }) {
+  const { data: settingsPricingOptions = [] } = trpc.lmsGroup.listPricingOptions.useQuery({ courseId: course.id });
+  const firstActivePricingOption = (settingsPricingOptions as any[]).find((o: any) => o.isActive);
+  const coursePaymentLink = trpc.lmsGroup.createPaymentLink.useMutation({
+    onSuccess: (data) => {
+      navigator.clipboard.writeText(data.url)
+        .then(() => toast.success("Stripe Payment Link copied!"))
+        .catch(() => toast.success(`Stripe Payment Link: ${data.url}`));
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    },
+    onError: (err) => toast.error(`Failed: ${err.message}`),
+  });
    const [uploadingCover, setUploadingCover] = useState(false);
   const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1745,19 +1756,21 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
       <div className="border border-gray-200 rounded-lg p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-700">Pricing</h3>
-          {course.slug && (
+          {firstActivePricingOption ? (
             <button
-              onClick={() => {
-                const url = `${window.location.origin}/courses/${course.slug}?checkout=1`;
-                navigator.clipboard.writeText(url).then(() => toast.success("Main checkout link copied!"));
-              }}
-              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 transition-colors"
-              title={`Copy main checkout link`}
+              onClick={() => coursePaymentLink.mutate({ pricingOptionId: firstActivePricingOption.id })}
+              disabled={coursePaymentLink.isPending}
+              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 transition-colors disabled:opacity-50"
+              title={`Generate & copy direct Stripe checkout link for "${firstActivePricingOption.label}"`}
             >
-              <Link2 className="w-3 h-3" />
-              Copy checkout link
+              {coursePaymentLink.isPending
+                ? <span className="w-3 h-3 block animate-spin border border-blue-400 border-t-transparent rounded-full" />
+                : <Link2 className="w-3 h-3" />}
+              {coursePaymentLink.isPending ? "Generating..." : "Copy Stripe Checkout Link"}
             </button>
-          )}
+          ) : course.slug ? (
+            <span className="text-xs text-gray-400 italic">Add a pricing option to generate a Stripe link</span>
+          ) : null}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
