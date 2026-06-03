@@ -721,7 +721,7 @@ export default function Checkout() {
                     className={`text-sm leading-relaxed cursor-pointer ${isDark ? "text-gray-300" : "text-gray-700"}`}
                   >
                     {sessionMeta.billingLabel
-                      ? <>I understand this is a <strong>recurring subscription</strong>{" "}({sessionMeta.billingLabel.replace(/,?\s*cancel anytime/i, "").trim()}). I can cancel anytime from my account.</>
+                      ? <>I understand this is a <strong>recurring subscription</strong>{" "}({sessionMeta.billingLabel.replace(/\s*[—–-].*$/i, "").trim()}). I can cancel anytime from my account.</>
                       : <>I understand this is a <strong>recurring subscription</strong>. I can cancel anytime from my account.</>
                     }
                   </Label>
