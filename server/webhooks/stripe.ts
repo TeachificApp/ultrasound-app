@@ -1611,7 +1611,11 @@ export function registerStripeWebhook(app: Express) {
       const eventType = event.type as string;
       const eventId = event.id as string;
 
-      // Log the event
+      // Respond immediately — Stripe requires a fast 2xx response (30s timeout)
+      // All heavy processing happens after the response is sent
+      res.json({ received: true });
+
+      // Log the event (async, after response)
       const logDb = await getDb();
       try {
         if (logDb) {
@@ -1629,7 +1633,7 @@ export function registerStripeWebhook(app: Express) {
         console.warn("[Stripe] Failed to log webhook event:", err);
       }
 
-      // Handle events
+      // Handle events (async, after response)
       try {
         const sessionObj = (event.data as { object: Record<string, unknown> }).object;
         if (eventType === "checkout.session.completed") {
@@ -1658,19 +1662,117 @@ export function registerStripeWebhook(app: Express) {
         }
       } catch (err) {
         console.error(`[Stripe] Error handling event ${eventType}:`, err);
-        // Still return 200 to prevent Stripe retries for handled errors
       }
-
-      res.json({ received: true });
     }
   );
 
   // Also register at /api/stripe/webhook (production webhook URL)
-  app.post("/api/stripe/webhook", (req: Request, res: Response) => {
-    // Forward to the main webhook handler by re-emitting the request
-    req.url = "/api/webhooks/stripe";
-    (app as any).handle(req, res);
-  });
+  // NOTE: We cannot use app.handle() to forward because the raw body stream is
+  // consumed on first read. Instead we register the full middleware stack again.
+  app.post(
+    "/api/stripe/webhook",
+    (req: Request, res: Response, next) => {
+      let data = "";
+      req.setEncoding("utf8");
+      req.on("data", (chunk: string) => { data += chunk; });
+      req.on("end", () => {
+        (req as Request & { rawBody: string }).rawBody = data;
+        next();
+      });
+    },
+    async (req: Request & { rawBody?: string }, res: Response) => {
+      const rawBody = req.rawBody ?? "";
+      const sig = req.headers["stripe-signature"] as string | undefined;
+
+      let event: Record<string, unknown>;
+
+      if (STRIPE_WEBHOOK_SECRET && sig) {
+        try {
+          const crypto = await import("crypto");
+          const parts = sig.split(",");
+          const tPart = parts.find((p) => p.startsWith("t="));
+          const v1Part = parts.find((p) => p.startsWith("v1="));
+          if (!tPart || !v1Part) throw new Error("Invalid signature format");
+          const timestamp = tPart.slice(2);
+          const expectedSig = v1Part.slice(3);
+          const payload = `${timestamp}.${rawBody}`;
+          const hmac = crypto
+            .createHmac("sha256", STRIPE_WEBHOOK_SECRET)
+            .update(payload)
+            .digest("hex");
+          if (hmac !== expectedSig) throw new Error("Signature mismatch");
+          event = JSON.parse(rawBody) as Record<string, unknown>;
+        } catch (err) {
+          console.error("[Stripe] /api/stripe/webhook signature verification failed:", err);
+          res.status(400).json({ error: "Invalid signature" });
+          return;
+        }
+      } else {
+        try {
+          event = JSON.parse(rawBody) as Record<string, unknown>;
+        } catch {
+          res.status(400).json({ error: "Invalid JSON" });
+          return;
+        }
+      }
+
+      // Immediately acknowledge receipt — Stripe requires a fast 2xx response
+      // All processing is done before responding but we respond first to avoid timeouts
+      const eventType = event.type as string;
+      const eventId = event.id as string;
+
+      // Respond immediately to prevent Stripe timeout (30s limit)
+      res.json({ received: true });
+
+      // Process asynchronously after responding
+      const logDb = await getDb();
+      try {
+        if (logDb) {
+          await logDb.insert(webhookEvents).values({
+            source: "stripe",
+            resource: eventType.split(".")[0] ?? "checkout",
+            action: eventType.split(".").slice(1).join(".") ?? eventType,
+            email: undefined,
+            outcome: "ignored",
+            message: `Stripe event received: ${eventType} (${eventId})`,
+            rawPayload: rawBody,
+          });
+        }
+      } catch (err) {
+        console.warn("[Stripe] Failed to log webhook event:", err);
+      }
+
+      try {
+        const sessionObj = (event.data as { object: Record<string, unknown> }).object;
+        if (eventType === "checkout.session.completed") {
+          await handleCheckoutSessionCompleted(sessionObj);
+          await handleEmployerCheckoutCompleted(sessionObj);
+          await handleLmsCheckoutCompleted(sessionObj);
+          await handleDigitalDownloadCheckoutCompleted(sessionObj);
+          await handleDigitalBundleCheckoutCompleted(sessionObj);
+          await handleBrandMembershipCheckoutCompleted(sessionObj);
+          await handleDualMembershipCheckoutCompleted(sessionObj);
+          await handlePhysicalProductCheckoutCompleted(sessionObj);
+          await handleMembershipCheckoutCompleted(sessionObj);
+        } else if (eventType === "payment_intent.succeeded") {
+          await handleFunnelPaymentIntentSucceeded(sessionObj);
+        } else if (eventType === "customer.subscription.deleted") {
+          await handleBrandSubscriptionLifecycle(sessionObj, eventType);
+          await handleSubscriptionCancelled(sessionObj);
+        } else if (eventType === "customer.subscription.updated") {
+          await handleBrandSubscriptionLifecycle(sessionObj, eventType);
+        } else if (eventType === "invoice.paid") {
+          await handleInvoicePaid(sessionObj);
+        } else if (eventType === "invoice.payment_failed") {
+          await handleInvoicePaymentFailed(sessionObj);
+        } else {
+          console.log(`[Stripe] Unhandled event type: ${eventType}`);
+        }
+      } catch (err) {
+        console.error(`[Stripe] Error handling event ${eventType}:`, err);
+      }
+    }
+  );
 
   console.log("[Stripe] Webhook registered at /api/webhooks/stripe and /api/stripe/webhook");
 }
