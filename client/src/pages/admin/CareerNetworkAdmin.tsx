@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import {
   Plus, Trash2, Edit2, Save, X, Loader2, RefreshCw, Rss, Globe, Briefcase,
   Users, Settings, Star, Eye, EyeOff, CheckCircle2, XCircle, FileText,
-  ChevronDown, ChevronUp, Tag, Search, ChevronRight, Pencil
+  ChevronDown, ChevronUp, Tag, Search, ChevronRight, Pencil, ExternalLink
 } from "lucide-react";
 import { Link } from "wouter";
 import { getAdminUrl } from "@/hooks/useSubdomain";
@@ -923,10 +923,16 @@ export default function CareerNetworkAdmin() {
         <div className="h-10 w-10 rounded-lg bg-teal-600 flex items-center justify-center flex-shrink-0">
           <Briefcase className="h-5 w-5 text-white" />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-gray-900">Career Network</h1>
           <p className="text-sm text-gray-500">Manage job postings, RSS sources, candidate profiles, and page settings.</p>
         </div>
+        <a href="/career-network" target="_blank" rel="noopener noreferrer">
+          <Button variant="outline" size="sm" className="gap-1.5 text-teal-700 border-teal-300 hover:bg-teal-50">
+            <ExternalLink className="h-4 w-4" />
+            Preview Landing Page
+          </Button>
+        </a>
       </div>
 
       <Tabs defaultValue="postings">
