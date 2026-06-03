@@ -38,6 +38,7 @@ import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
 import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
 import { scormExtractHeartbeatHandler } from "../routes/scormExtractor";
+import { registerMarketingSiteRoutes, registerMarketingSiteOgMeta } from "../routes/marketingSiteRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {

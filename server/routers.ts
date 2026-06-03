@@ -2087,6 +2087,8 @@ export const appRouter = router({
   productAnalytics: productAnalyticsRouter,
     lessonComments: lessonCommentsRouter,
   pageScraper: pageScraperRouter,
+  marketingSitePublic: marketingSitePublicRouter,
+  marketingSiteAdmin: marketingSiteAdminRouter,
   interests: interestsRouter,
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({
