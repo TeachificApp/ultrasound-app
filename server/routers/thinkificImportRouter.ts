@@ -1499,4 +1499,76 @@ export const thinkificImportRouter = router({
         blocksJson: JSON.stringify(result.blocks, null, 2).substring(0, 8000),
       };
     }),
+
+  /**
+   * Backfill: activate all pending enrollments for users who have already
+   * registered (isPending = false) but whose enrollments were never converted.
+   * Safe to run multiple times — skips already-enrolled users.
+   */
+  backfillAllPendingEnrollments: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      adminOnly(ctx.user.role);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Get all still-pending enrollment records
+      const pendingRows = await db
+        .select()
+        .from(lmsPendingEnrollments)
+        .where(eq(lmsPendingEnrollments.status, "pending"));
+
+      let activated = 0;
+      let skipped = 0;
+      let notFound = 0;
+
+      for (const pe of pendingRows) {
+        const normalised = pe.thinkificEmail.trim().toLowerCase();
+        // Find the real (non-pending) user by email
+        const [realUser] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(sql`LOWER(${users.email}) = ${normalised} AND ${users.isPending} = 0`);
+
+        if (!realUser) {
+          notFound++;
+          continue;
+        }
+
+        // Check if already enrolled
+        const [existing] = await db
+          .select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(
+            and(
+              eq(lmsEnrollments.userId, realUser.id),
+              eq(lmsEnrollments.courseId, pe.lmsCourseId)
+            )
+          );
+
+        if (!existing) {
+          await db.insert(lmsEnrollments).values({
+            userId: realUser.id,
+            courseId: pe.lmsCourseId,
+            enrolledAt: pe.thinkificEnrolledAt || new Date(),
+            progressPct: pe.thinkificProgressPct || 0,
+          });
+          activated++;
+        } else {
+          skipped++;
+        }
+
+        await db
+          .update(lmsPendingEnrollments)
+          .set({ status: "activated", lmsUserId: realUser.id, activatedAt: new Date() })
+          .where(eq(lmsPendingEnrollments.id, pe.id));
+      }
+
+      return {
+        total: pendingRows.length,
+        activated,
+        skipped,
+        notFound,
+        message: `Backfill complete: ${activated} enrolled, ${skipped} already enrolled, ${notFound} users not yet registered`,
+      };
+    }),
 });

@@ -127,6 +127,49 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       if (user.openId === ENV.ownerOpenId) updatePayload.role = "admin";
       await db.update(users).set(updatePayload).where(eq(users.id, pending[0].id));
       console.log(`[upsertUser] Activated pending account for ${normalised} (userId=${pending[0].id})`);
+
+      // ── Auto-activate pending enrollments for this user ──────────────────────
+      // Convert any lms_pending_enrollments records matching this email into
+      // real lms_enrollments so the user can access their courses immediately.
+      try {
+        const { lmsPendingEnrollments, lmsEnrollments } = await import("../../drizzle/schema");
+        const pendingEnrollments = await db
+          .select()
+          .from(lmsPendingEnrollments)
+          .where(
+            sql`LOWER(${lmsPendingEnrollments.thinkificEmail}) = ${normalised} AND ${lmsPendingEnrollments.status} = 'pending'`
+          );
+        for (const pe of pendingEnrollments) {
+          // Check if already enrolled
+          const [existing] = await db
+            .select({ id: lmsEnrollments.id })
+            .from(lmsEnrollments)
+            .where(
+              and(
+                eq(lmsEnrollments.userId, pending[0].id),
+                eq(lmsEnrollments.courseId, pe.lmsCourseId)
+              )
+            );
+          if (!existing) {
+            await db.insert(lmsEnrollments).values({
+              userId: pending[0].id,
+              courseId: pe.lmsCourseId,
+              enrolledAt: pe.thinkificEnrolledAt || new Date(),
+              progressPct: pe.thinkificProgressPct || 0,
+            });
+          }
+          await db
+            .update(lmsPendingEnrollments)
+            .set({ status: "activated", lmsUserId: pending[0].id, activatedAt: new Date() })
+            .where(eq(lmsPendingEnrollments.id, pe.id));
+        }
+        if (pendingEnrollments.length > 0) {
+          console.log(`[upsertUser] Auto-activated ${pendingEnrollments.length} pending enrollment(s) for ${normalised}`);
+        }
+      } catch (enrollErr) {
+        console.error(`[upsertUser] Failed to activate pending enrollments for ${normalised}:`, enrollErr);
+      }
+
       return;
     }
   }

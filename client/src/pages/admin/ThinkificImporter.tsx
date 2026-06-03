@@ -122,6 +122,16 @@ export default function ThinkificImporter() {
     },
   });
 
+  const backfillEnrollments = trpc.thinkificImport.backfillAllPendingEnrollments.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      utils.thinkificImport.listImports.invalidate();
+    },
+    onError: (err) => {
+      toast.error(`Backfill failed: ${err.message}`);
+    },
+  });
+
   const activateEnrollments = trpc.thinkificImport.activatePendingEnrollments.useMutation({
     onSuccess: (data) => {
       toast.success(`Enrollments activated: ${data.activated} students enrolled, ${data.skipped} skipped.`);
@@ -233,16 +243,33 @@ export default function ThinkificImporter() {
             Student enrollments are imported directly and visible in the Students tab. No welcome emails are sent.
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-shrink-0 mt-1"
-          onClick={() => syncImages.mutate()}
-          disabled={syncImages.isPending}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${syncImages.isPending ? 'animate-spin' : ''}`} />
-          Sync Course Images
-        </Button>
+        <div className="flex gap-2 flex-shrink-0 mt-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100"
+            onClick={() => backfillEnrollments.mutate()}
+            disabled={backfillEnrollments.isPending}
+            title="Activate pending enrollments for all users who have already registered"
+          >
+            {backfillEnrollments.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Users className="w-3.5 h-3.5 mr-1.5" />
+            )}
+            Backfill All Enrollments
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-shrink-0"
+            onClick={() => syncImages.mutate()}
+            disabled={syncImages.isPending}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${syncImages.isPending ? 'animate-spin' : ''}`} />
+            Sync Course Images
+          </Button>
+        </div>
       </div>
 
       {/* Past imports */}
