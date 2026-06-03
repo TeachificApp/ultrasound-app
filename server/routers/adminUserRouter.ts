@@ -45,6 +45,8 @@ import {
   communities,
   webinarRegistrations,
   webinars,
+  lmsLessonProgress,
+  lmsLessons,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
@@ -376,31 +378,124 @@ export const adminUserRouter = router({
 
   /** Manually enroll user in an LMS course */
   enrollInCourse: protectedProcedure
-    .input(z.object({ userId: z.number().int(), courseId: z.number().int() }))
+    .input(z.object({
+      userId: z.number().int(),
+      courseId: z.number().int(),
+      /** Payment mode:
+       *  'free'   – no charge, just enroll
+       *  'link'   – link to an existing Stripe PaymentIntent ID
+       *  'charge' – create a new Stripe PaymentIntent and charge a card token
+       */
+      paymentMode: z.enum(["free", "link", "charge"]).default("free"),
+      /** For 'link' mode: existing Stripe PaymentIntent ID */
+      stripePaymentIntentId: z.string().optional(),
+      /** For 'charge' mode: Stripe card token (from Stripe.js) */
+      stripeCardToken: z.string().optional(),
+      /** For 'charge' mode: amount in cents */
+      amountCents: z.number().int().min(50).optional(),
+      /** For 'charge' mode: currency (default 'usd') */
+      currency: z.string().default("usd"),
+      /** Optional note for the order record */
+      note: z.string().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // ── Handle enrollment (create or upgrade) ──────────────────────────────
       const [existing] = await db
         .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
         .from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, input.courseId)))
         .limit(1);
+
+      let enrollmentId: number;
+      let alreadyEnrolled = false;
+
       if (existing) {
-        // If admin manually enrolls someone who only had free preview, upgrade to full
         if (existing.enrollmentType === "free_preview") {
           await db.update(lmsEnrollments)
             .set({ enrollmentType: "full" })
             .where(eq(lmsEnrollments.id, existing.id));
-          return { enrollmentId: existing.id, alreadyEnrolled: false };
+          enrollmentId = existing.id;
+        } else {
+          enrollmentId = existing.id;
+          alreadyEnrolled = true;
         }
-        return { enrollmentId: existing.id, alreadyEnrolled: true };
+      } else {
+        const [result] = await db
+          .insert(lmsEnrollments)
+          .values({ userId: input.userId, courseId: input.courseId, enrollmentType: "full" })
+          .$returningId();
+        enrollmentId = result.id;
       }
-      const [result] = await db
-        .insert(lmsEnrollments)
-        .values({ userId: input.userId, courseId: input.courseId, enrollmentType: "full" })
-        .$returningId();
-      return { enrollmentId: result.id, alreadyEnrolled: false };
+
+      // ── Handle payment mode ────────────────────────────────────────────────
+      let orderId: number | undefined;
+      let resolvedPaymentIntentId: string | undefined;
+
+      if (input.paymentMode === "link" && input.stripePaymentIntentId) {
+        // Link to existing Stripe PaymentIntent — verify it exists
+        resolvedPaymentIntentId = input.stripePaymentIntentId;
+        const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+        let amount = 0;
+        if (STRIPE_SECRET_KEY) {
+          try {
+            const Stripe = (await import("stripe")).default;
+            const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+            const pi = await stripe.paymentIntents.retrieve(input.stripePaymentIntentId);
+            amount = pi.amount;
+          } catch {}
+        }
+        const [order] = await db.insert(lmsOrders).values({
+          userId: input.userId,
+          courseId: input.courseId,
+          amount,
+          currency: input.currency,
+          stripePaymentIntentId: resolvedPaymentIntentId,
+          status: "paid",
+        }).$returningId();
+        orderId = order.id;
+        // Link order to enrollment
+        await db.update(lmsEnrollments).set({ orderId }).where(eq(lmsEnrollments.id, enrollmentId));
+
+      } else if (input.paymentMode === "charge" && input.stripeCardToken && input.amountCents) {
+        // Create a new Stripe charge using a card token
+        const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+        if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
+        const Stripe = (await import("stripe")).default;
+        const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+        // Get user email for receipt
+        const [user] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, input.userId)).limit(1);
+        const pi = await stripe.paymentIntents.create({
+          amount: input.amountCents,
+          currency: input.currency,
+          payment_method_data: { type: "card", card: { token: input.stripeCardToken } },
+          confirm: true,
+          receipt_email: user?.email ?? undefined,
+          metadata: {
+            user_id: String(input.userId),
+            course_id: String(input.courseId),
+            admin_manual: "true",
+            note: input.note ?? "",
+          },
+        });
+        resolvedPaymentIntentId = pi.id;
+        const [order] = await db.insert(lmsOrders).values({
+          userId: input.userId,
+          courseId: input.courseId,
+          amount: input.amountCents,
+          currency: input.currency,
+          stripePaymentIntentId: pi.id,
+          status: pi.status === "succeeded" ? "paid" : "pending",
+        }).$returningId();
+        orderId = order.id;
+        await db.update(lmsEnrollments).set({ orderId }).where(eq(lmsEnrollments.id, enrollmentId));
+      }
+      // 'free' mode: no order record created
+
+      return { enrollmentId, alreadyEnrolled, orderId, stripePaymentIntentId: resolvedPaymentIntentId };
     }),
 
   /** Remove an enrollment by enrollment ID */
@@ -2096,5 +2191,87 @@ export const adminUserRouter = router({
         htmlBody,
       });
       return { success: sent };
+    }),
+
+  /** Get per-lesson progress for a user's enrollment in a course */
+  getUserCourseProgress: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      enrollmentId: z.number().int(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Get enrollment info
+      const [enrollment] = await db
+        .select({
+          id: lmsEnrollments.id,
+          courseId: lmsEnrollments.courseId,
+          enrolledAt: lmsEnrollments.enrolledAt,
+          completedAt: lmsEnrollments.completedAt,
+          progressPct: lmsEnrollments.progressPct,
+          enrollmentType: lmsEnrollments.enrollmentType,
+        })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.id, input.enrollmentId), eq(lmsEnrollments.userId, input.userId)))
+        .limit(1);
+
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+
+      // Get course info
+      const [course] = await db
+        .select({ id: lmsCourses.id, title: lmsCourses.title })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, enrollment.courseId!))
+        .limit(1);
+
+      // Get all lessons for this course
+      const lessons = await db
+        .select({
+          id: lmsLessons.id,
+          title: lmsLessons.title,
+          type: lmsLessons.type,
+          position: lmsLessons.position,
+          durationMinutes: lmsLessons.durationMinutes,
+        })
+        .from(lmsLessons)
+        .where(eq(lmsLessons.courseId, enrollment.courseId!))
+        .orderBy(lmsLessons.position);
+
+      // Get lesson progress for this enrollment
+      const progressRows = await db
+        .select({
+          lessonId: lmsLessonProgress.lessonId,
+          completedAt: lmsLessonProgress.completedAt,
+          quizScore: lmsLessonProgress.quizScore,
+          quizPassed: lmsLessonProgress.quizPassed,
+          attempts: lmsLessonProgress.attempts,
+        })
+        .from(lmsLessonProgress)
+        .where(eq(lmsLessonProgress.enrollmentId, input.enrollmentId));
+
+      const progressMap = new Map(progressRows.map(p => [p.lessonId, p]));
+
+      const lessonProgress = lessons.map(l => ({
+        ...l,
+        completed: progressMap.has(l.id) && progressMap.get(l.id)!.completedAt !== null,
+        completedAt: progressMap.get(l.id)?.completedAt ?? null,
+        quizScore: progressMap.get(l.id)?.quizScore ?? null,
+        quizPassed: progressMap.get(l.id)?.quizPassed ?? null,
+        attempts: progressMap.get(l.id)?.attempts ?? 0,
+      }));
+
+      const completedCount = lessonProgress.filter(l => l.completed).length;
+
+      return {
+        enrollment,
+        course: course ?? null,
+        lessonProgress,
+        totalLessons: lessons.length,
+        completedLessons: completedCount,
+        progressPct: enrollment.progressPct,
+      };
     }),
 });

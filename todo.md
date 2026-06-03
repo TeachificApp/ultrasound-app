@@ -4583,3 +4583,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Admin user profile — merge Transactions tab and Purchases (from Content tab) into single "Transactions" tab with refund capability per row
 - [ ] Fix assignment block content rendering — blocks not showing for students in AssignmentDetail page
 - [x] Admin user profile — Communications tab: add Resend button per email row
+- [x] Admin manual enrollment tool: three payment modes (free/comp, link existing Stripe PI, manual charge with card token)
+- [x] Admin user profile — Activity tab: course progress drill-down with per-lesson completion, quiz scores, timestamps

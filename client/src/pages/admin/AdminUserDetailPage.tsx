@@ -394,6 +394,11 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+  const [enrollPaymentMode, setEnrollPaymentMode] = useState<"free" | "link" | "charge">("free");
+  const [enrollStripePI, setEnrollStripePI] = useState("");
+  const [enrollCardToken, setEnrollCardToken] = useState("");
+  const [enrollAmountCents, setEnrollAmountCents] = useState("");
+  const [enrollNote, setEnrollNote] = useState("");
   const [unenrollConfirm, setUnenrollConfirm] = useState<number | null>(null);
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
   const [cancelNativeConfirm, setCancelNativeConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
@@ -404,9 +409,18 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const enroll = trpc.adminUser.enrollInCourse.useMutation({
     onSuccess: (res) => {
       if (res.alreadyEnrolled) toast.info("User is already enrolled in this course.");
-      else toast.success("Enrolled successfully.");
+      else {
+        const paymentNote = res.stripePaymentIntentId ? ` (PI: ${res.stripePaymentIntentId})` : "";
+        toast.success(`Enrolled successfully${paymentNote}.`);
+      }
       refetch();
       setEnrollOpen(false);
+      setSelectedCourseId("");
+      setEnrollPaymentMode("free");
+      setEnrollStripePI("");
+      setEnrollCardToken("");
+      setEnrollAmountCents("");
+      setEnrollNote("");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -734,31 +748,132 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       </AlertDialog>
 
       {/* Enroll dialog */}
-      <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
-        <DialogContent>
+      <Dialog open={enrollOpen} onOpenChange={(open) => {
+        setEnrollOpen(open);
+        if (!open) {
+          setSelectedCourseId(""); setEnrollPaymentMode("free");
+          setEnrollStripePI(""); setEnrollCardToken(""); setEnrollAmountCents(""); setEnrollNote("");
+        }
+      }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Enroll in Course</DialogTitle>
-            <DialogDescription>Manually enroll this user in an LMS course.</DialogDescription>
+            <DialogDescription>Manually enroll this user in an LMS course. Choose a payment mode below.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label>Select Course</Label>
-            <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
-              <SelectTrigger><SelectValue placeholder="Choose a course..." /></SelectTrigger>
-              <SelectContent>
-                {(allCourses ?? []).map((c: any) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
+          <div className="space-y-4 py-2">
+            {/* Course selector */}
+            <div className="space-y-1.5">
+              <Label>Course</Label>
+              <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+                <SelectTrigger><SelectValue placeholder="Choose a course..." /></SelectTrigger>
+                <SelectContent>
+                  {(allCourses ?? []).map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Payment mode */}
+            <div className="space-y-1.5">
+              <Label>Payment Mode</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["free", "link", "charge"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setEnrollPaymentMode(mode)}
+                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                      enrollPaymentMode === mode
+                        ? "bg-[#189aa1] text-white border-[#189aa1]"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"
+                    }`}
+                  >
+                    {mode === "free" ? "Free / Comp" : mode === "link" ? "Link Stripe PI" : "Charge Card"}
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+              <p className="text-xs text-gray-400">
+                {enrollPaymentMode === "free" && "No payment — enrollment granted at no charge."}
+                {enrollPaymentMode === "link" && "Link this enrollment to an existing Stripe PaymentIntent."}
+                {enrollPaymentMode === "charge" && "Charge a card manually using a Stripe card token."}
+              </p>
+            </div>
+
+            {/* Link mode: PI ID */}
+            {enrollPaymentMode === "link" && (
+              <div className="space-y-1.5">
+                <Label>Stripe PaymentIntent ID</Label>
+                <Input
+                  placeholder="pi_3abc..."
+                  value={enrollStripePI}
+                  onChange={(e) => setEnrollStripePI(e.target.value)}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-gray-400">Find this in your Stripe Dashboard → Payments.</p>
+              </div>
+            )}
+
+            {/* Charge mode: card token + amount */}
+            {enrollPaymentMode === "charge" && (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Stripe Card Token</Label>
+                  <Input
+                    placeholder="tok_visa (from Stripe.js)"
+                    value={enrollCardToken}
+                    onChange={(e) => setEnrollCardToken(e.target.value)}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-400">Use Stripe.js on the client to tokenize the card, then paste the token here.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Amount (USD)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                    <Input
+                      placeholder="0.00"
+                      value={enrollAmountCents}
+                      onChange={(e) => setEnrollAmountCents(e.target.value)}
+                      className="pl-7"
+                      type="number"
+                      min="0.50"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Optional note */}
+            <div className="space-y-1.5">
+              <Label>Internal Note <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Input
+                placeholder="e.g. Scholarship, promo, manual override..."
+                value={enrollNote}
+                onChange={(e) => setEnrollNote(e.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEnrollOpen(false)}>Cancel</Button>
             <Button
               onClick={() => {
                 if (!selectedCourseId) return;
-                enroll.mutate({ userId, courseId: Number(selectedCourseId) });
+                const amountCents = enrollPaymentMode === "charge" ? Math.round(parseFloat(enrollAmountCents) * 100) : undefined;
+                enroll.mutate({
+                  userId,
+                  courseId: Number(selectedCourseId),
+                  paymentMode: enrollPaymentMode,
+                  stripePaymentIntentId: enrollPaymentMode === "link" ? enrollStripePI || undefined : undefined,
+                  stripeCardToken: enrollPaymentMode === "charge" ? enrollCardToken || undefined : undefined,
+                  amountCents: enrollPaymentMode === "charge" ? amountCents : undefined,
+                  note: enrollNote || undefined,
+                });
               }}
-              disabled={enroll.isPending || !selectedCourseId}
+              disabled={enroll.isPending || !selectedCourseId ||
+                (enrollPaymentMode === "link" && !enrollStripePI) ||
+                (enrollPaymentMode === "charge" && (!enrollCardToken || !enrollAmountCents))
+              }
               className="bg-[#189aa1] hover:bg-[#157f85] text-white"
             >
               {enroll.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -1599,8 +1714,120 @@ function CommunicationsTab({ userId }: { userId: number }) {
 
 
 // ─── Activity Tab ─────────────────────────────────────────────────────────────
-function ActivityTab({ userId }: { userId: number }) {
+// ─── Course Progress Drill-Down Panel ────────────────────────────────────────
+function CourseProgressPanel({ userId, enrollmentId, courseTitle, onClose }: {
+  userId: number; enrollmentId: number; courseTitle: string; onClose: () => void;
+}) {
+  const { data, isLoading } = trpc.adminUser.getUserCourseProgress.useQuery({ userId, enrollmentId });
+
+  const LESSON_TYPE_COLORS: Record<string, string> = {
+    video: "bg-purple-100 text-purple-700",
+    text: "bg-gray-100 text-gray-600",
+    quiz: "bg-amber-100 text-amber-700",
+    download: "bg-indigo-100 text-indigo-700",
+    embed: "bg-blue-100 text-blue-700",
+    video_text: "bg-violet-100 text-violet-700",
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+        <div>
+          <h4 className="text-sm font-semibold text-gray-800">{courseTitle}</h4>
+          {data && (
+            <p className="text-xs text-gray-500 mt-0.5">
+              {data.completedLessons} / {data.totalLessons} lessons completed
+              {data.enrollment.completedAt ? " · Course completed " + toET(data.enrollment.completedAt) : ""}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {data && (
+            <div className="flex items-center gap-2">
+              <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#189aa1] rounded-full transition-all"
+                  style={{ width: `${data.progressPct}%` }}
+                />
+              </div>
+              <span className="text-xs font-medium text-gray-600">{data.progressPct}%</span>
+            </div>
+          )}
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      <div className="max-h-80 overflow-y-auto">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8 text-gray-400">
+            <RefreshCw className="w-4 h-4 animate-spin mr-2" /> Loading lesson progress…
+          </div>
+        ) : !data?.lessonProgress.length ? (
+          <div className="text-center py-8 text-gray-400 text-sm">No lessons found for this course.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100 sticky top-0">
+              <tr>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">#</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Lesson</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Type</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Status</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Completed</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Quiz</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {data.lessonProgress.map((l: any, idx: number) => (
+                <tr key={l.id} className={l.completed ? "bg-emerald-50/40" : "hover:bg-gray-50"}>
+                  <td className="px-4 py-2 text-xs text-gray-400">{idx + 1}</td>
+                  <td className="px-3 py-2 text-gray-700 max-w-xs">
+                    <p className="truncate text-xs font-medium">{l.title}</p>
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${LESSON_TYPE_COLORS[l.type] ?? "bg-gray-100 text-gray-600"}`}>
+                      {l.type}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    {l.completed ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                        <CheckCircle2 className="w-3 h-3" /> Done
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                        <Clock className="w-3 h-3" /> Pending
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                    {l.completedAt ? toET(l.completedAt) : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {l.type === "quiz" && l.attempts > 0 ? (
+                      <span className={`font-medium ${l.quizPassed ? "text-emerald-600" : "text-red-500"}`}>
+                        {l.quizScore ?? "??"}% {l.quizPassed ? "✓" : "✗"}
+                        {l.attempts > 1 ? <span className="text-gray-400 ml-1">({l.attempts}x)</span> : null}
+                      </span>
+                    ) : l.type === "quiz" ? (
+                      <span className="text-gray-400">Not attempted</span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ActivityTab({ userId, enrollments }: { userId: number; enrollments?: any[] }) {
   const [page, setPage] = useState(1);
+  const [progressPanel, setProgressPanel] = useState<{ enrollmentId: number; courseTitle: string } | null>(null);
   const { data, isLoading } = trpc.adminUser.getUserActivityLog.useQuery({ userId, page, pageSize: 50 });
   const events = data?.events ?? [];
 
@@ -1637,7 +1864,60 @@ function ActivityTab({ userId }: { userId: number }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Course Progress Drill-Down */}
+      {(enrollments ?? []).length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700">Course Progress</h3>
+            <span className="text-xs text-gray-400">{(enrollments ?? []).length} enrollment{(enrollments ?? []).length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="space-y-2">
+            {(enrollments ?? []).map((enr: any) => (
+              <div key={enr.enrollmentId ?? enr.id}>
+                <div className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <BookOpen className="w-4 h-4 text-[#189aa1] shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{enr.courseTitle ?? enr.title ?? "Course"}</p>
+                      <p className="text-xs text-gray-400">Enrolled {toET(enr.enrolledAt)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 ml-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-[#189aa1] rounded-full" style={{ width: `${enr.progressPct ?? 0}%` }} />
+                      </div>
+                      <span className="text-xs text-gray-500 w-8 text-right">{enr.progressPct ?? 0}%</span>
+                    </div>
+                    <button
+                      onClick={() => setProgressPanel(
+                        progressPanel?.enrollmentId === (enr.enrollmentId ?? enr.id)
+                          ? null
+                          : { enrollmentId: enr.enrollmentId ?? enr.id, courseTitle: enr.courseTitle ?? enr.title ?? "Course" }
+                      )}
+                      className="text-xs px-2.5 py-1 border border-[#189aa1] text-[#189aa1] rounded-lg hover:bg-teal-50 transition-colors"
+                    >
+                      {progressPanel?.enrollmentId === (enr.enrollmentId ?? enr.id) ? "Hide" : "Details"}
+                    </button>
+                  </div>
+                </div>
+                {progressPanel?.enrollmentId === (enr.enrollmentId ?? enr.id) && (
+                  <div className="mt-1">
+                    <CourseProgressPanel
+                      userId={userId}
+                      enrollmentId={enr.enrollmentId ?? enr.id}
+                      courseTitle={progressPanel.courseTitle}
+                      onClose={() => setProgressPanel(null)}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-700">Activity Log</h3>
         <div className="flex items-center gap-3">
@@ -2360,7 +2640,7 @@ export default function AdminUserDetailPage() {
           {activeTab === "subscriptions" && <SubscriptionsTab userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "certificates"   && <CertificatesTab   userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "communications"  && <CommunicationsTab userId={userId!} />}
-          {activeTab === "activity"      && <ActivityTab      userId={userId!} />}
+          {activeTab === "activity"      && <ActivityTab      userId={userId!} enrollments={data?.enrollments} />}
           {activeTab === "logins"        && <LoginsTab        userId={userId!} />}
           {activeTab === "teams"         && <TeamsTab         userId={userId!} data={data} />}
         </div>
