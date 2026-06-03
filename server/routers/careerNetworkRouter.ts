@@ -872,6 +872,10 @@ Return a JSON object with this exact structure:
         customer_email: ctx.user.email ?? "",
         customer_name: ctx.user.name ?? "",
       },
+      subscription_data: {
+        description: "Employer Subscription — Ultrasound Career Network",
+        metadata: { user_id: ctx.user.id.toString(), type: "employer_subscription" },
+      },
       success_url: `${origin}/employer/dashboard?success=subscription`,
       cancel_url: `${origin}/career-network`,
     });
