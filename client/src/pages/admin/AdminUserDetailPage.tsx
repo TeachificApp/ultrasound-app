@@ -1388,6 +1388,40 @@ function LoginsTab({ userId }: { userId: number }) {
   const { data, isLoading } = trpc.adminUser.getUserLoginHistory.useQuery({ userId, page, pageSize: 25 });
   const logins = data?.logins ?? [];
 
+  const exportCSV = () => {
+    if (!logins.length) return;
+    const header = ["Date & Time (ET)", "IP Address", "Country", "Device / Browser"];
+    const parseUA = (ua: string | null) => {
+      if (!ua) return "Unknown";
+      if (/iPhone|iPad|iOS/i.test(ua)) return "iOS";
+      if (/Android/i.test(ua)) return "Android";
+      if (/Windows/i.test(ua)) return "Windows";
+      if (/Mac OS X/i.test(ua)) return "macOS";
+      if (/Linux/i.test(ua)) return "Linux";
+      return ua.slice(0, 40);
+    };
+    const parseBrowser = (ua: string | null) => {
+      if (!ua) return "";
+      if (/Chrome/i.test(ua) && !/Chromium|Edge/i.test(ua)) return "Chrome";
+      if (/Firefox/i.test(ua)) return "Firefox";
+      if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) return "Safari";
+      if (/Edge/i.test(ua)) return "Edge";
+      return "";
+    };
+    const csvRows = logins.map((l: any) => [
+      toET(l.createdAt),
+      l.ipAddress ?? "",
+      l.country ?? "",
+      [parseUA(l.userAgent), parseBrowser(l.userAgent)].filter(Boolean).join(" / "),
+    ]);
+    const csv = [header, ...csvRows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `login-history-user-${userId}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const parseUA = (ua: string | null) => {
     if (!ua) return "Unknown";
     if (/iPhone|iPad|iOS/i.test(ua)) return "iOS";
@@ -1411,7 +1445,13 @@ function LoginsTab({ userId }: { userId: number }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-700">Login History</h3>
-        <span className="text-xs text-gray-400">{(data?.total ?? 0).toLocaleString()} total logins</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">{(data?.total ?? 0).toLocaleString()} total logins</span>
+          <button onClick={exportCSV} disabled={logins.length === 0}
+            className="text-xs px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1">
+            <Download className="w-3 h-3" /> Export CSV
+          </button>
+        </div>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
