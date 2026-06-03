@@ -231,19 +231,37 @@ async function extractAndUploadScormVersion(
       }
     }
 
-    // ── Step 5: Update DB row with prefix + launch file + status = done ──────
+    // ── Step 5: Validate launch file exists in uploaded files, auto-correct if needed ──
+    // Normalize paths to forward slashes for comparison
+    const normalize = (p: string) => p.replace(/\\/g, "/");
+    const uploadedRelPaths = allFiles.map(f => normalize(f));
+    let validatedLaunchFile = normalize(launchFile);
+
+    if (!uploadedRelPaths.some(p => p === validatedLaunchFile || p.toLowerCase() === validatedLaunchFile.toLowerCase())) {
+      // Launch file not found in uploaded set — scan for any index.html
+      const indexHtmlRel = uploadedRelPaths.find(p => p.toLowerCase().endsWith("/index.html") || p.toLowerCase() === "index.html");
+      if (indexHtmlRel) {
+        console.warn(`[ScormExtractor] Launch file '${launchFile}' not in extracted files. Auto-corrected to '${indexHtmlRel}'`);
+        validatedLaunchFile = indexHtmlRel;
+      } else {
+        const htmlFiles = uploadedRelPaths.filter(p => p.toLowerCase().endsWith(".html")).slice(0, 5);
+        throw new Error(`Launch file '${launchFile}' not found in extracted files. HTML files found: ${htmlFiles.join(", ") || "none"}`);
+      }
+    }
+
+    // ── Step 6: Update DB row with prefix + validated launch file + status = done ──
     const db = await getDb();
     if (db) {
       await db
         .update(mediaVersions)
         .set({
           scormExtractedPrefix: prefix,
-          scormLaunchFile: launchFile,
+          scormLaunchFile: validatedLaunchFile,
           scormExtractionStatus: "done",
           scormExtractionError: null,
         })
         .where(eq(mediaVersions.id, versionId));
-      console.log(`[ScormExtractor] ✓ Done: version ${versionId}, prefix=${prefix}, launch=${launchFile}`);
+      console.log(`[ScormExtractor] ✓ Done: version ${versionId}, prefix=${prefix}, launch=${validatedLaunchFile}`);
     }
 
     // ── Step 6: Clean up work directory ──────────────────────────────────────
@@ -300,6 +318,82 @@ export async function extractAndUploadScorm(
     console.log(`[ScormExtractor] Queued version ${versionId} (slug=${slug}) for heartbeat extraction`);
   } catch (err) {
     console.error(`[ScormExtractor] Failed to queue version ${versionId}:`, err);
+  }
+}
+
+// ─── SCORM Health-Check Heartbeat: POST /api/scheduled/scorm-health-check ────
+// Runs periodically (e.g. every 10 min). Audits all 'done' versions to verify
+// their launch file actually exists in R2. Re-queues any broken ones.
+
+export async function scormHealthCheckHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) { res.json({ ok: true, skipped: "no-db" }); return; }
+
+    // Get all 'done' versions that have an extracted prefix (not direct-HTML)
+    const doneVersions = await db
+      .select({
+        versionId: mediaVersions.id,
+        slug: mediaAssets.slug,
+        prefix: mediaVersions.scormExtractedPrefix,
+        launchFile: mediaVersions.scormLaunchFile,
+      })
+      .from(mediaVersions)
+      .innerJoin(mediaAssets, eq(mediaAssets.id, mediaVersions.assetId))
+      .where(
+        and(
+          eq(mediaVersions.scormExtractionStatus as any, "done"),
+          inArray(mediaAssets.mediaType, [...SCORM_PACKAGE_MEDIA_TYPES])
+        )
+      )
+      .limit(50); // Check up to 50 per run to stay within request timeout
+
+    const broken: number[] = [];
+    const healed: number[] = [];
+
+    for (const v of doneVersions) {
+      if (!v.prefix || v.prefix.startsWith("__direct_html__:")) continue; // skip direct HTML
+      const launchKey = `${v.prefix}/${v.launchFile || "index.html"}`;
+      try {
+        // Quick HEAD check via R2 list (cheaper than GET)
+        const { S3Client, HeadObjectCommand, ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+        const r2Client = new S3Client({
+          region: "auto",
+          endpoint: `https://${process.env.CF_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+          credentials: { accessKeyId: process.env.CF_R2_ACCESS_KEY_ID!, secretAccessKey: process.env.CF_R2_SECRET_ACCESS_KEY! },
+        });
+        try {
+          await r2Client.send(new HeadObjectCommand({ Bucket: process.env.CF_R2_BUCKET_NAME!, Key: launchKey }));
+          // Launch file exists — healthy
+        } catch (headErr: any) {
+          if (headErr?.name === "NotFound" || headErr?.$metadata?.httpStatusCode === 404) {
+            // Launch file missing — try to auto-heal by scanning R2
+            const listResult = await r2Client.send(new ListObjectsV2Command({ Bucket: process.env.CF_R2_BUCKET_NAME!, Prefix: `${v.prefix}/`, MaxKeys: 500 }));
+            const keys = (listResult.Contents || []).map(o => o.Key || "");
+            const indexKey = keys.find(k => k.toLowerCase().endsWith("/index.html") || k.toLowerCase() === `${v.prefix}/index.html`);
+            if (indexKey) {
+              const correctedLaunchFile = indexKey.replace(`${v.prefix}/`, "");
+              await db.update(mediaVersions).set({ scormLaunchFile: correctedLaunchFile }).where(eq(mediaVersions.id, v.versionId));
+              console.log(`[ScormHealthCheck] Healed version ${v.versionId} (${v.slug}): '${v.launchFile}' → '${correctedLaunchFile}'`);
+              healed.push(v.versionId);
+            } else {
+              // No index.html found — re-queue for full re-extraction
+              await db.update(mediaVersions).set({ scormExtractionStatus: "pending" as any, scormExtractedPrefix: null, scormLaunchFile: null }).where(eq(mediaVersions.id, v.versionId));
+              console.warn(`[ScormHealthCheck] Re-queued version ${v.versionId} (${v.slug}): launch file missing and no index.html found in R2`);
+              broken.push(v.versionId);
+            }
+          }
+          // Other errors (network, auth) — skip this version silently
+        }
+      } catch (err) {
+        console.error(`[ScormHealthCheck] Error checking version ${v.versionId}:`, err);
+      }
+    }
+
+    res.json({ ok: true, checked: doneVersions.length, healed, requeued: broken });
+  } catch (err: any) {
+    console.error(`[ScormHealthCheck] Error:`, err.message);
+    res.status(500).json({ error: err.message });
   }
 }
 

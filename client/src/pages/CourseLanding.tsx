@@ -6,7 +6,6 @@
  */
 import { useState, useEffect, useRef } from "react";
 import { EnrolledAccessBanner } from "@/components/EnrolledAccessBanner";
-import PromoCodeInput from "@/components/PromoCodeInput";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
@@ -1554,11 +1553,7 @@ export default function CourseLanding() {
             {pricingType === "trial_then_subscription" && (
               <p className="text-xs text-gray-500">{course.trialDays ?? 7}-day free trial, then billed {course.subscriptionInterval ?? "monthly"}</p>
             )}
-            {!enrollment && pricingType !== "free" && (
-              <PromoCodeInput
-                onApply={(code, _discount) => setPromoCode(code)}
-              />
-            )}
+
             <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
               {enrolling ? "Processing..." : (selectedPricingOptionId ? (course.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.ctaLabel ?? ctaText) : ctaText)}
             </Button>

@@ -499,7 +499,49 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       try {
         const served = await proxyR2File(r2Key, res);
         if (served) return;
-        // Key not found — fall through to Strategy 2
+
+        // Key not found — if this is the launch file (root request), try to auto-heal
+        if (relativePath === "") {
+          console.warn(`[ScormServe] Launch file missing from R2: ${r2Key}. Attempting auto-heal scan.`);
+          try {
+            const { S3Client, ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+            const r2Client = new S3Client({
+              region: "auto",
+              endpoint: `https://${process.env.CF_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+              credentials: { accessKeyId: process.env.CF_R2_ACCESS_KEY_ID!, secretAccessKey: process.env.CF_R2_SECRET_ACCESS_KEY! },
+            });
+            const listCmd = new ListObjectsV2Command({ Bucket: process.env.CF_R2_BUCKET_NAME!, Prefix: `${extractedPrefix}/`, MaxKeys: 500 });
+            const listResult = await r2Client.send(listCmd);
+            const keys = (listResult.Contents || []).map(o => o.Key || "");
+            const indexKey = keys.find(k => k.toLowerCase().endsWith("/index.html") || k.toLowerCase() === `${extractedPrefix}/index.html`);
+            if (indexKey) {
+              const correctedLaunchFile = indexKey.replace(`${extractedPrefix}/`, "");
+              console.warn(`[ScormServe] Auto-healed launch file: '${version.scormLaunchFile}' → '${correctedLaunchFile}'`);
+              // Update DB with corrected launch file
+              const dbHeal = await getDb();
+              if (dbHeal) {
+                await dbHeal.update(mediaVersions).set({ scormLaunchFile: correctedLaunchFile }).where(eq(mediaVersions.id, version.id));
+              }
+              // Serve the corrected file
+              const healServed = await proxyR2File(`${extractedPrefix}/${correctedLaunchFile}`, res);
+              if (healServed) return;
+            }
+          } catch (healErr) {
+            console.error(`[ScormServe] Auto-heal scan failed:`, healErr);
+          }
+          // Auto-heal failed — re-queue for extraction
+          console.warn(`[ScormServe] Auto-heal failed for ${extractedPrefix}. Re-queuing extraction.`);
+          try {
+            const dbRequeue = await getDb();
+            if (dbRequeue) {
+              await dbRequeue.update(mediaVersions).set({ scormExtractionStatus: "pending" as any, scormExtractedPrefix: null, scormLaunchFile: null }).where(eq(mediaVersions.id, version.id));
+            }
+          } catch {}
+          res.status(202).send(scormStatusPage("pending", null));
+          return;
+        }
+
+        // Non-launch file not found — fall through to Strategy 2
         console.warn(`[ScormServe] R2 key not found: ${r2Key}, falling back to on-the-fly extraction`);
       } catch (err) {
         console.error(`[ScormServe] R2 proxy error for ${r2Key}:`, err);

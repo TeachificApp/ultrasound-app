@@ -23,7 +23,6 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import { useState, useEffect, useRef } from "react";
-import PromoCodeInput from "@/components/PromoCodeInput";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { CountdownV2Block, ImageLinkWrapper } from "@/components/BlockPreview";
 
@@ -940,12 +939,7 @@ export default function DownloadLanding() {
             <Card className="sticky top-4">
               <CardContent className="p-6">
                 <div className="text-3xl font-bold text-teal-700 mb-3 text-center">{price}</div>
-                {!hasPurchased && !product.isFree && (
-                  <PromoCodeInput
-                    className="mb-3"
-                    onApply={(code, discount) => { setPromoCode(code); setPromoDiscountText(discount); }}
-                  />
-                )}
+
                 {hasPurchased ? (
                   <Link href={`/downloads/${slug}/files`}>
                     <Button className="w-full" size="lg">

@@ -39,7 +39,7 @@ import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
 import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
-import { scormExtractHeartbeatHandler } from "../routes/scormExtractor";
+import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes/scormExtractor";
 import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -236,6 +236,8 @@ async function startServer() {
   app.post("/api/scheduled/thinkific-community-sync", thinkificCommunitySyncHandler);
   // Heartbeat: SCORM extraction job (every 60s) — processes pending SCORM ZIP packages
   app.post("/api/scheduled/scorm-extract", scormExtractHeartbeatHandler);
+  // Heartbeat: SCORM health-check (every 10 min) — audits done versions and re-queues broken ones
+  app.post("/api/scheduled/scorm-health-check", scormHealthCheckHandler);
   // Heartbeat: Hourly source-code backup → R2 + email
   app.post("/api/scheduled/hourly-backup", hourlyBackupHandler);
   // Public REST API: GET /api/forms/:formId/submissions (auth via Bearer apiToken)
