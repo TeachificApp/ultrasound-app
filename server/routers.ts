@@ -25,11 +25,12 @@ import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import { menuLinksRouter } from "./routers/menuLinksRouter";
 import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
 import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
+import { lmsTeamManagerRouter } from "./routers/lmsTeamManagerRouter";
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
 import { careerNetworkRouter } from "./routers/careerNetworkRouter";
-import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter } from "./routers/webinarRouter";
+import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter, webinarCheckoutPublicRouter } from "./routers/webinarRouter";
 import { thinkificImportRouter } from "./routers/thinkificImportRouter";
-import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter } from "./routers/downloadsRouter";
+import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter, downloadsCheckoutPublicRouter } from "./routers/downloadsRouter";
 import { orderBumpsAdminRouter, orderBumpsPublicRouter } from "./routers/orderBumpsRouter";
 import { socialContentRouter } from "./routers/socialContentRouter";
 import { funnelRouter, funnelPublicRouter, funnelAdminRouter } from "./routers/funnelRouter";
@@ -41,15 +42,15 @@ import { abTestRouter } from "./routers/abTestRouter";
 import { engagementRouter } from "./routers/engagementRouter";
 import { brandMembershipRouter } from "./routers/brandMembershipRouter";
 import { membershipRouter } from "./routers/membershipRouter";
-import { productsPublicRouter, productsLearnerRouter, productsAdminRouter } from "./routers/productsRouter";
+import { productsPublicRouter, productsLearnerRouter, productsAdminRouter, productsCheckoutPublicRouter } from "./routers/productsRouter";
 import { dashboardRouter } from "./routers/dashboardRouter";
 import { embeddedCheckoutRouter } from "./routers/embeddedCheckoutRouter";
 import { adminUserRouter } from "./routers/adminUserRouter";
+import { fulfillmentAdminRouter } from "./routers/fulfillmentAdminRouter";
 import { blockTemplatesRouter } from "./routers/blockTemplatesRouter";
 import { ssoRouter } from "./routers/ssoRouter";
 import { lessonCommentsRouter } from "./routers/lessonCommentsRouter";
 import { pageScraperRouter } from "./routers/pageScraperRouter";
-import { marketingSitePublicRouter, marketingSiteAdminRouter } from "./routers/marketingSiteRouter";
 import { questionBankRouter } from "./routers/questionBankRouter";
 import { communityRouter } from "./routers/communityRouter";
 import { interestsRouter } from "./routers/interestsRouter";
@@ -210,6 +211,16 @@ export const appRouter = router({
         displayName: fullUser?.displayName ?? opts.ctx.user.displayName ?? null,
         avatarUrl: fullUser?.avatarUrl ?? opts.ctx.user.avatarUrl ?? null,
         name: fullUser?.name ?? opts.ctx.user.name ?? null,
+        // Always return these profile fields from the DB (not stale session token)
+        firstName: fullUser?.firstName ?? null,
+        lastName: fullUser?.lastName ?? null,
+        bio: fullUser?.bio ?? null,
+        credentials: fullUser?.credentials ?? null,
+        specialty: fullUser?.specialty ?? null,
+        yearsExperience: fullUser?.yearsExperience ?? null,
+        location: fullUser?.location ?? null,
+        website: fullUser?.website ?? null,
+        isPublicProfile: fullUser?.isPublicProfile ?? true,
         pendingEmail: fullUser?.pendingEmail ?? null,
         appRoles: roles,
         isPremium: isPremium || brandPremium,
@@ -2049,18 +2060,22 @@ export const appRouter = router({
   lmsEnrollmentAdmin: lmsEnrollmentAdminRouter,
   careerNetwork: careerNetworkRouter,
   lmsGroup: lmsGroupRouter,
+  lmsTeamManager: lmsTeamManagerRouter,
   webinar: webinarPublicRouter,
   webinarLearner: webinarLearnerRouter,
   webinarAdmin: webinarAdminRouter,
   webinarSession: webinarSessionRouter,
+  webinarCheckout: webinarCheckoutPublicRouter,
   questionBank: questionBankRouter,
   thinkificImport: thinkificImportRouter,
   downloads: downloadsPublicRouter,
   downloadsLearner: downloadsLearnerRouter,
   downloadsAdmin: downloadsAdminRouter,
+  downloadsCheckout: downloadsCheckoutPublicRouter,
   products: productsPublicRouter,
   productsLearner: productsLearnerRouter,
   productsAdmin: productsAdminRouter,
+  productsCheckout: productsCheckoutPublicRouter,
   orderBumpsAdmin: orderBumpsAdminRouter,
   orderBumps: orderBumpsPublicRouter,
   socialContent: socialContentRouter,
@@ -2084,11 +2099,10 @@ export const appRouter = router({
   dashboard: dashboardRouter,
   embeddedCheckout: embeddedCheckoutRouter,
   adminUser: adminUserRouter,
+  fulfillmentAdmin: fulfillmentAdminRouter,
   productAnalytics: productAnalyticsRouter,
     lessonComments: lessonCommentsRouter,
   pageScraper: pageScraperRouter,
-  marketingSitePublic: marketingSitePublicRouter,
-  marketingSiteAdmin: marketingSiteAdminRouter,
   interests: interestsRouter,
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({

@@ -59,19 +59,6 @@ export const MEMBERS_APP_URL = "https://members.allaboutultrasound.com";
 export const APP_URL = "https://app.allaboutultrasound.com";
 /** The canonical root domain — landing pages, education library, funnels (Cloudflare proxied) */
 export const ROOT_DOMAIN_URL = "https://allaboutultrasound.com";
-/** Staging marketing site replica (noindex) */
-export const MARKETING_STAGING_URL = "https://site.allaboutultrasound.com";
-
-const MARKETING_STAGING_HOSTNAMES = ["site.allaboutultrasound.com"];
-
-/** Staging replica of www.allaboutultrasound.com — not the live site */
-export function isMarketingStagingDomain(): boolean {
-  const hostname = window.location.hostname.toLowerCase();
-  if (MARKETING_STAGING_HOSTNAMES.includes(hostname)) return true;
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("subdomain") === "site") return true;
-  return false;
-}
 
 /**
  * Returns the correct absolute admin URL for a given path.

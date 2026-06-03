@@ -11,7 +11,6 @@ export const BRAND_DOMAINS: Record<string, Brand> = {
   "learn.allaboutultrasound.com": "aaus",
   "members.allaboutultrasound.com": "aaus",  // current subdomain (will become member. after Thinkific migration)
   "member.allaboutultrasound.com": "aaus",   // future subdomain
-  "site.allaboutultrasound.com": "aaus",     // staging marketing site replica
   "app.iheartecho.com": "iheartecho",
   "iheartecho.com": "iheartecho",
   "app.iheartecho.net": "iheartecho",

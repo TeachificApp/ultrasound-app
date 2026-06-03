@@ -4,6 +4,8 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { getSessionCookieOptions } from "./cookies";
+import { COOKIE_NAME } from "../../shared/const";
 import { registerStorageProxy } from "./storageProxy";
 import { registerChatRoutes } from "./chat";
 import { registerThinkificWebhook } from "../webhooks/thinkific";
@@ -37,8 +39,9 @@ import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
 import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
-import { scormExtractHeartbeatHandler } from "../routes/scormExtractor";
-import { registerMarketingSiteRoutes, registerMarketingSiteOgMeta } from "../routes/marketingSiteRoutes";
+import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
+import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes/scormExtractor";
+import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -216,12 +219,17 @@ async function startServer() {
   registerUploadCohortMediaRoute(app);
   // Social content image upload (multipart, admin only)
   registerUploadSocialImageRoute(app);
+  // Dedicated logout route — bypasses tRPC batching so Set-Cookie clear is never merged with other responses
+  app.post("/api/auth/logout", (req, res) => {
+    const opts = getSessionCookieOptions(req);
+    res.clearCookie(COOKIE_NAME, { ...opts, maxAge: -1 });
+    res.json({ success: true });
+  });
   // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
   registerSsoAutoRoute(app);
-  registerMarketingSiteRoutes(app);
   // Funnel page OG meta injection — must be before SPA catch-all so crawlers get correct meta tags
   registerFunnelOgMetaRoutes(app);
-  registerMarketingSiteOgMeta(app);
+  registerFormEmbedRoutes(app);
   // Auto-login route — one-time token redemption for post-purchase automatic sign-in
   registerAutoLoginRoute(app);
   // Google OAuth2 routes for per-form Google Sheets integration
@@ -230,6 +238,10 @@ async function startServer() {
   app.post("/api/scheduled/thinkific-community-sync", thinkificCommunitySyncHandler);
   // Heartbeat: SCORM extraction job (every 60s) — processes pending SCORM ZIP packages
   app.post("/api/scheduled/scorm-extract", scormExtractHeartbeatHandler);
+  // Heartbeat: SCORM health-check (every 10 min) — audits done versions and re-queues broken ones
+  app.post("/api/scheduled/scorm-health-check", scormHealthCheckHandler);
+  // Heartbeat: Hourly source-code backup → R2 + email
+  app.post("/api/scheduled/hourly-backup", hourlyBackupHandler);
   // Public REST API: GET /api/forms/:formId/submissions (auth via Bearer apiToken)
   app.get("/api/forms/:formId/submissions", async (req: any, res: any) => {
     try {

@@ -37,8 +37,6 @@ The server starts on port 3000 (auto-scans for next available port if busy). No 
 
 6. **Form Success Modules migration**: After pulling changes for multi-path success pages, run `scripts/form-success-modules-migration.sql` against MySQL. Existing forms auto-migrate legacy thank-you/redirect settings into a default Success Module on first admin load or submission.
 
-8. **Marketing Site staging (`site.allaboutultrasound.com`)**: Run `scripts/marketing-site-migration.sql`. Import pages via `/admin/marketing-site` or `pnpm exec tsx scripts/import-aau-marketing-site.ts --limit 25`. Staging has `noindex` + `robots.txt` disallow. Do **not** point www DNS until approved.
-
 7. **Form Embed Widget migration**: Run `scripts/form-embed-widget-migration.sql` after deploy. Embed loader is served at `/embed.js` (from `client/public/embed.js`). Public config/events API: `/api/form-embed/config` and `/api/form-embed/event`. For UI verification in Cloud VMs, use `pnpm build && node dist/index.js` (not `pnpm dev`) due to Vite HMR WSS issue.
 
 ### Key file locations

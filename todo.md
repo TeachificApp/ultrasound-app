@@ -140,16 +140,6 @@
 - [x] Accreditation Navigator (hidden from public)
 - [x] DIY Accreditation (hidden from public)
 
-## AAU Staging Site Replica (Jun 2026)
-- [x] Merge cursor/aau-staging-site-4bb0 branch into main
-- [x] Run SQL migration: marketingSitePages and marketingSiteSettings tables
-- [x] Fix syntax error in marketingSiteRoutes.ts (missing closing paren on line 39)
-- [x] Fix missing import for registerMarketingSiteRoutes/registerMarketingSiteOgMeta in server/_core/index.ts
-- [x] Mount marketingSitePublicRouter and marketingSiteAdminRouter in appRouter
-- [x] Import all 178 AAU pages (0 failed, 178 imported/skipped)
-- [x] Verified API: getPageByPath returns homepage with 37 blocks
-- [x] robots.txt returns Disallow: / for staging host
-
 ## Form Success Modules (Jun 2026)
 - [x] Merge Cursor branch cursor/form-embed-widget-4bb0 into main
 - [x] Run SQL migrations: generalFormSuccessModules, generalFormSuccessRoutingRules, generalFormEmbedWidgets, generalFormEmbedAnalytics tables
