@@ -1813,6 +1813,7 @@ export const lmsLearnerRouter = router({
       const [assignment] = await db.select().from(lmsCohortAssignments)
         .where(eq(lmsCohortAssignments.id, input.assignmentId)).limit(1);
       if (!assignment) throw new TRPCError({ code: "NOT_FOUND" });
+      console.log(`[getAssignmentDetail] id=${input.assignmentId} contentBlocks type=${typeof assignment.contentBlocks} isArray=${Array.isArray(assignment.contentBlocks)} len=${Array.isArray(assignment.contentBlocks) ? assignment.contentBlocks.length : 'N/A'} raw=${JSON.stringify(assignment.contentBlocks)?.substring(0, 200)}`);
       // Verify enrollment
       const [enrollment] = await db.select({ id: lmsEnrollments.id })
         .from(lmsEnrollments)

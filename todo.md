@@ -4576,3 +4576,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix admin user profile "Back to All Users" link — should go to /admin/members?tab=all-members not /admin/users
 - [ ] Add assignment duplication feature — when adding assignment to cohort, offer "New" or "Copy from existing cohort" options
 - [ ] Add subscription/recurring billing support to bundles (alongside existing one-time purchase)
+
+## Admin User Profile Overhaul (Jun 3, 2026 — Batch 3)
+- [x] Admin user profile — Subscriptions tab: rename "Brand Memberships" section to "Apps", add separate "Learn Subscriptions" section for all ongoing LMS/membership/community/bundle subscriptions, each with manage/revoke/cancel/refund actions
+- [x] Admin user profile — Content tab: add Memberships, Communities, and Webinars sections (currently only shows courses/downloads)
+- [x] Admin user profile — merge Transactions tab and Purchases (from Content tab) into single "Transactions" tab with refund capability per row
+- [ ] Fix assignment block content rendering — blocks not showing for students in AssignmentDetail page
+- [x] Admin user profile — Communications tab: add Resend button per email row

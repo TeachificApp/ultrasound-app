@@ -41,6 +41,10 @@ import {
   emailSendLog,
   userEmailAliases,
   userRoles,
+  communityMembers,
+  communities,
+  webinarRegistrations,
+  webinars,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
@@ -192,6 +196,41 @@ export const adminUserRouter = router({
         ORDER BY gs.assigned_at DESC
       `);
 
+      // Community memberships
+      const [communityMemberList] = await db.execute(sql`
+        SELECT
+          cm.id,
+          cm.community_id AS communityId,
+          c.title AS communityTitle,
+          c.slug AS communitySlug,
+          cm.role,
+          cm.joined_at AS joinedAt,
+          cm.member_status AS memberStatus,
+          cm.stripe_subscription_id AS stripeSubscriptionId
+        FROM community_members cm
+        JOIN communities c ON c.id = cm.community_id
+        WHERE cm.user_id = ${input.userId}
+        ORDER BY cm.joined_at DESC
+      `);
+
+      // Webinar registrations
+      const [webinarRegList] = await db.execute(sql`
+        SELECT
+          wr.id,
+          wr.webinar_id AS webinarId,
+          w.title AS webinarTitle,
+          w.slug AS webinarSlug,
+          wr.registered_at AS registeredAt,
+          wr.attended,
+          wr.attended_at AS attendedAt,
+          wr.watched_replay_at AS watchedReplayAt,
+          wr.stripe_payment_intent_id AS stripePaymentIntentId
+        FROM webinar_registrations wr
+        JOIN webinars w ON w.id = wr.webinar_id
+        WHERE wr.user_id = ${input.userId}
+        ORDER BY wr.registered_at DESC
+      `);
+
       // Native membership subscriptions (membership_plans)
       // Note: membership_subscriptions has no current_period_start column, only current_period_end
       const [nativeMemberships] = await db.execute(sql`
@@ -273,6 +312,27 @@ export const adminUserRouter = router({
           groupCreatedAt: r.groupCreatedAt,
           courseTitle: r.courseTitle ? String(r.courseTitle) : null,
           courseId: r.courseId ? Number(r.courseId) : null,
+        })),
+        communityMemberships: (communityMemberList as any[]).map(r => ({
+          id: Number(r.id),
+          communityId: Number(r.communityId),
+          communityTitle: String(r.communityTitle ?? ""),
+          communitySlug: String(r.communitySlug ?? ""),
+          role: String(r.role ?? "member"),
+          joinedAt: r.joinedAt,
+          memberStatus: String(r.memberStatus ?? "approved"),
+          stripeSubscriptionId: r.stripeSubscriptionId ? String(r.stripeSubscriptionId) : null,
+        })),
+        webinarRegistrations: (webinarRegList as any[]).map(r => ({
+          id: Number(r.id),
+          webinarId: Number(r.webinarId),
+          webinarTitle: String(r.webinarTitle ?? ""),
+          webinarSlug: String(r.webinarSlug ?? ""),
+          registeredAt: r.registeredAt,
+          attended: Boolean(r.attended),
+          attendedAt: r.attendedAt ?? null,
+          watchedReplayAt: r.watchedReplayAt ?? null,
+          stripePaymentIntentId: r.stripePaymentIntentId ? String(r.stripePaymentIntentId) : null,
         })),
         nativeMemberships: (nativeMemberships as any[]).map(r => ({
           id: Number(r.id),
@@ -1958,5 +2018,83 @@ export const adminUserRouter = router({
       if (input.role === "user") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot remove the base user role" });
       await db.delete(userRoles).where(and(eq(userRoles.userId, input.userId), eq(userRoles.role, input.role)));
       return { success: true };
+    }),
+
+  /** Cancel a native (Learn) membership subscription via Stripe */
+  cancelNativeMembership: protectedProcedure
+    .input(z.object({
+      membershipSubscriptionId: z.number().int(),
+      stripeSubscriptionId: z.string().optional(),
+      immediately: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (input.stripeSubscriptionId) {
+        const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+        if (STRIPE_SECRET_KEY) {
+          const Stripe = (await import("stripe")).default;
+          const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+          if (input.immediately) {
+            await stripe.subscriptions.cancel(input.stripeSubscriptionId);
+          } else {
+            await stripe.subscriptions.update(input.stripeSubscriptionId, { cancel_at_period_end: true });
+          }
+        }
+      }
+      await db.update(membershipSubscriptions)
+        .set({ status: "cancelled" })
+        .where(eq(membershipSubscriptions.id, input.membershipSubscriptionId));
+      return { success: true };
+    }),
+
+  /** Revoke (delete) a native membership subscription record */
+  revokeNativeMembership: protectedProcedure
+    .input(z.object({ membershipSubscriptionId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(membershipSubscriptions)
+        .set({ status: "cancelled" })
+        .where(eq(membershipSubscriptions.id, input.membershipSubscriptionId));
+      return { success: true };
+    }),
+
+  /** Resend an email from the email send log by log entry ID */
+  resendEmailFromLog: protectedProcedure
+    .input(z.object({ emailLogId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [logEntry] = await db
+        .select()
+        .from(emailSendLog)
+        .where(eq(emailSendLog.id, input.emailLogId))
+        .limit(1);
+      if (!logEntry) throw new TRPCError({ code: "NOT_FOUND", message: "Email log entry not found" });
+      // Build a simple resend wrapper — forward the original subject/recipient
+      // We don't store the original HTML body, so we send a plain-text notice with a re-login link
+      let loginUrl = `${process.env.VITE_OAUTH_PORTAL_URL || "https://app.allaboutultrasound.com"}/dashboard`;
+      if (logEntry.userId) {
+        try { loginUrl = await generateAutoLoginToken(logEntry.userId, loginUrl); } catch {}
+      }
+      const htmlBody = `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <p>Hi ${logEntry.recipientName || logEntry.recipientEmail.split("@")[0]},</p>
+          <p>This is a resent copy of a previous email: <strong>${logEntry.subject}</strong></p>
+          <p>If you need to access your account, please click the link below:</p>
+          <p><a href="${loginUrl}" style="background:#189aa1;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block">Access My Account</a></p>
+          <p style="color:#888;font-size:12px">This email was resent by an administrator on ${new Date().toLocaleDateString()}.</p>
+        </div>
+      `;
+      const sent = await sendEmail({
+        to: { name: logEntry.recipientName || logEntry.recipientEmail, email: logEntry.recipientEmail },
+        subject: `[Resent] ${logEntry.subject}`,
+        htmlBody,
+      });
+      return { success: sent };
     }),
 });

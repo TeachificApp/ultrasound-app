@@ -143,11 +143,17 @@ export default function AssignmentDetail() {
 
   const { assignment, mySubmission } = data;
   const blocks: any[] = (() => {
-    const raw = (assignment as any).contentBlocks;
+    const raw = (assignment as any).contentBlocks ?? (assignment as any).content_blocks;
+    console.log('[AssignmentDetail] raw contentBlocks type:', typeof raw, 'isArray:', Array.isArray(raw), 'value:', JSON.stringify(raw)?.substring(0, 200));
     if (!raw) return [];
     if (Array.isArray(raw)) return raw;
-    try { return JSON.parse(raw); } catch { return []; }
+    if (typeof raw === 'string') {
+      try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+    }
+    return [];
   })();
+  // Schema uses maxPoints; fall back to points for legacy data
+  const pointsValue = (assignment as any).maxPoints ?? (assignment as any).points ?? null;
   const isOverdue = assignment.dueDate && Date.now() > new Date(assignment.dueDate).getTime();
   const hasSubmission = !!mySubmission;
   const subType = assignment.submissionType as string;
@@ -177,10 +183,10 @@ export default function AssignmentDetail() {
               {isOverdue && !hasSubmission && <Badge className="bg-red-100 text-red-700 border-red-200 text-[10px]">Overdue</Badge>}
             </div>
           )}
-          {assignment.points != null && (
+          {pointsValue != null && (
             <div className="flex items-center gap-1.5">
               <Star size={14} />
-              <span>{assignment.points} points</span>
+              <span>{pointsValue} points</span>
             </div>
           )}
           {subType && subType !== "none" && (
@@ -224,7 +230,7 @@ export default function AssignmentDetail() {
               {mySubmission.grade != null && (
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-bold text-green-700">{mySubmission.grade}</span>
-                  {assignment.points != null && <span className="text-sm text-green-600">/ {assignment.points} points</span>}
+                  {pointsValue != null && <span className="text-sm text-green-600">/ {pointsValue} points</span>}
                 </div>
               )}
               {mySubmission.feedback && (

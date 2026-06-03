@@ -388,7 +388,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
 }
 
 // ─── Content Tab ──────────────────────────────────────────────────────────────
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "products" | "purchases";
+type ContentSubTab = "courses" | "quizzes" | "downloads" | "products" | "memberships" | "communities" | "webinars";
 
 function ContentTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
@@ -396,6 +396,8 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [unenrollConfirm, setUnenrollConfirm] = useState<number | null>(null);
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
+  const [cancelNativeConfirm, setCancelNativeConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
+  const [revokeNativeConfirm, setRevokeNativeConfirm] = useState<number | null>(null);
 
   const { data: allCourses } = trpc.adminUser.listAllCourses.useQuery();
 
@@ -418,20 +420,32 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: (res) => { toast.success(`Refund issued (${res.refundId}).`); refetch(); setRefundOpen(null); },
     onError: (e) => toast.error(e.message),
   });
+  const cancelNativeMembership = trpc.adminUser.cancelNativeMembership.useMutation({
+    onSuccess: () => { toast.success("Membership subscription cancelled."); refetch(); setCancelNativeConfirm(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const revokeNativeMembership = trpc.adminUser.revokeNativeMembership.useMutation({
+    onSuccess: () => { toast.success("Membership revoked."); refetch(); setRevokeNativeConfirm(null); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const enrollments = data.enrollments ?? [];
   const courses   = enrollments.filter((e: any) => !e.isQuiz && !e.isDownload);
   const quizzes   = enrollments.filter((e: any) => e.isQuiz);
   const downloads = enrollments.filter((e: any) => e.isDownload);
   const physOrders = data.physicalOrders ?? [];
-  const funnelPurchases = data.funnelPurchases ?? [];
+  const nativeMemberships = data.nativeMemberships ?? [];
+  const communityMemberships = data.communityMemberships ?? [];
+  const webinarRegistrations = data.webinarRegistrations ?? [];
 
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
-    { key: "courses",   label: "Courses",   icon: BookOpen,       count: enrollments.length },
-    { key: "quizzes",   label: "Quizzes",   icon: ClipboardCheck, count: quizzes.length },
-    { key: "downloads", label: "Downloads", icon: Download,       count: downloads.length },
-    { key: "products",  label: "Products",  icon: Package,        count: physOrders.length },
-    { key: "purchases", label: "Purchases", icon: ShoppingCart,   count: funnelPurchases.length },
+    { key: "courses",      label: "Courses",      icon: BookOpen,       count: courses.length },
+    { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: quizzes.length },
+    { key: "downloads",    label: "Downloads",    icon: Download,       count: downloads.length },
+    { key: "products",     label: "Products",     icon: Package,        count: physOrders.length },
+    { key: "memberships",  label: "Memberships",  icon: Star,           count: nativeMemberships.length },
+    { key: "communities",  label: "Communities",  icon: Users2,         count: communityMemberships.length },
+    { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
   ];
 
   return (
@@ -589,33 +603,42 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
         </div>
       )}
 
-      {/* Funnel Purchases */}
-      {contentTab === "purchases" && (
+      {/* Memberships */}
+      {contentTab === "memberships" && (
         <div className="space-y-3">
-          <SectionHeader title={`Checkout Purchases (${funnelPurchases.length})`} />
-          {funnelPurchases.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No checkout purchases.</p>
+          <SectionHeader title={`Learn Memberships (${nativeMemberships.length})`} />
+          {nativeMemberships.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No memberships found.</p>
           ) : (
-            funnelPurchases.map((p: any) => (
-              <div key={p.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            nativeMemberships.map((m: any) => (
+              <div key={m.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                 <div className="flex items-start justify-between gap-2 flex-wrap">
                   <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">{p.productName}</h4>
+                    <h4 className="font-semibold text-gray-800 text-sm">{m.planTitle ?? "Membership"}</h4>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {formatDate(p.purchasedAt ?? p.createdAt)} · {formatCurrency(p.amountPaid ?? 0, p.currency ?? "usd")}
+                      Since {formatDate(m.createdAt)}{m.currentPeriodEnd ? ` · Renews ${formatDate(new Date(m.currentPeriodEnd * 1000))}` : ""}
                     </p>
-                    {p.stripePaymentIntentId && (
-                      <p className="text-xs text-gray-400 mt-0.5 font-mono">{p.stripePaymentIntentId}</p>
+                    {m.price > 0 && <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(m.price, m.currency)} / {m.billingInterval}</p>}
+                    {m.stripeSubscriptionId && (
+                      <p className="text-xs text-gray-400 mt-0.5 font-mono">{m.stripeSubscriptionId}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <StatusBadge status={p.status ?? "completed"} />
-                    {p.stripePaymentIntentId && p.status !== "refunded" && (
+                    <StatusBadge status={m.status ?? "active"} />
+                    {m.status === "active" && (
                       <button
-                        onClick={() => setRefundOpen({ piId: p.stripePaymentIntentId, purchaseId: p.id })}
+                        onClick={() => setCancelNativeConfirm({ id: m.id, stripeSubId: m.stripeSubscriptionId ?? null })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                      >
+                        <XCircle className="w-3 h-3" /> Cancel
+                      </button>
+                    )}
+                    {m.status !== "cancelled" && (
+                      <button
+                        onClick={() => setRevokeNativeConfirm(m.id)}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                       >
-                        <DollarSign className="w-3 h-3" /> Refund
+                        <ShieldOff className="w-3 h-3" /> Revoke
                       </button>
                     )}
                   </div>
@@ -625,6 +648,90 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
           )}
         </div>
       )}
+
+      {/* Communities */}
+      {contentTab === "communities" && (
+        <div className="space-y-3">
+          <SectionHeader title={`Community Memberships (${communityMemberships.length})`} />
+          {communityMemberships.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No community memberships.</p>
+          ) : (
+            communityMemberships.map((c: any) => (
+              <div key={c.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-4">
+                <div>
+                  <h4 className="font-semibold text-gray-800 text-sm">{c.communityTitle ?? "Community"}</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">Joined {formatDate(c.joinedAt ?? c.createdAt)}</p>
+                  {c.role && <p className="text-xs text-gray-400 mt-0.5 capitalize">{c.role}</p>}
+                </div>
+                <StatusBadge status={c.memberStatus ?? "active"} />
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Webinars */}
+      {contentTab === "webinars" && (
+        <div className="space-y-3">
+          <SectionHeader title={`Webinar Registrations (${webinarRegistrations.length})`} />
+          {webinarRegistrations.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No webinar registrations.</p>
+          ) : (
+            webinarRegistrations.map((w: any) => (
+              <div key={w.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-4">
+                <div>
+                  <h4 className="font-semibold text-gray-800 text-sm">{w.webinarTitle ?? "Webinar"}</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">Registered {formatDate(w.registeredAt ?? w.createdAt)}</p>
+                  {w.webinarDate && <p className="text-xs text-gray-400 mt-0.5">Scheduled: {formatDate(w.webinarDate)}</p>}
+                </div>
+                <StatusBadge status={w.status ?? "registered"} />
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Cancel native membership confirm */}
+      <AlertDialog open={cancelNativeConfirm !== null} onOpenChange={open => !open && setCancelNativeConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Membership Subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The membership will be cancelled at the end of the current billing period. The user will retain access until then.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancelNativeConfirm && cancelNativeMembership.mutate({ membershipSubscriptionId: cancelNativeConfirm.id, stripeSubscriptionId: cancelNativeConfirm.stripeSubId ?? undefined })}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Cancel Subscription
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Revoke native membership confirm */}
+      <AlertDialog open={revokeNativeConfirm !== null} onOpenChange={open => !open && setRevokeNativeConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke Membership?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately remove the user's membership access. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => revokeNativeConfirm !== null && revokeNativeMembership.mutate({ membershipSubscriptionId: revokeNativeConfirm })}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Revoke
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Enroll dialog */}
       <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
@@ -715,23 +822,34 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const [grantExpiry, setGrantExpiry] = useState("");
   const [cancelConfirm, setCancelConfirm] = useState<{ membershipId: number; stripeSubId: string } | null>(null);
   const [revokeConfirm, setRevokeConfirm] = useState<number | null>(null);
+  const [cancelNativeSubConfirm, setCancelNativeSubConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
+  const [revokeNativeSubConfirm, setRevokeNativeSubConfirm] = useState<number | null>(null);
 
   const grantMembership = trpc.adminUser.grantBrandMembership.useMutation({
-    onSuccess: () => { toast.success("Membership granted."); refetch(); setGrantOpen(false); },
+    onSuccess: () => { toast.success("App access granted."); refetch(); setGrantOpen(false); },
     onError: (e) => toast.error(e.message),
   });
   const revokeMembership = trpc.adminUser.revokeBrandMembership.useMutation({
-    onSuccess: () => { toast.success("Membership revoked."); refetch(); setRevokeConfirm(null); },
+    onSuccess: () => { toast.success("App access revoked."); refetch(); setRevokeConfirm(null); },
     onError: (e) => toast.error(e.message),
   });
   const cancelSub = trpc.adminUser.cancelStripeSubscription.useMutation({
     onSuccess: () => { toast.success("Subscription cancelled."); refetch(); setCancelConfirm(null); },
     onError: (e) => toast.error(e.message),
   });
+  const cancelNativeSub = trpc.adminUser.cancelNativeMembership.useMutation({
+    onSuccess: () => { toast.success("Membership subscription cancelled."); refetch(); setCancelNativeSubConfirm(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const revokeNativeSub = trpc.adminUser.revokeNativeMembership.useMutation({
+    onSuccess: () => { toast.success("Membership revoked."); refetch(); setRevokeNativeSubConfirm(null); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const memberships = data.memberships ?? [];
+  const nativeMemberships = data.nativeMemberships ?? [];
 
-  // Group by brand
+  // Group app memberships by brand
   const byBrand: Record<string, typeof memberships> = {};
   for (const m of memberships) {
     const b = m.brand ?? "other";
@@ -740,18 +858,21 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   }
 
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        title={`Brand Memberships (${memberships.length})`}
-        action={
-          <Button size="sm" onClick={() => setGrantOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
-            <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant
-          </Button>
-        }
-      />
+    <div className="space-y-8">
+      {/* ── Apps Section ── */}
+      <div>
+        <SectionHeader
+          title={`Apps (${memberships.length})`}
+          action={
+            <Button size="sm" onClick={() => setGrantOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
+              <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant App Access
+            </Button>
+          }
+        />
+        <p className="text-xs text-gray-400 mb-3">UltrasoundAssist™ and EchoAssist™ app subscriptions</p>
 
       {memberships.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">No memberships found.</p>
+        <p className="text-sm text-gray-400 text-center py-8">No app subscriptions found.</p>
       ) : (
         Object.entries(byBrand).map(([brand, subs]) => {
           const brandCfg = BRAND_CONFIG[brand] ?? { label: brand, color: "#6b7280", bg: "bg-gray-50", border: "border-gray-200" };
@@ -820,12 +941,62 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
         })
       )}
 
+      </div>
+
+      {/* ── Learn Subscriptions Section ── */}
+      <div>
+        <SectionHeader title={`Learn Subscriptions (${nativeMemberships.length})`} />
+        <p className="text-xs text-gray-400 mb-3">Ongoing LMS membership subscriptions from the Learn platform</p>
+        {nativeMemberships.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">No active learn subscriptions.</p>
+        ) : (
+          <div className="space-y-3">
+            {nativeMemberships.map((m: any) => (
+              <div key={m.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-800">{m.planTitle ?? "Membership"}</span>
+                      <StatusBadge status={m.status ?? "active"} />
+                    </div>
+                    <div className="text-xs text-gray-500 space-y-0.5">
+                      <p>Since: {formatDate(m.createdAt)}</p>
+                      {m.currentPeriodEnd && <p>Renews: {formatDate(new Date(m.currentPeriodEnd * 1000))}</p>}
+                      {m.price > 0 && <p>{formatCurrency(m.price, m.currency)} / {m.billingInterval}</p>}
+                      {m.stripeSubscriptionId && <p className="font-mono text-gray-400">{m.stripeSubscriptionId}</p>}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 items-end">
+                    {m.status === "active" && (
+                      <button
+                        onClick={() => setCancelNativeSubConfirm({ id: m.id, stripeSubId: m.stripeSubscriptionId ?? null })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                      >
+                        <XCircle className="w-3 h-3" /> Cancel
+                      </button>
+                    )}
+                    {m.status !== "cancelled" && (
+                      <button
+                        onClick={() => setRevokeNativeSubConfirm(m.id)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                      >
+                        <ShieldOff className="w-3 h-3" /> Revoke
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Grant dialog */}
       <Dialog open={grantOpen} onOpenChange={setGrantOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Grant Brand Membership</DialogTitle>
-            <DialogDescription>Manually grant or upgrade access for this user.</DialogDescription>
+            <DialogTitle>Grant App Access</DialogTitle>
+            <DialogDescription>Manually grant or upgrade app access for this user.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -888,13 +1059,13 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Revoke confirm */}
+      {/* Revoke app confirm */}
       <AlertDialog open={revokeConfirm !== null} onOpenChange={open => !open && setRevokeConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revoke Membership?</AlertDialogTitle>
+            <AlertDialogTitle>Revoke App Access?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will immediately remove the user's access to this brand app.
+              This will immediately remove the user's access to this app.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -908,14 +1079,58 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cancel native subscription confirm */}
+      <AlertDialog open={cancelNativeSubConfirm !== null} onOpenChange={open => !open && setCancelNativeSubConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Learn Subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The subscription will be cancelled at the end of the current billing period. The user retains access until then.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancelNativeSubConfirm && cancelNativeSub.mutate({ membershipSubscriptionId: cancelNativeSubConfirm.id, stripeSubscriptionId: cancelNativeSubConfirm.stripeSubId ?? undefined })}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Cancel Subscription
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Revoke native subscription confirm */}
+      <AlertDialog open={revokeNativeSubConfirm !== null} onOpenChange={open => !open && setRevokeNativeSubConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke Learn Membership?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately remove the user's membership access. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => revokeNativeSubConfirm !== null && revokeNativeSub.mutate({ membershipSubscriptionId: revokeNativeSubConfirm })}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Revoke
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 // ─── Transactions Tab ─────────────────────────────────────────────────────────
-function TransactionsTab({ userId }: { userId: number }) {
+function TransactionsTab({ userId, data: userData, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [page, setPage] = useState(1);
   const { data, isLoading } = trpc.productAnalytics.getUserTransactions.useQuery({ userId, page, pageSize: 50 });
+  const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
+  const [activeSection, setActiveSection] = useState<"stripe" | "purchases">("stripe");
 
   const fmtCurrency = (cents: number, currency = "usd") =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
@@ -925,10 +1140,39 @@ function TransactionsTab({ userId }: { userId: number }) {
   const STATUS_COLORS: Record<string, string> = {
     paid: "bg-green-100 text-green-700", pending: "bg-yellow-100 text-yellow-700",
     refunded: "bg-gray-100 text-gray-600", failed: "bg-red-100 text-red-700",
+    completed: "bg-green-100 text-green-700",
   };
+
+  const refundPayment = trpc.adminUser.refundPayment.useMutation({
+    onSuccess: (res) => { toast.success(`Refund issued (${res.refundId}).`); refetch(); setRefundOpen(null); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const funnelPurchases = userData?.funnelPurchases ?? [];
 
   return (
     <div className="space-y-4">
+      {/* Section toggle */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveSection("stripe")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeSection === "stripe" ? "bg-[#189aa1] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          Stripe Transactions ({data?.total ?? 0})
+        </button>
+        <button
+          onClick={() => setActiveSection("purchases")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeSection === "purchases" ? "bg-[#189aa1] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          Checkout Purchases ({funnelPurchases.length})
+        </button>
+      </div>
+
+      {activeSection === "stripe" && (<>
       {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
@@ -1009,6 +1253,68 @@ function TransactionsTab({ userId }: { userId: number }) {
           </div>
         )}
       </div>
+      </>)}
+
+      {activeSection === "purchases" && (
+        <div className="space-y-3">
+          <SectionHeader title={`Checkout Purchases (${funnelPurchases.length})`} />
+          {funnelPurchases.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No checkout purchases.</p>
+          ) : (
+            funnelPurchases.map((p: any) => (
+              <div key={p.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                <div className="flex items-start justify-between gap-2 flex-wrap">
+                  <div>
+                    <h4 className="font-semibold text-gray-800 text-sm">{p.productName}</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {fmtDate(p.purchasedAt ?? p.createdAt)} · {fmtCurrency(p.amountPaid ?? 0, p.currency ?? "usd")}
+                    </p>
+                    {p.stripePaymentIntentId && (
+                      <p className="text-xs text-gray-400 mt-0.5 font-mono">{p.stripePaymentIntentId}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status] ?? "bg-gray-100 text-gray-600"}`}>
+                      {p.status ?? "completed"}
+                    </span>
+                    {p.stripePaymentIntentId && p.status !== "refunded" && (
+                      <button
+                        onClick={() => setRefundOpen({ piId: p.stripePaymentIntentId, purchaseId: p.id })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                      >
+                        <DollarSign className="w-3 h-3" /> Refund
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Refund dialog */}
+      {refundOpen && (
+        <Dialog open onOpenChange={() => setRefundOpen(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Issue Refund</DialogTitle>
+              <DialogDescription>This will refund the full amount for payment intent {refundOpen.piId}.</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRefundOpen(null)}>Cancel</Button>
+              <Button
+                onClick={() => refundPayment.mutate({ paymentIntentId: refundOpen.piId, purchaseId: refundOpen.purchaseId })}
+                disabled={refundPayment.isPending}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {refundPayment.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Confirm Refund
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -1176,6 +1482,11 @@ function CommunicationsTab({ userId }: { userId: number }) {
   const { data, isLoading } = trpc.adminUser.getUserEmailHistory.useQuery({ userId, page, pageSize: 25 });
   const emails = data?.emails ?? [];
 
+  const resendEmail = trpc.adminUser.resendEmailFromLog.useMutation({
+    onSuccess: () => toast.success("Email resent successfully."),
+    onError: (e) => toast.error(e.message),
+  });
+
   const parseMetadata = (raw: string | null) => {
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
@@ -1195,6 +1506,7 @@ function CommunicationsTab({ userId }: { userId: number }) {
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sent</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -1231,6 +1543,15 @@ function CommunicationsTab({ userId }: { userId: number }) {
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {toET(e.sentAt)}
+                    </td>
+                    <td className="px-4 py-3" onClick={ev => ev.stopPropagation()}>
+                      <button
+                        onClick={() => resendEmail.mutate({ emailLogId: e.id })}
+                        disabled={resendEmail.isPending}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 whitespace-nowrap"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Resend
+                      </button>
                     </td>
                   </tr>
                   {isExpanded && (
@@ -2035,7 +2356,7 @@ export default function AdminUserDetailPage() {
           {/* Tab Content */}
           {activeTab === "profile"       && <ProfileTab       userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "content"       && <ContentTab       userId={userId!} data={data} refetch={refetch} />}
-          {activeTab === "transactions"  && <TransactionsTab  userId={userId!} />}
+          {activeTab === "transactions"  && <TransactionsTab  userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "subscriptions" && <SubscriptionsTab userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "certificates"   && <CertificatesTab   userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "communications"  && <CommunicationsTab userId={userId!} />}
