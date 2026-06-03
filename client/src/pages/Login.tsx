@@ -78,24 +78,18 @@ export default function Login() {
 
   // On the learn subdomain:
   // - If there's a returnTo (e.g. /courses/my-course/player), stay on learn domain
-  // - If no returnTo (e.g. user just went to /login directly), send to members dashboard
-  //   because /my-dashboard on learn would redirect back to login (loop).
-  const postLoginUrl = isLearnDomain()
-    ? (returnTo ?? `${MEMBERS_APP_URL}/my-dashboard`)
-    : (returnTo ?? "/my-dashboard");
+  // - If no returnTo, default to /my-dashboard on the learn domain itself.
+  //   StudentDashboardPage is served at /my-dashboard on learn — no loop.
+  const postLoginUrl = returnTo ?? "/my-dashboard";
 
   // Redirect if already signed in
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      if (isLearnDomain()) {
-        // returnTo is a learn-domain path (e.g. /courses/...) — stay on learn.
-        // No returnTo → go to members dashboard to avoid /my-dashboard loop on learn.
-        window.location.href = returnTo ?? `${MEMBERS_APP_URL}/my-dashboard`;
-      } else {
-        navigate(returnTo ?? "/my-dashboard");
-      }
+      // Always navigate to postLoginUrl (relative /my-dashboard or explicit returnTo).
+      // On the learn domain this keeps the student on learn.allaboutultrasound.com.
+      navigate(postLoginUrl);
     }
-  }, [isAuthenticated, loading, navigate, returnTo]);
+  }, [isAuthenticated, loading, navigate, postLoginUrl]);
 
   // ── Magic link mutation ──
   const requestMutation = trpc.auth.requestMagicLink.useMutation({

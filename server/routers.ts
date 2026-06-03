@@ -530,9 +530,23 @@ export const appRouter = router({
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
         const brandMode = dbm3(originHostname);
 
-        // Resolve canonical app domain from brand — iHeartEcho → app.iheartecho.net, all others → app.allaboutultrasound.com
+        // Resolve canonical app domain for the magic link URL.
+        // For known student/member subdomains, use the origin directly so the student
+        // stays on the same domain after clicking the link (learn → learn, members → members).
+        // For marketing/WordPress origins, fall back to the brand's canonical app URL.
         const { getBrandDisplayConfig: gbc } = await import('@shared/brands');
-        const appUrl = gbc(brandMode).appUrl;
+        const KNOWN_APP_SUBDOMAINS = [
+          "learn.allaboutultrasound.com",
+          "members.allaboutultrasound.com",
+          "member.allaboutultrasound.com",
+          "app.allaboutultrasound.com",
+          "app.iheartecho.net",
+          "app.iheartecho.com",
+          "accreditation.iheartecho.com",
+        ];
+        const appUrl = KNOWN_APP_SUBDOMAINS.includes(originHostname)
+          ? `https://${originHostname}`
+          : gbc(brandMode).appUrl;
         // Use server-side GET redirect — bypasses Cloudflare stripping Set-Cookie on XHR/fetch responses.
         // The browser follows a full page navigation so the session cookie is preserved correctly.
         const returnToParam = input.returnTo ? `&returnTo=${encodeURIComponent(input.returnTo)}` : '';

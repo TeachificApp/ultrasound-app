@@ -158,9 +158,9 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                         </p>
                       </div>
 
-                      {/* My Dashboard → members hub */}
+                      {/* My Dashboard — stays on learn domain */}
                       <a
-                        href={`${MEMBERS_URL}/my-dashboard`}
+                        href="/my-dashboard"
                         className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                         onClick={() => setAccountOpen(false)}
                       >
