@@ -4517,3 +4517,24 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix admin user profile crash on /admin/users/{id} (current_period_start column missing from membership_subscriptions — removed from query)
 - [x] Show cohort group column in course Students tab (added cohort group lookup to getCourseUsers procedure + Cohort Group column in UI, only visible for cohort-type courses)
 - [x] Fix echo interests not showing for AAUS users (updated brandFilter from "iheartecho" to "both" for all 7 echo interests in DB)
+
+## Admin User Profile Fixes (Jun 2026)
+- [ ] Fix undefined course names in Content tab (course title not being joined in query)
+- [ ] Fix undefined product names in Products tab (physical product title not joined)
+- [ ] Fix "Invalid Date" in Teams tab seat assignments and membership subscriptions (null timestamps)
+- [ ] Fix ghost certificates showing "undefined" course name (certificate course join missing)
+- [ ] Fix ghost team seat assignments showing "No course linked" and "Invalid Date"
+- [ ] Fix ghost membership subscriptions showing $0.00 and "Invalid Date"
+- [ ] Add email preview modal — click email row to see full subject + body
+- [ ] Add CSV export button to Activity Log
+- [ ] Fix Login History showing 0 logins despite activity (magic-link sessions not recorded)
+
+## Admin User Profile Fixes (Jun 2026)
+- [x] Fix undefined names/dates in Content/Products/Certificates tabs (db.execute destructuring bug)
+- [x] Fix ghost physical orders showing $0 (same root cause)
+- [x] Fix ghost certificates showing (same root cause)
+- [x] Fix ghost team seat assignments (same root cause)
+- [x] Add email row click-to-expand with metadata details in Emails tab
+- [x] Add CSV export button to Activity Log tab
+- [x] Fix Login History - magic-link and access-link sessions now record login events
+- [x] All timestamps in admin user profile now display in Eastern Time (ET)

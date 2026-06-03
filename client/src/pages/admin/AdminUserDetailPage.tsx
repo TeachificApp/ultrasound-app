@@ -1147,6 +1147,17 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
 }
 
 // ─── Communications Tab ────────────────────────────────────────────────────────
+const toET = (ts: any) => {
+  if (!ts) return "—";
+  try {
+    return new Date(ts).toLocaleString("en-US", {
+      timeZone: "America/New_York",
+      month: "numeric", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit", hour12: true,
+    }) + " ET";
+  } catch { return String(ts); }
+};
+
 const COMM_TYPE_LABELS: Record<string, string> = {
   magic_link: "Magic Link", welcome: "Welcome", certificate: "Certificate",
   enrollment: "Enrollment", campaign: "Campaign", password_reset: "Password Reset",
@@ -1161,8 +1172,15 @@ const COMM_TYPE_COLORS: Record<string, string> = {
 };
 function CommunicationsTab({ userId }: { userId: number }) {
   const [page, setPage] = useState(1);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const { data, isLoading } = trpc.adminUser.getUserEmailHistory.useQuery({ userId, page, pageSize: 25 });
   const emails = data?.emails ?? [];
+
+  const parseMetadata = (raw: string | null) => {
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -1188,29 +1206,58 @@ function CommunicationsTab({ userId }: { userId: number }) {
               <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-400 text-sm">
                 No emails sent to this user yet. Emails will appear here automatically as they are sent.
               </td></tr>
-            ) : emails.map((e: any) => (
-              <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-3">
-                  <p className="text-slate-700 truncate max-w-sm">{e.subject}</p>
-                  {e.campaignSubject && <p className="text-xs text-slate-400">Campaign: {e.campaignSubject}</p>}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COMM_TYPE_COLORS[e.emailType] ?? COMM_TYPE_COLORS.other}`}>
-                    {COMM_TYPE_LABELS[e.emailType] ?? e.emailType}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                    e.status === "sent" ? "bg-green-100 text-green-700" :
-                    e.status === "failed" ? "bg-red-100 text-red-700" :
-                    "bg-slate-100 text-slate-600"
-                  }`}>{e.status}</span>
-                </td>
-                <td className="px-4 py-3 text-xs text-slate-500">
-                  {e.sentAt ? new Date(e.sentAt).toLocaleString() : "—"}
-                </td>
-              </tr>
-            ))}
+            ) : emails.map((e: any) => {
+              const meta = parseMetadata(e.metadata);
+              const isExpanded = expandedId === e.id;
+              return (
+                <>
+                  <tr key={e.id} onClick={() => setExpandedId(isExpanded ? null : e.id)}
+                    className="hover:bg-slate-50 transition-colors cursor-pointer">
+                    <td className="px-4 py-3">
+                      <p className="text-slate-700 truncate max-w-sm">{e.subject}</p>
+                      {e.campaignSubject && <p className="text-xs text-slate-400">Campaign: {e.campaignSubject}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COMM_TYPE_COLORS[e.emailType] ?? COMM_TYPE_COLORS.other}`}>
+                        {COMM_TYPE_LABELS[e.emailType] ?? e.emailType}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        e.status === "sent" ? "bg-green-100 text-green-700" :
+                        e.status === "failed" ? "bg-red-100 text-red-700" :
+                        "bg-slate-100 text-slate-600"
+                      }`}>{e.status}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-500">
+                      {toET(e.sentAt)}
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${e.id}-expand`} className="bg-slate-50">
+                      <td colSpan={4} className="px-6 py-3">
+                        <div className="text-xs text-slate-600 space-y-1">
+                          <p className="font-semibold text-slate-700 mb-1">Email Details</p>
+                          <p><span className="text-slate-400">Subject:</span> {e.subject}</p>
+                          <p><span className="text-slate-400">Type:</span> {COMM_TYPE_LABELS[e.emailType] ?? e.emailType}</p>
+                          <p><span className="text-slate-400">Status:</span> {e.status}</p>
+                          <p><span className="text-slate-400">Sent:</span> {toET(e.sentAt)}</p>
+                          {e.campaignSubject && <p><span className="text-slate-400">Campaign:</span> {e.campaignSubject}</p>}
+                          {meta && Object.keys(meta).length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-200">
+                              <p className="font-semibold text-slate-700 mb-1">Metadata</p>
+                              {Object.entries(meta).map(([k, v]) => (
+                                <p key={k}><span className="text-slate-400">{k}:</span> {String(v)}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
           </tbody>
         </table>
         {(data?.totalPages ?? 0) > 1 && (
@@ -1236,6 +1283,24 @@ function ActivityTab({ userId }: { userId: number }) {
   const { data, isLoading } = trpc.adminUser.getUserActivityLog.useQuery({ userId, page, pageSize: 50 });
   const events = data?.events ?? [];
 
+  const exportCSV = () => {
+    if (!events.length) return;
+    const header = ["Event", "Description", "Path", "IP", "Time (ET)"];
+    const csvRows = events.map((e: any) => [
+      e.eventType,
+      `"${(e.description ?? "").replace(/"/g, '""')}"`,
+      e.path ?? "",
+      e.ipAddress ?? "",
+      toET(e.createdAt),
+    ]);
+    const csv = [header, ...csvRows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `activity-log-user-${userId}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const EVENT_COLORS: Record<string, string> = {
     login: "bg-blue-100 text-blue-700",
     page_view: "bg-gray-100 text-gray-600",
@@ -1254,7 +1319,13 @@ function ActivityTab({ userId }: { userId: number }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-700">Activity Log</h3>
-        <span className="text-xs text-gray-400">{(data?.total ?? 0).toLocaleString()} total events</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">{(data?.total ?? 0).toLocaleString()} total events</span>
+          <button onClick={exportCSV} disabled={events.length === 0}
+            className="text-xs px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1">
+            <Download className="w-3 h-3" /> Export CSV
+          </button>
+        </div>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -1288,7 +1359,7 @@ function ActivityTab({ userId }: { userId: number }) {
                   </td>
                   <td className="px-3 py-2.5 text-xs text-gray-400 font-mono whitespace-nowrap">{e.ipAddress ?? "—"}</td>
                   <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
-                    {new Date(e.createdAt).toLocaleString()}
+                    {toET(e.createdAt)}
                   </td>
                 </tr>
               ))}
@@ -1360,7 +1431,7 @@ function LoginsTab({ userId }: { userId: number }) {
                 <tr><td colSpan={4} className="text-center py-10 text-gray-400 text-sm">No login history recorded yet.</td></tr>
               ) : logins.map((l: any) => (
                 <tr key={l.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">{new Date(l.createdAt).toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">{toET(l.createdAt)}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-500 font-mono">{l.ipAddress ?? "—"}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-500">{l.country ?? "—"}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-500">

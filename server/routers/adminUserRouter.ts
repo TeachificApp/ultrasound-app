@@ -86,7 +86,7 @@ export const adminUserRouter = router({
       if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
       // LMS enrollments with progress
-      const enrollments = await db.execute(sql`
+      const [enrollments] = await db.execute(sql`
         SELECT
           e.id AS enrollmentId,
           e.enrolled_at AS enrolledAt,
@@ -106,7 +106,7 @@ export const adminUserRouter = router({
       `);
 
       // Certificates
-      const certs = await db.execute(sql`
+      const [certs] = await db.execute(sql`
         SELECT
           cert.id,
           cert.course_id AS courseId,
@@ -135,7 +135,7 @@ export const adminUserRouter = router({
         .orderBy(desc(funnelPurchases.purchasedAt));
 
       // Digital product purchases
-      const digitalPurchaseList = await db.execute(sql`
+      const [digitalPurchaseList] = await db.execute(sql`
         SELECT
           dp.id,
           dp.purchased_at AS purchasedAt,
@@ -149,7 +149,7 @@ export const adminUserRouter = router({
       `);
 
       // Physical product orders
-      const physicalOrderList = await db.execute(sql`
+      const [physicalOrderList] = await db.execute(sql`
         SELECT
           po.id,
           po.ordered_at AS createdAt,
@@ -166,7 +166,7 @@ export const adminUserRouter = router({
       `);
 
       // Team / group memberships — find all groups this user has a seat in
-      const teamSeats = await db.execute(sql`
+      const [teamSeats] = await db.execute(sql`
         SELECT
           gs.id AS seatId,
           gs.group_id AS groupId,
@@ -194,7 +194,7 @@ export const adminUserRouter = router({
 
       // Native membership subscriptions (membership_plans)
       // Note: membership_subscriptions has no current_period_start column, only current_period_end
-      const nativeMemberships = await db.execute(sql`
+      const [nativeMemberships] = await db.execute(sql`
         SELECT
           ms.id,
           ms.status,
@@ -1419,7 +1419,7 @@ export const adminUserRouter = router({
         SELECT
           esl.id, esl.email_type AS emailType, esl.subject, esl.status,
           esl.sent_at AS sentAt, esl.campaign_id AS campaignId,
-          ec.subject AS campaignSubject
+          ec.subject AS campaignSubject, esl.metadata
         FROM email_send_log esl
         LEFT JOIN emailCampaigns ec ON ec.id = esl.campaign_id
         WHERE esl.user_id = ${input.userId} OR esl.recipient_email = ${userEmail}
@@ -1440,6 +1440,7 @@ export const adminUserRouter = router({
           sentAt: r.sentAt,
           campaignId: r.campaignId ? Number(r.campaignId) : null,
           campaignSubject: r.campaignSubject ? String(r.campaignSubject) : null,
+          metadata: r.metadata ? (typeof r.metadata === 'string' ? r.metadata : JSON.stringify(r.metadata)) : null,
         })),
         total,
         page: input.page,
