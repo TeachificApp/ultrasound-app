@@ -76,9 +76,12 @@ import {
   Zap,
   Check,
   Save,
+  Trophy,
 } from "lucide-react";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
+import FormEmbedSharePanel from "@/components/admin/FormEmbedSharePanel";
+import FormSuccessModulesTab from "@/components/admin/FormSuccessModulesTab";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BRAND = "#0e7490";
@@ -114,7 +117,6 @@ const ITEM_TYPES = [
   { value: "rich_text", label: "Rich Text (display only)", icon: "✦" },
   { value: "signature", label: "Signature", icon: "✍" },
   { value: "payment", label: "Payment (Stripe)", icon: "💳" },
-  { value: "hidden", label: "Hidden Field", icon: "👁" },
 ];
 
 const DEFAULT_THEME = {
@@ -705,14 +707,9 @@ function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
   );
 
   const hasOptions = ["dropdown", "radio", "checkbox"].includes(item.itemType);
-  const isHiddenField = item.itemType === "hidden";
-  const [hiddenValue, setHiddenValue] = useState(() => {
-    try { return JSON.parse(item.extraConfig ?? "{}").hiddenValue ?? ""; } catch { return ""; }
-  });
 
   const handleSave = () => {
-    const extraConfig = isHiddenField ? JSON.stringify({ hiddenValue }) : item.extraConfig;
-    const updates = { label, helpText: helpText || undefined, placeholder: placeholder || undefined, isRequired: false, scoreWeight: 0, extraConfig };
+    const updates = { label, helpText: helpText || undefined, placeholder: placeholder || undefined, isRequired, scoreWeight };
     let parsedOptions: any[] | undefined = undefined;
     if (hasOptions) {
       parsedOptions = optionsText.split("\n").filter(l => l.trim()).map((line, idx) => {
@@ -747,24 +744,10 @@ function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
               <Input value={placeholder} onChange={e => setPlaceholder(e.target.value)} placeholder="Placeholder text…" className="mt-1" />
             </div>
           )}
-          {isHiddenField ? (
-            <div className="space-y-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <Label className="text-amber-800 font-semibold">Hidden Field Value</Label>
-              <p className="text-xs text-amber-700">This value is set server-side and never shown to users. Use static text or variables:</p>
-              <Input value={hiddenValue} onChange={e => setHiddenValue(e.target.value)} placeholder="e.g. campaign_2024 or {{user_id}}" className="mt-1" />
-              <div className="flex flex-wrap gap-1 mt-1">
-                {["{{user_id}}", "{{user_email}}", "{{date}}", "{{form_id}}", "{{source}}"].map(v => (
-                  <button key={v} type="button" onClick={() => setHiddenValue(v)} className="text-xs px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded border border-amber-300">{v}</button>
-                ))}
-              </div>
-              <p className="text-xs text-amber-600 mt-1">The <strong>Field Name</strong> (label) is used as the key in submission results.</p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Switch checked={isRequired} onCheckedChange={setIsRequired} id="req-switch" />
-              <Label htmlFor="req-switch">Required</Label>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <Switch checked={isRequired} onCheckedChange={setIsRequired} id="req-switch" />
+            <Label htmlFor="req-switch">Required</Label>
+          </div>
           {scoreEnabled && (
             <div>
               <Label>Score Weight (points for correct answer)</Label>
@@ -1245,8 +1228,6 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
   });
 
   const publicUrl = template.publicSlug ? getPublicUrl(template.publicSlug, template.hostDomain) : null;
-  const embedCode = publicUrl ? `<iframe src="${publicUrl}/embed" width="100%" height="600" frameborder="0" style="border:none;border-radius:12px;" title="${template.name}"></iframe>` : null;
-
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopied(key);
@@ -1363,30 +1344,7 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
         </CardContent>
       </Card>
 
-      {/* Embed Code */}
-      {embedCode && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Code2 className="w-4 h-4" /> Embed Code</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-500">Copy and paste this code into any webpage to embed the form.</p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs"
-                onClick={() => copy(embedCode, "embed")}
-              >
-                {copied === "embed" ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied === "embed" ? "Copied!" : "Copy Code"}
-              </Button>
-            </div>
-            <pre className="bg-gray-900 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">{embedCode}</pre>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`${publicUrl}/embed`, "_blank")}>
-              <Eye className="w-3.5 h-3.5" /> Preview Embed
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <FormEmbedSharePanel formId={formId} publicUrl={publicUrl} hostDomain={template.hostDomain || DEFAULT_HOST_DOMAIN} />
     </div>
   );
 }
@@ -1399,8 +1357,6 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
   const [status, setStatus] = useState(template.status ?? "draft");
   const [scoreEnabled, setScoreEnabled] = useState(template.scoreEnabled ?? false);
   const [scoreLabel, setScoreLabel] = useState(template.scoreLabel ?? "Score");
-  const [successMessage, setSuccessMessage] = useState(template.successMessage ?? "");
-  const [successRedirectUrl, setSuccessRedirectUrl] = useState(template.successRedirectUrl ?? "");
   const [notifyEmail, setNotifyEmail] = useState(template.notifyEmail ?? "");
   const [maxSubmissions, setMaxSubmissions] = useState(template.maxSubmissions?.toString() ?? "");
   const [hostDomain, setHostDomain] = useState(template.hostDomain ?? DEFAULT_HOST_DOMAIN);
@@ -1428,8 +1384,6 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
       status: status as any,
       scoreEnabled,
       scoreLabel: scoreLabel || undefined,
-      successMessage: successMessage || undefined,
-      successRedirectUrl: successRedirectUrl || undefined,
       notifyEmail: notifyEmail || undefined,
       maxSubmissions: maxSubmissions ? parseInt(maxSubmissions) : undefined,
       hostDomain,
@@ -1585,50 +1539,23 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
       </Card>
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Submission Behavior</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Post-Submission Success Routing</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Post-Submission Action</Label>
-            </div>
-            <div className="flex gap-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setSuccessRedirectUrl("")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                  !successRedirectUrl ? "bg-[#0e7490] text-white border-[#0e7490]" : "bg-white text-gray-600 border-gray-200 hover:border-[#0e7490]"
-                }`}
-              >
-                Show Thank-You Message
-              </button>
-              <button
-                type="button"
-                onClick={() => { if (!successRedirectUrl) setSuccessRedirectUrl("https://"); }}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                  successRedirectUrl ? "bg-[#0e7490] text-white border-[#0e7490]" : "bg-white text-gray-600 border-gray-200 hover:border-[#0e7490]"
-                }`}
-              >
-                Redirect to URL
-              </button>
-            </div>
-            {!successRedirectUrl ? (
-              <div>
-                <Label className="text-xs text-gray-500 mb-1 block">Thank-You Message (rich text, shown after submission)</Label>
-                <RichTextEditor
-                  value={successMessage}
-                  onChange={setSuccessMessage}
-                  placeholder="Thank you for your submission! We'll be in touch soon."
-                  minHeight={120}
-                  maxHeight={400}
-                />
-              </div>
-            ) : (
-              <div>
-                <Label className="text-xs text-gray-500 mb-1 block">Redirect URL (user is sent here after submitting)</Label>
-                <Input value={successRedirectUrl} onChange={e => setSuccessRedirectUrl(e.target.value)} placeholder="https://yoursite.com/thank-you" className="mt-1" />
-              </div>
-            )}
-          </div>
+          <p className="text-sm text-gray-600">
+            Configure multiple success pathways in the <strong>Success Modules</strong> tab — inline thank-you messages, full success pages, and redirects.
+            Use routing rules to branch by score, pass/fail, payment, or field answers.
+          </p>
+          {template.defaultSuccessModuleId ? (
+            <p className="text-xs text-gray-500">Default module ID: {template.defaultSuccessModuleId}</p>
+          ) : (
+            <p className="text-xs text-amber-600">No default success module set yet. Open Success Modules to configure.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Submission Notifications</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
           <div>
             <Label>Notify Email (send a copy of each submission)</Label>
             <Input type="email" value={notifyEmail} onChange={e => setNotifyEmail(e.target.value)} placeholder="admin@yoursite.com" className="mt-1" />
@@ -1800,7 +1727,7 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
     const items = data?.items ?? [];
     const preview: { label: string; value: string }[] = [];
     for (const item of items) {
-      if (["heading", "paragraph", "section_break", "rich_text", "hidden"].includes(item.itemType)) continue;
+      if (["heading", "paragraph", "section_break", "rich_text"].includes(item.itemType)) continue;
       const v = r[String(item.id)];
       if (v === undefined || v === null || v === "") continue;
       const displayVal = Array.isArray(v) ? v.join(", ") : String(v);
@@ -1872,7 +1799,7 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
   ] as const;
 
   const filterableItems = useMemo(() => {
-    return (data?.items ?? []).filter((it: any) => !["heading", "paragraph", "section_break", "rich_text", "hidden"].includes(it.itemType));
+    return (data?.items ?? []).filter((it: any) => !["heading", "paragraph", "section_break", "rich_text"].includes(it.itemType));
   }, [data?.items]);
 
   return (
@@ -2207,6 +2134,29 @@ function AnalyticsTab({ formId, template }: { formId: number; template: any }) {
           </Card>
         ))}
       </div>
+
+      {/* Embed widget analytics */}
+      {analytics?.embed && (analytics.embed.loaded > 0 || analytics.embed.opened > 0) && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Code2 className="w-4 h-4" /> Embed Widget Analytics</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              {[
+                { label: "Loaded", value: analytics.embed.loaded },
+                { label: "Viewed", value: analytics.embed.viewed },
+                { label: "Opened", value: analytics.embed.opened },
+                { label: "Submitted", value: analytics.embed.submitted },
+              ].map(s => (
+                <div key={s.label} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <p className="text-xs text-gray-500">{s.label}</p>
+                  <p className="text-xl font-bold text-gray-900">{s.value}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">Conversion rate (submit / open): <strong>{analytics.embed.conversionRate}%</strong></p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Daily chart (simple bar) */}
       {analytics?.dailyCounts && analytics.dailyCounts.length > 0 && (
@@ -3043,11 +2993,12 @@ function ApiCard({ formId }: { formId: number }) {
 
 // ─── Form Editor Shell (tabs) ─────────────────────────────────────────────────
 function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "results" | "analytics" | "branching" | "integrations">("settings");
+  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "results" | "analytics" | "branching" | "integrations" | "success">("settings");
   const { data: formData, isLoading, refetch } = trpc.generalForm.getForm.useQuery({ id: formId });
 
   const TABS = [
     { id: "settings", label: "Settings", icon: Settings },
+    { id: "success", label: "Success Modules", icon: Trophy },
     { id: "editor", label: "Editor", icon: FileText },
     { id: "branching", label: "Logic", icon: GitBranch },
     { id: "style", label: "Style / Branding", icon: Palette },
@@ -3131,6 +3082,7 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
       {activeTab === "style" && <StyleTab formId={formId} template={template} />}
       {activeTab === "share" && <ShareTab formId={formId} template={template} onRefetch={refetch} />}
       {activeTab === "settings" && <SettingsTab formId={formId} template={template} onRefetch={refetch} />}
+      {activeTab === "success" && <FormSuccessModulesTab formId={formId} template={template} onRefetch={refetch} />}
       {activeTab === "results" && <ResultsTab formId={formId} template={template} />}
       {activeTab === "analytics" && <AnalyticsTab formId={formId} template={template} />}
       {activeTab === "integrations" && <IntegrationsTab formId={formId} />}

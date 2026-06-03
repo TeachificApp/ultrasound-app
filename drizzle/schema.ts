@@ -4208,6 +4208,8 @@ export const generalFormTemplates = mysqlTable("generalFormTemplates", {
   themeSettings: longtext("themeSettings"),
   successMessage: text("successMessage"),
   successRedirectUrl: varchar("successRedirectUrl", { length: 500 }),
+  defaultSuccessModuleId: int("defaultSuccessModuleId"),
+  passingScorePercent: int("passingScorePercent"),
   notifyEmail: varchar("notifyEmail", { length: 255 }),
   openAt: timestamp("openAt"),
   closeAt: timestamp("closeAt"),
@@ -4296,6 +4298,37 @@ export const generalFormBranchRules = mysqlTable("generalFormBranchRules", {
 export type GeneralFormBranchRule = typeof generalFormBranchRules.$inferSelect;
 export type InsertGeneralFormBranchRule = typeof generalFormBranchRules.$inferInsert;
 
+
+export const generalFormSuccessModules = mysqlTable("generalFormSuccessModules", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  moduleType: mysqlEnum("moduleType", ["inline_message", "full_page", "redirect_url"]).notNull(),
+  inlineContent: longtext("inlineContent"),
+  pageContent: longtext("pageContent"),
+  redirectUrl: varchar("redirectUrl", { length: 2000 }),
+  isEnabled: boolean("isEnabled").default(true).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type GeneralFormSuccessModule = typeof generalFormSuccessModules.$inferSelect;
+export type InsertGeneralFormSuccessModule = typeof generalFormSuccessModules.$inferInsert;
+
+export const generalFormSuccessRoutingRules = mysqlTable("generalFormSuccessRoutingRules", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  ruleLabel: varchar("ruleLabel", { length: 255 }).default(""),
+  successModuleId: int("successModuleId").notNull(),
+  logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("all"),
+  conditions: longtext("conditions").notNull(),
+  sortOrder: int("sortOrder").notNull().default(0),
+  isEnabled: boolean("isEnabled").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GeneralFormSuccessRoutingRule = typeof generalFormSuccessRoutingRules.$inferSelect;
+export type InsertGeneralFormSuccessRoutingRule = typeof generalFormSuccessRoutingRules.$inferInsert;
+
 export const generalFormSubmissions = mysqlTable("generalFormSubmissions", {
   id: int("id").autoincrement().primaryKey(),
   templateId: int("templateId").notNull(),
@@ -4314,6 +4347,37 @@ export const generalFormSubmissions = mysqlTable("generalFormSubmissions", {
 });
 export type GeneralFormSubmission = typeof generalFormSubmissions.$inferSelect;
 export type InsertGeneralFormSubmission = typeof generalFormSubmissions.$inferInsert;
+
+export const generalFormEmbedWidgets = mysqlTable("generalFormEmbedWidgets", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  widgetKey: varchar("widgetKey", { length: 64 }).notNull(),
+  name: varchar("name", { length: 200 }).notNull().default("Default Widget"),
+  isEnabled: boolean("isEnabled").default(false).notNull(),
+  displayType: mysqlEnum("displayType", ["inline", "popup", "slide_in"]).default("inline").notNull(),
+  settingsJson: longtext("settingsJson").notNull(),
+  domainMode: mysqlEnum("domainMode", ["all", "allowlist"]).default("all").notNull(),
+  allowedDomains: longtext("allowedDomains"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type GeneralFormEmbedWidget = typeof generalFormEmbedWidgets.$inferSelect;
+export type InsertGeneralFormEmbedWidget = typeof generalFormEmbedWidgets.$inferInsert;
+
+export const generalFormEmbedAnalytics = mysqlTable("generalFormEmbedAnalytics", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  widgetId: int("widgetId"),
+  eventType: varchar("eventType", { length: 40 }).notNull(),
+  triggerSource: varchar("triggerSource", { length: 80 }),
+  deviceType: varchar("deviceType", { length: 20 }),
+  hostDomain: varchar("hostDomain", { length: 255 }),
+  sessionKey: varchar("sessionKey", { length: 64 }),
+  metadataJson: longtext("metadataJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GeneralFormEmbedAnalytic = typeof generalFormEmbedAnalytics.$inferSelect;
+export type InsertGeneralFormEmbedAnalytic = typeof generalFormEmbedAnalytics.$inferInsert;
 
 // ─── Block Templates (shared across all page editors) ─────────────────────────
 export const blockTemplates = mysqlTable("blockTemplates", {

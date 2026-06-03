@@ -35,6 +35,10 @@ The server starts on port 3000 (auto-scans for next available port if busy). No 
 
 5. **pnpm build scripts warning**: On fresh `pnpm install`, you'll see a warning about ignored build scripts for `@tailwindcss/oxide`, `core-js`, `esbuild`. These packages still work correctly without running their postinstall scripts in this environment.
 
+6. **Form Success Modules migration**: After pulling changes for multi-path success pages, run `scripts/form-success-modules-migration.sql` against MySQL. Existing forms auto-migrate legacy thank-you/redirect settings into a default Success Module on first admin load or submission.
+
+7. **Form Embed Widget migration**: Run `scripts/form-embed-widget-migration.sql` after deploy. Embed loader is served at `/embed.js` (from `client/public/embed.js`). Public config/events API: `/api/form-embed/config` and `/api/form-embed/event`. For UI verification in Cloud VMs, use `pnpm build && node dist/index.js` (not `pnpm dev`) due to Vite HMR WSS issue.
+
 ### Key file locations
 
 - Server entry: `server/_core/index.ts`

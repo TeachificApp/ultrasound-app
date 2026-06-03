@@ -142,8 +142,6 @@ function FormField({
     transition: "border-color 0.15s, box-shadow 0.15s",
   };
 
-  if (item.itemType === "hidden") return null;
-
   if (item.itemType === "section_break" || item.itemType === "rich_text") {
     return (
       <div className="py-2">
@@ -867,7 +865,11 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
   const [showWelcome, setShowWelcome] = useState(true);
 
   const submitMutation = trpc.generalForm.submitForm.useMutation({
-    onSuccess: () => { setSubmitting(false); setSubmitted(true); },
+    onSuccess: () => {
+      setSubmitting(false);
+      setSubmitted(true);
+      postEmbedEvent("form_submitted");
+    },
     onError: (e) => { setSubmitting(false); setGlobalError(e.message); },
   });
 

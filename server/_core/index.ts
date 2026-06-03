@@ -39,6 +39,7 @@ import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
 import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
+import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
 import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes/scormExtractor";
 import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
 
@@ -228,6 +229,7 @@ async function startServer() {
   registerSsoAutoRoute(app);
   // Funnel page OG meta injection — must be before SPA catch-all so crawlers get correct meta tags
   registerFunnelOgMetaRoutes(app);
+  registerFormEmbedRoutes(app);
   // Auto-login route — one-time token redemption for post-purchase automatic sign-in
   registerAutoLoginRoute(app);
   // Google OAuth2 routes for per-form Google Sheets integration

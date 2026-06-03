@@ -32,11 +32,23 @@ import {
   googleFormIntegrations,
     generalFormWebhooks,
   users,
+  generalFormSuccessModules,
+  generalFormSuccessRoutingRules,
+  generalFormEmbedWidgets,
+  generalFormEmbedAnalytics,
 } from "../../drizzle/schema";
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 import { addToEmailList, addToAllContacts } from "../lib/emailListHelper";
-import { extractFormFromUrl } from "../lib/formHtmlExtractor";
+import {
+  ensureLegacySuccessModules,
+  fetchSuccessModules,
+  fetchSuccessRoutingRules,
+  clearDefaultIfDeleted,
+} from "../lib/formSuccessModulesDb";
+import { ensureEmbedWidget, deleteEmbedDataForForm, parseAllowedDomains } from "../lib/formEmbedWidgetDb";
+import { parseEmbedSettings } from "@shared/formEmbedWidgetTypes";
+import { getEmbedAnalyticsSummary } from "../routes/formEmbedRoutes";
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 async function requireAdmin(ctx: any) {
@@ -470,6 +482,7 @@ export const generalFormRouter = router({
       await db.delete(generalFormSections).where(eq(generalFormSections.templateId, input.id));
       await db.delete(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, input.id));
       await db.delete(generalFormSubmissions).where(eq(generalFormSubmissions.templateId, input.id));
+      await deleteEmbedDataForForm(db, input.id);
       await db.delete(generalFormTemplates).where(eq(generalFormTemplates.id, input.id));
       return { success: true };
     }),
@@ -500,6 +513,20 @@ export const generalFormRouter = router({
       }
       for (const opt of form.options) {
         await db.insert(generalFormOptions).values({ ...opt, id: undefined as any, itemId: itemIdMap[opt.itemId] ?? opt.itemId, createdAt: undefined as any });
+      }
+      const [embedWidget] = await db.select().from(generalFormEmbedWidgets).where(eq(generalFormEmbedWidgets.templateId, input.id)).limit(1);
+      if (embedWidget) {
+        const { randomUUID } = await import("crypto");
+        await db.insert(generalFormEmbedWidgets).values({
+          templateId: newId,
+          widgetKey: randomUUID().replace(/-/g, ""),
+          name: embedWidget.name,
+          isEnabled: embedWidget.isEnabled,
+          displayType: embedWidget.displayType,
+          settingsJson: embedWidget.settingsJson,
+          domainMode: embedWidget.domainMode,
+          allowedDomains: embedWidget.allowedDomains,
+        });
       }
       return { id: newId };
     }),
@@ -594,18 +621,30 @@ export const generalFormRouter = router({
         return { id: newId, name: formName };
       }
 
+      // ── Generic HTML scrape path ─────────────────────────────────────────────
+      // Fetch page content — preserve structural HTML hints before stripping
+      let pageText = "";
+      try {
+        const res = await fetch(resolvedUrl, { headers: { "User-Agent": "Mozilla/5.0 (compatible; FormImporter/1.0)" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
+        const html = await res.text();
+        pageText = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+          .replace(/<(label|legend|h[1-6]|p|li|option|th|td)[^>]*>/gi, "\n")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+          .replace(/\s+/g, " ").trim().substring(0, 6000);
+      } catch {
+        pageText = `Form from: ${resolvedUrl}`;
+      }
+      // AI scaffold with rich field metadata + branching + calculations
+      const systemPrompt = `You are a form builder assistant. Given a web page or form description, extract or infer ALL form fields, their types, options, conditional/branching logic, scoring, and any calculated/computed fields. Return structured JSON exactly matching the schema provided.
 
-      // Use structured HTML extractor for full multi-page support
-      const extracted_gf = await extractFormFromUrl(resolvedUrl);
-      const pageText_gf = extracted_gf.rawStructuredText || `Form from: ${resolvedUrl}`;
-      const systemPrompt = `You are a form builder assistant. Given a structured form description extracted from a web page, reconstruct ALL form fields from ALL pages, their types, options, conditional/branching logic, scoring, and any calculated/computed fields. Return structured JSON exactly matching the schema provided.
-IMPORTANT: The input includes VISIBLE FIELDS (current page) and HIDDEN FIELDS (from other pages). You MUST include fields from ALL pages — infer labels and types of hidden fields from context (field numbering, scoring patterns, form topic).
 For branching rules: reference fields by their field_key.
 For calculated fields: use itemType "paragraph" and put the formula in extraConfig as JSON {"formula": "expression using field_key names", "description": "what it calculates"}.
 For score weights: assign scoreWeight (0-100) to each scored field based on importance.
-For images: use itemType "paragraph" with extraConfig={"imageUrl": "URL"} for each image.
 For email routing: if a field routes submissions to different emails based on answer, set emailRoutingRules as JSON array [{"label": string, "conditionFieldKey": string, "conditionValue": string, "routeTo": string}].`;
-      const userPrompt = `Create a complete form from this structured description. Include ALL fields from ALL pages. Return JSON:
+      const userPrompt = `Create a complete form from this page. Extract ALL fields, logic, calculations, and scoring. Return JSON:
 {
   "name": string,
   "description": string,
@@ -636,15 +675,15 @@ For email routing: if a field routes submissions to different emails based on an
     "conditions": [{"conditionFieldKey": string, "operator": "equals"|"not_equals"|"contains"|"not_contains"|"greater_than"|"less_than"|"is_empty"|"is_not_empty", "value": string}]
   }]
 }
+
 IMPORTANT:
-- Include fields from ALL pages (visible + hidden).
 - If the form has calculated outputs (BMI, total score, risk level, etc.), create a "paragraph" item with extraConfig={"formula":"expression","description":"what it computes"}.
-- If the form has score thresholds (e.g. score 0-10=low risk, 11-20=high risk), add a "paragraph" item with extraConfig={"scoreThresholds":[{"min":0,"max":10,"label":"Low Risk","description":"..."},...]}.  
+- If the form has score thresholds (e.g. score 0-10=low risk, 11-20=high risk), add a "paragraph" item with extraConfig={"scoreThresholds":[{"min":0,"max":10,"label":"Low Risk","description":"..."},...]}.
 - Capture ALL conditional logic including skip patterns, required-if rules, and value-setting rules.
 - Use scoreWeight on each field to reflect its relative importance in scoring.
 
-Form description:
-${pageText_gf}`;
+Page content:
+${pageText}`;
       const itemSchema = { type: "object", properties: { field_key: { type: "string" }, itemType: { type: "string" }, label: { type: "string" }, placeholder: { type: "string" }, helpText: { type: "string" }, isRequired: { type: "boolean" }, scoreWeight: { type: "number" }, minValue: { type: ["number", "null"] }, maxValue: { type: ["number", "null"] }, extraConfig: { type: "string" }, emailRoutingRules: { type: "string" }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" }, scoreValue: { type: "number" } }, required: ["label", "value", "scoreValue"], additionalProperties: false } } }, required: ["field_key", "itemType", "label", "placeholder", "helpText", "isRequired", "scoreWeight", "minValue", "maxValue", "extraConfig", "emailRoutingRules", "options"], additionalProperties: false };
       const branchSchema = { type: "object", properties: { ruleLabel: { type: "string" }, targetFieldKey: { type: "string" }, targetType: { type: "string" }, action: { type: "string" }, setValue: { type: "string" }, logicOperator: { type: "string" }, conditions: { type: "array", items: { type: "object", properties: { conditionFieldKey: { type: "string" }, operator: { type: "string" }, value: { type: "string" } }, required: ["conditionFieldKey", "operator", "value"], additionalProperties: false } } }, required: ["ruleLabel", "targetFieldKey", "targetType", "action", "setValue", "logicOperator", "conditions"], additionalProperties: false };
       const aiSchema = { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: itemSchema } }, required: ["title", "items"], additionalProperties: false } }, branchRules: { type: "array", items: branchSchema } }, required: ["name", "description", "sections", "branchRules"], additionalProperties: false };
@@ -801,16 +840,28 @@ ${pageText_gf}`;
       }
 
       // ── Generic HTML scrape path ────────────────────────────────────────────────
-      // Use structured HTML extractor for full multi-page support
-      const extracted_gf_append = await extractFormFromUrl(resolvedUrlAppend);
-      const pageText = extracted_gf_append.rawStructuredText || `Form from: ${resolvedUrlAppend}`;
+      // Fetch page content — preserve structural hints
+      let pageText = "";
+      try {
+        const res = await fetch(resolvedUrlAppend, { headers: { "User-Agent": "Mozilla/5.0 (compatible; FormImporter/1.0)" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
+        const html = await res.text();
+        pageText = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+          .replace(/<(label|legend|h[1-6]|p|li|option|th|td)[^>]*>/gi, "\n")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+          .replace(/\s+/g, " ").trim().substring(0, 6000);
+      } catch {
+        pageText = `Form from: ${resolvedUrlAppend}`;
+      }
       // AI scaffold with rich metadata + branching + calculations
-      const systemPrompt = `You are a form builder assistant. Given a structured form description extracted from a web page, reconstruct ALL form fields from ALL pages, their types, options, conditional/branching logic, scoring weights, and any calculated/computed fields. Return structured JSON exactly matching the schema provided.
-IMPORTANT: The input includes VISIBLE FIELDS (current page) and HIDDEN FIELDS (from other pages). You MUST include fields from ALL pages — infer labels and types of hidden fields from context.
+      const systemPrompt = `You are a form builder assistant. Extract ALL form fields, their types, options, placeholder text, help text, conditional/branching logic, scoring weights, and any calculated/computed fields from the page. Return structured JSON exactly matching the schema provided.
+
 For calculated fields: use itemType "paragraph" and put the formula in extraConfig as JSON {"formula": "expression using field_key names", "description": "what it calculates"}.
-For score thresholds: add a "paragraph" item with extraConfig={"scoreThresholds":[{"min":0,"max":10,"label":"Low Risk","description":"..."},...]}.  
+For score thresholds: add a "paragraph" item with extraConfig={"scoreThresholds":[{"min":0,"max":10,"label":"Low Risk","description":"..."},...]}.
 For email routing: if a field routes submissions to different emails, set emailRoutingRules as JSON array [{"label": string, "conditionFieldKey": string, "conditionValue": string, "routeTo": string}].`;
-      const userPrompt = `Extract all form fields from ALL pages, logic, calculations, and scoring from this form description. Return JSON:
+      const userPrompt = `Extract all form fields, logic, calculations, and scoring from this page. Return JSON:
 {
   "sections": [{
     "title": string,
@@ -840,7 +891,7 @@ For email routing: if a field routes submissions to different emails, set emailR
   }]
 }
 
-Form description:
+Page content:
 ${pageText}`;
       const appendItemSchema = { type: "object", properties: { field_key: { type: "string" }, itemType: { type: "string" }, label: { type: "string" }, placeholder: { type: "string" }, helpText: { type: "string" }, isRequired: { type: "boolean" }, scoreWeight: { type: "number" }, minValue: { type: ["number", "null"] }, maxValue: { type: ["number", "null"] }, extraConfig: { type: "string" }, emailRoutingRules: { type: "string" }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" }, scoreValue: { type: "number" } }, required: ["label", "value", "scoreValue"], additionalProperties: false } } }, required: ["field_key", "itemType", "label", "placeholder", "helpText", "isRequired", "scoreWeight", "minValue", "maxValue", "extraConfig", "emailRoutingRules", "options"], additionalProperties: false };
       const appendBranchSchema = { type: "object", properties: { ruleLabel: { type: "string" }, targetFieldKey: { type: "string" }, targetType: { type: "string" }, action: { type: "string" }, setValue: { type: "string" }, logicOperator: { type: "string" }, conditions: { type: "array", items: { type: "object", properties: { conditionFieldKey: { type: "string" }, operator: { type: "string" }, value: { type: "string" } }, required: ["conditionFieldKey", "operator", "value"], additionalProperties: false } } }, required: ["ruleLabel", "targetFieldKey", "targetType", "action", "setValue", "logicOperator", "conditions"], additionalProperties: false };
@@ -1142,6 +1193,7 @@ ${pageText}`;
         avgScore: avgScore ? Math.round(avgScore) : null,
         recentSubmissions,
         dailyCounts: (dailyCounts[0] as unknown as any[]) ?? [],
+        embed: await getEmbedAnalyticsSummary(db, input.id),
       };
     }),
 
@@ -1366,35 +1418,10 @@ ${pageText}`;
         }
       }
       const req = (ctx as any).req;
-      // Inject hidden field values server-side
-      let finalResponses = input.responses;
-      try {
-        const allItems = await db.select().from(generalFormItems).where(eq(generalFormItems.templateId, input.templateId));
-        const hiddenItems = allItems.filter((it: any) => it.itemType === "hidden");
-        if (hiddenItems.length > 0) {
-          const parsed: Record<string, any> = JSON.parse(input.responses);
-          const now = new Date();
-          const user = ctx.user as any;
-          for (const hi of hiddenItems) {
-            let val = "";
-            try { val = JSON.parse(hi.extraConfig ?? "{}").hiddenValue ?? ""; } catch {}
-            val = val
-              .replace(/\{\{user_id\}\}/g, user?.id?.toString() ?? "")
-              .replace(/\{\{user_email\}\}/g, user?.email ?? "")
-              .replace(/\{\{date\}\}/g, now.toISOString().split("T")[0])
-              .replace(/\{\{form_id\}\}/g, input.templateId.toString())
-              .replace(/\{\{source\}\}/g, req?.headers?.referer ?? "");
-            parsed[hi.id.toString()] = val;
-          }
-          finalResponses = JSON.stringify(parsed);
-        }
-      } catch (e: any) {
-        console.error("[HiddenFields] Failed to inject hidden values:", e.message);
-      }
       const [result] = await db.insert(generalFormSubmissions).values({
         templateId: input.templateId,
         submittedByUserId: input.userId ?? null,
-        responses: finalResponses,
+        responses: input.responses,
         score,
         maxScore,
         status: "submitted",
@@ -1708,4 +1735,192 @@ ${pageText}`;
         .where(eq(generalFormTemplates.id, input.formId));
       return { apiToken: token };
     }),
+
+  listSuccessModules: protectedProcedure
+    .input(z.object({ templateId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [template] = await db.select().from(generalFormTemplates).where(eq(generalFormTemplates.id, input.templateId)).limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+      await ensureLegacySuccessModules(db, template);
+      const modules = await fetchSuccessModules(db, input.templateId);
+      const [freshTemplate] = await db.select().from(generalFormTemplates).where(eq(generalFormTemplates.id, input.templateId)).limit(1);
+      return { modules, defaultSuccessModuleId: freshTemplate?.defaultSuccessModuleId ?? null };
+    }),
+
+  upsertSuccessModule: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      templateId: z.number(),
+      name: z.string().min(1).max(200),
+      moduleType: z.enum(["inline_message", "full_page", "redirect_url"]),
+      inlineContent: z.string().optional(),
+      pageContent: z.string().optional(),
+      redirectUrl: z.string().optional(),
+      isEnabled: z.boolean().default(true),
+      sortOrder: z.number().default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, templateId, ...rest } = input;
+      const values = { ...rest, templateId, updatedAt: new Date() };
+      if (id) {
+        await db.update(generalFormSuccessModules).set(values).where(eq(generalFormSuccessModules.id, id));
+        return { id };
+      }
+      const [result] = await db.insert(generalFormSuccessModules).values(values);
+      const newId = (result as any).insertId;
+      const [tpl] = await db.select().from(generalFormTemplates).where(eq(generalFormTemplates.id, templateId)).limit(1);
+      if (tpl && !tpl.defaultSuccessModuleId) {
+        await db.update(generalFormTemplates).set({ defaultSuccessModuleId: newId }).where(eq(generalFormTemplates.id, templateId));
+      }
+      return { id: newId };
+    }),
+
+  duplicateSuccessModule: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [mod] = await db.select().from(generalFormSuccessModules).where(eq(generalFormSuccessModules.id, input.id)).limit(1);
+      if (!mod) throw new TRPCError({ code: "NOT_FOUND" });
+      const [result] = await db.insert(generalFormSuccessModules).values({
+        templateId: mod.templateId,
+        name: mod.name + " (Copy)",
+        moduleType: mod.moduleType,
+        inlineContent: mod.inlineContent,
+        pageContent: mod.pageContent,
+        redirectUrl: mod.redirectUrl,
+        isEnabled: mod.isEnabled,
+        sortOrder: mod.sortOrder + 1,
+      });
+      return { id: (result as any).insertId };
+    }),
+
+  deleteSuccessModule: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [mod] = await db.select().from(generalFormSuccessModules).where(eq(generalFormSuccessModules.id, input.id)).limit(1);
+      if (!mod) throw new TRPCError({ code: "NOT_FOUND" });
+      await db.delete(generalFormSuccessRoutingRules).where(eq(generalFormSuccessRoutingRules.successModuleId, input.id));
+      await db.delete(generalFormSuccessModules).where(eq(generalFormSuccessModules.id, input.id));
+      await clearDefaultIfDeleted(db, mod.templateId, input.id);
+      return { success: true };
+    }),
+
+  setDefaultSuccessModule: protectedProcedure
+    .input(z.object({ templateId: z.number(), moduleId: z.number().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (input.moduleId != null) {
+        const [mod] = await db.select().from(generalFormSuccessModules)
+          .where(and(eq(generalFormSuccessModules.id, input.moduleId), eq(generalFormSuccessModules.templateId, input.templateId)))
+          .limit(1);
+        if (!mod) throw new TRPCError({ code: "NOT_FOUND", message: "Success module not found for this form." });
+      }
+      await db.update(generalFormTemplates).set({ defaultSuccessModuleId: input.moduleId }).where(eq(generalFormTemplates.id, input.templateId));
+      return { success: true };
+    }),
+
+  listSuccessRoutingRules: protectedProcedure
+    .input(z.object({ templateId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return fetchSuccessRoutingRules(db, input.templateId);
+    }),
+
+  upsertSuccessRoutingRule: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      templateId: z.number(),
+      ruleLabel: z.string().default(""),
+      successModuleId: z.number(),
+      logicOperator: z.enum(["all", "any"]).default("all"),
+      conditions: z.string(),
+      sortOrder: z.number().default(0),
+      isEnabled: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [mod] = await db.select().from(generalFormSuccessModules)
+        .where(and(eq(generalFormSuccessModules.id, input.successModuleId), eq(generalFormSuccessModules.templateId, input.templateId)))
+        .limit(1);
+      if (!mod) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid success module for this form." });
+      const { id, ...rest } = input;
+      if (id) {
+        await db.update(generalFormSuccessRoutingRules).set(rest).where(eq(generalFormSuccessRoutingRules.id, id));
+        return { id };
+      }
+      const [result] = await db.insert(generalFormSuccessRoutingRules).values(rest);
+      return { id: (result as any).insertId };
+    }),
+
+  deleteSuccessRoutingRule: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(generalFormSuccessRoutingRules).where(eq(generalFormSuccessRoutingRules.id, input.id));
+      return { success: true };
+    }),
+
+  getEmbedWidget: protectedProcedure
+    .input(z.object({ templateId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const widget = await ensureEmbedWidget(db, input.templateId);
+      const [template] = await db.select().from(generalFormTemplates).where(eq(generalFormTemplates.id, input.templateId)).limit(1);
+      return {
+        widget,
+        settings: parseEmbedSettings(widget.settingsJson),
+        allowedDomains: parseAllowedDomains(widget.allowedDomains),
+        hostDomain: template?.hostDomain ?? "app.allaboutultrasound.com",
+        publicSlug: template?.publicSlug ?? null,
+      };
+    }),
+
+  saveEmbedWidget: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      name: z.string().min(1).max(200),
+      isEnabled: z.boolean(),
+      displayType: z.enum(["inline", "popup", "slide_in"]),
+      settingsJson: z.string(),
+      domainMode: z.enum(["all", "allowlist"]),
+      allowedDomains: z.array(z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const widget = await ensureEmbedWidget(db, input.templateId);
+      await db.update(generalFormEmbedWidgets).set({
+        name: input.name,
+        isEnabled: input.isEnabled,
+        displayType: input.displayType,
+        settingsJson: input.settingsJson,
+        domainMode: input.domainMode,
+        allowedDomains: JSON.stringify(input.allowedDomains),
+        updatedAt: new Date(),
+      }).where(eq(generalFormEmbedWidgets.id, widget.id));
+      return { success: true, widgetKey: widget.widgetKey };
+    }),
+
 });
