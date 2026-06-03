@@ -217,6 +217,23 @@ export function SdmsCmeConfigPanel({ activityType, activityId, defaultTitle }: P
             </div>
           </div>
 
+
+          <div className="rounded-lg border border-teal-200 bg-white p-3 text-xs text-gray-700 space-y-1">
+            <p className="font-semibold text-teal-900">Curriculum placement</p>
+            <p>
+              Saving with SDMS CME enabled adds a dedicated <strong>SDMS CME Credit</strong> section and lesson to this course curriculum.
+              Learners complete the post-test in that lesson; edit lesson blocks in the Curriculum tab.
+            </p>
+            {config?.cmeLessonId ? (
+              <p className="text-teal-700 font-medium">
+                CME lesson #{config.cmeLessonId}
+                {config.cmeSectionId ? ` · section #${config.cmeSectionId}` : ""}
+              </p>
+            ) : (
+              <p className="text-gray-500">Save settings to create the CME section and lesson.</p>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-teal-100 pt-4">
             <div>
               <Label>SDMS API Username</Label>

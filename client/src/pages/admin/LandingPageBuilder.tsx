@@ -238,7 +238,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       collectShipping: false,
       showProductSelect: true,
       products: [
-        { name: "Product Name", description: "Full online access", price: 997, imageUrl: "", type: "course" }
+        { name: "Product Name", description: "Full online access", price: 99700, imageUrl: "", type: "course" }
       ],
       orderBumps: [],
       submitText: "Submit",
@@ -260,7 +260,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       collectShipping: false,
       collectBilling: false,
       products: [
-        { name: "Product Name", description: "Product description", price: 97, imageUrl: "", type: "other" }
+        { name: "Product Name", description: "Product description", price: 9700, imageUrl: "", type: "other" }
       ],
       orderBumps: [],
       submitText: "Complete Purchase",
@@ -283,10 +283,10 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       showBillingInfo: true,
       showProductSelect: true,
       products: [
-        { name: "Main Course", description: "Full access to the course", price: 1997, imageUrl: "", type: "course" }
+        { name: "Main Course", description: "Full access to the course", price: 199700, imageUrl: "", type: "course" }
       ],
       orderBumps: [
-        { title: "Workbook", headline: "Workbooks will arrive approximately 1 week prior to the start of the course.", description: "Your step-by-step companion to actually understand, retain, and apply everything you learn.", price: 29.97, imageUrl: "", ctaText: "+ Add", ctaEmoji: "\uD83D\uDC4D", externalUrl: "" }
+        { title: "Workbook", headline: "Workbooks will arrive approximately 1 week prior to the start of the course.", description: "Your step-by-step companion to actually understand, retain, and apply everything you learn.", price: 29997, imageUrl: "", ctaText: "+ Add", ctaEmoji: "\uD83D\uDC4D", externalUrl: "" }
       ],
       termsText: "I attest that I meet the pre-requisites for this course and I agree to the",
       termsLinkText: "TERMS OF SERVICE",
@@ -460,6 +460,17 @@ BLOCK_CATALOG.push(
       ctaText: "Join Class",
       accentColor: "#189aa1",
       bgColor: "#f8fafc",
+    },
+  },
+  {
+    type: "sdms_cme_module",
+    label: "SDMS CME Module",
+    icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>,
+    category: "Content",
+    defaultData: {
+      activityType: "course",
+      activityId: 0,
+      headline: "SDMS CME Credit",
     },
   },
   {
@@ -1072,10 +1083,6 @@ function CTAActionPicker({
   const isCheckoutBehavior = behavior === "direct_checkout" || behavior === "free_preview" || behavior === "group_purchase";
   // Pricing option picker state
   const [poCourseId, setPoCoursId] = React.useState<number | null>(pricingOptionCourseIdValue ?? null);
-  // Sync local poCourseId when the prop changes (e.g. switching between blocks or loading saved data)
-  React.useEffect(() => {
-    setPoCoursId(pricingOptionCourseIdValue ?? null);
-  }, [pricingOptionCourseIdValue]);
   const { data: poCoursesData } = trpc.lmsAdmin.listCourses.useQuery(
     { status: "all", type: "all", pageSize: 200 },
     { enabled: behavior === "pricing_option" }
@@ -1321,7 +1328,7 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
     // Format price for display (price is stored in cents)
   const formatItemPrice = (item: typeof allItems[0]) => {
     if (item.isFree) return "Free";
-    const priceStr = `$${Number(item.price).toFixed(2)}`;
+    const priceStr = `$${(Number(item.price) / 100).toFixed(2)}`;
     if (item.pricingType === "subscription" && item.subscriptionInterval) {
       const intervalLabel: Record<string, string> = { monthly: "/ mo", quarterly: "/ qtr", annual: "/ yr" };
       return `${priceStr} ${intervalLabel[item.subscriptionInterval] ?? "/ period"}`;
@@ -2028,7 +2035,7 @@ function CheckoutFormBlockSettings({
                   className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                   {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                   <span className="flex-1 truncate">{item.name}</span>
-                  <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
+                  <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
                   <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
                 </button>
               ))}
@@ -2045,7 +2052,7 @@ function CheckoutFormBlockSettings({
                 <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                 <div className="relative flex-1">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                  <DebouncedInput type="number" value={Number(p.price).toFixed(2)} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], price: parseFloat(v || "0") }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                  <DebouncedInput type="number" value={(Number(p.price) / 100).toFixed(2)} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                 </div>
                 {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
                   <span className="text-xs text-gray-400 flex-shrink-0">orig ${(Number((p as any).catalogPrice) / 100).toFixed(2)}</span>
@@ -2086,7 +2093,7 @@ function CheckoutFormBlockSettings({
                   className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                   {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                   <span className="flex-1 truncate">{item.name}</span>
-                  <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
+                  <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
                 </button>
               ))}
             </div>
@@ -2839,7 +2846,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           </div>
         );
     case "video":
-      return <VideoBlockSettings d={d} set={set} setMany={setMany} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
+      return <VideoBlockSettings d={d} set={set} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
     case "audio":
       return (
         <AudioBlockEditor
@@ -3639,7 +3646,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           </div>
           {/* Products */}
           <div className="border border-gray-200 rounded p-3 space-y-2">
-            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({icProds.length})</span><button onClick={() => set("products", [...icProds, { name: "New Product", description: "", price: 97, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({icProds.length})</span><button onClick={() => set("products", [...icProds, { name: "New Product", description: "", price: 9700, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
             {icCatalog && icCatalog.length > 0 && (
               <div className="bg-gray-50 rounded p-2 space-y-1">
                 <p className="text-xs text-gray-400 mb-1">Click to add from catalog:</p>
@@ -3649,7 +3656,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                       {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                       <span className="flex-1 truncate">{item.name}</span>
-                      <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
+                      <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
                       <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
                     </button>
                   ))}
@@ -3666,7 +3673,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                     <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                      <DebouncedInput type="number" value={Number(p.price).toFixed(2)} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], price: parseFloat(v || "0") }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                      <DebouncedInput type="number" value={(Number(p.price) / 100).toFixed(2)} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                     </div>
                     {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
                       <span className="text-xs text-gray-400 flex-shrink-0">orig ${(Number((p as any).catalogPrice) / 100).toFixed(2)}</span>
@@ -3757,7 +3764,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           </div>
           {/* Products */}
           <div className="border border-gray-200 rounded p-3 space-y-2">
-            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({ecProds.length})</span><button onClick={() => set("products", [...ecProds, { name: "New Product", description: "", price: 97, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({ecProds.length})</span><button onClick={() => set("products", [...ecProds, { name: "New Product", description: "", price: 9700, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
             {ecCatalog && ecCatalog.length > 0 && (
               <div className="bg-gray-50 rounded p-2 space-y-1">
                 <p className="text-xs text-gray-400 mb-1">Click to add from catalog:</p>
@@ -3767,7 +3774,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                       {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                       <span className="flex-1 truncate">{item.name}</span>
-                      <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
+                      <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
                       <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
                     </button>
                   ))}
@@ -3784,7 +3791,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                     <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                      <DebouncedInput type="number" value={Number(p.price).toFixed(2)} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], price: parseFloat(v || "0") }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                      <DebouncedInput type="number" value={(Number(p.price) / 100).toFixed(2)} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                     </div>
                     {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
                       <span className="text-xs text-gray-400 flex-shrink-0">orig ${(Number((p as any).catalogPrice) / 100).toFixed(2)}</span>
@@ -4341,10 +4348,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             <p className="text-[10px] text-gray-400 mb-2">Append user data to the iframe URL as query parameters. Copy the parameter string and paste it into your form's field-mapping URL.</p>
             <div className="space-y-2">
               {([
-                { key: "passFirstName", label: "First Name", param: "first_name", value: "{{first_name}}" },
-                { key: "passLastName",  label: "Last Name",  param: "last_name",  value: "{{last_name}}" },
-                { key: "passEmail",     label: "Email",      param: "email",      value: "{{email}}" },
-                { key: "passName",      label: "Full Name",  param: "name",       value: "{{name}}" },
+                { key: "passFirstName", label: "First Name", param: "first_name", value: "{user.firstName}" },
+                { key: "passLastName",  label: "Last Name",  param: "last_name",  value: "{user.lastName}" },
+                { key: "passEmail",     label: "Email",      param: "email",      value: "{user.email}" },
+                { key: "passName",      label: "Full Name",  param: "name",       value: "{user.name}" },
               ] as const).map(({ key, label, param, value }) => (
                 <div key={key} className="flex items-center gap-2">
                   <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
@@ -4353,8 +4360,8 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   </label>
                   <button
                     type="button"
-                    title={`Copy {{${param}}}`}
-                    onClick={() => { navigator.clipboard.writeText(value); }}
+                    title={`Copy ?${param}=${value}`}
+                    onClick={() => { navigator.clipboard.writeText(`${param}=${encodeURIComponent(value)}`); }}
                     className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-gray-100 hover:bg-teal-50 hover:text-teal-700 text-gray-500 border border-gray-200 transition-colors font-mono"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
@@ -4371,10 +4378,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     type="button"
                     onClick={() => {
                       const params = [
-                        d.passFirstName && `first_name=${encodeURIComponent("{{first_name}}")}`,
-                        d.passLastName  && `last_name=${encodeURIComponent("{{last_name}}")}`,
-                        d.passEmail     && `email=${encodeURIComponent("{{email}}")}`,
-                        d.passName      && `name=${encodeURIComponent("{{name}}")}`,
+                        d.passFirstName && `first_name=${encodeURIComponent("{user.firstName}")}`,
+                        d.passLastName  && `last_name=${encodeURIComponent("{user.lastName}")}`,
+                        d.passEmail     && `email=${encodeURIComponent("{user.email}")}`,
+                        d.passName      && `name=${encodeURIComponent("{user.name}")}`,
                       ].filter(Boolean).join("&");
                       const full = `${d.url}${d.url.includes("?") ? "&" : "?"}${params}`;
                       navigator.clipboard.writeText(full);
@@ -4388,10 +4395,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 <p className="text-[10px] text-gray-400 break-all font-mono">
                   {d.url}{d.url.includes('?') ? '&' : '?'}
                   {[
-                    d.passFirstName && `first_name=%7B%7Bfirst_name%7D%7D`,
-                    d.passLastName  && `last_name=%7B%7Blast_name%7D%7D`,
-                    d.passEmail     && `email=%7B%7Bemail%7D%7D`,
-                    d.passName      && `name=%7B%7Bname%7D%7D`,
+                    d.passFirstName && `first_name=%7Buser.firstName%7D`,
+                    d.passLastName  && `last_name=%7Buser.lastName%7D`,
+                    d.passEmail     && `email=%7Buser.email%7D`,
+                    d.passName      && `name=%7Buser.name%7D`,
                   ].filter(Boolean).join('&')}
                 </p>
               </div>
@@ -6180,20 +6187,13 @@ export default function LandingPageBuilder() {
         </div>
 
         {/* Right Panel: Block Settings / Page SEO */}
-        <div className="flex-shrink-0 flex flex-row" style={{ width: rightPanelWidth }}>
-          {/* Drag handle — outside overflow container so it's never clipped */}
+        <div className="flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto relative" style={{ width: rightPanelWidth }}>
+          {/* Drag handle */}
           <div
             onMouseDown={handleRightPanelMouseDown}
-            className="w-2 flex-shrink-0 cursor-col-resize bg-gray-100 hover:bg-teal-400 active:bg-teal-500 transition-colors flex items-center justify-center group border-l border-gray-200"
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-teal-400 active:bg-teal-500 z-10 transition-colors"
             title="Drag to resize panel"
-          >
-            <div className="flex flex-col gap-0.5 opacity-40 group-hover:opacity-80">
-              <div className="w-0.5 h-3 bg-gray-500 rounded" />
-              <div className="w-0.5 h-3 bg-gray-500 rounded" />
-              <div className="w-0.5 h-3 bg-gray-500 rounded" />
-            </div>
-          </div>
-          <div className="flex-1 bg-white overflow-y-auto min-w-0">
+          />
           {selectedBlock ? (
             <>
               <div className="flex items-center justify-between pl-4 pr-3 py-3 border-b border-gray-100">
@@ -6270,7 +6270,6 @@ export default function LandingPageBuilder() {
               </div>
             </div>
           )}
-          </div>
         </div>
       </div>
 
@@ -7073,7 +7072,7 @@ function ScormEmbedBlockSettings({ d, set, dataRef, onChangeRef }: {
       {/* Embed URL preview */}
       {d.mediaAssetSlug && (
         <div className="text-[10px] text-gray-400 bg-gray-50 rounded p-2 font-mono break-all">
-          /api/media/{d.mediaAssetSlug}/scorm
+          /api/media/{d.mediaAssetSlug}/embed
         </div>
       )}
     </div>
@@ -7145,10 +7144,9 @@ function LandingBlockTemplatesTab({ onInsert }: { onInsert: (block: Block) => vo
 }
 
 // ─── Video Block Settings ──────────────────────────────────────────────────────
-export function VideoBlockSettings({ d, set, setMany, uploading, setUploading, uploadMedia }: {
+export function VideoBlockSettings({ d, set, uploading, setUploading, uploadMedia }: {
   d: Record<string, any>;
   set: (key: string, val: any) => void;
-  setMany?: (patch: Record<string, any>) => void;
   uploading: string | null;
   setUploading: (v: string | null) => void;
   uploadMedia: any;
@@ -7185,22 +7183,10 @@ export function VideoBlockSettings({ d, set, setMany, uploading, setUploading, u
 
   const selectMediaAsset = (asset: any) => {
     const url = asset.currentVersion?.s3Url ?? "";
-    // Use setMany to batch all fields in one update — avoids stale dataRef reads
-    // when multiple set() calls happen synchronously before a re-render.
-    if (setMany) {
-      setMany({
-        embedUrl: url,
-        source: "media_repo",
-        mediaAssetId: asset.id,
-        mediaAssetTitle: asset.title ?? asset.currentVersion?.fileName ?? "Video",
-      });
-    } else {
-      // Fallback: sequential set (may lose fields if dataRef is stale)
-      set("embedUrl", url);
-      set("source", "media_repo");
-      set("mediaAssetId", asset.id);
-      set("mediaAssetTitle", asset.title ?? asset.currentVersion?.fileName ?? "Video");
-    }
+    set("embedUrl", url);
+    set("source", "media_repo");
+    set("mediaAssetId", asset.id);
+    set("mediaAssetTitle", asset.title ?? asset.currentVersion?.fileName ?? "Video");
     setShowMediaPicker(false);
     toast.success("Video selected from media repository");
   };

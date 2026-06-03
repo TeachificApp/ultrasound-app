@@ -34,6 +34,7 @@ import {
   validateConfigForSubmission,
   validateLearnerFields,
 } from "../lib/sdmsCmeService";
+import { ensureCmeCurriculumModule, hideCmeCurriculumModule } from "../lib/sdmsCmeCurriculum";
 
 const activityTypeSchema = z.enum(sdmsCmeActivityTypeEnum);
 const creditCategorySchema = z.enum(sdmsCmeCreditCategoryEnum);
@@ -97,7 +98,16 @@ export const sdmsCmeRouter = router({
       }
 
       await db.update(sdmsCmeConfigs).set(updates).where(eq(sdmsCmeConfigs.id, config.id));
-      const [updated] = await db.select().from(sdmsCmeConfigs).where(eq(sdmsCmeConfigs.id, config.id)).limit(1);
+      let [updated] = await db.select().from(sdmsCmeConfigs).where(eq(sdmsCmeConfigs.id, config.id)).limit(1);
+      if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      if (updated.enabled) {
+        await ensureCmeCurriculumModule(updated);
+        [updated] = await db.select().from(sdmsCmeConfigs).where(eq(sdmsCmeConfigs.id, config.id)).limit(1);
+      } else if (input.enabled === false) {
+        await hideCmeCurriculumModule(updated);
+      }
+
       return sanitizeConfigForAdmin(updated!);
     }),
 

@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS `sdmsCmeConfigs` (
   `resubmissionEnabled` boolean NOT NULL DEFAULT true,
   `formFieldMapping` longtext,
   `moduleBlocks` longtext,
+  `cmeSectionId` int,
+  `cmeLessonId` int,
   `cmeInstructions` longtext,
   `sdmsBaseUrl` varchar(500),
   `createdByUserId` int,

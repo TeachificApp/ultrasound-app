@@ -5962,6 +5962,8 @@ export const sdmsCmeConfigs = mysqlTable(
     formFieldMapping: longtext("formFieldMapping"),
     /** Page builder blocks for learner-facing CME module */
     moduleBlocks: longtext("moduleBlocks"),
+    cmeSectionId: int("cmeSectionId"),
+    cmeLessonId: int("cmeLessonId"),
     cmeInstructions: longtext("cmeInstructions"),
     sdmsBaseUrl: varchar("sdmsBaseUrl", { length: 500 }),
     createdByUserId: int("createdByUserId"),

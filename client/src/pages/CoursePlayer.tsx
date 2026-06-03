@@ -26,8 +26,6 @@ import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/Lesso
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 
 import LessonCommentSection from "@/components/LessonCommentSection";
-import { SdmsCmeLearnerModule } from "@/components/SdmsCmeLearnerModule";
-import { resolveLmsActivityType } from "@/components/admin/SdmsCmeConfigPanel";
 
 // Lazy-load the heavy editor so it doesn't bloat the initial bundle
 const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));
@@ -1829,6 +1827,12 @@ export default function CoursePlayer() {
                           <InlineLessonFlashcardDeck key={block.id} data={block.data as any} />
                         ) : block.type === "live_session" ? (
                           <InlineLiveSession key={block.id} data={block.data as any} />
+                        ) : block.type === "sdms_cme_module" ? (
+                          <SdmsCmeLearnerModule
+                            key={block.id}
+                            activityType={(block.data as any).activityType ?? resolveLmsActivityType(data?.course?.type ?? "course")}
+                            activityId={(block.data as any).activityId ?? data?.course?.id ?? 0}
+                          />
                         ) : (
                           <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-lg">
                             <BlockPreview block={block} />
