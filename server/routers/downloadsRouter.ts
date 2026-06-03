@@ -321,7 +321,7 @@ export const downloadsLearnerRouter = router({
 
   /** Create Stripe checkout session for a bundle */
   createBundleCheckout: protectedProcedure
-    .input(z.object({ bundleId: z.number() }))
+    .input(z.object({ bundleId: z.number(), purchaseType: z.enum(["one_time", "subscription"]).default("one_time") }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -330,44 +330,94 @@ export const downloadsLearnerRouter = router({
         .where(eq(digitalBundles.id, input.bundleId)).limit(1);
       if (!bundle || bundle.status !== "published") throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Check if already purchased
+      // Check if already purchased (active access)
       const [existing] = await db.select().from(digitalBundlePurchases)
         .where(and(
           eq(digitalBundlePurchases.userId, ctx.user.id),
           eq(digitalBundlePurchases.bundleId, input.bundleId),
         )).limit(1);
-      if (existing) return { checkoutUrl: null, alreadyPurchased: true };
+      // Allow re-subscribe if subscription was cancelled
+      if (existing && (existing.purchaseType === "one_time" || existing.subscriptionStatus === "active" || existing.subscriptionStatus === "trialing")) {
+        return { checkoutUrl: null, alreadyPurchased: true };
+      }
+
+      // Validate subscription mode
+      if (input.purchaseType === "subscription" && !bundle.subscriptionEnabled) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Subscription billing is not enabled for this bundle" });
+      }
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
       const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        customer_email: ctx.user.email ?? undefined,
-        client_reference_id: ctx.user.id.toString(),
-        allow_promotion_codes: true,
-        line_items: [{
-          price_data: {
+      const commonMeta = {
+        type: "digital_bundle",
+        bundle_id: bundle.id.toString(),
+        user_id: ctx.user.id.toString(),
+        customer_email: ctx.user.email ?? "",
+        purchase_type: input.purchaseType,
+      };
+
+      let session;
+      if (input.purchaseType === "subscription") {
+        // Subscription mode — use or create a Stripe Price
+        let stripePriceId = bundle.subscriptionStripePriceId;
+        if (!stripePriceId) {
+          // Create a recurring price on the fly
+          const stripeProduct = await stripe.products.create({
+            name: bundle.title,
+            description: bundle.subtitle ?? undefined,
+            images: bundle.thumbnailUrl ? [bundle.thumbnailUrl] : [],
+          });
+          const stripePrice = await stripe.prices.create({
+            product: stripeProduct.id,
+            unit_amount: Math.round(Number(bundle.subscriptionPrice)),
             currency: bundle.currency,
-            product_data: {
-              name: bundle.title,
-              description: bundle.subtitle ?? undefined,
-              images: bundle.thumbnailUrl ? [bundle.thumbnailUrl] : undefined,
+            recurring: {
+              interval: (bundle.subscriptionInterval ?? "month") as "month" | "year",
+              interval_count: bundle.subscriptionIntervalCount ?? 1,
             },
-            unit_amount: Math.round(Number(bundle.discountPrice) * 100),
-          },
-          quantity: 1,
-        }],
-        metadata: {
-          type: "digital_bundle",
-          bundle_id: bundle.id.toString(),
-          user_id: ctx.user.id.toString(),
-          customer_email: ctx.user.email ?? "",
-        },
-        success_url: `${origin}/my-downloads?success=1`,
-        cancel_url: `${origin}/bundles/${bundle.slug}`,
-      });
+          });
+          stripePriceId = stripePrice.id;
+          // Save the price ID for future use
+          await db.update(digitalBundles)
+            .set({ subscriptionStripePriceId: stripePriceId })
+            .where(eq(digitalBundles.id, bundle.id));
+        }
+        session = await stripe.checkout.sessions.create({
+          mode: "subscription",
+          customer_email: ctx.user.email ?? undefined,
+          client_reference_id: ctx.user.id.toString(),
+          allow_promotion_codes: true,
+          line_items: [{ price: stripePriceId, quantity: 1 }],
+          metadata: commonMeta,
+          success_url: `${origin}/my-downloads?success=1`,
+          cancel_url: `${origin}/bundles/${bundle.slug}`,
+        });
+      } else {
+        // One-time payment mode
+        session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          customer_email: ctx.user.email ?? undefined,
+          client_reference_id: ctx.user.id.toString(),
+          allow_promotion_codes: true,
+          line_items: [{
+            price_data: {
+              currency: bundle.currency,
+              product_data: {
+                name: bundle.title,
+                description: bundle.subtitle ?? undefined,
+                images: bundle.thumbnailUrl ? [bundle.thumbnailUrl] : undefined,
+              },
+              unit_amount: Math.round(Number(bundle.discountPrice)),
+            },
+            quantity: 1,
+          }],
+          metadata: commonMeta,
+          success_url: `${origin}/my-downloads?success=1`,
+          cancel_url: `${origin}/bundles/${bundle.slug}`,
+        });
+      }
 
       return { checkoutUrl: session.url, alreadyPurchased: false };
     }),
@@ -418,7 +468,7 @@ export const downloadsLearnerRouter = router({
       return { ...bundle, items };
     }),
 
-  /** Check if user has purchased a bundle */
+  /** Check if user has purchased a bundle (active access only) */
   hasPurchasedBundle: protectedProcedure
     .input(z.object({ bundleId: z.number() }))
     .query(async ({ ctx, input }) => {
@@ -429,7 +479,14 @@ export const downloadsLearnerRouter = router({
           eq(digitalBundlePurchases.userId, ctx.user.id),
           eq(digitalBundlePurchases.bundleId, input.bundleId),
         )).limit(1);
-      return { purchased: !!purchase };
+      if (!purchase) return { purchased: false };
+      // For subscription purchases, check that the subscription is still active
+      if (purchase.purchaseType === "subscription") {
+        const activeStatuses = ["active", "trialing"];
+        return { purchased: activeStatuses.includes(purchase.subscriptionStatus ?? "") };
+      }
+      // One-time purchase = permanent access
+      return { purchased: true };
     }),
 });
 
@@ -796,6 +853,10 @@ export const downloadsAdminRouter = router({
       discountPrice: z.number().min(0).optional(),
       status: z.enum(["draft", "published", "hidden", "private", "archived"]).optional(),
       productIds: z.array(z.number()).optional(),
+      subscriptionEnabled: z.boolean().optional(),
+      subscriptionPrice: z.number().min(0).optional(),
+      subscriptionInterval: z.enum(["month", "year"]).optional(),
+      subscriptionIntervalCount: z.number().min(1).max(12).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

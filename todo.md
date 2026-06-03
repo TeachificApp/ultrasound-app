@@ -4569,3 +4569,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire invoice.paid and updated customer.subscription.deleted into webhook dispatcher
 - [x] Add stripeSubscriptionId column to community_members table (migration applied)
 - [x] Add communityMembers import to stripe webhook handler
+
+## Bug Fixes & Features (Jun 3, 2026 — Batch 2)
+- [ ] Fix Daniel Galindo (psndiddle@hotmail.com) enrollment in Advanced Cardiac Sonographer (ACS) Registry Review Quiz on learn.allaboutultrasound.com LMS
+- [ ] Fix user duplication bug — users are being created twice on registration/OAuth
+- [ ] Fix admin user profile "Back to All Users" link — should go to /admin/members?tab=all-members not /admin/users
+- [ ] Add assignment duplication feature — when adding assignment to cohort, offer "New" or "Copy from existing cohort" options
+- [ ] Add subscription/recurring billing support to bundles (alongside existing one-time purchase)

@@ -42,6 +42,20 @@ export default function BundleLanding() {
     onError: (e) => toast.error(e.message),
   });
 
+  const subCheckoutMut = trpc.downloadsLearner.createBundleCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.alreadyPurchased) {
+        toast.info("You already have an active subscription!");
+        return;
+      }
+      if (data.checkoutUrl) {
+        toast.info("Redirecting to subscription checkout...");
+        window.open(data.checkoutUrl, "_blank");
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   if (isLoading || authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
@@ -107,7 +121,7 @@ export default function BundleLanding() {
           </div>
 
           {/* CTA */}
-          <div className="mt-6">
+          <div className="mt-6 flex flex-col gap-3">
             {hasPurchased ? (
               <Link href="/my-downloads">
                 <Button size="lg" className="bg-teal-500 hover:bg-teal-600 gap-2">
@@ -115,14 +129,29 @@ export default function BundleLanding() {
                 </Button>
               </Link>
             ) : user ? (
-              <Button
-                size="lg"
-                className="bg-teal-500 hover:bg-teal-600 gap-2"
-                onClick={() => checkoutMut.mutate({ bundleId: bundle.id })}
-                disabled={checkoutMut.isPending}
-              >
-                <ShoppingCart className="w-5 h-5" /> {checkoutMut.isPending ? "Processing..." : "Buy Bundle"}
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  size="lg"
+                  className="bg-teal-500 hover:bg-teal-600 gap-2"
+                  onClick={() => checkoutMut.mutate({ bundleId: bundle.id, purchaseType: "one_time" })}
+                  disabled={checkoutMut.isPending || subCheckoutMut.isPending}
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  {checkoutMut.isPending ? "Processing..." : `Buy Once — $${Number(bundle.discountPrice).toFixed(2)}`}
+                </Button>
+                {(bundle as any).subscriptionEnabled && (bundle as any).subscriptionPrice > 0 && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-teal-400 text-teal-200 hover:bg-teal-800 gap-2"
+                    onClick={() => subCheckoutMut.mutate({ bundleId: bundle.id, purchaseType: "subscription" })}
+                    disabled={checkoutMut.isPending || subCheckoutMut.isPending}
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    {subCheckoutMut.isPending ? "Processing..." : `Subscribe — $${Number((bundle as any).subscriptionPrice).toFixed(2)}/${(bundle as any).subscriptionInterval ?? "month"}`}
+                  </Button>
+                )}
+              </div>
             ) : (
               <a href={getLoginUrl(`/bundles/${slug}`)}>
                 <Button size="lg" className="bg-teal-500 hover:bg-teal-600 gap-2">

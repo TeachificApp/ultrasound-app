@@ -512,11 +512,18 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
     return;
   }
 
+  // Determine purchase type from metadata
+  const purchaseType = (meta.purchase_type === "subscription" ? "subscription" : "one_time") as "one_time" | "subscription";
+  const subscriptionId = (session.subscription as string) ?? null;
+
   // Record bundle purchase
   await db.insert(digitalBundlePurchases).values({
     userId,
     bundleId,
     stripeCheckoutSessionId: session.id as string,
+    purchaseType,
+    stripeSubscriptionId: subscriptionId ?? undefined,
+    subscriptionStatus: purchaseType === "subscription" ? "active" : undefined,
   });
 
   // Grant access to all products in the bundle
@@ -1418,6 +1425,35 @@ async function handleInvoicePaid(invoice: Record<string, unknown>) {
   } catch (err) {
     console.error(`[Stripe] handleInvoicePaid: community renewal error for sub ${subscriptionId}:`, err);
   }
+
+  // ── 4. Digital bundle subscription ──────────────────────────────────────
+  try {
+    const [bundlePurchase] = await db.select().from(digitalBundlePurchases)
+      .where(eq(digitalBundlePurchases.stripeSubscriptionId, subscriptionId)).limit(1);
+    if (bundlePurchase) {
+      const newPeriodEnd = periodEnd ? new Date(periodEnd) : undefined;
+      await db.update(digitalBundlePurchases)
+        .set({ subscriptionStatus: "active", subscriptionCurrentPeriodEnd: newPeriodEnd })
+        .where(eq(digitalBundlePurchases.id, bundlePurchase.id));
+      // Re-grant access to all bundle items if they were revoked
+      const bundleItems = await db.select().from(digitalBundleItems)
+        .where(eq(digitalBundleItems.bundleId, bundlePurchase.bundleId));
+      for (const item of bundleItems) {
+        const [existingPurchase] = await db.select().from(digitalPurchases)
+          .where(and(eq(digitalPurchases.userId, bundlePurchase.userId), eq(digitalPurchases.productId, item.productId))).limit(1);
+        if (!existingPurchase) {
+          await db.insert(digitalPurchases).values({
+            userId: bundlePurchase.userId,
+            productId: item.productId,
+            stripeCheckoutSessionId: `sub_renewal_${subscriptionId}`,
+          });
+        }
+      }
+      console.log(`[Stripe] Bundle subscription renewed: userId=${bundlePurchase.userId} bundleId=${bundlePurchase.bundleId}`);
+    }
+  } catch (err) {
+    console.error(`[Stripe] handleInvoicePaid: bundle renewal error for sub ${subscriptionId}:`, err);
+  }
 }
 
 /**
@@ -1490,6 +1526,32 @@ async function handleSubscriptionCancelled(subscription: Record<string, unknown>
     }
   } catch (err) {
     console.error(`[Stripe] handleSubscriptionCancelled: community revocation error for sub ${subscriptionId}:`, err);
+  }
+
+  // ── 4. Digital bundle subscription ──────────────────────────────────────
+  try {
+    const [bundlePurchase] = await db.select().from(digitalBundlePurchases)
+      .where(eq(digitalBundlePurchases.stripeSubscriptionId, subscriptionId)).limit(1);
+    if (bundlePurchase) {
+      // Mark subscription as cancelled — revoke access to bundle items
+      await db.update(digitalBundlePurchases)
+        .set({ subscriptionStatus: "cancelled" })
+        .where(eq(digitalBundlePurchases.id, bundlePurchase.id));
+      // Remove individual product access granted by this bundle
+      const bundleItems = await db.select().from(digitalBundleItems)
+        .where(eq(digitalBundleItems.bundleId, bundlePurchase.bundleId));
+      for (const item of bundleItems) {
+        await db.delete(digitalPurchases)
+          .where(and(eq(digitalPurchases.userId, bundlePurchase.userId), eq(digitalPurchases.productId, item.productId)));
+      }
+      console.log(`[Stripe] Bundle subscription cancelled: userId=${bundlePurchase.userId} bundleId=${bundlePurchase.bundleId}`);
+      await notifyOwner({
+        title: "📦 Bundle Subscription Cancelled",
+        content: `Subscription ${subscriptionId} cancelled. Bundle access revoked for userId=${bundlePurchase.userId}, bundleId=${bundlePurchase.bundleId}.`,
+      });
+    }
+  } catch (err) {
+    console.error(`[Stripe] handleSubscriptionCancelled: bundle revocation error for sub ${subscriptionId}:`, err);
   }
 }
 

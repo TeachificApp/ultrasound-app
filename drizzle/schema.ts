@@ -3354,6 +3354,12 @@ export const digitalBundles = mysqlTable("digital_bundles", {
   discountPrice: int("discount_price").default(0).notNull(), // cents
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived"]).default("draft").notNull(),
+  // Subscription billing support
+  subscriptionEnabled: boolean("subscription_enabled").default(false).notNull(),
+  subscriptionPrice: int("subscription_price").default(0).notNull(), // cents
+  subscriptionInterval: mysqlEnum("subscription_interval", ["month", "year"]).default("month"),
+  subscriptionIntervalCount: int("subscription_interval_count").default(1).notNull(),
+  subscriptionStripePriceId: varchar("subscription_stripe_price_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3373,6 +3379,11 @@ export const digitalBundlePurchases = mysqlTable("digital_bundle_purchases", {
   bundleId: int("bundle_id").notNull(),
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
   purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
+  // Subscription fields
+  purchaseType: mysqlEnum("purchase_type", ["one_time", "subscription"]).default("one_time").notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  subscriptionStatus: mysqlEnum("subscription_status", ["active", "past_due", "cancelled", "trialing"]),
+  subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end"),
 });
 export type DigitalBundlePurchase = typeof digitalBundlePurchases.$inferSelect;
 

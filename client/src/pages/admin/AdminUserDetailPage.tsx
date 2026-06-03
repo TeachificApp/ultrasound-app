@@ -1973,7 +1973,7 @@ export default function AdminUserDetailPage() {
           <div className="max-w-5xl mx-auto">
             <div className="flex items-center gap-3 mb-1">
               <button
-                onClick={() => navigate("/admin/users")}
+                onClick={() => { window.location.href = "https://app.allaboutultrasound.com/admin/members?tab=all-members"; }}
                 className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-[#189aa1] transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" /> All Users

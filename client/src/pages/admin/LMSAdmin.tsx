@@ -10325,6 +10325,9 @@ function CohortTab({ courseId }: { courseId: number }) {
   // Assignment dialog state
   const assignBlockEditorRef = React.useRef<import('@/components/LessonBlockEditor').LessonBlockEditorHandle>(null);
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; assignment?: CohortAssignment }>({ open: false });
+  const [copyPickerOpen, setCopyPickerOpen] = useState(false);
+  const [copySearch, setCopySearch] = useState("");
+  const { data: copySourceData = [] } = trpc.lmsAdmin.listAssignmentsForCopy.useQuery(undefined, { enabled: copyPickerOpen });
   const [assignForm, setAssignForm] = useState({
     title: "", description: "", dueDate: "", maxPoints: 100,
     submissionType: "none" as "text" | "file" | "url" | "none",
@@ -10608,9 +10611,16 @@ function CohortTab({ courseId }: { courseId: number }) {
           )}
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500">Manage assignments, homework, and projects for cohort participants.</p>
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openAssignDialog()}>
-              <Plus className="w-3.5 h-3.5 mr-1" /> Add Assignment
-            </Button>
+            <div className="relative">
+              <div className="flex items-center gap-1">
+                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white rounded-r-none border-r border-teal-500" onClick={() => openAssignDialog()}>
+                  <Plus className="w-3.5 h-3.5 mr-1" /> New Assignment
+                </Button>
+                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white rounded-l-none px-2" title="Copy from existing" onClick={() => { setCopySearch(""); setCopyPickerOpen(true); }}>
+                  <Copy className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
           </div>
 
           {assignmentsLoading ? (
@@ -10938,6 +10948,73 @@ function CohortTab({ courseId }: { courseId: number }) {
                 onClick={handleSaveSession}>
                 {(createSession.isPending || updateSession.isPending) ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />Saving...</> : sessionDialog.session ? "Save Changes" : "Create Session"}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Copy Assignment Picker */}
+      {copyPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h3 className="font-bold text-gray-900 text-base">Copy Assignment from Another Cohort</h3>
+              <Button size="sm" variant="ghost" onClick={() => setCopyPickerOpen(false)}><X className="w-4 h-4" /></Button>
+            </div>
+            <div className="px-4 py-3 border-b border-gray-100">
+              <input
+                type="text"
+                placeholder="Search assignments..."
+                value={copySearch}
+                onChange={e => setCopySearch(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                autoFocus
+              />
+            </div>
+            <div className="overflow-y-auto flex-1 px-2 py-2">
+              {copySourceData.length === 0 ? (
+                <p className="text-center text-gray-400 text-sm py-8">No assignments found in other cohorts.</p>
+              ) : (
+                copySourceData.map(group => {
+                  const filtered = group.assignments.filter(a =>
+                    !copySearch || a.title.toLowerCase().includes(copySearch.toLowerCase())
+                  );
+                  if (filtered.length === 0) return null;
+                  return (
+                    <div key={group.courseId} className="mb-3">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-1">{group.courseTitle}</p>
+                      {filtered.map(a => (
+                        <button
+                          key={a.id}
+                          className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-teal-50 transition-colors group"
+                          onClick={() => {
+                            // Pre-fill the assignment form with the copied data
+                            setAssignForm({
+                              title: a.title + " (Copy)",
+                              description: a.description ?? "",
+                              dueDate: "",
+                              maxPoints: a.maxPoints,
+                              submissionType: a.submissionType as any,
+                              status: "draft",
+                              notifyStudents: false,
+                              contentBlocks: (a.contentBlocks as any[]) ?? [],
+                            });
+                            setAssignDialog({ open: true });
+                            setCopyPickerOpen(false);
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <ListChecks className="w-4 h-4 text-amber-500 shrink-0" />
+                            <span className="text-sm font-medium text-gray-800 group-hover:text-teal-700">{a.title}</span>
+                            {a.status === "published" && <span className="ml-auto text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Published</span>}
+                          </div>
+                          {a.description && <p className="text-xs text-gray-400 mt-0.5 ml-6 line-clamp-1">{a.description}</p>}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

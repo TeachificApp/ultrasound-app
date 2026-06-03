@@ -2117,19 +2117,33 @@ export async function createPendingUser(email: string): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   const normalised = email.trim().toLowerCase();
+
+  // Check if user already exists (pending or active) — prevents race condition duplicates
+  const existing = await findUserByEmail(normalised);
+  if (existing) return existing.id;
+
   // Generate a unique synthetic openId so the NOT NULL constraint is satisfied
   const syntheticOpenId = `pending_${normalised}_${Date.now()}`;
-  await db.insert(users).values({
-    openId: syntheticOpenId,
-    email: normalised,
-    name: normalised,
-    isPending: true,
-    pendingCreatedAt: new Date(),
-    lastSignedIn: new Date(),
-  });
+  try {
+    await db.insert(users).values({
+      openId: syntheticOpenId,
+      email: normalised,
+      name: normalised,
+      isPending: true,
+      pendingCreatedAt: new Date(),
+      lastSignedIn: new Date(),
+    });
+  } catch (err: any) {
+    // Handle unique constraint violation on email (concurrent request already created the user)
+    if (err?.code === 'ER_DUP_ENTRY' || err?.message?.includes('Duplicate entry')) {
+      const race = await findUserByEmail(normalised);
+      if (race) return race.id;
+    }
+    throw err;
+  }
   // Retrieve the inserted row to get the auto-incremented id
   const result = await db.select().from(users)
-    .where(sql`LOWER(${users.email}) = ${normalised} AND ${users.isPending} = 1`)
+    .where(sql`LOWER(${users.email}) = ${normalised}`)
     .orderBy(desc(users.id))
     .limit(1);
   if (!result[0]) throw new Error(`Failed to create pending user for ${email}`);

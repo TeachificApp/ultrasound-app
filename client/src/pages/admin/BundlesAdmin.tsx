@@ -158,6 +158,10 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>(
     bundle?.items.map((i) => i.productId) ?? []
   );
+  const [subscriptionEnabled, setSubscriptionEnabled] = useState(bundle?.subscriptionEnabled ?? false);
+  const [subscriptionPrice, setSubscriptionPrice] = useState(Number(bundle?.subscriptionPrice ?? 0).toFixed(2));
+  const [subscriptionInterval, setSubscriptionInterval] = useState<"month" | "year">(bundle?.subscriptionInterval ?? "month");
+  const [subscriptionIntervalCount, setSubscriptionIntervalCount] = useState(bundle?.subscriptionIntervalCount ?? 1);
 
   if (!bundle) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
 
@@ -171,6 +175,10 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
       discountPrice: parseFloat(discountPrice || "0"),
       status,
       productIds: selectedProductIds,
+      subscriptionEnabled,
+      subscriptionPrice: parseFloat(subscriptionPrice || "0"),
+      subscriptionInterval,
+      subscriptionIntervalCount,
     });
   };
 
@@ -272,6 +280,58 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
               </p>
             </div>
           )}
+
+          {/* Subscription Billing */}
+          <div className="border-t pt-4 mt-2">
+            <div className="flex items-center gap-3 mb-3">
+              <Switch checked={subscriptionEnabled} onCheckedChange={setSubscriptionEnabled} />
+              <div>
+                <Label className="text-sm font-medium">Enable Subscription Billing</Label>
+                <p className="text-xs text-muted-foreground">Allow customers to pay on a recurring basis for continued access</p>
+              </div>
+            </div>
+            {subscriptionEnabled && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">Subscription Price ($)</Label>
+                    <Input
+                      type="number" step="0.01" min="0"
+                      value={subscriptionPrice}
+                      onChange={(e) => setSubscriptionPrice(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Billing Interval</Label>
+                    <select
+                      value={subscriptionInterval}
+                      onChange={(e) => setSubscriptionInterval(e.target.value as "month" | "year")}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="month">Monthly</option>
+                      <option value="year">Yearly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Every N Intervals</Label>
+                    <Input
+                      type="number" min="1" max="12"
+                      value={subscriptionIntervalCount}
+                      onChange={(e) => setSubscriptionIntervalCount(parseInt(e.target.value) || 1)}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-blue-700">
+                  Customers will be billed ${subscriptionPrice} every {subscriptionIntervalCount > 1 ? `${subscriptionIntervalCount} ` : ""}{subscriptionInterval}{subscriptionIntervalCount > 1 ? "s" : ""}.
+                  Changing the price will create a new Stripe price on the next purchase.
+                </p>
+                {bundle.subscriptionStripePriceId && (
+                  <p className="text-xs text-gray-500">Stripe Price ID: <code className="bg-white px-1 rounded">{bundle.subscriptionStripePriceId}</code></p>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

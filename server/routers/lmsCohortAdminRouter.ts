@@ -236,6 +236,27 @@ export const lmsCohortAdminRouter = router({
       return assignments;
     }),
 
+  // Returns assignments from ALL cohort courses for the copy-from picker
+  listAssignmentsForCopy: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Get all cohort courses with their assignments
+      const cohortCourses = await db.select({ id: lmsCourses.id, title: lmsCourses.title })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.type, 'cohort'))
+        .orderBy(asc(lmsCourses.title));
+      const allAssignments = await db.select().from(lmsCohortAssignments)
+        .orderBy(asc(lmsCohortAssignments.courseId), asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.createdAt));
+      // Group by course
+      return cohortCourses.map(course => ({
+        courseId: course.id,
+        courseTitle: course.title,
+        assignments: allAssignments.filter(a => a.courseId === course.id),
+      })).filter(c => c.assignments.length > 0);
+    }),
+
   createCohortAssignment: protectedProcedure
     .input(z.object({
       courseId: z.number(),
