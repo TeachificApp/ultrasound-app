@@ -8,7 +8,7 @@ import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getOrCreateUserByEmail } from "../db";
 import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users } from "../../drizzle/schema";
-import { eq, and, asc, desc, sql, inArray, or, like, isNotNull } from "drizzle-orm";
+import { eq, and, asc, desc, sql, inArray, or, like, isNotNull, ne } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 
 function slugify(text: string): string {
@@ -2668,5 +2668,26 @@ export const funnelAdminRouter = router({
       });
 
       return { csvContent: [header, ...csvRows].join("\n"), total: rows.length };
+    }),
+
+  /** List all courses with their slug for the CTA action picker (Landing Page option) */
+  listCourseLandingPages: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const courses = await db
+        .select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, status: lmsCourses.status })
+        .from(lmsCourses)
+        .where(and(isNotNull(lmsCourses.slug), ne(lmsCourses.slug, "")))
+        .orderBy(asc(lmsCourses.title));
+      return courses.map(c => ({
+        id: c.id,
+        title: c.title,
+        slug: c.slug!,
+        type: c.type,
+        status: c.status,
+        url: `/courses/${c.slug}`,
+      }));
     }),
 });

@@ -26,6 +26,7 @@ import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import LeadCaptureModal from "@/components/LeadCaptureModal";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
+import { LEARN_APP_URL } from "@/hooks/useSubdomain";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
 
@@ -907,6 +908,11 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
     if (behavior === "send_email" && btn.emailAddress) return `mailto:${btn.emailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     if (behavior === "direct_checkout") return "#";
+    if (behavior === "landing_page" && (btn as any).landingPageSlug) return `${LEARN_APP_URL}/courses/${(btn as any).landingPageSlug}`;
+    if (behavior === "funnel_page" && (btn as any).funnelPageValue) {
+      const [fs, ps] = ((btn as any).funnelPageValue as string).split("/");
+      if (fs && ps) return `/${fs}/${ps}`;
+    }
     return btn.link || nextPageUrl || "#";
   };
 
@@ -929,6 +935,13 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
         else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
         else if (beh === "direct_checkout" && d.heroCheckoutProductId && d.heroCheckoutProductType) {
           // handled by createDirectCheckout mutation below
+        }
+        else if (beh === "landing_page" && d.heroLandingPageSlug) {
+          window.open(`${LEARN_APP_URL}/courses/${d.heroLandingPageSlug}`, "_blank");
+        }
+        else if (beh === "funnel_page" && d.heroFunnelPageValue) {
+          const [fs, ps] = (d.heroFunnelPageValue as string).split("/");
+          if (fs && ps) window.location.href = `/${fs}/${ps}`;
         }
       }
     : undefined;
@@ -1008,6 +1021,11 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     if (behavior === "direct_checkout") return "#";
+    if (behavior === "landing_page" && d.ctaLandingPageSlug) return `${LEARN_APP_URL}/courses/${d.ctaLandingPageSlug}`;
+    if (behavior === "funnel_page" && d.ctaFunnelPageValue) {
+      const [fs, ps] = (d.ctaFunnelPageValue as string).split("/");
+      if (fs && ps) return `/${fs}/${ps}`;
+    }
     return d.ctaLink || nextPageUrl || "#";
   };
 
@@ -1095,6 +1113,11 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     if (behavior === "direct_checkout") return "#";
+    if (behavior === "landing_page" && d.ctaLandingPageSlug) return `${LEARN_APP_URL}/courses/${d.ctaLandingPageSlug}`;
+    if (behavior === "funnel_page" && d.ctaFunnelPageValue) {
+      const [fs, ps] = (d.ctaFunnelPageValue as string).split("/");
+      if (fs && ps) return `/${fs}/${ps}`;
+    }
     return d.ctaLink || nextPageUrl || "#";
   };
 
@@ -1261,10 +1284,39 @@ function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Recor
     ? { backgroundColor: "transparent", color: btnTxtColor, border: `2px solid ${btnBorderColor}` }
     : { backgroundColor: btnBgColor, color: btnTxtColor, border: `2px solid ${btnBorderColor}` };
 
+  // Compute block background style
+  const lcBgType = data.bgType ?? "color";
+  const lcBgStyle: React.CSSProperties = (() => {
+    if (lcBgType === "gradient") {
+      const start = data.bgGradientStart ?? "#179ca3";
+      const end = data.bgGradientEnd ?? "#0e4a50";
+      const angle = data.bgGradientAngle ?? 135;
+      return { background: `linear-gradient(${angle}deg, ${start}, ${end})` };
+    }
+    if (lcBgType === "image" && data.bgImageUrl) {
+      return {
+        backgroundImage: `url(${data.bgImageUrl})`,
+        backgroundSize: data.bgImageSize ?? "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        position: "relative" as const,
+      };
+    }
+    return { backgroundColor: data.bgColor ?? "#179ca3" };
+  })();
+  const lcBorderStyle: React.CSSProperties = (data.blockBorderWidth ?? 0) > 0
+    ? { border: `${data.blockBorderWidth}px ${data.blockBorderStyle ?? "solid"} ${data.blockBorderColor ?? "#cccccc"}` }
+    : {};
+  const lcRadiusStyle: React.CSSProperties = data.blockBorderRadius ? { borderRadius: `${data.blockBorderRadius}px`, overflow: "hidden" } : {};
+  const lcWrapStyle: React.CSSProperties = { ...lcBgStyle, ...lcBorderStyle, ...lcRadiusStyle, color: data.textColor ?? "#ffffff" };
+
   if (submitted && (data.btnBehavior ?? "none") === "none") {
     return (
-      <div className="px-8 py-16 text-center" style={{ backgroundColor: data.bgColor ?? "#179ca3", color: data.textColor ?? "#ffffff" }}>
-        <div className="max-w-md mx-auto">
+      <div className="px-8 py-16 text-center" style={lcWrapStyle}>
+        {lcBgType === "image" && data.bgImageUrl && data.bgOverlayColor && (
+          <div style={{ position: "absolute", inset: 0, backgroundColor: data.bgOverlayColor, opacity: data.bgOverlayOpacity ?? 0.4, pointerEvents: "none" }} />
+        )}
+        <div className="max-w-md mx-auto relative">
           <CheckCircle size={48} className="mx-auto mb-4 opacity-90" />
           <h2 className="text-2xl font-bold mb-2">You're In!</h2>
           <p className="opacity-80">Check your email for access details.</p>
@@ -1274,8 +1326,11 @@ function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Recor
   }
 
   return (
-    <div className="px-8 py-16" style={{ backgroundColor: data.bgColor ?? "#179ca3", color: data.textColor ?? "#ffffff" }}>
-      <div className="max-w-2xl mx-auto text-center">
+    <div className="px-8 py-16" style={lcWrapStyle}>
+      {lcBgType === "image" && data.bgImageUrl && data.bgOverlayColor && (
+        <div style={{ position: "absolute", inset: 0, backgroundColor: data.bgOverlayColor, opacity: data.bgOverlayOpacity ?? 0.4, pointerEvents: "none" }} />
+      )}
+      <div className="max-w-2xl mx-auto text-center relative">
         <h2 className="text-2xl font-bold mb-2">{data.headline ?? "Get Access"}</h2>
         {data.subtext && <p className="opacity-80 mb-6">{data.subtext}</p>}
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 items-stretch">
@@ -1371,11 +1426,40 @@ function CtaOptinBlock({ data, funnelId, pageId, nextPageUrl }: { data: Record<s
     ? { backgroundColor: "transparent", color: btnTxtColor, border: `2px solid ${btnBorderColor}` }
     : { backgroundColor: btnBgColor, color: btnTxtColor, border: `2px solid ${btnBorderColor}` };
 
+  // Compute block background style
+  const optinBgType = data.bgType ?? "color";
+  const optinBgStyle: React.CSSProperties = (() => {
+    if (optinBgType === "gradient") {
+      const start = data.bgGradientStart ?? "#f0fafa";
+      const end = data.bgGradientEnd ?? "#e0f7fa";
+      const angle = data.bgGradientAngle ?? 135;
+      return { background: `linear-gradient(${angle}deg, ${start}, ${end})` };
+    }
+    if (optinBgType === "image" && data.bgImageUrl) {
+      return {
+        backgroundImage: `url(${data.bgImageUrl})`,
+        backgroundSize: data.bgImageSize ?? "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        position: "relative" as const,
+      };
+    }
+    return { backgroundColor: data.bgColor ?? "#f0fafa" };
+  })();
+  const optinBorderStyle: React.CSSProperties = (data.blockBorderWidth ?? 0) > 0
+    ? { border: `${data.blockBorderWidth}px ${data.blockBorderStyle ?? "solid"} ${data.blockBorderColor ?? "#cccccc"}` }
+    : {};
+  const optinRadiusStyle: React.CSSProperties = data.blockBorderRadius ? { borderRadius: `${data.blockBorderRadius}px`, overflow: "hidden" } : {};
+  const optinWrapStyle: React.CSSProperties = { ...optinBgStyle, ...optinBorderStyle, ...optinRadiusStyle, textAlign: (data.align ?? "center") as any };
+
   const showSuccess = submitted && (data.btnBehavior ?? "none") === "none" && !data.ctaLink;
   if (showSuccess) {
     return (
-      <div className="px-8 py-16 text-center" style={{ backgroundColor: data.bgColor ?? "#f0fafa" }}>
-        <div className="max-w-md mx-auto">
+      <div className="px-8 py-16 text-center" style={optinWrapStyle}>
+        {optinBgType === "image" && data.bgImageUrl && data.bgOverlayColor && (
+          <div style={{ position: "absolute", inset: 0, backgroundColor: data.bgOverlayColor, opacity: data.bgOverlayOpacity ?? 0.4, pointerEvents: "none" }} />
+        )}
+        <div className="max-w-md mx-auto relative">
           <CheckCircle size={48} className="mx-auto mb-4 text-teal-600" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">You're In!</h2>
           <p className="text-gray-600">Check your email for details.</p>
@@ -1385,8 +1469,11 @@ function CtaOptinBlock({ data, funnelId, pageId, nextPageUrl }: { data: Record<s
   }
 
   return (
-    <div className="px-8 py-12" style={{ backgroundColor: data.bgColor ?? "#f0fafa", textAlign: (data.align ?? "center") as any }}>
-      <div className="max-w-sm mx-auto">
+    <div className="px-8 py-12" style={optinWrapStyle}>
+      {optinBgType === "image" && data.bgImageUrl && data.bgOverlayColor && (
+        <div style={{ position: "absolute", inset: 0, backgroundColor: data.bgOverlayColor, opacity: data.bgOverlayOpacity ?? 0.4, pointerEvents: "none" }} />
+      )}
+      <div className="max-w-sm mx-auto relative">
         {data.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: data.headline }} />}
         {data.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: data.subtext }} />}
         <form onSubmit={handleSubmit} className="space-y-3 mb-4">

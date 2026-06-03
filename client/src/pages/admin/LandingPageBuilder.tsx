@@ -997,10 +997,13 @@ function BSLinkField({ data, onSet, label, field, value, onChange }: {
 type CTAAction =
   | "url" | "send_email" | "next_funnel_step" | "direct_checkout"
   | "free_preview" | "group_purchase" | "order_bump_lp"
-  | "scroll_to_section" | "open_popup" | "download_file" | "pricing_option";
+  | "scroll_to_section" | "open_popup" | "download_file" | "pricing_option"
+  | "landing_page" | "funnel_page";
 
 const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   url: "Link to URL",
+  landing_page: "Course Landing Page",
+  funnel_page: "Funnel Page",
   send_email: "Send Email",
   next_funnel_step: "Next Funnel Step",
   direct_checkout: "Direct Checkout (Stripe)",
@@ -1040,6 +1043,10 @@ function CTAActionPicker({
   pricingOptionIdValue,
   onPricingOptionChange,
   pricingOptionCourseIdValue,
+  landingPageSlugValue,
+  onLandingPageChange,
+  funnelPageValue,
+  onFunnelPageChange,
 }: {
   label?: string;
   behaviorValue: string;
@@ -1067,6 +1074,12 @@ function CTAActionPicker({
   pricingOptionIdValue?: number | null;
   onPricingOptionChange?: (courseId: number | null, pricingOptionId: number | null) => void;
   pricingOptionCourseIdValue?: number | null;
+  /** landing_page action: the selected course slug */
+  landingPageSlugValue?: string | null;
+  onLandingPageChange?: (slug: string | null) => void;
+  /** funnel_page action: encoded as "funnelSlug/pageSlug" */
+  funnelPageValue?: string | null;
+  onFunnelPageChange?: (value: string | null) => void;
 }) {
   const behavior = (behaviorValue ?? "url") as CTAAction;
   const isCheckoutBehavior = behavior === "direct_checkout" || behavior === "free_preview" || behavior === "group_purchase";
@@ -1086,6 +1099,23 @@ function CTAActionPicker({
     { enabled: behavior === "pricing_option" && !!poCourseId }
   );
   const poOptions = (poOptionsData ?? []) as Array<{ id: number; label: string; pricingType: string; price: number }>;
+
+  // Landing page and funnel page pickers
+  const { data: courseLandingPagesData } = trpc.funnel.listCourseLandingPages.useQuery(
+    undefined,
+    { enabled: behavior === "landing_page" }
+  );
+  const courseLandingPages = (courseLandingPagesData ?? []) as Array<{ id: number; title: string; slug: string; type: string; status: string; url: string }>;
+
+  const { data: funnelsWithPagesData } = trpc.funnel.getFunnelsWithPages.useQuery(
+    undefined,
+    { enabled: behavior === "funnel_page" }
+  );
+  const funnelsWithPages = (funnelsWithPagesData ?? []) as Array<{ id: number; name: string; slug: string; pages: Array<{ id: number; title: string; slug: string; pageType: string }> }>;
+
+  // For funnel_page: split "funnelSlug/pageSlug" into two parts
+  const [fpFunnelSlug, fpPageSlug] = (funnelPageValue ?? "").split("/");
+
   return (
     <div className="space-y-2">
       <div>
@@ -1254,6 +1284,69 @@ function CTAActionPicker({
               </select>
               {poOptions.length === 0 && <p className="text-[10px] text-gray-400 mt-0.5">No pricing options found for this course.</p>}
             </div>
+          )}
+        </div>
+      )}
+      {behavior === "landing_page" && (
+        <div className="space-y-2 bg-blue-50 border border-blue-200 rounded p-2">
+          <p className="text-[10px] text-blue-700 font-medium">Navigates to a course landing page on learn.allaboutultrasound.com.</p>
+          <div>
+            <label className="text-xs text-gray-500 block mb-0.5">Course</label>
+            <select
+              value={landingPageSlugValue ?? ""}
+              onChange={e => onLandingPageChange?.(e.target.value || null)}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            >
+              <option value="">-- Select course --</option>
+              {courseLandingPages.map(c => (
+                <option key={c.id} value={c.slug}>{c.title} ({c.type})</option>
+              ))}
+            </select>
+          </div>
+          {landingPageSlugValue && (
+            <p className="text-[10px] text-blue-500 break-all">/courses/{landingPageSlugValue}</p>
+          )}
+        </div>
+      )}
+      {behavior === "funnel_page" && (
+        <div className="space-y-2 bg-purple-50 border border-purple-200 rounded p-2">
+          <p className="text-[10px] text-purple-700 font-medium">Navigates to a specific page within a funnel.</p>
+          <div>
+            <label className="text-xs text-gray-500 block mb-0.5">Funnel</label>
+            <select
+              value={fpFunnelSlug ?? ""}
+              onChange={e => {
+                const slug = e.target.value;
+                onFunnelPageChange?.(slug ? `${slug}/` : null);
+              }}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            >
+              <option value="">-- Select funnel --</option>
+              {funnelsWithPages.map(f => (
+                <option key={f.id} value={f.slug}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+          {fpFunnelSlug && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-0.5">Page</label>
+              <select
+                value={fpPageSlug ?? ""}
+                onChange={e => {
+                  const pageSlug = e.target.value;
+                  onFunnelPageChange?.(pageSlug ? `${fpFunnelSlug}/${pageSlug}` : `${fpFunnelSlug}/`);
+                }}
+                className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+              >
+                <option value="">-- Select page --</option>
+                {(funnelsWithPages.find(f => f.slug === fpFunnelSlug)?.pages ?? []).map(p => (
+                  <option key={p.id} value={p.slug}>{p.title} ({p.pageType})</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {fpFunnelSlug && fpPageSlug && (
+            <p className="text-[10px] text-purple-500 break-all">/{fpFunnelSlug}/{fpPageSlug}</p>
           )}
         </div>
       )}
@@ -1555,8 +1648,72 @@ function LeadCaptureSettings({ d, set }: { d: Record<string, any>; set: (key: st
       {/* Content */}
       <BSTextField data={d} onSet={set} label="Headline" field="headline" />
       <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
-      <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+      {/* Block Background */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Block Background</p>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Background Type</label>
+          <select value={d.bgType ?? "color"} onChange={e => set("bgType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+            <option value="color">Solid Color</option>
+            <option value="gradient">Gradient</option>
+            <option value="image">Image</option>
+          </select>
+        </div>
+        {(d.bgType ?? "color") === "color" && (
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+        )}
+        {d.bgType === "gradient" && (
+          <div className="space-y-2">
+            <BSColorField data={d} onSet={set} label="Gradient Start" field="bgGradientStart" />
+            <BSColorField data={d} onSet={set} label="Gradient End" field="bgGradientEnd" />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Gradient Angle (deg)</label>
+              <input type="number" min={0} max={360} value={d.bgGradientAngle ?? 135} onChange={e => set("bgGradientAngle", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+            </div>
+          </div>
+        )}
+        {d.bgType === "image" && (
+          <div className="space-y-2">
+            <BSTextField data={d} onSet={set} label="Image URL" field="bgImageUrl" placeholder="https://..." />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Image Size</label>
+              <select value={d.bgImageSize ?? "cover"} onChange={e => set("bgImageSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+                <option value="cover">Cover</option>
+                <option value="contain">Contain</option>
+                <option value="auto">Auto</option>
+              </select>
+            </div>
+            <BSColorField data={d} onSet={set} label="Overlay Color" field="bgOverlayColor" />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Overlay Opacity (0–1)</label>
+              <input type="number" min={0} max={1} step={0.05} value={d.bgOverlayOpacity ?? 0.4} onChange={e => set("bgOverlayOpacity", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+            </div>
+          </div>
+        )}
+      </div>
       <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+      {/* Block Border & Corners */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Block Border &amp; Corners</p>
+        <BSColorField data={d} onSet={set} label="Border Color" field="blockBorderColor" />
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Border Width (px)</label>
+          <input type="number" min={0} max={20} value={d.blockBorderWidth ?? 0} onChange={e => set("blockBorderWidth", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Border Style</label>
+          <select value={d.blockBorderStyle ?? "solid"} onChange={e => set("blockBorderStyle", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+            <option value="solid">Solid</option>
+            <option value="dashed">Dashed</option>
+            <option value="dotted">Dotted</option>
+            <option value="double">Double</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Corner Radius (px)</label>
+          <input type="number" min={0} max={64} value={d.blockBorderRadius ?? 0} onChange={e => set("blockBorderRadius", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+        </div>
+      </div>
       {/* Fields */}
       <div className="border border-gray-200 rounded-lg p-3 space-y-2">
         <p className="text-xs font-semibold text-gray-600">Form Fields</p>
@@ -1657,8 +1814,72 @@ function CtaOptinSettings({ d, set }: { d: Record<string, any>; set: (key: strin
     <div className="space-y-3">
       <BSTextField data={d} onSet={set} label="Headline" field="headline" />
       <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
-      <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+      {/* Block Background */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Block Background</p>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Background Type</label>
+          <select value={d.bgType ?? "color"} onChange={e => set("bgType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+            <option value="color">Solid Color</option>
+            <option value="gradient">Gradient</option>
+            <option value="image">Image</option>
+          </select>
+        </div>
+        {(d.bgType ?? "color") === "color" && (
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+        )}
+        {d.bgType === "gradient" && (
+          <div className="space-y-2">
+            <BSColorField data={d} onSet={set} label="Gradient Start" field="bgGradientStart" />
+            <BSColorField data={d} onSet={set} label="Gradient End" field="bgGradientEnd" />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Gradient Angle (deg)</label>
+              <input type="number" min={0} max={360} value={d.bgGradientAngle ?? 135} onChange={e => set("bgGradientAngle", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+            </div>
+          </div>
+        )}
+        {d.bgType === "image" && (
+          <div className="space-y-2">
+            <BSTextField data={d} onSet={set} label="Image URL" field="bgImageUrl" placeholder="https://..." />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Image Size</label>
+              <select value={d.bgImageSize ?? "cover"} onChange={e => set("bgImageSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+                <option value="cover">Cover</option>
+                <option value="contain">Contain</option>
+                <option value="auto">Auto</option>
+              </select>
+            </div>
+            <BSColorField data={d} onSet={set} label="Overlay Color" field="bgOverlayColor" />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Overlay Opacity (0–1)</label>
+              <input type="number" min={0} max={1} step={0.05} value={d.bgOverlayOpacity ?? 0.4} onChange={e => set("bgOverlayOpacity", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+            </div>
+          </div>
+        )}
+      </div>
       <BSAlignField data={d} onSet={set} label="Text Alignment" field="align" />
+      {/* Block Border & Corners */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Block Border &amp; Corners</p>
+        <BSColorField data={d} onSet={set} label="Border Color" field="blockBorderColor" />
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Border Width (px)</label>
+          <input type="number" min={0} max={20} value={d.blockBorderWidth ?? 0} onChange={e => set("blockBorderWidth", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Border Style</label>
+          <select value={d.blockBorderStyle ?? "solid"} onChange={e => set("blockBorderStyle", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+            <option value="solid">Solid</option>
+            <option value="dashed">Dashed</option>
+            <option value="dotted">Dotted</option>
+            <option value="double">Double</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Corner Radius (px)</label>
+          <input type="number" min={0} max={64} value={d.blockBorderRadius ?? 0} onChange={e => set("blockBorderRadius", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+        </div>
+      </div>
       {/* Form Fields */}
       <div className="border border-gray-200 rounded-lg p-3 space-y-2">
         <p className="text-xs font-semibold text-gray-600">Form Fields</p>
@@ -2222,6 +2443,10 @@ function SortablePricingCard({
         pricingOptionIdValue={card.ctaPricingOptionId ?? null}
         pricingOptionCourseIdValue={card.ctaPricingOptionCourseId ?? null}
         onPricingOptionChange={(cid, oid) => { onSet("ctaPricingOptionCourseId", cid); onSet("ctaPricingOptionId", oid); }}
+        landingPageSlugValue={card.ctaLandingPageSlug ?? null}
+        onLandingPageChange={v => onSet("ctaLandingPageSlug", v)}
+        funnelPageValue={card.ctaFunnelPageValue ?? null}
+        onFunnelPageChange={v => onSet("ctaFunnelPageValue", v)}
       />
       <DebouncedInput value={card.badge ?? ""} onChange={v => onSet("badge", v)} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
       <div>
@@ -2648,6 +2873,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   pricingOptionIdValue={d.heroPricingOptionId ?? null}
                   pricingOptionCourseIdValue={d.heroPricingOptionCourseId ?? null}
                   onPricingOptionChange={(cid, oid) => setMany({ heroPricingOptionCourseId: cid, heroPricingOptionId: oid })}
+                  landingPageSlugValue={d.heroLandingPageSlug ?? null}
+                  onLandingPageChange={v => set("heroLandingPageSlug", v)}
+                  funnelPageValue={d.heroFunnelPageValue ?? null}
+                  onFunnelPageChange={v => set("heroFunnelPageValue", v)}
                 />
               </div>
             )}
@@ -2706,6 +2935,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     pricingOptionIdValue={(btn as any).pricingOptionId ?? null}
                     pricingOptionCourseIdValue={(btn as any).pricingOptionCourseId ?? null}
                     onPricingOptionChange={(cid, oid) => setBtnMulti(idx, { pricingOptionCourseId: cid, pricingOptionId: oid })}
+                    landingPageSlugValue={(btn as any).landingPageSlug ?? null}
+                    onLandingPageChange={v => setBtnMulti(idx, { landingPageSlug: v })}
+                    funnelPageValue={(btn as any).funnelPageValue ?? null}
+                    onFunnelPageChange={v => setBtnMulti(idx, { funnelPageValue: v })}
                   />
                   {(btn.behavior ?? "url") === "send_email" && (
                     <HeroSendEmailSettings btn={btn} idx={idx} setBtn={setBtn} setBtnMulti={setBtnMulti} />
@@ -2805,6 +3038,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 pricingOptionIdValue={d.linkPricingOptionId ?? null}
                 pricingOptionCourseIdValue={d.linkPricingOptionCourseId ?? null}
                 onPricingOptionChange={(cid, oid) => setMany({ linkPricingOptionCourseId: cid, linkPricingOptionId: oid })}
+                landingPageSlugValue={d.linkLandingPageSlug ?? null}
+                onLandingPageChange={v => set("linkLandingPageSlug", v)}
+                funnelPageValue={d.linkFunnelPageValue ?? null}
+                onFunnelPageChange={v => set("linkFunnelPageValue", v)}
               />
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={d.openInNewTab ?? true} onChange={e => set("openInNewTab", e.target.checked)} className="rounded" />
@@ -3262,6 +3499,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             pricingOptionIdValue={d.ctaPricingOptionId ?? null}
             pricingOptionCourseIdValue={d.ctaPricingOptionCourseId ?? null}
             onPricingOptionChange={(cid, oid) => setMany({ ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid })}
+            landingPageSlugValue={d.ctaLandingPageSlug ?? null}
+            onLandingPageChange={v => set("ctaLandingPageSlug", v)}
+            funnelPageValue={d.ctaFunnelPageValue ?? null}
+            onFunnelPageChange={v => set("ctaFunnelPageValue", v)}
           />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
@@ -3344,6 +3585,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             onCheckoutProductChange={(type, id) => setMany({ checkoutProductType: type, checkoutProductId: id })}
             groupDiscountTiersValue={d.groupDiscountTiers ?? []}
             onGroupDiscountTiersChange={v => set("groupDiscountTiers", v)}
+            landingPageSlugValue={d.ctaLandingPageSlug ?? null}
+            onLandingPageChange={v => set("ctaLandingPageSlug", v)}
+            funnelPageValue={d.ctaFunnelPageValue ?? null}
+            onFunnelPageChange={v => set("ctaFunnelPageValue", v)}
           /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Style</label><div className="flex gap-1">{(["filled","outline"] as const).map(s=><button key={s} onClick={()=>set("btnStyle",s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.btnStyle??"filled")===s?"bg-teal-600 text-white border-teal-600":"border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2"><div className="flex items-center gap-2"><input type="checkbox" id="cta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" /><label htmlFor="cta-lc" className="text-xs text-teal-700 font-medium">Collect lead before action</label></div>{(d.leadCapture??false)&&(<div className="space-y-1 pl-1"><p className="text-[10px] text-gray-400">A name/email modal will appear before the button action executes.</p><BSTextField data={d} onSet={set} label="Modal Title" field="leadModalTitle" placeholder="e.g. Get Instant Access" /><BSTextField data={d} onSet={set} label="Modal Subtext" field="leadModalSubtext" placeholder="Optional" /><BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="leadTags" placeholder="e.g. webinar, free-guide" /></div>)}</div><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
     case "lead_capture":
       return <LeadCaptureSettings d={d} set={set} />;
@@ -3439,6 +3684,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     pricingOptionIdValue={(product as any).ctaPricingOptionId ?? null}
                     pricingOptionCourseIdValue={(product as any).ctaPricingOptionCourseId ?? null}
                     onPricingOptionChange={(cid, oid) => set("products", products.map((p, j) => j === i ? { ...p, ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid } : p))}
+                    landingPageSlugValue={(product as any).ctaLandingPageSlug ?? null}
+                    onLandingPageChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaLandingPageSlug: v } : p))}
+                    funnelPageValue={(product as any).ctaFunnelPageValue ?? null}
+                    onFunnelPageChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaFunnelPageValue: v } : p))}
                   />
                   <DebouncedInput value={product.fulfillment ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, fulfillment: v } : p))} className="h-7 text-xs" placeholder="Fulfillment note" />
                   <DebouncedInput value={product.imageUrl ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, imageUrl: v } : p))} className="h-7 text-xs" placeholder="Image URL" />
@@ -3549,6 +3798,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             pricingOptionIdValue={d.ctaPricingOptionId ?? null}
             pricingOptionCourseIdValue={d.ctaPricingOptionCourseId ?? null}
             onPricingOptionChange={(cid, oid) => setMany({ ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid })}
+            landingPageSlugValue={d.ctaLandingPageSlug ?? null}
+            onLandingPageChange={v => set("ctaLandingPageSlug", v)}
+            funnelPageValue={d.ctaFunnelPageValue ?? null}
+            onFunnelPageChange={v => set("ctaFunnelPageValue", v)}
           />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
@@ -3601,6 +3854,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             pricingOptionIdValue={d.ctaPricingOptionId ?? null}
             pricingOptionCourseIdValue={d.ctaPricingOptionCourseId ?? null}
             onPricingOptionChange={(cid, oid) => setMany({ ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid })}
+            landingPageSlugValue={d.ctaLandingPageSlug ?? null}
+            onLandingPageChange={v => set("ctaLandingPageSlug", v)}
+            funnelPageValue={d.ctaFunnelPageValue ?? null}
+            onFunnelPageChange={v => set("ctaFunnelPageValue", v)}
           />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
@@ -4684,6 +4941,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       pricingOptionIdValue={tier.ctaPricingOptionId ?? null}
                       pricingOptionCourseIdValue={tier.ctaPricingOptionCourseId ?? null}
                       onPricingOptionChange={(cid, oid) => setTier(ti, { ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid })}
+                      landingPageSlugValue={(tier as any).ctaLandingPageSlug ?? null}
+                      onLandingPageChange={v => setTier(ti, { ctaLandingPageSlug: v })}
+                      funnelPageValue={(tier as any).ctaFunnelPageValue ?? null}
+                      onFunnelPageChange={v => setTier(ti, { ctaFunnelPageValue: v })}
                     />
                   </div>
                 </div>

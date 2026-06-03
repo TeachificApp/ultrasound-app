@@ -4601,3 +4601,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Admin user profile — Communications tab: add Resend button per email row
 - [x] Admin manual enrollment tool: three payment modes (free/comp, link existing Stripe PI, manual charge with card token)
 - [x] Admin user profile — Activity tab: course progress drill-down with per-lesson completion, quiz scores, timestamps
+
+## Lead Capture Block Styling (Jun 2026)
+- [x] Lead capture blocks: add border settings (width, style, color) in BlockSettings
+- [x] Lead capture blocks: add corner rounding (border-radius) in BlockSettings
+- [x] Lead capture blocks: add background type selector (solid/gradient/image) in BlockSettings
+- [x] Lead capture blocks: apply the new styling in PublicFunnelPage LeadCaptureBlock renderer
+
+## CTA Action Picker — Landing Page & Funnel Page (Jun 2026)
+- [x] CTA Action Picker: add Landing Page option (shows all course landing pages, links to learn.allaboutultrasound.com/courses/:slug)
+- [x] CTA Action Picker: add Funnel Page option (shows all funnels with their step pages, links to /:funnelSlug/:pageSlug)
+- [x] Wire landing_page and funnel_page behaviors in PublicFunnelPage.tsx (all CTA blocks: hero, pricing_cta, cta_standalone, pricing cards, urgency_offer, image, product_offer_stack)
