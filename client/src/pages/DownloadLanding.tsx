@@ -5,6 +5,7 @@
  * standard layout using landingBody / landingFeatures fields.
  */
 import { useParams } from "wouter";
+import { EnrolledAccessBanner } from "@/components/EnrolledAccessBanner";
 import { trpc } from "@/lib/trpc";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -767,6 +768,12 @@ export default function DownloadLanding() {
   if (blocks.length > 0) {
     return (
       <div className="min-h-screen bg-white">
+        {hasPurchased && (
+          <EnrolledAccessBanner
+            href={`/downloads/${slug}/files`}
+            label="Access Your Files"
+          />
+        )}
         {/* Breadcrumb */}
         <div className="bg-white border-b border-gray-100">
           <div className="max-w-4xl mx-auto px-4 py-2 flex items-center gap-1.5 text-sm text-gray-500">
@@ -818,6 +825,13 @@ export default function DownloadLanding() {
 
   // ── Fallback: standard layout ──
   return (
+    <>
+    {hasPurchased && (
+      <EnrolledAccessBanner
+        href={`/downloads/${slug}/files`}
+        label="Access Your Files"
+      />
+    )}
     <div className="min-h-screen bg-gray-50">
       {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-100">
@@ -950,6 +964,7 @@ export default function DownloadLanding() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

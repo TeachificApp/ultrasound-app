@@ -4552,3 +4552,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Bug Fixes (Jun 2, 2026)
 - [x] Fix assignment page not showing block content to students — contentBlocks JSON column was already parsed by Drizzle ORM but AssignmentDetail.tsx was calling JSON.parse() on it again, causing a TypeError caught silently as empty array; fixed to handle both array and string cases
 - [x] Fix embed block in BlockPreview not rendering when using d.url (AssignmentBlockEditor stores URL in d.url, but BlockPreview only checked d.embedCode); added d.url iframe fallback
+
+## Features (Jun 3, 2026)
+- [x] Add teal transparent "You already have access" banner to landing pages for enrolled/purchased users — CourseLanding (enrolled → Continue Learning), DownloadLanding (purchased → Access Your Files), BundleLanding (purchased → View Your Downloads); banner is sticky, clickable, slightly transparent teal with backdrop blur

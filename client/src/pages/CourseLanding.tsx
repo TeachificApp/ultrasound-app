@@ -5,6 +5,7 @@
  * Route: /courses/:slug
  */
 import { useState, useEffect, useRef } from "react";
+import { EnrolledAccessBanner } from "@/components/EnrolledAccessBanner";
 import PromoCodeInput from "@/components/PromoCodeInput";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -1261,6 +1262,12 @@ export default function CourseLanding() {
   if (blocks.length > 0) {
     return (
       <div className="min-h-screen bg-white">
+        {enrollment && (
+          <EnrolledAccessBanner
+            href={`/courses/${slug}/player`}
+            label="Continue Learning"
+          />
+        )}
         {EnrollmentCountdownBanner}
         {blocks.map(block => {
           // Full-bleed block types must never be wrapped in a contentWidth constraint at the outer level.
@@ -1318,6 +1325,12 @@ export default function CourseLanding() {
 
   return (
     <>
+    {enrollment && (
+      <EnrolledAccessBanner
+        href={`/courses/${slug}/player`}
+        label="Continue Learning"
+      />
+    )}
     {EnrollmentCountdownBanner}
     <div className="min-h-screen bg-gray-50">
       {/* Breadcrumb */}

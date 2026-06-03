@@ -2,6 +2,7 @@
  * BundleLanding.tsx — Public bundle sales page
  */
 import { useParams } from "wouter";
+import { EnrolledAccessBanner } from "@/components/EnrolledAccessBanner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -70,6 +71,13 @@ export default function BundleLanding() {
   const savingsPercent = bundle.originalPrice > 0 ? Math.round((savings / bundle.originalPrice) * 100) : 0;
 
   return (
+    <>
+    {hasPurchased && (
+      <EnrolledAccessBanner
+        href="/my-downloads"
+        label="View Your Downloads"
+      />
+    )}
     <div className="min-h-screen bg-gray-50">
       {/* Hero */}
       <div className="bg-gradient-to-br from-slate-900 via-teal-900 to-slate-900 text-white py-16">
@@ -170,5 +178,6 @@ export default function BundleLanding() {
         )}
       </div>
     </div>
+    </>
   );
 }
