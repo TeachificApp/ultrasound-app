@@ -4746,6 +4746,8 @@ export const communityMembers = mysqlTable("community_members", {
   memberStatus: mysqlEnum("member_status", ["pending", "approved", "rejected"]).default("approved").notNull(),
   // For admin-profile posts: which admin profile this member is linked to
   adminProfileId: int("admin_profile_id"),
+  // Stripe subscription ID for paid community memberships
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
 });
 export type CommunityMember = typeof communityMembers.$inferSelect;
 

@@ -4561,3 +4561,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix: handleLmsCheckoutCompleted webhook now handles sessions without order_id (hosted checkout fallback) — creates order row and enrolls user
 - [x] Fix: getCheckoutSessionStatus now triggers fallback enrollment if session is complete but user is not yet enrolled
 - [x] Manual fix: Enrolled Daniel Galindo (psndiddle@hotmail.com, user 30462) in ACS Registry Review Quiz (course 180001), order 390001
+
+## Subscription Lifecycle Handling (Jun 3, 2026)
+- [x] Add handleInvoicePaid — on renewal, confirm/restore LMS enrollment, membership subscription (update period end + reactivate brand memberships), and paid community membership
+- [x] Add handleSubscriptionCancelled — on customer.subscription.deleted, revoke LMS enrollment (delete row), cancel membership subscription + revoke brand memberships, remove community member row
+- [x] Extend handleInvoicePaymentFailed — on final failure (attempt >= 3 or no next retry): revoke LMS enrollment, cancel membership + brand memberships, remove community member; on earlier failures: mark membership as past_due
+- [x] Wire invoice.paid and updated customer.subscription.deleted into webhook dispatcher
+- [x] Add stripeSubscriptionId column to community_members table (migration applied)
+- [x] Add communityMembers import to stripe webhook handler

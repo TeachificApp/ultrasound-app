@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, pendingFulfillments, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, pendingFulfillments, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, communityMembers } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -1259,6 +1259,238 @@ async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
   } else if (shouldCancel && subscriptionId && !membership) {
     console.warn(`[Stripe] invoice.payment_failed: no brand membership found for subscription ${subscriptionId} — cannot revoke access`);
   }
+
+  // ── LMS Course/Quiz/Cohort: revoke on final failure ──────────────────────
+  if (shouldCancel && subscriptionId) {
+    try {
+      const [order] = await db.select().from(lmsOrders)
+        .where(eq(lmsOrders.stripeSubscriptionId, subscriptionId)).limit(1);
+      if (order) {
+        await db.delete(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, order.userId), eq(lmsEnrollments.courseId, order.courseId)));
+        await db.update(lmsOrders).set({ status: "cancelled" }).where(eq(lmsOrders.id, order.id));
+        console.log(`[Stripe] LMS enrollment revoked after failed payments: userId=${order.userId} courseId=${order.courseId}`);
+        await notifyOwner({
+          title: "⚠️ LMS Access Revoked — Failed Payments",
+          content: `Subscription ${subscriptionId} for ${customerEmail} failed ${attemptCount} times. LMS access revoked for userId=${order.userId}, courseId=${order.courseId}.`,
+        });
+      }
+    } catch (err) {
+      console.error(`[Stripe] handleInvoicePaymentFailed: LMS revocation error for sub ${subscriptionId}:`, err);
+    }
+  }
+
+  // ── Membership subscription: mark past_due or cancel ────────────────────
+  if (subscriptionId) {
+    try {
+      const [sub] = await db.select().from(membershipSubscriptions)
+        .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
+      if (sub) {
+        if (shouldCancel) {
+          await db.update(membershipSubscriptions)
+            .set({ status: "cancelled", updatedAt: new Date() })
+            .where(eq(membershipSubscriptions.id, sub.id));
+          // Revoke brand memberships
+          const accessItems = await db.select().from(membershipPlanAccess).where(eq(membershipPlanAccess.planId, sub.planId));
+          for (const item of accessItems) {
+            const brand = item.itemType.startsWith("ultrasoundassist") ? "all_about_ultrasound" : item.itemType.startsWith("echoassist") ? "iheartecho" : null;
+            if (!brand) continue;
+            await db.update(brandMemberships)
+              .set({ status: "cancelled", tier: "free" })
+              .where(and(eq(brandMemberships.userId, sub.userId), eq(brandMemberships.brand, brand as any)));
+          }
+          console.log(`[Stripe] Membership cancelled after failed payments: userId=${sub.userId} planId=${sub.planId}`);
+        } else {
+          // Grace period — mark as past_due
+          await db.update(membershipSubscriptions)
+            .set({ status: "past_due", updatedAt: new Date() })
+            .where(eq(membershipSubscriptions.id, sub.id));
+          console.log(`[Stripe] Membership marked past_due: userId=${sub.userId} planId=${sub.planId}`);
+        }
+      }
+    } catch (err) {
+      console.error(`[Stripe] handleInvoicePaymentFailed: membership update error for sub ${subscriptionId}:`, err);
+    }
+  }
+
+  // ── Paid community: revoke on final failure ──────────────────────────────
+  if (shouldCancel && subscriptionId) {
+    try {
+      const [cm] = await db.select().from(communityMembers)
+        .where(eq(communityMembers.stripeSubscriptionId, subscriptionId)).limit(1);
+      if (cm) {
+        await db.delete(communityMembers).where(eq(communityMembers.id, cm.id));
+        console.log(`[Stripe] Community membership removed after failed payments: userId=${cm.userId} communityId=${cm.communityId}`);
+      }
+    } catch (err) {
+      console.error(`[Stripe] handleInvoicePaymentFailed: community revocation error for sub ${subscriptionId}:`, err);
+    }
+  }
+}
+
+/**
+ * Handle invoice.paid — subscription renewal confirmed.
+ * Restores/confirms access for LMS courses, memberships, and paid communities.
+ */
+async function handleInvoicePaid(invoice: Record<string, unknown>) {
+  const subscriptionId = invoice.subscription as string | null;
+  if (!subscriptionId) return; // One-time payment invoice, not a subscription renewal
+
+  const periodEnd = invoice.lines
+    ? (() => {
+        try {
+          const lines = (invoice.lines as any)?.data as any[];
+          const periodEndTs = lines?.[0]?.period?.end;
+          return periodEndTs ? periodEndTs * 1000 : null;
+        } catch { return null; }
+      })()
+    : null;
+
+  const db = await getDb();
+  if (!db) return;
+
+  console.log(`[Stripe] invoice.paid — sub: ${subscriptionId}, periodEnd: ${periodEnd}`);
+
+  // ── 1. LMS Course/Quiz/Cohort enrollment ────────────────────────────────
+  try {
+    const [order] = await db.select().from(lmsOrders)
+      .where(eq(lmsOrders.stripeSubscriptionId, subscriptionId)).limit(1);
+    if (order) {
+      // Ensure enrollment still exists (may have been revoked on a previous failed payment)
+      const [enrollment] = await db.select().from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, order.userId), eq(lmsEnrollments.courseId, order.courseId))).limit(1);
+      if (!enrollment) {
+        // Re-enroll
+        await db.insert(lmsEnrollments).values({
+          userId: order.userId,
+          courseId: order.courseId,
+          enrolledAt: new Date(),
+          enrollmentType: "paid",
+          orderId: order.id,
+        });
+        console.log(`[Stripe] LMS re-enrolled userId=${order.userId} courseId=${order.courseId} on renewal`);
+      } else {
+        console.log(`[Stripe] LMS enrollment confirmed on renewal: userId=${order.userId} courseId=${order.courseId}`);
+      }
+      // Update order status to paid
+      await db.update(lmsOrders).set({ status: "paid" }).where(eq(lmsOrders.id, order.id));
+    }
+  } catch (err) {
+    console.error(`[Stripe] handleInvoicePaid: LMS renewal error for sub ${subscriptionId}:`, err);
+  }
+
+  // ── 2. Membership subscription ──────────────────────────────────────────
+  try {
+    const [sub] = await db.select().from(membershipSubscriptions)
+      .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
+    if (sub) {
+      await db.update(membershipSubscriptions)
+        .set({ status: "active", currentPeriodEnd: periodEnd ?? undefined, updatedAt: new Date() })
+        .where(eq(membershipSubscriptions.id, sub.id));
+      // Also ensure brand membership is active
+      const accessItems = await db.select().from(membershipPlanAccess).where(eq(membershipPlanAccess.planId, sub.planId));
+      for (const item of accessItems) {
+        const brand = item.itemType.startsWith("ultrasoundassist") ? "all_about_ultrasound" : item.itemType.startsWith("echoassist") ? "iheartecho" : null;
+        if (!brand) continue;
+        const tier = item.itemType.endsWith("_premium") ? "premium" : "free";
+        const [bm] = await db.select().from(brandMemberships)
+          .where(and(eq(brandMemberships.userId, sub.userId), eq(brandMemberships.brand, brand as any))).limit(1);
+        if (bm && bm.status !== "active") {
+          await db.update(brandMemberships).set({ status: "active", tier: tier as any })
+            .where(eq(brandMemberships.id, bm.id));
+        }
+      }
+      console.log(`[Stripe] Membership subscription renewed: userId=${sub.userId} planId=${sub.planId}`);
+    }
+  } catch (err) {
+    console.error(`[Stripe] handleInvoicePaid: membership renewal error for sub ${subscriptionId}:`, err);
+  }
+
+  // ── 3. Paid community membership ────────────────────────────────────────
+  try {
+    const [cm] = await db.select().from(communityMembers)
+      .where(eq(communityMembers.stripeSubscriptionId, subscriptionId)).limit(1);
+    if (cm && cm.memberStatus !== "approved") {
+      await db.update(communityMembers).set({ memberStatus: "approved" })
+        .where(eq(communityMembers.id, cm.id));
+      console.log(`[Stripe] Community membership re-approved on renewal: userId=${cm.userId} communityId=${cm.communityId}`);
+    }
+  } catch (err) {
+    console.error(`[Stripe] handleInvoicePaid: community renewal error for sub ${subscriptionId}:`, err);
+  }
+}
+
+/**
+ * Handle customer.subscription.deleted — subscription fully cancelled.
+ * Revokes access for LMS courses, memberships, and paid communities.
+ */
+async function handleSubscriptionCancelled(subscription: Record<string, unknown>) {
+  const subscriptionId = subscription.id as string;
+  if (!subscriptionId) return;
+
+  const db = await getDb();
+  if (!db) return;
+
+  console.log(`[Stripe] customer.subscription.deleted — sub: ${subscriptionId}`);
+
+  // ── 1. LMS Course/Quiz/Cohort enrollment ────────────────────────────────
+  try {
+    const [order] = await db.select().from(lmsOrders)
+      .where(eq(lmsOrders.stripeSubscriptionId, subscriptionId)).limit(1);
+    if (order) {
+      // Remove enrollment — user loses access
+      await db.delete(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, order.userId), eq(lmsEnrollments.courseId, order.courseId)));
+      // Mark order as cancelled
+      await db.update(lmsOrders).set({ status: "cancelled" }).where(eq(lmsOrders.id, order.id));
+      console.log(`[Stripe] LMS enrollment revoked on cancellation: userId=${order.userId} courseId=${order.courseId}`);
+      await notifyOwner({
+        title: "📚 LMS Subscription Cancelled",
+        content: `Subscription ${subscriptionId} cancelled. LMS access revoked for userId=${order.userId}, courseId=${order.courseId}.`,
+      });
+    }
+  } catch (err) {
+    console.error(`[Stripe] handleSubscriptionCancelled: LMS revocation error for sub ${subscriptionId}:`, err);
+  }
+
+  // ── 2. Membership subscription ──────────────────────────────────────────
+  try {
+    const [sub] = await db.select().from(membershipSubscriptions)
+      .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
+    if (sub) {
+      await db.update(membershipSubscriptions)
+        .set({ status: "cancelled", updatedAt: new Date() })
+        .where(eq(membershipSubscriptions.id, sub.id));
+      // Revoke brand memberships granted by this plan
+      const accessItems = await db.select().from(membershipPlanAccess).where(eq(membershipPlanAccess.planId, sub.planId));
+      for (const item of accessItems) {
+        const brand = item.itemType.startsWith("ultrasoundassist") ? "all_about_ultrasound" : item.itemType.startsWith("echoassist") ? "iheartecho" : null;
+        if (!brand) continue;
+        await db.update(brandMemberships)
+          .set({ status: "cancelled", tier: "free" })
+          .where(and(eq(brandMemberships.userId, sub.userId), eq(brandMemberships.brand, brand as any)));
+      }
+      console.log(`[Stripe] Membership subscription cancelled: userId=${sub.userId} planId=${sub.planId}`);
+      await notifyOwner({
+        title: "🎫 Membership Subscription Cancelled",
+        content: `Subscription ${subscriptionId} cancelled. Membership access revoked for userId=${sub.userId}, planId=${sub.planId}.`,
+      });
+    }
+  } catch (err) {
+    console.error(`[Stripe] handleSubscriptionCancelled: membership revocation error for sub ${subscriptionId}:`, err);
+  }
+
+  // ── 3. Paid community membership ────────────────────────────────────────
+  try {
+    const [cm] = await db.select().from(communityMembers)
+      .where(eq(communityMembers.stripeSubscriptionId, subscriptionId)).limit(1);
+    if (cm) {
+      await db.delete(communityMembers).where(eq(communityMembers.id, cm.id));
+      console.log(`[Stripe] Community membership removed on cancellation: userId=${cm.userId} communityId=${cm.communityId}`);
+    }
+  } catch (err) {
+    console.error(`[Stripe] handleSubscriptionCancelled: community revocation error for sub ${subscriptionId}:`, err);
+  }
 }
 
 export function registerStripeWebhook(app: Express) {
@@ -1350,8 +1582,13 @@ export function registerStripeWebhook(app: Express) {
           await handleMembershipCheckoutCompleted(sessionObj);
         } else if (eventType === "payment_intent.succeeded") {
           await handleFunnelPaymentIntentSucceeded(sessionObj);
-        } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
+        } else if (eventType === "customer.subscription.deleted") {
           await handleBrandSubscriptionLifecycle(sessionObj, eventType);
+          await handleSubscriptionCancelled(sessionObj);
+        } else if (eventType === "customer.subscription.updated") {
+          await handleBrandSubscriptionLifecycle(sessionObj, eventType);
+        } else if (eventType === "invoice.paid") {
+          await handleInvoicePaid(sessionObj);
         } else if (eventType === "invoice.payment_failed") {
           await handleInvoicePaymentFailed(sessionObj);
         } else {
