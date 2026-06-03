@@ -580,6 +580,7 @@ const createMembershipCheckout = protectedProcedure
         customer_name: ctx.user.name ?? "",
         type: "membership",
       },
+      ...(isRecurring ? { subscription_data: { description: plan.title, metadata: { user_id: ctx.user.id.toString(), plan_id: plan.id.toString(), type: "membership" } } } : {}),
       success_url: `${input.origin}/memberships/${plan.slug}?success=1`,
       cancel_url: `${input.origin}/memberships/${plan.slug}`,
     });
@@ -665,6 +666,7 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
       ...(discounts.length > 0 ? { discounts } : {}),
       client_reference_id: ctx.user.id.toString(),
       metadata: { type: "membership", plan_id: plan.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", customer_name: ctx.user.name ?? "" },
+      ...(isRecurring ? { subscription_data: { description: plan.title, metadata: { user_id: ctx.user.id.toString(), plan_id: plan.id.toString(), type: "membership" } } } : {}),
       return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=membership`,
     });
     const billingLabel = isRecurring ? (plan.billingInterval === "annual" ? "per year" : "per month") : null;

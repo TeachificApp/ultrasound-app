@@ -391,6 +391,10 @@ export const downloadsLearnerRouter = router({
           allow_promotion_codes: true,
           line_items: [{ price: stripePriceId, quantity: 1 }],
           metadata: commonMeta,
+          subscription_data: {
+            description: bundle.title,
+            metadata: { user_id: ctx.user.id.toString(), bundle_id: bundle.id.toString(), type: "digital_bundle" },
+          },
           success_url: `${origin}/my-downloads?success=1`,
           cancel_url: `${origin}/bundles/${bundle.slug}`,
         });

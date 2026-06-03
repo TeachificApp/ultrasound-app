@@ -1044,6 +1044,10 @@ export const lmsLearnerRouter = router({
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
           metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
+          subscription_data: {
+            description: productName,
+            metadata: { user_id: ctx.user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() },
+          },
           ...shippingOptions,
         });
 
@@ -1096,6 +1100,7 @@ export const lmsLearnerRouter = router({
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
           metadata: { ...commonMeta, installment_count: installmentCount.toString(), pricing_option_id: input.pricingOptionId?.toString() ?? "" },
+          ...(hasInstallments ? { subscription_data: { description: productName, metadata: { user_id: ctx.user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() } } } : {}),
           ...shippingOptions,
         });
       } else {
@@ -1285,6 +1290,10 @@ export const lmsLearnerRouter = router({
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: user.id.toString(),
           metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
+          subscription_data: {
+            description: productName,
+            metadata: { user_id: user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() },
+          },
           ...shippingOptions,
         });
       } else {

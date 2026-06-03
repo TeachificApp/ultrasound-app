@@ -203,6 +203,10 @@ export const brandMembershipRouter = router({
           },
           quantity: 1,
         }],
+        subscription_data: {
+          description: `${productConfig.name} — ${input.interval === "annual" ? "Annual" : "Monthly"} Subscription`,
+          metadata: { user_id: ctx.user.id.toString(), brand, type: "brand_membership_upgrade" },
+        },
         success_url: `${input.origin}/upgrade-success?brand=${brand}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${input.origin}/premium`,
         client_reference_id: ctx.user.id.toString(),
@@ -247,6 +251,10 @@ export const brandMembershipRouter = router({
           },
           quantity: 1,
         }],
+        subscription_data: {
+          description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Monthly Subscription`,
+          metadata: { user_id: ctx.user.id.toString(), type: "dual_membership" },
+        },
         success_url: `${input.origin}/upgrade-success?dual=1&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${input.origin}/premium`,
         client_reference_id: ctx.user.id.toString(),
