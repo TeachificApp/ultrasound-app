@@ -20,7 +20,7 @@ import {
   mediaVersions,
 } from "../../drizzle/schema";
 import { parseISpringQuizFromBuffer } from "../lib/iSpringQuizParser";
-import { storagePut } from "../storage";
+import { storagePut, storageGet } from "../storage";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -613,7 +613,23 @@ export const questionBankRouter = router({
 
 // ─── Download helper ──────────────────────────────────────────────────────────
 
-function downloadToBuffer(url: string): Promise<Buffer> {
+async function downloadToBuffer(storedUrl: string): Promise<Buffer> {
+  // storedUrl may be a storage-proxy URL that requires auth.
+  // Extract the relative key from the URL and get a fresh presigned download URL.
+  let downloadUrl = storedUrl;
+  try {
+    const u = new URL(storedUrl);
+    // If this is a storage proxy URL, use storageGet to get a fresh presigned URL
+    const pathParam = u.searchParams.get("path");
+    const relKey = pathParam ?? u.pathname.replace(/^\/+/, "");
+    if (relKey) {
+      const { url } = await storageGet(relKey);
+      downloadUrl = url;
+    }
+  } catch {
+    // If URL parsing fails, try the original URL directly
+  }
+
   return new Promise((resolve, reject) => {
     const follow = (targetUrl: string, redirects = 0): void => {
       if (redirects > 10) { reject(new Error("Too many redirects")); return; }
@@ -629,16 +645,23 @@ function downloadToBuffer(url: string): Promise<Buffer> {
         }
         const chunks: Buffer[] = [];
         res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => resolve(Buffer.concat(chunks)));
+        res.on("end", () => {
+          const buf = Buffer.concat(chunks);
+          if (buf.length === 0) {
+            reject(new Error("Downloaded file is empty — the file may not be accessible"));
+            return;
+          }
+          resolve(buf);
+        });
         res.on("error", reject);
       }).on("error", reject);
     };
     try {
-      const u = new URL(url);
+      const u = new URL(downloadUrl);
       u.pathname = u.pathname.split("/").map(p => encodeURIComponent(decodeURIComponent(p))).join("/");
       follow(u.toString());
     } catch {
-      follow(url);
+      follow(downloadUrl);
     }
   });
 }

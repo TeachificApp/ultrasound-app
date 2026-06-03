@@ -26,7 +26,7 @@ import unzipper from "unzipper";
 import { eq, and, lt, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import { mediaVersions, mediaAssets } from "../../drizzle/schema";
-import { storagePut } from "../storage";
+import { storagePut, storageGet } from "../storage";
 import type { Request, Response } from "express";
 import { findScormLaunchFile, SCORM_PACKAGE_MEDIA_TYPES } from "../lib/scormPackage";
 
@@ -36,7 +36,22 @@ const STALL_THRESHOLD_MS = 10 * 60 * 1000;
 
 // ─── Download helper ──────────────────────────────────────────────────────────
 
-function downloadToFile(url: string, destPath: string): Promise<void> {
+async function downloadToFile(storedUrl: string, destPath: string): Promise<void> {
+  // storedUrl may be a storage-proxy URL that requires auth.
+  // Use storageGet to get a fresh presigned download URL.
+  let downloadUrl = storedUrl;
+  try {
+    const u = new URL(storedUrl);
+    const pathParam = u.searchParams.get("path");
+    const relKey = pathParam ?? u.pathname.replace(/^\/+/, "");
+    if (relKey) {
+      const { url } = await storageGet(relKey);
+      downloadUrl = url;
+    }
+  } catch {
+    // If URL parsing fails, try the original URL directly
+  }
+
   return new Promise((resolve, reject) => {
     const follow = (targetUrl: string, redirects = 0): void => {
       if (redirects > 10) { reject(new Error("Too many redirects")); return; }
@@ -59,11 +74,11 @@ function downloadToFile(url: string, destPath: string): Promise<void> {
     };
     // URL-encode path segments to handle spaces and special characters
     try {
-      const u = new URL(url);
+      const u = new URL(downloadUrl);
       u.pathname = u.pathname.split("/").map(p => encodeURIComponent(decodeURIComponent(p))).join("/");
       follow(u.toString());
     } catch {
-      follow(url);
+      follow(downloadUrl);
     }
   });
 }
