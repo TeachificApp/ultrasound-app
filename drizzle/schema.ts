@@ -4208,6 +4208,8 @@ export const generalFormTemplates = mysqlTable("generalFormTemplates", {
   themeSettings: longtext("themeSettings"),
   successMessage: text("successMessage"),
   successRedirectUrl: varchar("successRedirectUrl", { length: 500 }),
+  defaultSuccessModuleId: int("defaultSuccessModuleId"),
+  passingScorePercent: int("passingScorePercent"),
   notifyEmail: varchar("notifyEmail", { length: 255 }),
   openAt: timestamp("openAt"),
   closeAt: timestamp("closeAt"),
@@ -4295,6 +4297,37 @@ export const generalFormBranchRules = mysqlTable("generalFormBranchRules", {
 });
 export type GeneralFormBranchRule = typeof generalFormBranchRules.$inferSelect;
 export type InsertGeneralFormBranchRule = typeof generalFormBranchRules.$inferInsert;
+
+
+export const generalFormSuccessModules = mysqlTable("generalFormSuccessModules", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  moduleType: mysqlEnum("moduleType", ["inline_message", "full_page", "redirect_url"]).notNull(),
+  inlineContent: longtext("inlineContent"),
+  pageContent: longtext("pageContent"),
+  redirectUrl: varchar("redirectUrl", { length: 2000 }),
+  isEnabled: boolean("isEnabled").default(true).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type GeneralFormSuccessModule = typeof generalFormSuccessModules.$inferSelect;
+export type InsertGeneralFormSuccessModule = typeof generalFormSuccessModules.$inferInsert;
+
+export const generalFormSuccessRoutingRules = mysqlTable("generalFormSuccessRoutingRules", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  ruleLabel: varchar("ruleLabel", { length: 255 }).default(""),
+  successModuleId: int("successModuleId").notNull(),
+  logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("all"),
+  conditions: longtext("conditions").notNull(),
+  sortOrder: int("sortOrder").notNull().default(0),
+  isEnabled: boolean("isEnabled").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GeneralFormSuccessRoutingRule = typeof generalFormSuccessRoutingRules.$inferSelect;
+export type InsertGeneralFormSuccessRoutingRule = typeof generalFormSuccessRoutingRules.$inferInsert;
 
 export const generalFormSubmissions = mysqlTable("generalFormSubmissions", {
   id: int("id").autoincrement().primaryKey(),
