@@ -1796,6 +1796,8 @@ export const accreditationFormTemplates = mysqlTable("accreditationFormTemplates
   importedFromUrl: varchar("importedFromUrl", { length: 1000 }),
   successMessage: longtext("successMessage"),
   successRedirectUrl: varchar("successRedirectUrl", { length: 500 }),
+  defaultSuccessModuleId: int("defaultSuccessModuleId"),
+  passingScorePercent: int("passingScorePercent"),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -1952,6 +1954,41 @@ export const accreditationFormSubmissions = mysqlTable("accreditationFormSubmiss
 });
 export type AccreditationFormSubmission = typeof accreditationFormSubmissions.$inferSelect;
 export type InsertAccreditationFormSubmission = typeof accreditationFormSubmissions.$inferInsert;
+
+// ─── Accreditation Form Success Modules ──────────────────────────────────────
+/**
+ * Per-form success modules for accreditation/DIY forms.
+ * Mirrors generalFormSuccessModules but scoped to accreditationFormTemplates.
+ */
+export const accreditationFormSuccessModules = mysqlTable("accreditationFormSuccessModules", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  moduleType: mysqlEnum("moduleType", ["inline_message", "full_page", "redirect_url"]).notNull(),
+  inlineContent: longtext("inlineContent"),
+  pageContent: longtext("pageContent"),
+  redirectUrl: varchar("redirectUrl", { length: 2000 }),
+  isEnabled: boolean("isEnabled").default(true).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type AccreditationFormSuccessModule = typeof accreditationFormSuccessModules.$inferSelect;
+export type InsertAccreditationFormSuccessModule = typeof accreditationFormSuccessModules.$inferInsert;
+
+export const accreditationFormSuccessRoutingRules = mysqlTable("accreditationFormSuccessRoutingRules", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  ruleLabel: varchar("ruleLabel", { length: 255 }).default(""),
+  successModuleId: int("successModuleId").notNull(),
+  logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("all"),
+  conditions: longtext("conditions").notNull(),
+  sortOrder: int("sortOrder").notNull().default(0),
+  isEnabled: boolean("isEnabled").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AccreditationFormSuccessRoutingRule = typeof accreditationFormSuccessRoutingRules.$inferSelect;
+export type InsertAccreditationFormSuccessRoutingRule = typeof accreditationFormSuccessRoutingRules.$inferInsert;
 
 // ── Flashcard guest (unauthenticated) daily usage tracking ───────────────────
 // Replaces in-memory Map so counts survive server restarts.

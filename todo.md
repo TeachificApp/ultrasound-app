@@ -140,6 +140,22 @@
 - [x] Accreditation Navigator (hidden from public)
 - [x] DIY Accreditation (hidden from public)
 
+## Form Success Modules (Jun 2026)
+- [x] Merge Cursor branch cursor/form-embed-widget-4bb0 into main
+- [x] Run SQL migrations: generalFormSuccessModules, generalFormSuccessRoutingRules, generalFormEmbedWidgets, generalFormEmbedAnalytics tables
+- [x] Wire generalFormRouter.submitForm to return successOutcome via formSuccessRouting
+- [x] Wire PublicFormRenderer to render FormSuccessOutcomeView + embed postMessage on submit
+- [x] Wire deleteForm/duplicateForm lifecycle helpers in generalFormRouter
+- [x] Create accreditationFormSuccessModules and accreditationFormSuccessRoutingRules tables (SQL migration)
+- [x] Add defaultSuccessModuleId and passingScorePercent columns to accreditationFormTemplates
+- [x] Create accreditationFormSuccessModulesDb.ts — full mirror of formSuccessModulesDb.ts
+- [x] Add success module CRUD procedures to formBuilderRouter (listSuccessModules, upsertSuccessModule, duplicateSuccessModule, deleteSuccessModule, setDefaultSuccessModule, listSuccessRoutingRules, upsertSuccessRoutingRule, deleteSuccessRoutingRule)
+- [x] Wire formBuilderRouter.submitForm to return successOutcome
+- [x] Wire DynamicFormRenderer to handle successOutcome and render FormSuccessOutcomeView
+- [x] Create DIYFormSuccessModulesTab.tsx — full mirror of FormSuccessModulesTab using trpc.formBuilder.*
+- [x] Add Success Modules tab to FormBuilderAdmin (DIY forms)
+- [x] 57 tests passing (formBuilder: 30, formSuccessRouting: 7, accreditation: 20)
+
 ## Testing
 - [x] Auth/logout test
 - [x] Thinkific webhook tests (free, premium, expiry)

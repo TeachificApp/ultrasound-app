@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, AlertCircle, ChevronRight } from "lucide-react";
 import { RichTextDisplay } from "@/components/RichTextEditor";
 import { toast } from "sonner";
+import { FormSuccessOutcomeView } from "@/components/FormSuccessOutcomeView";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -438,6 +439,7 @@ export default function DynamicFormRenderer({
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [successOutcome, setSuccessOutcome] = useState<any | null>(null);
 
   const { data: rawTemplateData, isLoading } = trpc.formBuilder.getFullTemplate.useQuery(
     { id: templateId },
@@ -491,8 +493,15 @@ export default function DynamicFormRenderer({
       setSubmitting(false);
       toast.success("Form submitted successfully");
       onSubmitted?.(data.id);
-      // Handle redirect first, then show success screen
-      if (templateData?.successRedirectUrl) {
+      // Use successOutcome if available, fall back to legacy fields
+      if (data.successOutcome) {
+        if (data.successOutcome.type === "redirect_url" && data.successOutcome.redirectUrl) {
+          window.location.href = data.successOutcome.redirectUrl;
+        } else {
+          setSuccessOutcome(data.successOutcome);
+          setSubmitted(true);
+        }
+      } else if (templateData?.successRedirectUrl) {
         window.location.href = templateData.successRedirectUrl;
       } else {
         setSubmitted(true);
@@ -577,6 +586,15 @@ export default function DynamicFormRenderer({
   }
 
   if (submitted) {
+    // If we have a successOutcome from the server, use the shared view component
+    if (successOutcome) {
+      return (
+        <div className="py-8">
+          <FormSuccessOutcomeView outcome={successOutcome} responses={responses} />
+        </div>
+      );
+    }
+    // Legacy fallback
     const hasCustomMsg = templateData?.successMessage && templateData.successMessage.trim().length > 0;
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">

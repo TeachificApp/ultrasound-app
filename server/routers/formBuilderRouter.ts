@@ -61,7 +61,24 @@ import {
   accreditationFormItems,
   accreditationFormOptions,
   accreditationFormBranchRules,
+  accreditationFormSuccessModules,
+  accreditationFormSuccessRoutingRules,
 } from "../../drizzle/schema";
+import {
+  ensureLegacyAccreditationSuccessModules,
+  fetchAccreditationSuccessModules,
+  fetchAccreditationSuccessRoutingRules,
+  clearAccreditationDefaultIfDeleted,
+  deleteAccreditationSuccessDataForForm,
+  buildAccreditationModuleIdMapForDuplicate,
+  copyAccreditationSuccessRoutingRulesForDuplicate,
+} from "../lib/accreditationFormSuccessModulesDb";
+import {
+  selectSuccessModule,
+  buildSuccessOutcome,
+  extractSubmitterInfo,
+  type FormSubmissionContext,
+} from "../lib/formSuccessRouting";
 
 // ─── Guard helper ─────────────────────────────────────────────────────────────
 
@@ -274,11 +291,24 @@ export const formBuilderRouter = router({
       hostDomain: z.string().optional(),
       successMessage: z.string().optional(),
       successRedirectUrl: z.string().optional(),
+      defaultSuccessModuleId: z.number().nullable().optional(),
+      passingScorePercent: z.number().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requirePlatformAdmin(ctx);
-      const { id, ...data } = input;
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const { id, defaultSuccessModuleId, passingScorePercent, ...data } = input;
       await updateFormTemplate(id, data);
+      // Update success module fields directly via Drizzle
+      const successFields: Record<string, any> = {};
+      if (defaultSuccessModuleId !== undefined) successFields.defaultSuccessModuleId = defaultSuccessModuleId;
+      if (passingScorePercent !== undefined) successFields.passingScorePercent = passingScorePercent;
+      if (Object.keys(successFields).length > 0) {
+        await db.update(accreditationFormTemplates)
+          .set({ ...successFields, updatedAt: new Date() })
+          .where(eq(accreditationFormTemplates.id, id));
+      }
       return { success: true };
     }),
 
@@ -287,6 +317,10 @@ export const formBuilderRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (db) {
+        await deleteAccreditationSuccessDataForForm(db, input.id);
+      }
       await deleteFormTemplate(input.id);
       return { success: true };
     }),
@@ -763,7 +797,37 @@ export const formBuilderRouter = router({
         maxPossibleScore: input.maxPossibleScore,
         status: 'submitted',
       });
-      return { id };
+
+      // ── Compute successOutcome ────────────────────────────────────────────────
+      let successOutcome: ReturnType<typeof buildSuccessOutcome> | null = null;
+      try {
+        const db2 = await getDb();
+        if (db2) {
+          const [template] = await db2.select().from(accreditationFormTemplates)
+            .where(eq(accreditationFormTemplates.id, input.templateId)).limit(1);
+          if (template) {
+            const modules = await fetchAccreditationSuccessModules(db2, input.templateId);
+            const rules = await fetchAccreditationSuccessRoutingRules(db2, input.templateId);
+            const { name: submitterName, email: submitterEmail } = extractSubmitterInfo(finalResponses);
+            const ctx2: FormSubmissionContext = {
+              responses: finalResponses,
+              score: input.qualityScore,
+              maxScore: input.maxPossibleScore,
+              passingScorePercent: template.passingScorePercent ?? null,
+              submissionId: id,
+              formName: template.name,
+              submitterName,
+              submitterEmail,
+            };
+            const selectedModule = selectSuccessModule(rules, modules as any, template.defaultSuccessModuleId ?? null, ctx2);
+            successOutcome = buildSuccessOutcome(selectedModule as any, template, ctx2);
+          }
+        }
+      } catch (e: any) {
+        console.error("[SuccessOutcome] Failed to compute outcome:", e.message);
+      }
+
+      return { id, successOutcome };
     }),
 
   /** Get my own submissions */
@@ -1162,6 +1226,177 @@ ${pageText}`;
       await db.update(accreditationFormTemplates)
         .set({ themeSettings: input.themeSettings, updatedAt: new Date() })
         .where(eq(accreditationFormTemplates.id, input.templateId));
+      return { success: true };
+    }),
+
+  // ── Success Modules (mirrors generalForm.*) ───────────────────────────────
+
+  /** List success modules for a DIY form template */
+  listSuccessModules: protectedProcedure
+    .input(z.object({ templateId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const [template] = await db.select().from(accreditationFormTemplates)
+        .where(eq(accreditationFormTemplates.id, input.templateId)).limit(1);
+      if (!template) throw new TRPCError({ code: 'NOT_FOUND' });
+      await ensureLegacyAccreditationSuccessModules(db, template);
+      const modules = await fetchAccreditationSuccessModules(db, input.templateId);
+      const [freshTemplate] = await db.select().from(accreditationFormTemplates)
+        .where(eq(accreditationFormTemplates.id, input.templateId)).limit(1);
+      return { modules, defaultSuccessModuleId: freshTemplate?.defaultSuccessModuleId ?? null };
+    }),
+
+  /** Create or update a success module */
+  upsertSuccessModule: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      templateId: z.number(),
+      name: z.string().min(1).max(200),
+      moduleType: z.enum(['inline_message', 'full_page', 'redirect_url']),
+      inlineContent: z.string().optional(),
+      pageContent: z.string().optional(),
+      redirectUrl: z.string().optional(),
+      isEnabled: z.boolean().default(true),
+      sortOrder: z.number().default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const { id, templateId, ...rest } = input;
+      const values = { ...rest, templateId, updatedAt: new Date() };
+      if (id) {
+        await db.update(accreditationFormSuccessModules).set(values)
+          .where(eq(accreditationFormSuccessModules.id, id));
+        return { id };
+      }
+      const [result] = await db.insert(accreditationFormSuccessModules).values(values);
+      const newId = (result as any).insertId;
+      const [tpl] = await db.select().from(accreditationFormTemplates)
+        .where(eq(accreditationFormTemplates.id, templateId)).limit(1);
+      if (tpl && !tpl.defaultSuccessModuleId) {
+        await db.update(accreditationFormTemplates)
+          .set({ defaultSuccessModuleId: newId })
+          .where(eq(accreditationFormTemplates.id, templateId));
+      }
+      return { id: newId };
+    }),
+
+  /** Duplicate a success module */
+  duplicateSuccessModule: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const [mod] = await db.select().from(accreditationFormSuccessModules)
+        .where(eq(accreditationFormSuccessModules.id, input.id)).limit(1);
+      if (!mod) throw new TRPCError({ code: 'NOT_FOUND' });
+      const [result] = await db.insert(accreditationFormSuccessModules).values({
+        templateId: mod.templateId,
+        name: mod.name + ' (Copy)',
+        moduleType: mod.moduleType,
+        inlineContent: mod.inlineContent,
+        pageContent: mod.pageContent,
+        redirectUrl: mod.redirectUrl,
+        isEnabled: mod.isEnabled,
+        sortOrder: mod.sortOrder + 1,
+      });
+      return { id: (result as any).insertId };
+    }),
+
+  /** Delete a success module */
+  deleteSuccessModule: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const [mod] = await db.select().from(accreditationFormSuccessModules)
+        .where(eq(accreditationFormSuccessModules.id, input.id)).limit(1);
+      if (!mod) throw new TRPCError({ code: 'NOT_FOUND' });
+      await db.delete(accreditationFormSuccessRoutingRules)
+        .where(eq(accreditationFormSuccessRoutingRules.successModuleId, input.id));
+      await db.delete(accreditationFormSuccessModules)
+        .where(eq(accreditationFormSuccessModules.id, input.id));
+      await clearAccreditationDefaultIfDeleted(db, mod.templateId, input.id);
+      return { success: true };
+    }),
+
+  /** Set the default success module for a template */
+  setDefaultSuccessModule: protectedProcedure
+    .input(z.object({ templateId: z.number(), moduleId: z.number().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      if (input.moduleId != null) {
+        const [mod] = await db.select().from(accreditationFormSuccessModules)
+          .where(and(
+            eq(accreditationFormSuccessModules.id, input.moduleId),
+            eq(accreditationFormSuccessModules.templateId, input.templateId),
+          )).limit(1);
+        if (!mod) throw new TRPCError({ code: 'NOT_FOUND', message: 'Success module not found for this form.' });
+      }
+      await db.update(accreditationFormTemplates)
+        .set({ defaultSuccessModuleId: input.moduleId })
+        .where(eq(accreditationFormTemplates.id, input.templateId));
+      return { success: true };
+    }),
+
+  /** List success routing rules for a template */
+  listSuccessRoutingRules: protectedProcedure
+    .input(z.object({ templateId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      return fetchAccreditationSuccessRoutingRules(db, input.templateId);
+    }),
+
+  /** Create or update a success routing rule */
+  upsertSuccessRoutingRule: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      templateId: z.number(),
+      ruleLabel: z.string().default(''),
+      successModuleId: z.number(),
+      logicOperator: z.enum(['all', 'any']).default('all'),
+      conditions: z.string(),
+      sortOrder: z.number().default(0),
+      isEnabled: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const [mod] = await db.select().from(accreditationFormSuccessModules)
+        .where(and(
+          eq(accreditationFormSuccessModules.id, input.successModuleId),
+          eq(accreditationFormSuccessModules.templateId, input.templateId),
+        )).limit(1);
+      if (!mod) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid success module for this form.' });
+      const { id, ...rest } = input;
+      if (id) {
+        await db.update(accreditationFormSuccessRoutingRules).set(rest)
+          .where(eq(accreditationFormSuccessRoutingRules.id, id));
+        return { id };
+      }
+      const [result] = await db.insert(accreditationFormSuccessRoutingRules).values(rest);
+      return { id: (result as any).insertId };
+    }),
+
+  /** Delete a success routing rule */
+  deleteSuccessRoutingRule: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      await db.delete(accreditationFormSuccessRoutingRules)
+        .where(eq(accreditationFormSuccessRoutingRules.id, input.id));
       return { success: true };
     }),
 });

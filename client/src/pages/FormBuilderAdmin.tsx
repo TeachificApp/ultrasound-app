@@ -68,6 +68,7 @@ import {
 import { Link } from "wouter";
 import FormPreview from "@/components/FormPreview";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
+import DIYFormSuccessModulesTab from "@/components/admin/DIYFormSuccessModulesTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1738,7 +1739,7 @@ function FormResultsTab({ templateId }: { templateId: number }) {
 
 function FormEditor({ templateId }: { templateId: number }) {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "style" | "preview" | "settings" | "results">("editor");
+  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "style" | "preview" | "settings" | "results" | "success-modules">("editor");
   const [urlImportOpen, setUrlImportOpen] = useState(false);
   const [urlImportValue, setUrlImportValue] = useState("");
   const [editingItem, setEditingItem] = useState<FormItem | null>(null);
@@ -1906,6 +1907,7 @@ function FormEditor({ templateId }: { templateId: number }) {
           { id: "style" as const, label: "Style", icon: Palette, badge: null },
           { id: "preview" as const, label: "Preview", icon: Eye, badge: null },
           { id: "settings" as const, label: "Settings", icon: Save, badge: null },
+          { id: "success-modules" as const, label: "Success Modules", icon: CheckCircle2, badge: null },
           { id: "results" as const, label: "Results", icon: BarChart2, badge: null },
         ].map(tab => (
           <button
@@ -2092,6 +2094,16 @@ function FormEditor({ templateId }: { templateId: number }) {
       {/* Settings Tab */}
       {activeTab === "settings" && (
         <DIYSettingsPanel template={template} templateId={templateId} updateTemplateMutation={updateTemplateMutation} />
+      )}
+
+      {/* Success Modules Tab */}
+      {activeTab === "success-modules" && template && (
+        <DIYFormSuccessModulesTab
+          templateId={templateId}
+          template={template}
+          onRefetch={refetch}
+          formItems={items.map(i => ({ id: i.id, label: i.label, itemType: i.itemType }))}
+        />
       )}
 
       {/* Results Tab */}

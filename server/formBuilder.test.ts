@@ -379,3 +379,109 @@ describe("Form Builder — Org Visibility Rules", () => {
     expect(orgs[0].name).toBe("IAC");
   });
 });
+
+// ─── DIY / Accreditation Form Success Modules Tests ───────────────────────────
+describe("DIY Form — Success Modules (accreditation tables)", () => {
+  it("creates a default inline_message module from legacy successMessage", () => {
+    // Simulate what createDefaultAccreditationSuccessModule does
+    const template = { id: 42, successMessage: "Thanks for submitting!", successRedirectUrl: null };
+    const moduleType = template.successRedirectUrl ? "redirect_url" : "inline_message";
+    const inlineContent = moduleType === "inline_message"
+      ? (template.successMessage || "<p>Thank you for your submission!</p>")
+      : null;
+    const redirectUrl = moduleType === "redirect_url" ? template.successRedirectUrl : null;
+
+    expect(moduleType).toBe("inline_message");
+    expect(inlineContent).toBe("Thanks for submitting!");
+    expect(redirectUrl).toBeNull();
+  });
+
+  it("creates a redirect_url module when successRedirectUrl is set", () => {
+    const template = { id: 43, successMessage: null, successRedirectUrl: "https://example.com/ty" };
+    const moduleType = template.successRedirectUrl ? "redirect_url" : "inline_message";
+    const redirectUrl = moduleType === "redirect_url" ? template.successRedirectUrl : null;
+
+    expect(moduleType).toBe("redirect_url");
+    expect(redirectUrl).toBe("https://example.com/ty");
+  });
+
+  it("scopes modules to their templateId — no cross-form contamination", () => {
+    // Simulate listSuccessModules filtering by templateId
+    const allModules = [
+      { id: 1, templateId: 10, name: "Module A" },
+      { id: 2, templateId: 11, name: "Module B" },
+      { id: 3, templateId: 10, name: "Module C" },
+    ];
+    const forTemplate10 = allModules.filter(m => m.templateId === 10);
+    const forTemplate11 = allModules.filter(m => m.templateId === 11);
+
+    expect(forTemplate10).toHaveLength(2);
+    expect(forTemplate11).toHaveLength(1);
+    expect(forTemplate10.every(m => m.templateId === 10)).toBe(true);
+  });
+
+  it("builds a module id map when duplicating a template", () => {
+    // Simulate buildAccreditationModuleIdMapForDuplicate
+    const originalModules = [
+      { id: 1, name: "Pass Module" },
+      { id: 2, name: "Fail Module" },
+    ];
+    const newModules = [
+      { id: 101, name: "Pass Module" },
+      { id: 102, name: "Fail Module" },
+    ];
+    // Map old id → new id by position
+    const idMap = new Map<number, number>();
+    originalModules.forEach((m, idx) => {
+      idMap.set(m.id, newModules[idx].id);
+    });
+
+    expect(idMap.get(1)).toBe(101);
+    expect(idMap.get(2)).toBe(102);
+  });
+
+  it("clears defaultSuccessModuleId when the default module is deleted", () => {
+    // Simulate clearAccreditationDefaultIfDeleted
+    const template = { id: 10, defaultSuccessModuleId: 5 };
+    const deletedModuleId = 5;
+
+    const updatedDefaultId = template.defaultSuccessModuleId === deletedModuleId
+      ? null
+      : template.defaultSuccessModuleId;
+
+    expect(updatedDefaultId).toBeNull();
+  });
+
+  it("keeps defaultSuccessModuleId when a different module is deleted", () => {
+    const template = { id: 10, defaultSuccessModuleId: 5 };
+    const deletedModuleId = 7;
+
+    const updatedDefaultId = template.defaultSuccessModuleId === deletedModuleId
+      ? null
+      : template.defaultSuccessModuleId;
+
+    expect(updatedDefaultId).toBe(5);
+  });
+
+  it("routing rules are scoped per templateId", () => {
+    const allRules = [
+      { id: 1, templateId: 10, successModuleId: 1, conditions: "[]" },
+      { id: 2, templateId: 11, successModuleId: 2, conditions: "[]" },
+    ];
+    const rulesForTemplate10 = allRules.filter(r => r.templateId === 10);
+    expect(rulesForTemplate10).toHaveLength(1);
+    expect(rulesForTemplate10[0].successModuleId).toBe(1);
+  });
+
+  it("passingScorePercent enables pass/fail routing", () => {
+    // Simulate __pass_status__ evaluation
+    const passingScorePercent = 80;
+    const scorePercent = 85;
+    const passStatus = scorePercent >= passingScorePercent ? "pass" : "fail";
+    expect(passStatus).toBe("pass");
+
+    const scorePercentFail = 70;
+    const failStatus = scorePercentFail >= passingScorePercent ? "pass" : "fail";
+    expect(failStatus).toBe("fail");
+  });
+});

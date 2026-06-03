@@ -45,7 +45,17 @@ import {
   fetchSuccessModules,
   fetchSuccessRoutingRules,
   clearDefaultIfDeleted,
+  deleteSuccessDataForForm,
+  copySuccessModulesForDuplicate,
+  copySuccessRoutingRulesForDuplicate,
+  buildModuleIdMapForDuplicate,
 } from "../lib/formSuccessModulesDb";
+import {
+  selectSuccessModule,
+  buildSuccessOutcome,
+  extractSubmitterInfo,
+  type FormSubmissionContext,
+} from "../lib/formSuccessRouting";
 import { ensureEmbedWidget, deleteEmbedDataForForm, parseAllowedDomains } from "../lib/formEmbedWidgetDb";
 import { parseEmbedSettings } from "@shared/formEmbedWidgetTypes";
 import { getEmbedAnalyticsSummary } from "../routes/formEmbedRoutes";
@@ -483,6 +493,7 @@ export const generalFormRouter = router({
       await db.delete(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, input.id));
       await db.delete(generalFormSubmissions).where(eq(generalFormSubmissions.templateId, input.id));
       await deleteEmbedDataForForm(db, input.id);
+      await deleteSuccessDataForForm(db, input.id);
       await db.delete(generalFormTemplates).where(eq(generalFormTemplates.id, input.id));
       return { success: true };
     }),
@@ -528,6 +539,9 @@ export const generalFormRouter = router({
           allowedDomains: embedWidget.allowedDomains,
         });
       }
+      // Copy success modules and routing rules
+      const moduleIdMap = await buildModuleIdMapForDuplicate(db, input.id, newId);
+      await copySuccessRoutingRulesForDuplicate(db, input.id, newId, moduleIdMap);
       return { id: newId };
     }),
 
@@ -1508,7 +1522,36 @@ ${pageText}`;
           console.error("[Webhook] Delivery failed for form", input.templateId, e.message);
         }
       })();
-      return { id: submissionId, score, maxScore };
+      // Build success outcome
+      let successOutcome = null;
+      try {
+        await ensureLegacySuccessModules(db, template);
+        const modules = await fetchSuccessModules(db, input.templateId);
+        const rulesRaw = await fetchSuccessRoutingRules(db, input.templateId);
+        const parsedResponses: Record<string, any> = JSON.parse(input.responses);
+        const submitter = extractSubmitterInfo(parsedResponses);
+        const submissionCtx: FormSubmissionContext = {
+          responses: parsedResponses,
+          score,
+          maxScore,
+          passingScorePercent: (template as any).passingScorePercent ?? null,
+          submissionId,
+          formName: template.name,
+          paymentStatus: null,
+          submitterName: submitter.name,
+          submitterEmail: submitter.email,
+        };
+        const selected = selectSuccessModule(
+          rulesRaw,
+          modules,
+          (template as any).defaultSuccessModuleId ?? null,
+          submissionCtx,
+        );
+        successOutcome = buildSuccessOutcome(selected, template, submissionCtx);
+      } catch (e: any) {
+        console.error("[SuccessModules] Failed to build success outcome:", e.message);
+      }
+      return { id: submissionId, score, maxScore, successOutcome };
     }),
 
     // ── ADMIN: Export form results as CSV-ready data ───────────────────────────

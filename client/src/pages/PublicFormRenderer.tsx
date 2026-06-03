@@ -17,6 +17,7 @@ import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { CheckCircle2, AlertCircle, RefreshCw, Lock, ArrowRight, ArrowLeft, ChevronDown } from "lucide-react";
 import { RichTextDisplay } from "@/components/RichTextEditor";
+import { FormSuccessOutcomeView, type SuccessOutcomePayload } from "@/components/FormSuccessOutcomeView";
 
 // ─── Theme helpers ────────────────────────────────────────────────────────────
 interface ThemeSettings {
@@ -849,6 +850,16 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
   const params = useParams<{ slug: string }>();
   const slug = params.slug ?? "";
 
+  // ── Embed widget postMessage ──
+  const widgetKey = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("widget");
+  }, []);
+  const postEmbedEvent = useCallback((event: "form_started" | "form_submitted") => {
+    if (!widgetKey || typeof window === "undefined") return;
+    window.parent.postMessage({ type: "teachific-form-embed", event, widgetKey }, "*");
+  }, [widgetKey]);
+
   const publicQuery = trpc.generalForm.getPublicForm.useQuery(
     { slug },
     { enabled: !!slug && !isPreview, retry: false }
@@ -863,11 +874,13 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
   const [submitting, setSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState("");
   const [showWelcome, setShowWelcome] = useState(true);
+  const [successOutcome, setSuccessOutcome] = useState<SuccessOutcomePayload | null>(null);
 
   const submitMutation = trpc.generalForm.submitForm.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
       setSubmitting(false);
       setSubmitted(true);
+      if (result.successOutcome) setSuccessOutcome(result.successOutcome as SuccessOutcomePayload);
       postEmbedEvent("form_submitted");
     },
     onError: (e) => { setSubmitting(false); setGlobalError(e.message); },
@@ -910,6 +923,17 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
 
   if (submitted) {
     const bgStyle = getBgStyle(theme);
+    // If we have a success outcome from the new routing system, use it
+    if (successOutcome) {
+      return (
+        <FormSuccessOutcomeView
+          outcome={successOutcome}
+          theme={theme}
+          isEmbed={isEmbed}
+        />
+      );
+    }
+    // Legacy fallback
     if (template.successRedirectUrl) {
       window.location.href = template.successRedirectUrl;
       return null;

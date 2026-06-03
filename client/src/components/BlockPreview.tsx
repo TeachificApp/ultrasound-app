@@ -87,7 +87,8 @@ export type BlockType =
   | "webinar_registration"
   | "webinar_host_bio"
   | "webinar_replay"
-  | "webinar_agenda";
+  | "webinar_agenda"
+  | "conditional_text";
 
 export interface Block {
   id: string;
