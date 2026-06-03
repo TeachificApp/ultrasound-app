@@ -249,12 +249,16 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
           <div className="max-w-4xl mx-auto">
             {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <ul className="space-y-3">
-              {(d.items ?? []).map((item: string, i: number) => (
-                <li key={i} className="flex items-start gap-3 text-lg text-gray-700">
-                  <CheckCircle size={20} className="flex-shrink-0 mt-1" style={{ color: d.iconColor ?? "#179ca3" }} />
-                  <span>{item}</span>
-                </li>
-              ))}
+              {(d.items ?? []).map((item: string | { text?: string; crossed?: boolean }, i: number) => {
+                const txt = typeof item === "string" ? item : (item?.text ?? "");
+                const crossed = typeof item === "object" && item?.crossed;
+                return (
+                  <li key={i} className="flex items-start gap-3 text-lg text-gray-700">
+                    <CheckCircle size={20} className="flex-shrink-0 mt-1" style={{ color: d.iconColor ?? "#179ca3" }} />
+                    <span className={crossed ? "line-through text-gray-400" : ""}>{txt}</span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
@@ -447,13 +451,17 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
             {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
             {!d.subHeading && d.headline && <div className="mb-6" />}
             <ol className="space-y-4">
-              {(d.items ?? []).map((item: string, i: number) => (
-                <li key={i} className="flex items-start gap-4">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm"
-                    style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{i + 1}</span>
-                  <span className="text-lg text-gray-700 pt-1">{item}</span>
-                </li>
-              ))}
+              {(d.items ?? []).map((item: string | { text?: string; crossed?: boolean }, i: number) => {
+                const txt = typeof item === "string" ? item : (item?.text ?? "");
+                const crossed = typeof item === "object" && item?.crossed;
+                return (
+                  <li key={i} className="flex items-start gap-4">
+                    <span className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm"
+                      style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{i + 1}</span>
+                    <span className={`text-lg text-gray-700 pt-1${crossed ? " line-through text-gray-400" : ""}`}>{txt}</span>
+                  </li>
+                );
+              })}
             </ol>
           </div>
         </div>
@@ -466,13 +474,17 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
             {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
             {!d.subHeading && d.headline && <div className="mb-6" />}
             <ul className="space-y-3">
-              {(d.items ?? []).map((item: string, i: number) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-xs mt-0.5"
-                    style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>✓</span>
-                  <span className="text-lg text-gray-700">{item}</span>
-                </li>
-              ))}
+              {(d.items ?? []).map((item: string | { text?: string; crossed?: boolean }, i: number) => {
+                const txt = typeof item === "string" ? item : (item?.text ?? "");
+                const crossed = typeof item === "object" && item?.crossed;
+                return (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-xs mt-0.5"
+                      style={{ backgroundColor: crossed ? "#ef4444" : (d.accentColor ?? "#179ca3") }}>{crossed ? "✗" : "✓"}</span>
+                    <span className={`text-lg${crossed ? " line-through text-gray-400" : " text-gray-700"}`}>{txt}</span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
