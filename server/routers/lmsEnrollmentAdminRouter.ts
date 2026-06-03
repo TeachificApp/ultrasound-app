@@ -71,6 +71,8 @@ import {
   lmsCohortAssignments,
   lmsCohortRecordings,
   lmsCohortSubmissions,
+  lmsCohortGroupEnrollments,
+  lmsCohortGroups,
   mediaUploadFolders,
   mediaUploadResponses,
   lmsGroupCourses,
@@ -1390,11 +1392,20 @@ CRITICAL REQUIREMENTS:
         const [lastActivity] = await db.select({ completedAt: lmsLessonProgress.completedAt })
           .from(lmsLessonProgress).where(eq(lmsLessonProgress.enrollmentId, e.id))
           .orderBy(desc(lmsLessonProgress.completedAt)).limit(1);
+        // Cohort group membership
+        const [cohortGroupEnrollment] = await db
+          .select({ groupName: lmsCohortGroups.name, groupId: lmsCohortGroups.id })
+          .from(lmsCohortGroupEnrollments)
+          .innerJoin(lmsCohortGroups, eq(lmsCohortGroupEnrollments.cohortGroupId, lmsCohortGroups.id))
+          .where(eq(lmsCohortGroupEnrollments.enrollmentId, e.id))
+          .limit(1);
         return {
           ...e,
           user: u ?? null,
           completedLessons: Number(completedCount),
           lastActivityAt: lastActivity?.completedAt ?? null,
+          cohortGroupName: cohortGroupEnrollment?.groupName ?? null,
+          cohortGroupId: cohortGroupEnrollment?.groupId ?? null,
         };
       }));
       // Filter by search after enrichment

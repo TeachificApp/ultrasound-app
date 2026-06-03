@@ -8372,6 +8372,7 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600">Progress</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600">Last Active</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600">Access</th>
+                {courseType === "cohort" && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600">Cohort Group</th>}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -8415,6 +8416,17 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
                       )}
                     </div>
                   </td>
+                  {courseType === "cohort" && (
+                    <td className="px-4 py-3">
+                      {e.cohortGroupName ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                          {e.cohortGroupName}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">Unassigned</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       {e.user?.id && (
@@ -8441,7 +8453,7 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
               ))}
               {(data?.enrollments ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={courseType === "cohort" ? 7 : 6} className="px-4 py-12 text-center text-gray-400 text-sm">
                     <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     No students enrolled yet.
                   </td>

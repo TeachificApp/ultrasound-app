@@ -4512,3 +4512,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix Thinkific import: now sets both coverImageUrl AND thumbnailUrl when updating course cover image
 - [x] Upgrade StudentDashboardPage interests section: replaced legacy 5-checkbox emailCampaign boolean system with normalized interests system (same as Profile.tsx) — now shows all 22 ultrasound specialties as pill-style tags
 - [x] Profile.tsx already had full Interests section with 22 ultrasound specialties (normalized system)
+- [x] Fix cohort courses not appearing in student dashboard (dashboardRouter getMyContent was filtering type="course" only — now includes "cohort")
+- [x] Fix enrollment email linking to course landing page instead of course player (changed /courses/{slug} to /courses/{slug}/player in enrollmentEmail.ts)
+- [x] Fix admin user profile crash on /admin/users/{id} (current_period_start column missing from membership_subscriptions — removed from query)
+- [x] Show cohort group column in course Students tab (added cohort group lookup to getCourseUsers procedure + Cohort Group column in UI, only visible for cohort-type courses)
+- [x] Fix echo interests not showing for AAUS users (updated brandFilter from "iheartecho" to "both" for all 7 echo interests in DB)

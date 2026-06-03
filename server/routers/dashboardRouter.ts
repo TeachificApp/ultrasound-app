@@ -169,7 +169,8 @@ export const dashboardRouter = router({
       .orderBy(desc(funnelPurchases.purchasedAt));
 
     // Separate courses from quiz-type LMS items
-    const courses = enrollments.filter(e => e.courseType === "course");
+    // "cohort" courses are live/scheduled cohort courses — include them alongside regular courses
+    const courses = enrollments.filter(e => e.courseType === "course" || e.courseType === "cohort");
     const quizzes = enrollments.filter(e => e.courseType === "quiz");
     const downloads = enrollments.filter(e => e.courseType === "download");
 

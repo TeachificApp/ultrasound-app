@@ -193,12 +193,13 @@ export const adminUserRouter = router({
       `);
 
       // Native membership subscriptions (membership_plans)
+      // Note: membership_subscriptions has no current_period_start column, only current_period_end
       const nativeMemberships = await db.execute(sql`
         SELECT
           ms.id,
           ms.status,
           ms.created_at AS createdAt,
-          ms.current_period_start AS currentPeriodStart,
+          NULL AS currentPeriodStart,
           ms.current_period_end AS currentPeriodEnd,
           ms.stripe_subscription_id AS stripeSubscriptionId,
           mp.id AS planId,

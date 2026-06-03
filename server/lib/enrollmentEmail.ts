@@ -127,7 +127,8 @@ export async function sendEnrollmentEmail(opts: {
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Welcome to "${opts.courseTitle}" 🎉`;
-  const courseDestination = `https://learn.allaboutultrasound.com/courses/${opts.courseSlug}`;
+  // Link directly to the course player so the user lands in the course immediately after sign-in
+  const courseDestination = `https://learn.allaboutultrasound.com/courses/${opts.courseSlug}/player`;
   const courseUrl = buildAccessUrl(courseDestination, opts.accessToken);
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
