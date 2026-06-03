@@ -4348,6 +4348,37 @@ export const generalFormSubmissions = mysqlTable("generalFormSubmissions", {
 export type GeneralFormSubmission = typeof generalFormSubmissions.$inferSelect;
 export type InsertGeneralFormSubmission = typeof generalFormSubmissions.$inferInsert;
 
+export const generalFormEmbedWidgets = mysqlTable("generalFormEmbedWidgets", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  widgetKey: varchar("widgetKey", { length: 64 }).notNull(),
+  name: varchar("name", { length: 200 }).notNull().default("Default Widget"),
+  isEnabled: boolean("isEnabled").default(false).notNull(),
+  displayType: mysqlEnum("displayType", ["inline", "popup", "slide_in"]).default("inline").notNull(),
+  settingsJson: longtext("settingsJson").notNull(),
+  domainMode: mysqlEnum("domainMode", ["all", "allowlist"]).default("all").notNull(),
+  allowedDomains: longtext("allowedDomains"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type GeneralFormEmbedWidget = typeof generalFormEmbedWidgets.$inferSelect;
+export type InsertGeneralFormEmbedWidget = typeof generalFormEmbedWidgets.$inferInsert;
+
+export const generalFormEmbedAnalytics = mysqlTable("generalFormEmbedAnalytics", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  widgetId: int("widgetId"),
+  eventType: varchar("eventType", { length: 40 }).notNull(),
+  triggerSource: varchar("triggerSource", { length: 80 }),
+  deviceType: varchar("deviceType", { length: 20 }),
+  hostDomain: varchar("hostDomain", { length: 255 }),
+  sessionKey: varchar("sessionKey", { length: 64 }),
+  metadataJson: longtext("metadataJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GeneralFormEmbedAnalytic = typeof generalFormEmbedAnalytics.$inferSelect;
+export type InsertGeneralFormEmbedAnalytic = typeof generalFormEmbedAnalytics.$inferInsert;
+
 // ─── Block Templates (shared across all page editors) ─────────────────────────
 export const blockTemplates = mysqlTable("blockTemplates", {
   id: int("id").autoincrement().primaryKey(),

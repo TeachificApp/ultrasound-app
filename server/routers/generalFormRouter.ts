@@ -32,10 +32,23 @@ import {
   googleFormIntegrations,
     generalFormWebhooks,
   users,
+  generalFormSuccessModules,
+  generalFormSuccessRoutingRules,
+  generalFormEmbedWidgets,
+  generalFormEmbedAnalytics,
 } from "../../drizzle/schema";
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 import { addToEmailList, addToAllContacts } from "../lib/emailListHelper";
+import {
+  ensureLegacySuccessModules,
+  fetchSuccessModules,
+  fetchSuccessRoutingRules,
+  clearDefaultIfDeleted,
+} from "../lib/formSuccessModulesDb";
+import { ensureEmbedWidget, deleteEmbedDataForForm, parseAllowedDomains } from "../lib/formEmbedWidgetDb";
+import { parseEmbedSettings } from "@shared/formEmbedWidgetTypes";
+import { getEmbedAnalyticsSummary } from "../routes/formEmbedRoutes";
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 async function requireAdmin(ctx: any) {
@@ -469,6 +482,7 @@ export const generalFormRouter = router({
       await db.delete(generalFormSections).where(eq(generalFormSections.templateId, input.id));
       await db.delete(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, input.id));
       await db.delete(generalFormSubmissions).where(eq(generalFormSubmissions.templateId, input.id));
+      await deleteEmbedDataForForm(db, input.id);
       await db.delete(generalFormTemplates).where(eq(generalFormTemplates.id, input.id));
       return { success: true };
     }),
@@ -499,6 +513,20 @@ export const generalFormRouter = router({
       }
       for (const opt of form.options) {
         await db.insert(generalFormOptions).values({ ...opt, id: undefined as any, itemId: itemIdMap[opt.itemId] ?? opt.itemId, createdAt: undefined as any });
+      }
+      const [embedWidget] = await db.select().from(generalFormEmbedWidgets).where(eq(generalFormEmbedWidgets.templateId, input.id)).limit(1);
+      if (embedWidget) {
+        const { randomUUID } = await import("crypto");
+        await db.insert(generalFormEmbedWidgets).values({
+          templateId: newId,
+          widgetKey: randomUUID().replace(/-/g, ""),
+          name: embedWidget.name,
+          isEnabled: embedWidget.isEnabled,
+          displayType: embedWidget.displayType,
+          settingsJson: embedWidget.settingsJson,
+          domainMode: embedWidget.domainMode,
+          allowedDomains: embedWidget.allowedDomains,
+        });
       }
       return { id: newId };
     }),
@@ -1165,6 +1193,7 @@ ${pageText}`;
         avgScore: avgScore ? Math.round(avgScore) : null,
         recentSubmissions,
         dailyCounts: (dailyCounts[0] as unknown as any[]) ?? [],
+        embed: await getEmbedAnalyticsSummary(db, input.id),
       };
     }),
 
@@ -1849,4 +1878,49 @@ ${pageText}`;
       await db.delete(generalFormSuccessRoutingRules).where(eq(generalFormSuccessRoutingRules.id, input.id));
       return { success: true };
     }),
+
+  getEmbedWidget: protectedProcedure
+    .input(z.object({ templateId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const widget = await ensureEmbedWidget(db, input.templateId);
+      const [template] = await db.select().from(generalFormTemplates).where(eq(generalFormTemplates.id, input.templateId)).limit(1);
+      return {
+        widget,
+        settings: parseEmbedSettings(widget.settingsJson),
+        allowedDomains: parseAllowedDomains(widget.allowedDomains),
+        hostDomain: template?.hostDomain ?? "app.allaboutultrasound.com",
+        publicSlug: template?.publicSlug ?? null,
+      };
+    }),
+
+  saveEmbedWidget: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      name: z.string().min(1).max(200),
+      isEnabled: z.boolean(),
+      displayType: z.enum(["inline", "popup", "slide_in"]),
+      settingsJson: z.string(),
+      domainMode: z.enum(["all", "allowlist"]),
+      allowedDomains: z.array(z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const widget = await ensureEmbedWidget(db, input.templateId);
+      await db.update(generalFormEmbedWidgets).set({
+        name: input.name,
+        isEnabled: input.isEnabled,
+        displayType: input.displayType,
+        settingsJson: input.settingsJson,
+        domainMode: input.domainMode,
+        allowedDomains: JSON.stringify(input.allowedDomains),
+        updatedAt: new Date(),
+      }).where(eq(generalFormEmbedWidgets.id, widget.id));
+      return { success: true, widgetKey: widget.widgetKey };
+    }),
+
 });

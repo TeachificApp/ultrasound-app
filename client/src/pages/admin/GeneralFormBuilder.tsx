@@ -80,6 +80,7 @@ import {
 } from "lucide-react";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
+import FormEmbedSharePanel from "@/components/admin/FormEmbedSharePanel";
 import FormSuccessModulesTab from "@/components/admin/FormSuccessModulesTab";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1227,8 +1228,6 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
   });
 
   const publicUrl = template.publicSlug ? getPublicUrl(template.publicSlug, template.hostDomain) : null;
-  const embedCode = publicUrl ? `<iframe src="${publicUrl}/embed" width="100%" height="600" frameborder="0" style="border:none;border-radius:12px;" title="${template.name}"></iframe>` : null;
-
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopied(key);
@@ -1345,30 +1344,7 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
         </CardContent>
       </Card>
 
-      {/* Embed Code */}
-      {embedCode && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Code2 className="w-4 h-4" /> Embed Code</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-500">Copy and paste this code into any webpage to embed the form.</p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs"
-                onClick={() => copy(embedCode, "embed")}
-              >
-                {copied === "embed" ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied === "embed" ? "Copied!" : "Copy Code"}
-              </Button>
-            </div>
-            <pre className="bg-gray-900 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">{embedCode}</pre>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`${publicUrl}/embed`, "_blank")}>
-              <Eye className="w-3.5 h-3.5" /> Preview Embed
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <FormEmbedSharePanel formId={formId} publicUrl={publicUrl} hostDomain={template.hostDomain || DEFAULT_HOST_DOMAIN} />
     </div>
   );
 }
@@ -2158,6 +2134,29 @@ function AnalyticsTab({ formId, template }: { formId: number; template: any }) {
           </Card>
         ))}
       </div>
+
+      {/* Embed widget analytics */}
+      {analytics?.embed && (analytics.embed.loaded > 0 || analytics.embed.opened > 0) && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Code2 className="w-4 h-4" /> Embed Widget Analytics</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              {[
+                { label: "Loaded", value: analytics.embed.loaded },
+                { label: "Viewed", value: analytics.embed.viewed },
+                { label: "Opened", value: analytics.embed.opened },
+                { label: "Submitted", value: analytics.embed.submitted },
+              ].map(s => (
+                <div key={s.label} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <p className="text-xs text-gray-500">{s.label}</p>
+                  <p className="text-xl font-bold text-gray-900">{s.value}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">Conversion rate (submit / open): <strong>{analytics.embed.conversionRate}%</strong></p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Daily chart (simple bar) */}
       {analytics?.dailyCounts && analytics.dailyCounts.length > 0 && (

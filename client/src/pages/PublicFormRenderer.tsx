@@ -17,7 +17,6 @@ import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { CheckCircle2, AlertCircle, RefreshCw, Lock, ArrowRight, ArrowLeft, ChevronDown } from "lucide-react";
 import { RichTextDisplay } from "@/components/RichTextEditor";
-import { FormSuccessOutcomeView } from "@/components/FormSuccessOutcomeView";
 
 // ─── Theme helpers ────────────────────────────────────────────────────────────
 interface ThemeSettings {
@@ -861,17 +860,15 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
   const { data, isLoading, error } = isPreview ? previewQuery : publicQuery;
 
   const [submitted, setSubmitted] = useState(false);
-  const [successOutcome, setSuccessOutcome] = useState<any | null>(null);
-  const [lastResponses, setLastResponses] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState("");
   const [showWelcome, setShowWelcome] = useState(true);
 
   const submitMutation = trpc.generalForm.submitForm.useMutation({
-    onSuccess: (data) => {
+    onSuccess: () => {
       setSubmitting(false);
-      setSuccessOutcome(data.successOutcome ?? null);
       setSubmitted(true);
+      postEmbedEvent("form_submitted");
     },
     onError: (e) => { setSubmitting(false); setGlobalError(e.message); },
   });
@@ -882,7 +879,6 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
   const handleSubmit = (responses: Record<string, any>) => {
     setGlobalError("");
     setSubmitting(true);
-    setLastResponses(responses);
     submitMutation.mutate({ templateId: data!.template.id, responses: JSON.stringify(responses) });
   };
 
@@ -913,16 +909,6 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
   );
 
   if (submitted) {
-    if (successOutcome) {
-      return (
-        <FormSuccessOutcomeView
-          outcome={successOutcome}
-          theme={theme}
-          isEmbed={isEmbed}
-          responses={lastResponses}
-        />
-      );
-    }
     const bgStyle = getBgStyle(theme);
     if (template.successRedirectUrl) {
       window.location.href = template.successRedirectUrl;
