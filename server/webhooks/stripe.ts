@@ -226,24 +226,59 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
   const affiliateCode = meta.affiliate_code ?? null;
   const sessionId = session.id as string;
 
-  if (!orderId || !userId || !courseId) return; // Not an LMS order
+  // If no order_id but we have user_id + course_id (e.g. hosted embedded checkout),
+  // still proceed with enrollment — we'll create an order row below.
+  if (!userId || !courseId) return; // Not an LMS order — missing required fields
+  const isHostedCheckoutFallback = !orderId;
 
   const db = await getDb();
   if (!db) return;
 
   // Mark order as paid (also store subscription ID if this was a subscription checkout)
   const subscriptionIdForOrder = session.subscription as string | undefined;
-  await db.update(lmsOrders).set({
-    status: "paid",
-    stripeSessionId: sessionId,
-    ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
-  }).where(eq(lmsOrders.id, orderId));
+  let resolvedOrderId = orderId;
+
+  if (isHostedCheckoutFallback) {
+    // No order_id in metadata (older hosted checkout sessions) — create one now
+    // First check if there's already a pending order for this user+course+session
+    const [existingOrder] = await db.select({ id: lmsOrders.id })
+      .from(lmsOrders)
+      .where(and(eq(lmsOrders.userId, userId!), eq(lmsOrders.courseId, courseId!), eq(lmsOrders.stripeSessionId, sessionId)))
+      .limit(1);
+    if (existingOrder) {
+      resolvedOrderId = existingOrder.id;
+      await db.update(lmsOrders).set({
+        status: "paid",
+        ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
+      }).where(eq(lmsOrders.id, existingOrder.id));
+    } else {
+      const amountTotal = (session.amount_total as number) ?? 0;
+      const [newOrder] = await db.insert(lmsOrders).values({
+        userId: userId!,
+        courseId: courseId!,
+        amount: amountTotal,
+        currency: (session.currency as string) ?? "usd",
+        stripeSessionId: sessionId,
+        ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
+        status: "paid",
+        seats,
+      }).$returningId();
+      resolvedOrderId = newOrder?.id ?? null;
+    }
+    console.log(`[Stripe] Hosted checkout fallback: created/found order ${resolvedOrderId} for user ${userId}, course ${courseId}`);
+  } else {
+    await db.update(lmsOrders).set({
+      status: "paid",
+      stripeSessionId: sessionId,
+      ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
+    }).where(eq(lmsOrders.id, orderId!));
+  }
 
   // Enroll user (and extra seats if group purchase)
   const [existingEnrollment] = await db.select().from(lmsEnrollments)
     .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
   if (!existingEnrollment) {
-    await db.insert(lmsEnrollments).values({ userId, courseId, orderId, affiliateCode });
+    await db.insert(lmsEnrollments).values({ userId: userId!, courseId: courseId!, orderId: resolvedOrderId, affiliateCode });
   }
 
   // Track affiliate conversion
@@ -266,7 +301,7 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
 
   await notifyOwner({
     title: "🎓 New LMS Course Purchase",
-    content: `User ID ${userId} purchased course ID ${courseId} (${seats} seat${seats > 1 ? 's' : ''}). Order #${orderId}. Amount: $${((session.amount_total as number ?? 0) / 100).toFixed(2)}.`,
+    content: `User ID ${userId} purchased course ID ${courseId} (${seats} seat${seats > 1 ? 's' : ''}). Order #${resolvedOrderId ?? 'N/A'}${isHostedCheckoutFallback ? ' (hosted checkout)' : ''}. Amount: $${((session.amount_total as number ?? 0) / 100).toFixed(2)}.`,
   });
   // Log purchase + enrollment to unified activity log (fire-and-forget)
   try {
@@ -277,26 +312,28 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
       description: `Purchased course: ${courseRow?.title ?? `Course #${courseId}`}`,
       courseId,
       contentTitle: courseRow?.title ?? null,
-      metadata: { orderId, seats, amountCents: session.amount_total, sessionId },
+      metadata: { orderId: resolvedOrderId, seats, amountCents: session.amount_total, sessionId },
     });
     if (!existingEnrollment) {
       await db.insert(userActivityLogs).values({
-        userId,
+        userId: userId!,
         eventType: 'course_enroll',
         description: `Enrolled in course: ${courseRow?.title ?? `Course #${courseId}`}`,
-        courseId,
+        courseId: courseId!,
         contentTitle: courseRow?.title ?? null,
-        metadata: { orderId, enrollmentType: 'paid' },
+        metadata: { orderId: resolvedOrderId, enrollmentType: 'paid' },
       });
     }
   } catch (_e) { /* non-blocking */ }
-  await fulfillOrderBumpPurchase(db, meta, {
-    userId,
-    sessionId,
-    triggerOrderType: "course",
-    triggerOrderId: orderId,
-  });
-  console.log(`[Stripe] LMS order ${orderId} fulfilled for user ${userId}, course ${courseId}`);
+  if (resolvedOrderId) {
+    await fulfillOrderBumpPurchase(db, meta, {
+      userId: userId!,
+      sessionId,
+      triggerOrderType: "course",
+      triggerOrderId: resolvedOrderId,
+    });
+  }
+  console.log(`[Stripe] LMS order ${resolvedOrderId ?? 'N/A'} fulfilled for user ${userId}, course ${courseId}${isHostedCheckoutFallback ? ' (hosted checkout fallback)' : ''}`);
 }
 
 async function handleDigitalDownloadCheckoutCompleted(session: Record<string, unknown>) {

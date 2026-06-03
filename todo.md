@@ -4555,3 +4555,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Features (Jun 3, 2026)
 - [x] Add teal transparent "You already have access" banner to landing pages for enrolled/purchased users — CourseLanding (enrolled → Continue Learning), DownloadLanding (purchased → Access Your Files), BundleLanding (purchased → View Your Downloads); banner is sticky, clickable, slightly transparent teal with backdrop blur
+
+## Checkout Flow Fixes (Jun 3, 2026)
+- [x] Fix: createEmbeddedCheckoutSession now creates a pending lmsOrders row before Stripe session, includes order_id + user_id in all metadata paths
+- [x] Fix: handleLmsCheckoutCompleted webhook now handles sessions without order_id (hosted checkout fallback) — creates order row and enrolls user
+- [x] Fix: getCheckoutSessionStatus now triggers fallback enrollment if session is complete but user is not yet enrolled
+- [x] Manual fix: Enrolled Daniel Galindo (psndiddle@hotmail.com, user 30462) in ACS Registry Review Quiz (course 180001), order 390001
