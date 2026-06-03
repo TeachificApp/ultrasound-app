@@ -36,20 +36,52 @@ const STALL_THRESHOLD_MS = 10 * 60 * 1000;
 
 // ─── Download helper ──────────────────────────────────────────────────────────
 
-async function downloadToFile(storedUrl: string, destPath: string): Promise<void> {
-  // storedUrl may be a storage-proxy URL that requires auth.
-  // Use storageGet to get a fresh presigned download URL.
-  let downloadUrl = storedUrl;
+/**
+ * Detect whether a stored URL is a Manus storage-proxy URL that needs a fresh
+ * presigned download URL, vs a direct CDN/CloudFront URL that can be fetched as-is.
+ *
+ * Storage-proxy URLs look like:
+ *   https://api.manus.im/v1/storage/...?path=<key>   (explicit ?path= param)
+ *   https://<forge-host>/v1/storage/...              (Forge API host)
+ *
+ * Direct CDN URLs look like:
+ *   https://d2xsxph8kpxj0f.cloudfront.net/...        (CloudFront)
+ *   https://<r2-public-url>/...                       (R2 public bucket)
+ *
+ * We MUST NOT call storageGet() on direct CDN URLs because storageGet() treats
+ * the full pathname as a relative storage key and prepends the storage base path
+ * again, producing a doubled path that results in HTTP 403.
+ */
+function isStorageProxyUrl(url: string): boolean {
   try {
-    const u = new URL(storedUrl);
-    const pathParam = u.searchParams.get("path");
-    const relKey = pathParam ?? u.pathname.replace(/^\/+/, "");
-    if (relKey) {
-      const { url } = await storageGet(relKey);
-      downloadUrl = url;
-    }
+    const u = new URL(url);
+    // Explicit storage-proxy URLs always have a ?path= query param
+    if (u.searchParams.has("path")) return true;
+    // Forge API host pattern (contains /v1/storage/ in path)
+    if (u.pathname.includes("/v1/storage/")) return true;
+    return false;
   } catch {
-    // If URL parsing fails, try the original URL directly
+    return false;
+  }
+}
+
+async function downloadToFile(storedUrl: string, destPath: string): Promise<void> {
+  // Only call storageGet() for Manus storage-proxy URLs that need a fresh presigned URL.
+  // Direct CDN/CloudFront URLs must be used as-is — calling storageGet() on them
+  // would double the path prefix and produce HTTP 403.
+  let downloadUrl = storedUrl;
+  if (isStorageProxyUrl(storedUrl)) {
+    try {
+      const u = new URL(storedUrl);
+      const pathParam = u.searchParams.get("path");
+      const relKey = pathParam ?? u.pathname.replace(/^\/+/, "");
+      if (relKey) {
+        const { url } = await storageGet(relKey);
+        downloadUrl = url;
+      }
+    } catch {
+      // If URL parsing fails, try the original URL directly
+    }
   }
 
   return new Promise((resolve, reject) => {
