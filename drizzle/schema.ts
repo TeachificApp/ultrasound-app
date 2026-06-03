@@ -1845,7 +1845,7 @@ export const accreditationFormItems = mysqlTable("accreditationFormItems", {
   templateId: int("templateId").notNull(), // denormalized for fast queries
   label: text("label").notNull(),
   helpText: text("helpText"),
-  itemType: mysqlEnum("itemType", ["text", "textarea", "email", "richtext", "radio", "checkbox", "select", "scale", "heading", "info"]).notNull(),
+  itemType: mysqlEnum("itemType", ["text", "textarea", "email", "richtext", "radio", "checkbox", "select", "scale", "heading", "info", "hidden"]).notNull(),
   isRequired: boolean("isRequired").default(false).notNull(),
   sortOrder: int("sortOrder").default(0).notNull(),
   scaleMin: int("scaleMin"),
@@ -1857,6 +1857,7 @@ export const accreditationFormItems = mysqlTable("accreditationFormItems", {
   emailRoutingRules: text("emailRoutingRules"),
   placeholder: varchar("placeholder", { length: 300 }),
   validationRegex: varchar("validationRegex", { length: 500 }),
+  extraConfig: longtext("extraConfig"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type AccreditationFormItem = typeof accreditationFormItems.$inferSelect;

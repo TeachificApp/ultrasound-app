@@ -114,6 +114,7 @@ const ITEM_TYPES = [
   { value: "rich_text", label: "Rich Text (display only)", icon: "✦" },
   { value: "signature", label: "Signature", icon: "✍" },
   { value: "payment", label: "Payment (Stripe)", icon: "💳" },
+  { value: "hidden", label: "Hidden Field", icon: "👁" },
 ];
 
 const DEFAULT_THEME = {
@@ -704,9 +705,14 @@ function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
   );
 
   const hasOptions = ["dropdown", "radio", "checkbox"].includes(item.itemType);
+  const isHiddenField = item.itemType === "hidden";
+  const [hiddenValue, setHiddenValue] = useState(() => {
+    try { return JSON.parse(item.extraConfig ?? "{}").hiddenValue ?? ""; } catch { return ""; }
+  });
 
   const handleSave = () => {
-    const updates = { label, helpText: helpText || undefined, placeholder: placeholder || undefined, isRequired, scoreWeight };
+    const extraConfig = isHiddenField ? JSON.stringify({ hiddenValue }) : item.extraConfig;
+    const updates = { label, helpText: helpText || undefined, placeholder: placeholder || undefined, isRequired: false, scoreWeight: 0, extraConfig };
     let parsedOptions: any[] | undefined = undefined;
     if (hasOptions) {
       parsedOptions = optionsText.split("\n").filter(l => l.trim()).map((line, idx) => {
@@ -741,10 +747,24 @@ function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
               <Input value={placeholder} onChange={e => setPlaceholder(e.target.value)} placeholder="Placeholder text…" className="mt-1" />
             </div>
           )}
-          <div className="flex items-center gap-3">
-            <Switch checked={isRequired} onCheckedChange={setIsRequired} id="req-switch" />
-            <Label htmlFor="req-switch">Required</Label>
-          </div>
+          {isHiddenField ? (
+            <div className="space-y-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <Label className="text-amber-800 font-semibold">Hidden Field Value</Label>
+              <p className="text-xs text-amber-700">This value is set server-side and never shown to users. Use static text or variables:</p>
+              <Input value={hiddenValue} onChange={e => setHiddenValue(e.target.value)} placeholder="e.g. campaign_2024 or {{user_id}}" className="mt-1" />
+              <div className="flex flex-wrap gap-1 mt-1">
+                {["{{user_id}}", "{{user_email}}", "{{date}}", "{{form_id}}", "{{source}}"].map(v => (
+                  <button key={v} type="button" onClick={() => setHiddenValue(v)} className="text-xs px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded border border-amber-300">{v}</button>
+                ))}
+              </div>
+              <p className="text-xs text-amber-600 mt-1">The <strong>Field Name</strong> (label) is used as the key in submission results.</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Switch checked={isRequired} onCheckedChange={setIsRequired} id="req-switch" />
+              <Label htmlFor="req-switch">Required</Label>
+            </div>
+          )}
           {scoreEnabled && (
             <div>
               <Label>Score Weight (points for correct answer)</Label>
@@ -1780,7 +1800,7 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
     const items = data?.items ?? [];
     const preview: { label: string; value: string }[] = [];
     for (const item of items) {
-      if (["heading", "paragraph", "section_break", "rich_text"].includes(item.itemType)) continue;
+      if (["heading", "paragraph", "section_break", "rich_text", "hidden"].includes(item.itemType)) continue;
       const v = r[String(item.id)];
       if (v === undefined || v === null || v === "") continue;
       const displayVal = Array.isArray(v) ? v.join(", ") : String(v);
@@ -1852,7 +1872,7 @@ function ResultsTab({ formId, template }: { formId: number; template: any }) {
   ] as const;
 
   const filterableItems = useMemo(() => {
-    return (data?.items ?? []).filter((it: any) => !["heading", "paragraph", "section_break", "rich_text"].includes(it.itemType));
+    return (data?.items ?? []).filter((it: any) => !["heading", "paragraph", "section_break", "rich_text", "hidden"].includes(it.itemType));
   }, [data?.items]);
 
   return (

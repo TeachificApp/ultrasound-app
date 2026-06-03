@@ -60,7 +60,7 @@ export const productAnalyticsRouter = router({
           GROUP BY c.id, c.title, c.created_at
           ORDER BY purchaseCount DESC
         `) as any;
-        const rows = Array.isArray(courses) ? courses : (courses as any)[0] ?? [];
+        const rows = ((courses as any)[0] ?? []) as any[];
         for (const r of rows) {
           results.push({
             id: Number(r.id),
@@ -85,7 +85,7 @@ export const productAnalyticsRouter = router({
           GROUP BY dp.id, dp.title, dp.created_at, dp.price
           ORDER BY purchaseCount DESC
         `) as any;
-        const rows = Array.isArray(downloads) ? downloads : (downloads as any)[0] ?? [];
+        const rows = ((downloads as any)[0] ?? []) as any[];
         for (const r of rows) {
           results.push({
             id: Number(r.id),
@@ -111,7 +111,7 @@ export const productAnalyticsRouter = router({
           GROUP BY pp.id, pp.title, pp.created_at
           ORDER BY purchaseCount DESC
         `) as any;
-        const rows = Array.isArray(physical) ? physical : (physical as any)[0] ?? [];
+        const rows = ((physical as any)[0] ?? []) as any[];
         for (const r of rows) {
           results.push({
             id: Number(r.id),
@@ -136,7 +136,7 @@ export const productAnalyticsRouter = router({
           GROUP BY b.id, b.title, b.created_at, b.discount_price
           ORDER BY purchaseCount DESC
         `) as any;
-        const rows = Array.isArray(bundles) ? bundles : (bundles as any)[0] ?? [];
+        const rows = ((bundles as any)[0] ?? []) as any[];
         for (const r of rows) {
           results.push({
             id: Number(r.id),
@@ -162,7 +162,7 @@ export const productAnalyticsRouter = router({
           GROUP BY f.id, f.name, f.created_at
           ORDER BY purchaseCount DESC
         `) as any;
-        const rows = Array.isArray(funnelData) ? funnelData : (funnelData as any)[0] ?? [];
+        const rows = ((funnelData as any)[0] ?? []) as any[];
         for (const r of rows) {
           results.push({
             id: Number(r.id),

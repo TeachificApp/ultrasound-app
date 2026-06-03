@@ -142,6 +142,8 @@ function FormField({
     transition: "border-color 0.15s, box-shadow 0.15s",
   };
 
+  if (item.itemType === "hidden") return null;
+
   if (item.itemType === "section_break" || item.itemType === "rich_text") {
     return (
       <div className="py-2">

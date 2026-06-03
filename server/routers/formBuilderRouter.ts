@@ -54,6 +54,7 @@ import {
   getDb,
 } from "../db";
 import { eq, sql, and } from "drizzle-orm";
+import { extractFormFromUrl } from "../lib/formHtmlExtractor";
 import {
   accreditationFormTemplates,
   accreditationFormSections,
@@ -371,6 +372,7 @@ export const formBuilderRouter = router({
       placeholder: z.string().optional(),
       validationRegex: z.string().optional(),
       options: z.array(optionSchema).optional(),
+      extraConfig: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requirePlatformAdmin(ctx);
@@ -399,6 +401,7 @@ export const formBuilderRouter = router({
         emailRoutingRules: itemData.emailRoutingRules ?? null,
         placeholder: itemData.placeholder ?? null,
         validationRegex: itemData.validationRegex ?? null,
+        extraConfig: itemData.extraConfig ?? null,
       });
       if (options && options.length > 0) {
         await replaceFormOptions(itemId, options.map((o, i) => ({
@@ -430,6 +433,7 @@ export const formBuilderRouter = router({
       emailRoutingRules: z.string().nullable().optional(),
       placeholder: z.string().nullable().optional(),
       validationRegex: z.string().nullable().optional(),
+      extraConfig: z.string().nullable().optional(),
       options: z.array(optionSchema).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -721,6 +725,32 @@ export const formBuilderRouter = router({
       maxPossibleScore: z.number().min(0).default(0),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Inject hidden field values server-side
+      let finalResponses = { ...input.responses };
+      try {
+        const db = await getDb();
+        if (db) {
+          const allItems = await db.select().from(accreditationFormItems).where(eq(accreditationFormItems.templateId, input.templateId));
+          const hiddenItems = allItems.filter((it: any) => it.itemType === "hidden");
+          if (hiddenItems.length > 0) {
+            const now = new Date();
+            const req = (ctx as any).req;
+            for (const hi of hiddenItems) {
+              let val = "";
+              try { val = JSON.parse(hi.extraConfig ?? "{}").hiddenValue ?? ""; } catch {}
+              val = val
+                .replace(/\{\{user_id\}\}/g, ctx.user.id.toString())
+                .replace(/\{\{user_email\}\}/g, (ctx.user as any).email ?? "")
+                .replace(/\{\{date\}\}/g, now.toISOString().split("T")[0])
+                .replace(/\{\{form_id\}\}/g, input.templateId.toString())
+                .replace(/\{\{source\}\}/g, req?.headers?.referer ?? "");
+              finalResponses[hi.id.toString()] = val;
+            }
+          }
+        }
+      } catch (e: any) {
+        console.error("[HiddenFields] Failed to inject hidden values:", e.message);
+      }
       const id = await createFormSubmission({
         templateId: input.templateId,
         formType: input.formType,
@@ -728,7 +758,7 @@ export const formBuilderRouter = router({
         orgId: input.orgId ?? null,
         reviewTargetType: input.reviewTargetType ?? null,
         reviewTargetId: input.reviewTargetId ?? null,
-        responses: JSON.stringify(input.responses),
+        responses: JSON.stringify(finalResponses),
         qualityScore: input.qualityScore,
         maxPossibleScore: input.maxPossibleScore,
         status: 'submitted',
@@ -930,33 +960,19 @@ export const formBuilderRouter = router({
         return { id: newId, name: formName };
       }
 
-      // ── Generic HTML scrape path ─────────────────────────────────────────────
-      let pageText = '';
-      try {
-        const res = await fetch(input.url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FormImporter/1.0)' },
-          signal: AbortSignal.timeout(12000),
-          redirect: 'follow',
-        });
-        const html = await res.text();
-        pageText = html
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-          .replace(/\s+/g, ' ').trim().substring(0, 5000);
-      } catch (err: any) {
-        console.error('[importFormByUrl] fetch error:', err?.message);
-        pageText = `Form from: ${input.url}`;
-      }
+            // ── Generic HTML scrape path ─────────────────────────────────────────────
+      // Use structured HTML extractor for full multi-page support
+      const extracted_fb = await extractFormFromUrl(resolvedUrl_fb);
+      const pageText = extracted_fb.rawStructuredText || `Form from: ${resolvedUrl_fb}`;
       // AI scaffold with rich metadata + branching + calculations
-      const diySystemPrompt = `You are a form builder assistant. Given a web page or form description, extract or infer ALL form fields, their types, options, placeholder text, help text, conditional/branching logic, scoring weights, and any calculated/computed fields. Return structured JSON exactly matching the schema provided.
-
+      const diySystemPrompt = `You are a form builder assistant. Given a structured form description extracted from a web page, reconstruct ALL form fields, their types, options, placeholder text, help text, conditional/branching logic, scoring weights, and any calculated/computed fields. Return structured JSON exactly matching the schema provided.
+IMPORTANT: The input includes VISIBLE FIELDS (current page) and HIDDEN FIELDS (from other pages). You MUST include fields from ALL pages — infer the labels and types of hidden fields from context (field numbering, scoring patterns, form topic).
 For calculated fields: use itemType "info" and put the formula/description in richTextContent as HTML.
 For score thresholds: use itemType "info" with richTextContent describing the scoring bands.
+For images: use itemType "info" with richTextContent as <img src="URL" /> for each image found.
 For email routing: if a field routes submissions to different emails, set emailRoutingRules as JSON array [{"label": string, "conditionItemId": 0, "conditionValue": string, "routeTo": string}].
 For score weights: assign scoreWeight (0-100) to each scored field based on importance.`;
-      const diyUserPrompt = `Create a complete form from this page. Extract ALL fields, logic, calculations, and scoring. Return JSON:
+      const diyUserPrompt = `Create a complete form from this structured description. Include ALL fields from ALL pages. Return JSON:
 {
   "name": string,
   "description": string,
@@ -986,14 +1002,13 @@ For score weights: assign scoreWeight (0-100) to each scored field based on impo
     "action": "show"|"hide"
   }]
 }
-
 IMPORTANT:
+- Include fields from ALL pages (visible + hidden).
 - If the form has calculated outputs (total score, risk level, etc.), create an "info" item with richTextContent describing the calculation.
 - If the form has score thresholds (e.g. 0-10=low risk, 11-20=high risk), add an "info" item with richTextContent listing the bands.
 - Capture ALL conditional logic including skip patterns.
 - Use scoreWeight on each field to reflect its relative importance in scoring.
-
-Page content:
+Form description:
 ${pageText}`;
       const diyItemSchema = { type: 'object', properties: { field_key: { type: 'string' }, itemType: { type: 'string' }, label: { type: 'string' }, placeholder: { type: 'string' }, helpText: { type: 'string' }, isRequired: { type: 'boolean' }, scoreWeight: { type: 'number' }, scaleMin: { type: ['number', 'null'] }, scaleMax: { type: ['number', 'null'] }, scaleMinLabel: { type: 'string' }, scaleMaxLabel: { type: 'string' }, richTextContent: { type: 'string' }, emailRoutingRules: { type: 'string' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, qualityScore: { type: 'number' } }, required: ['label', 'value', 'qualityScore'], additionalProperties: false } } }, required: ['field_key', 'itemType', 'label', 'placeholder', 'helpText', 'isRequired', 'scoreWeight', 'scaleMin', 'scaleMax', 'scaleMinLabel', 'scaleMaxLabel', 'richTextContent', 'emailRoutingRules', 'options'], additionalProperties: false };
       const diyAiSchema = { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, sections: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: diyItemSchema } }, required: ['title', 'items'], additionalProperties: false } }, branchRules: { type: 'array', items: { type: 'object', properties: { targetFieldKey: { type: 'string' }, conditionFieldKey: { type: 'string' }, conditionValue: { type: 'string' }, action: { type: 'string' } }, required: ['targetFieldKey', 'conditionFieldKey', 'conditionValue', 'action'], additionalProperties: false } } }, required: ['name', 'description', 'sections', 'branchRules'], additionalProperties: false };
@@ -1070,21 +1085,8 @@ ${pageText}`;
       await requirePlatformAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
-      let pageText = '';
-      try {
-        const res = await fetch(input.url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FormImporter/1.0)' },
-          signal: AbortSignal.timeout(12000), redirect: 'follow',
-        });
-        const html = await res.text();
-        pageText = html
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-          .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 5000);
-      } catch (err: any) {
-        console.error('[appendFieldsFromUrl] fetch error:', err?.message);
-        pageText = `Form fields from: ${input.url}`;
-      }
+      const extracted_append_fb = await extractFormFromUrl(input.url);
+      const pageText = extracted_append_fb.rawStructuredText || `Form fields from: ${input.url}`;
       const appendDiyItemSchema = { type: 'object', properties: { field_key: { type: 'string' }, itemType: { type: 'string' }, label: { type: 'string' }, placeholder: { type: 'string' }, helpText: { type: 'string' }, isRequired: { type: 'boolean' }, scoreWeight: { type: 'number' }, scaleMin: { type: ['number', 'null'] }, scaleMax: { type: ['number', 'null'] }, scaleMinLabel: { type: 'string' }, scaleMaxLabel: { type: 'string' }, richTextContent: { type: 'string' }, emailRoutingRules: { type: 'string' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, qualityScore: { type: 'number' } }, required: ['label', 'value', 'qualityScore'], additionalProperties: false } } }, required: ['field_key', 'itemType', 'label', 'placeholder', 'helpText', 'isRequired', 'scoreWeight', 'scaleMin', 'scaleMax', 'scaleMinLabel', 'scaleMaxLabel', 'richTextContent', 'emailRoutingRules', 'options'], additionalProperties: false };
       const appendDiyBranchSchema = { type: 'object', properties: { targetFieldKey: { type: 'string' }, conditionFieldKey: { type: 'string' }, conditionValue: { type: 'string' }, action: { type: 'string' } }, required: ['targetFieldKey', 'conditionFieldKey', 'conditionValue', 'action'], additionalProperties: false };
       const appendDiyAiSchema = { type: 'object', properties: { sections: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: appendDiyItemSchema } }, required: ['title', 'items'], additionalProperties: false } }, branchRules: { type: 'array', items: appendDiyBranchSchema } }, required: ['sections', 'branchRules'], additionalProperties: false };

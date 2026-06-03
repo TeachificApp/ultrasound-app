@@ -71,7 +71,7 @@ import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ItemType = "text" | "textarea" | "email" | "richtext" | "radio" | "checkbox" | "select" | "scale" | "heading" | "info";
+type ItemType = "text" | "textarea" | "email" | "richtext" | "radio" | "checkbox" | "select" | "scale" | "heading" | "info" | "hidden";
 type BranchAction = "show" | "hide";
 type OrgVisAction = "show_only_for" | "hide_for";
 type OrgVisRuleType = "item" | "section";
@@ -157,6 +157,7 @@ const ITEM_TYPE_META: Record<ItemType, { label: string; icon: React.ElementType;
   scale: { label: "Scale / Rating", icon: ToggleLeft, description: "Numeric scale (e.g. 1–5)" },
   heading: { label: "Section Heading", icon: Heading, description: "Visual heading, not a question" },
   info: { label: "Info Text", icon: Info, description: "Informational paragraph" },
+  hidden: { label: "Hidden Field", icon: Info, description: "Server-side field, invisible to users" },
 };
 
 const FORM_TYPES = [
@@ -903,6 +904,9 @@ function ItemEditorDialog({ open, onClose, item, existingOptions, sectionId, tem
   const [placeholder, setPlaceholder] = useState(item?.placeholder ?? "");
   const [validationRegex, setValidationRegex] = useState(item?.validationRegex ?? "");
   const [emailRoutingRules, setEmailRoutingRules] = useState(item?.emailRoutingRules ?? "");
+  const [hiddenValue, setHiddenValue] = useState(() => {
+    try { return JSON.parse((item as any)?.extraConfig ?? "{}").hiddenValue ?? ""; } catch { return ""; }
+  });
   const createMutation = trpc.formBuilder.createItem.useMutation({
     onSuccess: () => { toast.success("Item added"); onSaved(); onClose(); },
     onError: (e) => toast.error(e.message),
@@ -933,6 +937,9 @@ function ItemEditorDialog({ open, onClose, item, existingOptions, sectionId, tem
       placeholder: ["text", "textarea", "email"].includes(itemType) ? placeholder || undefined : undefined,
       validationRegex: ["text", "email"].includes(itemType) ? validationRegex || undefined : undefined,
       options: hasOptions ? options : undefined,
+      extraConfig: itemType === "hidden" ? JSON.stringify({ hiddenValue }) : undefined,
+      isRequired: itemType === "hidden" ? false : isRequired,
+      scoreWeight: itemType === "hidden" ? 0 : scoreWeight,
     };
 
     if (isEdit && item) {
@@ -1047,7 +1054,20 @@ function ItemEditorDialog({ open, onClose, item, existingOptions, sectionId, tem
               />
             </div>
           )}
-          {!["heading", "info"].includes(itemType) && (
+          {itemType === "hidden" && (
+            <div className="space-y-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <label className="text-xs font-semibold text-amber-800 block">Hidden Field Value</label>
+              <p className="text-xs text-amber-700">This value is set server-side and never shown to users. Use static text or variables:</p>
+              <Input value={hiddenValue} onChange={e => setHiddenValue(e.target.value)} placeholder="e.g. campaign_2024 or {{user_id}}" className="mt-1" />
+              <div className="flex flex-wrap gap-1 mt-1">
+                {["{{user_id}}", "{{user_email}}", "{{date}}", "{{form_id}}", "{{source}}"].map(v => (
+                  <button key={v} type="button" onClick={() => setHiddenValue(v)} className="text-xs px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded border border-amber-300">{v}</button>
+                ))}
+              </div>
+              <p className="text-xs text-amber-600 mt-1">The <strong>Field Name</strong> (label) is used as the key in submission results.</p>
+            </div>
+          )}
+          {!["heading", "info", "hidden"].includes(itemType) && (
             <div className="flex items-center gap-6 p-3 bg-gray-50 rounded-lg">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={isRequired} onChange={e => setIsRequired(e.target.checked)} className="w-4 h-4 rounded" />
