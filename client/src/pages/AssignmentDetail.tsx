@@ -143,7 +143,10 @@ export default function AssignmentDetail() {
 
   const { assignment, mySubmission } = data;
   const blocks: any[] = (() => {
-    try { return JSON.parse((assignment as any).contentBlocks || "[]"); } catch { return []; }
+    const raw = (assignment as any).contentBlocks;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    try { return JSON.parse(raw); } catch { return []; }
   })();
   const isOverdue = assignment.dueDate && Date.now() > new Date(assignment.dueDate).getTime();
   const hasSubmission = !!mySubmission;

@@ -4538,3 +4538,17 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add CSV export button to Activity Log tab
 - [x] Fix Login History - magic-link and access-link sessions now record login events
 - [x] All timestamps in admin user profile now display in Eastern Time (ET)
+
+## Quiz System Expansion
+- [ ] Expand question_bank schema: add types hotspot, matching, sequence, fillblank, wordbank, multiselect, videoquestion
+- [ ] Add hotspotData JSON column (regions array with x/y/w/h), matchingPairs JSON, sequenceItems JSON, blankTemplate text
+- [ ] Run schema migration
+- [ ] Expand iSpring SCORM parser: extract images/videos from ZIP to S3, parse hotspot regions, matching, sequence, wordbank
+- [ ] Question editor: hotspot draw tool (drag regions on image), matching pairs editor, sequence drag-to-order editor
+- [ ] Question editor: fill-in-the-blank editor, word bank editor, video question editor, multi-select
+- [ ] Quiz player: render hotspot (click region), matching (drag/drop), sequence (drag-to-order), fill-in-blank, word bank
+- [ ] Quiz player design system: per-quiz theme (colors, fonts, logo, intro/outro screens, pass/fail screens, progress bar style)
+
+## Bug Fixes (Jun 2, 2026)
+- [x] Fix assignment page not showing block content to students — contentBlocks JSON column was already parsed by Drizzle ORM but AssignmentDetail.tsx was calling JSON.parse() on it again, causing a TypeError caught silently as empty array; fixed to handle both array and string cases
+- [x] Fix embed block in BlockPreview not rendering when using d.url (AssignmentBlockEditor stores URL in d.url, but BlockPreview only checked d.embedCode); added d.url iframe fallback

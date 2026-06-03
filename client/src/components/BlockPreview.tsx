@@ -294,6 +294,15 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                 style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block" }}
                 title={d.caption ?? "Embedded content"}
               />
+            ) : d.url ? (
+              <iframe
+                src={d.url}
+                style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block", borderRadius: "8px" }}
+                title={d.caption ?? "Embedded content"}
+                allow="autoplay; fullscreen; clipboard-write; encrypted-media; picture-in-picture"
+                allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-top-navigation-by-user-activation"
+              />
             ) : <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}><Globe size={32} /></div>}
             {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: embedAlign as any }}>{d.caption}</p>}
           </div>
