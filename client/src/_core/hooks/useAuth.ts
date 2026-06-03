@@ -32,12 +32,15 @@ export function useAuth(options?: UseAuthOptions) {
         error instanceof TRPCClientError &&
         error.data?.code === "UNAUTHORIZED"
       ) {
-        return;
+        // Already logged out — still redirect
+      } else {
+        // Non-auth errors: still clear state and redirect
+        console.error("[logout] error:", error);
       }
-      throw error;
     } finally {
       utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
+      // Hard redirect to login — clears all in-memory state and forces a fresh page load
+      window.location.href = getLoginUrl();
     }
   }, [logoutMutation, utils]);
 
