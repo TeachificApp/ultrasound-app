@@ -629,6 +629,37 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       return <FunnelCurriculumBlock block={block} />;
     case "carousel":
       return <div className="px-4 py-4"><CarouselBlock data={d} /></div>;
+    case "column_layout": {
+      const leftBlocks: Block[] = d.leftBlocks ?? [];
+      const rightBlocks: Block[] = d.rightBlocks ?? [];
+      const leftRatio = d.leftRatio ?? 50;
+      const rightRatio = 100 - leftRatio;
+      const gap = d.gap ?? 32;
+      return (
+        <div style={{ backgroundColor: d.bgColor ?? "transparent" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: `${gap}px`,
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ flex: leftRatio, minWidth: "280px" }}>
+              {leftBlocks.map((cb) => (
+                <RenderBlock key={cb.id} block={cb} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} nextPage={nextPage} user={user} />
+              ))}
+            </div>
+            <div style={{ flex: rightRatio, minWidth: "280px" }}>
+              {rightBlocks.map((cb) => (
+                <RenderBlock key={cb.id} block={cb} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} nextPage={nextPage} user={user} />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
     // Webinar blocks — delegate to shared BlockPreview renderers
     case "webinar_hero":
     case "webinar_registration":
