@@ -277,6 +277,8 @@ const CareerNetwork = lazy(() => import("./pages/CareerNetwork"));
 const CareerProfile = lazy(() => import("./pages/CareerProfile"));
 const CareerNetworkAdmin = lazy(() => import("./pages/admin/CareerNetworkAdmin"));
 const EmployerDashboard = lazy(() => import("./pages/EmployerDashboard"));
+const PublicMarketingSitePage = lazy(() => import("./pages/PublicMarketingSitePage"));
+const MarketingSiteAdmin = lazy(() => import("./pages/admin/MarketingSiteAdmin"));
 
 function Router() {
   usePageViewTracker();
