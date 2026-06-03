@@ -4,6 +4,8 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { getSessionCookieOptions } from "./cookies";
+import { COOKIE_NAME } from "../../shared/const";
 import { registerStorageProxy } from "./storageProxy";
 import { registerChatRoutes } from "./chat";
 import { registerThinkificWebhook } from "../webhooks/thinkific";
@@ -216,6 +218,12 @@ async function startServer() {
   registerUploadCohortMediaRoute(app);
   // Social content image upload (multipart, admin only)
   registerUploadSocialImageRoute(app);
+  // Dedicated logout route — bypasses tRPC batching so Set-Cookie clear is never merged with other responses
+  app.post("/api/auth/logout", (req, res) => {
+    const opts = getSessionCookieOptions(req);
+    res.clearCookie(COOKIE_NAME, { ...opts, maxAge: -1 });
+    res.json({ success: true });
+  });
   // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
   registerSsoAutoRoute(app);
   // Funnel page OG meta injection — must be before SPA catch-all so crawlers get correct meta tags

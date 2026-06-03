@@ -4505,3 +4505,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] SCORM asset picker with search
 - [x] Group selection with question preview
 - [x] Extra tag assignment on import
+
+## Session Fixes (Jun 2026)
+- [x] Fix logout: replaced tRPC mutation with direct fetch POST to /api/auth/logout (bypasses httpBatchLink batching that dropped Set-Cookie clear header)
+- [x] Fix course card images: backfilled thumbnailUrl from coverImageUrl for all courses where thumbnailUrl was NULL (SQL backfill)
+- [x] Fix Thinkific import: now sets both coverImageUrl AND thumbnailUrl when updating course cover image
+- [x] Upgrade StudentDashboardPage interests section: replaced legacy 5-checkbox emailCampaign boolean system with normalized interests system (same as Profile.tsx) — now shows all 22 ultrasound specialties as pill-style tags
+- [x] Profile.tsx already had full Interests section with 22 ultrasound specialties (normalized system)

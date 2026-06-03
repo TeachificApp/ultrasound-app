@@ -1154,7 +1154,7 @@ export const thinkificImportRouter = router({
         try {
           const newCoverUrl = thinkificCourseData.course_card_image_url || thinkificCourseData.banner_image_url;
           if (newCoverUrl) {
-            await db.update(lmsCourses).set({ coverImageUrl: newCoverUrl }).where(eq(lmsCourses.id, input.lmsCourseId));
+            await db.update(lmsCourses).set({ coverImageUrl: newCoverUrl, thumbnailUrl: newCoverUrl }).where(eq(lmsCourses.id, input.lmsCourseId));
             log.push(`Updated cover image: ${newCoverUrl}`);
           }
         } catch (e) {

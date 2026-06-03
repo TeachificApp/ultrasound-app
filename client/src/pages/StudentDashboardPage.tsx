@@ -127,19 +127,28 @@ function ProfileTab() {
     onError: () => toast.error("Failed to save preferences"),
   });
 
-  // ── Interest preferences ──────────────────────────────────────────────────
-  const { data: interestPrefs, isLoading: interestLoading } = trpc.emailCampaign.getInterestPrefs.useQuery(
+  // ── Interest preferences (normalized system) ────────────────────────────────
+  const userBrand = (user as any)?.brand as string | undefined;
+  const { data: availableInterests, isLoading: interestsListLoading } = trpc.interests.getInterests.useQuery(
+    { brand: userBrand },
+    { enabled: !!user }
+  );
+  const { data: myInterestsData, isLoading: myInterestsLoading } = trpc.interests.getMyInterests.useQuery(
     undefined,
     { enabled: !!user }
   );
-  const [interests, setInterests] = useState<{ acs: boolean; adultEcho: boolean; pediatricEcho: boolean; fetalEcho: boolean; pocus: boolean }>(
-    { acs: false, adultEcho: false, pediatricEcho: false, fetalEcho: false, pocus: false }
-  );
+  const [selectedInterestIds, setSelectedInterestIds] = useState<number[]>([]);
   useEffect(() => {
-    if (interestPrefs) setInterests((prev) => ({ ...prev, ...interestPrefs }));
-  }, [interestPrefs]);
-  const updateInterestsMutation = trpc.emailCampaign.updateInterestPrefs.useMutation({
-    onSuccess: () => toast.success("Interests saved"),
+    if (myInterestsData) {
+      setSelectedInterestIds(myInterestsData.map((i: any) => i.id));
+    }
+  }, [myInterestsData]);
+  const interestLoading = interestsListLoading || myInterestsLoading;
+  const updateInterestsMutation = trpc.interests.updateMyInterests.useMutation({
+    onSuccess: () => {
+      toast.success("Interests saved");
+      utils.interests.getMyInterests.invalidate();
+    },
     onError: () => toast.error("Failed to save interests"),
   });
   const updateProfile = trpc.auth.updateProfile.useMutation({
@@ -582,7 +591,7 @@ function ProfileTab() {
             Select the clinical areas you are most interested in. This helps us send you relevant updates, resources, and announcements.
           </p>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-6">
           {interestLoading ? (
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -590,52 +599,42 @@ function ProfileTab() {
             </div>
           ) : (
             <>
-              {([
-                { key: "acs" as const, label: "ACS", description: "Acute care echo, ICU echo, hemodynamic assessment, and critical care applications.", icon: "🫀" },
-                { key: "adultEcho" as const, label: "Adult Echocardiography", description: "TTE, TEE, stress echo, valvular disease, cardiomyopathy, and adult structural heart.", icon: "❤️" },
-                { key: "pediatricEcho" as const, label: "Pediatric Echocardiography", description: "Congenital heart disease, CHD protocols, pediatric measurements, and neonatal echo.", icon: "🧒" },
-                { key: "fetalEcho" as const, label: "Fetal Echocardiography", description: "Fetal cardiac screening, CHD detection, biometry, and fetal hemodynamics.", icon: "🤰" },
-                { key: "pocus" as const, label: "POCUS", description: "Point-of-care ultrasound, eFAST, RUSH, lung POCUS, and bedside cardiac assessment.", icon: "🔍" },
-              ] as const).map(({ key, label, description, icon }) => (
-                <label
-                  key={key}
-                  className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    interests[key]
-                      ? "border-[#189aa1] bg-[#189aa1]/5"
-                      : "border-gray-100 hover:border-gray-200 bg-gray-50"
-                  }`}
-                >
-                  <div className="mt-0.5">
-                    <div
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                        interests[key] ? "bg-[#189aa1] border-[#189aa1]" : "border-gray-300 bg-white"
-                      }`}
-                    >
-                      {interests[key] && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={interests[key]}
-                      onChange={(e) => setInterests((prev) => ({ ...prev, [key]: e.target.checked }))}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{icon}</span>
-                      <span className="text-sm font-semibold text-gray-800">{label}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{description}</p>
-                  </div>
-                </label>
-              ))}
-              <div className="pt-2 border-t border-gray-100 flex justify-end">
+              {(!availableInterests || availableInterests.length === 0) ? (
+                <p className="text-sm text-gray-400">No interests available for your account.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {availableInterests.map((interest: any) => {
+                    const isSelected = selectedInterestIds.includes(interest.id);
+                    return (
+                      <button
+                        key={interest.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedInterestIds(prev =>
+                            isSelected
+                              ? prev.filter(id => id !== interest.id)
+                              : [...prev, interest.id]
+                          );
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                          isSelected
+                            ? "border-[#189aa1] bg-[#189aa1] text-white"
+                            : "border-gray-200 bg-gray-50 text-gray-600 hover:border-[#189aa1] hover:text-[#189aa1]"
+                        }`}
+                      >
+                        {interest.iconEmoji && <span className="mr-1">{interest.iconEmoji}</span>}
+                        {interest.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                <p className="text-xs text-gray-400">
+                  {selectedInterestIds.length} interest{selectedInterestIds.length !== 1 ? "s" : ""} selected
+                </p>
                 <button
-                  onClick={() => updateInterestsMutation.mutate(interests)}
+                  onClick={() => updateInterestsMutation.mutate({ interestIds: selectedInterestIds })}
                   disabled={updateInterestsMutation.isPending}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
                   style={{ background: "#189aa1" }}
