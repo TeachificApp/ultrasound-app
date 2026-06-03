@@ -44,6 +44,7 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 6. **Production build requires analytics env vars OR safe strip**: `vite.config.ts` removes the umami `<script>` when `VITE_ANALYTICS_ENDPOINT` / `VITE_ANALYTICS_WEBSITE_ID` are unset. Use `VITE_ANALYTICS_ENDPOINT=... VITE_ANALYTICS_WEBSITE_ID=... pnpm build` for production-like builds. A broken build strips `#root` and JS if the old greedy regex matched — see `transformAnalyticsIndexHtml` in `vite.config.ts`.
 
+<<<<<<< HEAD
 7. **PR #20 `isAdminOrAuthPath` reverted**: Do not skip the Router outer `<Suspense>` for admin paths — lazy admin pages need it. `/platform-admin` stays fixed via eager `PlatformAdmin` + `AdminLoginRedirect` (`window.location.replace`, not wouter `Redirect`). Funnel `/:slug` redirects use `HardRedirect` for the same reason.
 
 8. **wouter `<Switch>` + wrapper components**: Never place custom components (e.g. `PerBrandAdminRoutes`) as direct `<Switch>` children — wouter treats missing `path` as `*` and stops before later routes (blank funnel/admin pages). Use `perBrandAdminRouteElements()` / `perBrandUserRouteElements()` from `client/src/routes/perBrandRouteHelpers.tsx` to spread flat `<Route>` elements inside `<Switch>`.
@@ -81,6 +82,11 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 - Migration: `drizzle/0012_digital_download_access.sql` before using limits/activity in production.
 - API: `downloadsAdmin.getAccessDashboard`, `listOrders`, `getOrderDetail`, `updateOrderAccess`, `expireOrder`, `reopenOrder`, `resendOrderEmail`.
 - Learner downloads enforced via `downloadsLearner.trackDownload` (must succeed before file opens).
+=======
+8. **Marketing Site staging (`site.allaboutultrasound.com`)**: Run `scripts/marketing-site-migration.sql`. Import pages via `/admin/marketing-site` or `pnpm exec tsx scripts/import-aau-marketing-site.ts --limit 25`. Staging has `noindex` + `robots.txt` disallow. Do **not** point www DNS until approved.
+
+7. **Form Embed Widget migration**: Run `scripts/form-embed-widget-migration.sql` after deploy. Embed loader is served at `/embed.js` (from `client/public/embed.js`). Public config/events API: `/api/form-embed/config` and `/api/form-embed/event`. For UI verification in Cloud VMs, use `pnpm build && node dist/index.js` (not `pnpm dev`) due to Vite HMR WSS issue.
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
 
 ### Key file locations
 

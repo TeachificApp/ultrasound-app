@@ -6479,6 +6479,7 @@ export const lmsGroupManagers = mysqlTable("lms_group_managers", {
 export type LmsGroupManager = typeof lmsGroupManagers.$inferSelect;
 export type InsertLmsGroupManager = typeof lmsGroupManagers.$inferInsert;
 
+<<<<<<< HEAD
 // ─── SDMS CME Credit Integration ─────────────────────────────────────────────
 
 /** Eligible activity types for SDMS CME credit */
@@ -6617,6 +6618,8 @@ export const sdmsCmeSubmissionLogs = mysqlTable("sdmsCmeSubmissionLogs", {
 export type SdmsCmeSubmissionLog = typeof sdmsCmeSubmissionLogs.$inferSelect;
 export type InsertSdmsCmeSubmissionLog = typeof sdmsCmeSubmissionLogs.$inferInsert;
 
+=======
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
 // ─── Marketing Site (staging replica of public website) ─────────────────────
 
 export const marketingSiteSettings = mysqlTable("marketingSiteSettings", {
@@ -6663,6 +6666,7 @@ export const marketingSitePages = mysqlTable("marketingSitePages", {
 export type MarketingSitePage = typeof marketingSitePages.$inferSelect;
 export type InsertMarketingSitePage = typeof marketingSitePages.$inferInsert;
 
+<<<<<<< HEAD
 // ─── Cohort Recording Progress ────────────────────────────────────────────────
 /** One row per user per recording — tracks watch progress for cohort replays */
 export const lmsCohortRecordingProgress = mysqlTable("lms_cohort_recording_progress", {
@@ -7111,3 +7115,5 @@ export const printfulSyncProducts = mysqlTable("printful_sync_products", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type PrintfulSyncProductRow = typeof printfulSyncProducts.$inferSelect;
+=======
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)

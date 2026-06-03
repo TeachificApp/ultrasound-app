@@ -48,9 +48,12 @@ const UpgradeSuccess = lazy(() => import("./pages/UpgradeSuccess"));
 const Premium = lazy(() => import("./pages/Premium"));
 
 // ── LMS — LMS Management ─────────────────────────────────────────────────
+<<<<<<< HEAD
 const Checkout = lazy(() => import("./pages/Checkout"));
 const CheckoutComplete = lazy(() => import("./pages/CheckoutComplete"));
 const WorkshopCheckout = lazy(() => import("./pages/WorkshopCheckout"));
+=======
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
 const EducationLibrary = lazy(() => import("./pages/EducationLibrary"));
 const LMSHome = lazy(() => import("./pages/LMSHome"));
 const CollectionDetail = lazy(() => import("./pages/CollectionDetail"));
@@ -65,7 +68,6 @@ const LandingPageBuilder = lazy(() => import("./pages/admin/LandingPageBuilder")
 const FunnelBuilder = lazy(() => import("./pages/admin/FunnelBuilder"));
 const FunnelPageEditor = lazy(() => import("./pages/admin/FunnelPageEditor"));
 const ContactsAdmin = lazy(() => import("./pages/admin/ContactsAdmin"));
-const CheckoutPageEditorPage = lazy(() => import("./pages/admin/CheckoutPageEditorPage"));
 const AdminLessonComments = lazy(() => import("./pages/admin/AdminLessonComments"));
 const SharingMonitor = lazy(() => import("./pages/admin/SharingMonitor"));
 // Eager — marketing funnel pages must render outside the Router outer Suspense boundary.
@@ -291,7 +293,6 @@ const LabAdmin = lazy(() => import("./pages/iheartecho/LabAdmin"));
 const EducatorAdmin = lazy(() => import("./pages/iheartecho/EducatorAdmin"));
 const StudentDashboard = lazy(() => import("./pages/iheartecho/StudentDashboard"));
 const StudentDashboardPage = lazy(() => import("./pages/StudentDashboardPage"));
-const MyTeamPage = lazy(() => import("./pages/MyTeamPage"));
 const SoundBytesPage = lazy(() => import("./pages/SoundBytes"));
 
 // ── CME Hub ─────────────────────────────────────────────────────────────────────────
@@ -306,7 +307,6 @@ const AdminUserDetailPage = lazy(() => import("./pages/admin/AdminUserDetailPage
 const AdminSalesPage = lazy(() => import("./pages/admin/AdminSalesPage"));
 const AdminSalesDashboard = lazy(() => import("./pages/admin/AdminSalesDashboard"));
 const AdminDiscountCodesPage = lazy(() => import("./pages/admin/AdminDiscountCodesPage"));
-const FulfillmentAdmin = lazy(() => import("./pages/admin/FulfillmentAdmin"));
 const MembershipAdmin = lazy(() => import("./pages/admin/MembershipAdmin"));
 const SdmsCmeExportPage = lazy(() => import("./pages/admin/SdmsCmeExportPage"));
 const MembershipPage = lazy(() => import("./pages/MembershipPage"));
@@ -361,7 +361,6 @@ function Router() {
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
-        <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
 
@@ -489,7 +488,6 @@ function Router() {
         <Route path="/bundles/:slug" component={BundleLanding} />
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
-        <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/memberships/:planId/sales-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembershipSalesPageBuilder /></RoleGuard>}</Route>
@@ -525,6 +523,7 @@ function Router() {
         <Route path="/employer" component={EmployerDashboard} />
 
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
+<<<<<<< HEAD
         <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><CommunityAdmin /></Suspense></RoleGuard>}</Route>
         {perBrandAdminRouteElements([
           { base: "/admin/cases", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard> },
@@ -536,6 +535,12 @@ function Router() {
           { base: "/admin/thinkific-webhook", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard> },
           { base: "/admin/soundbytes", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SoundBytesAdmin /></RoleGuard> },
         ])}
+=======
+        <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
+        <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
+        <Route path="/admin/social-content">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard>}</Route>
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
         <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelPageEditor /></Suspense></RoleGuard>}</Route>
@@ -574,8 +579,11 @@ function Router() {
         <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
+<<<<<<< HEAD
         <Route path="/admin/fulfillment">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FulfillmentAdmin /></RoleGuard>}</Route>
         <Route path="/admin/sdms-cme-export">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SdmsCmeExportPage /></RoleGuard>}</Route>
+=======
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
         <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
         <Route path="/admin">{() => { window.location.replace("/platform-admin"); return null; }}</Route>
@@ -717,7 +725,6 @@ function MembersRouter() {
           <Suspense fallback={pageFallback}>
             <Switch>
               <Route path="/my-dashboard" component={StudentDashboardPage} />
-        <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/teach" component={TeachDashboard} />
@@ -731,8 +738,6 @@ function MembersRouter() {
               <Route path="/downloads" component={DownloadsBrowse} />
               {/* Auth */}
               <Route path="/login" component={Login} />
-              <Route path="/forgot-password" component={ForgotPassword} />
-              <Route path="/reset-password" component={ResetPassword} />
               <Route path="/magic-link" component={MagicLinkRequest} />
               <Route path="/auth/magic" component={MagicLinkCallback} />
               <Route path="/auth/access" component={AccessLinkCallback} />
@@ -770,6 +775,7 @@ function LMSRouter() {
         </Suspense>
       </Route>
       <Route path="/downloads/:slug/files" component={DownloadFiles} />
+<<<<<<< HEAD
       {/* Hosted checkout pages — outside LMSLayout (full-screen, no nav) */}
       <Route path="/checkout/complete">
         <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
@@ -780,6 +786,8 @@ function LMSRouter() {
       <Route path="/checkout/:slug">
         <Suspense fallback={pageFallback}><Checkout /></Suspense>
       </Route>
+=======
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
       {/* Course/download landing pages render directly on learn subdomain */}
       <Route path="/cohort/:courseId/assignment/:assignmentId" component={AssignmentDetail} />
       <Route path="/cohort/:courseId/replay/:recordingId" component={CohortReplayPlayer} />
@@ -843,7 +851,6 @@ function LMSRouter() {
         {/* Admin (platform_admin only) */}
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
-        <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         {/* ── Physical Products ───────────────────────────────────────────────── */}
@@ -877,8 +884,6 @@ function LMSRouter() {
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         {/* Auth pages (needed for login flow) */}
         <Route path="/login" component={Login} />
-        <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/auth/access" component={AccessLinkCallback} />
@@ -886,7 +891,6 @@ function LMSRouter() {
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
         <Route path="/my-dashboard" component={StudentDashboardPage} />
-        <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/memberships/:slug">{() => <Suspense fallback={pageFallback}><MembershipPage /></Suspense>}</Route>
@@ -949,7 +953,6 @@ function IHeartEchoRouter() {
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
-        <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
 
@@ -1076,6 +1079,7 @@ function IHeartEchoRouter() {
         <Route path="/admin/engagement">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard>}</Route>
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
+<<<<<<< HEAD
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/workshops/:workshopId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><WorkshopDetail /></Suspense></RoleGuard>}</Route>
@@ -1085,6 +1089,8 @@ function IHeartEchoRouter() {
         <Route path="/admin/webinars/:webinarId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/bundles/:bundleId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><BundleLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>
+=======
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
@@ -1308,7 +1314,26 @@ function AccreditationDivisionRouter() {
   );
 }
 
+function MarketingSiteRouter() {
+  usePageViewTracker();
+  const pageFallback = (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+    </div>
+  );
+  return (
+    <Suspense fallback={pageFallback}>
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/admin/marketing-site">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MarketingSiteAdmin /></RoleGuard>}</Route>
+        <Route component={PublicMarketingSitePage} />
+      </Switch>
+    </Suspense>
+  );
+}
+
 function App() {
+  const onMarketingStaging = isMarketingStagingDomain();
   const onLearnSubdomain = isLearnDomain();
   const onMembersSubdomain = isMembersDomain();
   const onIHeartEchoSubdomain = isIHeartEchoDomain();
@@ -1318,7 +1343,9 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          {onMembersSubdomain ? (
+          {onMarketingStaging ? (
+            <MarketingSiteRouter />
+          ) : onMembersSubdomain ? (
             <MembersRouter />
           ) : onLearnSubdomain ? (
             <LMSRouter />

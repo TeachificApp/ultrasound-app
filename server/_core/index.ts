@@ -42,6 +42,7 @@ import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
 import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
+<<<<<<< HEAD
 import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes/scormExtractor";
 import { healStuckScormVersions } from "../scheduled/scormHealthCheck";
 import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
@@ -50,6 +51,9 @@ import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
 import { sdmsCmeDailySummaryHandler } from "../routes/sdmsCmeDailySummary";
 import { clearSessionCookies, getSessionCookieOptions } from "./cookies";
 import { COOKIE_NAME, DEMO_COOKIE_NAME } from "../../shared/const";
+=======
+import { scormExtractHeartbeatHandler } from "../routes/scormExtractor";
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -243,6 +247,7 @@ async function startServer() {
   registerUploadCohortResourceRoute(app);
   // Social content image upload (multipart, admin only)
   registerUploadSocialImageRoute(app);
+<<<<<<< HEAD
   // TEACH chunked file upload (multipart, bypasses tRPC JSON body limit for large PPTX files)
   registerUploadTeachRoute(app);
   // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
@@ -251,6 +256,14 @@ async function startServer() {
   registerSitemapRoute(app);
   // Funnel page OG meta injection — must be before SPA catch-all so crawlers get correct meta tags
   registerFunnelOgMetaRoutes(app);
+=======
+  // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
+  registerSsoAutoRoute(app);
+  registerMarketingSiteRoutes(app);
+  // Funnel page OG meta injection — must be before SPA catch-all so crawlers get correct meta tags
+  registerFunnelOgMetaRoutes(app);
+  registerMarketingSiteOgMeta(app);
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
   // Auto-login route — one-time token redemption for post-purchase automatic sign-in
   registerAutoLoginRoute(app);
   // Form embed widget routes (public embed endpoint)
@@ -268,12 +281,15 @@ async function startServer() {
   app.post("/api/scheduled/thinkific-community-sync", thinkificCommunitySyncHandler);
   // Heartbeat: SCORM extraction job (every 60s) — processes pending SCORM ZIP packages
   app.post("/api/scheduled/scorm-extract", scormExtractHeartbeatHandler);
+<<<<<<< HEAD
   // Heartbeat: SCORM health-check (every 10 min) — audits done versions and re-queues broken ones
   app.post("/api/scheduled/scorm-health-check", scormHealthCheckHandler);
   // Heartbeat: Hourly source-code backup → R2 + email
   app.post("/api/scheduled/hourly-backup", hourlyBackupHandler);
   // Heartbeat: Daily SDMS CME summary — 8:00 AM UTC
   app.post("/api/scheduled/sdms-cme-daily-summary", sdmsCmeDailySummaryHandler);
+=======
+>>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
   // Public REST API: GET /api/forms/:formId/submissions (auth via Bearer apiToken)
   app.get("/api/forms/:formId/submissions", async (req: any, res: any) => {
     try {
