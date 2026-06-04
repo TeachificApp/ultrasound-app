@@ -1062,11 +1062,24 @@ function SubscriptionsTab() {
     onSuccess: (res) => { toast.success(res.message); utils.dashboard.getMySubscriptions.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
+  const cancelCourseSub = trpc.dashboard.cancelCourseSubscription.useMutation({
+    onSuccess: (res) => { toast.success(res.message); utils.dashboard.getMySubscriptions.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const reactivateCourseSub = trpc.dashboard.reactivateCourseSubscription.useMutation({
+    onSuccess: (res) => { toast.success(res.message); utils.dashboard.getMySubscriptions.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
   const [confirmCancel, setConfirmCancel] = useState<number | null>(null);
+  const [confirmCancelCourse, setConfirmCancelCourse] = useState<number | null>(null);
 
   if (isLoading) return <LoadingSpinner />;
 
-  if (!data || data.length === 0) {
+  const memberships = data?.memberships ?? [];
+  const courseSubscriptions = data?.courseSubscriptions ?? [];
+  const hasAnything = memberships.length > 0 || courseSubscriptions.length > 0;
+
+  if (!data || !hasAnything) {
     return (
       <EmptyState
         icon={CreditCard}
@@ -1077,119 +1090,198 @@ function SubscriptionsTab() {
     );
   }
 
-  // Group by brand for display
-  const byBrand: Record<string, typeof data> = {};
-  for (const sub of data) {
+  // Group brand memberships by brand for display
+  const byBrand: Record<string, typeof memberships> = {};
+  for (const sub of memberships) {
     const b = sub.brand ?? "other";
     if (!byBrand[b]) byBrand[b] = [];
     byBrand[b].push(sub);
   }
 
   return (
-    <div className="space-y-6">
-      {Object.entries(byBrand).map(([brand, subs]) => {
-        const brandCfg = BRAND_CONFIG[brand] ?? { label: brand, color: "#6b7280", bg: "bg-gray-50", border: "border-gray-200" };
-        return (
-          <div key={brand}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-px flex-1 bg-gray-100" />
-              <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border"
-                style={{ color: brandCfg.color, background: brandCfg.bg, borderColor: brandCfg.color + "40" }}>
-                {brandCfg.label}
-              </span>
-              <div className="h-px flex-1 bg-gray-100" />
-            </div>
+    <div className="space-y-8">
+      {/* ── Brand Memberships ── */}
+      {memberships.length > 0 && (
+        <div className="space-y-6">
+          {Object.entries(byBrand).map(([brand, subs]) => {
+            const brandCfg = BRAND_CONFIG[brand] ?? { label: brand, color: "#6b7280", bg: "bg-gray-50", border: "border-gray-200" };
+            return (
+              <div key={brand}>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-px flex-1 bg-gray-100" />
+                  <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border"
+                    style={{ color: brandCfg.color, background: brandCfg.bg, borderColor: brandCfg.color + "40" }}>
+                    {brandCfg.label}
+                  </span>
+                  <div className="h-px flex-1 bg-gray-100" />
+                </div>
 
-            <div className="space-y-4">
-              {subs.map(sub => {
-                const isThinkific = sub.isThinkific;
-                const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
-                const tierLabel = sub.tier === "premium" ? "Premium" : sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1);
+                <div className="space-y-4">
+                  {subs.map(sub => {
+                    const isThinkific = sub.isThinkific;
+                    const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
+                    const tierLabel = sub.tier === "premium" ? "Premium" : sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1);
 
-                return (
-                  <div key={sub.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-gray-800">{tierLabel} Membership</span>
-                          <StatusBadge status={sub.stripe?.status ?? sub.status} />
-                          {isCancelPending && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                              <XCircle className="w-3 h-3" /> Cancels at period end
-                            </span>
-                          )}
-                          {isThinkific && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
-                              Thinkific
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500 space-y-0.5">
-                          {sub.stripe?.amount != null && (
-                            <p>{formatCurrency(sub.stripe.amount, sub.stripe.currency ?? "usd")} / {sub.stripe.interval}</p>
-                          )}
-                          {sub.stripe?.currentPeriodEnd && (
-                            <p className="flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5" />
-                              {isCancelPending ? "Access until" : "Renews"}: {formatDate(sub.stripe.currentPeriodEnd)}
-                            </p>
-                          )}
-                          {!sub.stripe && sub.expiresAt && (
-                            <p className="flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5" />
-                              Expires: {formatDate(sub.expiresAt)}
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-400">Granted: {formatDate(sub.grantedAt)}</p>
+                    return (
+                      <div key={sub.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-gray-800">{tierLabel} Membership</span>
+                              <StatusBadge status={sub.stripe?.status ?? sub.status} />
+                              {isCancelPending && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                                  <XCircle className="w-3 h-3" /> Cancels at period end
+                                </span>
+                              )}
+                              {isThinkific && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                  Thinkific
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-500 space-y-0.5">
+                              {sub.stripe?.amount != null && (
+                                <p>{formatCurrency(sub.stripe.amount, sub.stripe.currency ?? "usd")} / {sub.stripe.interval}</p>
+                              )}
+                              {sub.stripe?.currentPeriodEnd && (
+                                <p className="flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  {isCancelPending ? "Access until" : "Renews"}: {formatDate(sub.stripe.currentPeriodEnd)}
+                                </p>
+                              )}
+                              {!sub.stripe && sub.expiresAt && (
+                                <p className="flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  Expires: {formatDate(sub.expiresAt)}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-400">Granted: {formatDate(sub.grantedAt)}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-2 items-end">
+                            {isThinkific ? (
+                              <a
+                                href={sub.thinkificManageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200"
+                              >
+                                Manage on Thinkific <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            ) : sub.stripeSubscriptionId ? (
+                              isCancelPending ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => reactivateSub.mutate({ membershipId: sub.id })}
+                                  disabled={reactivateSub.isPending}
+                                  className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                                >
+                                  {reactivateSub.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                                  Reactivate
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setConfirmCancel(sub.id)}
+                                  disabled={sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled"}
+                                  className="text-red-600 border-red-200 hover:bg-red-50"
+                                >
+                                  <XCircle className="w-3.5 h-3.5 mr-1" />
+                                  Cancel
+                                </Button>
+                              )
+                            ) : null}
+                          </div>
                         </div>
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-                      <div className="flex flex-col gap-2 items-end">
-                        {isThinkific ? (
-                          <a
-                            href={sub.thinkificManageUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200"
-                          >
-                            Manage on Thinkific <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        ) : sub.stripeSubscriptionId ? (
-                          isCancelPending ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => reactivateSub.mutate({ membershipId: sub.id })}
-                              disabled={reactivateSub.isPending}
-                              className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                            >
-                              {reactivateSub.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
-                              Reactivate
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setConfirmCancel(sub.id)}
-                              disabled={sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled"}
-                              className="text-red-600 border-red-200 hover:bg-red-50"
-                            >
-                              <XCircle className="w-3.5 h-3.5 mr-1" />
-                              Cancel
-                            </Button>
-                          )
-                        ) : null}
+      {/* ── Course Subscriptions ── */}
+      {courseSubscriptions.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-px flex-1 bg-gray-100" />
+            <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border bg-teal-50 text-teal-700 border-teal-200">
+              Course Subscriptions
+            </span>
+            <div className="h-px flex-1 bg-gray-100" />
+          </div>
+          <div className="space-y-4">
+            {courseSubscriptions.map(sub => {
+              const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
+              return (
+                <div key={sub.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-800">{sub.courseTitle}</span>
+                        <StatusBadge status={sub.stripe?.status ?? sub.status ?? "active"} />
+                        {isCancelPending && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                            <XCircle className="w-3 h-3" /> Cancels at period end
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-500 space-y-0.5">
+                        {sub.stripe?.amount != null && (
+                          <p>{formatCurrency(sub.stripe.amount, sub.stripe.currency ?? "usd")} / {sub.stripe.interval}</p>
+                        )}
+                        {sub.stripe?.currentPeriodEnd && (
+                          <p className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            {isCancelPending ? "Access until" : "Renews"}: {formatDate(sub.stripe.currentPeriodEnd)}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-400">Since: {formatDate(sub.createdAt)}</p>
                       </div>
                     </div>
+                    <div className="flex flex-col gap-2 items-end">
+                      {sub.stripeSubscriptionId && (
+                        isCancelPending ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => reactivateCourseSub.mutate({ orderId: sub.id })}
+                            disabled={reactivateCourseSub.isPending}
+                            className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                          >
+                            {reactivateCourseSub.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                            Reactivate
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setConfirmCancelCourse(sub.id)}
+                            disabled={sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled"}
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                          >
+                            <XCircle className="w-3.5 h-3.5 mr-1" />
+                            Cancel
+                          </Button>
+                        )
+                      )}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      )}
 
-      {/* Cancel confirmation */}
+      {/* Cancel membership confirmation */}
       <AlertDialog open={confirmCancel !== null} onOpenChange={open => !open && setConfirmCancel(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1205,6 +1297,32 @@ function SubscriptionsTab() {
                 if (confirmCancel !== null) {
                   cancelSub.mutate({ membershipId: confirmCancel });
                   setConfirmCancel(null);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Yes, Cancel
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel course subscription confirmation */}
+      <AlertDialog open={confirmCancelCourse !== null} onOpenChange={open => !open && setConfirmCancelCourse(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Course Subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your access will continue until the end of the current billing period. You will not be charged again after that. You can reactivate at any time before then.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmCancelCourse !== null) {
+                  cancelCourseSub.mutate({ orderId: confirmCancelCourse });
+                  setConfirmCancelCourse(null);
                 }
               }}
               className="bg-red-600 hover:bg-red-700 text-white"

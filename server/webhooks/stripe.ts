@@ -1555,6 +1555,36 @@ async function handleSubscriptionCancelled(subscription: Record<string, unknown>
   }
 }
 
+/**
+ * Re-process a Stripe checkout.session.completed event by session ID.
+ * Used by the admin "Missed Payments" recovery tool.
+ * Returns a summary of what was done.
+ */
+export async function processStripeSessionById(sessionId: string): Promise<{ ok: boolean; message: string; actions: string[] }> {
+  const actions: string[] = [];
+  try {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["line_items", "subscription"] });
+    if (session.status !== "complete" && session.payment_status !== "paid") {
+      return { ok: false, message: `Session ${sessionId} is not completed (status: ${session.status}, payment_status: ${session.payment_status})`, actions };
+    }
+    const sessionObj = session as unknown as Record<string, unknown>;
+    await handleCheckoutSessionCompleted(sessionObj); actions.push("handleCheckoutSessionCompleted");
+    await handleEmployerCheckoutCompleted(sessionObj); actions.push("handleEmployerCheckoutCompleted");
+    await handleLmsCheckoutCompleted(sessionObj); actions.push("handleLmsCheckoutCompleted");
+    await handleDigitalDownloadCheckoutCompleted(sessionObj); actions.push("handleDigitalDownloadCheckoutCompleted");
+    await handleDigitalBundleCheckoutCompleted(sessionObj); actions.push("handleDigitalBundleCheckoutCompleted");
+    await handleBrandMembershipCheckoutCompleted(sessionObj); actions.push("handleBrandMembershipCheckoutCompleted");
+    await handleDualMembershipCheckoutCompleted(sessionObj); actions.push("handleDualMembershipCheckoutCompleted");
+    await handlePhysicalProductCheckoutCompleted(sessionObj); actions.push("handlePhysicalProductCheckoutCompleted");
+    await handleMembershipCheckoutCompleted(sessionObj); actions.push("handleMembershipCheckoutCompleted");
+    return { ok: true, message: `Session ${sessionId} re-processed successfully`, actions };
+  } catch (err: any) {
+    return { ok: false, message: `Failed to re-process session ${sessionId}: ${err?.message ?? String(err)}`, actions };
+  }
+}
+
 export function registerStripeWebhook(app: Express) {
   // Raw body needed for Stripe signature verification
   app.post(

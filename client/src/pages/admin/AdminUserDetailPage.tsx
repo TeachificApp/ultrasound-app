@@ -939,6 +939,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const [revokeConfirm, setRevokeConfirm] = useState<number | null>(null);
   const [cancelNativeSubConfirm, setCancelNativeSubConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
   const [revokeNativeSubConfirm, setRevokeNativeSubConfirm] = useState<number | null>(null);
+  const [cancelLmsOrderConfirm, setCancelLmsOrderConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
 
   const grantMembership = trpc.adminUser.grantBrandMembership.useMutation({
     onSuccess: () => { toast.success("App access granted."); refetch(); setGrantOpen(false); },
@@ -960,9 +961,14 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
     onSuccess: () => { toast.success("Membership revoked."); refetch(); setRevokeNativeSubConfirm(null); },
     onError: (e) => toast.error(e.message),
   });
+  const cancelLmsOrderSub = trpc.adminUser.cancelLmsOrderSubscription.useMutation({
+    onSuccess: () => { toast.success("Course subscription cancelled at period end."); refetch(); setCancelLmsOrderConfirm(null); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const memberships = data.memberships ?? [];
   const nativeMemberships = data.nativeMemberships ?? [];
+  const lmsCourseOrders = data.lmsCourseOrders ?? [];
 
   // Group app memberships by brand
   const byBrand: Record<string, typeof memberships> = {};
@@ -1056,6 +1062,45 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
         })
       )}
 
+      </div>
+
+      {/* ── LMS Course Orders Section ── */}
+      <div>
+        <SectionHeader title={`Course Orders (${lmsCourseOrders.length})`} />
+        <p className="text-xs text-gray-400 mb-3">LMS course purchases and subscriptions</p>
+        {lmsCourseOrders.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">No course orders found.</p>
+        ) : (
+          <div className="space-y-3">
+            {lmsCourseOrders.map((o: any) => (
+              <div key={o.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-800">{o.courseTitle ?? "Course"}</span>
+                      <StatusBadge status={o.stripeSubscriptionId ? "subscription" : o.status} />
+                    </div>
+                    <div className="text-xs text-gray-500 space-y-0.5">
+                      <p>Order #{o.id} &mdash; {formatDate(o.createdAt)}</p>
+                      {o.amount != null && <p>{formatCurrency(o.amount, o.currency)}</p>}
+                      {o.stripeSubscriptionId && <p className="font-mono text-gray-400">{o.stripeSubscriptionId}</p>}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 items-end">
+                    {o.stripeSubscriptionId && (
+                      <button
+                        onClick={() => setCancelLmsOrderConfirm({ id: o.id, stripeSubId: o.stripeSubscriptionId })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                      >
+                        <XCircle className="w-3 h-3" /> Cancel Sub
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Learn Subscriptions Section ── */}
@@ -1232,6 +1277,27 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Revoke
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel LMS order subscription confirm */}
+      <AlertDialog open={cancelLmsOrderConfirm !== null} onOpenChange={open => !open && setCancelLmsOrderConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Course Subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The subscription will be cancelled at the end of the current billing period. The student retains access until then.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancelLmsOrderConfirm && cancelLmsOrderSub.mutate({ orderId: cancelLmsOrderConfirm.id })}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Cancel Subscription
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

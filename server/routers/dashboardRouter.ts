@@ -26,6 +26,7 @@ import {
   physicalProducts,
   brandMemberships,
   funnelPurchases,
+  lmsOrders,
 } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import Stripe from "stripe";
@@ -248,8 +249,116 @@ export const dashboardRouter = router({
       })
     );
 
-    return enriched;
+    // Also fetch LMS course subscriptions (orders with a stripeSubscriptionId)
+    const courseOrders = await db
+      .select({
+        id: lmsOrders.id,
+        courseId: lmsOrders.courseId,
+        stripeSubscriptionId: lmsOrders.stripeSubscriptionId,
+        stripeSessionId: lmsOrders.stripeSessionId,
+        amount: lmsOrders.amount,
+        currency: lmsOrders.currency,
+        status: lmsOrders.status,
+        createdAt: lmsOrders.createdAt,
+        courseTitle: lmsCourses.title,
+        courseSlug: lmsCourses.slug,
+      })
+      .from(lmsOrders)
+      .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
+      .where(and(eq(lmsOrders.userId, ctx.user.id)))
+      .orderBy(desc(lmsOrders.createdAt));
+
+    const enrichedCourseOrders = await Promise.all(
+      courseOrders
+        .filter(o => o.stripeSubscriptionId != null)
+        .map(async (o) => {
+          let stripeData: {
+            status: string;
+            currentPeriodEnd: Date | null;
+            cancelAtPeriodEnd: boolean;
+            interval: string | null;
+            amount: number | null;
+            currency: string | null;
+          } | null = null;
+
+          if (o.stripeSubscriptionId) {
+            try {
+              const sub = await stripe.subscriptions.retrieve(o.stripeSubscriptionId) as any;
+              const item = sub.items?.data?.[0];
+              stripeData = {
+                status: sub.status,
+                currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+                cancelAtPeriodEnd: sub.cancel_at_period_end,
+                interval: item?.price?.recurring?.interval ?? null,
+                amount: item?.price?.unit_amount ?? null,
+                currency: item?.price?.currency ?? null,
+              };
+            } catch (err) {
+              console.warn("[Dashboard] Failed to fetch Stripe subscription for order:", o.id, err);
+            }
+          }
+
+          return {
+            id: o.id,
+            type: "course" as const,
+            courseTitle: o.courseTitle ?? "Course Subscription",
+            courseSlug: o.courseSlug ?? null,
+            stripeSubscriptionId: o.stripeSubscriptionId,
+            status: o.status,
+            createdAt: o.createdAt,
+            stripe: stripeData,
+          };
+        })
+    );
+
+    return { memberships: enriched, courseSubscriptions: enrichedCourseOrders };
   }),
+
+  // ── Cancel Course Subscription (student-accessible) ───────────────────────────
+
+  cancelCourseSubscription: protectedProcedure
+    .input(z.object({ orderId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      // Verify ownership — student can only cancel their own orders
+      const [order] = await db
+        .select()
+        .from(lmsOrders)
+        .where(and(eq(lmsOrders.id, input.orderId), eq(lmsOrders.userId, ctx.user.id)))
+        .limit(1);
+
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
+      if (!order.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found for this order" });
+
+      // Cancel at period end — student keeps access until billing period ends
+      await stripe.subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: true });
+
+      return { success: true, message: "Your subscription will be cancelled at the end of the current billing period. You will retain access until then." };
+    }),
+
+  // ── Reactivate Course Subscription (student-accessible) ───────────────────────
+
+  reactivateCourseSubscription: protectedProcedure
+    .input(z.object({ orderId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [order] = await db
+        .select()
+        .from(lmsOrders)
+        .where(and(eq(lmsOrders.id, input.orderId), eq(lmsOrders.userId, ctx.user.id)))
+        .limit(1);
+
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
+      if (!order.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found" });
+
+      await stripe.subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: false });
+
+      return { success: true, message: "Your subscription has been reactivated." };
+    }),
 
   // ── Cancel Subscription ───────────────────────────────────────────────────────
 

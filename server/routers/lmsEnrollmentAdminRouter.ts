@@ -91,7 +91,7 @@ import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
-
+import { processStripeSessionById } from "../webhooks/stripe";
 export const lmsEnrollmentAdminRouter = router({
   listEnrollments: protectedProcedure
     .input(z.object({ courseId: z.number().optional(), page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(20) }))

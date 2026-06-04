@@ -233,6 +233,25 @@ export const adminUserRouter = router({
         ORDER BY wr.registered_at DESC
       `);
 
+      // LMS course orders with subscriptions
+      const [lmsCourseOrders] = await db.execute(sql`
+        SELECT
+          o.id,
+          o.status,
+          o.created_at AS createdAt,
+          o.stripe_subscription_id AS stripeSubscriptionId,
+          o.stripe_session_id AS stripeSessionId,
+          o.amount,
+          o.currency,
+          c.id AS courseId,
+          c.title AS courseTitle,
+          c.slug AS courseSlug
+        FROM lms_orders o
+        LEFT JOIN lms_courses c ON c.id = o.course_id
+        WHERE o.user_id = ${input.userId}
+        ORDER BY o.created_at DESC
+      `);
+
       // Native membership subscriptions (membership_plans)
       // Note: membership_subscriptions has no current_period_start column, only current_period_end
       const [nativeMemberships] = await db.execute(sql`
@@ -335,6 +354,18 @@ export const adminUserRouter = router({
           attendedAt: r.attendedAt ?? null,
           watchedReplayAt: r.watchedReplayAt ?? null,
           stripePaymentIntentId: r.stripePaymentIntentId ? String(r.stripePaymentIntentId) : null,
+        })),
+        lmsCourseOrders: (lmsCourseOrders as any[]).map(r => ({
+          id: Number(r.id),
+          status: String(r.status ?? "completed"),
+          createdAt: r.createdAt,
+          stripeSubscriptionId: r.stripeSubscriptionId ? String(r.stripeSubscriptionId) : null,
+          stripeSessionId: r.stripeSessionId ? String(r.stripeSessionId) : null,
+          amount: r.amount != null ? Number(r.amount) : null,
+          currency: String(r.currency ?? "usd"),
+          courseId: r.courseId ? Number(r.courseId) : null,
+          courseTitle: r.courseTitle ? String(r.courseTitle) : null,
+          courseSlug: r.courseSlug ? String(r.courseSlug) : null,
         })),
         nativeMemberships: (nativeMemberships as any[]).map(r => ({
           id: Number(r.id),
@@ -2273,5 +2304,40 @@ export const adminUserRouter = router({
         completedLessons: completedCount,
         progressPct: enrollment.progressPct,
       };
+    }),
+
+  /** Cancel an LMS course order subscription (admin) */
+  cancelLmsOrderSubscription: protectedProcedure
+    .input(z.object({
+      orderId: z.number().int(),
+      immediately: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [order] = await db
+        .select()
+        .from(lmsOrders)
+        .where(eq(lmsOrders.id, input.orderId))
+        .limit(1);
+
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+
+      if (order.stripeSubscriptionId) {
+        const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+        if (STRIPE_SECRET_KEY) {
+          const Stripe = (await import("stripe")).default;
+          const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+          if (input.immediately) {
+            await stripe.subscriptions.cancel(order.stripeSubscriptionId);
+          } else {
+            await stripe.subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: true });
+          }
+        }
+      }
+
+      return { success: true };
     }),
 });

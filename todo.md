@@ -4630,3 +4630,15 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire RichTextEditor into community comment composer (CommunityFeed.tsx CommentThread)
 - [x] Render community post bodies with RichTextDisplay (HTML-aware, fallback to plain text)
 - [x] Render community comment bodies with RichTextDisplay (HTML-aware, fallback to plain text)
+
+## Student Subscription Cancellation (Jun 2026)
+- [x] Add lmsOrders import to dashboardRouter.ts
+- [x] Extend getMySubscriptions to return {memberships, courseSubscriptions} (was flat array)
+- [x] Add cancelCourseSubscription procedure (student-owned, cancel at period end)
+- [x] Add reactivateCourseSubscription procedure (student-owned)
+- [x] Update StudentDashboardPage.tsx SubscriptionsTab to handle new {memberships, courseSubscriptions} shape
+- [x] Add Course Subscriptions section in student dashboard with cancel/reactivate buttons
+- [x] Add lmsCourseOrders to adminUserRouter.ts getUserDetail response
+- [x] Add cancelLmsOrderSubscription procedure to adminUserRouter.ts (admin-only)
+- [x] Add Course Orders section to admin SubscriptionsTab (AdminUserDetailPage.tsx)
+- [x] Admin can see and cancel course subscriptions for any user (e.g., Katerin Valdivia)
