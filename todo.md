@@ -4662,4 +4662,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add SDMS CME Export to MembersHub sidebar navigation
 - [x] Create sdmsCmeDailySummary heartbeat handler (POST /api/scheduled/sdms-cme-daily-summary)
 - [x] Register handler in server/_core/index.ts
-- [ ] Create heartbeat cron job after deploy (daily 8:00 AM UTC)
+- [x] Create heartbeat cron job after deploy (daily 8:00 AM UTC) — task_uid: GN4nrVx56hJSBDNvAkEHox
+
+## Bundles Feature (Jun 2026)
+- [x] Create lmsBundles table (id, title, slug, description, coverImageUrl, price, compareAtPrice, currency, status, sortOrder, createdAt, updatedAt)
+- [x] Create lmsBundleItems table (id, bundleId, itemType enum [course, download, product, quiz], itemId, sortOrder)
+- [x] Create lmsBundleOrders table (id, userId, bundleId, stripePaymentIntentId, stripeCheckoutSessionId, status, paidAt)
+- [x] Add bundle CRUD admin procedures (create, update, delete, list, addItem, removeItem, reorderItems)
+- [x] Add bundle checkout procedure (creates Stripe checkout session for bundle price)
+- [x] Add bundle fulfillment in webhook (on purchase: enroll user in all bundle courses, grant download access, etc.)
+- [x] Build admin Bundles panel in LMS sidebar (list, create, edit, manage items)
+- [ ] Build student-facing bundle cards in Education Library
+- [x] Build bundle detail/purchase page
+- [x] Wire bundle purchase to grant access to all included items

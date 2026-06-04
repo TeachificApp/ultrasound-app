@@ -25,6 +25,7 @@ import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import { menuLinksRouter } from "./routers/menuLinksRouter";
 import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
 import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
+import { bundlePublicRouter, bundleLearnerRouter, bundleAdminRouter } from "./routers/bundleRouter";
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
 import { careerNetworkRouter } from "./routers/careerNetworkRouter";
 import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter } from "./routers/webinarRouter";
@@ -2103,6 +2104,9 @@ export const appRouter = router({
     lessonComments: lessonCommentsRouter,
   pageScraper: pageScraperRouter,
   interests: interestsRouter,
+  bundles: bundlePublicRouter,
+  bundlesLearner: bundleLearnerRouter,
+  bundlesAdmin: bundleAdminRouter,
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({
     /** List all invitations for the current user's lab */

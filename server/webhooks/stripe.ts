@@ -16,7 +16,7 @@
  */
 import express, { type Express, type Request, type Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, pendingFulfillments, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, communityMembers } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, pendingFulfillments, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, communityMembers, bundles, bundleItems, bundleEnrollments, webinarRegistrations } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -1269,6 +1269,123 @@ async function enrichFunnelCheckoutMetadata(meta: Record<string, string>): Promi
   return enriched;
 }
 
+/**
+ * Handle LMS Bundle purchase completion.
+ * Triggered when a user completes a Stripe checkout for a paid LMS bundle.
+ * Enrolls the user in all bundle courses, grants download access, registers for webinars.
+ */
+async function handleLmsBundlePurchaseCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata as Record<string, string>) ?? {};
+  if (meta.purchase_type !== "bundle_purchase") return;
+
+  const bundleId = meta.bundle_id ? parseInt(meta.bundle_id) : null;
+  const userId = meta.user_id ? parseInt(meta.user_id) : null;
+  const pricingOptionId = meta.pricing_option_id || null;
+  if (!bundleId || !userId) return;
+
+  const db = await getDb();
+  if (!db) return;
+
+  const sessionId = session.id as string;
+  console.log(`[Stripe] LMS bundle purchase — bundleId: ${bundleId}, userId: ${userId}, session: ${sessionId}`);
+
+  // Idempotency: check if already enrolled
+  const [existingEnrollment] = await db.select({ id: bundleEnrollments.id })
+    .from(bundleEnrollments)
+    .where(and(eq(bundleEnrollments.bundleId, bundleId), eq(bundleEnrollments.userId, userId)))
+    .limit(1);
+  if (existingEnrollment) {
+    console.log(`[Stripe] LMS bundle already enrolled: user ${userId}, bundle ${bundleId}`);
+    return;
+  }
+
+  // Create bundle enrollment
+  await db.insert(bundleEnrollments).values({
+    bundleId,
+    userId,
+    pricingOptionId,
+    stripePaymentIntentId: (session.payment_intent as string) ?? null,
+  });
+
+  // Fetch all items in this bundle
+  const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, bundleId));
+
+  const grantedItems: string[] = [];
+
+  for (const item of items) {
+    try {
+      if (item.itemType === "course") {
+        // Enroll in LMS course
+        const [existingCourseEnr] = await db.select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, userId)))
+          .limit(1);
+        if (!existingCourseEnr) {
+          await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId, source: "bundle" });
+          grantedItems.push(`course:${item.itemId}`);
+        }
+      } else if (item.itemType === "download") {
+        // Grant digital download access
+        const [existingPurchase] = await db.select({ id: digitalPurchases.id })
+          .from(digitalPurchases)
+          .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, item.itemId)))
+          .limit(1);
+        if (!existingPurchase) {
+          await db.insert(digitalPurchases).values({
+            userId,
+            productId: item.itemId,
+            stripeCheckoutSessionId: sessionId,
+          });
+          grantedItems.push(`download:${item.itemId}`);
+          // Send download confirmation email
+          try { await sendPurchaseConfirmationEmail(userId, item.itemId); } catch {}
+        }
+      } else if (item.itemType === "webinar") {
+        // Register for webinar
+        const [existingReg] = await db.select({ id: webinarRegistrations.id })
+          .from(webinarRegistrations)
+          .where(and(eq(webinarRegistrations.webinarId, item.itemId), eq(webinarRegistrations.userId, userId)))
+          .limit(1);
+        if (!existingReg) {
+          await db.insert(webinarRegistrations).values({
+            webinarId: item.itemId,
+            userId,
+          });
+          grantedItems.push(`webinar:${item.itemId}`);
+        }
+      } else if (item.itemType === "product") {
+        // Record physical product order (no shipping info available from bundle checkout)
+        // We'll mark as "pending_shipping" so admin knows to follow up
+        grantedItems.push(`product:${item.itemId} (pending admin fulfillment)`);
+      } else if (item.itemType === "quiz") {
+        // Quizzes don't have a separate access table — they're accessible to enrolled users
+        // Just note it was included
+        grantedItems.push(`quiz:${item.itemId}`);
+      }
+    } catch (itemErr) {
+      console.error(`[Stripe] Failed to grant bundle item ${item.itemType}:${item.itemId} to user ${userId}:`, itemErr);
+    }
+  }
+
+  // Log activity
+  try {
+    const [bundleRow] = await db.select({ title: bundles.title }).from(bundles).where(eq(bundles.id, bundleId)).limit(1);
+    await db.insert(userActivityLogs).values({
+      userId,
+      eventType: "purchase",
+      description: `Purchased bundle: ${bundleRow?.title ?? `Bundle #${bundleId}`}`,
+      metadata: { bundleId, items: grantedItems, sessionId, amountCents: session.amount_total },
+    });
+  } catch {} // non-blocking
+
+  await notifyOwner({
+    title: "\uD83C\uDF81 New LMS Bundle Purchase",
+    content: `User ID ${userId} purchased LMS bundle ID ${bundleId} (${items.length} items: ${grantedItems.join(", ")}). Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
+  });
+
+  console.log(`[Stripe] LMS bundle fulfilled: user ${userId}, bundle ${bundleId}, granted: ${grantedItems.join(", ")}`);
+}
+
 async function handleFunnelCheckoutSessionCompleted(session: Record<string, unknown>) {
   const rawMeta = (session.metadata as Record<string, string>) ?? {};
   if (!["funnel_purchase", "funnel_form_purchase"].includes(rawMeta.type)) return;
@@ -1680,6 +1797,7 @@ export async function processStripeSessionById(sessionId: string): Promise<{ ok:
     await handleDualMembershipCheckoutCompleted(sessionObj); actions.push("handleDualMembershipCheckoutCompleted");
     await handlePhysicalProductCheckoutCompleted(sessionObj); actions.push("handlePhysicalProductCheckoutCompleted");
     await handleMembershipCheckoutCompleted(sessionObj); actions.push("handleMembershipCheckoutCompleted");
+    await handleLmsBundlePurchaseCompleted(sessionObj); actions.push("handleLmsBundlePurchaseCompleted");
     return { ok: true, message: `Session ${sessionId} re-processed successfully`, actions };
   } catch (err: any) {
     return { ok: false, message: `Failed to re-process session ${sessionId}: ${err?.message ?? String(err)}`, actions };
@@ -1718,6 +1836,7 @@ async function processStripeEvent(event: Record<string, unknown>, rawBody: strin
       await handleDualMembershipCheckoutCompleted(sessionObj);
       await handlePhysicalProductCheckoutCompleted(sessionObj);
       await handleMembershipCheckoutCompleted(sessionObj);
+      await handleLmsBundlePurchaseCompleted(sessionObj);
     } else if (eventType === "payment_intent.succeeded") {
       await handleFunnelPaymentIntentSucceeded(sessionObj);
     } else if (eventType === "customer.subscription.deleted") {

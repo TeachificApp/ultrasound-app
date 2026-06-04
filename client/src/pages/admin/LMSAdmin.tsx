@@ -63,6 +63,7 @@ import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { SdmsCmeConfigPanel, resolveLmsActivityType } from "@/components/admin/SdmsCmeConfigPanel";
 import { WebinarsAdmin } from "./WebinarsAdmin";
+import BundlesAdmin from "./BundlesAdmin";
 import MembershipsAdmin from "./MembershipsAdmin";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 /** Convenience alias used in LandingPageEditor */
@@ -6976,7 +6977,7 @@ export default function LMSAdmin() {
               {activeTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
               {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
               {activeTab === "webinars"    && <WebinarsAdmin />}
-              {activeTab === "bundles"     && <LMSComingSoonTab icon={Layers} title="Bundles" description="Package courses, downloads, products, and quizzes together and sell them as a single bundle at a special price." color="teal" />}
+              {activeTab === "bundles"     && <BundlesAdmin />}
               {activeTab === "memberships" && <MembershipsAdmin />}
               {activeTab === "communities" && <CommunitiesTab />}
               {activeTab === "orderbumps"  && <OrderBumpsAdmin />}

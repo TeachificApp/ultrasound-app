@@ -10,6 +10,7 @@ import { getDb } from "../db";
 import {
   bundles, bundleItems, bundleEnrollments, users,
   lmsCourses, lmsEnrollments, lmsQuizzes, digitalBundlePurchases,
+  digitalProducts, physicalProducts, webinars, sonoQuizzes,
 } from "../../drizzle/schema";
 
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80); }
@@ -48,13 +49,41 @@ export const bundlePublicRouter = router({
       const isAdmin = (ctx.user as any)?.role === "admin";
       if (bundle.status !== "published" && !input.preview && !isAdmin) throw new TRPCError({ code: "NOT_FOUND" });
       const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, bundle.id)).orderBy(asc(bundleItems.sortOrder));
+      // Enrich items with titles from their respective tables
+      const enrichedItems = await Promise.all(items.map(async (item) => {
+        let itemTitle = "";
+        let itemSlug = "";
+        try {
+          if (item.itemType === "course") {
+            const [c] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, item.itemId)).limit(1);
+            itemTitle = c?.title || "";
+            itemSlug = c?.slug || "";
+          } else if (item.itemType === "download") {
+            const [d] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug }).from(digitalProducts).where(eq(digitalProducts.id, item.itemId)).limit(1);
+            itemTitle = d?.title || "";
+            itemSlug = d?.slug || "";
+          } else if (item.itemType === "product") {
+            const [p] = await db.select({ title: physicalProducts.title, slug: physicalProducts.slug }).from(physicalProducts).where(eq(physicalProducts.id, item.itemId)).limit(1);
+            itemTitle = p?.title || "";
+            itemSlug = p?.slug || "";
+          } else if (item.itemType === "webinar") {
+            const [w] = await db.select({ title: webinars.title, slug: webinars.slug }).from(webinars).where(eq(webinars.id, item.itemId)).limit(1);
+            itemTitle = w?.title || "";
+            itemSlug = w?.slug || "";
+          } else if (item.itemType === "quiz") {
+            const [q] = await db.select({ title: sonoQuizzes.title }).from(sonoQuizzes).where(eq(sonoQuizzes.id, item.itemId)).limit(1);
+            itemTitle = q?.title || "";
+          }
+        } catch {}
+        return { ...item, itemTitle, itemSlug };
+      }));
       let isEnrolled = false;
       if ((ctx.user as any)?.id) {
         const [enr] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
           .where(and(eq(bundleEnrollments.bundleId, bundle.id), eq(bundleEnrollments.userId, (ctx.user as any).id))).limit(1);
         isEnrolled = !!enr;
       }
-      return { bundle, items, isEnrolled };
+      return { bundle, items: enrichedItems, isEnrolled };
     }),
 });
 
@@ -82,6 +111,87 @@ export const bundleLearnerRouter = router({
         }
       }
       return { success: true };
+    }),
+
+  createCheckout: protectedProcedure
+    .input(z.object({ bundleId: z.number(), pricingOptionId: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [bundle] = await db.select().from(bundles).where(eq(bundles.id, input.bundleId)).limit(1);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      // If free bundle, just enroll directly
+      if (bundle.accessType === "free") {
+        const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
+          .where(and(eq(bundleEnrollments.bundleId, input.bundleId), eq(bundleEnrollments.userId, ctx.user.id))).limit(1);
+        if (ex) return { alreadyEnrolled: true, checkoutUrl: null };
+        await db.insert(bundleEnrollments).values({ bundleId: input.bundleId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId });
+        // Auto-enroll in courses
+        const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, input.bundleId));
+        for (const item of items) {
+          if (item.itemType === "course") {
+            const [courseEnr] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+              .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, ctx.user.id))).limit(1);
+            if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId: ctx.user.id, source: "bundle" });
+          }
+        }
+        return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
+      }
+      // Paid bundle — create Stripe Checkout
+      const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
+        .where(and(eq(bundleEnrollments.bundleId, input.bundleId), eq(bundleEnrollments.userId, ctx.user.id))).limit(1);
+      if (ex) return { alreadyEnrolled: true, checkoutUrl: null };
+      // Parse pricing options
+      let pricingOptions: any[] = [];
+      try { pricingOptions = JSON.parse(bundle.pricingOptions || "[]"); } catch {}
+      const selectedOption = input.pricingOptionId
+        ? pricingOptions.find((p: any) => p.id === input.pricingOptionId)
+        : pricingOptions[0];
+      if (!selectedOption && pricingOptions.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No pricing options configured for this bundle" });
+      }
+      const price = selectedOption?.price ?? 0;
+      if (price <= 0) {
+        // Free pricing option — enroll directly
+        await db.insert(bundleEnrollments).values({ bundleId: input.bundleId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId });
+        const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, input.bundleId));
+        for (const item of items) {
+          if (item.itemType === "course") {
+            const [courseEnr] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+              .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, ctx.user.id))).limit(1);
+            if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId: ctx.user.id, source: "bundle" });
+          }
+        }
+        return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
+      }
+      const { default: Stripe } = await import("stripe");
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-12-18.acacia" as any });
+      const origin = ctx.req.headers.origin || "https://app.allaboutultrasound.com";
+      const isSubscription = selectedOption?.type === "subscription";
+      const session = await stripe.checkout.sessions.create({
+        mode: isSubscription ? "subscription" : "payment",
+        customer_email: ctx.user.email || undefined,
+        client_reference_id: ctx.user.id.toString(),
+        allow_promotion_codes: true,
+        metadata: {
+          user_id: ctx.user.id.toString(),
+          bundle_id: input.bundleId.toString(),
+          pricing_option_id: input.pricingOptionId || "",
+          purchase_type: "bundle_purchase",
+        },
+        line_items: [{
+          price_data: {
+            currency: "usd",
+            product_data: { name: bundle.title, description: `Bundle: ${bundle.title}` },
+            unit_amount: Math.round(price * 100),
+            ...(isSubscription ? { recurring: { interval: selectedOption?.interval || "month" } } : {}),
+          },
+          quantity: 1,
+        }],
+        success_url: `${origin}/bundles/${bundle.slug}?success=1`,
+        cancel_url: `${origin}/bundles/${bundle.slug}?cancelled=1`,
+        ...(isSubscription ? {} : { payment_intent_data: { metadata: { user_id: ctx.user.id.toString(), bundle_id: input.bundleId.toString(), purchase_type: "bundle_purchase" } } }),
+      });
+      return { alreadyEnrolled: false, checkoutUrl: session.url, enrolled: false };
     }),
 
   myBundles: protectedProcedure.query(async ({ ctx }) => {
@@ -251,4 +361,18 @@ export const bundleAdminRouter = router({
       await db.delete(bundleEnrollments).where(eq(bundleEnrollments.id, input.enrollmentId));
       return { success: true };
     }),
+
+  listAvailableItems: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return { courses: [], downloads: [], products: [], webinars: [], quizzes: [] };
+    const [courses, downloads, products, webinarRows, quizzes] = await Promise.all([
+      db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, status: lmsCourses.status }).from(lmsCourses).where(eq(lmsCourses.status, "public")).orderBy(desc(lmsCourses.createdAt)),
+      db.select({ id: digitalProducts.id, title: digitalProducts.title, status: digitalProducts.status }).from(digitalProducts).orderBy(desc(digitalProducts.createdAt)),
+      db.select({ id: physicalProducts.id, title: physicalProducts.title, status: physicalProducts.status }).from(physicalProducts).orderBy(desc(physicalProducts.createdAt)),
+      db.select({ id: webinars.id, title: webinars.title, status: webinars.status }).from(webinars).orderBy(desc(webinars.createdAt)),
+      db.select({ id: sonoQuizzes.id, title: sonoQuizzes.title, status: sonoQuizzes.status }).from(sonoQuizzes).orderBy(desc(sonoQuizzes.createdAt)),
+    ]);
+    return { courses, downloads, products, webinars: webinarRows, quizzes };
+  }),
 });
