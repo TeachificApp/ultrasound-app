@@ -8,7 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -119,7 +119,7 @@ function CommentThread({ postId, isOpen, onClose }: { postId: number; isOpen: bo
                   {c.author?.credentials && <span className="text-xs text-teal-600 font-medium">{c.author.credentials}</span>}
                   <span className="text-xs text-gray-400 ml-auto">{timeAgo(c.createdAt)}</span>
                 </div>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.body}</p>
+                {c.body && (c.body.startsWith('<') ? <RichTextDisplay content={c.body} className="text-sm text-gray-700" /> : <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.body}</p>)}
               </div>
             </div>
           ))}
@@ -132,23 +132,17 @@ function CommentThread({ postId, isOpen, onClose }: { postId: number; isOpen: bo
         <div className="flex gap-3 mt-4">
           <AuthorAvatar author={user} />
           <div className="flex-1 flex gap-2">
-            <Textarea
+            <RichTextEditor
               value={body}
-              onChange={e => setBody(e.target.value)}
+              onChange={setBody}
               placeholder="Add a comment…"
-              className="min-h-[60px] resize-none text-sm"
-              onKeyDown={e => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  if (body.trim()) addComment.mutate({ postId, body: body.trim() });
-                }
-              }}
+              minHeight={60}
             />
             <Button
               size="sm"
               className="self-end bg-teal-600 hover:bg-teal-700"
-              disabled={!body.trim() || addComment.isPending}
-              onClick={() => addComment.mutate({ postId, body: body.trim() })}
+              disabled={!body || addComment.isPending}
+              onClick={() => addComment.mutate({ postId, body })}
             >
               <Send className="w-4 h-4" />
             </Button>
@@ -258,7 +252,7 @@ function PostCard({ post, isAdmin, communityId }: { post: any; isAdmin: boolean;
 
         {/* Content */}
         {post.title && <h3 className="font-semibold text-gray-900 mb-2">{post.title}</h3>}
-        <p className="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">{post.body}</p>
+        {post.body && (post.body.startsWith('<') ? <RichTextDisplay content={post.body} className="text-gray-700 text-sm leading-relaxed" /> : <p className="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">{post.body}</p>)}
 
         {/* Attachments */}
         {attachments.length > 0 && (
@@ -379,12 +373,11 @@ function CreatePostBox({ communityId, channelId, onPosted }: { communityId: numb
                   placeholder="Title (optional)"
                   className="mb-2 text-sm"
                 />
-                <Textarea
+                <RichTextEditor
                   value={body}
-                  onChange={e => setBody(e.target.value)}
+                  onChange={setBody}
                   placeholder="Share a case, ask a question, or start a discussion… Use #hashtags to categorize."
-                  className="min-h-[100px] resize-none text-sm"
-                  autoFocus
+                  minHeight={100}
                 />
               </div>
             </div>
@@ -430,7 +423,7 @@ function CreatePostBox({ communityId, channelId, onPosted }: { communityId: numb
               </Button>
               <div className="ml-auto flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => { setExpanded(false); setBody(""); setTitle(""); }}>Cancel</Button>
-                <Button size="sm" className="bg-teal-600 hover:bg-teal-700" disabled={!body.trim() || createPost.isPending || uploadImage.isPending} onClick={handleSubmit}>
+                <Button size="sm" className="bg-teal-600 hover:bg-teal-700" disabled={!body || createPost.isPending || uploadImage.isPending} onClick={handleSubmit}>
                   {createPost.isPending ? "Posting…" : "Post"}
                 </Button>
               </div>

@@ -4612,3 +4612,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CTA Action Picker: add Landing Page option (shows all course landing pages, links to learn.allaboutultrasound.com/courses/:slug)
 - [x] CTA Action Picker: add Funnel Page option (shows all funnels with their step pages, links to /:funnelSlug/:pageSlug)
 - [x] Wire landing_page and funnel_page behaviors in PublicFunnelPage.tsx (all CTA blocks: hero, pricing_cta, cta_standalone, pricing cards, urgency_offer, image, product_offer_stack)
+
+## Rich Text in Discussions (Jun 2026)
+- [ ] Install Tiptap editor packages (@tiptap/react, @tiptap/starter-kit, @tiptap/extension-link, @tiptap/extension-placeholder)
+- [ ] Build shared RichTextEditor component (toolbar: bold, italic, link, bullet list, ordered list)
+- [ ] Build shared RichTextRenderer component (renders stored HTML safely)
+- [ ] Wire RichTextEditor into cohort discussion post composer and reply composer
+- [ ] Wire RichTextRenderer into cohort discussion post and reply display
+- [ ] Wire RichTextEditor into community discussion post composer and reply composer
+- [ ] Wire RichTextRenderer into community discussion post and reply display
+
+## Rich Text in Discussions (Jun 2026)
+- [x] Install Tiptap rich text editor packages
+- [x] Wire RichTextEditor into cohort discussion composer (CourseOverview.tsx)
+- [x] Render cohort discussion messages with RichTextDisplay (HTML-aware, fallback to plain text)
+- [x] Wire RichTextEditor into community post composer (CommunityFeed.tsx CreatePostBox)
+- [x] Wire RichTextEditor into community comment composer (CommunityFeed.tsx CommentThread)
+- [x] Render community post bodies with RichTextDisplay (HTML-aware, fallback to plain text)
+- [x] Render community comment bodies with RichTextDisplay (HTML-aware, fallback to plain text)

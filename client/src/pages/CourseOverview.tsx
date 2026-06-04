@@ -11,7 +11,7 @@
  *   - Admin: "Edit Overview" button to open the block editor
  */
 import { useState, useEffect } from "react";
-import { RichTextDisplay } from "@/components/RichTextEditor";
+import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { useParams, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -944,7 +944,7 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
               </div>
               {/* Post composer */}
               <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                <textarea value={discBody} onChange={e => setDiscBody(e.target.value)} placeholder="Share something with your cohort..." className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" rows={3} />
+                <RichTextEditor value={discBody} onChange={setDiscBody} placeholder="Share something with your cohort..." minHeight={80} />
                 {discMedia.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {discMedia.map((m, i) => (
@@ -960,7 +960,7 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
                     {discUploading ? 'Uploading...' : '+ Add Image/Video'}
                     <input type="file" accept="image/*,video/*" className="hidden" disabled={discUploading} onChange={e => { if (e.target.files?.[0]) handleDiscMediaUpload(e.target.files[0]); e.target.value = ''; }} />
                   </label>
-                  <button disabled={(!discBody.trim() && discMedia.length === 0) || postDisc.isPending} onClick={() => postDisc.mutate({ courseId, body: discBody.trim() || undefined, mediaUrls: discMedia.length > 0 ? discMedia : undefined })} className="ml-auto px-4 py-1.5 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                  <button disabled={((!discBody.trim() || discBody === '<p></p>') && discMedia.length === 0) || postDisc.isPending} onClick={() => postDisc.mutate({ courseId, body: (discBody && discBody !== '<p></p>') ? discBody : undefined, mediaUrls: discMedia.length > 0 ? discMedia : undefined })} className="ml-auto px-4 py-1.5 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
                     {postDisc.isPending ? 'Posting...' : 'Post'}
                   </button>
                 </div>
@@ -988,7 +988,7 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
                         <button onClick={() => { if (confirm('Delete your message?')) deleteDisc.mutate({ id: msg.id, courseId }); }} className="text-xs text-red-400 hover:underline">Delete</button>
                       )}
                     </div>
-                    {msg.body && <p className="text-sm text-gray-700 whitespace-pre-wrap">{msg.body}</p>}
+                    {msg.body && (msg.body.startsWith('<') ? <RichTextDisplay content={msg.body} className="text-sm text-gray-700" /> : <p className="text-sm text-gray-700 whitespace-pre-wrap">{msg.body}</p>)}
                     {(msg.mediaUrls as any[])?.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {(msg.mediaUrls as any[]).map((m: any, i: number) => (
