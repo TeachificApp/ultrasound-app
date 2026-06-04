@@ -9961,18 +9961,39 @@ function GlobalUnassignedPanel({ unassignedStudents, cohortGroups, courseId, onA
 function CurriculumEmbedTab({ course }: { course: any }) {
   const baseUrl = window.location.origin;
   const slug = course.slug ?? "";
+
+  // ── Shared options ──────────────────────────────────────────────────────────
   const [accentColor, setAccentColor] = useState("#14b8a6");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [ctaUrl, setCtaUrl] = useState(`${baseUrl}/checkout/${slug}`);
   const [ctaLabel, setCtaLabel] = useState("Enroll Now");
-  const [showCta, setShowCta] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const iframeSrc = `${baseUrl}/embed/curriculum/${slug}?accent=${encodeURIComponent(accentColor)}&theme=${theme}&ctaUrl=${encodeURIComponent(ctaUrl)}&ctaLabel=${encodeURIComponent(ctaLabel)}&cta=${showCta ? "1" : "0"}`;
+  // ── Curriculum accordion options ────────────────────────────────────────────
+  const [showCta, setShowCta] = useState(true);
 
-  const iframeEmbed = `<iframe\n  src="${iframeSrc}"\n  style="width:100%;border:none;min-height:400px;"\n  scrolling="no"\n  frameborder="0"\n  allowtransparency="true"\n  title="${course.title} — Curriculum"\n></iframe>`;
+  // ── CTA card options ────────────────────────────────────────────────────────
+  const [ctaLayout, setCtaLayout] = useState<"vertical" | "horizontal">("vertical");
+  const [showImage, setShowImage] = useState(true);
+  const [showPrice, setShowPrice] = useState(true);
+  const [showMeta, setShowMeta] = useState(true);
+  const [customImageUrl, setCustomImageUrl] = useState("");
+  const [customTitle, setCustomTitle] = useState("");
+  const [customSubtitle, setCustomSubtitle] = useState("");
 
-  const scriptEmbed = `<div\n  data-curriculum-embed="${slug}"\n  data-accent="${accentColor}"\n  data-theme="${theme}"\n  data-cta-url="${ctaUrl}"\n  data-cta-label="${ctaLabel}"\n  data-cta="${showCta ? "1" : "0"}"\n  data-base-url="${baseUrl}"\n></div>\n<script src="${baseUrl}/embed/curriculum.js" async><\/script>`;
+  // ── Derived URLs ────────────────────────────────────────────────────────────
+  const accordionSrc = `${baseUrl}/embed/curriculum/${slug}?accent=${encodeURIComponent(accentColor)}&theme=${theme}&ctaUrl=${encodeURIComponent(ctaUrl)}&ctaLabel=${encodeURIComponent(ctaLabel)}&cta=${showCta ? "1" : "0"}`;
+
+  const ctaCardSrc = `${baseUrl}/embed/curriculum-cta/${slug}?accent=${encodeURIComponent(accentColor)}&theme=${theme}&ctaUrl=${encodeURIComponent(ctaUrl)}&ctaLabel=${encodeURIComponent(ctaLabel)}&layout=${ctaLayout}&showImage=${showImage ? "1" : "0"}&showPrice=${showPrice ? "1" : "0"}&showMeta=${showMeta ? "1" : "0"}&imageUrl=${encodeURIComponent(customImageUrl)}&title=${encodeURIComponent(customTitle)}&subtitle=${encodeURIComponent(customSubtitle)}`;
+
+  // ── Embed code strings ──────────────────────────────────────────────────────
+  const accordionIframeEmbed = `<iframe\n  src="${accordionSrc}"\n  style="width:100%;border:none;min-height:400px;"\n  scrolling="no"\n  frameborder="0"\n  allowtransparency="true"\n  title="${course.title} — Curriculum"\n></iframe>`;
+
+  const accordionScriptEmbed = `<div\n  data-curriculum-embed="${slug}"\n  data-accent="${accentColor}"\n  data-theme="${theme}"\n  data-cta-url="${ctaUrl}"\n  data-cta-label="${ctaLabel}"\n  data-cta="${showCta ? "1" : "0"}"\n  data-base-url="${baseUrl}"\n></div>\n<script src="${baseUrl}/embed/curriculum.js" async><\/script>`;
+
+  const ctaCardIframeEmbed = `<iframe\n  src="${ctaCardSrc}"\n  style="width:100%;border:none;min-height:${ctaLayout === "horizontal" ? "140" : "320"}px;"\n  scrolling="no"\n  frameborder="0"\n  allowtransparency="true"\n  title="${course.title}"\n></iframe>`;
+
+  const ctaCardScriptEmbed = `<div\n  data-cta-card-embed="${slug}"\n  data-accent="${accentColor}"\n  data-theme="${theme}"\n  data-cta-url="${ctaUrl}"\n  data-cta-label="${ctaLabel}"\n  data-layout="${ctaLayout}"\n  data-show-image="${showImage ? "1" : "0"}"\n  data-show-price="${showPrice ? "1" : "0"}"\n  data-show-meta="${showMeta ? "1" : "0"}"${customImageUrl ? `\n  data-image-url="${customImageUrl}"` : ""}${customTitle ? `\n  data-title="${customTitle}"` : ""}${customSubtitle ? `\n  data-subtitle="${customSubtitle}"` : ""}\n  data-base-url="${baseUrl}"\n></div>\n<script src="${baseUrl}/embed/curriculum-cta.js" async><\/script>`;
 
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -9981,70 +10002,75 @@ function CurriculumEmbedTab({ course }: { course: any }) {
     });
   };
 
+  // ── Shared options panel ────────────────────────────────────────────────────
+  const SharedOptions = (
+    <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium text-gray-700">Accent Color</Label>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={accentColor}
+            onChange={e => setAccentColor(e.target.value)}
+            className="h-8 w-12 rounded border border-gray-200 cursor-pointer p-0.5"
+          />
+          <Input
+            value={accentColor}
+            onChange={e => setAccentColor(e.target.value)}
+            className="h-8 text-xs font-mono flex-1"
+            placeholder="#14b8a6"
+          />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium text-gray-700">Theme</Label>
+        <Select value={theme} onValueChange={(v: "light" | "dark") => setTheme(v)}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="light">Light</SelectItem>
+            <SelectItem value="dark">Dark</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium text-gray-700">Button URL</Label>
+        <Input
+          value={ctaUrl}
+          onChange={e => setCtaUrl(e.target.value)}
+          className="h-8 text-xs"
+          placeholder="https://..."
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium text-gray-700">Button Label</Label>
+        <Input
+          value={ctaLabel}
+          onChange={e => setCtaLabel(e.target.value)}
+          className="h-8 text-xs"
+          placeholder="Enroll Now"
+        />
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+
+      {/* ── Section 1: Curriculum Accordion ── */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-base font-semibold text-gray-900 mb-1">Curriculum Embed Widget</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-1">Curriculum Accordion Embed</h3>
         <p className="text-sm text-gray-500 mb-5">
-          Embed the course curriculum accordion on any external website — a Kajabi page, Squarespace, WordPress, Webflow, or plain HTML.
-          The widget is fully self-contained, auto-resizes, and requires no login.
+          Embed the full course curriculum accordion on any external website. Fully self-contained, auto-resizes, no login required.
         </p>
 
-        {/* Options */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-700">Accent Color</Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={accentColor}
-                onChange={e => setAccentColor(e.target.value)}
-                className="h-8 w-12 rounded border border-gray-200 cursor-pointer p-0.5"
-              />
-              <Input
-                value={accentColor}
-                onChange={e => setAccentColor(e.target.value)}
-                className="h-8 text-xs font-mono flex-1"
-                placeholder="#14b8a6"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-700">Theme</Label>
-            <Select value={theme} onValueChange={(v: "light" | "dark") => setTheme(v)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">Light</SelectItem>
-                <SelectItem value="dark">Dark</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-700">CTA Button URL</Label>
-            <Input
-              value={ctaUrl}
-              onChange={e => setCtaUrl(e.target.value)}
-              className="h-8 text-xs"
-              placeholder="https://..."
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-700">CTA Button Label</Label>
-            <div className="flex items-center gap-3">
-              <Input
-                value={ctaLabel}
-                onChange={e => setCtaLabel(e.target.value)}
-                className="h-8 text-xs flex-1"
-                placeholder="Enroll Now"
-              />
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Switch checked={showCta} onCheckedChange={setShowCta} />
-                <span className="text-xs text-gray-500">{showCta ? "Show" : "Hide"}</span>
-              </div>
-            </div>
-          </div>
+        {SharedOptions}
+
+        {/* Accordion-specific: show/hide CTA */}
+        <div className="flex items-center gap-3 mb-6">
+          <Switch checked={showCta} onCheckedChange={setShowCta} />
+          <span className="text-xs text-gray-600">Show enroll button below accordion</span>
         </div>
 
         {/* Live preview */}
@@ -10052,85 +10078,163 @@ function CurriculumEmbedTab({ course }: { course: any }) {
           <p className="text-xs font-medium text-gray-600 mb-2">Live Preview</p>
           <div className="rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
             <iframe
-              src={iframeSrc}
+              src={accordionSrc}
               style={{ width: "100%", border: "none", minHeight: 320, display: "block" }}
-              title="Curriculum preview"
+              title="Curriculum accordion preview"
             />
           </div>
-          <p className="text-xs text-gray-400 mt-1">Preview updates as you change options above.</p>
         </div>
 
         {/* Embed codes */}
         <div className="space-y-4">
-          {/* Script tag */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <p className="text-xs font-semibold text-gray-800">Script Tag (Recommended)</p>
-                <p className="text-xs text-gray-500">Paste before the closing &lt;/body&gt; tag. Auto-resizes the iframe.</p>
+                <p className="text-xs text-gray-500">Paste before &lt;/body&gt;. Auto-resizes.</p>
               </div>
-              <Button
-                size="sm" variant="outline" className="h-7 text-xs shrink-0"
-                onClick={() => copy(scriptEmbed, "script")}
-              >
-                <Copy className="h-3 w-3 mr-1" />
-                {copied === "script" ? "Copied!" : "Copy"}
+              <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => copy(accordionScriptEmbed, "acc-script")}>
+                <Copy className="h-3 w-3 mr-1" />{copied === "acc-script" ? "Copied!" : "Copy"}
               </Button>
             </div>
-            <textarea
-              readOnly
-              value={scriptEmbed}
-              rows={6}
-              className="w-full text-xs font-mono bg-white border border-gray-200 rounded p-2 resize-none focus:outline-none"
-            />
+            <textarea readOnly value={accordionScriptEmbed} rows={6} className="w-full text-xs font-mono bg-white border border-gray-200 rounded p-2 resize-none focus:outline-none" />
           </div>
-
-          {/* Direct iframe */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <p className="text-xs font-semibold text-gray-800">Direct &lt;iframe&gt;</p>
-                <p className="text-xs text-gray-500">Use when script tags are not allowed (e.g. Kajabi, Squarespace).</p>
+                <p className="text-xs text-gray-500">For Kajabi, Squarespace, and platforms that block script tags.</p>
               </div>
-              <Button
-                size="sm" variant="outline" className="h-7 text-xs shrink-0"
-                onClick={() => copy(iframeEmbed, "iframe")}
-              >
-                <Copy className="h-3 w-3 mr-1" />
-                {copied === "iframe" ? "Copied!" : "Copy"}
+              <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => copy(accordionIframeEmbed, "acc-iframe")}>
+                <Copy className="h-3 w-3 mr-1" />{copied === "acc-iframe" ? "Copied!" : "Copy"}
               </Button>
             </div>
-            <textarea
-              readOnly
-              value={iframeEmbed}
-              rows={8}
-              className="w-full text-xs font-mono bg-white border border-gray-200 rounded p-2 resize-none focus:outline-none"
-            />
+            <textarea readOnly value={accordionIframeEmbed} rows={8} className="w-full text-xs font-mono bg-white border border-gray-200 rounded p-2 resize-none focus:outline-none" />
           </div>
-
-          {/* JSON data endpoint */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <p className="text-xs font-semibold text-gray-800">JSON Data Endpoint</p>
-                <p className="text-xs text-gray-500">Use this to build a fully custom UI with your own styles.</p>
+                <p className="text-xs text-gray-500">Build a fully custom UI with your own styles.</p>
               </div>
-              <Button
-                size="sm" variant="outline" className="h-7 text-xs shrink-0"
-                onClick={() => copy(`${baseUrl}/api/curriculum-embed/data?courseSlug=${slug}`, "json")}
-              >
-                <Copy className="h-3 w-3 mr-1" />
-                {copied === "json" ? "Copied!" : "Copy"}
+              <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => copy(`${baseUrl}/api/curriculum-embed/data?courseSlug=${slug}`, "json")}>
+                <Copy className="h-3 w-3 mr-1" />{copied === "json" ? "Copied!" : "Copy"}
               </Button>
             </div>
-            <Input
-              readOnly
-              value={`${baseUrl}/api/curriculum-embed/data?courseSlug=${slug}`}
-              className="h-8 text-xs font-mono bg-white"
-            />
+            <Input readOnly value={`${baseUrl}/api/curriculum-embed/data?courseSlug=${slug}`} className="h-8 text-xs font-mono bg-white" />
           </div>
         </div>
       </div>
+
+      {/* ── Section 2: CTA Card ── */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">CTA Card Embed</h3>
+        <p className="text-sm text-gray-500 mb-5">
+          A compact promotional card with course image, title, price, and an enroll button. Great for sidebars, blog posts, or email landing pages.
+        </p>
+
+        {SharedOptions}
+
+        {/* CTA card-specific options */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">Layout</Label>
+            <Select value={ctaLayout} onValueChange={(v: "vertical" | "horizontal") => setCtaLayout(v)}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vertical">Vertical (image on top)</SelectItem>
+                <SelectItem value="horizontal">Horizontal (image on left)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">Custom Image URL <span className="text-gray-400">(optional)</span></Label>
+            <Input
+              value={customImageUrl}
+              onChange={e => setCustomImageUrl(e.target.value)}
+              className="h-8 text-xs"
+              placeholder={course.coverImageUrl ? "Leave blank to use course cover" : "https://..."}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">Custom Title <span className="text-gray-400">(optional)</span></Label>
+            <Input
+              value={customTitle}
+              onChange={e => setCustomTitle(e.target.value)}
+              className="h-8 text-xs"
+              placeholder={course.title}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">Custom Subtitle <span className="text-gray-400">(optional)</span></Label>
+            <Input
+              value={customSubtitle}
+              onChange={e => setCustomSubtitle(e.target.value)}
+              className="h-8 text-xs"
+              placeholder={course.subtitle ?? "Short description..."}
+            />
+          </div>
+        </div>
+
+        {/* Toggles */}
+        <div className="flex flex-wrap gap-5 mb-6">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Switch checked={showImage} onCheckedChange={setShowImage} />
+            <span className="text-xs text-gray-600">Show image</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Switch checked={showPrice} onCheckedChange={setShowPrice} />
+            <span className="text-xs text-gray-600">Show price</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Switch checked={showMeta} onCheckedChange={setShowMeta} />
+            <span className="text-xs text-gray-600">Show lesson/duration stats</span>
+          </label>
+        </div>
+
+        {/* Live preview */}
+        <div className="mb-6">
+          <p className="text-xs font-medium text-gray-600 mb-2">Live Preview</p>
+          <div className="rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
+            <iframe
+              src={ctaCardSrc}
+              style={{ width: "100%", border: "none", minHeight: ctaLayout === "horizontal" ? 160 : 340, display: "block" }}
+              title="CTA card preview"
+            />
+          </div>
+        </div>
+
+        {/* Embed codes */}
+        <div className="space-y-4">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Script Tag (Recommended)</p>
+                <p className="text-xs text-gray-500">Paste before &lt;/body&gt;. Auto-resizes.</p>
+              </div>
+              <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => copy(ctaCardScriptEmbed, "cta-script")}>
+                <Copy className="h-3 w-3 mr-1" />{copied === "cta-script" ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+            <textarea readOnly value={ctaCardScriptEmbed} rows={8} className="w-full text-xs font-mono bg-white border border-gray-200 rounded p-2 resize-none focus:outline-none" />
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Direct &lt;iframe&gt;</p>
+                <p className="text-xs text-gray-500">For platforms that block script tags.</p>
+              </div>
+              <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => copy(ctaCardIframeEmbed, "cta-iframe")}>
+                <Copy className="h-3 w-3 mr-1" />{copied === "cta-iframe" ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+            <textarea readOnly value={ctaCardIframeEmbed} rows={7} className="w-full text-xs font-mono bg-white border border-gray-200 rounded p-2 resize-none focus:outline-none" />
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

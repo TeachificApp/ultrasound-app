@@ -1,12 +1,14 @@
 /**
  * curriculumEmbedRoutes.ts
  *
- * Public CORS-open endpoints for the embeddable course curriculum widget.
+ * Public CORS-open endpoints for embeddable course widgets.
  *
  * Routes:
  *   GET /api/curriculum-embed/data?courseSlug=<slug>   — JSON curriculum data
- *   GET /embed/curriculum/<slug>                        — self-contained iframe HTML page
- *   GET /embed/curriculum.js                            — JS loader snippet (optional script-tag approach)
+ *   GET /embed/curriculum/<slug>                        — curriculum accordion iframe page
+ *   GET /embed/curriculum-cta/<slug>                    — CTA card iframe page (image + title + price + button)
+ *   GET /embed/curriculum.js                            — JS loader (curriculum accordion)
+ *   GET /embed/curriculum-cta.js                        — JS loader (CTA card)
  */
 import type { Express, Request, Response } from "express";
 import { getDb } from "../db";
@@ -17,6 +19,11 @@ function setCors(res: Response) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+function setFrameable(res: Response) {
+  res.setHeader("X-Frame-Options", "ALLOWALL");
+  res.setHeader("Content-Security-Policy", "frame-ancestors *");
 }
 
 /** Fetch curriculum data for a course by slug */
@@ -71,7 +78,6 @@ async function getCurriculumData(slug: string) {
     })
   );
 
-  // Drop sections with no published lessons
   const filteredSections = sectionsWithLessons.filter((s) => s.lessons.length > 0);
 
   const totalLessons = filteredSections.reduce((n, s) => n + s.lessons.length, 0);
@@ -96,7 +102,15 @@ async function getCurriculumData(slug: string) {
   };
 }
 
-/** Build the self-contained iframe HTML */
+function escHtml(s: string | null | undefined): string {
+  return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function escAttr(s: string | null | undefined): string {
+  return (s ?? "").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// ─── Curriculum Accordion iframe ─────────────────────────────────────────────
+
 function buildIframeHtml(data: NonNullable<Awaited<ReturnType<typeof getCurriculumData>>>, opts: {
   accentColor: string;
   ctaUrl: string;
@@ -242,12 +256,10 @@ function toggleSection(btn) {
     chevron.style.transform = 'rotate(90deg)';
     btn.setAttribute('aria-expanded', 'true');
   }
-  // Notify parent of height change for auto-resize
   if (window.parent !== window) {
     window.parent.postMessage({ type: 'curriculum-resize', height: document.body.scrollHeight }, '*');
   }
 }
-// Auto-resize on load
 window.addEventListener('load', function() {
   if (window.parent !== window) {
     window.parent.postMessage({ type: 'curriculum-resize', height: document.body.scrollHeight }, '*');
@@ -258,66 +270,117 @@ window.addEventListener('load', function() {
 </html>`;
 }
 
-function escHtml(s: string | null | undefined): string {
-  return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// ─── CTA Card iframe ──────────────────────────────────────────────────────────
+
+function buildCtaCardHtml(data: NonNullable<Awaited<ReturnType<typeof getCurriculumData>>>, opts: {
+  accentColor: string;
+  ctaUrl: string;
+  ctaLabel: string;
+  showImage: boolean;
+  showPrice: boolean;
+  showMeta: boolean;
+  customTitle: string;
+  customSubtitle: string;
+  theme: "light" | "dark";
+  layout: "horizontal" | "vertical";
+  imageUrl: string; // override image URL (empty = use course cover)
+}) {
+  const { accentColor, ctaUrl, ctaLabel, showImage, showPrice, showMeta, customTitle, customSubtitle, theme, layout, imageUrl } = opts;
+
+  const isDark = theme === "dark";
+  const bg = isDark ? "#0f172a" : "#ffffff";
+  const cardBg = isDark ? "#1e293b" : "#f8fafc";
+  const border = isDark ? "#334155" : "#e2e8f0";
+  const text = isDark ? "#f1f5f9" : "#1e293b";
+  const subtext = isDark ? "#94a3b8" : "#64748b";
+
+  const displayTitle = customTitle || data.title;
+  const displaySubtitle = customSubtitle || data.subtitle || "";
+
+  const resolvedImageUrl = imageUrl || data.coverImageUrl || "";
+
+  const priceStr = data.isFree
+    ? "Free"
+    : data.pricingType === "subscription"
+      ? `$${Number(data.price ?? 0).toFixed(2)}/mo`
+      : `$${Number(data.price ?? 0).toFixed(2)}`;
+
+  const totalHours = data.totalMinutes >= 60
+    ? `${Math.floor(data.totalMinutes / 60)}h ${data.totalMinutes % 60}m`
+    : data.totalMinutes > 0 ? `${data.totalMinutes}m` : null;
+
+  const metaHtml = showMeta ? `
+    <div class="meta">
+      <span class="meta-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        ${data.totalLessons} lesson${data.totalLessons !== 1 ? "s" : ""}
+      </span>
+      ${totalHours ? `<span class="meta-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        ${totalHours}
+      </span>` : ""}
+      <span class="meta-item">${data.sections.length} section${data.sections.length !== 1 ? "s" : ""}</span>
+    </div>` : "";
+
+  const priceHtml = showPrice ? `<div class="price">${escHtml(priceStr)}</div>` : "";
+
+  const imageHtml = showImage && resolvedImageUrl
+    ? `<div class="img-wrap"><img src="${escAttr(resolvedImageUrl)}" alt="${escAttr(displayTitle)}" class="course-img" /></div>`
+    : "";
+
+  const isHorizontal = layout === "horizontal";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escHtml(displayTitle)}</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;background:transparent;color:${text};line-height:1.5}
+body{padding:12px;overflow-x:hidden}
+.card{background:${cardBg};border:1px solid ${border};border-radius:12px;overflow:hidden;display:${isHorizontal ? "flex" : "block"};align-items:stretch;gap:0}
+.img-wrap{${isHorizontal ? "width:200px;flex-shrink:0;" : "width:100%;"}overflow:hidden}
+.course-img{width:100%;height:${isHorizontal ? "100%" : "200px"};object-fit:cover;display:block}
+.body{padding:18px;flex:1;display:flex;flex-direction:column;gap:10px}
+.title{font-size:${isHorizontal ? "16px" : "18px"};font-weight:700;color:${text};line-height:1.3}
+.subtitle{font-size:13px;color:${subtext};line-height:1.5}
+.meta{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:${subtext}}
+.meta-item{display:flex;align-items:center;gap:4px}
+.price{font-size:${isHorizontal ? "18px" : "22px"};font-weight:800;color:${accentColor}}
+.cta-btn{display:inline-block;padding:${isHorizontal ? "9px 20px" : "12px 28px"};border-radius:7px;background:${accentColor};color:#fff;font-weight:600;font-size:${isHorizontal ? "13px" : "15px"};text-decoration:none;text-align:center;transition:opacity 0.15s;width:${isHorizontal ? "auto" : "100%"}}
+.cta-btn:hover{opacity:0.88}
+.bottom-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:auto}
+</style>
+</head>
+<body>
+<div class="card">
+  ${imageHtml}
+  <div class="body">
+    <div class="title">${escHtml(displayTitle)}</div>
+    ${displaySubtitle ? `<div class="subtitle">${escHtml(displaySubtitle)}</div>` : ""}
+    ${metaHtml}
+    <div class="bottom-row">
+      ${priceHtml}
+      ${ctaUrl ? `<a href="${escAttr(ctaUrl)}" target="_blank" rel="noopener" class="cta-btn">${escHtml(ctaLabel || "Enroll Now")}</a>` : ""}
+    </div>
+  </div>
+</div>
+<script>
+window.addEventListener('load', function() {
+  if (window.parent !== window) {
+    window.parent.postMessage({ type: 'cta-card-resize', height: document.body.scrollHeight }, '*');
+  }
+});
+</script>
+</body>
+</html>`;
 }
-function escAttr(s: string | null | undefined): string {
-  return (s ?? "").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
 
-export function registerCurriculumEmbedRoutes(app: Express) {
-  // CORS preflight
-  app.options("/api/curriculum-embed/data", (_req, res) => { setCors(res); res.sendStatus(204); });
-  app.options("/embed/curriculum/:slug", (_req, res) => { setCors(res); res.sendStatus(204); });
+// ─── JS loaders ──────────────────────────────────────────────────────────────
 
-  // JSON data endpoint
-  app.get("/api/curriculum-embed/data", async (req: Request, res: Response) => {
-    setCors(res);
-    try {
-      const slug = String(req.query.courseSlug ?? "").trim();
-      if (!slug) { res.status(400).json({ error: "Missing courseSlug" }); return; }
-      const data = await getCurriculumData(slug);
-      if (!data) { res.status(404).json({ error: "Course not found or not public" }); return; }
-      res.json(data);
-    } catch (e: any) {
-      res.status(500).json({ error: e.message ?? "Server error" });
-    }
-  });
-
-  // Self-contained iframe page
-  app.get("/embed/curriculum/:slug", async (req: Request, res: Response) => {
-    setCors(res);
-    try {
-      const slug = req.params.slug;
-      const accentColor = String(req.query.accent ?? "#14b8a6");
-      const ctaUrl = String(req.query.ctaUrl ?? "");
-      const ctaLabel = String(req.query.ctaLabel ?? "Enroll Now");
-      const showCta = req.query.cta !== "0" && req.query.cta !== "false";
-      const theme = req.query.theme === "dark" ? "dark" : "light";
-
-      const data = await getCurriculumData(slug);
-      if (!data) {
-        res.status(404).send("<html><body style='font-family:sans-serif;padding:20px;color:#64748b'>Course not found.</body></html>");
-        return;
-      }
-
-      const html = buildIframeHtml(data, { accentColor, ctaUrl, ctaLabel, showCta, theme });
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("X-Frame-Options", "ALLOWALL");
-      res.setHeader("Content-Security-Policy", "frame-ancestors *");
-      res.send(html);
-    } catch (e: any) {
-      res.status(500).send(`<html><body>Error: ${escHtml(e.message)}</body></html>`);
-    }
-  });
-
-  // JS loader snippet — auto-sizing iframe injector
-  app.get("/embed/curriculum.js", (_req: Request, res: Response) => {
-    setCors(res);
-    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=3600");
-    res.send(`
-(function() {
+const CURRICULUM_JS_LOADER = `(function() {
   var containers = document.querySelectorAll('[data-curriculum-embed]');
   containers.forEach(function(el) {
     var slug = el.getAttribute('data-curriculum-embed');
@@ -346,7 +409,143 @@ export function registerCurriculumEmbedRoutes(app: Express) {
       }
     });
   });
-})();
-`);
+})();`;
+
+const CTA_CARD_JS_LOADER = `(function() {
+  var containers = document.querySelectorAll('[data-cta-card-embed]');
+  containers.forEach(function(el) {
+    var slug = el.getAttribute('data-cta-card-embed');
+    var accent = el.getAttribute('data-accent') || '#14b8a6';
+    var theme = el.getAttribute('data-theme') || 'light';
+    var ctaUrl = el.getAttribute('data-cta-url') || '';
+    var ctaLabel = el.getAttribute('data-cta-label') || 'Enroll Now';
+    var layout = el.getAttribute('data-layout') || 'vertical';
+    var showImage = el.getAttribute('data-show-image') !== '0' ? '1' : '0';
+    var showPrice = el.getAttribute('data-show-price') !== '0' ? '1' : '0';
+    var showMeta = el.getAttribute('data-show-meta') !== '0' ? '1' : '0';
+    var imageUrl = el.getAttribute('data-image-url') || '';
+    var customTitle = el.getAttribute('data-title') || '';
+    var customSubtitle = el.getAttribute('data-subtitle') || '';
+    var base = el.getAttribute('data-base-url') || 'https://app.allaboutultrasound.com';
+    var src = base + '/embed/curriculum-cta/' + encodeURIComponent(slug)
+      + '?accent=' + encodeURIComponent(accent)
+      + '&theme=' + encodeURIComponent(theme)
+      + '&ctaUrl=' + encodeURIComponent(ctaUrl)
+      + '&ctaLabel=' + encodeURIComponent(ctaLabel)
+      + '&layout=' + encodeURIComponent(layout)
+      + '&showImage=' + showImage
+      + '&showPrice=' + showPrice
+      + '&showMeta=' + showMeta
+      + '&imageUrl=' + encodeURIComponent(imageUrl)
+      + '&title=' + encodeURIComponent(customTitle)
+      + '&subtitle=' + encodeURIComponent(customSubtitle);
+    var iframe = document.createElement('iframe');
+    iframe.src = src;
+    iframe.style.cssText = 'width:100%;border:none;display:block;min-height:120px;';
+    iframe.setAttribute('scrolling', 'no');
+    iframe.setAttribute('frameborder', '0');
+    iframe.setAttribute('allowtransparency', 'true');
+    el.appendChild(iframe);
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'cta-card-resize' && e.source === iframe.contentWindow) {
+        iframe.style.height = (e.data.height + 8) + 'px';
+      }
+    });
+  });
+})();`;
+
+// ─── Route registration ───────────────────────────────────────────────────────
+
+export function registerCurriculumEmbedRoutes(app: Express) {
+  // CORS preflight
+  app.options("/api/curriculum-embed/data", (_req, res) => { setCors(res); res.sendStatus(204); });
+  app.options("/embed/curriculum/:slug", (_req, res) => { setCors(res); res.sendStatus(204); });
+  app.options("/embed/curriculum-cta/:slug", (_req, res) => { setCors(res); res.sendStatus(204); });
+
+  // JSON data endpoint
+  app.get("/api/curriculum-embed/data", async (req: Request, res: Response) => {
+    setCors(res);
+    try {
+      const slug = String(req.query.courseSlug ?? "").trim();
+      if (!slug) { res.status(400).json({ error: "Missing courseSlug" }); return; }
+      const data = await getCurriculumData(slug);
+      if (!data) { res.status(404).json({ error: "Course not found or not public" }); return; }
+      res.json(data);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message ?? "Server error" });
+    }
+  });
+
+  // Curriculum accordion iframe page
+  app.get("/embed/curriculum/:slug", async (req: Request, res: Response) => {
+    setCors(res);
+    setFrameable(res);
+    try {
+      const slug = req.params.slug;
+      const accentColor = String(req.query.accent ?? "#14b8a6");
+      const ctaUrl = String(req.query.ctaUrl ?? "");
+      const ctaLabel = String(req.query.ctaLabel ?? "Enroll Now");
+      const showCta = req.query.cta !== "0" && req.query.cta !== "false";
+      const theme = req.query.theme === "dark" ? "dark" : "light";
+
+      const data = await getCurriculumData(slug);
+      if (!data) {
+        res.status(404).send("<html><body style='font-family:sans-serif;padding:20px;color:#64748b'>Course not found.</body></html>");
+        return;
+      }
+
+      const html = buildIframeHtml(data, { accentColor, ctaUrl, ctaLabel, showCta, theme });
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(html);
+    } catch (e: any) {
+      res.status(500).send(`<html><body>Error: ${escHtml(e.message)}</body></html>`);
+    }
+  });
+
+  // CTA card iframe page
+  app.get("/embed/curriculum-cta/:slug", async (req: Request, res: Response) => {
+    setCors(res);
+    setFrameable(res);
+    try {
+      const slug = req.params.slug;
+      const accentColor = String(req.query.accent ?? "#14b8a6");
+      const ctaUrl = String(req.query.ctaUrl ?? "");
+      const ctaLabel = String(req.query.ctaLabel ?? "Enroll Now");
+      const theme = req.query.theme === "dark" ? "dark" : "light";
+      const layout = req.query.layout === "horizontal" ? "horizontal" : "vertical";
+      const showImage = req.query.showImage !== "0";
+      const showPrice = req.query.showPrice !== "0";
+      const showMeta = req.query.showMeta !== "0";
+      const imageUrl = String(req.query.imageUrl ?? "");
+      const customTitle = String(req.query.title ?? "");
+      const customSubtitle = String(req.query.subtitle ?? "");
+
+      const data = await getCurriculumData(slug);
+      if (!data) {
+        res.status(404).send("<html><body style='font-family:sans-serif;padding:20px;color:#64748b'>Course not found.</body></html>");
+        return;
+      }
+
+      const html = buildCtaCardHtml(data, { accentColor, ctaUrl, ctaLabel, showImage, showPrice, showMeta, customTitle, customSubtitle, theme, layout, imageUrl });
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(html);
+    } catch (e: any) {
+      res.status(500).send(`<html><body>Error: ${escHtml(e.message)}</body></html>`);
+    }
+  });
+
+  // JS loaders
+  app.get("/embed/curriculum.js", (_req: Request, res: Response) => {
+    setCors(res);
+    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(CURRICULUM_JS_LOADER);
+  });
+
+  app.get("/embed/curriculum-cta.js", (_req: Request, res: Response) => {
+    setCors(res);
+    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(CTA_CARD_JS_LOADER);
   });
 }
