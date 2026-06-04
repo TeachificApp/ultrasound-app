@@ -11,12 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle } from "lucide-react";
+import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package } from "lucide-react";
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-4 h-4" />,
   quiz: <HelpCircle className="w-4 h-4" />,
   download: <Download className="w-4 h-4" />,
+  bundle: <Package className="w-4 h-4" />,
 };
 
 const BRAND_LABELS: Record<string, string> = {
@@ -108,6 +109,70 @@ function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { cour
   );
 }
 
+function BundleCard({ bundle, enrolledBundleIds }: { bundle: any; enrolledBundleIds: Set<number> }) {
+  const pricingOptions = bundle.pricingOptions ? JSON.parse(bundle.pricingOptions) : [];
+  const lowestPrice = pricingOptions.length > 0
+    ? Math.min(...pricingOptions.map((o: any) => Number(o.price || 0)))
+    : 0;
+  const isFree = bundle.accessType === "free" || lowestPrice === 0;
+  const price = isFree ? "Free" : `$${lowestPrice.toFixed(2)}`;
+  const isOwned = enrolledBundleIds.has(bundle.id);
+
+  return (
+    <Link href={`/bundles/${bundle.slug}`}>
+      <div className="group bg-white rounded-xl border border-gray-200 hover:border-teal-400 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">
+        {/* Cover image */}
+        <div className="relative h-44 bg-gradient-to-br from-teal-100 to-cyan-100 overflow-hidden">
+          {bundle.coverImage ? (
+            <img src={bundle.coverImage} alt={bundle.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Package className="w-12 h-12 text-teal-300" />
+            </div>
+          )}
+          {/* Bundle badge overlay */}
+          <div className="absolute top-2 right-2">
+            <Badge className="bg-teal-600 text-white text-xs shadow-sm">Bundle</Badge>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 flex flex-col flex-1">
+          <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-1 group-hover:text-teal-700 transition-colors">
+            {bundle.title}
+          </h3>
+          {bundle.description && (
+            <p className="text-xs text-gray-500 line-clamp-2 mb-3">{bundle.description.replace(/<[^>]+>/g, "").slice(0, 120)}</p>
+          )}
+
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
+            <span className="text-sm font-bold text-teal-700">{price}</span>
+            <Button size="sm" variant="outline" className={`text-xs h-7 ${isOwned ? "border-green-400 text-green-700 hover:bg-green-50" : "border-teal-300 text-teal-700 hover:bg-teal-50"}`}>
+              {isOwned && <CheckCircle className="w-3 h-3 mr-1" />}
+              {isOwned ? "View Bundle" : "View Bundle"}
+            </Button>
+          </div>
+          {/* Tags */}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <Badge variant="secondary" className="bg-teal-50 text-teal-700 text-xs font-medium flex items-center gap-1">
+              <Package className="w-3 h-3" /> Bundle
+            </Badge>
+            {isFree && (
+              <Badge className="bg-green-500 text-white text-xs">Free</Badge>
+            )}
+            {bundle.brand && (
+              <Badge variant="outline" className="text-xs text-gray-500 border-gray-200">
+                {BRAND_LABELS[bundle.brand === "all_about_ultrasound" ? "aaus" : "iheartecho"] ?? bundle.brand}
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 function CourseCardSkeleton() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -138,6 +203,10 @@ export default function EducationLibrary() {
   // Fetch ownership data for smart routing (only when logged in)
   const { data: myCoursesData } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
   const { data: myPurchasesData } = trpc.downloads.myPurchases.useQuery(undefined, { enabled: !!user });
+  const { data: myBundlesData } = trpc.bundlesLearner.myBundles.useQuery(undefined, { enabled: !!user });
+
+  // Fetch published bundles
+  const { data: bundlesData } = trpc.bundles.list.useQuery({ page: 1, limit: 50 });
 
   // Set page title for SEO
   useEffect(() => {
@@ -148,6 +217,7 @@ export default function EducationLibrary() {
   // Build fast lookup sets
   const enrolledCourseIds = useMemo(() => new Set((myCoursesData ?? []).map((e: any) => e.courseId)), [myCoursesData]);
   const purchasedProductSlugs = useMemo(() => new Set((myPurchasesData ?? []).map((p: any) => p.slug)), [myPurchasesData]);
+  const enrolledBundleIds = useMemo(() => new Set((myBundlesData ?? []).map((b: any) => b.id)), [myBundlesData]);
 
   // Fetch collections for filter tabs
   const { data: collections } = trpc.lms.listCollections.useQuery();
@@ -250,6 +320,7 @@ export default function EducationLibrary() {
               <SelectItem value="course">Courses</SelectItem>
               <SelectItem value="quiz">Quizzes</SelectItem>
               <SelectItem value="download">Downloads</SelectItem>
+              <SelectItem value="bundle">Bundles</SelectItem>
             </SelectContent>
           </Select>
           <Select value={isFree} onValueChange={v => { setIsFree(v); setPage(1); }}>
@@ -274,7 +345,26 @@ export default function EducationLibrary() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {Array.from({ length: 8 }).map((_, i) => <CourseCardSkeleton key={i} />)}
           </div>
-        ) : courses.length === 0 ? (
+        ) : type === "bundle" ? (
+          // Show only bundles when bundle type is selected
+          (bundlesData?.bundles ?? []).length === 0 ? (
+            <div className="text-center py-20 text-gray-400">
+              <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-lg font-medium">No bundles found</p>
+              <p className="text-sm mt-1">Try adjusting your filters</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {(bundlesData?.bundles ?? []).filter((b: any) => {
+                if (brand !== "all" && b.brand !== (brand === "aaus" ? "all_about_ultrasound" : "iheartecho")) return false;
+                if (search && !b.title.toLowerCase().includes(search.toLowerCase())) return false;
+                if (isFree === "free" && b.accessType !== "free") return false;
+                if (isFree === "paid" && b.accessType === "free") return false;
+                return true;
+              }).map((b: any) => <BundleCard key={`bundle-${b.id}`} bundle={b} enrolledBundleIds={enrolledBundleIds} />)}
+            </div>
+          )
+        ) : courses.length === 0 && (bundlesData?.bundles ?? []).length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             {type === "quiz" ? <HelpCircle className="w-12 h-12 mx-auto mb-3 opacity-30" /> : type === "download" ? <Download className="w-12 h-12 mx-auto mb-3 opacity-30" /> : <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />}
             <p className="text-lg font-medium">No {type === "quiz" ? "quizzes" : type === "download" ? "downloads" : "courses"} found</p>
@@ -282,6 +372,15 @@ export default function EducationLibrary() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {/* Show bundles first when type is "all" */}
+            {type === "all" && (bundlesData?.bundles ?? []).filter((b: any) => {
+              if (brand !== "all" && b.brand !== (brand === "aaus" ? "all_about_ultrasound" : "iheartecho")) return false;
+              if (search && !b.title.toLowerCase().includes(search.toLowerCase())) return false;
+              if (isFree === "free" && b.accessType !== "free") return false;
+              if (isFree === "paid" && b.accessType === "free") return false;
+              return true;
+            }).map((b: any) => <BundleCard key={`bundle-${b.id}`} bundle={b} enrolledBundleIds={enrolledBundleIds} />)}
+            {/* Then courses/quizzes/downloads */}
             {courses.map((c: any) => <CourseCard key={`${c._source ?? c.type}-${c.id}`} course={c} enrolledCourseIds={enrolledCourseIds} purchasedProductSlugs={purchasedProductSlugs} />)}
           </div>
         )}

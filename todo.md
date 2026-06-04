@@ -4672,6 +4672,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add bundle checkout procedure (creates Stripe checkout session for bundle price)
 - [x] Add bundle fulfillment in webhook (on purchase: enroll user in all bundle courses, grant download access, etc.)
 - [x] Build admin Bundles panel in LMS sidebar (list, create, edit, manage items)
-- [ ] Build student-facing bundle cards in Education Library
+- [x] Build student-facing bundle cards in Education Library
 - [x] Build bundle detail/purchase page
 - [x] Wire bundle purchase to grant access to all included items
