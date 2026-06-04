@@ -41,6 +41,7 @@ import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes
 import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
 import { registerCurriculumEmbedRoutes } from "../routes/curriculumEmbedRoutes";
 import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
+import { sdmsCmeDailySummaryHandler } from "../routes/sdmsCmeDailySummary";
 import { getSessionCookieOptions } from "./cookies";
 import { COOKIE_NAME } from "../../shared/const";
 
@@ -246,6 +247,8 @@ async function startServer() {
   app.post("/api/scheduled/scorm-health-check", scormHealthCheckHandler);
   // Heartbeat: Hourly source-code backup → R2 + email
   app.post("/api/scheduled/hourly-backup", hourlyBackupHandler);
+  // Heartbeat: Daily SDMS CME summary — 8:00 AM UTC
+  app.post("/api/scheduled/sdms-cme-daily-summary", sdmsCmeDailySummaryHandler);
   // Public REST API: GET /api/forms/:formId/submissions (auth via Bearer apiToken)
   app.get("/api/forms/:formId/submissions", async (req: any, res: any) => {
     try {

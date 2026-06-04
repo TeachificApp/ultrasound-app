@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, between, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   generalFormTemplates,
@@ -12,6 +12,8 @@ import {
   sdmsCmeConfigs,
   sdmsCmeCreditCategoryEnum,
   sdmsCmeFormKindEnum,
+  sdmsCmeSubmissionLogs,
+  users,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -305,10 +307,8 @@ export const sdmsCmeRouter = router({
       activityType: activityTypeSchema.optional(),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
+            const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-
-      const { users } = await import("../../drizzle/schema");
       const conditions: any[] = [];
       if (input.startDate) conditions.push(gte(sdmsCmeSubmissionLogs.createdAt, new Date(input.startDate)));
       if (input.endDate) {
@@ -349,7 +349,6 @@ export const sdmsCmeRouter = router({
   adminGetStats: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return { total: 0, success: 0, failed: 0, pending: 0 };
-    const { sql } = await import("drizzle-orm");
     const [row] = await db.execute(sql`
       SELECT
         COUNT(*) as total,

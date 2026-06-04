@@ -7,7 +7,7 @@
  *   Analytics: Sales, Product Analytics, Memberships, Contacts
  *   Settings
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,10 @@ import MembershipAdmin from "./MembershipAdmin";
 import ContactsAdmin from "./ContactsAdmin";
 import ProductAnalytics from "./ProductAnalytics";
 import SharingMonitor from "./SharingMonitor";
+const SdmsCmeExportPageLazy = lazy(() => import("./SdmsCmeExportPage"));
+function SdmsCmeExportInline() {
+  return <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading SDMS CME Export…</div>}><SdmsCmeExportPageLazy /></Suspense>;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(d: Date | null | undefined) {
@@ -73,6 +77,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "memberships",       label: "Memberships",       icon: <Crown size={16} /> },
   { id: "contacts",          label: "Contacts",          icon: <Mail size={16} /> },
   { id: "sharing-monitor",   label: "Sharing Monitor",   icon: <Shield size={16} /> },
+  { id: "sdms-cme",          label: "SDMS CME Export",   icon: <ExternalLink size={16} /> },
   { id: "settings",          label: "Settings",          icon: <Settings size={16} />, section: "Settings" },
 ];
 
@@ -1133,6 +1138,7 @@ export default function MembersHub() {
       case "memberships":       return <MembershipAdmin />;
       case "contacts":          return <ContactsAdmin />;
       case "sharing-monitor":   return <SharingMonitor />;
+      case "sdms-cme":           return <SdmsCmeExportInline />;
       case "settings":          return <PlaceholderPanel title="Member Settings" description="Configure member registration, approval workflows, and access rules." />;
       default:                  return <OverviewPanel />;
     }

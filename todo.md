@@ -4651,3 +4651,15 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Lesson discussion comments (LessonCommentSection) — upgraded from Textarea to RichTextEditor + RichTextDisplay
 - [x] Lesson discussion replies (ReplyBox in LessonCommentSection) — upgraded from Textarea to RichTextEditor
 - [x] Existing plain-text comments render correctly via CommentBody helper (auto-detects HTML vs plain)
+
+## SDMS CME Export & Daily Summary (Jun 2026)
+- [x] Merge Cursor's SDMS CME integration branch (cursor/sdms-cme-integration-4bb0)
+- [x] Fix missing schema exports (pendingFulfillments, lmsCheckoutTemplates, lmsDefaultTeamTiers, lmsGroupManagers)
+- [x] Add sdmsCmeSubmissionLogs and users imports to sdmsCmeRouter
+- [x] Add adminExportSubmissionLogs procedure with date/status/activityType filters
+- [x] Add adminGetStats procedure for summary dashboard cards
+- [x] Create SdmsCmeExportPage admin UI with filters, stats, and CSV download
+- [x] Add SDMS CME Export to MembersHub sidebar navigation
+- [x] Create sdmsCmeDailySummary heartbeat handler (POST /api/scheduled/sdms-cme-daily-summary)
+- [x] Register handler in server/_core/index.ts
+- [ ] Create heartbeat cron job after deploy (daily 8:00 AM UTC)
