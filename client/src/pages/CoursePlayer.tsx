@@ -24,7 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
-import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
+
 import LessonCommentSection from "@/components/LessonCommentSection";
 
 // Lazy-load the heavy editor so it doesn't bloat the initial bundle
@@ -848,16 +848,7 @@ export default function CoursePlayer() {
           return;
         }
       }
-      // Skip draft/hidden lessons AND preview_hide_after_purchase lessons (for enrolled users) when picking the default first lesson
-      const isVisible = (l: any) => {
-        if (l.lessonStatus && l.lessonStatus !== "published") return false;
-        if (isEnrolled) {
-          const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
-          if (pm === "preview_hide_after_purchase") return false;
-        }
-        return true;
-      };
-      const first = topLevel.find(isVisible) ?? data.sections.flatMap((s: any) => s.lessons).find(isVisible);
+      const first = topLevel[0] ?? data.sections[0]?.lessons[0];
       if (first) setSelectedLessonId(first.id);
     }
   }, [data]);
@@ -984,7 +975,7 @@ export default function CoursePlayer() {
 
   if (!data) return null;
   const { course } = data;
-  // Filter out preview_hide_after_purchase lessons for enrolled students, then remove empty sections
+  // Filter out preview_hide_after_purchase lessons for enrolled students
   const sections: any[] = (data.sections ?? []).map((s: any) => ({
     ...s,
     lessons: s.lessons.filter((l: any) => {
@@ -992,7 +983,7 @@ export default function CoursePlayer() {
       const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
       return pm !== "preview_hide_after_purchase";
     }),
-  })).filter((s: any) => s.lessons.length > 0);
+  }));
   // ── Course Color Scheme ──────────────────────────────────────────────────────
   const primaryColor = course.primaryColor ?? "#0d9488";
   const accentColor = course.accentColor ?? "#0f766e";
@@ -1105,10 +1096,8 @@ export default function CoursePlayer() {
   };
 
   const currentIdx = allLessons.findIndex((l: any) => l.id === selectedLessonId);
-  const isLessonVisible = (l: any) => !l.lessonStatus || l.lessonStatus === "published";
-  // Skip draft/hidden lessons in Prev/Next navigation
-  const prevLesson = (() => { for (let i = currentIdx - 1; i >= 0; i--) { if (isLessonVisible(allLessons[i])) return allLessons[i]; } return null; })();
-  const nextLesson = (() => { for (let i = currentIdx + 1; i < allLessons.length; i++) { if (isLessonVisible(allLessons[i])) return allLessons[i]; } return null; })();
+  const prevLesson = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
+  const nextLesson = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
 
   const currentSection = sections.find((s: any) => s.lessons.some((l: any) => l.id === selectedLessonId));
   const currentSectionIdx = currentSection ? sections.indexOf(currentSection) : -1;
@@ -1777,34 +1766,23 @@ export default function CoursePlayer() {
 
                   {/* ── Embed lesson — only show if no content blocks override ── */}
                   {lessonData.type === "embed" && lessonData.embedUrl && contentBlocks.length === 0 && (() => {
-                    let embedSrc = lessonData.embedUrl;
-                    const parsed = embedSrc.startsWith("/") ? parseMediaRepoUrl(embedSrc) : null;
-                    if (parsed?.path === "embed") {
-                      embedSrc = embedSrc.replace(/\/embed(\?|$)/, "/scorm$1");
-                    }
-                    const isScormEmbed = isMediaRepoEmbedUrl(embedSrc) || embedSrc.includes("/scorm");
+                    // Resolve relative embed URLs (e.g. /api/media/:slug/embed) to absolute
+                    const resolvedEmbedUrl = lessonData.embedUrl.startsWith('/')
+                      ? `${window.location.origin}${lessonData.embedUrl}`
+                      : lessonData.embedUrl;
+                    // SCORM/HTML packages need full height — use min-h-[600px] instead of fixed aspect-video
+                    const isScormEmbed = lessonData.embedUrl.includes('/api/media/') || lessonData.embedUrl.includes('/media/');
                     return (
                       <div className="mb-5">
                         <div className={`bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 ${isScormEmbed ? 'min-h-[600px] h-[75vh]' : 'aspect-video'}`}>
-                          {isScormEmbed ? (
-                            <MediaEmbedIframe
-                              src={embedSrc}
-                              courseId={data?.course?.id}
-                              title={lessonData.title}
-                              className="w-full h-full"
-                              style={{ border: 'none', minHeight: '600px' }}
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                            />
-                          ) : (
-                            <iframe
-                              src={embedSrc.startsWith('/') ? `${window.location.origin}${embedSrc}` : embedSrc}
-                              className="w-full h-full"
-                              allowFullScreen
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                              title={lessonData.title}
-                              style={{ border: 'none' }}
-                            />
-                          )}
+                          <iframe
+                            src={resolvedEmbedUrl}
+                            className="w-full h-full"
+                            allowFullScreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            title={lessonData.title}
+                            style={{ border: 'none', minHeight: isScormEmbed ? '600px' : undefined }}
+                          />
                         </div>
                       </div>
                     );
@@ -1849,9 +1827,15 @@ export default function CoursePlayer() {
                           <InlineLessonFlashcardDeck key={block.id} data={block.data as any} />
                         ) : block.type === "live_session" ? (
                           <InlineLiveSession key={block.id} data={block.data as any} />
+                        ) : block.type === "sdms_cme_module" ? (
+                          <SdmsCmeLearnerModule
+                            key={block.id}
+                            activityType={(block.data as any).activityType ?? resolveLmsActivityType(data?.course?.type ?? "course")}
+                            activityId={(block.data as any).activityId ?? data?.course?.id ?? 0}
+                          />
                         ) : (
                           <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-lg">
-                            <BlockPreview block={block} courseId={data?.course?.id} />
+                            <BlockPreview block={block} />
                           </div>
                         )
                       ))}

@@ -61,6 +61,7 @@ import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } 
 import { useLearnLink } from "@/hooks/useLearnLink";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
+import { SdmsCmeConfigPanel, resolveLmsActivityType } from "@/components/admin/SdmsCmeConfigPanel";
 import { WebinarsAdmin } from "./WebinarsAdmin";
 import MembershipsAdmin from "./MembershipsAdmin";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
@@ -1988,6 +1989,13 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           <CertTemplateSelector value={certificateTemplateId} onChange={setCertificateTemplateId} />
         </div>
       )}
+
+      <SdmsCmeConfigPanel
+        activityType={resolveLmsActivityType(courseType)}
+        activityId={course.id}
+        defaultTitle={title}
+      />
+
       <div className="flex items-center gap-2">
         <Switch checked={isFeatured} onCheckedChange={setIsFeatured} id="featured-switch" />
         <Label htmlFor="featured-switch" className="text-sm">Featured on LMS Home Page</Label>

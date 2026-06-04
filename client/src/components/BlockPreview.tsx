@@ -15,7 +15,6 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
-import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
@@ -96,7 +95,7 @@ export interface Block {
   data: Record<string, any>;
 }
 
-export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number }) {
+export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; coursePrice?: number; courseTitle?: string }) {
   const { user } = useAuth();
   const d = block.data ?? {};
   // Pre-compute pass-through URL for url_embed blocks (hooks must be at top level, not inside switch)
@@ -294,15 +293,6 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
                 style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block" }}
                 title={d.caption ?? "Embedded content"}
-              />
-            ) : d.url ? (
-              <iframe
-                src={d.url}
-                style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block", borderRadius: "8px" }}
-                title={d.caption ?? "Embedded content"}
-                allow="autoplay; fullscreen; clipboard-write; encrypted-media; picture-in-picture"
-                allowFullScreen
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-top-navigation-by-user-activation"
               />
             ) : <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}><Globe size={32} /></div>}
             {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: embedAlign as any }}>{d.caption}</p>}
@@ -1079,12 +1069,12 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           <div style={{ width: scormMaxWidth, maxWidth: "100%" }}>
             {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
             {embedUrl ? (
-              <MediaEmbedIframe
+              <iframe
                 src={embedUrl}
-                courseId={courseId}
-                title={title}
                 style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+                title={title}
                 allow="autoplay; fullscreen"
+                allowFullScreen
               />
             ) : (
               <div
@@ -1273,6 +1263,27 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     }
     case "form_embed":
       return <FormEmbedBlockPreview d={d} />;
+    case "sdms_cme_module": {
+      const activityType = d.activityType ?? "course";
+      const activityId = d.activityId ?? 0;
+      const headline = d.headline ?? "SDMS CME Credit";
+      return (
+        <div className="px-6 py-5 bg-gradient-to-br from-teal-50 to-white border-2 border-teal-200 rounded-xl">
+          <div className="flex items-start gap-3">
+            <Award className="w-8 h-8 text-teal-600 shrink-0" />
+            <div>
+              <p className="font-bold text-teal-900">{headline}</p>
+              <p className="text-sm text-gray-600 mt-1">
+                SDMS CME post-test, pass/fail scoring, and roster submission appear here for learners.
+              </p>
+              <p className="text-xs text-gray-400 mt-2 font-mono">
+                {activityType} · activity #{activityId || "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     case "upgrade_prompt":
       return <UpgradePromptBlockPreview d={d} />;
     case "data_table":

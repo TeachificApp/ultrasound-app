@@ -34,6 +34,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import Layout from "@/components/Layout";
+import { SdmsCmeUserTab } from "@/components/admin/SdmsCmeUserTab";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 const BRAND_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -204,8 +205,8 @@ function AppRolesPanel({ userId, refetch }: { userId: number; refetch: () => voi
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates" | "communications" | "activity" | "logins" | "teams";
-const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates", "communications", "activity", "logins", "teams"];
+type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates" | "cme" | "communications" | "activity" | "logins" | "teams";
+const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates", "cme", "communications", "activity", "logins", "teams"];
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
@@ -2565,6 +2566,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "subscriptions",  label: "Subscriptions",   icon: CreditCard },
   { key: "teams",          label: "Teams",           icon: Users2 },
   { key: "certificates",   label: "Certificates",    icon: Award },
+  { key: "cme",            label: "CME",             icon: Award },
   { key: "communications", label: "Emails",          icon: FileText },
   { key: "activity",       label: "Activity",        icon: ClipboardCheck },
   { key: "logins",         label: "Logins",          icon: Shield },
@@ -2705,6 +2707,7 @@ export default function AdminUserDetailPage() {
           {activeTab === "transactions"  && <TransactionsTab  userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "subscriptions" && <SubscriptionsTab userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "certificates"   && <CertificatesTab   userId={userId!} data={data} refetch={refetch} />}
+          {activeTab === "cme"            && userId && <SdmsCmeUserTab userId={userId} />}
           {activeTab === "communications"  && <CommunicationsTab userId={userId!} />}
           {activeTab === "activity"      && <ActivityTab      userId={userId!} enrollments={data?.enrollments} />}
           {activeTab === "logins"        && <LoginsTab        userId={userId!} />}

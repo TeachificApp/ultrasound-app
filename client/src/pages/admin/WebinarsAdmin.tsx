@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
-import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function fmtDate(ts: number | null | undefined) {
@@ -308,16 +307,6 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
             >
               <Copy className="w-3 h-3" /> Copy URL
             </button>
-            <button
-              className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1 font-medium"
-              onClick={() => {
-                const checkoutUrl = `${window.location.origin}/checkout/${webinar.slug}?type=webinar`;
-                navigator.clipboard.writeText(checkoutUrl);
-                toast.success("Checkout link copied");
-              }}
-            >
-              <Copy className="w-3 h-3" /> Copy Checkout Link
-            </button>
           </div>
         </div>
         <Button
@@ -360,7 +349,6 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
           <TabsTrigger value="attendees" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Attendees</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs"><BarChart2 className="w-3.5 h-3.5 mr-1" />Analytics</TabsTrigger>
           <TabsTrigger value="domain" className="text-xs"><Globe className="w-3.5 h-3.5 mr-1" />Domain</TabsTrigger>
-          <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -459,6 +447,11 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
               </div>
             </div>
           </div>
+          <SdmsCmeConfigPanel
+            activityType={resolveWebinarActivityType(type, replayEnabled)}
+            activityId={webinarId}
+            defaultTitle={title}
+          />
         </TabsContent>
 
         {/* Video Tab */}
@@ -633,46 +626,6 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
                 </div>
               </Card>
             ))}
-          </div>
-        </TabsContent>
-
-        {/* Checkout Page Tab */}
-        <TabsContent value="checkout-page" className="pt-2">
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900">Checkout Page Editor</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Customise the sections shown on the hosted checkout page at{" "}
-                    <a href={`/checkout/${webinar.slug}?type=webinar`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
-                      /checkout/{webinar.slug}
-                    </a>.
-                    Use the full-screen editor to add trust seals, testimonials, FAQs, guarantees, and more.
-                  </p>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <a href={`/checkout/${webinar.slug}?type=webinar`} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    Preview
-                  </a>
-                  <a href={`/admin/checkout-editor/webinar/${webinar.id}`}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    Open Page Editor
-                  </a>
-                </div>
-              </div>
-              <div className="mt-5 grid grid-cols-3 gap-3">
-                {["Trust Seals & Badges","Webinar Includes","Money-Back Guarantee","Testimonials","FAQ","Custom HTML"].map(s => (
-                  <div key={s} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                    <div className="w-2 h-2 rounded-full bg-teal-400" />
-                    <span className="text-xs text-gray-600">{s}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </TabsContent>
 

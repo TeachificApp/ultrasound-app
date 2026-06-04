@@ -2098,10 +2098,8 @@ export const emailTemplates = mysqlTable("emailTemplates", {
   createdByUserId: int("createdByUserId").notNull(),
   name: varchar("name", { length: 200 }).notNull(),
   subject: varchar("subject", { length: 500 }).notNull(),
-  // Rich HTML body (derived from blocks on save)
+  // Rich HTML body (from TipTap editor)
   htmlBody: longtext("htmlBody").notNull(),
-  // Block editor JSON — raw block data for re-editing
-  blocksJson: longtext("blocksJson"),
   // Optional plain-text version
   previewText: varchar("previewText", { length: 300 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -2117,8 +2115,6 @@ export const emailCampaigns = mysqlTable("emailCampaigns", {
   sentByUserId: int("sentByUserId").notNull(),
   subject: varchar("subject", { length: 500 }).notNull(),
   htmlBody: longtext("htmlBody").notNull(),
-  // Block editor JSON — raw block data for re-editing
-  blocksJson: longtext("blocksJson"),
   previewText: varchar("previewText", { length: 300 }),
   // Audience filter snapshot (JSON)
   // { interests: string[], roles: string[], subscriptionType: string, specificEmails: string[] }
@@ -2804,8 +2800,6 @@ export const lmsCourses = mysqlTable("lms_courses", {
   installmentIntervalDays: int("installment_interval_days").default(30), // days between installments
   // Stripe IDs for subscription/payment-plan products (created on first checkout)
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
-  // Cached Stripe Payment Link for the primary pricing (reused to avoid creating duplicates)
-  stripePaymentLinkId: varchar("stripe_payment_link_id", { length: 255 }),
   // SEO / landing page
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
@@ -2884,27 +2878,11 @@ export const lmsCourses = mysqlTable("lms_courses", {
   publishDomain: varchar("publish_domain", { length: 255 }),
   // Multi-cohort mode: when true, live sessions/assignments/recordings are scoped per cohort group
   multiCohortMode: boolean("multi_cohort_mode").default(false).notNull(),
-  // Checkout page configuration — JSON array of CheckoutSection objects
-  // Sections: trust_seals, guarantee, testimonials, faq, custom_html, course_includes, instructor_bio
-  // null = use platform defaults
-  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LmsCourse = typeof lmsCourses.$inferSelect;
 export type InsertLmsCourse = typeof lmsCourses.$inferInsert;
-
-// Saved checkout page templates (admin-created, reusable across courses)
-export const lmsCheckoutTemplates = mysqlTable("lms_checkout_templates", {
-  id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  config: longtext("config").notNull(), // JSON string of CheckoutPageConfig
-  createdByUserId: int("created_by_user_id").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
-});
-export type LmsCheckoutTemplate = typeof lmsCheckoutTemplates.$inferSelect;
 
 export const lmsSections = mysqlTable("lms_sections", {
   id: int("id").autoincrement().primaryKey(),
@@ -3337,11 +3315,6 @@ export const digitalProducts = mysqlTable("digital_products", {
   libraryOrder: int("library_order").default(0).notNull(),
   // Per-download publish domain override (null = use global downloadPublishDomain)
   publishDomain: varchar("publish_domain", { length: 255 }),
-  // Stripe product/price IDs for embedded checkout
-  stripeProductId: varchar("stripe_product_id", { length: 128 }),
-  stripePriceId: varchar("stripe_price_id", { length: 128 }),
-  // Configurable checkout page sections (JSON)
-  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3392,12 +3365,6 @@ export const digitalBundles = mysqlTable("digital_bundles", {
   discountPrice: int("discount_price").default(0).notNull(), // cents
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived"]).default("draft").notNull(),
-  // Subscription billing support
-  subscriptionEnabled: boolean("subscription_enabled").default(false).notNull(),
-  subscriptionPrice: int("subscription_price").default(0).notNull(), // cents
-  subscriptionInterval: mysqlEnum("subscription_interval", ["month", "year"]).default("month"),
-  subscriptionIntervalCount: int("subscription_interval_count").default(1).notNull(),
-  subscriptionStripePriceId: varchar("subscription_stripe_price_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3417,11 +3384,6 @@ export const digitalBundlePurchases = mysqlTable("digital_bundle_purchases", {
   bundleId: int("bundle_id").notNull(),
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
   purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
-  // Subscription fields
-  purchaseType: mysqlEnum("purchase_type", ["one_time", "subscription"]).default("one_time").notNull(),
-  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
-  subscriptionStatus: mysqlEnum("subscription_status", ["active", "past_due", "cancelled", "trialing"]),
-  subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end"),
 });
 export type DigitalBundlePurchase = typeof digitalBundlePurchases.$inferSelect;
 
@@ -4027,10 +3989,6 @@ export const platformSettings = mysqlTable("platform_settings", {
   productPublishDomain: varchar("product_publish_domain", { length: 255 }),
   coursePublishDomain: varchar("course_publish_domain", { length: 255 }),
   formPublishDomain: varchar("form_publish_domain", { length: 255 }),
-  // ── Legal / Compliance URLs ──
-  // Shown on the hosted checkout page as required agreement links
-  termsUrl: varchar("terms_url", { length: 2048 }),
-  privacyUrl: varchar("privacy_url", { length: 2048 }),
   // ── Future platform-wide toggles go here ──
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4065,8 +4023,6 @@ export const lmsPricingOptions = mysqlTable("lms_pricing_options", {
   ctaLabel: varchar("cta_label", { length: 100 }),
   // Optional external URL — if set, the CTA button links here instead of triggering Stripe checkout
   ctaUrl: varchar("cta_url", { length: 2048 }),
-  // Cached Stripe Payment Link ID (plink_...) — created on demand by admin, reused on subsequent requests
-  stripePaymentLinkId: varchar("stripe_payment_link_id", { length: 255 }),
   // Sort order in the pricing options list (lower = shown first)
   sortOrder: int("sort_order").default(0).notNull(),
   // Whether this option is currently shown on the landing page
@@ -4127,11 +4083,6 @@ export const physicalProducts = mysqlTable("physical_products", {
   orderCount: int("order_count").default(0).notNull(),
   // Per-product publish domain override (null = use global productPublishDomain)
   publishDomain: varchar("publish_domain", { length: 255 }),
-  // Stripe product/price IDs for embedded checkout
-  stripeProductId: varchar("stripe_product_id", { length: 128 }),
-  stripePriceId: varchar("stripe_price_id", { length: 128 }),
-  // Configurable checkout page sections (JSON)
-  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4624,11 +4575,6 @@ export const webinars = mysqlTable("webinars", {
   postWebinarMessage: text("post_webinar_message"),
   postWebinarDelaySeconds: int("post_webinar_delay_seconds").default(0),
   publishDomain: varchar("publish_domain", { length: 255 }),
-  // Stripe product/price IDs for embedded checkout
-  stripeProductId: varchar("stripe_product_id", { length: 128 }),
-  stripePriceId: varchar("stripe_price_id", { length: 128 }),
-  // Configurable checkout page sections (JSON)
-  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4762,8 +4708,6 @@ export const membershipPlans = mysqlTable("membership_plans", {
   publishDomain: varchar("publish_domain", { length: 255 }),
   /** JSON: { maxMembers, requireApproval, welcomeEmailSubject, welcomeEmailBody } */
   settings: longtext("settings"),
-  // Configurable checkout page sections (JSON)
-  checkoutPageConfig: longtext("checkout_page_config"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4859,8 +4803,6 @@ export const communityMembers = mysqlTable("community_members", {
   memberStatus: mysqlEnum("member_status", ["pending", "approved", "rejected"]).default("approved").notNull(),
   // For admin-profile posts: which admin profile this member is linked to
   adminProfileId: int("admin_profile_id"),
-  // Stripe subscription ID for paid community memberships
-  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
 });
 export type CommunityMember = typeof communityMembers.$inferSelect;
 
@@ -6059,99 +6001,146 @@ export const employerSubscriptions = mysqlTable("employer_subscriptions", {
 export type EmployerSubscription = typeof employerSubscriptions.$inferSelect;
 export type InsertEmployerSubscription = typeof employerSubscriptions.$inferInsert;
 
-// ─── Pending Fulfillments — Retry Queue ──────────────────────────────────────
-// Every paid order creates a pending_fulfillment record BEFORE fulfillment runs.
-// On success the status is set to "completed". On failure it stays "pending" or
-// becomes "failed" so an admin can retry. This is the safety net that ensures
-// no student ever loses access due to a transient DB error or webhook failure.
+// ─── SDMS CME Credit Integration ─────────────────────────────────────────────
 
-export const pendingFulfillments = mysqlTable("pending_fulfillments", {
-  id: int("id").primaryKey().autoincrement(),
-  // Stripe payment intent ID — unique identifier for this payment
-  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 100 }),
-  // Resolved user ID (may be null if auto-account creation failed)
-  userId: int("user_id"),
-  // Buyer email — always present even if userId is null
-  email: varchar("email", { length: 320 }).notNull(),
-  customerName: varchar("customer_name", { length: 255 }),
-  // Product info
-  productName: varchar("product_name", { length: 500 }).notNull(),
-  productType: varchar("product_type", { length: 50 }).notNull(), // course | download | physical | membership | bundle | other
-  productId: int("product_id"), // download/physical/bundle product ID
-  courseId: int("course_id"), // LMS course to enroll in
-  fulfillmentBrand: varchar("fulfillment_brand", { length: 20 }), // aaus | iheartecho | both
-  additionalAccessJson: text("additional_access_json"), // JSON array of bonus access items
-  // Amount paid (stored in dollars, NOT cents)
-  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).notNull().default("0.00"),
-  // Fulfillment status
-  status: mysqlEnum("status", ["pending", "completed", "failed"]).notNull().default("pending"),
-  attempts: int("attempts").notNull().default(0),
-  lastAttemptAt: timestamp("last_attempt_at"),
-  completedAt: timestamp("completed_at"),
-  errorMessage: text("error_message"),
-  // Fulfillment result notes (what was actually granted)
-  fulfillmentNotes: text("fulfillment_notes"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
-});
-export type PendingFulfillment = typeof pendingFulfillments.$inferSelect;
-export type InsertPendingFulfillment = typeof pendingFulfillments.$inferInsert;
+/** Eligible activity types for SDMS CME credit */
+export const sdmsCmeActivityTypeEnum = [
+  "course",
+  "cohort",
+  "webinar",
+  "replay_course",
+  "live_event",
+  "standalone_cme",
+] as const;
+export type SdmsCmeActivityType = (typeof sdmsCmeActivityTypeEnum)[number];
 
-// ─── Default Team Pricing Tiers ───────────────────────────────────────────────
-/** Volume discount tiers for a course — "X+ seats = Y% off primary price".
- *  Each tier generates its own Stripe Payment Link (per-seat price).
- *  These are defaults that can be overridden by content-block group pricing. */
-export const lmsDefaultTeamTiers = mysqlTable("lms_default_team_tiers", {
+export const sdmsCmeCreditCategoryEnum = [
+  "AB_CME",
+  "AE_CME",
+  "BR_CME",
+  "FE_CME",
+  "MSK_CME",
+  "OB_CME",
+  "OT_CME",
+  "PE_CME",
+  "PS_CME",
+  "SPI_CME",
+  "VT_CME",
+] as const;
+export type SdmsCmeCreditCategory = (typeof sdmsCmeCreditCategoryEnum)[number];
+
+export const sdmsCmeFormKindEnum = [
+  "post_test",
+  "evaluation",
+  "combined",
+  "attestation",
+] as const;
+export type SdmsCmeFormKind = (typeof sdmsCmeFormKindEnum)[number];
+
+/** Per-activity SDMS CME configuration (one row per activity) */
+export const sdmsCmeConfigs = mysqlTable(
+  "sdmsCmeConfigs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    activityType: mysqlEnum("activityType", sdmsCmeActivityTypeEnum).notNull(),
+    activityId: int("activityId").notNull(),
+    enabled: boolean("enabled").default(false).notNull(),
+    approvalId: varchar("approvalId", { length: 64 }),
+    activityTitle: varchar("activityTitle", { length: 500 }),
+    activityStartDate: varchar("activityStartDate", { length: 32 }),
+    activityEndDate: varchar("activityEndDate", { length: 32 }),
+    cmeCreditAmount: varchar("cmeCreditAmount", { length: 16 }).default("0.00"),
+    cmeCreditCategory: mysqlEnum("cmeCreditCategory", sdmsCmeCreditCategoryEnum).default("SPI_CME"),
+    speakerStatusDefault: varchar("speakerStatusDefault", { length: 1 }).default("N"),
+    apiUsername: varchar("apiUsername", { length: 255 }),
+    /** AES-256-GCM encrypted SDMS API password — never returned to client */
+    apiPasswordEncrypted: text("apiPasswordEncrypted"),
+    formTemplateId: int("formTemplateId"),
+    formKind: mysqlEnum("formKind", sdmsCmeFormKindEnum).default("combined"),
+    passingScorePercent: varchar("passingScorePercent", { length: 8 }).default("70"),
+    submissionDeadlineDays: varchar("submissionDeadlineDays", { length: 8 }).default("90"),
+    resubmissionEnabled: boolean("resubmissionEnabled").default(true).notNull(),
+    /** JSON field mapping: SDMS field name → form item id (string keys) */
+    formFieldMapping: longtext("formFieldMapping"),
+    /** Page builder blocks for learner-facing CME module */
+    moduleBlocks: longtext("moduleBlocks"),
+    cmeSectionId: int("cmeSectionId"),
+    cmeLessonId: int("cmeLessonId"),
+    cmeInstructions: longtext("cmeInstructions"),
+    sdmsBaseUrl: varchar("sdmsBaseUrl", { length: 500 }),
+    createdByUserId: int("createdByUserId"),
+    updatedByUserId: int("updatedByUserId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (t) => ({
+    uniqActivity: uniqueIndex("idx_sdms_cme_config_activity").on(t.activityType, t.activityId),
+  })
+);
+export type SdmsCmeConfig = typeof sdmsCmeConfigs.$inferSelect;
+export type InsertSdmsCmeConfig = typeof sdmsCmeConfigs.$inferInsert;
+
+/** Learner CME completion + SDMS submission state */
+export const sdmsCmeCompletions = mysqlTable("sdmsCmeCompletions", {
   id: int("id").autoincrement().primaryKey(),
-  /** The course/quiz/cohort/download this tier applies to */
-  courseId: int("course_id").notNull(),
-  /** Minimum number of seats to qualify for this tier */
-  minSeats: int("min_seats").notNull().default(2),
-  /** Discount percentage off the primary course price (0–100) */
-  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }).notNull().default("0.00"),
-  /** Cached Stripe Price ID for the per-seat price at this tier */
-  stripePriceId: varchar("stripe_price_id", { length: 255 }),
-  /** Cached Stripe Payment Link ID for this tier */
-  stripePaymentLinkId: varchar("stripe_payment_link_id", { length: 255 }),
-  /** Cached Stripe Payment Link URL for quick copy */
-  stripePaymentLinkUrl: varchar("stripe_payment_link_url", { length: 1024 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  configId: int("configId").notNull(),
+  userId: int("userId").notNull(),
+  activityType: mysqlEnum("activityType", sdmsCmeActivityTypeEnum).notNull(),
+  activityId: int("activityId").notNull(),
+  formSubmissionId: int("formSubmissionId"),
+  formScore: varchar("formScore", { length: 16 }),
+  formMaxScore: varchar("formMaxScore", { length: 16 }),
+  formScorePercent: varchar("formScorePercent", { length: 16 }),
+  passStatus: mysqlEnum("passStatus", ["pending", "passed", "failed", "override_pass", "override_fail"]).default("pending").notNull(),
+  manualOverrideNotes: text("manualOverrideNotes"),
+  manualOverrideByUserId: int("manualOverrideByUserId"),
+  dateCompleted: varchar("dateCompleted", { length: 32 }),
+  /** Captured learner SDMS payload fields (all strings) */
+  learnerPayload: longtext("learnerPayload"),
+  sdmsSubmissionStatus: mysqlEnum("sdmsSubmissionStatus", [
+    "not_submitted",
+    "pending",
+    "success",
+    "failed",
+    "timeout",
+  ]).default("not_submitted").notNull(),
+  sdmsResponseCode: varchar("sdmsResponseCode", { length: 16 }),
+  sdmsResponseMessage: text("sdmsResponseMessage"),
+  sdmsResponseRaw: longtext("sdmsResponseRaw"),
+  certificateUrl: text("certificateUrl"),
+  certificateId: varchar("certificateId", { length: 128 }),
+  lastSubmissionAttemptAt: timestamp("lastSubmissionAttemptAt"),
+  retryCount: int("retryCount").default(0).notNull(),
+  lastSubmittedBy: mysqlEnum("lastSubmittedBy", ["system", "admin"]),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
-export type LmsDefaultTeamTier = typeof lmsDefaultTeamTiers.$inferSelect;
-export type InsertLmsDefaultTeamTier = typeof lmsDefaultTeamTiers.$inferInsert;
+export type SdmsCmeCompletion = typeof sdmsCmeCompletions.$inferSelect;
+export type InsertSdmsCmeCompletion = typeof sdmsCmeCompletions.$inferInsert;
 
-// ─── Team Managers ────────────────────────────────────────────────────────────
-/**
- * Up to 5 managers per team (lmsGroups row).
- * Managers do NOT consume a seat by default; hasSeat=true means they also
- * occupy one of the group's paid seats and get course access like a regular member.
- * Managers can: assign/revoke seats, resend invites, view team analytics.
- */
-export const lmsGroupManagers = mysqlTable("lms_group_managers", {
+/** Full audit log for every SDMS API attempt */
+export const sdmsCmeSubmissionLogs = mysqlTable("sdmsCmeSubmissionLogs", {
   id: int("id").autoincrement().primaryKey(),
-  groupId: int("group_id").notNull(),
-  /** Resolved user ID once the manager accepts the invite and logs in */
-  userId: int("user_id"),
-  /** Email address the invite was sent to */
-  email: varchar("email", { length: 320 }).notNull(),
-  /** Display name (optional, filled from user profile on accept) */
-  managerName: varchar("manager_name", { length: 255 }),
-  /** Whether this manager also occupies a paid seat in the group */
-  hasSeat: boolean("has_seat").default(false).notNull(),
-  /** pending = invite sent, active = accepted, revoked = removed */
-  status: mysqlEnum("status", ["pending", "active", "revoked"]).default("pending").notNull(),
-  /** One-time token for the invite email */
-  inviteToken: varchar("invite_token", { length: 128 }),
-  acceptedAt: timestamp("accepted_at"),
-  lastInviteSentAt: timestamp("last_invite_sent_at"),
-  /** Admin user who added this manager */
-  addedByUserId: int("added_by_user_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  completionId: int("completionId"),
+  userId: int("userId").notNull(),
+  activityType: mysqlEnum("activityType", sdmsCmeActivityTypeEnum).notNull(),
+  activityId: int("activityId").notNull(),
+  approvalId: varchar("approvalId", { length: 64 }),
+  payloadSent: longtext("payloadSent").notNull(),
+  apiResponse: longtext("apiResponse"),
+  responseCode: varchar("responseCode", { length: 16 }),
+  status: mysqlEnum("status", ["success", "failed", "timeout", "simulated_success", "simulated_failure", "validation_error"]).notNull(),
+  retryCount: int("retryCount").default(0).notNull(),
+  triggeredBy: mysqlEnum("triggeredBy", ["system", "admin"]).default("system").notNull(),
+  errorMessage: text("errorMessage"),
+  resolved: boolean("resolved").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type LmsGroupManager = typeof lmsGroupManagers.$inferSelect;
 export type InsertLmsGroupManager = typeof lmsGroupManagers.$inferInsert;
+
+export type SdmsCmeSubmissionLog = typeof sdmsCmeSubmissionLogs.$inferSelect;
+export type InsertSdmsCmeSubmissionLog = typeof sdmsCmeSubmissionLogs.$inferInsert;
 
 // ─── Marketing Site (staging replica of public website) ─────────────────────
 
@@ -6198,4 +6187,3 @@ export const marketingSitePages = mysqlTable("marketingSitePages", {
 });
 export type MarketingSitePage = typeof marketingSitePages.$inferSelect;
 export type InsertMarketingSitePage = typeof marketingSitePages.$inferInsert;
-
