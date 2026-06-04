@@ -4675,3 +4675,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Build student-facing bundle cards in Education Library
 - [x] Build bundle detail/purchase page
 - [x] Wire bundle purchase to grant access to all included items
+- [x] Fix cohort Activity popup stuck on Loading for Assignments and Lesson Progress

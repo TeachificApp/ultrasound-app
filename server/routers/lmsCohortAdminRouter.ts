@@ -1056,23 +1056,25 @@ export const lmsCohortAdminRouter = router({
             ))
         : [];
       const submissionMap = Object.fromEntries(submissions.map(s => [s.assignmentId, s]));
-      const progress = await db
-        .select({
-          lessonId: lmsLessonProgress.lessonId,
-          completed: lmsLessonProgress.completed,
-          completedAt: lmsLessonProgress.completedAt,
-          watchedSeconds: lmsLessonProgress.watchedSeconds,
-          lessonTitle: lmsLessons.title,
-          sectionTitle: lmsSections.title,
-        })
-        .from(lmsLessonProgress)
-        .innerJoin(lmsLessons, eq(lmsLessons.id, lmsLessonProgress.lessonId))
-        .innerJoin(lmsSections, eq(lmsSections.id, lmsLessons.sectionId))
-        .where(and(
-          eq(lmsLessonProgress.userId, input.userId),
-          eq(lmsLessonProgress.courseId, input.courseId),
-        ))
-        .orderBy(asc(lmsSections.position), asc(lmsLessons.position));
+      // Find the user's enrollment for this course to get progress
+      const [enrollment] = await db.select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, input.courseId)))
+        .limit(1);
+      const progress = enrollment
+        ? await db
+            .select({
+              lessonId: lmsLessonProgress.lessonId,
+              completedAt: lmsLessonProgress.completedAt,
+              lessonTitle: lmsLessons.title,
+              sectionTitle: sql<string>`COALESCE(${lmsSections.title}, 'Ungrouped')`,
+            })
+            .from(lmsLessonProgress)
+            .innerJoin(lmsLessons, eq(lmsLessons.id, lmsLessonProgress.lessonId))
+            .leftJoin(lmsSections, eq(lmsSections.id, lmsLessons.sectionId))
+            .where(eq(lmsLessonProgress.enrollmentId, enrollment.id))
+            .orderBy(asc(lmsLessons.position))
+        : [];
       return {
         assignments: assignments.map(a => ({ ...a, submission: submissionMap[a.id] ?? null })),
         lessonProgress: progress,

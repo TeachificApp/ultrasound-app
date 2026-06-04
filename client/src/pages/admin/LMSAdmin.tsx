@@ -11692,10 +11692,10 @@ function CohortTab({ courseId }: { courseId: number }) {
                               <div className="text-xs text-gray-400">{p.sectionTitle}</div>
                             </div>
                             <div className="text-right">
-                              {p.completed ? (
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Completed</span>
+                              {p.completedAt ? (
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Completed {new Date(p.completedAt).toLocaleDateString()}</span>
                               ) : (
-                                <span className="text-xs text-gray-400">{p.watchedSeconds ? `${Math.round(p.watchedSeconds / 60)}m watched` : "Started"}</span>
+                                <span className="text-xs text-gray-400">In Progress</span>
                               )}
                             </div>
                           </div>
