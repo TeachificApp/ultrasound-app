@@ -1,18 +1,17 @@
 /**
  * LessonCommentSection.tsx
  * Student-facing comment section shown at the bottom of a lesson when commentsEnabled = true.
- * Supports one-level-deep reply threading, paginated listing, and optimistic updates.
+ * Supports one-level-deep reply threading, paginated listing, and rich text (Tiptap).
  */
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MessageSquare, Send, Loader2, Reply, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 
 interface CommentReply {
   id: number;
@@ -52,6 +51,19 @@ function CommentAvatar({ name, displayName, avatarUrl }: { name?: string | null;
   );
 }
 
+/** Helper: check if content is HTML (from rich text) or plain text */
+function isHtml(content: string): boolean {
+  return content.trimStart().startsWith("<");
+}
+
+/** Render comment/reply body — HTML if rich text, plain text otherwise */
+function CommentBody({ content, className = "" }: { content: string; className?: string }) {
+  if (isHtml(content)) {
+    return <RichTextDisplay content={content} className={`text-sm text-gray-700 ${className}`} />;
+  }
+  return <p className={`text-sm text-gray-700 whitespace-pre-wrap break-words leading-relaxed ${className}`}>{content}</p>;
+}
+
 function ReplyBox({
   lessonId,
   parentId,
@@ -77,34 +89,29 @@ function ReplyBox({
     },
   });
 
+  const isEmpty = !text || text === "<p></p>" || text.trim() === "";
+
   const handleSubmit = () => {
-    const content = text.trim();
-    if (!content || !user) return;
-    addComment.mutate({ lessonId, content, parentId });
+    if (isEmpty || !user) return;
+    addComment.mutate({ lessonId, content: text, parentId });
   };
 
   return (
     <div className="flex gap-2 mt-2">
       <CommentAvatar name={user?.name} displayName={(user as any)?.displayName} avatarUrl={user?.avatarUrl} />
       <div className="flex-1 space-y-1.5">
-        <Textarea
+        <RichTextEditor
           value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder="Write a reply… (Ctrl+Enter to post)"
-          className="min-h-[64px] text-sm resize-none border-gray-200 focus:border-teal-400 focus:ring-teal-400"
-          maxLength={2000}
-          autoFocus
-          onKeyDown={e => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(); }
-            if (e.key === "Escape") onCancel();
-          }}
+          onChange={setText}
+          placeholder="Write a reply…"
+          minHeight={64}
         />
         <div className="flex gap-2 justify-end">
           <Button variant="ghost" size="sm" onClick={onCancel} className="text-xs text-gray-500">Cancel</Button>
           <Button
             size="sm"
             onClick={handleSubmit}
-            disabled={!text.trim() || addComment.isPending}
+            disabled={isEmpty || addComment.isPending}
             className="bg-teal-500 hover:bg-teal-600 text-white text-xs px-3"
           >
             {addComment.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
@@ -142,9 +149,7 @@ function CommentItem({
           )}
           <span className="text-xs text-gray-400">{timeAgo}</span>
         </div>
-        <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
-          {comment.content}
-        </p>
+        <CommentBody content={comment.content} />
 
         {/* Actions row */}
         <div className="flex items-center gap-3 mt-1.5">
@@ -192,9 +197,7 @@ function CommentItem({
                       )}
                       <span className="text-xs text-gray-400">{replyTimeAgo}</span>
                     </div>
-                    <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
-                      {reply.content}
-                    </p>
+                    <CommentBody content={reply.content} />
                   </div>
                 </div>
               );
@@ -241,12 +244,12 @@ export default function LessonCommentSection({ lessonId, commentsEnabled }: Less
   if (!commentsEnabled) return null;
 
   const allComments: Comment[] = (data?.pages.flatMap(p => p.comments) ?? []) as Comment[];
+  const isEmpty = !draft || draft === "<p></p>" || draft.trim() === "";
 
   const handleSubmit = () => {
-    const content = draft.trim();
-    if (!content) return;
+    if (isEmpty) return;
     if (!user) { toast.error("Please sign in to comment"); return; }
-    addComment.mutate({ lessonId, content });
+    addComment.mutate({ lessonId, content: draft });
   };
 
   const handleReplyAdded = () => {
@@ -275,22 +278,17 @@ export default function LessonCommentSection({ lessonId, commentsEnabled }: Less
             <div className="flex gap-3">
               <CommentAvatar name={user.name} displayName={(user as any).displayName} avatarUrl={user.avatarUrl} />
               <div className="flex-1 space-y-2">
-                <Textarea
+                <RichTextEditor
                   value={draft}
-                  onChange={e => setDraft(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(); }
-                  }}
-                  placeholder="Share a question or thought about this lesson… (Ctrl+Enter to post)"
-                  className="min-h-[80px] text-sm resize-none border-gray-200 focus:border-teal-400 focus:ring-teal-400"
-                  maxLength={2000}
+                  onChange={setDraft}
+                  placeholder="Share a question or thought about this lesson…"
+                  minHeight={80}
                 />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">{draft.length}/2000</span>
+                <div className="flex items-center justify-end">
                   <Button
                     size="sm"
                     onClick={handleSubmit}
-                    disabled={!draft.trim() || addComment.isPending}
+                    disabled={isEmpty || addComment.isPending}
                     className="bg-teal-500 hover:bg-teal-600 text-white text-xs px-4"
                   >
                     {addComment.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Send className="w-3.5 h-3.5 mr-1.5" />}

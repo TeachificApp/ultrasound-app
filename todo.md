@@ -4642,3 +4642,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add cancelLmsOrderSubscription procedure to adminUserRouter.ts (admin-only)
 - [x] Add Course Orders section to admin SubscriptionsTab (AdminUserDetailPage.tsx)
 - [x] Admin can see and cancel course subscriptions for any user (e.g., Katerin Valdivia)
+
+## Rich Text for Discussions (Jun 2026)
+- [x] Community post creation (CreatePostBox) — already uses RichTextEditor
+- [x] Community post comments (CommentThread) — already uses RichTextEditor + RichTextDisplay
+- [x] Cohort discussions tab (CohortDashboardTab in CourseOverview) — already uses RichTextEditor + RichTextDisplay
+- [x] Lesson discussion comments (LessonCommentSection) — upgraded from Textarea to RichTextEditor + RichTextDisplay
+- [x] Lesson discussion replies (ReplyBox in LessonCommentSection) — upgraded from Textarea to RichTextEditor
+- [x] Existing plain-text comments render correctly via CommentBody helper (auto-detects HTML vs plain)
