@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, between, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 import {
   generalFormTemplates,
@@ -295,6 +295,76 @@ export const sdmsCmeRouter = router({
       limit: z.number().int().min(1).max(500).optional(),
     }))
     .query(async ({ input }) => listSubmissionLogs(input)),
+
+  /** Admin: export submission logs as CSV */
+  adminExportSubmissionLogs: adminProcedure
+    .input(z.object({
+      startDate: z.string().optional(), // ISO date string
+      endDate: z.string().optional(),
+      status: z.enum(["success", "failed", "timeout", "simulated_success", "simulated_failure", "validation_error", "all"]).optional(),
+      activityType: activityTypeSchema.optional(),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const { users } = await import("../../drizzle/schema");
+      const conditions: any[] = [];
+      if (input.startDate) conditions.push(gte(sdmsCmeSubmissionLogs.createdAt, new Date(input.startDate)));
+      if (input.endDate) {
+        const end = new Date(input.endDate);
+        end.setHours(23, 59, 59, 999);
+        conditions.push(lte(sdmsCmeSubmissionLogs.createdAt, end));
+      }
+      if (input.status && input.status !== "all") conditions.push(eq(sdmsCmeSubmissionLogs.status, input.status));
+      if (input.activityType) conditions.push(eq(sdmsCmeSubmissionLogs.activityType, input.activityType));
+
+      const logs = await db
+        .select({
+          id: sdmsCmeSubmissionLogs.id,
+          userId: sdmsCmeSubmissionLogs.userId,
+          activityType: sdmsCmeSubmissionLogs.activityType,
+          activityId: sdmsCmeSubmissionLogs.activityId,
+          approvalId: sdmsCmeSubmissionLogs.approvalId,
+          status: sdmsCmeSubmissionLogs.status,
+          responseCode: sdmsCmeSubmissionLogs.responseCode,
+          errorMessage: sdmsCmeSubmissionLogs.errorMessage,
+          triggeredBy: sdmsCmeSubmissionLogs.triggeredBy,
+          retryCount: sdmsCmeSubmissionLogs.retryCount,
+          resolved: sdmsCmeSubmissionLogs.resolved,
+          createdAt: sdmsCmeSubmissionLogs.createdAt,
+          userName: users.name,
+          userEmail: users.email,
+        })
+        .from(sdmsCmeSubmissionLogs)
+        .leftJoin(users, eq(sdmsCmeSubmissionLogs.userId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(sdmsCmeSubmissionLogs.createdAt))
+        .limit(10000);
+
+      return logs;
+    }),
+
+  /** Admin: get summary stats for SDMS CME dashboard */
+  adminGetStats: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return { total: 0, success: 0, failed: 0, pending: 0 };
+    const { sql } = await import("drizzle-orm");
+    const [row] = await db.execute(sql`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'success' OR status = 'simulated_success' THEN 1 ELSE 0 END) as success,
+        SUM(CASE WHEN status = 'failed' OR status = 'timeout' OR status = 'validation_error' OR status = 'simulated_failure' THEN 1 ELSE 0 END) as failed,
+        SUM(CASE WHEN resolved = 0 AND (status = 'failed' OR status = 'timeout' OR status = 'validation_error') THEN 1 ELSE 0 END) as unresolved
+      FROM sdmsCmeSubmissionLogs
+    `);
+    return {
+      total: Number((row as any)?.total ?? 0),
+      success: Number((row as any)?.success ?? 0),
+      failed: Number((row as any)?.failed ?? 0),
+      unresolved: Number((row as any)?.unresolved ?? 0),
+    };
+  }),
 
   /** Learner: get CME module for activity (only if enabled) */
   getLearnerModule: protectedProcedure

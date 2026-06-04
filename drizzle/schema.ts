@@ -2884,6 +2884,18 @@ export const lmsCourses = mysqlTable("lms_courses", {
 export type LmsCourse = typeof lmsCourses.$inferSelect;
 export type InsertLmsCourse = typeof lmsCourses.$inferInsert;
 
+// Saved checkout page templates (admin-created, reusable across courses)
+export const lmsCheckoutTemplates = mysqlTable("lms_checkout_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  config: longtext("config").notNull(), // JSON string of CheckoutPageConfig
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCheckoutTemplate = typeof lmsCheckoutTemplates.$inferSelect;
+
 export const lmsSections = mysqlTable("lms_sections", {
   id: int("id").autoincrement().primaryKey(),
   courseId: int("course_id").notNull(),
@@ -6001,6 +6013,100 @@ export const employerSubscriptions = mysqlTable("employer_subscriptions", {
 export type EmployerSubscription = typeof employerSubscriptions.$inferSelect;
 export type InsertEmployerSubscription = typeof employerSubscriptions.$inferInsert;
 
+// ─── Pending Fulfillments (retry queue for failed webhook fulfillments) ────────
+// When a Stripe webhook fires and the fulfillment logic fails (DB error, timeout, etc.),
+// the payment is recorded here so a background job can retry. On success the status
+// becomes "completed"; after max retries (3) with exponential backoff, the status
+// becomes "failed" so an admin can retry. This is the safety net that ensures
+// no student ever loses access due to a transient DB error or webhook failure.
+export const pendingFulfillments = mysqlTable("pending_fulfillments", {
+  id: int("id").primaryKey().autoincrement(),
+  // Stripe payment intent ID — unique identifier for this payment
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 100 }),
+  // Resolved user ID (may be null if auto-account creation failed)
+  userId: int("user_id"),
+  // Buyer email — always present even if userId is null
+  email: varchar("email", { length: 320 }).notNull(),
+  customerName: varchar("customer_name", { length: 255 }),
+  // Product info
+  productName: varchar("product_name", { length: 500 }).notNull(),
+  productType: varchar("product_type", { length: 50 }).notNull(), // course | download | physical | membership | bundle | other
+  productId: int("product_id"), // download/physical/bundle product ID
+  courseId: int("course_id"), // LMS course to enroll in
+  fulfillmentBrand: varchar("fulfillment_brand", { length: 20 }), // aaus | iheartecho | both
+  additionalAccessJson: text("additional_access_json"), // JSON array of bonus access items
+  // Amount paid (stored in dollars, NOT cents)
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  // Fulfillment status
+  status: mysqlEnum("status", ["pending", "completed", "failed"]).notNull().default("pending"),
+  attempts: int("attempts").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  completedAt: timestamp("completed_at"),
+  errorMessage: text("error_message"),
+  // Fulfillment result notes (what was actually granted)
+  fulfillmentNotes: text("fulfillment_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type PendingFulfillment = typeof pendingFulfillments.$inferSelect;
+export type InsertPendingFulfillment = typeof pendingFulfillments.$inferInsert;
+
+// ─── Default Team Pricing Tiers ───────────────────────────────────────────
+/** Volume discount tiers for a course — "X+ seats = Y% off primary price".
+ *  Each tier generates its own Stripe Payment Link (per-seat price).
+ *  These are defaults that can be overridden by content-block group pricing. */
+export const lmsDefaultTeamTiers = mysqlTable("lms_default_team_tiers", {
+  id: int("id").autoincrement().primaryKey(),
+  /** The course/quiz/cohort/download this tier applies to */
+  courseId: int("course_id").notNull(),
+  /** Minimum number of seats to qualify for this tier */
+  minSeats: int("min_seats").notNull().default(2),
+  /** Discount percentage off the primary course price (0–100) */
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }).notNull().default("0.00"),
+  /** Cached Stripe Price ID for the per-seat price at this tier */
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  /** Cached Stripe Payment Link ID for this tier */
+  stripePaymentLinkId: varchar("stripe_payment_link_id", { length: 255 }),
+  /** Cached Stripe Payment Link URL for quick copy */
+  stripePaymentLinkUrl: varchar("stripe_payment_link_url", { length: 1024 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsDefaultTeamTier = typeof lmsDefaultTeamTiers.$inferSelect;
+export type InsertLmsDefaultTeamTier = typeof lmsDefaultTeamTiers.$inferInsert;
+
+// ─── Team Managers ────────────────────────────────────────────────────────
+/**
+ * Up to 5 managers per team (lmsGroups row).
+ * Managers do NOT consume a seat by default; hasSeat=true means they also
+ * occupy one of the group's paid seats and get course access like a regular member.
+ * Managers can: assign/revoke seats, resend invites, view team analytics.
+ */
+export const lmsGroupManagers = mysqlTable("lms_group_managers", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  /** Resolved user ID once the manager accepts the invite and logs in */
+  userId: int("user_id"),
+  /** Email address the invite was sent to */
+  email: varchar("email", { length: 320 }).notNull(),
+  /** Display name (optional, filled from user profile on accept) */
+  managerName: varchar("manager_name", { length: 255 }),
+  /** Whether this manager also occupies a paid seat in the group */
+  hasSeat: boolean("has_seat").default(false).notNull(),
+  /** pending = invite sent, active = accepted, revoked = removed */
+  status: mysqlEnum("status", ["pending", "active", "revoked"]).default("pending").notNull(),
+  /** One-time token for the invite email */
+  inviteToken: varchar("invite_token", { length: 128 }),
+  acceptedAt: timestamp("accepted_at"),
+  lastInviteSentAt: timestamp("last_invite_sent_at"),
+  /** Admin user who added this manager */
+  addedByUserId: int("added_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsGroupManager = typeof lmsGroupManagers.$inferSelect;
+export type InsertLmsGroupManager = typeof lmsGroupManagers.$inferInsert;
+
 // ─── SDMS CME Credit Integration ─────────────────────────────────────────────
 
 /** Eligible activity types for SDMS CME credit */
@@ -6136,9 +6242,6 @@ export const sdmsCmeSubmissionLogs = mysqlTable("sdmsCmeSubmissionLogs", {
   resolved: boolean("resolved").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
-export type LmsGroupManager = typeof lmsGroupManagers.$inferSelect;
-export type InsertLmsGroupManager = typeof lmsGroupManagers.$inferInsert;
-
 export type SdmsCmeSubmissionLog = typeof sdmsCmeSubmissionLogs.$inferSelect;
 export type InsertSdmsCmeSubmissionLog = typeof sdmsCmeSubmissionLogs.$inferInsert;
 

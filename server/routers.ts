@@ -53,6 +53,7 @@ import { questionBankRouter } from "./routers/questionBankRouter";
 import { communityRouter } from "./routers/communityRouter";
 import { interestsRouter } from "./routers/interestsRouter";
 import { productAnalyticsRouter } from "./routers/productAnalyticsRouter";
+import { sdmsCmeRouter } from "./routers/sdmsCmeRouter";
 import {
   getUserById,
   getUsersByIds,
