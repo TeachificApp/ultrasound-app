@@ -1178,6 +1178,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           <TabsTrigger value="sales" className="text-xs">Sales</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs">After Purchase</TabsTrigger>
           <TabsTrigger value="checkout-page" className="text-xs">Checkout Page</TabsTrigger>
+          <TabsTrigger value="embed" className="text-xs">Embed</TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -1391,6 +1392,13 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         {/* Cohort Tab — only visible for cohort type */}
         <TabsContent value="cohort" className="mt-4">
           <CohortTab courseId={courseId} />
+        </TabsContent>
+
+        {/* Embed Tab */}
+        <TabsContent value="embed" className="mt-4">
+          {visitedTabs.has("embed") && (
+            <CurriculumEmbedTab course={course} />
+          )}
         </TabsContent>
       </Tabs>
 
@@ -9945,6 +9953,184 @@ function GlobalUnassignedPanel({ unassignedStudents, cohortGroups, courseId, onA
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Curriculum Embed Tab ─────────────────────────────────────────────────────
+function CurriculumEmbedTab({ course }: { course: any }) {
+  const baseUrl = window.location.origin;
+  const slug = course.slug ?? "";
+  const [accentColor, setAccentColor] = useState("#14b8a6");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [ctaUrl, setCtaUrl] = useState(`${baseUrl}/checkout/${slug}`);
+  const [ctaLabel, setCtaLabel] = useState("Enroll Now");
+  const [showCta, setShowCta] = useState(true);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const iframeSrc = `${baseUrl}/embed/curriculum/${slug}?accent=${encodeURIComponent(accentColor)}&theme=${theme}&ctaUrl=${encodeURIComponent(ctaUrl)}&ctaLabel=${encodeURIComponent(ctaLabel)}&cta=${showCta ? "1" : "0"}`;
+
+  const iframeEmbed = `<iframe\n  src="${iframeSrc}"\n  style="width:100%;border:none;min-height:400px;"\n  scrolling="no"\n  frameborder="0"\n  allowtransparency="true"\n  title="${course.title} — Curriculum"\n></iframe>`;
+
+  const scriptEmbed = `<div\n  data-curriculum-embed="${slug}"\n  data-accent="${accentColor}"\n  data-theme="${theme}"\n  data-cta-url="${ctaUrl}"\n  data-cta-label="${ctaLabel}"\n  data-cta="${showCta ? "1" : "0"}"\n  data-base-url="${baseUrl}"\n></div>\n<script src="${baseUrl}/embed/curriculum.js" async><\/script>`;
+
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">Curriculum Embed Widget</h3>
+        <p className="text-sm text-gray-500 mb-5">
+          Embed the course curriculum accordion on any external website — a Kajabi page, Squarespace, WordPress, Webflow, or plain HTML.
+          The widget is fully self-contained, auto-resizes, and requires no login.
+        </p>
+
+        {/* Options */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">Accent Color</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={accentColor}
+                onChange={e => setAccentColor(e.target.value)}
+                className="h-8 w-12 rounded border border-gray-200 cursor-pointer p-0.5"
+              />
+              <Input
+                value={accentColor}
+                onChange={e => setAccentColor(e.target.value)}
+                className="h-8 text-xs font-mono flex-1"
+                placeholder="#14b8a6"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">Theme</Label>
+            <Select value={theme} onValueChange={(v: "light" | "dark") => setTheme(v)}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">CTA Button URL</Label>
+            <Input
+              value={ctaUrl}
+              onChange={e => setCtaUrl(e.target.value)}
+              className="h-8 text-xs"
+              placeholder="https://..."
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">CTA Button Label</Label>
+            <div className="flex items-center gap-3">
+              <Input
+                value={ctaLabel}
+                onChange={e => setCtaLabel(e.target.value)}
+                className="h-8 text-xs flex-1"
+                placeholder="Enroll Now"
+              />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Switch checked={showCta} onCheckedChange={setShowCta} />
+                <span className="text-xs text-gray-500">{showCta ? "Show" : "Hide"}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live preview */}
+        <div className="mb-6">
+          <p className="text-xs font-medium text-gray-600 mb-2">Live Preview</p>
+          <div className="rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
+            <iframe
+              src={iframeSrc}
+              style={{ width: "100%", border: "none", minHeight: 320, display: "block" }}
+              title="Curriculum preview"
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Preview updates as you change options above.</p>
+        </div>
+
+        {/* Embed codes */}
+        <div className="space-y-4">
+          {/* Script tag */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Script Tag (Recommended)</p>
+                <p className="text-xs text-gray-500">Paste before the closing &lt;/body&gt; tag. Auto-resizes the iframe.</p>
+              </div>
+              <Button
+                size="sm" variant="outline" className="h-7 text-xs shrink-0"
+                onClick={() => copy(scriptEmbed, "script")}
+              >
+                <Copy className="h-3 w-3 mr-1" />
+                {copied === "script" ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+            <textarea
+              readOnly
+              value={scriptEmbed}
+              rows={6}
+              className="w-full text-xs font-mono bg-white border border-gray-200 rounded p-2 resize-none focus:outline-none"
+            />
+          </div>
+
+          {/* Direct iframe */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Direct &lt;iframe&gt;</p>
+                <p className="text-xs text-gray-500">Use when script tags are not allowed (e.g. Kajabi, Squarespace).</p>
+              </div>
+              <Button
+                size="sm" variant="outline" className="h-7 text-xs shrink-0"
+                onClick={() => copy(iframeEmbed, "iframe")}
+              >
+                <Copy className="h-3 w-3 mr-1" />
+                {copied === "iframe" ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+            <textarea
+              readOnly
+              value={iframeEmbed}
+              rows={8}
+              className="w-full text-xs font-mono bg-white border border-gray-200 rounded p-2 resize-none focus:outline-none"
+            />
+          </div>
+
+          {/* JSON data endpoint */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">JSON Data Endpoint</p>
+                <p className="text-xs text-gray-500">Use this to build a fully custom UI with your own styles.</p>
+              </div>
+              <Button
+                size="sm" variant="outline" className="h-7 text-xs shrink-0"
+                onClick={() => copy(`${baseUrl}/api/curriculum-embed/data?courseSlug=${slug}`, "json")}
+              >
+                <Copy className="h-3 w-3 mr-1" />
+                {copied === "json" ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+            <Input
+              readOnly
+              value={`${baseUrl}/api/curriculum-embed/data?courseSlug=${slug}`}
+              className="h-8 text-xs font-mono bg-white"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

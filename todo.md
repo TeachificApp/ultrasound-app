@@ -253,6 +253,7 @@
 - [x] Verify and fix AI case generator for AAUS category types (updated prompts, AIUM/SVU/ACR/ARDMS guidelines)
 
 ## Features
+- [x] Curriculum Embed Widget — public REST endpoint (/api/curriculum-embed/data), iframe page (/embed/curriculum/:slug), JS loader (/embed/curriculum.js), admin Embed tab in CourseEditor with live preview and copy buttons
 - [x] Add Course Curriculum block to funnel pages — added getCurriculumById server procedure, CurriculumCourseSelector in BlockSettings, and FunnelCurriculumBlock renderer in PublicFunnelPage
 
 ## Bugs

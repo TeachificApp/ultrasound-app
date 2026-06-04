@@ -39,6 +39,7 @@ import { startSharingMonitor } from "../jobs/sharingMonitor";
 import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
 import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes/scormExtractor";
 import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
+import { registerCurriculumEmbedRoutes } from "../routes/curriculumEmbedRoutes";
 import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
 import { getSessionCookieOptions } from "./cookies";
 import { COOKIE_NAME } from "../../shared/const";
@@ -227,6 +228,8 @@ async function startServer() {
   registerAutoLoginRoute(app);
   // Form embed widget routes (public embed endpoint)
   registerFormEmbedRoutes(app);
+  // Curriculum embed widget routes (public iframe + JS loader for external sites)
+  registerCurriculumEmbedRoutes(app);
   // Dedicated logout route — bypasses tRPC batching so Set-Cookie clear is never merged with other responses
   app.post("/api/auth/logout", (req, res) => {
     const opts = getSessionCookieOptions(req);
