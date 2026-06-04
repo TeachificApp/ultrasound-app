@@ -716,15 +716,15 @@ export default function Checkout() {
                     className="mt-0.5"
                     style={subscriptionAcknowledged ? { backgroundColor: primary, borderColor: primary } : {}}
                   />
-                  <Label
+                  <label
                     htmlFor="subscription-ack"
                     className={`text-sm leading-relaxed cursor-pointer ${isDark ? "text-gray-300" : "text-gray-700"}`}
                   >
                     {sessionMeta.billingLabel
-                      ? <>I understand this is a <strong>recurring subscription</strong>{" "}({sessionMeta.billingLabel.replace(/\s*[—–-].*$/i, "").trim()}). I can cancel anytime from my account.</>
-                      : <>I understand this is a <strong>recurring subscription</strong>. I can cancel anytime from my account.</>
+                      ? `I understand this is a recurring subscription (${sessionMeta.billingLabel.replace(/\s*[—–-].*$/i, "").trim()}). I can cancel anytime from my account.`
+                      : "I understand this is a recurring subscription. I can cancel anytime from my account."
                     }
-                  </Label>
+                  </label>
                 </div>
               )}
 
