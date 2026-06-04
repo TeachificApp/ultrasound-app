@@ -8,7 +8,7 @@ import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getOrCreateUserByEmail } from "../db";
 import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users } from "../../drizzle/schema";
-import { eq, and, asc, desc, sql, inArray, or, like, isNotNull, ne } from "drizzle-orm";
+import { eq, and, asc, desc, sql, inArray, or, like, isNotNull } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 
 function slugify(text: string): string {
@@ -641,19 +641,22 @@ export const funnelRouter = router({
         : `${input.origin}/${funnel.slug}/${page.slug}?success=1`;
       const cancelUrl = `${input.origin}/${funnel.slug}/${page.slug}`;
 
+      const funnelCheckoutMeta = {
+          type: "funnel_purchase",
+          funnel_id: funnel.id.toString(),
+          funnel_page_id: page.id.toString(),
+          user_id: ctx.user.id.toString(),
+          customer_email: ctx.user.email ?? "",
+        };
+
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,
         client_reference_id: ctx.user.id.toString(),
         allow_promotion_codes: true,
         line_items: lineItems,
-        metadata: {
-          type: "funnel_purchase",
-          funnel_id: funnel.id.toString(),
-          funnel_page_id: page.id.toString(),
-          user_id: ctx.user.id.toString(),
-          customer_email: ctx.user.email ?? "",
-        },
+        metadata: funnelCheckoutMeta,
+        payment_intent_data: { metadata: funnelCheckoutMeta },
         success_url: successUrl,
         cancel_url: cancelUrl,
       });
@@ -1165,12 +1168,7 @@ export const funnelPublicRouter = router({
       const successUrl = resolveSuccessUrl(successRedirect);
       const cancelUrl = `${input.origin}/${funnel.slug}/${page.slug}`;
 
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        customer_email: input.email,
-        allow_promotion_codes: true,
-        line_items: lineItems,
-        metadata: {
+      const funnelFormMeta = {
           type: "funnel_form_purchase",
           funnel_id: funnel.id.toString(),
           funnel_page_id: page.id.toString(),
@@ -1184,7 +1182,15 @@ export const funnelPublicRouter = router({
           product_id: selectedProduct.productId ? selectedProduct.productId.toString() : "",
           success_url: successUrl.slice(0, 490),
           brand_mode: checkoutBlock.data?.brandMode ?? "aaus",
-        },
+        };
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: input.email,
+        allow_promotion_codes: true,
+        line_items: lineItems,
+        metadata: funnelFormMeta,
+        payment_intent_data: { metadata: funnelFormMeta },
         success_url: successUrl,
         cancel_url: cancelUrl,
       });
@@ -1335,7 +1341,7 @@ export const funnelPublicRouter = router({
               to: { name: customerName || firstName, email: input.email },
               subject: `Your account is ready — set your password to access ${selectedProduct.name || "your purchase"}`,
               htmlBody: emailContent.htmlBody,
-              previewText: `Set your password to access your ${selectedProduct.name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™"}`,
+              previewText: `Set your password to access your ${selectedProduct.name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
             });
             console.log(`[FreeCheckout] Sent set-password email to ${input.email} (new user ${resolvedUserId})`);
           } catch (emailErr) {
@@ -1720,6 +1726,18 @@ export const funnelPublicRouter = router({
       // ── Build Stripe session ─────────────────────────────────────────────────
       const successUrl = `${input.origin}/my-dashboard?purchase=success&product=${encodeURIComponent(productName)}`;
       const cancelUrl = `${input.origin}`;
+      const quickCheckoutMeta = {
+        type: "funnel_form_purchase",
+        product_type: input.productType,
+        product_id: input.productId.toString(),
+        product_name: productName.slice(0, 490),
+        customer_email: input.email ?? "",
+        funnel_id: input.funnelId?.toString() ?? "",
+        funnel_page_id: input.pageId?.toString() ?? "",
+        user_id: ctx.user?.id?.toString() ?? "",
+        success_url: successUrl.slice(0, 490),
+        ...(input.productType === "course" ? { fulfillment_course_id: input.productId.toString() } : {}),
+      };
       const sessionParams: any = {
         mode: "payment",
         allow_promotion_codes: true,
@@ -1731,17 +1749,8 @@ export const funnelPublicRouter = router({
           },
           quantity: 1,
         }],
-        metadata: {
-          type: "funnel_form_purchase",
-          product_type: input.productType,
-          product_id: input.productId.toString(),
-          product_name: productName.slice(0, 490),
-          customer_email: input.email ?? "",
-          funnel_id: input.funnelId?.toString() ?? "",
-          funnel_page_id: input.pageId?.toString() ?? "",
-          user_id: ctx.user?.id?.toString() ?? "",
-          success_url: successUrl.slice(0, 490),
-        },
+        metadata: quickCheckoutMeta,
+        payment_intent_data: { metadata: quickCheckoutMeta },
         success_url: successUrl,
         cancel_url: cancelUrl,
       };
@@ -2668,26 +2677,5 @@ export const funnelAdminRouter = router({
       });
 
       return { csvContent: [header, ...csvRows].join("\n"), total: rows.length };
-    }),
-
-  /** List all courses with their slug for the CTA action picker (Landing Page option) */
-  listCourseLandingPages: protectedProcedure
-    .query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const courses = await db
-        .select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, status: lmsCourses.status })
-        .from(lmsCourses)
-        .where(and(isNotNull(lmsCourses.slug), ne(lmsCourses.slug, "")))
-        .orderBy(asc(lmsCourses.title));
-      return courses.map(c => ({
-        id: c.id,
-        title: c.title,
-        slug: c.slug!,
-        type: c.type,
-        status: c.status,
-        url: `/courses/${c.slug}`,
-      }));
     }),
 });

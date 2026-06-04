@@ -8,13 +8,13 @@
  *   https://buy.stripe.com/7sYcN475Lcs94Nm3hH9R604
  *
  * When a payment completes, this webhook:
- *  1. Verifies the Stripe signature (if STRIPE_WEBHOOK_SECRET is set)
+ *  1. Verifies the Stripe signature (if getStripeWebhookSecret() is set)
  *  2. Identifies the buyer by email
  *  3. Marks hasConcierge = true on their diySubscription
  *  4. Sends an owner notification via notifyOwner()
  *  5. Logs the event to webhookEvents table
  */
-import type { Express, Request, Response } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
 import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, pendingFulfillments, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, communityMembers } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
@@ -26,7 +26,9 @@ import { generateAutoLoginToken } from "../routes/autoLogin";
 import { createPendingFulfillmentRecord, executeFulfillment, getCourseSlug } from "../lib/fulfillmentEngine";
 
 // Stripe webhook secret — optional but strongly recommended in production
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+function getStripeWebhookSecret(): string {
+  return process.env.STRIPE_WEBHOOK_SECRET ?? "";
+}
 
 // Stripe Concierge product price ID (from the payment link)
 const CONCIERGE_PRICE_ID = "price_concierge_4997"; // update if Stripe price ID is known
@@ -334,6 +336,45 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
     });
   }
   console.log(`[Stripe] LMS order ${resolvedOrderId ?? 'N/A'} fulfilled for user ${userId}, course ${courseId}${isHostedCheckoutFallback ? ' (hosted checkout fallback)' : ''}`);
+
+
+  try {
+    const customerEmail = (session.customer_email as string)
+      ?? (session.customer_details as Record<string, string>)?.email;
+    if (customerEmail) {
+      const [courseRow] = await db
+        .select({ title: lmsCourses.title, slug: lmsCourses.slug })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, courseId))
+        .limit(1);
+      const baseUrl = "https://app.allaboutultrasound.com";
+      const coursePlayerUrl = courseRow?.slug
+        ? `${baseUrl}/courses/${courseRow.slug}`
+        : `${baseUrl}/my-dashboard`;
+      let autoLoginUrl = coursePlayerUrl;
+      try {
+        const token = await generateAutoLoginToken(userId!, coursePlayerUrl);
+        autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
+      } catch { /* fall back */ }
+      const user = await getUserByEmail(customerEmail);
+      const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
+      const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
+        firstName,
+        productName: courseRow?.title ?? `Course #${courseId}`,
+        amountPaid: (session.amount_total as number) ?? 0,
+        loginUrl: autoLoginUrl,
+        brandMode: "aaus",
+      });
+      await sendEmail({
+        to: { name: user?.name || firstName, email: customerEmail },
+        subject,
+        htmlBody,
+        previewText,
+      });
+    }
+  } catch (emailErr) {
+    console.error("[Stripe] Failed to send LMS purchase confirmation email:", emailErr);
+  }
 }
 
 async function handleDigitalDownloadCheckoutCompleted(session: Record<string, unknown>) {
@@ -882,7 +923,7 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
 async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, unknown>) {
   const meta = (paymentIntent.metadata ?? {}) as Record<string, string>;
   // Handle both funnel_form_purchase and embedded_checkout_purchase
-  const validTypes = ["funnel_form_purchase", "embedded_checkout_purchase"];
+  const validTypes = ["funnel_form_purchase", "embedded_checkout_purchase", "funnel_purchase"];
   if (!validTypes.includes(meta.type)) return;
 
   const funnelId = meta.funnel_id ? parseInt(meta.funnel_id) : null;
@@ -1025,11 +1066,19 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   }
   // ── END AUTO-ACCOUNT CREATION ────────────────────────────────────────────
 
-  // Idempotency check
-  const [existingPurchase] = await db.select({ id: funnelPurchases.id })
+  // Idempotency check (PaymentIntent and/or Checkout Session)
+  const checkoutSessionId = meta.checkout_session_id ?? null;
+  let existingPurchase: { id: number } | undefined;
+  [existingPurchase] = await db.select({ id: funnelPurchases.id })
     .from(funnelPurchases)
     .where(eq(funnelPurchases.stripePaymentIntentId, piId))
     .limit(1);
+  if (!existingPurchase && checkoutSessionId) {
+    [existingPurchase] = await db.select({ id: funnelPurchases.id })
+      .from(funnelPurchases)
+      .where(eq(funnelPurchases.stripeCheckoutSessionId, checkoutSessionId))
+      .limit(1);
+  }
 
   if (!existingPurchase) {
     // Build order bumps JSON
@@ -1055,6 +1104,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       amountPaid: amountDollars, // stored in DOLLARS (not cents)
       currency: "usd",
       stripePaymentIntentId: piId,
+      stripeCheckoutSessionId: checkoutSessionId,
       sourceType: sourceType as any,
       sourceFunnelId: funnelId,
       sourceFunnelPageId: funnelPageId,
@@ -1073,8 +1123,12 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   } else {
     // Record already exists (created as "pending" by createPaymentIntent) — update to paid
     await db.update(funnelPurchases)
-      .set({ status: "paid", userId: resolvedUserId || undefined })
-      .where(eq(funnelPurchases.stripePaymentIntentId, piId));
+      .set({
+        status: "paid",
+        userId: resolvedUserId || undefined,
+        stripeCheckoutSessionId: checkoutSessionId ?? undefined,
+      })
+      .where(eq(funnelPurchases.id, existingPurchase.id));
     console.log(`[Stripe] Updated existing funnel purchase to paid: PI ${piId}, user ${resolvedUserId}`);
   }
 
@@ -1193,6 +1247,53 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       console.error(`[Stripe] Failed to send purchase confirmation email to ${customerEmail}:`, err);
     }
   }
+}
+
+async function enrichFunnelCheckoutMetadata(meta: Record<string, string>): Promise<Record<string, string>> {
+  const enriched = { ...meta };
+  if (meta.type !== "funnel_purchase" || !meta.funnel_page_id) return enriched;
+  const pageId = parseInt(meta.funnel_page_id);
+  if (Number.isNaN(pageId)) return enriched;
+  const db = await getDb();
+  if (!db) return enriched;
+  const [page] = await db.select().from(funnelPages).where(eq(funnelPages.id, pageId)).limit(1);
+  if (!page) return enriched;
+  if (!enriched.product_type && page.productType) {
+    enriched.product_type = page.productType === "custom" ? "other" : page.productType;
+  }
+  if (!enriched.product_id && page.productId) enriched.product_id = page.productId.toString();
+  if (!enriched.product_name) enriched.product_name = page.customPriceLabel || page.title || "Funnel Product";
+  if (page.productType === "course" && page.productId && !enriched.fulfillment_course_id) {
+    enriched.fulfillment_course_id = page.productId.toString();
+  }
+  return enriched;
+}
+
+async function handleFunnelCheckoutSessionCompleted(session: Record<string, unknown>) {
+  const rawMeta = (session.metadata as Record<string, string>) ?? {};
+  if (!["funnel_purchase", "funnel_form_purchase"].includes(rawMeta.type)) return;
+
+  let meta = await enrichFunnelCheckoutMetadata({ ...rawMeta });
+  meta.checkout_session_id = session.id as string;
+
+  const customerEmail = meta.customer_email
+    ?? (session.customer_email as string)
+    ?? (session.customer_details as Record<string, string>)?.email;
+  if (customerEmail && !meta.customer_email) meta.customer_email = customerEmail;
+
+  const customerDetails = session.customer_details as Record<string, string> | undefined;
+  if (!meta.customer_name && customerDetails?.name) meta.customer_name = customerDetails.name;
+
+  const paymentIntentRaw = session.payment_intent;
+  const paymentIntentId = typeof paymentIntentRaw === "string"
+    ? paymentIntentRaw
+    : (paymentIntentRaw as { id?: string } | undefined)?.id ?? `cs_${session.id}`;
+
+  await handleFunnelPaymentIntentSucceeded({
+    id: paymentIntentId,
+    amount: session.amount_total as number,
+    metadata: meta,
+  });
 }
 
 /**
@@ -1585,224 +1686,113 @@ export async function processStripeSessionById(sessionId: string): Promise<{ ok:
   }
 }
 
+async function processStripeEvent(event: Record<string, unknown>, rawBody: string): Promise<void> {
+  const eventType = event.type as string;
+  const eventId = event.id as string;
+  const logDb = await getDb();
+  try {
+    if (logDb) {
+      await logDb.insert(webhookEvents).values({
+        source: "stripe",
+        resource: eventType.split(".")[0] ?? "checkout",
+        action: eventType.split(".").slice(1).join(".") ?? eventType,
+        email: undefined,
+        outcome: "ignored",
+        message: `Stripe event received: ${eventType} (${eventId})`,
+        rawPayload: rawBody,
+      });
+    }
+  } catch (err) {
+    console.warn("[Stripe] Failed to log webhook event:", err);
+  }
+  try {
+    const sessionObj = (event.data as { object: Record<string, unknown> }).object;
+    if (eventType === "checkout.session.completed") {
+      await handleCheckoutSessionCompleted(sessionObj);
+      await handleEmployerCheckoutCompleted(sessionObj);
+      await handleLmsCheckoutCompleted(sessionObj);
+      await handleFunnelCheckoutSessionCompleted(sessionObj);
+      await handleDigitalDownloadCheckoutCompleted(sessionObj);
+      await handleDigitalBundleCheckoutCompleted(sessionObj);
+      await handleBrandMembershipCheckoutCompleted(sessionObj);
+      await handleDualMembershipCheckoutCompleted(sessionObj);
+      await handlePhysicalProductCheckoutCompleted(sessionObj);
+      await handleMembershipCheckoutCompleted(sessionObj);
+    } else if (eventType === "payment_intent.succeeded") {
+      await handleFunnelPaymentIntentSucceeded(sessionObj);
+    } else if (eventType === "customer.subscription.deleted") {
+      await handleBrandSubscriptionLifecycle(sessionObj, eventType);
+      await handleSubscriptionCancelled(sessionObj);
+    } else if (eventType === "customer.subscription.updated") {
+      await handleBrandSubscriptionLifecycle(sessionObj, eventType);
+    } else if (eventType === "invoice.paid") {
+      await handleInvoicePaid(sessionObj);
+    } else if (eventType === "invoice.payment_failed") {
+      await handleInvoicePaymentFailed(sessionObj);
+    } else {
+      console.log(`[Stripe] Unhandled event type: ${eventType}`);
+    }
+  } catch (err) {
+    console.error(`[Stripe] Error handling event ${eventType}:`, err);
+  }
+}
+
+async function verifyAndParseStripeEvent(
+  rawBody: Buffer,
+  sig: string | undefined
+): Promise<{ event: Record<string, unknown> } | { error: string; status: number }> {
+  const rawBodyStr = rawBody.toString("utf8");
+  const secret = getStripeWebhookSecret();
+  if (secret && sig) {
+    try {
+      const crypto = await import("crypto");
+      const parts = sig.split(",");
+      const tPart = parts.find((p) => p.startsWith("t="));
+      const v1Part = parts.find((p) => p.startsWith("v1="));
+      if (!tPart || !v1Part) throw new Error("Invalid signature format");
+      const timestamp = tPart.slice(2);
+      const expectedSig = v1Part.slice(3);
+      const payload = `${timestamp}.${rawBodyStr}`;
+      const hmac = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+      if (hmac !== expectedSig) throw new Error("Signature mismatch");
+      return { event: JSON.parse(rawBodyStr) as Record<string, unknown> };
+    } catch (err) {
+      console.error("[Stripe] Webhook signature verification failed:", err);
+      return { error: "Invalid signature", status: 400 };
+    }
+  }
+  try {
+    return { event: JSON.parse(rawBodyStr) as Record<string, unknown> };
+  } catch {
+    return { error: "Invalid JSON", status: 400 };
+  }
+}
+
+function stripeWebhookRequestHandler(req: Request, res: Response): void {
+  const rawBody = req.body as Buffer;
+  const sig = req.headers["stripe-signature"] as string | undefined;
+  void (async () => {
+    const parsed = await verifyAndParseStripeEvent(rawBody, sig);
+    if ("error" in parsed) {
+      res.status(parsed.status).json({ error: parsed.error });
+      return;
+    }
+    res.status(200).json({ received: true });
+    setImmediate(() => {
+      processStripeEvent(parsed.event, rawBody.toString("utf8")).catch((err) => {
+        console.error("[Stripe] Async webhook processing failed:", err);
+      });
+    });
+  })().catch((err) => {
+    console.error("[Stripe] Webhook handler error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Webhook handler error" });
+  });
+}
+
 export function registerStripeWebhook(app: Express) {
-  // Raw body needed for Stripe signature verification
-  app.post(
-    "/api/webhooks/stripe",
-    // Express raw body middleware for this route only
-    (req: Request, res: Response, next) => {
-      let data = "";
-      req.setEncoding("utf8");
-      req.on("data", (chunk: string) => { data += chunk; });
-      req.on("end", () => {
-        (req as Request & { rawBody: string }).rawBody = data;
-        next();
-      });
-    },
-    async (req: Request & { rawBody?: string }, res: Response) => {
-      const rawBody = req.rawBody ?? "";
-      const sig = req.headers["stripe-signature"] as string | undefined;
-
-      let event: Record<string, unknown>;
-
-      // Verify signature if secret is configured
-      if (STRIPE_WEBHOOK_SECRET && sig) {
-        try {
-          // Simple HMAC verification without the Stripe SDK
-          const crypto = await import("crypto");
-          const parts = sig.split(",");
-          const tPart = parts.find((p) => p.startsWith("t="));
-          const v1Part = parts.find((p) => p.startsWith("v1="));
-          if (!tPart || !v1Part) throw new Error("Invalid signature format");
-          const timestamp = tPart.slice(2);
-          const expectedSig = v1Part.slice(3);
-          const payload = `${timestamp}.${rawBody}`;
-          const hmac = crypto
-            .createHmac("sha256", STRIPE_WEBHOOK_SECRET)
-            .update(payload)
-            .digest("hex");
-          if (hmac !== expectedSig) throw new Error("Signature mismatch");
-          event = JSON.parse(rawBody) as Record<string, unknown>;
-        } catch (err) {
-          console.error("[Stripe] Webhook signature verification failed:", err);
-          res.status(400).json({ error: "Invalid signature" });
-          return;
-        }
-      } else {
-        // No secret configured — accept without verification (dev mode)
-        try {
-          event = JSON.parse(rawBody) as Record<string, unknown>;
-        } catch {
-          res.status(400).json({ error: "Invalid JSON" });
-          return;
-        }
-      }
-
-      const eventType = event.type as string;
-      const eventId = event.id as string;
-
-      // Respond immediately — Stripe requires a fast 2xx response (30s timeout)
-      // All heavy processing happens after the response is sent
-      res.json({ received: true });
-
-      // Log the event (async, after response)
-      const logDb = await getDb();
-      try {
-        if (logDb) {
-          await logDb.insert(webhookEvents).values({
-            source: "stripe",
-            resource: eventType.split(".")[0] ?? "checkout",
-            action: eventType.split(".").slice(1).join(".") ?? eventType,
-            email: undefined,
-            outcome: "ignored",
-            message: `Stripe event received: ${eventType} (${eventId})`,
-            rawPayload: rawBody,
-          });
-        }
-      } catch (err) {
-        console.warn("[Stripe] Failed to log webhook event:", err);
-      }
-
-      // Handle events (async, after response)
-      try {
-        const sessionObj = (event.data as { object: Record<string, unknown> }).object;
-        if (eventType === "checkout.session.completed") {
-          await handleCheckoutSessionCompleted(sessionObj);
-          await handleEmployerCheckoutCompleted(sessionObj);
-          await handleLmsCheckoutCompleted(sessionObj);
-          await handleDigitalDownloadCheckoutCompleted(sessionObj);
-          await handleDigitalBundleCheckoutCompleted(sessionObj);
-          await handleBrandMembershipCheckoutCompleted(sessionObj);
-          await handleDualMembershipCheckoutCompleted(sessionObj);
-          await handlePhysicalProductCheckoutCompleted(sessionObj);
-          await handleMembershipCheckoutCompleted(sessionObj);
-        } else if (eventType === "payment_intent.succeeded") {
-          await handleFunnelPaymentIntentSucceeded(sessionObj);
-        } else if (eventType === "customer.subscription.deleted") {
-          await handleBrandSubscriptionLifecycle(sessionObj, eventType);
-          await handleSubscriptionCancelled(sessionObj);
-        } else if (eventType === "customer.subscription.updated") {
-          await handleBrandSubscriptionLifecycle(sessionObj, eventType);
-        } else if (eventType === "invoice.paid") {
-          await handleInvoicePaid(sessionObj);
-        } else if (eventType === "invoice.payment_failed") {
-          await handleInvoicePaymentFailed(sessionObj);
-        } else {
-          console.log(`[Stripe] Unhandled event type: ${eventType}`);
-        }
-      } catch (err) {
-        console.error(`[Stripe] Error handling event ${eventType}:`, err);
-      }
-    }
-  );
-
-  // Also register at /api/stripe/webhook (production webhook URL)
-  // NOTE: We cannot use app.handle() to forward because the raw body stream is
-  // consumed on first read. Instead we register the full middleware stack again.
-  app.post(
-    "/api/stripe/webhook",
-    (req: Request, res: Response, next) => {
-      let data = "";
-      req.setEncoding("utf8");
-      req.on("data", (chunk: string) => { data += chunk; });
-      req.on("end", () => {
-        (req as Request & { rawBody: string }).rawBody = data;
-        next();
-      });
-    },
-    async (req: Request & { rawBody?: string }, res: Response) => {
-      const rawBody = req.rawBody ?? "";
-      const sig = req.headers["stripe-signature"] as string | undefined;
-
-      let event: Record<string, unknown>;
-
-      if (STRIPE_WEBHOOK_SECRET && sig) {
-        try {
-          const crypto = await import("crypto");
-          const parts = sig.split(",");
-          const tPart = parts.find((p) => p.startsWith("t="));
-          const v1Part = parts.find((p) => p.startsWith("v1="));
-          if (!tPart || !v1Part) throw new Error("Invalid signature format");
-          const timestamp = tPart.slice(2);
-          const expectedSig = v1Part.slice(3);
-          const payload = `${timestamp}.${rawBody}`;
-          const hmac = crypto
-            .createHmac("sha256", STRIPE_WEBHOOK_SECRET)
-            .update(payload)
-            .digest("hex");
-          if (hmac !== expectedSig) throw new Error("Signature mismatch");
-          event = JSON.parse(rawBody) as Record<string, unknown>;
-        } catch (err) {
-          console.error("[Stripe] /api/stripe/webhook signature verification failed:", err);
-          res.status(400).json({ error: "Invalid signature" });
-          return;
-        }
-      } else {
-        try {
-          event = JSON.parse(rawBody) as Record<string, unknown>;
-        } catch {
-          res.status(400).json({ error: "Invalid JSON" });
-          return;
-        }
-      }
-
-      // Immediately acknowledge receipt — Stripe requires a fast 2xx response
-      // All processing is done before responding but we respond first to avoid timeouts
-      const eventType = event.type as string;
-      const eventId = event.id as string;
-
-      // Respond immediately to prevent Stripe timeout (30s limit)
-      res.json({ received: true });
-
-      // Process asynchronously after responding
-      const logDb = await getDb();
-      try {
-        if (logDb) {
-          await logDb.insert(webhookEvents).values({
-            source: "stripe",
-            resource: eventType.split(".")[0] ?? "checkout",
-            action: eventType.split(".").slice(1).join(".") ?? eventType,
-            email: undefined,
-            outcome: "ignored",
-            message: `Stripe event received: ${eventType} (${eventId})`,
-            rawPayload: rawBody,
-          });
-        }
-      } catch (err) {
-        console.warn("[Stripe] Failed to log webhook event:", err);
-      }
-
-      try {
-        const sessionObj = (event.data as { object: Record<string, unknown> }).object;
-        if (eventType === "checkout.session.completed") {
-          await handleCheckoutSessionCompleted(sessionObj);
-          await handleEmployerCheckoutCompleted(sessionObj);
-          await handleLmsCheckoutCompleted(sessionObj);
-          await handleDigitalDownloadCheckoutCompleted(sessionObj);
-          await handleDigitalBundleCheckoutCompleted(sessionObj);
-          await handleBrandMembershipCheckoutCompleted(sessionObj);
-          await handleDualMembershipCheckoutCompleted(sessionObj);
-          await handlePhysicalProductCheckoutCompleted(sessionObj);
-          await handleMembershipCheckoutCompleted(sessionObj);
-        } else if (eventType === "payment_intent.succeeded") {
-          await handleFunnelPaymentIntentSucceeded(sessionObj);
-        } else if (eventType === "customer.subscription.deleted") {
-          await handleBrandSubscriptionLifecycle(sessionObj, eventType);
-          await handleSubscriptionCancelled(sessionObj);
-        } else if (eventType === "customer.subscription.updated") {
-          await handleBrandSubscriptionLifecycle(sessionObj, eventType);
-        } else if (eventType === "invoice.paid") {
-          await handleInvoicePaid(sessionObj);
-        } else if (eventType === "invoice.payment_failed") {
-          await handleInvoicePaymentFailed(sessionObj);
-        } else {
-          console.log(`[Stripe] Unhandled event type: ${eventType}`);
-        }
-      } catch (err) {
-        console.error(`[Stripe] Error handling event ${eventType}:`, err);
-      }
-    }
-  );
-
+  const rawJson = express.raw({ type: "application/json" });
+  for (const path of ["/api/webhooks/stripe", "/api/stripe/webhook"]) {
+    app.post(path, rawJson, stripeWebhookRequestHandler);
+  }
   console.log("[Stripe] Webhook registered at /api/webhooks/stripe and /api/stripe/webhook");
 }
