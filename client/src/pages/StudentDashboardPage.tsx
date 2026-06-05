@@ -820,7 +820,7 @@ function MyContentTab() {
           <button
             key={t.key}
             onClick={() => setContentTab(t.key)}
-            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
               contentTab === t.key ? "bg-white text-[#189aa1] shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
           >
