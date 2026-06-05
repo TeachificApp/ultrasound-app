@@ -4,7 +4,7 @@
  * Extracted into its own file to break the circular dependency between CoursePlayer and LandingPageBuilder.
  */
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
+import { Award, ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import CarouselBlock from "@/components/CarouselBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
@@ -87,7 +87,8 @@ export type BlockType =
   | "webinar_host_bio"
   | "webinar_replay"
   | "webinar_agenda"
-  | "conditional_text";
+  | "conditional_text"
+  | "sdms_cme_module";
 
 export interface Block {
   id: string;
@@ -2316,7 +2317,7 @@ function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
   const triggerScrollPct: number = d.triggerScrollPercent ?? 50;
   const accentColor: string = d.accentColor ?? "#179ca3";
   const bgColor: string = d.bgColor ?? "#f0fdfa";
-  const productType: string = d.productType ?? "course"; // course | download | product
+  const productType = (["course", "download", "product"].includes(d.productType) ? d.productType : "course") as "course" | "download" | "product";
   const productSlug: string = d.productSlug ?? "";
   const productId: number | null = d.productId ? Number(d.productId) : null;
   const discountType: string = d.discountType ?? "none"; // none | percent | fixed | promo_code
@@ -2337,7 +2338,7 @@ function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
     ? Math.max(0, originalPrice - discountValue * 100)
     : originalPrice;
 
-  const createCheckout = trpc.lms.upgradePromptCheckout.useMutation();
+  const createCheckout = trpc.lmsLearner.upgradePromptCheckout.useMutation();
 
   async function handleCTA() {
     if (!user) {
