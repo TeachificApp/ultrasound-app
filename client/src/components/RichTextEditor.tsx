@@ -312,12 +312,23 @@ async function uploadVideoToMediaRepo(
   file: File,
   onProgress: (pct: number) => void,
 ): Promise<string> {
-  // 1. Init upload session
+  const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+
+  // 1. Init upload session with all required fields
   const initRes = await fetch("/api/upload-media-repo/init", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type || "video/mp4",
+      totalChunks,
+      fileSize: file.size,
+      title: file.name.replace(/\.[^.]+$/, ""),
+      access: "public",
+      mediaType: "video",
+      notes: "Uploaded via rich text editor",
+    }),
   });
   if (!initRes.ok) {
     const e = await initRes.json().catch(() => ({}));
@@ -326,7 +337,6 @@ async function uploadVideoToMediaRepo(
   const { uploadId } = await initRes.json();
 
   // 2. Send chunks
-  const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
   let lastResult: any = null;
 
   for (let i = 0; i < totalChunks; i++) {

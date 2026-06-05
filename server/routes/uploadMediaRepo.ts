@@ -313,6 +313,7 @@ router.post(
       .limit(1);
 
     if (!session) {
+      console.error(`[upload-media-repo/chunk] Session not found for uploadId=${uploadId} (chunkIndex=${chunkIndex})`);
       res.status(404).json({ error: "Upload session not found — please restart the upload" });
       return;
     }

@@ -4677,3 +4677,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire bundle purchase to grant access to all included items
 - [x] Fix cohort Activity popup stuck on Loading for Assignments and Lesson Progress
 - [x] Fix checkout 'Cannot convert undefined or null to object' error — added missing termsUrl/privacyUrl to platformSettings schema + cleared stale stripe_price_ids
+- [x] Fix video upload in rich text editor - init endpoint was sending empty body, causing session creation issues
