@@ -16,7 +16,7 @@
  */
 import express, { type Express, type Request, type Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, pendingFulfillments, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, communityMembers, bundles, bundleItems, bundleEnrollments, webinarRegistrations } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, pendingFulfillments, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, communityMembers, bundles, bundleItems, bundleEnrollments, webinarRegistrations, funnelPages } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -155,17 +155,12 @@ async function handleMembershipCheckoutCompleted(session: Record<string, unknown
   // Get plan info for notification
   const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.id, planId)).limit(1);
 
-  // Create new subscription record
+  // Create new subscription record (schema: membership_subscriptions)
   await db.insert(membershipSubscriptions).values({
     userId,
     planId,
     status: "active",
     stripeSubscriptionId: stripeSubscriptionId ?? null,
-    stripeCheckoutSessionId: sessionId,
-    currentPeriodStart: Date.now(),
-    currentPeriodEnd: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
   });
 
   // Increment discount code usage if one was applied
@@ -553,18 +548,11 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
     return;
   }
 
-  // Determine purchase type from metadata
-  const purchaseType = (meta.purchase_type === "subscription" ? "subscription" : "one_time") as "one_time" | "subscription";
-  const subscriptionId = (session.subscription as string) ?? null;
-
-  // Record bundle purchase
+  // Record bundle purchase (schema: digital_bundle_purchases — session id only)
   await db.insert(digitalBundlePurchases).values({
     userId,
     bundleId,
     stripeCheckoutSessionId: session.id as string,
-    purchaseType,
-    stripeSubscriptionId: subscriptionId ?? undefined,
-    subscriptionStatus: purchaseType === "subscription" ? "active" : undefined,
   });
 
   // Grant access to all products in the bundle
@@ -823,44 +811,57 @@ async function handleEmployerCheckoutCompleted(session: Record<string, unknown>)
   }
 
   const db = await getDb();
+  if (!db) return;
 
-  // Ensure employer profile exists
+  const paymentIntentId = (session.payment_intent as string) ?? null;
+  const subscriptionId = (session.subscription as string) ?? meta.subscription_id ?? null;
+
+  // Ensure employer profile exists (schema: employer_profiles.id → employer_subscriptions.employer_id)
   const [existingProfile] = await db.select({ id: employerProfiles.id })
     .from(employerProfiles).where(eq(employerProfiles.userId, userId)).limit(1);
-  const profileId = existingProfile?.id ?? (
-    await db.insert(employerProfiles).values({ userId, companyName: meta.company_name ?? "My Company", status: "active" })
+  const employerId = existingProfile?.id ?? (
+    await db.insert(employerProfiles).values({ userId, companyName: meta.company_name ?? "My Company" })
       .then(([r]: any) => (r as { insertId: number }).insertId)
   );
 
   if (productType === "employer_job_post") {
     // Add 1 job post credit
     const [existing] = await db.select().from(employerSubscriptions)
-      .where(and(eq(employerSubscriptions.employerProfileId, profileId), eq(employerSubscriptions.plan, "job_post"))).limit(1);
+      .where(and(eq(employerSubscriptions.employerId, employerId), eq(employerSubscriptions.plan, "job_post"))).limit(1);
     if (existing) {
       await db.update(employerSubscriptions)
         .set({ jobCredits: sql`${employerSubscriptions.jobCredits} + 1`, status: "active" })
         .where(eq(employerSubscriptions.id, existing.id));
     } else {
       await db.insert(employerSubscriptions).values({
-        employerProfileId: profileId, plan: "job_post", status: "active",
-        stripeSessionId: session.id as string, jobCredits: 1,
+        employerId,
+        plan: "job_post",
+        status: "active",
+        stripePaymentIntentId: paymentIntentId,
+        jobCredits: 1,
       });
     }
     console.log(`[Stripe] Employer job post credit added for userId=${userId}`);
   } else if (productType === "employer_subscription") {
     // Upsert unlimited subscription
     const [existing] = await db.select().from(employerSubscriptions)
-      .where(and(eq(employerSubscriptions.employerProfileId, profileId), eq(employerSubscriptions.plan, "unlimited"))).limit(1);
+      .where(and(eq(employerSubscriptions.employerId, employerId), eq(employerSubscriptions.plan, "unlimited"))).limit(1);
     const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
     if (existing) {
       await db.update(employerSubscriptions)
-        .set({ status: "active", currentPeriodEnd: periodEnd, stripeSubscriptionId: meta.subscription_id ?? existing.stripeSubscriptionId })
+        .set({
+          status: "active",
+          currentPeriodEnd: periodEnd,
+          stripeSubscriptionId: subscriptionId ?? existing.stripeSubscriptionId,
+        })
         .where(eq(employerSubscriptions.id, existing.id));
     } else {
       await db.insert(employerSubscriptions).values({
-        employerProfileId: profileId, plan: "unlimited", status: "active",
-        stripeSessionId: session.id as string,
-        stripeSubscriptionId: meta.subscription_id,
+        employerId,
+        plan: "unlimited",
+        status: "active",
+        stripePaymentIntentId: paymentIntentId,
+        stripeSubscriptionId: subscriptionId,
         currentPeriodEnd: periodEnd,
       });
     }
@@ -1049,7 +1050,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
           const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
             firstName,
             productName,
-            amountPaid: amount ?? 0,
+            amountPaid: amountDollars ?? 0,
             orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
             loginUrl: autoLoginUrlExisting,
             brandMode: brandMode as any,
@@ -1321,7 +1322,7 @@ async function handleLmsBundlePurchaseCompleted(session: Record<string, unknown>
           .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, userId)))
           .limit(1);
         if (!existingCourseEnr) {
-          await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId, source: "bundle" });
+          await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId, enrollmentType: "full" });
           grantedItems.push(`course:${item.itemId}`);
         }
       } else if (item.itemType === "download") {
@@ -1493,7 +1494,7 @@ async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
       if (order) {
         await db.delete(lmsEnrollments)
           .where(and(eq(lmsEnrollments.userId, order.userId), eq(lmsEnrollments.courseId, order.courseId)));
-        await db.update(lmsOrders).set({ status: "cancelled" }).where(eq(lmsOrders.id, order.id));
+        await db.update(lmsOrders).set({ status: "failed" }).where(eq(lmsOrders.id, order.id));
         console.log(`[Stripe] LMS enrollment revoked after failed payments: userId=${order.userId} courseId=${order.courseId}`);
         await notifyOwner({
           title: "⚠️ LMS Access Revoked — Failed Payments",
@@ -1538,19 +1539,8 @@ async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
     }
   }
 
-  // ── Paid community: revoke on final failure ──────────────────────────────
-  if (shouldCancel && subscriptionId) {
-    try {
-      const [cm] = await db.select().from(communityMembers)
-        .where(eq(communityMembers.stripeSubscriptionId, subscriptionId)).limit(1);
-      if (cm) {
-        await db.delete(communityMembers).where(eq(communityMembers.id, cm.id));
-        console.log(`[Stripe] Community membership removed after failed payments: userId=${cm.userId} communityId=${cm.communityId}`);
-      }
-    } catch (err) {
-      console.error(`[Stripe] handleInvoicePaymentFailed: community revocation error for sub ${subscriptionId}:`, err);
-    }
-  }
+  // Paid community subscription revoke: community_members has stripe_payment_intent_id only
+  // (no stripe_subscription_id column). Skip until schema supports subscription linkage.
 }
 
 /**
@@ -1589,8 +1579,7 @@ async function handleInvoicePaid(invoice: Record<string, unknown>) {
         await db.insert(lmsEnrollments).values({
           userId: order.userId,
           courseId: order.courseId,
-          enrolledAt: new Date(),
-          enrollmentType: "paid",
+          enrollmentType: "full",
           orderId: order.id,
         });
         console.log(`[Stripe] LMS re-enrolled userId=${order.userId} courseId=${order.courseId} on renewal`);
@@ -1631,47 +1620,8 @@ async function handleInvoicePaid(invoice: Record<string, unknown>) {
     console.error(`[Stripe] handleInvoicePaid: membership renewal error for sub ${subscriptionId}:`, err);
   }
 
-  // ── 3. Paid community membership ────────────────────────────────────────
-  try {
-    const [cm] = await db.select().from(communityMembers)
-      .where(eq(communityMembers.stripeSubscriptionId, subscriptionId)).limit(1);
-    if (cm && cm.memberStatus !== "approved") {
-      await db.update(communityMembers).set({ memberStatus: "approved" })
-        .where(eq(communityMembers.id, cm.id));
-      console.log(`[Stripe] Community membership re-approved on renewal: userId=${cm.userId} communityId=${cm.communityId}`);
-    }
-  } catch (err) {
-    console.error(`[Stripe] handleInvoicePaid: community renewal error for sub ${subscriptionId}:`, err);
-  }
-
-  // ── 4. Digital bundle subscription ──────────────────────────────────────
-  try {
-    const [bundlePurchase] = await db.select().from(digitalBundlePurchases)
-      .where(eq(digitalBundlePurchases.stripeSubscriptionId, subscriptionId)).limit(1);
-    if (bundlePurchase) {
-      const newPeriodEnd = periodEnd ? new Date(periodEnd) : undefined;
-      await db.update(digitalBundlePurchases)
-        .set({ subscriptionStatus: "active", subscriptionCurrentPeriodEnd: newPeriodEnd })
-        .where(eq(digitalBundlePurchases.id, bundlePurchase.id));
-      // Re-grant access to all bundle items if they were revoked
-      const bundleItems = await db.select().from(digitalBundleItems)
-        .where(eq(digitalBundleItems.bundleId, bundlePurchase.bundleId));
-      for (const item of bundleItems) {
-        const [existingPurchase] = await db.select().from(digitalPurchases)
-          .where(and(eq(digitalPurchases.userId, bundlePurchase.userId), eq(digitalPurchases.productId, item.productId))).limit(1);
-        if (!existingPurchase) {
-          await db.insert(digitalPurchases).values({
-            userId: bundlePurchase.userId,
-            productId: item.productId,
-            stripeCheckoutSessionId: `sub_renewal_${subscriptionId}`,
-          });
-        }
-      }
-      console.log(`[Stripe] Bundle subscription renewed: userId=${bundlePurchase.userId} bundleId=${bundlePurchase.bundleId}`);
-    }
-  } catch (err) {
-    console.error(`[Stripe] handleInvoicePaid: bundle renewal error for sub ${subscriptionId}:`, err);
-  }
+  // Community / digital-bundle subscription renewals require columns not present on
+  // community_members or digital_bundle_purchases — handled at checkout.session.completed only.
 }
 
 /**
@@ -1695,8 +1645,8 @@ async function handleSubscriptionCancelled(subscription: Record<string, unknown>
       // Remove enrollment — user loses access
       await db.delete(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, order.userId), eq(lmsEnrollments.courseId, order.courseId)));
-      // Mark order as cancelled
-      await db.update(lmsOrders).set({ status: "cancelled" }).where(eq(lmsOrders.id, order.id));
+      // Mark order failed — lms_orders.status enum: pending | paid | failed | refunded
+      await db.update(lmsOrders).set({ status: "failed" }).where(eq(lmsOrders.id, order.id));
       console.log(`[Stripe] LMS enrollment revoked on cancellation: userId=${order.userId} courseId=${order.courseId}`);
       await notifyOwner({
         title: "📚 LMS Subscription Cancelled",
@@ -1734,43 +1684,7 @@ async function handleSubscriptionCancelled(subscription: Record<string, unknown>
     console.error(`[Stripe] handleSubscriptionCancelled: membership revocation error for sub ${subscriptionId}:`, err);
   }
 
-  // ── 3. Paid community membership ────────────────────────────────────────
-  try {
-    const [cm] = await db.select().from(communityMembers)
-      .where(eq(communityMembers.stripeSubscriptionId, subscriptionId)).limit(1);
-    if (cm) {
-      await db.delete(communityMembers).where(eq(communityMembers.id, cm.id));
-      console.log(`[Stripe] Community membership removed on cancellation: userId=${cm.userId} communityId=${cm.communityId}`);
-    }
-  } catch (err) {
-    console.error(`[Stripe] handleSubscriptionCancelled: community revocation error for sub ${subscriptionId}:`, err);
-  }
-
-  // ── 4. Digital bundle subscription ──────────────────────────────────────
-  try {
-    const [bundlePurchase] = await db.select().from(digitalBundlePurchases)
-      .where(eq(digitalBundlePurchases.stripeSubscriptionId, subscriptionId)).limit(1);
-    if (bundlePurchase) {
-      // Mark subscription as cancelled — revoke access to bundle items
-      await db.update(digitalBundlePurchases)
-        .set({ subscriptionStatus: "cancelled" })
-        .where(eq(digitalBundlePurchases.id, bundlePurchase.id));
-      // Remove individual product access granted by this bundle
-      const bundleItems = await db.select().from(digitalBundleItems)
-        .where(eq(digitalBundleItems.bundleId, bundlePurchase.bundleId));
-      for (const item of bundleItems) {
-        await db.delete(digitalPurchases)
-          .where(and(eq(digitalPurchases.userId, bundlePurchase.userId), eq(digitalPurchases.productId, item.productId)));
-      }
-      console.log(`[Stripe] Bundle subscription cancelled: userId=${bundlePurchase.userId} bundleId=${bundlePurchase.bundleId}`);
-      await notifyOwner({
-        title: "📦 Bundle Subscription Cancelled",
-        content: `Subscription ${subscriptionId} cancelled. Bundle access revoked for userId=${bundlePurchase.userId}, bundleId=${bundlePurchase.bundleId}.`,
-      });
-    }
-  } catch (err) {
-    console.error(`[Stripe] handleSubscriptionCancelled: bundle revocation error for sub ${subscriptionId}:`, err);
-  }
+  // Community / digital-bundle subscription cancellation: no stripe_subscription_id on those tables.
 }
 
 /**
