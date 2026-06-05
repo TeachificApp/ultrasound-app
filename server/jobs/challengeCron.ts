@@ -23,6 +23,8 @@ import sgMail from "@sendgrid/mail";
 import crypto from "crypto";
 import { ENV } from "../_core/env";
 import { syncIheUnsubscribes } from "./syncIheUnsubscribes";
+import { CHALLENGE_CATEGORIES, IHE_CHALLENGE_CATEGORIES } from "../../shared/quickfireCategories";
+import { ensureTodaySet } from "../lib/quickfireDailySet";
 
 /**
  * Generate a self-contained HMAC-signed unsubscribe token.
@@ -120,8 +122,8 @@ export async function runChallengeCron() {
     // ── Step 3–7: Run per-brand ──────────────────────────────────────────────
     const BRANDS = ["aaus", "iheartecho"] as const;
     const BRAND_CATEGORIES: Record<string, readonly string[]> = {
-      aaus: ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"],
-      iheartecho: ["ACS", "Adult Echo", "Pediatric Echo", "General"],
+      aaus: CHALLENGE_CATEGORIES,
+      iheartecho: IHE_CHALLENGE_CATEGORIES,
     };
 
     for (const brand of BRANDS) {
@@ -168,7 +170,8 @@ export async function runChallengeCron() {
       }
 
       if (toPublish.length === 0) {
-        console.log(`[ChallengeCron][${brand}] No queued challenges found for ${todayStr}.`);
+        console.log(`[ChallengeCron][${brand}] No queued challenges — running backfill for ${todayStr}.`);
+        await ensureTodaySet(db, todayStr, brand);
         continue;
       }
 

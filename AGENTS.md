@@ -23,6 +23,10 @@ pnpm dev
 
 The server starts on port 3000 (auto-scans for next available port if busy). No database is required to start — the app handles missing `DATABASE_URL` gracefully, returning "DB unavailable" errors from tRPC endpoints.
 
+### Per-brand clinical tool URLs
+
+Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkific-webhook, challenge-cards, social-content, soundbytes) use URL suffixes `-aaus` or `-ihe` (e.g. `/admin/quickfire-ihe`). Legacy paths without a suffix redirect based on hostname. The tRPC `_brand` query param is derived from the path suffix via `shared/brandScopedRoutes.ts` (`detectBrandFromPath`). Platform Admin’s brand toggle sets per-brand card links accordingly. Full deploy/QA handoff: `docs/MANUS_BRAND_URLS.md`.
+
 ### Important caveats
 
 1. **Vite HMR in Cloud VMs**: The `vite.config.ts` sets `hmr.clientPort: 443` and `hmr.protocol: "wss"` for the Manus sandbox proxy. In Cloud Agent VMs, this causes Chrome to hang when loading the dev server UI (hundreds of module requests + failed WSS connection). **Workaround**: Use `pnpm build && node dist/index.js` to verify UI rendering in browser, or rely on curl/tests for API verification. The dev server itself works correctly for API development.

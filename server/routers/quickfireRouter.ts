@@ -41,6 +41,14 @@ import { notifyOwner } from "../_core/notification";
 import { generateVirtualLeaderboard } from "../leaderboardSeed";
 import { createHash } from "crypto";
 import { flashcardGuestDailyUsage } from "../../drizzle/schema";
+import {
+  CHALLENGE_CATEGORIES,
+  IHE_CHALLENGE_CATEGORIES,
+  AAUS_QUESTION_CATEGORIES,
+  IHE_QUESTION_CATEGORIES,
+  getBrandCategoryConfig,
+} from "../../shared/quickfireCategories";
+import { ensureTodaySet, parseDailySetIds } from "../lib/quickfireDailySet";
 
 // ─── IP-based daily flashcard tracker (DB-backed, survives server restarts) ───────
 /** Hash IP for privacy before storing in DB */
@@ -110,331 +118,22 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
   return result;
 }
 
-// Category keys used throughout the daily challenge system (AAUS categories)
-export const CHALLENGE_CATEGORIES = [
-  "Abdominal",
-  "OB/Gyn",
-  "Small Parts",
-  "Vascular",
-  "MSK",
-  "POCUS",
-] as const;
-export type ChallengeCategory = typeof CHALLENGE_CATEGORIES[number];
-// Map category label -> JSON key used in questionIds object
-const CAT_KEY: Record<ChallengeCategory, string> = {
-  "Abdominal": "abdominal",
-  "OB/Gyn": "obgyn",
-  "Small Parts": "smallParts",
-  "Vascular": "vascular",
-  "MSK": "msk",
-  "POCUS": "pocus",
-};
+export { CHALLENGE_CATEGORIES, IHE_CHALLENGE_CATEGORIES };
 
-// IHE-specific challenge categories (echocardiography)
-export const IHE_CHALLENGE_CATEGORIES = [
-  "Adult Echo",
-  "Pediatric Echo",
-  "ACS",
-  "Fetal Echo",
-  "ECG",
-  "POCUS",
-  "Physics",
-] as const;
-export type IHEChallengeCategory = typeof IHE_CHALLENGE_CATEGORIES[number];
-// Map IHE category label -> JSON key used in questionIds object
-const IHE_CAT_KEY: Record<IHEChallengeCategory, string> = {
-  "Adult Echo": "adultEcho",
-  "Pediatric Echo": "pediatricEcho",
-  "ACS": "acs",
-  "Fetal Echo": "fetalEcho",
-  "ECG": "ecg",
-  "POCUS": "pocus",
-  "Physics": "physics",
-};
-
-/** Get the category list and key map for a given brand */
-function getBrandCategoryConfig(brand: string): {
-  categories: readonly string[];
-  catKey: Record<string, string>;
-  defaultMap: Record<string, number | null>;
-  defaultOrder: string[];
-  defaultEnabledSet: Set<string>;
-} {
-  if (brand === "iheartecho") {
-    const defaultMap: Record<string, number | null> = { adultEcho: null, pediatricEcho: null, acs: null, fetalEcho: null, ecg: null, pocus: null, physics: null };
-    return {
-      categories: IHE_CHALLENGE_CATEGORIES,
-      catKey: IHE_CAT_KEY,
-      defaultMap,
-      defaultOrder: ["adultEcho", "pediatricEcho", "acs", "fetalEcho", "ecg", "pocus", "physics"],
-      defaultEnabledSet: new Set(["adultEcho", "pediatricEcho", "acs", "fetalEcho", "ecg", "pocus", "physics"]),
-    };
-  }
-  const defaultMap: Record<string, number | null> = { abdominal: null, obgyn: null, smallParts: null, vascular: null, msk: null, pocus: null };
-  return {
-    categories: CHALLENGE_CATEGORIES,
-    catKey: CAT_KEY,
-    defaultMap,
-    defaultOrder: ["abdominal", "obgyn", "smallParts", "vascular", "msk", "pocus"],
-    defaultEnabledSet: new Set(["abdominal", "obgyn", "smallParts", "vascular", "msk", "pocus"]),
-  };
+function challengeCategoryZod(brand: string) {
+  const cats =
+    brand === "iheartecho"
+      ? ([...IHE_CHALLENGE_CATEGORIES] as [string, ...string[]])
+      : ([...CHALLENGE_CATEGORIES] as [string, ...string[]]);
+  return z.enum(cats as [string, ...string[]]);
 }
 
-/**
- * Parse questionIds from a daily set row.
- * Handles both the legacy array format [id] and the new object format
- * { acs: id|null, adultEcho: id|null, pediatricEcho: id|null, fetalEcho: id|null }.
- */
-function parseDailySetIds(raw: string, brand = "aaus"): Record<string, number | null> {
-  const { defaultMap } = getBrandCategoryConfig(brand);
-  const defaults: Record<string, number | null> = { ...defaultMap };
-  try {
-    const parsed = JSON.parse(raw || "{}");
-    if (Array.isArray(parsed)) {
-      // Legacy: single-question array — treat as first category
-      const firstKey = Object.keys(defaults)[0];
-      return { ...defaults, [firstKey]: parsed[0] ?? null };
-    }
-    return { ...defaults, ...parsed };
-  } catch {
-    return defaults;
-  }
-}
-
-/**
- * Ensure a daily set exists for the given date and brand.
- * Stores one question per category:
-   *   questionIds = JSON object: { abdominal: id|null, vascular: id|null, ob2nd3rd: id|null, pocus: id|null }
- *
- * Priority order per category:
- *   1. Next queued challenge with matching category (draft/scheduled)
- *   2. Fallback: random active non-flashcard question from that category
- */
-async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, date: string, brand: "aaus" | "iheartecho" = "aaus") {
-  const existing = await db
-    .select()
-    .from(quickfireDailySets)
-    .where(and(eq(quickfireDailySets.setDate, date), eq(quickfireDailySets.brand, brand)))
-    .limit(1);
-  if (existing.length > 0) return existing[0];
-
-  const { categories, catKey, defaultMap } = getBrandCategoryConfig(brand);
-  const questionMap: Record<string, number | null> = { ...defaultMap };
-
-  // 0. First, map any already-live challenges for today into the category map
-  const liveChallenges = await db
-    .select()
-    .from(quickfireChallenges)
-    .where(and(eq(quickfireChallenges.status, "live" as any), eq(quickfireChallenges.brand, brand)));
-
-  for (const liveC of liveChallenges) {
-    if (!liveC.category) continue;
-    const key = catKey[liveC.category];
-    if (!key) continue;
-    const ids: number[] = JSON.parse(liveC.questionIds || "[]");
-    if (ids.length > 0 && questionMap[key] === null) {
-      questionMap[key] = ids[0];
-    }
-  }
-
-  // 1. Check for queued challenges per category (publish next in queue for categories not yet covered)
-  const queuedChallenges = await db
-    .select()
-    .from(quickfireChallenges)
-    .where(and(inArray(quickfireChallenges.status, ["draft", "scheduled"] as any[]), eq(quickfireChallenges.brand, brand)))
-    .orderBy(quickfireChallenges.priority, quickfireChallenges.createdAt)
-    .limit(50);
-
-  const usedChallengeIds: number[] = [];
-  const firstCat = categories[0];
-
-  for (const cat of categories) {
-    const key = catKey[cat];
-    // Skip if already covered by a live challenge
-    if (questionMap[key] !== null) continue;
-    const match = queuedChallenges.find(
-      (c) =>
-        !usedChallengeIds.includes(c.id) &&
-        (c.category === cat || (!c.category && cat === firstCat)) &&
-        (!c.publishDate || c.publishDate <= date)
-    );
-    if (match) {
-      const ids: number[] = JSON.parse(match.questionIds || "[]");
-      if (ids.length > 0) {
-        questionMap[key] = ids[0];
-        usedChallengeIds.push(match.id);
-        await db
-          .update(quickfireChallenges)
-          .set({ status: "live", publishDate: match.publishDate ?? date, publishedAt: new Date(), archivedAt: null })
-          .where(eq(quickfireChallenges.id, match.id));
-      }
-    }
-  }
-
-  // Archive previously live challenges that were replaced today (same category, not re-used)
-  // Only archive live challenges for categories that got a new challenge today
-  const categoriesPublishedToday = queuedChallenges
-    .filter((c) => usedChallengeIds.includes(c.id))
-    .map((c) => c.category)
-    .filter(Boolean) as string[];
-
-  if (categoriesPublishedToday.length > 0) {
-    const liveRows = await db
-      .select({ id: quickfireChallenges.id, category: quickfireChallenges.category })
-      .from(quickfireChallenges)
-      .where(and(eq(quickfireChallenges.status, "live"), eq(quickfireChallenges.brand, brand)));
-    for (const row of liveRows) {
-      // Archive only if: this category got a new challenge today AND this row wasn't the one just published
-      if (!usedChallengeIds.includes(row.id) && row.category && categoriesPublishedToday.includes(row.category)) {
-        await db
-          .update(quickfireChallenges)
-          .set({ status: "archived", archivedAt: new Date() })
-          .where(eq(quickfireChallenges.id, row.id));
-      }
-    }
-  }
-
-  // 2. Fallback: for any category still null, pick a random active question
-  // Exclude questions already used in archived/live challenges for the same category (no repeats)
-  // Collect recently used question IDs per category from the last 90 days of archived challenges
-  const recentCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-  const recentArchived = await db
-    .select({ category: quickfireChallenges.category, questionIds: quickfireChallenges.questionIds })
-    .from(quickfireChallenges)
-    .where(and(
-      inArray(quickfireChallenges.status, ["archived", "live"] as any[]),
-      eq(quickfireChallenges.brand, brand),
-      sql`${quickfireChallenges.publishedAt} >= ${recentCutoff}` as any
-    ));
-
-  const usedIdsByCategory: Record<string, Set<number>> = {};
-  for (const row of recentArchived) {
-    const catKey2 = row.category ?? "";
-    if (!usedIdsByCategory[catKey2]) usedIdsByCategory[catKey2] = new Set();
-    try {
-      const ids: number[] = JSON.parse(row.questionIds || "[]");
-      for (const id of ids) usedIdsByCategory[catKey2].add(id);
-    } catch { /* ignore */ }
-  }
-
-  // Track which categories need a fallback live challenge row created
-  const fallbackLiveNeeded: { cat: string; questionId: number }[] = [];
-
-  // Brand filter: only pick questions belonging to this brand
-  const brandFilter = eq(quickfireQuestions.brand, brand as any);
-
-  // Category → echoCategory pool mapping for merged categories
-  // OB/Gyn pulls from Pelvic/Gyn + OB 1st Trimester + OB 2nd/3rd Trimester + Fetal Echo
-  // Small Parts pulls from Small Parts + Breast
-  // Vascular pulls from Vascular (already merged venous+arterial into Vascular)
-  const CAT_POOL_LABELS: Record<string, string[]> = {
-    "OB/Gyn": ["Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "OB/Gyn"],
-    "Small Parts": ["Small Parts", "Breast"],
-    "Vascular": ["Vascular"],
-  };
-
-  for (const cat of categories) {
-    const key = catKey[cat];
-    if (questionMap[key] !== null) continue;
-    const usedIds = Array.from(usedIdsByCategory[cat] ?? new Set<number>());
-    const poolLabels = CAT_POOL_LABELS[cat];
-    const catFilter = poolLabels
-      ? sql`${quickfireQuestions.category} IN (${sql.join(poolLabels.map(c => sql`${c}`), sql`, `)})` as any
-      : sql`${quickfireQuestions.category} = ${cat}` as any;
-
-    // Try scenario questions first (preferred for challenges)
-    const scenarioPool = await db
-      .select({ id: quickfireQuestions.id })
-      .from(quickfireQuestions)
-      .where(and(
-        eq(quickfireQuestions.isActive, true),
-        brandFilter,
-        sql`${quickfireQuestions.type} != 'quickReview'` as any,
-        catFilter,
-        ...(usedIds.length > 0 ? [sql`${quickfireQuestions.id} NOT IN (${sql.join(usedIds.map(id => sql`${id}`), sql`, `)})` as any] : [])
-      ));
-
-    // Fallback 1: scenario pool without dedup exclusion (cycle reset)
-    const scenarioFull = scenarioPool.length > 0 ? scenarioPool : await db
-      .select({ id: quickfireQuestions.id })
-      .from(quickfireQuestions)
-      .where(and(
-        eq(quickfireQuestions.isActive, true),
-        brandFilter,
-        sql`${quickfireQuestions.type} != 'quickReview'` as any,
-        catFilter
-      ));
-
-    if (scenarioFull.length > 0) {
-      const picked = sampleN(scenarioFull, 1)[0].id;
-      questionMap[key] = picked;
-      fallbackLiveNeeded.push({ cat, questionId: picked });
-      continue;
-    }
-
-    // Fallback 2: if no scenario questions at all, use quickReview questions
-    const reviewPool = await db
-      .select({ id: quickfireQuestions.id })
-      .from(quickfireQuestions)
-      .where(and(
-        eq(quickfireQuestions.isActive, true),
-        brandFilter,
-        catFilter,
-        ...(usedIds.length > 0 ? [sql`${quickfireQuestions.id} NOT IN (${sql.join(usedIds.map(id => sql`${id}`), sql`, `)})` as any] : [])
-      ));
-
-    const reviewFull = reviewPool.length > 0 ? reviewPool : await db
-      .select({ id: quickfireQuestions.id })
-      .from(quickfireQuestions)
-      .where(and(
-        eq(quickfireQuestions.isActive, true),
-        brandFilter,
-        catFilter
-      ));
-
-    if (reviewFull.length > 0) {
-      const picked = sampleN(reviewFull, 1)[0].id;
-      questionMap[key] = picked;
-      fallbackLiveNeeded.push({ cat, questionId: picked });
-    }
-  }
-
-  // Alert admin if any category has no questions at all
-  const emptyCats = categories.filter(cat => questionMap[catKey[cat]] === null);
-  if (emptyCats.length > 0) {
-    notifyOwner({
-      title: `⚠️ Daily Challenge [${brand}]: ${emptyCats.length} categor${emptyCats.length === 1 ? 'y has' : 'ies have'} no available questions`,
-      content: `The following categories had no active questions available for today's (${date}) daily challenge and will show no question card:\n\n${emptyCats.map(c => `• ${c}`).join('\n')}\n\nPlease add active questions for these categories in the admin panel.`,
-    }).catch(() => { /* non-blocking */ });
-  }
-
-  // Create live quickfireChallenges rows for fallback categories (so admin queue shows all categories)
-  for (const { cat, questionId } of fallbackLiveNeeded) {
-    // Archive any existing live challenge for this category first
-    await db
-      .update(quickfireChallenges)
-      .set({ status: "archived", archivedAt: new Date() })
-      .where(and(
-        eq(quickfireChallenges.status, "live" as any),
-        eq(quickfireChallenges.category, cat as any),
-        eq(quickfireChallenges.brand, brand)
-      ));
-    // Create a new live challenge row for this category
-    await db.insert(quickfireChallenges).values({
-      title: `${cat} Daily Challenge — ${date}`,
-      description: "",
-      category: cat as any,
-      questionIds: JSON.stringify([questionId]),
-      status: "live" as any,
-      priority: 100,
-      publishDate: date,
-      publishedAt: new Date(),
-    });
-  }
-
-  const questionIds = JSON.stringify(questionMap);
-  await db.insert(quickfireDailySets).values({ setDate: date, brand, questionIds });
-  return { setDate: date, questionIds };
+function questionCategoryZod(brand: string) {
+  const cats =
+    brand === "iheartecho"
+      ? ([...IHE_QUESTION_CATEGORIES] as [string, ...string[]])
+      : ([...AAUS_QUESTION_CATEGORIES] as [string, ...string[]]);
+  return z.enum(cats as [string, ...string[]]);
 }
 
 // ─── Admin guard ─────────────────────────────────────────────────────────────
@@ -1768,26 +1467,32 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
   getCategoryPrefs: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const brandCfg = getBrandCategoryConfig(ctx.brand);
     const [userRow] = await db
       .select({ challengeCategoryPrefs: users.challengeCategoryPrefs })
       .from(users)
       .where(eq(users.id, ctx.user.id))
       .limit(1);
-     const defaults = { abdominal: true, obgyn: true, smallParts: true, vascular: true, msk: true, pocus: true };
+    const defaults = { ...brandCfg.defaultPrefs };
     if (!userRow?.challengeCategoryPrefs) return defaults;
     try {
-      const stored = JSON.parse(userRow.challengeCategoryPrefs);
-      // Migrate legacy keys: if stored has old keys but not new ones, derive them
+      const stored = JSON.parse(userRow.challengeCategoryPrefs) as Record<string, boolean>;
       const migrated: Record<string, boolean> = { ...defaults };
-      if (stored.abdominal !== undefined) migrated.abdominal = stored.abdominal;
-      if (stored.obgyn !== undefined) migrated.obgyn = stored.obgyn;
-      else if (stored.pelvicGyn !== undefined || stored.ob1st !== undefined || stored.ob2nd3rd !== undefined || stored.fetalEcho !== undefined) {
-        migrated.obgyn = [stored.pelvicGyn, stored.ob1st, stored.ob2nd3rd, stored.fetalEcho].some(v => v === true);
+      for (const key of Object.keys(defaults)) {
+        if (stored[key] !== undefined) migrated[key] = stored[key];
       }
-      if (stored.smallParts !== undefined) migrated.smallParts = stored.smallParts;
-      if (stored.vascular !== undefined) migrated.vascular = stored.vascular;
-      if (stored.msk !== undefined) migrated.msk = stored.msk;
-      if (stored.pocus !== undefined) migrated.pocus = stored.pocus;
+      if (ctx.brand === "aaus") {
+        if (stored.obgyn !== undefined) migrated.obgyn = stored.obgyn;
+        else if (
+          stored.pelvicGyn !== undefined ||
+          stored.ob1st !== undefined ||
+          stored.ob2nd3rd !== undefined
+        ) {
+          migrated.obgyn = [stored.pelvicGyn, stored.ob1st, stored.ob2nd3rd, stored.fetalEcho].some(
+            (v) => v === true,
+          );
+        }
+      }
       return migrated;
     } catch {
       return defaults;
@@ -1795,22 +1500,18 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
   }),
   /** Update the current user's daily challenge category preferences */
   updateCategoryPrefs: protectedProcedure
-    .input(
-      z.object({
-        abdominal: z.boolean().default(true),
-        obgyn: z.boolean().default(true),
-        smallParts: z.boolean().default(true),
-        vascular: z.boolean().default(true),
-        msk: z.boolean().default(true),
-        pocus: z.boolean().default(true),
-      })
-    )
+    .input(z.record(z.string(), z.boolean()))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const brandCfg = getBrandCategoryConfig(ctx.brand);
+      const filtered: Record<string, boolean> = {};
+      for (const key of Object.keys(brandCfg.defaultPrefs)) {
+        filtered[key] = input[key] !== false;
+      }
       await db
         .update(users)
-        .set({ challengeCategoryPrefs: JSON.stringify(input) })
+        .set({ challengeCategoryPrefs: JSON.stringify(filtered) })
         .where(eq(users.id, ctx.user.id));
       return { success: true };
     }),
@@ -2023,17 +1724,29 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       description: z.string().max(2000).optional(),
       questionIds: z.array(z.number().int().positive()).min(1).max(1),  // exactly 1 question per challenge
       priority: z.number().int().min(1).default(100),
-      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).optional(),
+      category: z.string().optional(),
       queuePosition: z.number().int().min(1).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      // Duplicate prevention: check if any active/scheduled/draft challenge already uses these question IDs
+      const brandCfg = getBrandCategoryConfig(ctx.brand);
+      const defaultCat = brandCfg.categories[0];
+      if (input.category && !brandCfg.categories.includes(input.category)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Invalid category for ${ctx.brand}. Use: ${brandCfg.categories.join(", ")}`,
+        });
+      }
       const activeChallenges = await db
         .select({ id: quickfireChallenges.id, questionIds: quickfireChallenges.questionIds, title: quickfireChallenges.title })
         .from(quickfireChallenges)
-        .where(inArray(quickfireChallenges.status, ["draft", "scheduled", "live"] as any[]));
+        .where(
+          and(
+            inArray(quickfireChallenges.status, ["draft", "scheduled", "live"] as never[]),
+            eq(quickfireChallenges.brand, ctx.brand),
+          ),
+        );
       for (const ch of activeChallenges) {
         const existingIds: number[] = JSON.parse(ch.questionIds || "[]");
         const conflict = input.questionIds.find((qid) => existingIds.includes(qid));
@@ -2050,7 +1763,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         questionIds: JSON.stringify(input.questionIds),
         priority: input.priority,
         brand: ctx.brand,
-        category: (input.category as any) ?? "Abdominal",
+        category: (input.category as never) ?? (defaultCat as never),
         status: "scheduled",
         queuePosition: input.queuePosition ?? null,
         createdByUserId: ctx.user.id,
@@ -2065,19 +1778,31 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       description: z.string().max(2000).optional().nullable(),
       questionIds: z.array(z.number().int().positive()).min(1).max(1).optional(),  // exactly 1 question per challenge
       priority: z.number().int().min(1).optional(),
-      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).optional(),
+      category: z.string().optional(),
       queuePosition: z.number().int().min(1).optional().nullable(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const brandCfg = getBrandCategoryConfig(ctx.brand);
+      if (input.category && !brandCfg.categories.includes(input.category)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Invalid category for ${ctx.brand}. Use: ${brandCfg.categories.join(", ")}`,
+        });
+      }
       const { id, questionIds, ...rest } = input;
       // Duplicate prevention: if questionIds are being changed, ensure no other active challenge uses them
       if (questionIds && questionIds.length > 0) {
         const activeChallenges = await db
           .select({ id: quickfireChallenges.id, questionIds: quickfireChallenges.questionIds, title: quickfireChallenges.title })
           .from(quickfireChallenges)
-          .where(inArray(quickfireChallenges.status, ["draft", "scheduled", "live"] as any[]));
+          .where(
+            and(
+              inArray(quickfireChallenges.status, ["draft", "scheduled", "live"] as never[]),
+              eq(quickfireChallenges.brand, ctx.brand),
+            ),
+          );
         for (const ch of activeChallenges) {
           if (ch.id === id) continue; // skip self
           const existingIds: number[] = JSON.parse(ch.questionIds || "[]");
@@ -2105,7 +1830,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
    */
   adminDeleteChallenge: adminProcedure
     .input(z.object({ id: z.number().int().positive() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [ch] = await db
@@ -2132,9 +1857,10 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
           .from(quickfireChallenges)
           .where(
             and(
-              inArray(quickfireChallenges.status, ["queued", "scheduled", "draft"] as any[]),
-              eq(quickfireChallenges.category, category as any)
-            )
+              inArray(quickfireChallenges.status, ["queued", "scheduled", "draft"] as never[]),
+              eq(quickfireChallenges.category, category as never),
+              eq(quickfireChallenges.brand, ctx.brand),
+            ),
           )
           .orderBy(quickfireChallenges.priority, quickfireChallenges.createdAt)
           .limit(1);
@@ -2226,31 +1952,39 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
    */
   adminPublishNextChallenge: adminProcedure
     .input(z.object({ sendNotification: z.boolean().default(true) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const now = new Date();
       const today = now.toISOString().slice(0, 10);
 
-      // 1. Pick next queued challenge (prefer scheduled with publishDate <= today, then draft)
-      const candidates = await db.select().from(quickfireChallenges)
-        .where(inArray(quickfireChallenges.status, ['draft', 'scheduled'] as any[]))
+      const candidates = await db
+        .select()
+        .from(quickfireChallenges)
+        .where(
+          and(
+            inArray(quickfireChallenges.status, ["draft", "scheduled"] as never[]),
+            eq(quickfireChallenges.brand, ctx.brand),
+          ),
+        )
         .orderBy(quickfireChallenges.priority, quickfireChallenges.createdAt)
         .limit(50);
 
       const next = candidates.find((c) => !c.publishDate || c.publishDate <= today) ?? candidates[0];
       if (!next) return { published: false, message: "No challenges in queue" };
 
-      // 2. Archive any existing live challenge for the SAME category only
-      //    (one live per category — other categories keep their own live challenge)
       if (next.category) {
-        await db.update(quickfireChallenges)
+        await db
+          .update(quickfireChallenges)
           .set({ status: "archived", archivedAt: now })
-          .where(and(
-            eq(quickfireChallenges.status, "live"),
-            eq(quickfireChallenges.category, next.category)
-          ));
+          .where(
+            and(
+              eq(quickfireChallenges.status, "live"),
+              eq(quickfireChallenges.category, next.category),
+              eq(quickfireChallenges.brand, ctx.brand),
+            ),
+          );
       }
 
       // 3. Publish the next challenge
