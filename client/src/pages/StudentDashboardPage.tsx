@@ -18,7 +18,7 @@ import {
   User, BookOpen, CreditCard, Award, Camera, Save, Lock, Eye, EyeOff,
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
   Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart, BarChart2, Bell,
-  GraduationCap, BookMarked, PenLine, ArrowRight,
+  GraduationCap, BookMarked, PenLine, ArrowRight, Video, Layers, Users, Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -771,7 +771,7 @@ function CommunityProfileSection({ userId }: { userId: number }) {
 
 // ─── My Content Tab ───────────────────────────────────────────────────────────
 
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "products" | "purchases";
+type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "products" | "bundles" | "memberships" | "communities" | "purchases";
 
 function MyContentTab() {
   const { data, isLoading } = trpc.dashboard.getMyContent.useQuery();
@@ -782,13 +782,17 @@ function MyContentTab() {
   // Auto-select first non-empty tab once data loads
   useEffect(() => {
     if (!data || autoTabSet) return;
-    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "products", "purchases"];
+    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "webinars", "products", "bundles", "memberships", "communities", "purchases"];
     const counts: Record<ContentSubTab, number> = {
-      courses:   data.courses?.length ?? 0,
-      quizzes:   data.quizzes?.length ?? 0,
-      downloads: data.downloads?.length ?? 0,
-      products:  data.physicalProducts?.length ?? 0,
-      purchases: data.funnelPurchases?.length ?? 0,
+      courses:      data.courses?.length ?? 0,
+      quizzes:      data.quizzes?.length ?? 0,
+      downloads:    data.downloads?.length ?? 0,
+      webinars:     data.webinars?.length ?? 0,
+      products:     data.physicalProducts?.length ?? 0,
+      bundles:      data.bundles?.length ?? 0,
+      memberships:  0, // memberships shown in Subscriptions tab
+      communities:  data.communities?.length ?? 0,
+      purchases:    data.funnelPurchases?.length ?? 0,
     };
     const firstNonEmpty = tabOrder.find(t => counts[t] > 0);
     if (firstNonEmpty) {
@@ -800,11 +804,15 @@ function MyContentTab() {
   if (isLoading) return <LoadingSpinner />;
 
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
-    { key: "courses",   label: "Courses",   icon: BookOpen,       count: data?.courses.length ?? 0 },
-    { key: "quizzes",   label: "Quizzes",   icon: ClipboardCheck, count: data?.quizzes.length ?? 0 },
-    { key: "downloads", label: "Downloads", icon: Download,       count: data?.downloads.length ?? 0 },
-    { key: "products",  label: "Products",  icon: Package,        count: data?.physicalProducts.length ?? 0 },
-    { key: "purchases", label: "Purchases",  icon: ShoppingCart,   count: data?.funnelPurchases?.length ?? 0 },
+    { key: "courses",      label: "Courses",      icon: BookOpen,       count: data?.courses.length ?? 0 },
+    { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: data?.quizzes.length ?? 0 },
+    { key: "downloads",    label: "Downloads",    icon: Download,       count: data?.downloads.length ?? 0 },
+    { key: "webinars",     label: "Webinars",     icon: Video,          count: data?.webinars?.length ?? 0 },
+    { key: "products",     label: "Products",     icon: Package,        count: data?.physicalProducts.length ?? 0 },
+    { key: "bundles",      label: "Bundles",      icon: Layers,         count: data?.bundles?.length ?? 0 },
+    { key: "memberships",  label: "Memberships",  icon: Star,           count: 0 },
+    { key: "communities",  label: "Communities",  icon: Users,          count: data?.communities?.length ?? 0 },
+    { key: "purchases",    label: "Purchases",    icon: ShoppingCart,   count: data?.funnelPurchases?.length ?? 0 },
   ];
 
   return (
@@ -949,6 +957,84 @@ function MyContentTab() {
         </div>
       )}
 
+      {/* Webinars */}
+      {contentTab === "webinars" && (
+        <div>
+          {(data?.webinars?.length ?? 0) === 0 ? (
+            <EmptyState icon={Video} title="No webinar registrations" description="Register for a webinar to see it here." />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data?.webinars?.map(w => (
+                <ContentCard
+                  key={w.registrationId}
+                  thumbnail={w.webinarCover}
+                  title={w.webinarTitle}
+                  subtitle={`Registered ${formatDate(w.registeredAt)}${w.scheduledAt ? ` · Scheduled ${formatDate(new Date(w.scheduledAt))}` : ""}`}
+                  badge={w.attended ? "Attended" : w.webinarStatus === "ended" ? "Replay Available" : "Registered"}
+                  badgeColor={w.attended ? "emerald" : w.webinarStatus === "ended" ? "teal" : "blue"}
+                  actions={[
+                    { label: "View Webinar", icon: ExternalLink, href: `/webinar/${w.webinarSlug}` },
+                  ]}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {/* Bundles */}
+      {contentTab === "bundles" && (
+        <div>
+          {(data?.bundles?.length ?? 0) === 0 ? (
+            <EmptyState icon={Layers} title="No bundles purchased" description="Purchase a bundle to see it here." />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data?.bundles?.map(b => (
+                <ContentCard
+                  key={b.enrollmentId}
+                  thumbnail={b.bundleCover}
+                  title={b.bundleTitle}
+                  subtitle={`Enrolled ${formatDate(b.enrolledAt)}`}
+                  badge="Owned"
+                  badgeColor="emerald"
+                  actions={[
+                    { label: "View Bundle", icon: ExternalLink, href: `/bundle/${b.bundleSlug}` },
+                  ]}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {/* Memberships */}
+      {contentTab === "memberships" && (
+        <div>
+          <EmptyState icon={Star} title="Memberships" description="Your memberships are managed in the Subscriptions tab." />
+        </div>
+      )}
+      {/* Communities */}
+      {contentTab === "communities" && (
+        <div>
+          {(data?.communities?.length ?? 0) === 0 ? (
+            <EmptyState icon={Users} title="No community memberships" description="Join a community to see it here." />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data?.communities?.map(c => (
+                <ContentCard
+                  key={c.memberId}
+                  thumbnail={c.communityCover}
+                  title={c.communityTitle}
+                  subtitle={`Joined ${formatDate(c.joinedAt)} · ${c.role}`}
+                  badge={c.role === "admin" ? "Admin" : c.role === "moderator" ? "Moderator" : "Member"}
+                  badgeColor={c.role === "admin" ? "purple" : c.role === "moderator" ? "blue" : "emerald"}
+                  actions={[
+                    { label: "View Community", icon: ExternalLink, href: `/community/${c.communitySlug}` },
+                  ]}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {/* Funnel / Embedded Checkout Purchases */}
       {contentTab === "purchases" && (
         <div>

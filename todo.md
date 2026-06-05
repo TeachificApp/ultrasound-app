@@ -4681,3 +4681,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix site freezing when inserting images in rich text editor - upload to S3 instead of base64 embedding
 - [x] Add resizable settings/edit panel in lesson content editor (drag to resize width)
 - [x] Add 'Preview as Student' button in lesson content editor that opens in new window
+- [ ] Fix student dashboard not showing enrolled courses (Katerin can see enrollment in admin but not in her dashboard)
+- [x] Align content category tabs between admin user view and student dashboard: Courses, Quizzes, Downloads, Webinars, Products, Bundles, Memberships, Subscriptions, Communities

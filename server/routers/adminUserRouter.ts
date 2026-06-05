@@ -102,6 +102,7 @@ export const adminUserRouter = router({
           c.title AS courseTitle,
           c.slug AS courseSlug,
           c.thumbnail_url AS thumbnailUrl,
+          c.type AS courseType,
           (SELECT COUNT(*) FROM lms_video_events WHERE user_id = ${input.userId} AND course_id = c.id AND event_type = 'complete') AS videosCompleted,
           (SELECT COUNT(*) FROM lms_quiz_attempts WHERE user_id = ${input.userId} AND course_id = c.id) AS quizAttempts,
           (SELECT ROUND(AVG(score),1) FROM lms_quiz_attempts WHERE user_id = ${input.userId} AND course_id = c.id) AS avgQuizScore
@@ -252,6 +253,21 @@ export const adminUserRouter = router({
         ORDER BY o.created_at DESC
       `);
 
+      // Bundle enrollments
+      const [bundleEnrollmentList] = await db.execute(sql`
+        SELECT
+          be.id,
+          be.bundle_id AS bundleId,
+          b.title AS bundleTitle,
+          b.slug AS bundleSlug,
+          b.cover_image AS bundleCover,
+          be.enrolled_at AS enrolledAt
+        FROM bundle_enrollments be
+        JOIN bundles b ON b.id = be.bundle_id
+        WHERE be.user_id = ${input.userId}
+        ORDER BY be.enrolled_at DESC
+      `);
+
       // Native membership subscriptions (membership_plans)
       // Note: membership_subscriptions has no current_period_start column, only current_period_end
       const [nativeMemberships] = await db.execute(sql`
@@ -286,6 +302,9 @@ export const adminUserRouter = router({
           courseTitle: String(r.courseTitle),
           courseSlug: String(r.courseSlug),
           thumbnailUrl: r.thumbnailUrl as string | null,
+          isQuiz: String(r.courseType ?? "course") === "quiz",
+          isDownload: String(r.courseType ?? "course") === "download",
+          courseType: String(r.courseType ?? "course"),
           videosCompleted: Number(r.videosCompleted ?? 0),
           quizAttempts: Number(r.quizAttempts ?? 0),
           avgQuizScore: r.avgQuizScore != null ? Number(r.avgQuizScore) : null,
@@ -366,6 +385,14 @@ export const adminUserRouter = router({
           courseId: r.courseId ? Number(r.courseId) : null,
           courseTitle: r.courseTitle ? String(r.courseTitle) : null,
           courseSlug: r.courseSlug ? String(r.courseSlug) : null,
+        })),
+        bundleEnrollments: (bundleEnrollmentList as any[]).map(r => ({
+          id: Number(r.id),
+          bundleId: Number(r.bundleId),
+          bundleTitle: String(r.bundleTitle ?? ""),
+          bundleSlug: String(r.bundleSlug ?? ""),
+          bundleCover: r.bundleCover ? String(r.bundleCover) : null,
+          enrolledAt: r.enrolledAt,
         })),
         nativeMemberships: (nativeMemberships as any[]).map(r => ({
           id: Number(r.id),

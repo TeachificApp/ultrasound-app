@@ -18,7 +18,7 @@ import {
   RefreshCw, Loader2, ChevronRight, ChevronLeft, ShoppingCart,
   UserCog, PlusCircle, Trash2, Shield, ShieldOff, BadgeCheck,
   ClipboardCheck, RotateCcw, DollarSign, Edit3, GitMerge, Mail, X,
-  Users2, Building2, Star,
+  Users2, Building2, Star, Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -389,7 +389,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
 }
 
 // ─── Content Tab ──────────────────────────────────────────────────────────────
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "products" | "memberships" | "communities" | "webinars";
+type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "products" | "bundles" | "memberships" | "communities";
 
 function ContentTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
@@ -449,6 +449,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const quizzes   = enrollments.filter((e: any) => e.isQuiz);
   const downloads = enrollments.filter((e: any) => e.isDownload);
   const physOrders = data.physicalOrders ?? [];
+  const bundleEnrollments = data.bundleEnrollments ?? [];
   const nativeMemberships = data.nativeMemberships ?? [];
   const communityMemberships = data.communityMemberships ?? [];
   const webinarRegistrations = data.webinarRegistrations ?? [];
@@ -457,10 +458,11 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: courses.length },
     { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: quizzes.length },
     { key: "downloads",    label: "Downloads",    icon: Download,       count: downloads.length },
+    { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
     { key: "products",     label: "Products",     icon: Package,        count: physOrders.length },
+    { key: "bundles",      label: "Bundles",      icon: Layers,         count: bundleEnrollments.length },
     { key: "memberships",  label: "Memberships",  icon: Star,           count: nativeMemberships.length },
     { key: "communities",  label: "Communities",  icon: Users2,         count: communityMemberships.length },
-    { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
   ];
 
   return (
@@ -591,6 +593,27 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
         </div>
       )}
 
+      {/* Webinars */}
+      {contentTab === "webinars" && (
+        <div className="space-y-3">
+          <SectionHeader title={`Webinar Registrations (${webinarRegistrations.length})`} />
+          {webinarRegistrations.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No webinar registrations.</p>
+          ) : (
+            webinarRegistrations.map((w: any) => (
+              <div key={w.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-4">
+                <div>
+                  <h4 className="font-semibold text-gray-800 text-sm">{w.webinarTitle ?? "Webinar"}</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">Registered {formatDate(w.registeredAt ?? w.createdAt)}</p>
+                  {w.attendedAt && <p className="text-xs text-gray-400 mt-0.5">Attended: {formatDate(w.attendedAt)}</p>}
+                </div>
+                <StatusBadge status={w.attended ? "attended" : "registered"} />
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* Physical Products */}
       {contentTab === "products" && (
         <div className="space-y-3">
@@ -612,6 +635,31 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                   </div>
                   <StatusBadge status={o.fulfillmentStatus} />
                 </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Bundles */}
+      {contentTab === "bundles" && (
+        <div className="space-y-3">
+          <SectionHeader title={`Bundle Enrollments (${bundleEnrollments.length})`} />
+          {bundleEnrollments.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No bundle enrollments.</p>
+          ) : (
+            bundleEnrollments.map((b: any) => (
+              <div key={b.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  {b.bundleCover && (
+                    <img src={b.bundleCover} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                  )}
+                  <div>
+                    <h4 className="font-semibold text-gray-800 text-sm">{b.bundleTitle}</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">Enrolled {formatDate(b.enrolledAt)}</p>
+                  </div>
+                </div>
+                <StatusBadge status="enrolled" />
               </div>
             ))
           )}
@@ -679,27 +727,6 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                   {c.role && <p className="text-xs text-gray-400 mt-0.5 capitalize">{c.role}</p>}
                 </div>
                 <StatusBadge status={c.memberStatus ?? "active"} />
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Webinars */}
-      {contentTab === "webinars" && (
-        <div className="space-y-3">
-          <SectionHeader title={`Webinar Registrations (${webinarRegistrations.length})`} />
-          {webinarRegistrations.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No webinar registrations.</p>
-          ) : (
-            webinarRegistrations.map((w: any) => (
-              <div key={w.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-4">
-                <div>
-                  <h4 className="font-semibold text-gray-800 text-sm">{w.webinarTitle ?? "Webinar"}</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">Registered {formatDate(w.registeredAt ?? w.createdAt)}</p>
-                  {w.webinarDate && <p className="text-xs text-gray-400 mt-0.5">Scheduled: {formatDate(w.webinarDate)}</p>}
-                </div>
-                <StatusBadge status={w.status ?? "registered"} />
               </div>
             ))
           )}

@@ -27,6 +27,12 @@ import {
   brandMemberships,
   funnelPurchases,
   lmsOrders,
+  webinarRegistrations,
+  webinars,
+  bundleEnrollments,
+  bundles,
+  communityMembers,
+  communities,
 } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import Stripe from "stripe";
@@ -169,6 +175,61 @@ export const dashboardRouter = router({
       .where(eq(funnelPurchases.userId, ctx.user.id))
       .orderBy(desc(funnelPurchases.purchasedAt));
 
+    // 5. Webinar registrations
+    const webinarRegs = await db
+      .select({
+        registrationId: webinarRegistrations.id,
+        webinarId: webinarRegistrations.webinarId,
+        registeredAt: webinarRegistrations.registeredAt,
+        attended: webinarRegistrations.attended,
+        webinarTitle: webinars.title,
+        webinarSlug: webinars.slug,
+        webinarBrand: webinars.brand,
+        webinarCover: webinars.coverImage,
+        webinarType: webinars.type,
+        webinarStatus: webinars.status,
+        scheduledAt: webinars.scheduledAt,
+      })
+      .from(webinarRegistrations)
+      .innerJoin(webinars, eq(webinarRegistrations.webinarId, webinars.id))
+      .where(eq(webinarRegistrations.userId, ctx.user.id))
+      .orderBy(desc(webinarRegistrations.registeredAt));
+
+    // 6. Bundle enrollments
+    const bundleRegs = await db
+      .select({
+        enrollmentId: bundleEnrollments.id,
+        bundleId: bundleEnrollments.bundleId,
+        enrolledAt: bundleEnrollments.enrolledAt,
+        bundleTitle: bundles.title,
+        bundleSlug: bundles.slug,
+        bundleBrand: bundles.brand,
+        bundleCover: bundles.coverImage,
+        bundleStatus: bundles.status,
+      })
+      .from(bundleEnrollments)
+      .innerJoin(bundles, eq(bundleEnrollments.bundleId, bundles.id))
+      .where(eq(bundleEnrollments.userId, ctx.user.id))
+      .orderBy(desc(bundleEnrollments.enrolledAt));
+
+    // 7. Community memberships
+    const communityRegs = await db
+      .select({
+        memberId: communityMembers.id,
+        communityId: communityMembers.communityId,
+        joinedAt: communityMembers.joinedAt,
+        role: communityMembers.role,
+        communityTitle: communities.title,
+        communitySlug: communities.slug,
+        communityBrand: communities.brand,
+        communityCover: communities.coverImage,
+        communityStatus: communities.status,
+      })
+      .from(communityMembers)
+      .innerJoin(communities, eq(communityMembers.communityId, communities.id))
+      .where(eq(communityMembers.userId, ctx.user.id))
+      .orderBy(desc(communityMembers.joinedAt));
+
     // Separate courses from quiz-type LMS items
     // "cohort" courses are live/scheduled cohort courses — include them alongside regular courses
     const courses = enrollments.filter(e => e.courseType === "course" || e.courseType === "cohort");
@@ -182,7 +243,10 @@ export const dashboardRouter = router({
         ...downloads,
         ...digitalPurchaseRows,
       ],
+      webinars: webinarRegs,
       physicalProducts: physicalOrders,
+      bundles: bundleRegs,
+      communities: communityRegs,
       funnelPurchases: funnelPurchaseRows,
     };
   }),
