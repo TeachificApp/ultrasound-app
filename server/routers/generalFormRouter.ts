@@ -59,6 +59,35 @@ import {
 import { ensureEmbedWidget, deleteEmbedDataForForm, parseAllowedDomains } from "../lib/formEmbedWidgetDb";
 import { parseEmbedSettings } from "@shared/formEmbedWidgetTypes";
 import { getEmbedAnalyticsSummary } from "../routes/formEmbedRoutes";
+import {
+  isAdminOnlyItem,
+  parseResultsSettings,
+  mergeResultsSettingsIntoTheme,
+  type FormResultsSettings,
+} from "../../shared/formItemUtils";
+import {
+  fireFormWebhook,
+  fireConfiguredFormActions,
+  sendFormNotifyEmail,
+} from "../lib/generalFormActions";
+
+type DbConn = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+async function stripAdminOnlyFromResponses(
+  db: DbConn,
+  templateId: number,
+  responsesJson: string,
+): Promise<string> {
+  const items = await db
+    .select({ id: generalFormItems.id, extraConfig: generalFormItems.extraConfig })
+    .from(generalFormItems)
+    .where(eq(generalFormItems.templateId, templateId));
+  const adminIds = new Set(items.filter(isAdminOnlyItem).map(i => i.id.toString()));
+  if (adminIds.size === 0) return responsesJson;
+  const responses = JSON.parse(responsesJson) as Record<string, unknown>;
+  for (const id of adminIds) delete responses[id];
+  return JSON.stringify(responses);
+}
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 async function requireAdmin(ctx: any) {
@@ -472,7 +501,17 @@ export const generalFormRouter = router({
       await requireAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(generalFormTemplates).set({ themeSettings: input.themeSettings, updatedAt: new Date() }).where(eq(generalFormTemplates.id, input.id));
+      const [existing] = await db
+        .select({ themeSettings: generalFormTemplates.themeSettings })
+        .from(generalFormTemplates)
+        .where(eq(generalFormTemplates.id, input.id))
+        .limit(1);
+      const preserved = parseResultsSettings(existing?.themeSettings ?? null);
+      const merged = mergeResultsSettingsIntoTheme(input.themeSettings, preserved);
+      await db
+        .update(generalFormTemplates)
+        .set({ themeSettings: merged, updatedAt: new Date() })
+        .where(eq(generalFormTemplates.id, input.id));
       return { success: true };
     }),
 
@@ -1264,6 +1303,215 @@ ${pageText}`;
       return { success: true };
     }),
 
+  bulkDeleteSubmissions: protectedProcedure
+    .input(z.object({ ids: z.array(z.number()).min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(generalFormSubmissions).where(inArray(generalFormSubmissions.id, input.ids));
+      return { success: true, deleted: input.ids.length };
+    }),
+
+  updateSubmissionResponses: protectedProcedure
+    .input(
+      z.object({
+        id: z.number(),
+        fieldUpdates: z.record(z.string(), z.union([z.string(), z.array(z.string())])),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [sub] = await db
+        .select()
+        .from(generalFormSubmissions)
+        .where(eq(generalFormSubmissions.id, input.id))
+        .limit(1);
+      if (!sub) throw new TRPCError({ code: "NOT_FOUND" });
+      const [template] = await db
+        .select()
+        .from(generalFormTemplates)
+        .where(eq(generalFormTemplates.id, sub.templateId))
+        .limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+
+      let responses: Record<string, unknown> = {};
+      try {
+        responses = JSON.parse(sub.responses);
+      } catch {
+        responses = {};
+      }
+      const changedFields: string[] = [];
+      for (const [fieldId, value] of Object.entries(input.fieldUpdates)) {
+        responses[fieldId] = value;
+        changedFields.push(fieldId);
+      }
+
+      await db
+        .update(generalFormSubmissions)
+        .set({ responses: JSON.stringify(responses), updatedAt: new Date() })
+        .where(eq(generalFormSubmissions.id, input.id));
+
+      const resultsSettings = parseResultsSettings(template.themeSettings);
+      await fireConfiguredFormActions(db, sub.templateId, "on_update", resultsSettings.actions, {
+        formName: template.name,
+        submissionId: input.id,
+        responses,
+        changedFields,
+      });
+
+      try {
+        await fireFormWebhook(db, sub.templateId, "update", {
+          submissionId: input.id,
+          responses,
+          changedFields,
+        });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[Webhook] Update delivery failed:", msg);
+      }
+
+      if (template.notifyEmail) {
+        try {
+          await sendFormNotifyEmail(
+            template.notifyEmail,
+            `Submission updated: ${template.name} #${input.id}`,
+            `Submission #${input.id} was updated.\nChanged fields: ${changedFields.join(", ")}`,
+          );
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error("[NotifyEmail] Update notification failed:", msg);
+        }
+      }
+
+      return { success: true };
+    }),
+
+  bulkUpdateSubmissions: protectedProcedure
+    .input(
+      z.object({
+        ids: z.array(z.number()).min(1),
+        fieldUpdates: z.record(z.string(), z.union([z.string(), z.array(z.string())])),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const subs = await db
+        .select()
+        .from(generalFormSubmissions)
+        .where(inArray(generalFormSubmissions.id, input.ids));
+      if (subs.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const templateId = subs[0].templateId;
+      const [template] = await db
+        .select()
+        .from(generalFormTemplates)
+        .where(eq(generalFormTemplates.id, templateId))
+        .limit(1);
+      const resultsSettings = template ? parseResultsSettings(template.themeSettings) : { savedFilters: [], actions: [] };
+
+      for (const sub of subs) {
+        let responses: Record<string, unknown> = {};
+        try {
+          responses = JSON.parse(sub.responses);
+        } catch {
+          responses = {};
+        }
+        for (const [fieldId, value] of Object.entries(input.fieldUpdates)) {
+          responses[fieldId] = value;
+        }
+        await db
+          .update(generalFormSubmissions)
+          .set({ responses: JSON.stringify(responses), updatedAt: new Date() })
+          .where(eq(generalFormSubmissions.id, sub.id));
+
+        if (template) {
+          await fireConfiguredFormActions(db, templateId, "on_update", resultsSettings.actions, {
+            formName: template.name,
+            submissionId: sub.id,
+            responses,
+            changedFields: Object.keys(input.fieldUpdates),
+          });
+        }
+      }
+
+      return { success: true, updated: subs.length };
+    }),
+
+  getResultsSettings: protectedProcedure
+    .input(z.object({ formId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [template] = await db
+        .select({ themeSettings: generalFormTemplates.themeSettings })
+        .from(generalFormTemplates)
+        .where(eq(generalFormTemplates.id, input.formId))
+        .limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+      return parseResultsSettings(template.themeSettings);
+    }),
+
+  saveResultsSettings: protectedProcedure
+    .input(
+      z.object({
+        formId: z.number(),
+        settings: z.object({
+          savedFilters: z.array(
+            z.object({
+              id: z.string(),
+              name: z.string(),
+              logic: z.enum(["AND", "OR"]),
+              conditions: z.array(
+                z.object({
+                  fieldId: z.string(),
+                  operator: z.string(),
+                  value: z.string(),
+                }),
+              ),
+            }),
+          ),
+          actions: z.array(
+            z.object({
+              id: z.string(),
+              name: z.string(),
+              event: z.enum(["on_submit", "on_update"]),
+              type: z.enum(["email", "webhook"]),
+              enabled: z.boolean(),
+              emailTo: z.string().optional(),
+              emailSubject: z.string().optional(),
+            }),
+          ),
+        }),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [template] = await db
+        .select({ themeSettings: generalFormTemplates.themeSettings })
+        .from(generalFormTemplates)
+        .where(eq(generalFormTemplates.id, input.formId))
+        .limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+      const merged = mergeResultsSettingsIntoTheme(
+        template.themeSettings,
+        input.settings as FormResultsSettings,
+      );
+      await db
+        .update(generalFormTemplates)
+        .set({ themeSettings: merged, updatedAt: new Date() })
+        .where(eq(generalFormTemplates.id, input.formId));
+      return { success: true };
+    }),
+
   // ── PUBLIC: Get form by slug ───────────────────────────────────────────────
   getPublicForm: publicProcedure
     .input(z.object({ slug: z.string() }))
@@ -1278,11 +1526,24 @@ ${pageText}`;
       if (template.closeAt && new Date(template.closeAt) < new Date()) throw new TRPCError({ code: "FORBIDDEN", message: "This form has expired." });
       if (template.openAt && new Date(template.openAt) > new Date()) throw new TRPCError({ code: "FORBIDDEN", message: "This form is not open yet." });
       const sections = await db.select().from(generalFormSections).where(eq(generalFormSections.templateId, template.id)).orderBy(asc(generalFormSections.sortOrder));
-      const items = await db.select().from(generalFormItems).where(eq(generalFormItems.templateId, template.id)).orderBy(asc(generalFormItems.sortOrder));
-      const options = items.length > 0
-        ? await db.select().from(generalFormOptions).where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id))).orderBy(asc(generalFormOptions.sortOrder))
-        : [];
-      const branchRules = await db.select().from(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, template.id));
+      const allItems = await db
+        .select()
+        .from(generalFormItems)
+        .where(eq(generalFormItems.templateId, template.id))
+        .orderBy(asc(generalFormItems.sortOrder));
+      const items = allItems.filter(i => !isAdminOnlyItem(i));
+      const options =
+        items.length > 0
+          ? await db
+              .select()
+              .from(generalFormOptions)
+              .where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id)))
+              .orderBy(asc(generalFormOptions.sortOrder))
+          : [];
+      const branchRules = await db
+        .select()
+        .from(generalFormBranchRules)
+        .where(eq(generalFormBranchRules.templateId, template.id));
       return { template, sections, items, options, branchRules };
     }),
 
@@ -1388,11 +1649,37 @@ ${pageText}`;
           .offset(offset),
         db.select({ total: count() }).from(generalFormSubmissions).where(and(...conditions)),
       ]);
-      const items = await db.select({ id: generalFormItems.id, label: generalFormItems.label, itemType: generalFormItems.itemType, sortOrder: generalFormItems.sortOrder })
+      const items = await db
+        .select({
+          id: generalFormItems.id,
+          label: generalFormItems.label,
+          itemType: generalFormItems.itemType,
+          sortOrder: generalFormItems.sortOrder,
+          extraConfig: generalFormItems.extraConfig,
+          isRequired: generalFormItems.isRequired,
+        })
         .from(generalFormItems)
         .where(eq(generalFormItems.templateId, input.templateId))
         .orderBy(asc(generalFormItems.sortOrder));
-      return { submissions, total: total as number, items };
+      const itemIds = items.map(i => i.id);
+      const options =
+        itemIds.length > 0
+          ? await db
+              .select()
+              .from(generalFormOptions)
+              .where(inArray(generalFormOptions.itemId, itemIds))
+              .orderBy(asc(generalFormOptions.sortOrder))
+          : [];
+      const resultsSettings = parseResultsSettings(
+        (
+          await db
+            .select({ themeSettings: generalFormTemplates.themeSettings })
+            .from(generalFormTemplates)
+            .where(eq(generalFormTemplates.id, input.templateId))
+            .limit(1)
+        )[0]?.themeSettings ?? null,
+      );
+      return { submissions, total: total as number, items, options, resultsSettings };
     }),
 
   // ── PUBLIC: Submit form ───────────────────────────────────────────────────
@@ -1413,6 +1700,7 @@ ${pageText}`;
         const [{ total }] = await db.select({ total: count() }).from(generalFormSubmissions).where(eq(generalFormSubmissions.templateId, input.templateId));
         if ((total as number) >= template.maxSubmissions) throw new TRPCError({ code: "FORBIDDEN", message: "This form has reached its maximum number of submissions." });
       }
+      const sanitizedResponses = await stripAdminOnlyFromResponses(db, input.templateId, input.responses);
       // Calculate score if enabled
       let score = 0;
       let maxScore = 0;
@@ -1421,7 +1709,7 @@ ${pageText}`;
         const options = items.length > 0
           ? await db.select().from(generalFormOptions).where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id)))
           : [];
-        const responses: Record<string, any> = JSON.parse(input.responses);
+        const responses: Record<string, any> = JSON.parse(sanitizedResponses);
         for (const item of items) {
           if (item.scoreWeight > 0) {
             maxScore += item.scoreWeight;
@@ -1435,7 +1723,7 @@ ${pageText}`;
       const [result] = await db.insert(generalFormSubmissions).values({
         templateId: input.templateId,
         submittedByUserId: input.userId ?? null,
-        responses: input.responses,
+        responses: sanitizedResponses,
         score,
         maxScore,
         status: "submitted",
@@ -1446,7 +1734,7 @@ ${pageText}`;
       // Fire-and-forget Google Sheets sync (non-blocking)
       try {
         const { syncSubmissionToSheets } = await import("../lib/googleSheets");
-        const parsedResponses: Record<string, any> = JSON.parse(input.responses);
+        const parsedResponses: Record<string, any> = JSON.parse(sanitizedResponses);
         syncSubmissionToSheets(input.templateId, parsedResponses, new Date()).catch((err: any) => {
           console.error("[GoogleSheets] Sync failed for form", input.templateId, err.message);
         });
@@ -1456,7 +1744,7 @@ ${pageText}`;
       ;(async () => {
         try {
           // Extract submitter email from responses
-          const parsedResponses: Record<string, any> = JSON.parse(input.responses);
+          const parsedResponses: Record<string, any> = JSON.parse(sanitizedResponses);
           let submitterEmail: string | null = null;
           let submitterName: string | null = null;
           for (const [, val] of Object.entries(parsedResponses)) {
@@ -1486,40 +1774,35 @@ ${pageText}`;
       // Fire-and-forget Webhook delivery (non-blocking)
       ;(async () => {
         try {
-          const [webhookRow] = await db.select().from(generalFormWebhooks)
-            .where(eq(generalFormWebhooks.formId, input.templateId)).limit(1);
-          if (webhookRow?.isEnabled && webhookRow.webhookUrl) {
-            const payload = JSON.stringify({
-              event: "submission",
-              formId: input.templateId,
-              submissionId,
-              timestamp: new Date().toISOString(),
-              responses: JSON.parse(input.responses),
-              score: template.scoreEnabled ? { score, maxScore } : undefined,
-            });
-            let signature = "";
-            if (webhookRow.secret) {
-              const { createHmac } = await import("crypto");
-              signature = createHmac("sha256", webhookRow.secret).update(payload).digest("hex");
-            }
-            const res = await fetch(webhookRow.webhookUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                ...(signature ? { "X-Signature-256": `sha256=${signature}` } : {}),
-              },
-              body: payload,
-              signal: AbortSignal.timeout(15000),
-            });
-            const statusCode = res.status;
-            await db.update(generalFormWebhooks).set({
-              lastTriggeredAt: Date.now(),
-              lastStatus: statusCode >= 200 && statusCode < 300 ? "success" : "error",
-              lastStatusCode: statusCode,
-            }).where(eq(generalFormWebhooks.id, webhookRow.id));
-          }
+          const parsedResponses: Record<string, any> = JSON.parse(sanitizedResponses);
+          await fireFormWebhook(db, input.templateId, "submission", {
+            submissionId,
+            responses: parsedResponses,
+            score: template.scoreEnabled ? { score, maxScore } : undefined,
+          });
         } catch (e: any) {
           console.error("[Webhook] Delivery failed for form", input.templateId, e.message);
+        }
+      })();
+      // Fire-and-forget configured form actions + notify email (non-blocking)
+      ;(async () => {
+        try {
+          const parsedResponses: Record<string, any> = JSON.parse(sanitizedResponses);
+          const resultsSettings = parseResultsSettings(template.themeSettings);
+          await fireConfiguredFormActions(db, input.templateId, "on_submit", resultsSettings.actions, {
+            formName: template.name,
+            submissionId,
+            responses: parsedResponses,
+          });
+          if (template.notifyEmail) {
+            await sendFormNotifyEmail(
+              template.notifyEmail,
+              `New submission: ${template.name}`,
+              `A new submission (#${submissionId}) was received for ${template.name}.`,
+            );
+          }
+        } catch (e: any) {
+          console.error("[FormActions] Submit actions failed for form", input.templateId, e.message);
         }
       })();
       // Build success outcome
@@ -1528,7 +1811,7 @@ ${pageText}`;
         await ensureLegacySuccessModules(db, template);
         const modules = await fetchSuccessModules(db, input.templateId);
         const rulesRaw = await fetchSuccessRoutingRules(db, input.templateId);
-        const parsedResponses: Record<string, any> = JSON.parse(input.responses);
+        const parsedResponses: Record<string, any> = JSON.parse(sanitizedResponses);
         const submitter = extractSubmitterInfo(parsedResponses);
         const submissionCtx: FormSubmissionContext = {
           responses: parsedResponses,

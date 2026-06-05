@@ -18,6 +18,7 @@ import { trpc } from "@/lib/trpc";
 import { CheckCircle2, AlertCircle, RefreshCw, Lock, ArrowRight, ArrowLeft, ChevronDown } from "lucide-react";
 import { RichTextDisplay } from "@/components/RichTextEditor";
 import { FormSuccessOutcomeView, type SuccessOutcomePayload } from "@/components/FormSuccessOutcomeView";
+import { isAdminOnlyItem } from "@shared/formItemUtils";
 
 // ─── Theme helpers ────────────────────────────────────────────────────────────
 interface ThemeSettings {
@@ -911,7 +912,8 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
     </div>
   );
 
-  const { template, sections, items, options, branchRules } = data;
+  const { template, sections, items: rawItems, options, branchRules } = data;
+  const items = isPreview ? rawItems : rawItems.filter((i: { extraConfig?: string | null }) => !isAdminOnlyItem(i));
 
   if (template.status === "closed") return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, ...getBgStyle(theme), fontFamily: theme.fontFamily }}>

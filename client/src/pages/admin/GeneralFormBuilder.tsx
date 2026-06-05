@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -76,12 +77,14 @@ import {
   Zap,
   Check,
   Save,
-  Trophy,
+  Shield,
 } from "lucide-react";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import FormEmbedSharePanel from "@/components/admin/FormEmbedSharePanel";
 import FormSuccessModulesTab from "@/components/admin/FormSuccessModulesTab";
+import FormResultsTable from "@/components/admin/FormResultsTable";
+import { mergeExtraConfig, isAdminOnlyItem, type SavedResultsFilter, type FormActionConfig } from "@shared/formItemUtils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BRAND = "#0e7490";
@@ -528,6 +531,11 @@ function FormEditor({ formId }: { formId: number }) {
                         {ITEM_TYPES.find(t => t.value === item.itemType)?.label ?? item.itemType}
                       </span>
                       {item.isRequired && <span className="text-xs text-red-500">Required</span>}
+                      {isAdminOnlyItem(item) && (
+                        <span className="text-xs text-amber-600 flex items-center gap-0.5">
+                          <Shield className="w-3 h-3" /> Admin only
+                        </span>
+                      )}
                       {item.scoreWeight > 0 && <span className="text-xs text-amber-600">Score: {item.scoreWeight}pts</span>}
                     </div>
                     <p className="font-medium text-gray-800 mt-0.5">{item.label}</p>
@@ -702,6 +710,7 @@ function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
   const [placeholder, setPlaceholder] = useState(item.placeholder ?? "");
   const [isRequired, setIsRequired] = useState(item.isRequired);
   const [scoreWeight, setScoreWeight] = useState(item.scoreWeight ?? 0);
+  const [adminOnly, setAdminOnly] = useState(isAdminOnlyItem(item));
   const [optionsText, setOptionsText] = useState(
     item.options?.map((o: any) => `${o.label}${o.scoreValue ? ` [${o.scoreValue}]` : ""}`).join("\n") ?? ""
   );
@@ -709,7 +718,14 @@ function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
   const hasOptions = ["dropdown", "radio", "checkbox"].includes(item.itemType);
 
   const handleSave = () => {
-    const updates = { label, helpText: helpText || undefined, placeholder: placeholder || undefined, isRequired, scoreWeight };
+    const updates = {
+      label,
+      helpText: helpText || undefined,
+      placeholder: placeholder || undefined,
+      isRequired,
+      scoreWeight,
+      extraConfig: mergeExtraConfig(item.extraConfig, { adminOnly }),
+    };
     let parsedOptions: any[] | undefined = undefined;
     if (hasOptions) {
       parsedOptions = optionsText.split("\n").filter(l => l.trim()).map((line, idx) => {
@@ -748,6 +764,19 @@ function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
             <Switch checked={isRequired} onCheckedChange={setIsRequired} id="req-switch" />
             <Label htmlFor="req-switch">Required</Label>
           </div>
+          {!["section_break", "rich_text", "payment"].includes(item.itemType) && (
+            <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50/50">
+              <Switch checked={adminOnly} onCheckedChange={setAdminOnly} id="admin-only-switch" />
+              <div>
+                <Label htmlFor="admin-only-switch" className="flex items-center gap-1">
+                  <Shield className="w-3.5 h-3.5 text-amber-600" /> Admin Only
+                </Label>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Hidden from the public form. Visible and editable only in the admin results table.
+                </p>
+              </div>
+            </div>
+          )}
           {scoreEnabled && (
             <div>
               <Label>Score Weight (points for correct answer)</Label>
@@ -1349,6 +1378,367 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
   );
 }
 
+// ─── Results Settings (saved filters + form actions) ─────────────────────────
+function ResultsSettingsPanel({ formId }: { formId: number }) {
+  const { data: formData } = trpc.generalForm.getForm.useQuery({ id: formId });
+  const { data: resultsSettings, refetch } = trpc.generalForm.getResultsSettings.useQuery({ formId });
+  const saveSettings = trpc.generalForm.saveResultsSettings.useMutation({
+    onSuccess: () => { toast.success("Results settings saved"); refetch(); },
+    onError: e => toast.error(e.message),
+  });
+
+  const [savedFilters, setSavedFilters] = useState<SavedResultsFilter[]>([]);
+  const [actions, setActions] = useState<FormActionConfig[]>([]);
+
+  useEffect(() => {
+    if (resultsSettings) {
+      setSavedFilters(resultsSettings.savedFilters ?? []);
+      setActions(resultsSettings.actions ?? []);
+    }
+  }, [resultsSettings]);
+
+  const inputItems = useMemo(
+    () => (formData?.items ?? []).filter((it: any) => !["section_break", "rich_text", "payment"].includes(it.itemType)),
+    [formData?.items],
+  );
+
+  const addFilter = () => {
+    const firstField = inputItems[0];
+    setSavedFilters(prev => [
+      ...prev,
+      {
+        id: Math.random().toString(36).slice(2),
+        name: `Filter ${prev.length + 1}`,
+        logic: "AND",
+        conditions: firstField
+          ? [{ fieldId: String(firstField.id), operator: "contains", value: "" }]
+          : [],
+      },
+    ]);
+  };
+
+  const addAction = () => {
+    setActions(prev => [
+      ...prev,
+      {
+        id: Math.random().toString(36).slice(2),
+        name: `Action ${prev.length + 1}`,
+        event: "on_submit",
+        type: "email",
+        enabled: true,
+        emailTo: "",
+        emailSubject: "",
+      },
+    ]);
+  };
+
+  const save = () => {
+    saveSettings.mutate({ formId, settings: { savedFilters, actions } });
+  };
+
+  const OPERATORS = [
+    { value: "equals", label: "equals" },
+    { value: "contains", label: "contains" },
+    { value: "is_empty", label: "is empty" },
+    { value: "is_not_empty", label: "is not empty" },
+  ] as const;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Search className="w-4 h-4" /> Results Table Filters &amp; Actions
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <Label className="text-sm font-medium">Saved Filters</Label>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addFilter}>
+              <Plus className="w-3 h-3 mr-1" /> Add Filter
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Create named filters for the Results tab dropdown. Each filter defines conditions submissions must match.
+          </p>
+          {savedFilters.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">No saved filters yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {savedFilters.map((filter, fi) => (
+                <div key={filter.id} className="border rounded-lg p-3 space-y-2 bg-gray-50/50">
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      value={filter.name}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setSavedFilters(prev => prev.map((f, i) => (i === fi ? { ...f, name: v } : f)));
+                      }}
+                      className="h-8 text-sm flex-1"
+                      placeholder="Filter name"
+                    />
+                    <Select
+                      value={filter.logic}
+                      onValueChange={v =>
+                        setSavedFilters(prev =>
+                          prev.map((f, i) => (i === fi ? { ...f, logic: v as "AND" | "OR" } : f)),
+                        )
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-20 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="AND">AND</SelectItem>
+                        <SelectItem value="OR">OR</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 h-8 w-8 p-0"
+                      onClick={() => setSavedFilters(prev => prev.filter((_, i) => i !== fi))}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  {filter.conditions.map((cond, ci) => (
+                    <div key={ci} className="flex gap-2 items-center flex-wrap">
+                      <Select
+                        value={cond.fieldId}
+                        onValueChange={v =>
+                          setSavedFilters(prev =>
+                            prev.map((f, i) =>
+                              i === fi
+                                ? {
+                                    ...f,
+                                    conditions: f.conditions.map((c, j) =>
+                                      j === ci ? { ...c, fieldId: v } : c,
+                                    ),
+                                  }
+                                : f,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-7 text-xs w-36"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {inputItems.map((it: any) => (
+                            <SelectItem key={it.id} value={String(it.id)}>
+                              {it.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={cond.operator}
+                        onValueChange={v =>
+                          setSavedFilters(prev =>
+                            prev.map((f, i) =>
+                              i === fi
+                                ? {
+                                    ...f,
+                                    conditions: f.conditions.map((c, j) =>
+                                      j === ci ? { ...c, operator: v as typeof cond.operator } : c,
+                                    ),
+                                  }
+                                : f,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {OPERATORS.map(op => (
+                            <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        className="h-7 text-xs flex-1 min-w-[100px]"
+                        value={cond.value}
+                        placeholder="Value"
+                        onChange={e =>
+                          setSavedFilters(prev =>
+                            prev.map((f, i) =>
+                              i === fi
+                                ? {
+                                    ...f,
+                                    conditions: f.conditions.map((c, j) =>
+                                      j === ci ? { ...c, value: e.target.value } : c,
+                                    ),
+                                  }
+                                : f,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      const ff = inputItems[0];
+                      setSavedFilters(prev =>
+                        prev.map((f, i) =>
+                          i === fi
+                            ? {
+                                ...f,
+                                conditions: [
+                                  ...f.conditions,
+                                  {
+                                    fieldId: ff ? String(ff.id) : "",
+                                    operator: "contains" as const,
+                                    value: "",
+                                  },
+                                ],
+                              }
+                            : f,
+                        ),
+                      );
+                    }}
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> Add condition
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <Label className="text-sm font-medium">Form Actions &amp; Workflows</Label>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addAction}>
+              <Plus className="w-3 h-3 mr-1" /> Add Action
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Trigger notifications or webhooks on initial form submit or when results are updated in the admin table.
+          </p>
+          {actions.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">No actions configured.</p>
+          ) : (
+            <div className="space-y-3">
+              {actions.map((action, ai) => (
+                <div key={action.id} className="border rounded-lg p-3 space-y-2 bg-gray-50/50">
+                  <div className="flex gap-2 items-center">
+                    <Switch
+                      checked={action.enabled}
+                      onCheckedChange={v =>
+                        setActions(prev => prev.map((a, i) => (i === ai ? { ...a, enabled: v } : a)))
+                      }
+                    />
+                    <Input
+                      value={action.name}
+                      onChange={e =>
+                        setActions(prev => prev.map((a, i) => (i === ai ? { ...a, name: e.target.value } : a)))
+                      }
+                      className="h-8 text-sm flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 h-8 w-8 p-0"
+                      onClick={() => setActions(prev => prev.filter((_, i) => i !== ai))}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">When</Label>
+                      <Select
+                        value={action.event}
+                        onValueChange={v =>
+                          setActions(prev =>
+                            prev.map((a, i) =>
+                              i === ai ? { ...a, event: v as FormActionConfig["event"] } : a,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="on_submit">On form submit</SelectItem>
+                          <SelectItem value="on_update">On results table update</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Action type</Label>
+                      <Select
+                        value={action.type}
+                        onValueChange={v =>
+                          setActions(prev =>
+                            prev.map((a, i) =>
+                              i === ai ? { ...a, type: v as FormActionConfig["type"] } : a,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="email">Send email</SelectItem>
+                          <SelectItem value="webhook">Fire webhook</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {action.type === "email" && (
+                    <div className="space-y-2">
+                      <Input
+                        type="email"
+                        placeholder="Recipient email"
+                        value={action.emailTo ?? ""}
+                        className="h-8 text-sm"
+                        onChange={e =>
+                          setActions(prev =>
+                            prev.map((a, i) => (i === ai ? { ...a, emailTo: e.target.value } : a)),
+                          )
+                        }
+                      />
+                      <Input
+                        placeholder="Email subject (optional)"
+                        value={action.emailSubject ?? ""}
+                        className="h-8 text-sm"
+                        onChange={e =>
+                          setActions(prev =>
+                            prev.map((a, i) => (i === ai ? { ...a, emailSubject: e.target.value } : a)),
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+                  {action.type === "webhook" && (
+                    <p className="text-xs text-gray-500">
+                      Uses the webhook URL configured in the Integrations tab.
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Button
+          type="button"
+          onClick={save}
+          disabled={saveSettings.isPending}
+          className="w-full text-white gap-2"
+          style={{ background: BRAND }}
+        >
+          {saveSettings.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save Filters &amp; Actions
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 function SettingsTab({ formId, template, onRefetch }: { formId: number; template: any; onRefetch: () => void }) {
   const [name, setName] = useState(template.name);
@@ -1585,517 +1975,12 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
         </CardContent>
       </Card>
 
+      <ResultsSettingsPanel formId={formId} />
+
       <Button onClick={save} disabled={!name.trim() || updateForm.isPending} className="w-full text-white gap-2" style={{ background: BRAND }}>
         {updateForm.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
         Save Settings
       </Button>
-    </div>
-  );
-}
-
-// ─── Results Tab ─────────────────────────────────────────────────────────────
-type FilterCondition = {
-  id: string;
-  fieldId: string; // item id as string
-  operator: "equals" | "not_equals" | "contains" | "not_contains" | "starts_with" | "is_empty" | "is_not_empty" | "greater_than" | "less_than";
-  value: string;
-};
-type FilterLogic = "AND" | "OR";
-
-function ResultsTab({ formId, template }: { formId: number; template: any }) {
-  const [statusFilter, setStatusFilter] = useState<"all" | "submitted" | "draft" | "reviewed">("all");
-  const [page, setPage] = useState(1);
-  const [selectedSub, setSelectedSub] = useState<any | null>(null);
-  const [exportStatus, setExportStatus] = useState<"all" | "submitted" | "draft" | "reviewed">("all");
-  const [filterConditions, setFilterConditions] = useState<FilterCondition[]>([]);
-  const [filterLogic, setFilterLogic] = useState<FilterLogic>("AND");
-  const [showFilters, setShowFilters] = useState(false);
-  const utils = trpc.useUtils();
-
-  const { data, isLoading, refetch } = trpc.generalForm.getFormResults.useQuery({
-    templateId: formId,
-    page,
-    pageSize: 50,
-    status: statusFilter,
-  });
-
-  const { data: exportData, refetch: fetchExport } = trpc.generalForm.exportFormResults.useQuery(
-    { templateId: formId, status: exportStatus },
-    { enabled: false }
-  );
-
-  const updateStatus = trpc.generalForm.updateSubmissionStatus.useMutation({
-    onSuccess: () => { toast.success("Status updated"); refetch(); },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const deleteSubmission = trpc.generalForm.deleteSubmission.useMutation({
-    onSuccess: () => { toast.success("Deleted"); refetch(); setSelectedSub(null); },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const handleExport = async () => {
-    const result = await fetchExport();
-    const d = result.data;
-    if (!d) return;
-    const { submissions, items, userMap } = d;
-    const headers = ["ID", "Submitted At", "Status", "User Name", "User Email", "Score", "Max Score",
-      ...items.map((it: any) => it.label || it.itemType)];
-    const rows = submissions.map((s: any) => {
-      const responses = (() => { try { return JSON.parse(s.responses); } catch { return {}; } })();
-      const user = s.submittedByUserId ? (userMap as any)[s.submittedByUserId] : null;
-      return [
-        s.id,
-        new Date(s.submittedAt).toISOString(),
-        s.status,
-        user?.name ?? "",
-        user?.email ?? "",
-        s.score,
-        s.maxScore,
-        ...items.map((it: any) => {
-          const v = responses[it.id.toString()];
-          return Array.isArray(v) ? v.join("; ") : (v ?? "");
-        }),
-      ];
-    });
-    const csv = [headers, ...rows].map(r => r.map((c: any) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${template.name.replace(/\s+/g, "-")}-results.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const STATUS_TABS = [
-    { id: "all", label: "All" },
-    { id: "submitted", label: "Submitted" },
-    { id: "draft", label: "Incomplete" },
-    { id: "reviewed", label: "Reviewed" },
-  ] as const;
-
-  const statusBadgeColor = (s: string) => {
-    if (s === "submitted") return "bg-green-50 text-green-700 border-green-200";
-    if (s === "reviewed") return "bg-blue-50 text-blue-700 border-blue-200";
-    if (s === "draft") return "bg-yellow-50 text-yellow-700 border-yellow-200";
-    return "bg-gray-50 text-gray-600 border-gray-200";
-  };
-
-  const parseResponses = (s: any) => { try { return JSON.parse(s.responses); } catch { return {}; } };
-
-  // Build a map from item ID -> label for quick lookup
-  const itemLabelMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const item of (data?.items ?? [])) {
-      map[String(item.id)] = item.label || item.itemType;
-    }
-    return map;
-  }, [data?.items]);
-
-  // Find email field item ID (first email-type field)
-  const emailItemId = useMemo(() => {
-    const emailItem = (data?.items ?? []).find((it: any) => it.itemType === "email");
-    return emailItem ? String(emailItem.id) : null;
-  }, [data?.items]);
-
-  // Get the best display email for a submission
-  const getSubmitterEmail = (sub: any) => {
-    if (sub.userEmail) return sub.userEmail;
-    if (emailItemId) {
-      const r = parseResponses(sub);
-      return r[emailItemId] || null;
-    }
-    return null;
-  };
-
-  // Get the best display name for a submission
-  const getSubmitterName = (sub: any) => {
-    if (sub.userName) return sub.userName;
-    // Try to find a name-like field
-    const r = parseResponses(sub);
-    const nameItem = (data?.items ?? []).find((it: any) =>
-      it.itemType === "text" && /name/i.test(it.label || "")
-    );
-    if (nameItem) return r[String(nameItem.id)] || null;
-    return null;
-  };
-
-  // Get first few non-empty response values for table preview
-  const getResponsePreview = (sub: any) => {
-    const r = parseResponses(sub);
-    const items = data?.items ?? [];
-    const preview: { label: string; value: string }[] = [];
-    for (const item of items) {
-      if (["heading", "paragraph", "section_break", "rich_text"].includes(item.itemType)) continue;
-      const v = r[String(item.id)];
-      if (v === undefined || v === null || v === "") continue;
-      const displayVal = Array.isArray(v) ? v.join(", ") : String(v);
-      preview.push({ label: item.label || item.itemType, value: displayVal });
-      if (preview.length >= 3) break;
-    }
-    return preview;
-  };
-
-  // Evaluate a single filter condition against a submission
-  const evalCondition = (sub: any, cond: FilterCondition): boolean => {
-    const r = parseResponses(sub);
-    const raw = r[cond.fieldId];
-    const fieldVal = Array.isArray(raw) ? raw.join(", ") : (raw === undefined || raw === null ? "" : String(raw));
-    const condVal = cond.value.toLowerCase();
-    const fv = fieldVal.toLowerCase();
-    switch (cond.operator) {
-      case "equals": return fv === condVal;
-      case "not_equals": return fv !== condVal;
-      case "contains": return fv.includes(condVal);
-      case "not_contains": return !fv.includes(condVal);
-      case "starts_with": return fv.startsWith(condVal);
-      case "is_empty": return fieldVal === "";
-      case "is_not_empty": return fieldVal !== "";
-      case "greater_than": return parseFloat(fieldVal) > parseFloat(cond.value);
-      case "less_than": return parseFloat(fieldVal) < parseFloat(cond.value);
-      default: return true;
-    }
-  };
-
-  // Apply all filter conditions to submissions
-  const filteredSubmissions = useMemo(() => {
-    const subs = data?.submissions ?? [];
-    if (filterConditions.length === 0) return subs;
-    return subs.filter(sub => {
-      const results = filterConditions.map(c => evalCondition(sub, c));
-      return filterLogic === "AND" ? results.every(Boolean) : results.some(Boolean);
-    });
-  }, [data?.submissions, filterConditions, filterLogic]);
-
-  const addFilterCondition = () => {
-    const firstField = (data?.items ?? []).find((it: any) => !["heading", "paragraph", "section_break", "rich_text"].includes(it.itemType));
-    setFilterConditions(prev => [...prev, {
-      id: Math.random().toString(36).slice(2),
-      fieldId: firstField ? String(firstField.id) : "",
-      operator: "contains",
-      value: "",
-    }]);
-  };
-
-  const updateFilterCondition = (id: string, updates: Partial<FilterCondition>) => {
-    setFilterConditions(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-  };
-
-  const removeFilterCondition = (id: string) => {
-    setFilterConditions(prev => prev.filter(c => c.id !== id));
-  };
-
-  const OPERATORS = [
-    { value: "equals", label: "equals" },
-    { value: "not_equals", label: "does not equal" },
-    { value: "contains", label: "contains" },
-    { value: "not_contains", label: "does not contain" },
-    { value: "starts_with", label: "starts with" },
-    { value: "is_empty", label: "is empty" },
-    { value: "is_not_empty", label: "is not empty" },
-    { value: "greater_than", label: "greater than" },
-    { value: "less_than", label: "less than" },
-  ] as const;
-
-  const filterableItems = useMemo(() => {
-    return (data?.items ?? []).filter((it: any) => !["heading", "paragraph", "section_break", "rich_text"].includes(it.itemType));
-  }, [data?.items]);
-
-  return (
-    <div className="space-y-4">
-      {/* Header row */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-1 border border-gray-200 rounded-lg p-1 bg-gray-50">
-          {STATUS_TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => { setStatusFilter(t.id); setPage(1); }}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                statusFilter === t.id ? "bg-white shadow-sm text-[#0e7490]" : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm" variant={showFilters ? "default" : "outline"}
-            className={`gap-1 h-8 ${showFilters ? "bg-teal-600 text-white hover:bg-teal-700" : ""}`}
-            onClick={() => setShowFilters(v => !v)}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-            Filters {filterConditions.length > 0 && <span className="ml-0.5 bg-white text-teal-700 rounded-full px-1.5 text-[10px] font-bold">{filterConditions.length}</span>}
-          </Button>
-          <Select value={exportStatus} onValueChange={v => setExportStatus(v as any)}>
-            <SelectTrigger className="h-8 text-xs w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="submitted">Submitted</SelectItem>
-              <SelectItem value="draft">Incomplete</SelectItem>
-              <SelectItem value="reviewed">Reviewed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button size="sm" variant="outline" className="gap-1 h-8" onClick={handleExport}>
-            <Download className="w-3.5 h-3.5" /> Export CSV
-          </Button>
-        </div>
-      </div>
-
-      {/* Filter Panel */}
-      {showFilters && (
-        <Card className="border-teal-200 bg-teal-50/40">
-          <CardContent className="pt-4 pb-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-700">Filter submissions where</span>
-                <div className="flex rounded border border-gray-200 overflow-hidden text-xs">
-                  {(["AND", "OR"] as const).map(l => (
-                    <button key={l} type="button"
-                      onClick={() => setFilterLogic(l)}
-                      className={`px-2.5 py-1 font-medium transition-colors ${
-                        filterLogic === l ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
-                      }`}>{l}</button>
-                  ))}
-                </div>
-                <span className="text-xs text-gray-500">of the following conditions match:</span>
-              </div>
-              {filterConditions.length > 0 && (
-                <button type="button" onClick={() => setFilterConditions([])} className="text-xs text-red-400 hover:text-red-600">Clear all</button>
-              )}
-            </div>
-
-            {filterConditions.length === 0 && (
-              <p className="text-xs text-gray-400 italic">No filters yet. Click "Add Condition" to filter by any form field.</p>
-            )}
-
-            {filterConditions.map((cond, idx) => (
-              <div key={cond.id} className="flex items-center gap-2 flex-wrap">
-                {idx > 0 && (
-                  <span className="text-xs font-semibold text-teal-700 w-8 text-center">{filterLogic}</span>
-                )}
-                {idx === 0 && <span className="text-xs text-gray-400 w-8">If</span>}
-
-                {/* Field selector */}
-                <Select value={cond.fieldId} onValueChange={v => updateFilterCondition(cond.id, { fieldId: v })}>
-                  <SelectTrigger className="h-7 text-xs w-44"><SelectValue placeholder="Select field" /></SelectTrigger>
-                  <SelectContent>
-                    {filterableItems.map((it: any) => (
-                      <SelectItem key={it.id} value={String(it.id)}>{it.label || it.itemType}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Operator selector */}
-                <Select value={cond.operator} onValueChange={v => updateFilterCondition(cond.id, { operator: v as any })}>
-                  <SelectTrigger className="h-7 text-xs w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {OPERATORS.map(op => (
-                      <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Value input (hidden for is_empty / is_not_empty) */}
-                {!["is_empty", "is_not_empty"].includes(cond.operator) && (
-                  <input
-                    type="text"
-                    value={cond.value}
-                    onChange={e => updateFilterCondition(cond.id, { value: e.target.value })}
-                    placeholder="value"
-                    className="h-7 px-2 text-xs border border-gray-200 rounded w-36 bg-white focus:outline-none focus:border-teal-400"
-                  />
-                )}
-
-                <button type="button" onClick={() => removeFilterCondition(cond.id)}
-                  className="text-gray-400 hover:text-red-500 transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-            ))}
-
-            <Button size="sm" variant="outline" className="h-7 text-xs gap-1 mt-1" onClick={addFilterCondition}
-              disabled={filterableItems.length === 0}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Condition
-            </Button>
-
-            {filterConditions.length > 0 && (
-              <p className="text-xs text-teal-700 font-medium">
-                Showing {filteredSubmissions.length} of {data?.submissions?.length ?? 0} submissions
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin mr-2" />Loading…</div>
-          ) : !data?.submissions?.length ? (
-            <div className="text-center py-12 text-gray-400">No results found</div>
-          ) : filteredSubmissions.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <p className="font-medium">No submissions match your filters</p>
-              <p className="text-xs mt-1">Try adjusting or clearing your filter conditions</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">#</th>
-                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Submitter</th>
-                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Responses</th>
-                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Date</th>
-                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Status</th>
-                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Score</th>
-                    <th className="text-right py-2.5 px-4 text-xs font-medium text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSubmissions.map((sub: any) => {
-                    const submitterEmail = getSubmitterEmail(sub);
-                    const submitterName = getSubmitterName(sub);
-                    const preview = getResponsePreview(sub);
-                    return (
-                      <tr
-                        key={sub.id}
-                        className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer"
-                        onClick={() => setSelectedSub(sub)}
-                      >
-                        <td className="py-2.5 px-4 font-mono text-xs text-gray-400">#{sub.id}</td>
-                        <td className="py-2.5 px-4 min-w-[140px]">
-                          <div className="font-medium text-gray-800 text-xs">
-                            {submitterName || submitterEmail || <span className="text-gray-400 italic">Anonymous</span>}
-                          </div>
-                          {submitterEmail && submitterName && (
-                            <div className="text-xs text-gray-400">{submitterEmail}</div>
-                          )}
-                          {!submitterEmail && !submitterName && sub.ipAddress && (
-                            <div className="text-xs text-gray-400">{sub.ipAddress}</div>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-4 max-w-[280px]">
-                          <div className="space-y-0.5">
-                            {preview.map((p, i) => (
-                              <div key={i} className="flex gap-1 text-xs">
-                                <span className="text-gray-400 shrink-0">{p.label}:</span>
-                                <span className="text-gray-700 truncate max-w-[180px]">{p.value}</span>
-                              </div>
-                            ))}
-                            {preview.length === 0 && <span className="text-gray-300 text-xs italic">No data</span>}
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-4 text-xs text-gray-500 whitespace-nowrap">{new Date(sub.submittedAt).toLocaleString()}</td>
-                        <td className="py-2.5 px-4" onClick={e => e.stopPropagation()}>
-                          <Select value={sub.status} onValueChange={v => updateStatus.mutate({ id: sub.id, status: v as any })}>
-                            <SelectTrigger className="h-6 text-xs w-28"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="submitted">Submitted</SelectItem>
-                              <SelectItem value="reviewed">Reviewed</SelectItem>
-                              <SelectItem value="draft">Incomplete</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="py-2.5 px-4 text-xs">
-                          {sub.maxScore > 0 ? (
-                            <span className="font-medium" style={{ color: BRAND }}>{sub.score}/{sub.maxScore}</span>
-                          ) : <span className="text-gray-400">—</span>}
-                        </td>
-                        <td className="py-2.5 px-4 text-right" onClick={e => e.stopPropagation()}>
-                          <Button
-                            variant="ghost" size="sm" className="text-red-400 hover:text-red-600 h-6 w-6 p-0"
-                            onClick={() => { if (confirm("Delete this submission?")) deleteSubmission.mutate({ id: sub.id }); }}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Pagination */}
-      {data && data.total > 50 && (
-        <div className="flex items-center justify-between text-sm text-gray-500">
-          <span>{((page - 1) * 50) + 1}–{Math.min(page * 50, data.total)} of {data.total}</span>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
-            <Button size="sm" variant="outline" disabled={page * 50 >= data.total} onClick={() => setPage(p => p + 1)}>Next</Button>
-          </div>
-        </div>
-      )}
-
-      {/* Detail drawer */}
-      {selectedSub && (
-        <Dialog open={!!selectedSub} onOpenChange={() => setSelectedSub(null)}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                Submission #{selectedSub.id}
-                <Badge className={`text-xs border ${statusBadgeColor(selectedSub.status)}`}>{selectedSub.status}</Badge>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              {(() => {
-                const selEmail = getSubmitterEmail(selectedSub);
-                const selName = getSubmitterName(selectedSub);
-                return (
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div><span className="text-gray-500">Submitter:</span> <span className="font-medium">{selName || selEmail || "Anonymous"}</span></div>
-                    <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selEmail || "—"}</span></div>
-                    <div><span className="text-gray-500">Date:</span> <span className="font-medium">{new Date(selectedSub.submittedAt).toLocaleString()}</span></div>
-                    <div><span className="text-gray-500">Score:</span> <span className="font-medium">{selectedSub.maxScore > 0 ? `${selectedSub.score}/${selectedSub.maxScore}` : "N/A"}</span></div>
-                  </div>
-                );
-              })()}
-              <div className="border-t pt-3">
-                <p className="text-xs font-medium text-gray-500 mb-2">Responses</p>
-                <div className="space-y-2">
-                  {(data?.items ?? []).filter((it: any) => !['heading','paragraph','section_break','rich_text'].includes(it.itemType)).map((item: any) => {
-                    const r = parseResponses(selectedSub);
-                    const v = r[String(item.id)];
-                    if (v === undefined || v === null || v === '') return null;
-                    return (
-                      <div key={item.id} className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500 font-medium">{item.label || item.itemType}</p>
-                        <p className="text-sm font-medium text-gray-800 mt-0.5">
-                          {Array.isArray(v) ? v.join(", ") : String(v)}
-                        </p>
-                      </div>
-                    );
-                  })}
-                  {/* Show any responses for fields not in items list (e.g. deleted fields) */}
-                  {Object.entries(parseResponses(selectedSub)).filter(([k]) => !(data?.items ?? []).some((it: any) => String(it.id) === k)).map(([k, v]) => (
-                    <div key={k} className="bg-gray-50 rounded p-2 opacity-60">
-                      <p className="text-xs text-gray-400">Deleted field #{k}</p>
-                      <p className="text-sm text-gray-600 mt-0.5">{Array.isArray(v) ? v.join(", ") : String(v)}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" size="sm" onClick={() => setSelectedSub(null)}>Close</Button>
-              <Button
-                variant="destructive" size="sm"
-                onClick={() => { if (confirm("Delete this submission?")) deleteSubmission.mutate({ id: selectedSub.id }); }}
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
@@ -2819,6 +2704,7 @@ function WebhookCard({ formId }: { formId: number }) {
   const [url, setUrl] = useState("");
   const [secret, setSecret] = useState("");
   const [enabled, setEnabled] = useState(false);
+  const [events, setEvents] = useState<string[]>(["submission"]);
   const [showSecret, setShowSecret] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; statusCode: number; error?: string } | null>(null);
 
@@ -2826,11 +2712,19 @@ function WebhookCard({ formId }: { formId: number }) {
     if (webhook) {
       setUrl(webhook.webhookUrl ?? "");
       setEnabled(webhook.isEnabled ?? false);
+      const ev = (webhook.events ?? "submission").split(",").map((e: string) => e.trim());
+      setEvents(ev.length ? ev : ["submission"]);
     }
   }, [webhook]);
 
   const handleSave = async () => {
-    await saveMutation.mutateAsync({ formId, webhookUrl: url, secret: secret || undefined, isEnabled: enabled });
+    await saveMutation.mutateAsync({
+      formId,
+      webhookUrl: url,
+      secret: secret || undefined,
+      isEnabled: enabled,
+      events: events.join(","),
+    });
     toast.success("Webhook settings saved");
   };
 
@@ -2856,10 +2750,34 @@ function WebhookCard({ formId }: { formId: number }) {
             <p className="text-xs text-gray-500">POST submission data to any URL in real-time</p>
           </div>
         </div>
-        <Switch checked={enabled} onCheckedChange={v => { setEnabled(v); saveMutation.mutate({ formId, isEnabled: v }); }} />
+        <Switch checked={enabled} onCheckedChange={v => { setEnabled(v); saveMutation.mutate({ formId, isEnabled: v, events: events.join(",") }); }} />
       </div>
 
       <div className="space-y-3">
+        <div>
+          <Label className="text-xs text-gray-600 mb-1 block">Trigger on</Label>
+          <div className="flex flex-wrap gap-3">
+            {[
+              { value: "submission", label: "Form submit" },
+              { value: "update", label: "Results table update" },
+            ].map(opt => (
+              <label key={opt.value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <Checkbox
+                  checked={events.includes(opt.value)}
+                  onCheckedChange={checked => {
+                    setEvents(prev => {
+                      const next = checked
+                        ? [...new Set([...prev, opt.value])]
+                        : prev.filter(e => e !== opt.value);
+                      return next.length ? next : ["submission"];
+                    });
+                  }}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
         <div>
           <Label className="text-xs text-gray-600 mb-1 block">Endpoint URL</Label>
           <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://your-server.com/webhook" className="h-8 text-sm" />
@@ -3083,7 +3001,7 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
       {activeTab === "share" && <ShareTab formId={formId} template={template} onRefetch={refetch} />}
       {activeTab === "settings" && <SettingsTab formId={formId} template={template} onRefetch={refetch} />}
       {activeTab === "success" && <FormSuccessModulesTab formId={formId} template={template} onRefetch={refetch} />}
-      {activeTab === "results" && <ResultsTab formId={formId} template={template} />}
+      {activeTab === "results" && <FormResultsTable formId={formId} template={template} />}
       {activeTab === "analytics" && <AnalyticsTab formId={formId} template={template} />}
       {activeTab === "integrations" && <IntegrationsTab formId={formId} />}
     </div>
