@@ -29,6 +29,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/_core/hooks/useAuth";
+import type { AudienceFilter, LegacyInterestKey } from "@shared/emailCampaignAudience";
+import { DEFAULT_AUDIENCE_FILTER } from "@shared/emailCampaignAudience";
 
 // Block type is imported from LandingPageBuilder via EmailBlockEditor
 function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -83,59 +85,67 @@ ${preview}
 </html>`;
 }
 
-// ─── Audience filter types ────────────────────────────────────────────────────
-type InterestKey = "acs" | "adultEcho" | "pediatricEcho" | "fetalEcho" | "pocus";
-
-const INTEREST_OPTIONS: { key: InterestKey; label: string }[] = [
+const LEGACY_INTEREST_OPTIONS: { key: LegacyInterestKey; label: string }[] = [
   { key: "acs", label: "ACS" },
   { key: "adultEcho", label: "Adult Echo" },
   { key: "pediatricEcho", label: "Pediatric Echo" },
   { key: "fetalEcho", label: "Fetal Echo" },
   { key: "pocus", label: "POCUS" },
 ];
-// ─── Audience filter builder ──────────────────────────────────────────────────
-interface AudienceFilter {
-  interests: InterestKey[];
-  roles: string[];
-  subscriptionType: "all" | "premium" | "free";
-  userStatus: "all" | "active" | "pending";
-  specificEmails: string[];
-  enrolledInCourseIds: number[];
-  purchasedProductIds: number[];
-  downloadedProductIds: number[];
-  inGroupIds: number[];
-  inCohortGroupIds: number[];
-  submittedFormIds: number[];
-  completedCourseIds: number[];
-  freePreviewCourseIds: number[];
-  logic: "and" | "or";
-}
 
-const DEFAULT_FILTER: AudienceFilter = {
-  interests: [], roles: [], subscriptionType: "all", userStatus: "active",
-  specificEmails: [], enrolledInCourseIds: [], purchasedProductIds: [],
-  downloadedProductIds: [], inGroupIds: [], inCohortGroupIds: [],
-  submittedFormIds: [], completedCourseIds: [], freePreviewCourseIds: [], logic: "and",
-};
+const DEFAULT_FILTER: AudienceFilter = { ...DEFAULT_AUDIENCE_FILTER };
 
-function MultiSelect({ label, options, selected, onChange }: {
+function MultiSelect({ label, options, selected, onChange, hint }: {
   label: string;
   options: { id: number; label: string }[];
   selected: number[];
   onChange: (v: number[]) => void;
+  hint?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selectedLabels = options.filter((o) => selected.includes(o.id)).map((o) => o.label);
   return (
     <div className="relative">
       <label className="text-xs text-gray-500 mb-1 block">{label}</label>
-      <button onClick={() => setOpen(!open)} className="w-full text-left text-sm border rounded-lg px-3 py-2 bg-white flex items-center justify-between">
+      {hint && <p className="text-[10px] text-gray-400 mb-1">{hint}</p>}
+      <button type="button" onClick={() => setOpen(!open)} className="w-full text-left text-sm border rounded-lg px-3 py-2 bg-white flex items-center justify-between">
         <span className="truncate text-gray-700">{selectedLabels.length > 0 ? selectedLabels.join(", ") : <span className="text-gray-400">None selected</span>}</span>
         <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
       </button>
       {open && (
         <div className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
           {options.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">No options available</div>}
+          {options.map((o) => (
+            <label key={o.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm">
+              <input type="checkbox" checked={selected.includes(o.id)} onChange={(e) => {
+                onChange(e.target.checked ? [...selected, o.id] : selected.filter((id) => id !== o.id));
+              }} className="rounded" />
+              {o.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StringMultiSelect({ label, options, selected, onChange }: {
+  label: string;
+  options: { id: string; label: string }[];
+  selected: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedLabels = options.filter((o) => selected.includes(o.id)).map((o) => o.label);
+  return (
+    <div className="relative">
+      <label className="text-xs text-gray-500 mb-1 block">{label}</label>
+      <button type="button" onClick={() => setOpen(!open)} className="w-full text-left text-sm border rounded-lg px-3 py-2 bg-white flex items-center justify-between">
+        <span className="truncate text-gray-700">{selectedLabels.length > 0 ? selectedLabels.join(", ") : <span className="text-gray-400">None selected</span>}</span>
+        <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
           {options.map((o) => (
             <label key={o.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm">
               <input type="checkbox" checked={selected.includes(o.id)} onChange={(e) => {
@@ -157,16 +167,24 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
 }) {
   const { data: options } = trpc.emailCampaign.getAudienceOptions.useQuery();
   const [expanded, setExpanded] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [specificEmailsText, setSpecificEmailsText] = useState(filter.specificEmails.join("\n"));
 
   function update(patch: Partial<AudienceFilter>) {
     onChange({ ...filter, ...patch });
   }
 
-  function toggleInterest(key: InterestKey) {
+  function toggleLegacyInterest(key: LegacyInterestKey) {
     const arr = filter.interests.includes(key) ? filter.interests.filter((k) => k !== key) : [...filter.interests, key];
     update({ interests: arr });
   }
+
+  function toggleInterestId(id: number) {
+    const arr = filter.interestIds.includes(id) ? filter.interestIds.filter((k) => k !== id) : [...filter.interestIds, id];
+    update({ interestIds: arr });
+  }
+
+  const abTest = filter.abTest ?? { enabled: false, variants: [] };
 
   return (
     <Card className="border shadow-sm">
@@ -186,24 +204,49 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
       </CardHeader>
       {expanded && (
         <CardContent className="px-5 pb-5 space-y-4">
-          {/* Logic toggle */}
+          {/* Email lists */}
+          {options?.lists && options.lists.length > 0 && (
+            <div className="p-3 bg-[#f0fbfc] border border-[#189aa1]/20 rounded-lg space-y-3">
+              <label className="text-xs font-semibold text-gray-700 block">Email Lists</label>
+              <MultiSelect
+                label="Target lists"
+                options={options.lists.map((l) => ({ id: l.id, label: `${l.label} (${l.subscriberCount ?? 0})` }))}
+                selected={filter.listIds}
+                onChange={(v) => update({ listIds: v })}
+                hint="Connect campaigns to lists built in the Email Lists tab"
+              />
+              {filter.listIds.length > 0 && (
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">List combination</label>
+                  <Select value={filter.listMode} onValueChange={(v: AudienceFilter["listMode"]) => update({ listMode: v })}>
+                    <SelectTrigger className="text-sm h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="intersect">List + filters (intersect)</SelectItem>
+                      <SelectItem value="only">List only</SelectItem>
+                      <SelectItem value="union">List + all matching users (union)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">Match</span>
             <div className="flex rounded-lg border overflow-hidden">
               {(["and", "or"] as const).map((l) => (
-                <button key={l} onClick={() => update({ logic: l })} className={`px-3 py-1 text-xs font-semibold ${filter.logic === l ? "bg-[#189aa1] text-white" : "bg-white text-gray-600"}`}>
+                <button key={l} type="button" onClick={() => update({ logic: l })} className={`px-3 py-1 text-xs font-semibold ${filter.logic === l ? "bg-[#189aa1] text-white" : "bg-white text-gray-600"}`}>
                   {l === "and" ? "ALL" : "ANY"}
                 </button>
               ))}
             </div>
-            <span className="text-xs text-gray-500">filters</span>
+            <span className="text-xs text-gray-500">advanced filters</span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Subscription */}
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Subscription</label>
-              <Select value={filter.subscriptionType} onValueChange={(v: any) => update({ subscriptionType: v })}>
+              <Select value={filter.subscriptionType} onValueChange={(v: AudienceFilter["subscriptionType"]) => update({ subscriptionType: v })}>
                 <SelectTrigger className="text-sm h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All users</SelectItem>
@@ -212,11 +255,9 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* User status */}
             <div>
               <label className="text-xs text-gray-500 mb-1 block">User Status</label>
-              <Select value={filter.userStatus} onValueChange={(v: any) => update({ userStatus: v })}>
+              <Select value={filter.userStatus} onValueChange={(v: AudienceFilter["userStatus"]) => update({ userStatus: v })}>
                 <SelectTrigger className="text-sm h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
@@ -227,45 +268,72 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
             </div>
           </div>
 
-          {/* Interests */}
+          {options?.roles && options.roles.length > 0 && (
+            <StringMultiSelect label="Roles" options={options.roles} selected={filter.roles} onChange={(v) => update({ roles: v })} />
+          )}
+
+          {options?.interests && options.interests.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Specialty Interests (all)</label>
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                {options.interests.map((i) => (
+                  <button key={i.id} type="button" onClick={() => toggleInterestId(i.id)} className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${filter.interestIds.includes(i.id) ? "bg-[#189aa1] text-white border-[#189aa1]" : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"}`}>
+                    {i.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
-            <label className="text-xs text-gray-500 mb-1.5 block">Interests</label>
+            <label className="text-xs text-gray-500 mb-1.5 block">Legacy Echo Interests</label>
             <div className="flex flex-wrap gap-1.5">
-              {INTEREST_OPTIONS.map(({ key, label }) => (
-                <button key={key} onClick={() => toggleInterest(key)} className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${filter.interests.includes(key) ? "bg-[#189aa1] text-white border-[#189aa1]" : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"}`}>
+              {LEGACY_INTEREST_OPTIONS.map(({ key, label }) => (
+                <button key={key} type="button" onClick={() => toggleLegacyInterest(key)} className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${filter.interests.includes(key) ? "bg-[#189aa1] text-white border-[#189aa1]" : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"}`}>
                   {label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Course enrollment */}
-          {options && (
-            <MultiSelect label="Enrolled in Course (any type)" options={options.courses} selected={filter.enrolledInCourseIds} onChange={(v) => update({ enrolledInCourseIds: v })} />
-          )}
-          {options && (
-            <MultiSelect label="Free Preview Enrollees" options={options.courses} selected={filter.freePreviewCourseIds} onChange={(v) => update({ freePreviewCourseIds: v })} />
-          )}
-          {options && (
-            <MultiSelect label="Completed Course" options={options.courses} selected={filter.completedCourseIds} onChange={(v) => update({ completedCourseIds: v })} />
-          )}
-          {options && (
-            <MultiSelect label="Purchased Product" options={options.products} selected={filter.purchasedProductIds} onChange={(v) => update({ purchasedProductIds: v })} />
-          )}
-          {options && (
-            <MultiSelect label="Downloaded Product" options={options.products} selected={filter.downloadedProductIds} onChange={(v) => update({ downloadedProductIds: v })} />
-          )}
-          {options && (
-            <MultiSelect label="In Team/Group" options={options.groups} selected={filter.inGroupIds} onChange={(v) => update({ inGroupIds: v })} />
-          )}
-          {options && (
-            <MultiSelect label="In Cohort Group" options={options.cohortGroups} selected={filter.inCohortGroupIds} onChange={(v) => update({ inCohortGroupIds: v })} />
-          )}
-          {options && (
-            <MultiSelect label="Submitted Form" options={options.forms} selected={filter.submittedFormIds} onChange={(v) => update({ submittedFormIds: v })} />
+          <button type="button" onClick={() => setShowAdvanced(!showAdvanced)} className="text-xs text-[#189aa1] font-medium flex items-center gap-1">
+            {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {showAdvanced ? "Hide" : "Show"} course, product, cohort & date filters
+          </button>
+
+          {showAdvanced && options && (
+            <div className="space-y-4 pl-1 border-l-2 border-gray-100 ml-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Enrolled after</label>
+                  <Input type="date" value={filter.enrolledAfter?.slice(0, 10) ?? ""} onChange={(e) => update({ enrolledAfter: e.target.value ? `${e.target.value}T00:00:00.000Z` : undefined })} className="text-sm h-9" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Enrolled before</label>
+                  <Input type="date" value={filter.enrolledBefore?.slice(0, 10) ?? ""} onChange={(e) => update({ enrolledBefore: e.target.value ? `${e.target.value}T23:59:59.999Z` : undefined })} className="text-sm h-9" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Purchased after</label>
+                  <Input type="date" value={filter.purchasedAfter?.slice(0, 10) ?? ""} onChange={(e) => update({ purchasedAfter: e.target.value ? `${e.target.value}T00:00:00.000Z` : undefined })} className="text-sm h-9" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Purchased before</label>
+                  <Input type="date" value={filter.purchasedBefore?.slice(0, 10) ?? ""} onChange={(e) => update({ purchasedBefore: e.target.value ? `${e.target.value}T23:59:59.999Z` : undefined })} className="text-sm h-9" />
+                </div>
+              </div>
+              <MultiSelect label="Enrolled in Course" options={options.courses} selected={filter.enrolledInCourseIds} onChange={(v) => update({ enrolledInCourseIds: v })} />
+              <MultiSelect label="Active Course Access (in progress)" options={options.courses} selected={filter.activeAccessCourseIds} onChange={(v) => update({ activeAccessCourseIds: v })} />
+              <MultiSelect label="Free Preview Enrollees" options={options.courses} selected={filter.freePreviewCourseIds} onChange={(v) => update({ freePreviewCourseIds: v })} />
+              <MultiSelect label="Completed Course" options={options.courses} selected={filter.completedCourseIds} onChange={(v) => update({ completedCourseIds: v })} />
+              <MultiSelect label="Purchased Course (paid order)" options={options.courses} selected={filter.purchasedCourseIds} onChange={(v) => update({ purchasedCourseIds: v })} />
+              <MultiSelect label="Purchased Product" options={options.products} selected={filter.purchasedProductIds} onChange={(v) => update({ purchasedProductIds: v })} />
+              <MultiSelect label="Downloaded Product" options={options.products} selected={filter.downloadedProductIds} onChange={(v) => update({ downloadedProductIds: v })} />
+              <MultiSelect label="In Team/Group" options={options.groups} selected={filter.inGroupIds} onChange={(v) => update({ inGroupIds: v })} />
+              <MultiSelect label="In Cohort Group" options={options.cohortGroups} selected={filter.inCohortGroupIds} onChange={(v) => update({ inCohortGroupIds: v })} />
+              <MultiSelect label="Submitted Form" options={options.forms} selected={filter.submittedFormIds} onChange={(v) => update({ submittedFormIds: v })} />
+            </div>
           )}
 
-          {/* Specific emails */}
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Specific Emails (overrides all filters)</label>
             <Textarea
@@ -281,7 +349,58 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
             />
           </div>
 
-          {/* Preview */}
+          {/* A/B segmentation */}
+          <div className="border rounded-lg p-3 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={abTest.enabled}
+                onChange={(e) => update({
+                  abTest: {
+                    ...abTest,
+                    enabled: e.target.checked,
+                    variants: abTest.variants.length > 0 ? abTest.variants : [
+                      { key: "A", name: "Variant A", weight: 50 },
+                      { key: "B", name: "Variant B", weight: 50 },
+                    ],
+                  },
+                })}
+                className="rounded"
+              />
+              A/B test segmentation
+            </label>
+            {abTest.enabled && (
+              <div className="space-y-2">
+                {abTest.variants.map((v, idx) => (
+                  <div key={v.key} className="grid grid-cols-12 gap-2 items-center text-sm">
+                    <Input className="col-span-2 h-8 text-xs" value={v.key} onChange={(e) => {
+                      const variants = [...abTest.variants];
+                      variants[idx] = { ...v, key: e.target.value };
+                      update({ abTest: { ...abTest, variants } });
+                    }} placeholder="Key" />
+                    <Input className="col-span-4 h-8 text-xs" value={v.name ?? ""} onChange={(e) => {
+                      const variants = [...abTest.variants];
+                      variants[idx] = { ...v, name: e.target.value };
+                      update({ abTest: { ...abTest, variants } });
+                    }} placeholder="Name" />
+                    <Input className="col-span-2 h-8 text-xs" type="number" min={1} max={100} value={v.weight} onChange={(e) => {
+                      const variants = [...abTest.variants];
+                      variants[idx] = { ...v, weight: Number(e.target.value) || 1 };
+                      update({ abTest: { ...abTest, variants } });
+                    }} />
+                    <span className="col-span-1 text-xs text-gray-400">%</span>
+                    <Input className="col-span-3 h-8 text-xs" value={v.subject ?? ""} onChange={(e) => {
+                      const variants = [...abTest.variants];
+                      variants[idx] = { ...v, subject: e.target.value || undefined };
+                      update({ abTest: { ...abTest, variants } });
+                    }} placeholder="Subject override" />
+                  </div>
+                ))}
+                <p className="text-[10px] text-gray-400">Recipients are split by email hash. Leave subject blank to use the campaign default. Variant HTML overrides can be set when duplicating blocks per variant in a future release.</p>
+              </div>
+            )}
+          </div>
+
           {preview && preview.sampleEmails.length > 0 && (
             <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500">
               <span className="font-medium">Sample recipients:</span> {preview.sampleEmails.join(", ")}
@@ -339,7 +458,10 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     setPreviewText(existingCampaign.previewText ?? "");
     if (existingCampaign.senderProfileId) setSenderProfileId(existingCampaign.senderProfileId);
     if (existingCampaign.audienceFilter) {
-      try { setFilter(JSON.parse(existingCampaign.audienceFilter)); } catch {}
+      try {
+        const parsed = JSON.parse(existingCampaign.audienceFilter) as Partial<AudienceFilter>;
+        setFilter({ ...DEFAULT_FILTER, ...parsed });
+      } catch { /* ignore */ }
     }
     if (existingCampaign.blocksJson) {
       try {

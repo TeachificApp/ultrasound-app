@@ -268,10 +268,37 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
               <div>
                 <p className="text-xs font-semibold text-gray-500 mb-2">TOP CLICKED LINKS</p>
                 <div className="space-y-1">
-                  {analytics.topLinks.map((link: any, i: number) => (
+                  {analytics.topLinks.map((link: { url: string; clicks: number }, i: number) => (
                     <div key={i} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
                       <span className="text-blue-600 truncate flex-1 mr-3">{link.url}</span>
                       <span className="font-medium text-gray-700 shrink-0">{link.clicks} clicks</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {analytics.orders && analytics.orders.count > 0 && (
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-3 border rounded-lg bg-amber-50">
+                  <p className="text-xs text-amber-700 mb-1">Attributed Orders</p>
+                  <p className="font-bold text-amber-900">{analytics.orders.count}</p>
+                </div>
+                <div className="p-3 border rounded-lg bg-amber-50">
+                  <p className="text-xs text-amber-700 mb-1">Attributed Revenue</p>
+                  <p className="font-bold text-amber-900">${(analytics.orders.revenueCents / 100).toFixed(2)}</p>
+                </div>
+              </div>
+            )}
+
+            {analytics.variantStats && Object.keys(analytics.variantStats).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">A/B VARIANT PERFORMANCE</p>
+                <div className="space-y-1">
+                  {Object.entries(analytics.variantStats).map(([variant, stats]) => (
+                    <div key={variant} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
+                      <span className="font-medium text-gray-700">Variant {variant}</span>
+                      <span className="text-gray-500">{stats.opens} opens · {stats.clicks} clicks</span>
                     </div>
                   ))}
                 </div>

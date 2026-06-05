@@ -17,7 +17,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { eq, and, desc, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, lte, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
@@ -26,19 +26,19 @@ import {
   emailCampaigns,
   emailSenderProfiles,
   userRoles,
-  lmsEnrollments,
-  digitalPurchases,
-  digitalDownloadEvents,
-  lmsGroupSeats,
-  lmsCohortGroupEnrollments,
-  generalFormSubmissions,
-  lmsGroups,
-  lmsCohortGroups,
   emailLists,
   emailListSubscribers,
   leadCaptureWidgets,
+  lmsInterests,
 } from "../../drizzle/schema";
 import { addToEmailList, ensureAllContactsList } from "../lib/emailListHelper";
+import { resolveRecipients } from "../lib/emailCampaignAudienceResolver";
+import {
+  AudienceFilterSchema,
+  buildRecipientTrackingKey,
+  pickAbVariant,
+  type AudienceFilter,
+} from "../../shared/emailCampaignAudience";
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
 import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
@@ -51,37 +51,6 @@ const InterestPrefsSchema = z.object({
   pediatricEcho: z.boolean().default(false),
   fetalEcho: z.boolean().default(false),
   pocus: z.boolean().default(false),
-});
-
-const AudienceFilterSchema = z.object({
-  /** Interest categories — only users who have at least one of these selected */
-  interests: z.array(z.enum(["acs", "adultEcho", "pediatricEcho", "fetalEcho", "pocus"])).default([]),
-  /** App roles to filter by — empty means all roles */
-  roles: z.array(z.string()).default([]),
-  /** Subscription type: "all" | "premium" | "free" */
-  subscriptionType: z.enum(["all", "premium", "free"]).default("all"),
-  /** User status: "active" = verified non-pending, "pending" = pending/unverified, "all" = both */
-  userStatus: z.enum(["all", "active", "pending"]).default("all"),
-  /** Specific email addresses — overrides all other filters when non-empty */
-  specificEmails: z.array(z.string().email()).default([]),
-  /** Filter to users enrolled in specific course IDs */
-  enrolledInCourseIds: z.array(z.number().int()).default([]),
-  /** Filter to users who purchased specific digital product IDs */
-  purchasedProductIds: z.array(z.number().int()).default([]),
-  /** Filter to users who downloaded specific digital product IDs */
-  downloadedProductIds: z.array(z.number().int()).default([]),
-  /** Filter to users in specific team/group IDs (lmsGroups) */
-  inGroupIds: z.array(z.number().int()).default([]),
-  /** Filter to users in specific cohort group IDs (lmsCohortGroups) */
-  inCohortGroupIds: z.array(z.number().int()).default([]),
-  /** Filter to users who submitted a specific general form ID */
-  submittedFormIds: z.array(z.number().int()).default([]),
-  /** Filter to users who completed a course (progressPct = 100) */
-  completedCourseIds: z.array(z.number().int()).default([]),
-  /** Filter to users enrolled as free_preview in specific course IDs */
-  freePreviewCourseIds: z.array(z.number().int()).default([]),
-  /** AND/OR logic between filter groups: "and" = must match all, "or" = match any */
-  logic: z.enum(["and", "or"]).default("and"),
 });
 
 // ─── Unsubscribe token helper ─────────────────────────────────────────────────
@@ -149,233 +118,37 @@ async function assertAdmin(userId: number) {
   }
 }
 
-// ─── Audience resolver ────────────────────────────────────────────────────────
-
-async function resolveRecipients(
-  filter: z.infer<typeof AudienceFilterSchema>,
-): Promise<{ id: number; email: string; displayName: string | null; name: string | null }[]> {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-
-  // If specific emails are provided, use those directly (still respect unsubscribe)
-  if (filter.specificEmails.length > 0) {
-    const results: { id: number; email: string; displayName: string | null; name: string | null }[] = [];
-    for (const email of filter.specificEmails) {
-      const found = await db
-        .select({
-          id: users.id,
-          email: users.email,
-          displayName: users.displayName,
-          name: users.name,
-          unsubscribedAt: users.unsubscribedAt,
-        })
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-      if (found[0]?.email && !found[0]?.unsubscribedAt) {
-        results.push({
-          id: found[0].id,
-          email: found[0].email,
-          displayName: found[0].displayName,
-          name: found[0].name,
-        });
-      }
-    }
-    return results;
-  }
-
-  // Fetch users based on userStatus filter
-  let allUsers = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      displayName: users.displayName,
-      name: users.name,
-      isPremium: users.isPremium,
-      interestPrefs: users.interestPrefs,
-      isPending: users.isPending,
-      unsubscribedAt: users.unsubscribedAt,
-    })
-    .from(users);
-
-  // Apply user status filter
-  if (filter.userStatus === "active") {
-    allUsers = allUsers.filter((u) => !u.isPending);
-  } else if (filter.userStatus === "pending") {
-    allUsers = allUsers.filter((u) => u.isPending);
-  }
-  // "all" = include both active and pending
-
-  // Filter: must have email, must not have unsubscribed
-  allUsers = allUsers.filter(
-    (u) => u.email && u.email.trim() !== "" && !u.unsubscribedAt,
-  );
-
-  // Apply subscription filter
-  if (filter.subscriptionType === "premium") {
-    allUsers = allUsers.filter((u) => u.isPremium);
-  } else if (filter.subscriptionType === "free") {
-    allUsers = allUsers.filter((u) => !u.isPremium);
-  }
-
-  // Apply role filter
-  if (filter.roles.length > 0) {
-    const roleUserIds = new Set<number>();
-    for (const role of filter.roles) {
-      const roleRows = await db
-        .select({ userId: userRoles.userId })
-        .from(userRoles)
-        .where(eq(userRoles.role, role as any));
-      roleRows.forEach((r) => roleUserIds.add(r.userId));
-    }
-    allUsers = allUsers.filter((u) => roleUserIds.has(u.id));
-  }
-
-  // Apply interest filter
-  if (filter.interests.length > 0) {
-    allUsers = allUsers.filter((u) => {
-      if (!u.interestPrefs) return false;
-      try {
-        const prefs = JSON.parse(u.interestPrefs) as Record<string, boolean>;
-        return filter.interests.some((interest) => prefs[interest] === true);
-      } catch {
-        return false;
-      }
-    });
-  }
-
-  // Apply course enrollment filter
-  if (filter.enrolledInCourseIds && filter.enrolledInCourseIds.length > 0) {
-    const enrolledUserIds = new Set<number>();
-    for (const courseId of filter.enrolledInCourseIds) {
-      const rows = await db
-        .select({ userId: lmsEnrollments.userId })
-        .from(lmsEnrollments)
-        .where(eq(lmsEnrollments.courseId, courseId));
-      rows.forEach(r => enrolledUserIds.add(r.userId));
-    }
-    allUsers = allUsers.filter(u => enrolledUserIds.has(u.id));
-  }
-
-  // Apply completed course filter
-  if (filter.completedCourseIds && filter.completedCourseIds.length > 0) {
-    const completedUserIds = new Set<number>();
-    for (const courseId of filter.completedCourseIds) {
-      const rows = await db
-        .select({ userId: lmsEnrollments.userId })
-        .from(lmsEnrollments)
-        .where(and(eq(lmsEnrollments.courseId, courseId), isNotNull(lmsEnrollments.completedAt)));
-      rows.forEach(r => completedUserIds.add(r.userId));
-    }
-    allUsers = allUsers.filter(u => completedUserIds.has(u.id));
-  }
-
-  // Apply digital product purchase filter
-  if (filter.purchasedProductIds && filter.purchasedProductIds.length > 0) {
-    const purchasedUserIds = new Set<number>();
-    for (const productId of filter.purchasedProductIds) {
-      const rows = await db
-        .select({ userId: digitalPurchases.userId })
-        .from(digitalPurchases)
-        .where(eq(digitalPurchases.productId, productId));
-      rows.forEach(r => purchasedUserIds.add(r.userId));
-    }
-    allUsers = allUsers.filter(u => purchasedUserIds.has(u.id));
-  }
-
-  // Apply digital download filter
-  if (filter.downloadedProductIds && filter.downloadedProductIds.length > 0) {
-    const downloadedUserIds = new Set<number>();
-    for (const productId of filter.downloadedProductIds) {
-      const rows = await db
-        .select({ userId: digitalDownloadEvents.userId })
-        .from(digitalDownloadEvents)
-        .where(eq(digitalDownloadEvents.productId, productId));
-      rows.forEach(r => downloadedUserIds.add(r.userId));
-    }
-    allUsers = allUsers.filter(u => downloadedUserIds.has(u.id));
-  }
-
-  // Apply team/group filter (lmsGroupSeats — match by email)
-  if (filter.inGroupIds && filter.inGroupIds.length > 0) {
-    const groupEmails = new Set<string>();
-    for (const groupId of filter.inGroupIds) {
-      const rows = await db
-        .select({ email: lmsGroupSeats.email })
-        .from(lmsGroupSeats)
-        .where(and(eq(lmsGroupSeats.groupId, groupId), eq(lmsGroupSeats.status, "active")));
-      rows.forEach(r => { if (r.email) groupEmails.add(r.email.toLowerCase()); });
-    }
-    allUsers = allUsers.filter(u => u.email && groupEmails.has(u.email.toLowerCase()));
-  }
-
-  // Apply cohort group filter (lmsCohortGroupEnrollments)
-  if (filter.inCohortGroupIds && filter.inCohortGroupIds.length > 0) {
-    const cohortUserIds = new Set<number>();
-    for (const cohortGroupId of filter.inCohortGroupIds) {
-      const rows = await db
-        .select({ userId: lmsCohortGroupEnrollments.userId })
-        .from(lmsCohortGroupEnrollments)
-        .where(eq(lmsCohortGroupEnrollments.cohortGroupId, cohortGroupId));
-      rows.forEach(r => cohortUserIds.add(r.userId));
-    }
-    allUsers = allUsers.filter(u => cohortUserIds.has(u.id));
-  }
-
-  // Apply free preview enrollment filter
-  if (filter.freePreviewCourseIds && filter.freePreviewCourseIds.length > 0) {
-    const freePreviewUserIds = new Set<number>();
-    for (const courseId of filter.freePreviewCourseIds) {
-      const rows = await db
-        .select({ userId: lmsEnrollments.userId })
-        .from(lmsEnrollments)
-        .where(and(eq(lmsEnrollments.courseId, courseId), eq(lmsEnrollments.enrollmentType, "free_preview")));
-      rows.forEach(r => freePreviewUserIds.add(r.userId));
-    }
-    allUsers = allUsers.filter(u => freePreviewUserIds.has(u.id));
-  }
-
-  // Apply form submission filter
-  if (filter.submittedFormIds && filter.submittedFormIds.length > 0) {
-    const formUserEmails = new Set<string>();
-    for (const formId of filter.submittedFormIds) {
-      const rows = await db
-        .select({ userEmail: generalFormSubmissions.userEmail })
-        .from(generalFormSubmissions)
-        .where(and(eq(generalFormSubmissions.formId, formId), isNotNull(generalFormSubmissions.userEmail)));
-      rows.forEach(r => { if (r.userEmail) formUserEmails.add(r.userEmail.toLowerCase()); });
-    }
-    allUsers = allUsers.filter(u => u.email && formUserEmails.has(u.email.toLowerCase()));
-  }
-
-  return allUsers.map((u) => ({
-    id: u.id,
-    email: u.email!,
-    displayName: u.displayName,
-    name: u.name,
-  }));
-}
-
 // ─── Core send function (shared by immediate and scheduled sends) ─────────────
 
 /** Inject a 1x1 tracking pixel into an HTML email body */
-function injectTrackingPixel(html: string, campaignId: number, userId: number): string {
+function injectTrackingPixel(
+  html: string,
+  campaignId: number,
+  recipientKey: string,
+  variant?: string,
+): string {
   const appUrl = process.env.CANONICAL_ROOT_DOMAIN || "https://app.allaboutultrasound.com";
-  const pixelUrl = `${appUrl}/api/email/track/open/${campaignId}/${userId}.gif`;
+  const vq = variant ? `?v=${encodeURIComponent(variant)}` : "";
+  const pixelUrl = `${appUrl}/api/email/track/open/${campaignId}/${recipientKey}.gif${vq}`;
   const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;" />`;
   if (html.includes("</body>")) return html.replace("</body>", `${pixel}</body>`);
   return html + pixel;
 }
 
 /** Wrap all <a href="..."> links in the email with click-tracking redirect */
-function wrapLinksForTracking(html: string, campaignId: number, userId: number): string {
+function wrapLinksForTracking(
+  html: string,
+  campaignId: number,
+  recipientKey: string,
+  variant?: string,
+): string {
   const appUrl = process.env.CANONICAL_ROOT_DOMAIN || "https://app.allaboutultrasound.com";
-  // Use a string-based approach to avoid regex literal issues with esbuild
   const hrefPattern = new RegExp('href="(https?://[^"]+)"', 'gi');
+  const vq = variant ? `&v=${encodeURIComponent(variant)}` : "";
   return html.replace(hrefPattern, (_, url: string) => {
     if (url.includes("/api/email/track/") || url.includes("/unsubscribe")) return `href="${url}"`;
     const encoded = encodeURIComponent(url);
-    return `href="${appUrl}/api/email/track/click/${campaignId}/${userId}?url=${encoded}"`;
+    return `href="${appUrl}/api/email/track/click/${campaignId}/${recipientKey}?url=${encoded}${vq}"`;
   });
 }
 
@@ -390,7 +163,7 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     .limit(1);
   if (!campaign) return;
 
-  let filter: z.infer<typeof AudienceFilterSchema>;
+  let filter: AudienceFilter;
   try {
     filter = AudienceFilterSchema.parse(JSON.parse(campaign.audienceFilter));
   } catch {
@@ -421,29 +194,40 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     .set({ status: "sending" })
     .where(eq(emailCampaigns.id, campaignId));
 
-  const recipients = await resolveRecipients(filter);
+  const recipients = await resolveRecipients(filter, campaignId);
   let sent = 0;
   let failed = 0;
 
   for (const recipient of recipients) {
-    // Ensure unsubscribe token exists for this user
-    const token = await ensureUnsubscribeToken(recipient.id);
-    const unsubscribeUrl = buildUnsubscribeUrl(token);
-    // Replace the {{UNSUBSCRIBE_URL}} placeholder in the branded wrapper (set by EmailCampaignEditor)
-    // If the placeholder is not present (legacy HTML), fall back to injecting a footer
-    let html = campaign.htmlBody;
-    if (html.includes("{{UNSUBSCRIBE_URL}}")) {
-      html = html.replaceAll("{{UNSUBSCRIBE_URL}}", unsubscribeUrl);
-    } else {
-      html = injectUnsubscribeFooter(html, unsubscribeUrl);
+    const variant = pickAbVariant(recipient.email, filter.abTest, campaignId);
+    const subject = variant?.subject?.trim() || campaign.subject;
+    let html = variant?.htmlBody?.trim() || campaign.htmlBody;
+
+    let unsubscribeUrl: string | undefined;
+    if (recipient.userId) {
+      const token = await ensureUnsubscribeToken(recipient.userId);
+      unsubscribeUrl = buildUnsubscribeUrl(token);
+      if (html.includes("{{UNSUBSCRIBE_URL}}")) {
+        html = html.replaceAll("{{UNSUBSCRIBE_URL}}", unsubscribeUrl);
+      } else {
+        html = injectUnsubscribeFooter(html, unsubscribeUrl);
+      }
+    } else if (html.includes("{{UNSUBSCRIBE_URL}}")) {
+      html = html.replaceAll(
+        "{{UNSUBSCRIBE_URL}}",
+        "mailto:support@allaboutultrasound.com?subject=Unsubscribe",
+      );
     }
-    html = injectTrackingPixel(html, campaignId, recipient.id);
-    html = wrapLinksForTracking(html, campaignId, recipient.id);
+
+    const recipientKey = buildRecipientTrackingKey(recipient);
+    const variantKey = recipient.abVariant ?? variant?.key;
+    html = injectTrackingPixel(html, campaignId, recipientKey, variantKey);
+    html = wrapLinksForTracking(html, campaignId, recipientKey, variantKey);
 
     const displayName = recipient.displayName || recipient.name || recipient.email;
     const ok = await sendEmail({
       to: { name: displayName, email: recipient.email },
-      subject: campaign.subject,
+      subject,
       htmlBody: html,
       previewText: campaign.previewText ?? undefined,
       fromName: senderName,
@@ -815,19 +599,69 @@ export const emailCampaignRouter = router({
     await assertAdmin(ctx.user.id);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const [courses, products, groups, cohortGroups, forms] = await Promise.all([
+    const [courses, products, groups, cohortGroups, forms, interests, lists] = await Promise.all([
       db.execute(sql`SELECT id, title FROM lms_courses WHERE status='published' ORDER BY title LIMIT 200`),
       db.execute(sql`SELECT id, title FROM digital_products WHERE is_active=1 ORDER BY title LIMIT 200`),
       db.execute(sql`SELECT id, name FROM lms_groups ORDER BY name LIMIT 200`),
       db.execute(sql`SELECT id, name FROM lmsCohortGroups ORDER BY name LIMIT 200`),
       db.execute(sql`SELECT id, title FROM generalFormTemplates WHERE status='open' ORDER BY title LIMIT 200`),
+      db
+        .select({
+          id: lmsInterests.id,
+          name: lmsInterests.name,
+          category: lmsInterests.category,
+        })
+        .from(lmsInterests)
+        .where(eq(lmsInterests.isActive, true))
+        .orderBy(lmsInterests.sortOrder)
+        .limit(200),
+      db
+        .select({
+          id: emailLists.id,
+          name: emailLists.name,
+          subscriberCount: emailLists.subscriberCount,
+        })
+        .from(emailLists)
+        .where(eq(emailLists.isActive, true))
+        .orderBy(desc(emailLists.createdAt))
+        .limit(200),
     ]);
+    const roleRows = await db
+      .selectDistinct({ role: userRoles.role })
+      .from(userRoles)
+      .limit(50);
     return {
-      courses: (courses[0] as any[]).map((r: any) => ({ id: r.id, label: r.title })),
-      products: (products[0] as any[]).map((r: any) => ({ id: r.id, label: r.title })),
-      groups: (groups[0] as any[]).map((r: any) => ({ id: r.id, label: r.name })),
-      cohortGroups: (cohortGroups[0] as any[]).map((r: any) => ({ id: r.id, label: r.name })),
-      forms: (forms[0] as any[]).map((r: any) => ({ id: r.id, label: r.title })),
+      courses: (courses[0] as { id: number; title: string }[]).map((r) => ({
+        id: r.id,
+        label: r.title,
+      })),
+      products: (products[0] as { id: number; title: string }[]).map((r) => ({
+        id: r.id,
+        label: r.title,
+      })),
+      groups: (groups[0] as { id: number; name: string }[]).map((r) => ({
+        id: r.id,
+        label: r.name,
+      })),
+      cohortGroups: (cohortGroups[0] as { id: number; name: string }[]).map((r) => ({
+        id: r.id,
+        label: r.name,
+      })),
+      forms: (forms[0] as { id: number; title: string }[]).map((r) => ({
+        id: r.id,
+        label: r.title,
+      })),
+      interests: interests.map((r) => ({
+        id: r.id,
+        label: r.name,
+        category: r.category,
+      })),
+      lists: lists.map((r) => ({
+        id: r.id,
+        label: r.name,
+        subscriberCount: r.subscriberCount,
+      })),
+      roles: roleRows.map((r) => ({ id: r.role, label: r.role.replace(/_/g, " ") })),
     };
   }),
 
@@ -848,11 +682,46 @@ export const emailCampaignRouter = router({
     await assertAdmin(ctx.user.id);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    return db
+    const campaigns = await db
       .select()
       .from(emailCampaigns)
       .orderBy(desc(emailCampaigns.createdAt))
       .limit(100);
+    if (campaigns.length === 0) return [];
+
+    const ids = campaigns.map((c) => c.id);
+    const [metricsRaw] = (await db.execute(sql`
+      SELECT
+        campaignId,
+        SUM(CASE WHEN eventType = 'open' THEN 1 ELSE 0 END) as openCount,
+        SUM(CASE WHEN eventType = 'click' THEN 1 ELSE 0 END) as clickCount,
+        SUM(CASE WHEN eventType = 'unsubscribe' THEN 1 ELSE 0 END) as unsubscribeCount
+      FROM emailCampaignEvents
+      WHERE campaignId IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
+      GROUP BY campaignId
+    `)) as [
+      { campaignId: number; openCount: number; clickCount: number; unsubscribeCount: number }[],
+      unknown,
+    ];
+    const metricsMap = new Map(
+      (Array.isArray(metricsRaw) ? metricsRaw : []).map((m) => [m.campaignId, m]),
+    );
+
+    return campaigns.map((c) => {
+      const m = metricsMap.get(c.id);
+      const sent = c.recipientCount ?? 0;
+      const openCount = Number(m?.openCount ?? 0);
+      const clickCount = Number(m?.clickCount ?? 0);
+      const unsubscribeCount = Number(m?.unsubscribeCount ?? 0);
+      return {
+        ...c,
+        openCount,
+        clickCount,
+        unsubscribeCount,
+        openRate: sent > 0 ? Math.round((openCount / sent) * 100) : 0,
+        clickRate: sent > 0 ? Math.round((clickCount / sent) * 100) : 0,
+      };
+    });
   }),
 
   // ── Admin: campaign analytics ─────────────────────────────────────────────
@@ -863,32 +732,115 @@ export const emailCampaignRouter = router({
       await assertAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const [campaign] = await db.select().from(emailCampaigns).where(eq(emailCampaigns.id, input.campaignId)).limit(1);
+      const [campaign] = await db
+        .select()
+        .from(emailCampaigns)
+        .where(eq(emailCampaigns.id, input.campaignId))
+        .limit(1);
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
-      // Count events from emailCampaignEvents table
-      const [eventsRaw] = await db.execute(sql`
+
+      const [eventsRaw] = (await db.execute(sql`
         SELECT eventType, COUNT(*) as cnt
         FROM emailCampaignEvents
         WHERE campaignId = ${input.campaignId}
         GROUP BY eventType
-      `) as any;
+      `)) as [{ eventType: string; cnt: number }[], unknown];
+
+      const [uniqueRaw] = (await db.execute(sql`
+        SELECT
+          eventType,
+          COUNT(DISTINCT COALESCE(userId, metadata)) as uniqueCnt
+        FROM emailCampaignEvents
+        WHERE campaignId = ${input.campaignId}
+        GROUP BY eventType
+      `)) as [{ eventType: string; uniqueCnt: number }[], unknown];
+
+      const [topLinksRaw] = (await db.execute(sql`
+        SELECT
+          CASE
+            WHEN metadata LIKE '{%' THEN JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.url'))
+            ELSE metadata
+          END as url,
+          COUNT(*) as clicks
+        FROM emailCampaignEvents
+        WHERE campaignId = ${input.campaignId} AND eventType = 'click' AND metadata IS NOT NULL
+        GROUP BY url
+        ORDER BY clicks DESC
+        LIMIT 10
+      `)) as [{ url: string; clicks: number }[], unknown];
+
+      const [ordersRaw] = (await db.execute(sql`
+        SELECT COUNT(DISTINCT lo.id) as orderCount, COALESCE(SUM(lo.amount), 0) as revenueCents
+        FROM lms_orders lo
+        INNER JOIN users u ON u.id = lo.user_id
+        INNER JOIN emailCampaignEvents e ON e.userId = u.id
+          AND e.campaignId = ${input.campaignId}
+          AND e.eventType = 'click'
+        WHERE lo.status = 'paid'
+          AND lo.created_at >= (
+            SELECT MIN(createdAt) FROM emailCampaignEvents WHERE campaignId = ${input.campaignId}
+          )
+      `)) as [{ orderCount: number; revenueCents: number }[], unknown];
+
+      const [variantRaw] = (await db.execute(sql`
+        SELECT
+          JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.variant')) as variant,
+          eventType,
+          COUNT(*) as cnt
+        FROM emailCampaignEvents
+        WHERE campaignId = ${input.campaignId}
+          AND metadata LIKE '%"variant"%'
+        GROUP BY variant, eventType
+      `)) as [{ variant: string; eventType: string; cnt: number }[], unknown];
+
       const events = Array.isArray(eventsRaw) ? eventsRaw : [];
-      const opens = events.find((e: any) => e.eventType === 'open')?.cnt ?? 0;
-      const clicks = events.find((e: any) => e.eventType === 'click')?.cnt ?? 0;
-      const unsubs = events.find((e: any) => e.eventType === 'unsubscribe')?.cnt ?? 0;
+      const uniqueEvents = Array.isArray(uniqueRaw) ? uniqueRaw : [];
+      const totalOpens = Number(events.find((e) => e.eventType === "open")?.cnt ?? 0);
+      const totalClicks = Number(events.find((e) => e.eventType === "click")?.cnt ?? 0);
+      const totalUnsubscribes = Number(events.find((e) => e.eventType === "unsubscribe")?.cnt ?? 0);
+      const uniqueOpens = Number(uniqueEvents.find((e) => e.eventType === "open")?.uniqueCnt ?? 0);
+      const uniqueClicks = Number(uniqueEvents.find((e) => e.eventType === "click")?.uniqueCnt ?? 0);
       const sent = campaign.recipientCount ?? 0;
+
+      const variantStats: Record<string, { opens: number; clicks: number }> = {};
+      for (const row of Array.isArray(variantRaw) ? variantRaw : []) {
+        if (!row.variant) continue;
+        if (!variantStats[row.variant]) variantStats[row.variant] = { opens: 0, clicks: 0 };
+        if (row.eventType === "open") variantStats[row.variant].opens += Number(row.cnt);
+        if (row.eventType === "click") variantStats[row.variant].clicks += Number(row.cnt);
+      }
+
+      const openRate = sent > 0 ? Math.round((uniqueOpens / sent) * 100) : 0;
+      const clickRate = sent > 0 ? Math.round((uniqueClicks / sent) * 100) : 0;
+      const unsubscribeRate = sent > 0 ? Math.round((totalUnsubscribes / sent) * 100) : 0;
+
       return {
         campaignId: campaign.id,
         subject: campaign.subject,
         status: campaign.status,
         sentAt: campaign.sentAt,
         recipientCount: sent,
-        openCount: Number(opens),
-        clickCount: Number(clicks),
-        unsubscribeCount: Number(unsubs),
-        openRate: sent > 0 ? Math.round((Number(opens) / sent) * 100) : 0,
-        clickRate: sent > 0 ? Math.round((Number(clicks) / sent) * 100) : 0,
-        unsubscribeRate: sent > 0 ? Math.round((Number(unsubs) / sent) * 100) : 0,
+        totalSent: sent,
+        totalOpens,
+        totalClicks,
+        totalUnsubscribes,
+        uniqueOpens,
+        uniqueClicks,
+        openCount: totalOpens,
+        clickCount: totalClicks,
+        unsubscribeCount: totalUnsubscribes,
+        openRate,
+        clickRate,
+        unsubscribeRate,
+        topLinks: (Array.isArray(topLinksRaw) ? topLinksRaw : []).map((r) => ({
+          url: r.url,
+          clicks: Number(r.clicks),
+        })),
+        orders: {
+          count: Number((Array.isArray(ordersRaw) ? ordersRaw[0] : null)?.orderCount ?? 0),
+          revenueCents: Number((Array.isArray(ordersRaw) ? ordersRaw[0] : null)?.revenueCents ?? 0),
+        },
+        variantStats,
       };
     }),
 

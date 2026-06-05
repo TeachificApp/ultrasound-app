@@ -49,6 +49,13 @@ The server starts on port 3000 (auto-scans for next available port if busy). No 
 - Vite config: `vite.config.ts`
 - Test config: `vitest.config.ts` (tests only in `server/**/*.test.ts`)
 
+### Email campaigns
+
+- Audience filter schema: `shared/emailCampaignAudience.ts`; resolver: `server/lib/emailCampaignAudienceResolver.ts`
+- Campaign editor supports email list targeting, all `lms_interests`, date filters, cohort/course/product filters, and A/B segmentation (stored in `audienceFilter` JSON)
+- Tracking URLs use recipient keys (`u{userId}` or `e{base64url(email)}`) so list-only subscribers are tracked
+- Analytics: `getCampaignAnalytics` returns fields aligned with `EmailCampaignDashboard` (`totalSent`, `uniqueOpens`, `topLinks`, `orders`, `variantStats`)
+
 ### Form Builder analytics
 
 - **Deep analytics tab** (`GeneralFormBuilder` → Analytics): per-field distributions, numeric stats, cross-tabulation, multi-form field comparison, and Formsite-style **public reports** (table/charts/embed links with optional password + saved filter).
