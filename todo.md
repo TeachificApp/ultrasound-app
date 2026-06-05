@@ -4683,5 +4683,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add 'Preview as Student' button in lesson content editor that opens in new window
 - [ ] Fix student dashboard not showing enrolled courses (Katerin can see enrollment in admin but not in her dashboard)
 - [x] Align content category tabs between admin user view and student dashboard: Courses, Quizzes, Downloads, Webinars, Products, Bundles, Memberships, Subscriptions, Communities
+- [x] Move Purchases to top-level dashboard tab (next to Subscriptions), not in content sub-tabs
+- [x] Fix Trophy icon not imported in GeneralFormBuilder causing crash on /admin/general-forms
 - [x] Fix instructor portal showing no courses even when user profile is linked to instructor profile and listed as instructor on courses
 - [x] Fix logout not working - signing out signs user right back in, and incognito window shows user still logged in

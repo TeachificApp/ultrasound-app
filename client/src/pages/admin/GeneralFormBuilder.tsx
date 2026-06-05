@@ -78,6 +78,7 @@ import {
   Check,
   Save,
   Shield,
+  Trophy,
 } from "lucide-react";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";

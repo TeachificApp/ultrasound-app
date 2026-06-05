@@ -99,8 +99,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "subscriptions" | "certificates" | "instructor";
-const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "certificates", "instructor"];
+type Tab = "profile" | "content" | "subscriptions" | "purchases" | "certificates" | "instructor";
+const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "purchases", "certificates", "instructor"];
 
 // ─── Profile Tab ─────────────────────────────────────────────────────────────
 
@@ -771,18 +771,17 @@ function CommunityProfileSection({ userId }: { userId: number }) {
 
 // ─── My Content Tab ───────────────────────────────────────────────────────────
 
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "products" | "bundles" | "memberships" | "communities" | "purchases";
+type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "products" | "bundles" | "memberships" | "communities";
 
 function MyContentTab() {
   const { data, isLoading } = trpc.dashboard.getMyContent.useQuery();
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
   const [autoTabSet, setAutoTabSet] = useState(false);
-  const [receiptPurchase, setReceiptPurchase] = useState<any | null>(null);
 
   // Auto-select first non-empty tab once data loads
   useEffect(() => {
     if (!data || autoTabSet) return;
-    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "purchases", "webinars", "products", "bundles", "memberships", "communities"];
+    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "webinars", "products", "bundles", "memberships", "communities"];
     const counts: Record<ContentSubTab, number> = {
       courses:      data.courses?.length ?? 0,
       quizzes:      data.quizzes?.length ?? 0,
@@ -792,7 +791,6 @@ function MyContentTab() {
       bundles:      data.bundles?.length ?? 0,
       memberships:  0, // memberships shown in Subscriptions tab
       communities:  data.communities?.length ?? 0,
-      purchases:    data.funnelPurchases?.length ?? 0,
     };
     const firstNonEmpty = tabOrder.find(t => counts[t] > 0);
     if (firstNonEmpty) {
@@ -807,7 +805,6 @@ function MyContentTab() {
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: data?.courses.length ?? 0 },
     { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: data?.quizzes.length ?? 0 },
     { key: "downloads",    label: "Downloads",    icon: Download,       count: data?.downloads.length ?? 0 },
-    { key: "purchases",    label: "Purchases",    icon: ShoppingCart,   count: data?.funnelPurchases?.length ?? 0 },
     { key: "webinars",     label: "Webinars",     icon: Video,          count: data?.webinars?.length ?? 0 },
     { key: "products",     label: "Products",     icon: Package,        count: data?.physicalProducts.length ?? 0 },
     { key: "bundles",      label: "Bundles",      icon: Layers,         count: data?.bundles?.length ?? 0 },
@@ -823,7 +820,7 @@ function MyContentTab() {
           <button
             key={t.key}
             onClick={() => setContentTab(t.key)}
-            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${
               contentTab === t.key ? "bg-white text-[#189aa1] shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -1035,36 +1032,47 @@ function MyContentTab() {
           )}
         </div>
       )}
-      {/* Funnel / Embedded Checkout Purchases */}
-      {contentTab === "purchases" && (
-        <div>
-          {(data?.funnelPurchases?.length ?? 0) === 0 ? (
-            <EmptyState icon={ShoppingCart} title="No purchases yet" description="Complete a checkout to see your purchases here." />
-          ) : (
-            <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
-              {(data?.funnelPurchases ?? []).map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-gray-900 truncate">{p.productName}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{formatDate(p.purchasedAt)}</p>
-                  </div>
-                  <div className="flex items-center gap-3 ml-4 shrink-0">
-                    <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amountPaid, p.currency)}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">
-                      {p.productType === "download" ? "Digital Download" : p.productType === "course" ? "Course" : p.productType === "quiz" ? "Quiz" : p.productType ? p.productType.charAt(0).toUpperCase() + p.productType.slice(1) : "Purchase"}
-                    </span>
-                    <button
-                      onClick={() => setReceiptPurchase(p)}
-                      className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      Receipt
-                    </button>
-                  </div>
-                </div>
-              ))}
+    </div>
+  );
+}
+
+// ─── Purchases Tab (top-level) ───────────────────────────────────────────────
+
+function PurchasesTab() {
+  const { data, isLoading } = trpc.dashboard.getMyContent.useQuery();
+  const [receiptPurchase, setReceiptPurchase] = useState<any | null>(null);
+
+  if (isLoading) return <LoadingSpinner />;
+
+  const purchases = data?.funnelPurchases ?? [];
+
+  return (
+    <div className="space-y-6">
+      {purchases.length === 0 ? (
+        <EmptyState icon={ShoppingCart} title="No purchases yet" description="Complete a checkout to see your purchases here." />
+      ) : (
+        <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+          {purchases.map((p: any) => (
+            <div key={p.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-gray-900 truncate">{p.productName}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{formatDate(p.purchasedAt)}</p>
+              </div>
+              <div className="flex items-center gap-3 ml-4 shrink-0">
+                <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amountPaid, p.currency)}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">
+                  {p.productType === "download" ? "Digital Download" : p.productType === "course" ? "Course" : p.productType === "quiz" ? "Quiz" : p.productType ? p.productType.charAt(0).toUpperCase() + p.productType.slice(1) : "Purchase"}
+                </span>
+                <button
+                  onClick={() => setReceiptPurchase(p)}
+                  className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Receipt
+                </button>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -1856,6 +1864,7 @@ export default function StudentDashboardPage() {
     { key: "content",       label: "My Content",    icon: BookOpen },
     { key: "profile",       label: "Profile",       icon: User },
     { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
+    { key: "purchases",     label: "Purchases",     icon: ShoppingCart },
     { key: "certificates",  label: "Certificates",  icon: Award },
     ...(isInstructor ? [{ key: "instructor" as Tab, label: "Instructor", icon: GraduationCap }] : []),
   ];
@@ -1942,6 +1951,7 @@ export default function StudentDashboardPage() {
           {activeTab === "profile"       && <ProfileTab />}
           {activeTab === "content"       && <MyContentTab />}
           {activeTab === "subscriptions" && <SubscriptionsTab />}
+          {activeTab === "purchases"     && <PurchasesTab />}
           {activeTab === "certificates"  && <CertificatesTab />}
           {activeTab === "instructor"    && <InstructorTab />}
         </div>
