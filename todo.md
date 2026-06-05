@@ -4679,3 +4679,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix checkout 'Cannot convert undefined or null to object' error — added missing termsUrl/privacyUrl to platformSettings schema + cleared stale stripe_price_ids
 - [x] Fix video upload in rich text editor - init endpoint was sending empty body, causing session creation issues
 - [x] Fix site freezing when inserting images in rich text editor - upload to S3 instead of base64 embedding
+- [x] Add resizable settings/edit panel in lesson content editor (drag to resize width)
+- [x] Add 'Preview as Student' button in lesson content editor that opens in new window

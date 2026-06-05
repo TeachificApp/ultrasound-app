@@ -25,7 +25,7 @@ import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } 
 import React, { useImperativeHandle } from "react";
 import {
   X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2,
-  ChevronLeft, ChevronRight, Bookmark,
+  ChevronLeft, ChevronRight, Bookmark, GripVertical,
 } from "lucide-react";
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
 import { cn } from "@/lib/utils";
@@ -89,6 +89,9 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const [pickerTab, setPickerTab] = useState<PickerTab>("catalog");
   const [previewMode, setPreviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Resizable settings panel
+  const [settingsPanelWidth, setSettingsPanelWidth] = useState(320);
+  const isResizingPanel = useRef(false);
 
   // Refs for scroll-to-new-block
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -636,19 +639,19 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
                 <Plus className="w-3 h-3 mr-1" /> Add Block
               </Button>
             )}
-            {/* Preview in course player — opens new window at this lesson */}
+            {/* Preview as Student — opens lesson in course player in new window */}
             {courseSlug && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  const url = `https://learn.allaboutultrasound.com/courses/${courseSlug}/player?lesson=${lessonId}&preview=admin`;
+                  const url = `${window.location.origin}/courses/${courseSlug}/player?lesson=${lessonId}&preview=student`;
                   window.open(url, "_blank", "noopener,noreferrer");
                 }}
                 className="text-xs h-7 border-teal-300 text-teal-700 hover:bg-teal-50"
-                title="Open lesson in course player (new window)"
+                title="Preview this lesson as a student would see it (new window)"
               >
-                <ExternalLink className="w-3 h-3 mr-1" /> Preview
+                <ExternalLink className="w-3 h-3 mr-1" /> Preview as Student
               </Button>
             )}
             <Button
@@ -836,24 +839,54 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
             )}
           </div>
 
-          {/* Right: Settings panel */}
+          {/* Right: Settings panel (resizable) */}
           {!previewMode && selectedBlock && (
-            <div className="w-72 shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
-              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                <span className="text-gray-700 text-xs font-bold uppercase tracking-wide">Block Settings</span>
-                <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700">
-                  <X className="w-4 h-4" />
-                </button>
+            <>
+              {/* Resize handle */}
+              <div
+                className="w-1.5 shrink-0 cursor-col-resize bg-gray-100 hover:bg-teal-200 active:bg-teal-300 transition-colors flex items-center justify-center group"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  isResizingPanel.current = true;
+                  const startX = e.clientX;
+                  const startWidth = settingsPanelWidth;
+                  const onMove = (ev: MouseEvent) => {
+                    if (!isResizingPanel.current) return;
+                    const delta = startX - ev.clientX;
+                    setSettingsPanelWidth(Math.max(260, Math.min(700, startWidth + delta)));
+                  };
+                  const onUp = () => {
+                    isResizingPanel.current = false;
+                    document.removeEventListener("mousemove", onMove);
+                    document.removeEventListener("mouseup", onUp);
+                    document.body.style.cursor = "";
+                    document.body.style.userSelect = "";
+                  };
+                  document.addEventListener("mousemove", onMove);
+                  document.addEventListener("mouseup", onUp);
+                  document.body.style.cursor = "col-resize";
+                  document.body.style.userSelect = "none";
+                }}
+              >
+                <GripVertical className="w-3 h-3 text-gray-400 group-hover:text-teal-600" />
               </div>
-              <div className="p-3">
-                <BlockSettings
-                  block={selectedBlock}
-                  onChange={data => updateBlock(selectedBlock.id, data)}
-                  lessonId={lessonId}
-                  courseId={courseId}
-                />
+              <div style={{ width: settingsPanelWidth }} className="shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
+                <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                  <span className="text-gray-700 text-xs font-bold uppercase tracking-wide">Block Settings</span>
+                  <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="p-3">
+                  <BlockSettings
+                    block={selectedBlock}
+                    onChange={data => updateBlock(selectedBlock.id, data)}
+                    lessonId={lessonId}
+                    courseId={courseId}
+                  />
+                </div>
               </div>
-            </div>
+            </>
           )}
           </div>{/* end canvas+settings row */}
         </div>
