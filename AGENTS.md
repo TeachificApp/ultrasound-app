@@ -47,6 +47,14 @@ The server starts on port 3000 (auto-scans for next available port if busy). No 
 - Vite config: `vite.config.ts`
 - Test config: `vitest.config.ts` (tests only in `server/**/*.test.ts`)
 
+### Form Builder analytics
+
+- **Deep analytics tab** (`GeneralFormBuilder` → Analytics): per-field distributions, numeric stats, cross-tabulation, multi-form field comparison, and Formsite-style **public reports** (table/charts/embed links with optional password + saved filter).
+- **Multi-form dashboards**: `/admin/general-forms/analytics-dashboard` — combine widgets across forms; public share at `/reports/dashboard/:token`.
+- **Public report URLs**: `/reports/analytics/:token` (add `?view=table` or `?view=charts`), embed at `/reports/analytics/:token/embed`.
+- Report tokens are indexed in `globalFormTheme.themeSettings` (`_analyticsReportIndex`); report configs live in each form's `themeSettings._analyticsSettings`.
+- Analytics utils: `shared/formAnalyticsUtils.ts`; server loader: `server/lib/formAnalyticsEngine.ts`.
+
 ### General Form Builder — results table
 
 - **Admin-only fields**: Set via the field editor (`extraConfig.adminOnly`). Hidden on public forms; editable in the Results tab only.

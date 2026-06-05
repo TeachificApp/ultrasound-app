@@ -66,6 +66,24 @@ import {
   type FormResultsSettings,
 } from "../../shared/formItemUtils";
 import {
+  parseFormAnalyticsSettings,
+  mergeFormAnalyticsIntoTheme,
+  type AnalyticsReportConfig,
+  type AnalyticsDashboardConfig,
+} from "../../shared/formAnalyticsUtils";
+import {
+  loadFormAnalyticsBundle,
+  buildDeepAnalyticsPayload,
+  getGlobalAnalyticsSettings,
+  persistGlobalAnalyticsSettings,
+  resolveReportByToken,
+  resolveDashboardByToken,
+  loadMultiFormCompare,
+  rebuildReportIndexForForm,
+  syncDashboardIndex,
+} from "../lib/formAnalyticsEngine";
+import { randomBytes } from "crypto";
+import {
   fireFormWebhook,
   fireConfiguredFormActions,
   sendFormNotifyEmail,
@@ -1247,6 +1265,441 @@ ${pageText}`;
         recentSubmissions,
         dailyCounts: (dailyCounts[0] as unknown as any[]) ?? [],
         embed: await getEmbedAnalyticsSummary(db, input.id),
+      };
+    }),
+
+  getDeepFieldAnalytics: protectedProcedure
+    .input(
+      z.object({
+        formId: z.number(),
+        filterId: z.string().optional(),
+        crossTabRowFieldId: z.number().optional(),
+        crossTabColFieldId: z.number().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const bundle = await loadFormAnalyticsBundle(db, input.formId, input.filterId);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      const payload = buildDeepAnalyticsPayload(
+        bundle.items,
+        bundle.options,
+        bundle.submissions,
+        input.crossTabRowFieldId,
+        input.crossTabColFieldId,
+      );
+      return {
+        formName: bundle.template.name,
+        filterId: input.filterId ?? null,
+        savedFilters: bundle.resultsSettings.savedFilters,
+        items: bundle.items.map(i => ({ id: i.id, label: i.label, itemType: i.itemType })),
+        ...payload,
+      };
+    }),
+
+  listAnalyticsReports: protectedProcedure
+    .input(z.object({ formId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const bundle = await loadFormAnalyticsBundle(db, input.formId);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      return bundle.analyticsSettings.reports;
+    }),
+
+  saveAnalyticsReport: protectedProcedure
+    .input(
+      z.object({
+        formId: z.number(),
+        report: z.object({
+          id: z.string().optional(),
+          name: z.string().min(1),
+          headerHtml: z.string().optional(),
+          password: z.string().optional(),
+          filterId: z.string().optional(),
+          visibleFieldIds: z.array(z.number()).optional(),
+          chartFieldIds: z.array(z.number()).optional(),
+          showTable: z.boolean().default(true),
+          showCharts: z.boolean().default(true),
+          crossTabRowFieldId: z.number().optional(),
+          crossTabColFieldId: z.number().optional(),
+        }),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const bundle = await loadFormAnalyticsBundle(db, input.formId);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const now = new Date().toISOString();
+      const reports = [...bundle.analyticsSettings.reports];
+      const existingIdx = input.report.id ? reports.findIndex(r => r.id === input.report.id) : -1;
+      let passwordHash: string | undefined =
+        existingIdx >= 0 ? reports[existingIdx].passwordHash : undefined;
+      if (input.report.password === "") {
+        passwordHash = undefined;
+      } else if (input.report.password) {
+        const bcrypt = await import("bcryptjs");
+        passwordHash = await bcrypt.hash(input.report.password, 10);
+      }
+
+      const report: AnalyticsReportConfig = {
+        id: input.report.id ?? `rpt_${randomBytes(8).toString("hex")}`,
+        name: input.report.name,
+        token:
+          existingIdx >= 0
+            ? reports[existingIdx].token
+            : randomBytes(24).toString("base64url"),
+        headerHtml: input.report.headerHtml,
+        passwordHash,
+        filterId: input.report.filterId,
+        visibleFieldIds: input.report.visibleFieldIds,
+        chartFieldIds: input.report.chartFieldIds,
+        showTable: input.report.showTable,
+        showCharts: input.report.showCharts,
+        crossTabRowFieldId: input.report.crossTabRowFieldId,
+        crossTabColFieldId: input.report.crossTabColFieldId,
+        createdAt: existingIdx >= 0 ? reports[existingIdx].createdAt : now,
+        updatedAt: now,
+      };
+
+      if (existingIdx >= 0) reports[existingIdx] = report;
+      else reports.push(report);
+
+      const themeMerged = mergeFormAnalyticsIntoTheme(bundle.template.themeSettings, { reports });
+      await db
+        .update(generalFormTemplates)
+        .set({ themeSettings: themeMerged, updatedAt: new Date() })
+        .where(eq(generalFormTemplates.id, input.formId));
+
+      const global = await rebuildReportIndexForForm(db, input.formId, reports);
+      await persistGlobalAnalyticsSettings(db, global);
+
+      return { report };
+    }),
+
+  deleteAnalyticsReport: protectedProcedure
+    .input(z.object({ formId: z.number(), reportId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const bundle = await loadFormAnalyticsBundle(db, input.formId);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      const reports = bundle.analyticsSettings.reports.filter(r => r.id !== input.reportId);
+      const themeMerged = mergeFormAnalyticsIntoTheme(bundle.template.themeSettings, { reports });
+      await db
+        .update(generalFormTemplates)
+        .set({ themeSettings: themeMerged, updatedAt: new Date() })
+        .where(eq(generalFormTemplates.id, input.formId));
+      const global = await rebuildReportIndexForForm(db, input.formId, reports);
+      await persistGlobalAnalyticsSettings(db, global);
+      return { success: true };
+    }),
+
+  listAnalyticsDashboards: protectedProcedure.query(async ({ ctx }) => {
+    await requireAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const global = await getGlobalAnalyticsSettings(db);
+    return global.dashboards;
+  }),
+
+  saveAnalyticsDashboard: protectedProcedure
+    .input(
+      z.object({
+        dashboard: z.object({
+          id: z.string().optional(),
+          name: z.string().min(1),
+          headerHtml: z.string().optional(),
+          password: z.string().optional(),
+          widgets: z.array(
+            z.union([
+              z.object({ id: z.string(), type: z.literal("summary"), formIds: z.array(z.number()) }),
+              z.object({
+                id: z.string(),
+                type: z.literal("field_chart"),
+                formId: z.number(),
+                fieldId: z.number(),
+                filterId: z.string().optional(),
+              }),
+              z.object({
+                id: z.string(),
+                type: z.literal("cross_tab"),
+                formId: z.number(),
+                rowFieldId: z.number(),
+                colFieldId: z.number(),
+                filterId: z.string().optional(),
+              }),
+              z.object({
+                id: z.string(),
+                type: z.literal("multi_form_compare"),
+                formIds: z.array(z.number()),
+                fieldLabel: z.string(),
+              }),
+            ]),
+          ),
+        }),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const global = await getGlobalAnalyticsSettings(db);
+      const now = new Date().toISOString();
+      const dashboards = [...global.dashboards];
+      const idx = input.dashboard.id ? dashboards.findIndex(d => d.id === input.dashboard.id) : -1;
+      let passwordHash: string | undefined = idx >= 0 ? dashboards[idx].passwordHash : undefined;
+      if (input.dashboard.password === "") passwordHash = undefined;
+      else if (input.dashboard.password) {
+        const bcrypt = await import("bcryptjs");
+        passwordHash = await bcrypt.hash(input.dashboard.password, 10);
+      }
+
+      const dashboard: AnalyticsDashboardConfig = {
+        id: input.dashboard.id ?? `dash_${randomBytes(8).toString("hex")}`,
+        name: input.dashboard.name,
+        token: idx >= 0 ? dashboards[idx].token : randomBytes(24).toString("base64url"),
+        headerHtml: input.dashboard.headerHtml,
+        passwordHash,
+        widgets: input.dashboard.widgets as AnalyticsDashboardConfig["widgets"],
+        createdAt: idx >= 0 ? dashboards[idx].createdAt : now,
+        updatedAt: now,
+      };
+
+      if (idx >= 0) dashboards[idx] = dashboard;
+      else dashboards.push(dashboard);
+
+      await persistGlobalAnalyticsSettings(db, {
+        ...global,
+        dashboards,
+        dashboardIndex: syncDashboardIndex(dashboards),
+      });
+      return { dashboard };
+    }),
+
+  deleteAnalyticsDashboard: protectedProcedure
+    .input(z.object({ dashboardId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const global = await getGlobalAnalyticsSettings(db);
+      const dashboards = global.dashboards.filter(d => d.id !== input.dashboardId);
+      await persistGlobalAnalyticsSettings(db, {
+        ...global,
+        dashboards,
+        dashboardIndex: syncDashboardIndex(dashboards),
+      });
+      return { success: true };
+    }),
+
+  getDashboardAnalytics: protectedProcedure
+    .input(z.object({ dashboardId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const global = await getGlobalAnalyticsSettings(db);
+      const dashboard = global.dashboards.find(d => d.id === input.dashboardId);
+      if (!dashboard) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const widgetData = await Promise.all(
+        dashboard.widgets.map(async widget => {
+          if (widget.type === "summary") {
+            const summaries = await Promise.all(
+              widget.formIds.map(async formId => {
+                const bundle = await loadFormAnalyticsBundle(db, formId);
+                return bundle
+                  ? { formId, formName: bundle.template.name, total: bundle.submissions.length }
+                  : null;
+              }),
+            );
+            return { widget, data: summaries.filter(Boolean) };
+          }
+          if (widget.type === "field_chart") {
+            const bundle = await loadFormAnalyticsBundle(db, widget.formId, widget.filterId);
+            if (!bundle) return { widget, data: null };
+            const payload = buildDeepAnalyticsPayload(bundle.items, bundle.options, bundle.submissions);
+            const field = payload.fieldAnalytics.find(f => f.fieldId === widget.fieldId);
+            return { widget, data: field ?? null };
+          }
+          if (widget.type === "cross_tab") {
+            const bundle = await loadFormAnalyticsBundle(db, widget.formId, widget.filterId);
+            if (!bundle) return { widget, data: null };
+            const payload = buildDeepAnalyticsPayload(
+              bundle.items,
+              bundle.options,
+              bundle.submissions,
+              widget.rowFieldId,
+              widget.colFieldId,
+            );
+            return { widget, data: payload.crossTab };
+          }
+          if (widget.type === "multi_form_compare") {
+            const compare = await loadMultiFormCompare(db, widget.formIds, widget.fieldLabel);
+            return { widget, data: compare };
+          }
+          return { widget, data: null };
+        }),
+      );
+
+      return { dashboard, widgetData };
+    }),
+
+  compareFormsByField: protectedProcedure
+    .input(z.object({ formIds: z.array(z.number()).min(1), fieldLabel: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return loadMultiFormCompare(db, input.formIds, input.fieldLabel);
+    }),
+
+  getPublicAnalyticsReport: publicProcedure
+    .input(
+      z.object({
+        token: z.string(),
+        password: z.string().optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const resolved = await resolveReportByToken(db, input.token);
+      if (!resolved) throw new TRPCError({ code: "NOT_FOUND" });
+
+      if (resolved.report.passwordHash) {
+        if (!input.password) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Password required" });
+        }
+        const bcrypt = await import("bcryptjs");
+        const ok = await bcrypt.compare(input.password, resolved.report.passwordHash);
+        if (!ok) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid password" });
+      }
+
+      const payload = buildDeepAnalyticsPayload(
+        resolved.items,
+        resolved.options,
+        resolved.submissions,
+        resolved.report.crossTabRowFieldId,
+        resolved.report.crossTabColFieldId,
+      );
+
+      const visibleItems = resolved.report.visibleFieldIds?.length
+        ? resolved.items.filter(i => resolved.report.visibleFieldIds!.includes(i.id))
+        : resolved.items;
+
+      const chartFields = resolved.report.chartFieldIds?.length
+        ? payload.fieldAnalytics.filter(f => resolved.report.chartFieldIds!.includes(f.fieldId))
+        : payload.fieldAnalytics.filter(f => f.distribution.length > 0 || f.numericStats);
+
+      return {
+        report: {
+          id: resolved.report.id,
+          name: resolved.report.name,
+          headerHtml: resolved.report.headerHtml,
+          showTable: resolved.report.showTable,
+          showCharts: resolved.report.showCharts,
+          requiresPassword: !!resolved.report.passwordHash,
+        },
+        formName: resolved.template.name,
+        items: visibleItems.map(i => ({ id: i.id, label: i.label, itemType: i.itemType })),
+        submissions: resolved.report.showTable
+          ? resolved.submissions.map(s => ({
+              id: s.id,
+              submittedAt: s.submittedAt,
+              responses: Object.fromEntries(
+                visibleItems.map(i => [String(i.id), s.responses[String(i.id)] ?? ""]),
+              ),
+            }))
+          : [],
+        fieldAnalytics: resolved.report.showCharts ? chartFields : [],
+        crossTab: payload.crossTab,
+        totalSubmissions: payload.totalSubmissions,
+      };
+    }),
+
+  getPublicAnalyticsDashboard: publicProcedure
+    .input(
+      z.object({
+        token: z.string(),
+        password: z.string().optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const dashboard = await resolveDashboardByToken(db, input.token);
+      if (!dashboard) throw new TRPCError({ code: "NOT_FOUND" });
+
+      if (dashboard.passwordHash) {
+        if (!input.password) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Password required" });
+        }
+        const bcrypt = await import("bcryptjs");
+        const ok = await bcrypt.compare(input.password, dashboard.passwordHash);
+        if (!ok) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid password" });
+      }
+
+      const widgetData = await Promise.all(
+        dashboard.widgets.map(async widget => {
+          if (widget.type === "summary") {
+            const summaries = await Promise.all(
+              widget.formIds.map(async formId => {
+                const bundle = await loadFormAnalyticsBundle(db, formId);
+                return bundle
+                  ? { formId, formName: bundle.template.name, total: bundle.submissions.length }
+                  : null;
+              }),
+            );
+            return { widget, data: summaries.filter(Boolean) };
+          }
+          if (widget.type === "field_chart") {
+            const bundle = await loadFormAnalyticsBundle(db, widget.formId, widget.filterId);
+            if (!bundle) return { widget, data: null };
+            const payload = buildDeepAnalyticsPayload(bundle.items, bundle.options, bundle.submissions);
+            return {
+              widget,
+              data: payload.fieldAnalytics.find(f => f.fieldId === widget.fieldId) ?? null,
+            };
+          }
+          if (widget.type === "cross_tab") {
+            const bundle = await loadFormAnalyticsBundle(db, widget.formId, widget.filterId);
+            if (!bundle) return { widget, data: null };
+            const payload = buildDeepAnalyticsPayload(
+              bundle.items,
+              bundle.options,
+              bundle.submissions,
+              widget.rowFieldId,
+              widget.colFieldId,
+            );
+            return { widget, data: payload.crossTab };
+          }
+          if (widget.type === "multi_form_compare") {
+            return {
+              widget,
+              data: await loadMultiFormCompare(db, widget.formIds, widget.fieldLabel),
+            };
+          }
+          return { widget, data: null };
+        }),
+      );
+
+      return {
+        dashboard: {
+          id: dashboard.id,
+          name: dashboard.name,
+          headerHtml: dashboard.headerHtml,
+          requiresPassword: !!dashboard.passwordHash,
+        },
+        widgetData,
       };
     }),
 

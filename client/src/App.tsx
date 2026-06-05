@@ -185,7 +185,10 @@ const ScanCoachHub = lazy(() => import("./pages/ScanCoachHub"));
 const ThinkificWebhookAdmin = lazy(() => import("./pages/ThinkificWebhookAdmin"));
 const FormBuilderAdmin = lazy(() => import("./pages/FormBuilderAdmin"));
 const GeneralFormBuilder = lazy(() => import("./pages/admin/GeneralFormBuilder"));
+const GeneralFormAnalyticsDashboard = lazy(() => import("./pages/admin/GeneralFormAnalyticsDashboard"));
 const PublicFormRenderer = lazy(() => import("./pages/PublicFormRenderer"));
+const PublicFormAnalyticsReport = lazy(() => import("./pages/PublicFormAnalyticsReport"));
+const PublicFormAnalyticsDashboard = lazy(() => import("./pages/PublicFormAnalyticsDashboard"));
 const EmailAdmin = lazy(() => import("./pages/EmailAdmin"));
 const EmailCampaignDashboard = lazy(() => import("./pages/EmailCampaignDashboard"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
@@ -476,11 +479,20 @@ function Router() {
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/general-forms/analytics-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><GeneralFormAnalyticsDashboard /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
         {/* ── Public Form Renderer (no auth required) ──────────────────────── */}
         <Route path="/forms/:slug" component={PublicFormRenderer} />
         <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
+      <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
+      <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
+        <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
+        <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
+        <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
+        <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/admin/email-campaigns">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><EmailCampaignDashboard /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
@@ -573,6 +585,7 @@ function MembersRouter() {
       <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><AdminUserDetailPage /></Suspense></RoleGuard>}</Route>
       {/* Form builder routes — served on app domain, must be before catch-all */}
       <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><GeneralFormBuilder /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/general-forms/analytics-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><GeneralFormAnalyticsDashboard /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><GeneralFormBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FormBuilderAdmin /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FormBuilderAdmin /></Suspense></RoleGuard>}</Route>
@@ -604,6 +617,10 @@ function MembersRouter() {
       <Route path="/forms/:slug" component={PublicFormRenderer} />
       <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
       <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
+      <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
+      <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
       {/* ── Members-only routes (user profile / dashboard hub) ─────────── */}
       <Route>
         <MembersLayout>
@@ -676,6 +693,10 @@ function LMSRouter() {
       <Route path="/forms/:slug" component={PublicFormRenderer} />
       <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
       <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
+      <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
+      <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
       {/* All other LMS routes — wrapped in LMSLayout */}
       <Route>
         <LMSLayout>
@@ -729,6 +750,7 @@ function LMSRouter() {
         <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
         {/* Form builder routes on learn domain */}
         <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/general-forms/analytics-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><GeneralFormAnalyticsDashboard /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
@@ -899,11 +921,20 @@ function IHeartEchoRouter() {
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/general-forms/analytics-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><GeneralFormAnalyticsDashboard /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
         {/* ── Public Form Renderer (no auth required) ──────────────────────── */}
         <Route path="/forms/:slug" component={PublicFormRenderer} />
         <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
+      <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
+      <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
+        <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
+        <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
+        <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
+        <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/admin/engagement">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard>}</Route>
         <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
@@ -1025,6 +1056,14 @@ function AccreditationDivisionRouter() {
         <Route path="/forms/:slug" component={PublicFormRenderer} />
         <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
+      <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
+      <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
+      <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
+        <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
+        <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
+        <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
+        <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
         {/* Default: public landing page */}
         <Route component={DIYAccreditationLanding} />
       </Switch>
