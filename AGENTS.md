@@ -25,7 +25,7 @@ The server starts on port 3000 (auto-scans for next available port if busy). No 
 
 ### Per-brand clinical tool URLs
 
-Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkific-webhook, challenge-cards, social-content, soundbytes) use URL suffixes `-aaus` or `-ihe` (e.g. `/admin/quickfire-ihe`). Legacy paths without a suffix redirect based on hostname. The tRPC `_brand` query param is derived from the path suffix via `shared/brandScopedRoutes.ts` (`detectBrandFromPath`). Platform Admin’s brand toggle sets per-brand card links accordingly.
+Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkific-webhook, challenge-cards, social-content, soundbytes) use URL suffixes `-aaus` or `-ihe` (e.g. `/admin/quickfire-ihe`). Legacy paths without a suffix redirect based on hostname. The tRPC `_brand` query param is derived from the path suffix via `shared/brandScopedRoutes.ts` (`detectBrandFromPath`). Platform Admin’s brand toggle sets per-brand card links accordingly. Full deploy/QA handoff: `docs/MANUS_BRAND_URLS.md`.
 
 ### Important caveats
 
