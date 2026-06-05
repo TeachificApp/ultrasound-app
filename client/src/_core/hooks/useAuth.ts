@@ -21,7 +21,7 @@ export function useAuth(options?: UseAuthOptions) {
     try {
       // Use a direct fetch POST to /api/auth/logout — bypasses tRPC httpBatchLink
       // so the Set-Cookie: clear header is never merged with other batched responses.
-      await fetch("/api/auth/logout", {
+      const resp = await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
         headers: {
@@ -29,15 +29,18 @@ export function useAuth(options?: UseAuthOptions) {
           "Content-Type": "application/json",
         },
       });
+      if (!resp.ok) {
+        console.error("[logout] server returned", resp.status);
+      }
     } catch (error) {
       console.error("[logout] fetch error:", error);
-    } finally {
-      // Clear client-side auth state
-      utils.auth.me.setData(undefined, null);
-      localStorage.removeItem("manus-runtime-user-info");
-      // Hard redirect to login — clears all in-memory state and forces a fresh page load
-      window.location.href = getLoginUrl();
     }
+    // Clear client-side auth state
+    utils.auth.me.setData(undefined, null);
+    localStorage.removeItem("manus-runtime-user-info");
+    // Add ?logout=1 so the Login page knows not to auto-redirect even if
+    // the cookie somehow persists (e.g., domain mismatch edge case).
+    window.location.href = getLoginUrl() + "?logout=1";
   }, [utils]);
 
   const state = useMemo(() => {

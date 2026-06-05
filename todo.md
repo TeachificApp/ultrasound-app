@@ -4684,3 +4684,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix student dashboard not showing enrolled courses (Katerin can see enrollment in admin but not in her dashboard)
 - [x] Align content category tabs between admin user view and student dashboard: Courses, Quizzes, Downloads, Webinars, Products, Bundles, Memberships, Subscriptions, Communities
 - [x] Fix instructor portal showing no courses even when user profile is linked to instructor profile and listed as instructor on courses
+- [x] Fix logout not working - signing out signs user right back in, and incognito window shows user still logged in

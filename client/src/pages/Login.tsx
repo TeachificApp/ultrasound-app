@@ -82,14 +82,18 @@ export default function Login() {
   //   StudentDashboardPage is served at /my-dashboard on learn — no loop.
   const postLoginUrl = returnTo ?? "/my-dashboard";
 
-  // Redirect if already signed in
+  // Detect if user just logged out — don't auto-redirect back
+  const isPostLogout = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("logout");
+
+  // Redirect if already signed in (but NOT if user just clicked logout)
   useEffect(() => {
+    if (isPostLogout) return; // User explicitly logged out — stay on login page
     if (!loading && isAuthenticated) {
       // Always navigate to postLoginUrl (relative /my-dashboard or explicit returnTo).
       // On the learn domain this keeps the student on learn.allaboutultrasound.com.
       navigate(postLoginUrl);
     }
-  }, [isAuthenticated, loading, navigate, postLoginUrl]);
+  }, [isAuthenticated, loading, navigate, postLoginUrl, isPostLogout]);
 
   // ── Magic link mutation ──
   const requestMutation = trpc.auth.requestMagicLink.useMutation({
@@ -156,8 +160,8 @@ export default function Login() {
     requestMutation.reset();
   };
 
-  // Show redirect spinner when already authenticated
-  if (!loading && isAuthenticated) {
+  // Show redirect spinner when already authenticated (but not post-logout)
+  if (!loading && isAuthenticated && !isPostLogout) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "#0e1e2e" }}>
         <div className="w-8 h-8 border-2 border-[#189aa1] border-t-transparent rounded-full animate-spin" />

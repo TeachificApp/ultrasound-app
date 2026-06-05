@@ -222,8 +222,18 @@ export const appRouter = router({
       };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      const opts = getSessionCookieOptions(ctx.req);
+      const isProduction = !!(ctx.req.headers["x-forwarded-proto"] || ctx.req.headers["x-forwarded-host"]);
+      const secure = isProduction ? true : opts.secure;
+      const domains: (string | undefined)[] = [opts.domain, undefined];
+      const sameSites: ("none" | "lax" | "strict")[] = ["none", "lax"];
+      for (const domain of domains) {
+        for (const sameSite of sameSites) {
+          const clearOpts: any = { httpOnly: true, path: "/", sameSite, secure, maxAge: 0 };
+          if (domain) clearOpts.domain = domain;
+          ctx.res.clearCookie(COOKIE_NAME, clearOpts);
+        }
+      }
       return { success: true } as const;
     }),
 
