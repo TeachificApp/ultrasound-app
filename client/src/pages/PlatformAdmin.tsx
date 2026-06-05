@@ -8,7 +8,7 @@
   - Stats overview
 */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   DndContext,
   closestCenter,
@@ -95,6 +95,7 @@ import {
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
 import { isIHeartEchoDomain, LEARN_APP_URL, APP_URL, getAdminUrl } from "@/hooks/useSubdomain";
+import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 
 type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";
 
@@ -1208,17 +1209,30 @@ export default function PlatformAdmin() {
     { id: "career-network", href: getAdminUrl("/admin/career-network"), icon: Briefcase, label: "Career Network", description: "Manage job postings, RSS feed sources, candidate profiles, and employer subscriptions", color: "#0369a1" },
   ];
 
-  // Per-Brand tool cards (auto-scoped to current brand)
-  const PER_BRAND_TOOLS_DEFAULT: ToolCard[] = [
-    { id: "cases", href: getAdminUrl("/admin/cases"), icon: ClipboardList, label: "Case Management", description: "Manage clinical case submissions and reviews", color: "#189aa1" },
-    { id: "quickfire", href: getAdminUrl("/admin/quickfire"), icon: Zap, label: "Daily Challenge", description: "Manage daily quiz challenges and questions", color: "#f59e0b" },
-    { id: "scancoach", href: getAdminUrl("/admin/scancoach"), icon: Scan, label: "ScanCoach Editor", description: "Edit ScanCoach protocols and content", color: "#0891b2" },
-    { id: "navigator", href: getAdminUrl("/admin/navigator"), icon: Globe, label: "Navigator Editor", description: "Edit Navigator pathways and content", color: "#7c3aed" },
-    { id: "thinkific-webhook", href: getAdminUrl("/admin/thinkific-webhook"), icon: Webhook, label: "Thinkific Webhook", description: "Configure Thinkific course sync webhooks", color: "#be185d" },
-    { id: "challenge-cards", href: getAdminUrl("/admin/challenge-cards"), icon: GraduationCap, label: "Challenge Card Generator", description: "Generate visual challenge cards for social media", color: "#059669" },
-    { id: "social-content", href: getAdminUrl("/admin/social-content"), icon: Image, label: "Social Content Generator", description: "Create branded social media content", color: "#f97316" },
-    { id: "soundbytes", href: getAdminUrl("/admin/soundbytes"), icon: Volume2, label: "SoundBytes Admin", description: "Manage SoundBytes audio content and playlists", color: "#7c3aed" },
-  ];
+  // Per-Brand tool cards — hrefs include `-aaus` / `-ihe` from brand selector above
+  const PER_BRAND_TOOLS_META = [
+    { id: "cases", basePath: "/admin/cases", icon: ClipboardList, label: "Case Management", description: "Manage clinical case submissions and reviews", color: "#189aa1" },
+    { id: "quickfire", basePath: "/admin/quickfire", icon: Zap, label: "Daily Challenge", description: "Manage daily quiz challenges and questions", color: "#f59e0b" },
+    { id: "scancoach", basePath: "/admin/scancoach", icon: Scan, label: "ScanCoach Editor", description: "Edit ScanCoach protocols and content", color: "#0891b2" },
+    { id: "navigator", basePath: "/admin/navigator", icon: Globe, label: "Navigator Editor", description: "Edit Navigator pathways and content", color: "#7c3aed" },
+    { id: "thinkific-webhook", basePath: "/admin/thinkific-webhook", icon: Webhook, label: "Thinkific Webhook", description: "Configure Thinkific course sync webhooks", color: "#be185d" },
+    { id: "challenge-cards", basePath: "/admin/challenge-cards", icon: GraduationCap, label: "Challenge Card Generator", description: "Generate visual challenge cards for social media", color: "#059669" },
+    { id: "social-content", basePath: "/admin/social-content", icon: Image, label: "Social Content Generator", description: "Create branded social media content", color: "#f97316" },
+    { id: "soundbytes", basePath: "/admin/soundbytes", icon: Volume2, label: "SoundBytes Admin", description: "Manage SoundBytes audio content and playlists", color: "#7c3aed" },
+  ] as const;
+
+  const perBrandTools = useMemo<ToolCard[]>(
+    () =>
+      PER_BRAND_TOOLS_META.map((t) => ({
+        id: t.id,
+        href: perBrandAdminUrl(t.basePath, dualBrand),
+        icon: t.icon,
+        label: t.label,
+        description: t.description,
+        color: t.color,
+      })),
+    [dualBrand],
+  );
 
   // IHE-only tool cards
   const IHE_ONLY_TOOLS_DEFAULT: ToolCard[] = [
@@ -1229,7 +1243,7 @@ export default function PlatformAdmin() {
   ];
 
   const [dualToolOrder, setDualToolOrder] = useState<string[]>(() => DUAL_TOOLS_DEFAULT.map(t => t.id));
-  const [perBrandToolOrder, setPerBrandToolOrder] = useState<string[]>(() => PER_BRAND_TOOLS_DEFAULT.map(t => t.id));
+  const [perBrandToolOrder, setPerBrandToolOrder] = useState<string[]>(() => PER_BRAND_TOOLS_META.map(t => t.id));
   const [iheOnlyToolOrder, setIheOnlyToolOrder] = useState<string[]>(() => IHE_ONLY_TOOLS_DEFAULT.map(t => t.id));
 
   const dndSensors = useSensors(
@@ -1540,13 +1554,13 @@ export default function PlatformAdmin() {
         <div className="mb-8">
           <div className="mb-3">
             <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Per-Brand Tools</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Available on both platforms — each operates for the current brand. Drag cards to reorder.</p>
+            <p className="text-xs text-gray-400 mt-0.5">Available on both platforms — links use the brand selected above (<code className="text-[10px]">-aaus</code> / <code className="text-[10px]">-ihe</code> URL suffix). Drag cards to reorder.</p>
           </div>
           <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handlePerBrandDragEnd}>
             <SortableContext items={perBrandToolOrder} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {perBrandToolOrder.map(id => {
-                  const card = PER_BRAND_TOOLS_DEFAULT.find(t => t.id === id);
+                  const card = perBrandTools.find(t => t.id === id);
                   if (!card) return null;
                   return <SortableToolCard key={card.id} card={card} />;
                 })}

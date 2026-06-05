@@ -9,7 +9,15 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
+import { detectBrandFromPath } from "@shared/quickfireCategories";
+import {
+  buildDisplayCategories,
+  defaultCategoryPrefs,
+  resolveQuickfireBrand,
+} from "@/lib/quickfireCategoryUi";
+import { getBrandCategoryConfig } from "@shared/quickfireCategories";
 import { isVideoUrl } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -438,6 +446,24 @@ export default function QuickFire() {
   const todaySetQuery = trpc.quickfire.getTodaySet.useQuery(undefined, {
     refetchInterval: 5 * 60 * 1000,
   });
+  const [pathname] = useLocation();
+  const quickfireBrand = useMemo(() => {
+    const fromPath = detectBrandFromPath(pathname);
+    if (fromPath) return fromPath;
+    const map = (todaySetQuery.data as { categoryMap?: Record<string, number | null> })?.categoryMap ?? {};
+    return resolveQuickfireBrand(map, isIHeartEchoDomain());
+  }, [pathname, todaySetQuery.data]);
+  const displayCategories = useMemo(
+    () => buildDisplayCategories(quickfireBrand),
+    [quickfireBrand],
+  );
+  const catDisplayToKey = useMemo(() => {
+    const cfg = getBrandCategoryConfig(quickfireBrand);
+    const out: Record<string, string> = {};
+    for (const label of cfg.categories) out[label] = cfg.catKey[label];
+    return out;
+  }, [quickfireBrand]);
+  const defaultPrefs = useMemo(() => defaultCategoryPrefs(quickfireBrand), [quickfireBrand]);
   const categoryPrefsQuery = trpc.quickfire.getCategoryPrefs.useQuery(undefined, { enabled: isAuthenticated });
   const updateCategoryPrefsMutation = trpc.quickfire.updateCategoryPrefs.useMutation({
     onSuccess: () => trpc.useUtils().quickfire.getCategoryPrefs.invalidate(),
@@ -488,21 +514,7 @@ export default function QuickFire() {
   const todayCategoryMap: Record<string, number> = (todaySetQuery.data as any)?.categoryMap ?? {};
   const todayAllQuestions: any[] = (todaySetQuery.data as any)?.questions ?? [];
   const todayUserAttempts: Record<number, any> = (todaySetQuery.data as any)?.userAttempts ?? {};
-  // Map display names to server camelCase keys
-  const CAT_DISPLAY_TO_KEY: Record<string, string> = {
-    "Abdominal": "abdominal",
-    "Small Parts": "smallParts",
-    "Pelvic/Gyn": "pelvicGyn",
-    "OB 1st Trimester": "ob1st",
-    "OB 2nd/3rd Trimester": "ob2nd3rd",
-    "Fetal Echo": "fetalEcho",
-    "Breast": "breast",
-    "Vascular": "vascular",
-    "MSK": "msk",
-    "POCUS": "pocus",
-    "Physics": "physics",
-  };
-  const activeCatMapKey = activeCategory ? (CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory) : null;
+  const activeCatMapKey = activeCategory ? (catDisplayToKey[activeCategory] ?? activeCategory) : null;
   const activeCatQId = activeCatMapKey ? todayCategoryMap[activeCatMapKey] : null;
   const activeCatQ = activeCatQId ? todayAllQuestions.find((q: any) => q.id === activeCatQId) : null;
 
@@ -828,34 +840,10 @@ export default function QuickFire() {
   if (!isAuthenticated) {
     const catMap: Record<string, number> = (todaySetQuery.data as any)?.categoryMap ?? {};
     const todayQs: any[] = (todaySetQuery.data as any)?.questions ?? [];
-    // Detect IHE from server-returned categoryMap keys (most reliable — works even if domain detection fails)
-    const serverHasIHEKeys = Object.keys(catMap).some(k => ["adultEcho","pediatricEcho","acs"].includes(k));
-    const useIHECatsUnauth = isIHeartEchoDomain() || serverHasIHEKeys;
-    const CATS_UNAUTH = useIHECatsUnauth ? [
-      { key: "Adult Echo", label: "Adult Echo", Icon: Heart, desc: "Adult Echocardiography", mapKey: "adultEcho" },
-      { key: "Pediatric Echo", label: "Pediatric Echo", Icon: Baby, desc: "Pediatric Echocardiography", mapKey: "pediatricEcho" },
-      { key: "ACS", label: "ACS", Icon: Activity, desc: "Acute Coronary Syndrome", mapKey: "acs" },
-      { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", mapKey: "fetalEcho" },
-      { key: "ECG", label: "ECG", Icon: Activity, desc: "Electrocardiography", mapKey: "ecg" },
-      { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", mapKey: "pocus" },
-      { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics", mapKey: "physics" },
-    ] : [
-      { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", mapKey: "abdominal" },
-      { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", mapKey: "smallParts" },
-      { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Activity, desc: "Pelvic/Gynecologic Ultrasound", mapKey: "pelvicGyn" },
-      { key: "OB 1st Trimester", label: "OB 1st Tri", Icon: Baby, desc: "1st Trimester Obstetric", mapKey: "ob1st" },
-      { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "2nd/3rd Trimester Obstetric", mapKey: "ob2nd3rd" },
-      { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", mapKey: "fetalEcho" },
-      { key: "Breast", label: "Breast", Icon: Activity, desc: "Breast Ultrasound", mapKey: "breast" },
-      { key: "Vascular", label: "Vascular", Icon: Activity, desc: "Vascular Duplex", mapKey: "vascular" },
-      { key: "MSK", label: "MSK", Icon: Activity, desc: "Musculoskeletal Ultrasound", mapKey: "msk" },
-      { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", mapKey: "pocus" },
-      { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics", mapKey: "physics" },
-    ];
+    const CATS_UNAUTH = displayCategories;
 
-    // If a category is active, show the question player (read-only, sign-in to submit)
     if (activeCategory) {
-      const catMapKey = CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory;
+      const catMapKey = catDisplayToKey[activeCategory] ?? activeCategory;
       const qId = catMap[catMapKey];
       const catQ: any = qId ? todayQs.find((q: any) => q.id === qId) : null;
       const typeInfo = TYPE_LABELS[(catQ?.type ?? "scenario") as keyof typeof TYPE_LABELS] ?? TYPE_LABELS.scenario;
@@ -1263,26 +1251,14 @@ export default function QuickFire() {
                   </button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {([
-                    { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Activity, label: "Abdominal" },
-                    { cat: "Small Parts" as const, prefKey: "smallParts" as const, Icon: Scan, label: "Small Parts" },
-                    { cat: "Pelvic/Gyn" as const, prefKey: "pelvicGyn" as const, Icon: Activity, label: "Pelvic/Gyn" },
-                    { cat: "OB 1st Trimester" as const, prefKey: "ob1st" as const, Icon: Baby, label: "OB 1st Tri" },
-                    { cat: "OB 2nd/3rd Trimester" as const, prefKey: "ob2nd3rd" as const, Icon: Baby, label: "OB 2nd/3rd" },
-                    { cat: "Fetal Echo" as const, prefKey: "fetalEcho" as const, Icon: Heart, label: "Fetal Echo" },
-                    { cat: "Breast" as const, prefKey: "breast" as const, Icon: Activity, label: "Breast" },
-                    { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular" },
-                    { cat: "MSK" as const, prefKey: "msk" as const, Icon: Activity, label: "MSK" },
-                    { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Wind, label: "POCUS" },
-                    { cat: "Physics" as const, prefKey: "physics" as const, Icon: Activity, label: "Physics" },
-                  ] as { cat: string; prefKey: "abdominal" | "smallParts" | "pelvicGyn" | "ob1st" | "ob2nd3rd" | "fetalEcho" | "breast" | "vascular" | "msk" | "pocus" | "physics"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
-                    const prefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
-                    const isEnabled = (prefs as any)[prefKey] !== false;
+                  {displayCategories.map(({ key: cat, prefKey, Icon, label }) => {
+                    const prefs = categoryPrefsQuery.data ?? defaultPrefs;
+                    const isEnabled = prefs[prefKey] !== false;
                     return (
                       <button
                         key={cat}
                         onClick={() => {
-                          const current = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
+                          const current = categoryPrefsQuery.data ?? defaultPrefs;
                           updateCategoryPrefsMutation.mutate({ ...current, [prefKey]: !isEnabled });
                         }}                        className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
                           isEnabled
@@ -1343,33 +1319,8 @@ export default function QuickFire() {
                   const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
                   const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
                   const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-                  // Detect IHE from server-returned categoryMap keys (most reliable)
-                  const serverHasIHEKeysAuth = Object.keys(categoryMap).some(k => ["adultEcho","pediatricEcho","acs"].includes(k));
-                  const useIHECatsAuth = isIHeartEchoDomain() || serverHasIHEKeysAuth;
-                  const IHE_DEFAULT_PREFS_AUTH = { adultEcho: true, pediatricEcho: true, acs: true, fetalEcho: true, ecg: true, pocus: true, physics: true };
-                  const catPrefs = categoryPrefsQuery.data ?? (useIHECatsAuth ? IHE_DEFAULT_PREFS_AUTH : { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true });
-
-                  const CATS = useIHECatsAuth ? [
-                    { key: "Adult Echo", label: "Adult Echo", Icon: Heart, desc: "Adult Echocardiography", prefKey: "adultEcho" as const, mapKey: "adultEcho", isPocus: false },
-                    { key: "Pediatric Echo", label: "Pediatric Echo", Icon: Baby, desc: "Pediatric Echocardiography", prefKey: "pediatricEcho" as const, mapKey: "pediatricEcho", isPocus: false },
-                    { key: "ACS", label: "ACS", Icon: Activity, desc: "Acute Coronary Syndrome", prefKey: "acs" as const, mapKey: "acs", isPocus: false },
-                    { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", prefKey: "fetalEcho" as const, mapKey: "fetalEcho", isPocus: false },
-                    { key: "ECG", label: "ECG", Icon: Activity, desc: "Electrocardiography", prefKey: "ecg" as const, mapKey: "ecg", isPocus: false },
-                    { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus", isPocus: false },
-                    { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics", prefKey: "physics" as const, mapKey: "physics", isPocus: false },
-                  ] : [
-                    { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal", isPocus: false },
-                    { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", prefKey: "smallParts" as const, mapKey: "smallParts", isPocus: false },
-                    { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Activity, desc: "Pelvic/Gynecologic Ultrasound", prefKey: "pelvicGyn" as const, mapKey: "pelvicGyn", isPocus: false },
-                    { key: "OB 1st Trimester", label: "OB 1st Tri", Icon: Baby, desc: "1st Trimester Obstetric", prefKey: "ob1st" as const, mapKey: "ob1st", isPocus: false },
-                    { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "2nd/3rd Trimester Obstetric", prefKey: "ob2nd3rd" as const, mapKey: "ob2nd3rd", isPocus: false },
-                    { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", prefKey: "fetalEcho" as const, mapKey: "fetalEcho", isPocus: false },
-                    { key: "Breast", label: "Breast", Icon: Activity, desc: "Breast Ultrasound", prefKey: "breast" as const, mapKey: "breast", isPocus: false },
-                    { key: "Vascular", label: "Vascular", Icon: Activity, desc: "Vascular Duplex", prefKey: "vascular" as const, mapKey: "vascular", isPocus: false },
-                    { key: "MSK", label: "MSK", Icon: Activity, desc: "Musculoskeletal Ultrasound", prefKey: "msk" as const, mapKey: "msk", isPocus: false },
-                    { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus", isPocus: false },
-                    { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics & Instrumentation", prefKey: "physics" as const, mapKey: "physics", isPocus: false },
-                  ];
+                  const catPrefs = categoryPrefsQuery.data ?? defaultPrefs;
+                  const CATS = displayCategories;
 
                   const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false && categoryMap[c.mapKey] != null);
                   const allDone = enabledCats.length > 0 && enabledCats.every((c) => {
@@ -1546,7 +1497,7 @@ export default function QuickFire() {
               const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
               const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
               const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-              const catMapKey = CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory;
+              const catMapKey = catDisplayToKey[activeCategory] ?? activeCategory;
               const qId = categoryMap[catMapKey];
               const catQ = todayQuestions.find((q: any) => q.id === qId);
               if (!catQ) return (

@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import { detectBrandFromPath } from "@shared/brandScopedRoutes";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -74,6 +75,8 @@ queryClient.getMutationCache().subscribe(event => {
 // Embed brand in the tRPC URL as a query param — this cannot be stripped by any proxy.
 // The X-App-Hostname header is also sent as a belt-and-suspenders fallback.
 function getBrandParam(): string {
+  const fromPath = detectBrandFromPath(window.location.pathname);
+  if (fromPath) return fromPath;
   const h = window.location.hostname.toLowerCase();
   if (h.includes("iheartecho")) return "iheartecho";
   return "aaus";

@@ -7,7 +7,7 @@
  *  - Generate the daily set for today (or a specific date)
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   DndContext,
   closestCenter,
@@ -99,6 +99,9 @@ import {
   Eye,
 } from "lucide-react";
 import { toast } from "sonner";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
+import { perBrandUserPath } from "@/lib/perBrandUrls";
+import { detectBrandFromPath, getBrandCategoryConfig } from "@shared/quickfireCategories";
 
 const TYPE_META = {
   scenario: { label: "Scenario (MCQ)", icon: Stethoscope, color: "bg-blue-100 text-blue-700" },
@@ -116,7 +119,19 @@ interface ConnectPair { left: string; right: string; }
 interface IdentifierMarker { x: number; y: number; label: string; }
 interface OrderItem { text: string; }
 
-type QuestionCategory = "Abdominal" | "OB/Gyn" | "Small Parts" | "Vascular" | "MSK" | "POCUS";
+type QuestionCategory = string;
+
+function ChallengeCategoryOptions({ categories }: { categories: readonly string[] }) {
+  return (
+    <>
+      {categories.map((cat) => (
+        <SelectItem key={cat} value={cat}>
+          {cat}
+        </SelectItem>
+      ))}
+    </>
+  );
+}
 
 type FlashcardEchoCategory = "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk";
 interface QuestionForm {
@@ -408,9 +423,20 @@ function SortableQueueItem({ c, idx, openEditChallenge, deleteChallengeMutation,
 }
 
 export default function QuickFireAdmin() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const utils = trpc.useUtils();
+
+  const adminBrand = useMemo(
+    () => detectBrandFromPath(location) ?? (isIHeartEchoDomain() ? "iheartecho" : "aaus"),
+    [location],
+  );
+  const challengeCategories = useMemo(
+    () => getBrandCategoryConfig(adminBrand).categories,
+    [adminBrand],
+  );
+  const defaultCategory = challengeCategories[0] ?? "Abdominal";
+  const brandLabel = adminBrand === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™";
 
   // List state
   const [page, setPage] = useState(1);
@@ -1165,14 +1191,17 @@ export default function QuickFireAdmin() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate("/quickfire")} className="text-gray-400 hover:text-[#189aa1]">
+            <button onClick={() => navigate(perBrandUserPath("/quickfire", adminBrand))} className="text-gray-400 hover:text-[#189aa1]">
               <ChevronLeft className="w-5 h-5" />
             </button>
             <div>
               <h1 className="text-xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
                 Daily Challenge Question Builder
               </h1>
-              <p className="text-xs text-gray-400">Create and manage daily challenge questions</p>
+              <p className="text-xs text-gray-400">
+                Create and manage daily challenge questions ·{" "}
+                <span className="font-semibold text-[#189aa1]">{brandLabel}</span>
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1286,11 +1315,11 @@ export default function QuickFireAdmin() {
                 const cat = (c as any).category as string;
                 if (cat) counts[cat] = (counts[cat] ?? 0) + 1;
               }
-              const cats = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-              if (cats.length === 0) return null;
               return (
                 <div className="flex flex-wrap gap-2">
-                  {cats.map(([cat, count]) => (
+                  {challengeCategories.map((cat) => {
+                    const count = counts[cat] ?? 0;
+                    return (
                     <button
                       key={cat}
                       onClick={() => setQueueCategoryFilter(cat as any)}
@@ -1312,7 +1341,8 @@ export default function QuickFireAdmin() {
                         {count}
                       </span>
                     </button>
-                  ))}
+                    );
+                  })}
                   {queueCategoryFilter !== "all" && (
                     <button
                       onClick={() => setQueueCategoryFilter("all")}
@@ -1343,12 +1373,7 @@ export default function QuickFireAdmin() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All categories</SelectItem>
-                    <SelectItem value="Abdominal">Abdominal</SelectItem>
-                    <SelectItem value="OB/Gyn">OB/Gyn</SelectItem>
-                    <SelectItem value="Small Parts">Small Parts</SelectItem>
-                    <SelectItem value="Vascular">Vascular</SelectItem>
-                    <SelectItem value="MSK">MSK</SelectItem>
-                    <SelectItem value="POCUS">POCUS</SelectItem>
+                    <ChallengeCategoryOptions categories={challengeCategories} />
                   </SelectContent>
                 </Select>
               </div>
@@ -1529,12 +1554,7 @@ export default function QuickFireAdmin() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="Abdominal">Abdominal</SelectItem>
-              <SelectItem value="OB/Gyn">OB/Gyn</SelectItem>
-              <SelectItem value="Small Parts">Small Parts</SelectItem>
-              <SelectItem value="Vascular">Vascular</SelectItem>
-              <SelectItem value="MSK">MSK</SelectItem>
-              <SelectItem value="POCUS">POCUS</SelectItem>
+              <ChallengeCategoryOptions categories={challengeCategories} />
             </SelectContent>
           </Select>
           <Button
@@ -2467,12 +2487,7 @@ export default function QuickFireAdmin() {
                 <Select value={challengeForm.category} onValueChange={(v) => setChallengeForm((f) => ({ ...f, category: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Abdominal">Abdominal</SelectItem>
-                    <SelectItem value="OB/Gyn">OB/Gyn</SelectItem>
-                    <SelectItem value="Small Parts">Small Parts</SelectItem>
-                    <SelectItem value="Vascular">Vascular</SelectItem>
-                    <SelectItem value="MSK">MSK</SelectItem>
-                    <SelectItem value="POCUS">POCUS</SelectItem>
+                    <ChallengeCategoryOptions categories={challengeCategories} />
                     <SelectItem value="Mixed">Mixed</SelectItem>
                   </SelectContent>
                 </Select>
@@ -3053,12 +3068,7 @@ export default function QuickFireAdmin() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Abdominal">Abdominal</SelectItem>
-                  <SelectItem value="OB/Gyn">OB/Gyn</SelectItem>
-                  <SelectItem value="Small Parts">Small Parts</SelectItem>
-                  <SelectItem value="Vascular">Vascular</SelectItem>
-                  <SelectItem value="MSK">MSK</SelectItem>
-                  <SelectItem value="POCUS">POCUS</SelectItem>
+                  <ChallengeCategoryOptions categories={challengeCategories} />
                 </SelectContent>
               </Select>
             </div>
@@ -3254,12 +3264,7 @@ export default function QuickFireAdmin() {
                     <Select value={aiCategory} onValueChange={(v) => setAiCategory(v as QuestionCategory)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Abdominal">Abdominal</SelectItem>
-                        <SelectItem value="OB/Gyn">OB/Gyn</SelectItem>
-                        <SelectItem value="Small Parts">Small Parts</SelectItem>
-                        <SelectItem value="Vascular">Vascular</SelectItem>
-                        <SelectItem value="MSK">MSK</SelectItem>
-                        <SelectItem value="POCUS">POCUS</SelectItem>
+                        <ChallengeCategoryOptions categories={challengeCategories} />
                       </SelectContent>
                     </Select>
                   </div>
@@ -3324,12 +3329,7 @@ export default function QuickFireAdmin() {
                       <Select value={aiCategory} onValueChange={(v) => setAiCategory(v as QuestionCategory)}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Abdominal">Abdominal</SelectItem>
-                          <SelectItem value="OB/Gyn">OB/Gyn</SelectItem>
-                          <SelectItem value="Small Parts">Small Parts</SelectItem>
-                          <SelectItem value="Vascular">Vascular</SelectItem>
-                          <SelectItem value="MSK">MSK</SelectItem>
-                          <SelectItem value="POCUS">POCUS</SelectItem>
+                          <ChallengeCategoryOptions categories={challengeCategories} />
                         </SelectContent>
                     </Select>
                   </div>
