@@ -525,13 +525,15 @@ const createMembershipCheckout = protectedProcedure
     // Dynamic import to avoid issues if Stripe not configured
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" as any });
+    const validatePriceId = async (priceId: string | null | undefined): Promise<string | null> => { if (!priceId) return null; try { await stripe.prices.retrieve(priceId); return priceId; } catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; } };
 
     const isRecurring = plan.billingInterval !== "one_time" && plan.billingInterval !== "lifetime";
 
     // Build line item
     let priceData: any;
-    if (plan.stripePriceId) {
-      priceData = { price: plan.stripePriceId, quantity: 1 };
+    const validatedPriceId = await validatePriceId(plan.stripePriceId);
+    if (validatedPriceId) {
+      priceData = { price: validatedPriceId, quantity: 1 };
     } else {
       priceData = {
         price_data: {
@@ -637,10 +639,12 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
     const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" as any });
+    const validatePriceId2 = async (priceId: string | null | undefined): Promise<string | null> => { if (!priceId) return null; try { await stripe.prices.retrieve(priceId); return priceId; } catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; } };
     const isRecurring = plan.billingInterval !== "one_time" && plan.billingInterval !== "lifetime";
     let lineItem: any;
-    if (plan.stripePriceId) {
-      lineItem = { price: plan.stripePriceId, quantity: 1 };
+    const validatedPriceId2 = await validatePriceId2(plan.stripePriceId);
+    if (validatedPriceId2) {
+      lineItem = { price: validatedPriceId2, quantity: 1 };
     } else {
       lineItem = {
         price_data: {

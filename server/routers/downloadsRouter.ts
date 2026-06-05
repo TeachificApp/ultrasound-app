@@ -347,6 +347,7 @@ export const downloadsLearnerRouter = router({
       }
 
       const Stripe = (await import("stripe")).default;
+      const validatePriceId = async (priceId: string | null | undefined): Promise<string | null> => { if (!priceId) return null; try { await stripe.prices.retrieve(priceId); return priceId; } catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; } };
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
       const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
@@ -361,7 +362,7 @@ export const downloadsLearnerRouter = router({
       let session;
       if (input.purchaseType === "subscription") {
         // Subscription mode — use or create a Stripe Price
-        let stripePriceId = bundle.subscriptionStripePriceId;
+        let stripePriceId = await validatePriceId(bundle.subscriptionStripePriceId);
         if (!stripePriceId) {
           // Create a recurring price on the fly
           const stripeProduct = await stripe.products.create({

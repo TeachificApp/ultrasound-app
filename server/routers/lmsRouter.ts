@@ -939,6 +939,12 @@ export const lmsLearnerRouter = router({
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      // Helper: validate a stored stripe price ID exists in the current Stripe account
+      const validatePriceId = async (priceId: string | null | undefined): Promise<string | null> => {
+        if (!priceId) return null;
+        try { await stripe.prices.retrieve(priceId); return priceId; }
+        catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; }
+      };
 
       const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
         orderBumpId: input.orderBumpId,
@@ -1012,7 +1018,7 @@ export const lmsLearnerRouter = router({
 
       } else if (pricingType === "subscription") {
         // Create or reuse a Stripe Price for this subscription option
-        let stripePriceId = effectiveStripePriceId;
+        let stripePriceId = await validatePriceId(effectiveStripePriceId);
         if (!stripePriceId) {
           const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
           const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
@@ -1069,7 +1075,7 @@ export const lmsLearnerRouter = router({
           });
         }
         if (installmentAmount > 0 && installmentCount > 0) {
-          let stripePriceId = effectiveStripePriceId;
+          let stripePriceId = await validatePriceId(effectiveStripePriceId);
           if (!stripePriceId) {
             const stripeProduct = await stripe.products.create({
               name: `${productName} — Installment`,
@@ -1272,7 +1278,7 @@ export const lmsLearnerRouter = router({
           ...shippingOptions,
         });
       } else if (pricingType === "subscription") {
-        let stripePriceId = effectiveStripePriceId;
+        let stripePriceId = await validatePriceId(effectiveStripePriceId);
         if (!stripePriceId) {
           const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
           const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
@@ -2136,6 +2142,21 @@ export const lmsLearnerRouter = router({
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      // Helper: validate a stored stripe price ID exists in the current Stripe account
+      const validatePriceId = async (priceId: string | null): Promise<string | null> => {
+        if (!priceId) return null;
+        try {
+          await stripe.prices.retrieve(priceId);
+          return priceId;
+        } catch (e: any) {
+          if (e?.code === 'resource_missing' || e?.statusCode === 404 || (e?.message && e.message.includes('No such price'))) {
+            return null; // stale price from a different Stripe account
+          }
+          throw e; // re-throw unexpected errors
+        }
+      };
+
       const learnDomain = "https://learn.allaboutultrasound.com";
       const returnUrl = `${learnDomain}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&slug=${course.slug}`;
 
@@ -2181,7 +2202,7 @@ export const lmsLearnerRouter = router({
         billingLabel = `$${perSeatPrice.toFixed(2)}/seat × ${tier.minSeats} seats minimum`;
 
         // Reuse or create Stripe Price
-        stripePriceId = tier.stripePriceId ?? null;
+        stripePriceId = await validatePriceId(tier.stripePriceId ?? null);
         if (!stripePriceId) {
           const product = await stripe.products.create({
             name: productName,
@@ -2237,7 +2258,7 @@ export const lmsLearnerRouter = router({
         subscriptionInterval = opt.subscriptionInterval ?? null;
         productName = `${course.title}${opt.label ? ` — ${opt.label}` : ""}`;
         isSubscription = pricingType === "subscription" || pricingType === "payment_plan";
-        stripePriceId = opt.stripePriceId ?? null;
+        stripePriceId = await validatePriceId(opt.stripePriceId ?? null);
 
         if (!stripePriceId) {
           const product = await stripe.products.create({
@@ -2311,7 +2332,7 @@ export const lmsLearnerRouter = router({
       displayPrice = Number(course.price ?? 0);
       subscriptionInterval = course.subscriptionInterval ?? null;
       isSubscription = pricingType === "subscription" || pricingType === "payment_plan";
-      stripePriceId = course.stripePriceId ?? null;
+      stripePriceId = await validatePriceId(course.stripePriceId ?? null);
 
       if (!stripePriceId) {
         const product = await stripe.products.create({
@@ -3442,6 +3463,7 @@ export const lmsGroupRouter = router({
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
 
       const Stripe = (await import("stripe")).default;
+      const validatePriceId = async (priceId: string | null | undefined): Promise<string | null> => { if (!priceId) return null; try { await stripe.prices.retrieve(priceId); return priceId; } catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; } };
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
       const learnDomain = "https://learn.allaboutultrasound.com";
 
@@ -3462,7 +3484,7 @@ export const lmsGroupRouter = router({
       const currency = course.currency ?? "usd";
 
       // Create or reuse Stripe Price
-      let stripePriceId = tier.stripePriceId ?? null;
+      let stripePriceId = await validatePriceId(tier.stripePriceId ?? null);
       if (!stripePriceId) {
         const product = await stripe.products.create({
           name: `${course.title} — Team (${tier.minSeats}+ seats, ${discountPct}% off)`,
