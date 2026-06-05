@@ -642,6 +642,53 @@ export default function RichTextEditor({
       isInternalUpdate.current = true;
       onChange(html === "<p></p>" ? "" : html);
     },
+    editorProps: {
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (const item of Array.from(items)) {
+          if (item.type.startsWith("image/")) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) return true;
+            const fd = new FormData();
+            fd.append("file", file);
+            toast.info("Uploading pasted image...");
+            fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd })
+              .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(new Error(e.error || "Upload failed"))))
+              .then(({ url }) => {
+                view.dispatch(view.state.tr.replaceSelectionWith(
+                  view.state.schema.nodes.image.create({ src: url, alt: file.name || "pasted image" })
+                ));
+                toast.success("Image uploaded");
+              })
+              .catch((err: any) => toast.error(`Image upload failed: ${err.message}`));
+            return true;
+          }
+        }
+        return false;
+      },
+      handleDrop: (view, event) => {
+        const files = event.dataTransfer?.files;
+        if (!files || files.length === 0) return false;
+        const file = files[0];
+        if (!file.type.startsWith("image/")) return false;
+        event.preventDefault();
+        const fd = new FormData();
+        fd.append("file", file);
+        toast.info("Uploading dropped image...");
+        const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? view.state.selection.from;
+        fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd })
+          .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(new Error(e.error || "Upload failed"))))
+          .then(({ url }) => {
+            const node = view.state.schema.nodes.image.create({ src: url, alt: file.name || "dropped image" });
+            view.dispatch(view.state.tr.insert(pos, node));
+            toast.success("Image uploaded");
+          })
+          .catch((err: any) => toast.error(`Image upload failed: ${err.message}`));
+        return true;
+      },
+    },
   });
 
   // Track whether the last value change came from the editor itself
@@ -674,16 +721,26 @@ export default function RichTextEditor({
     setImageUrl(""); setImageAlt(""); setImageDialogOpen(false);
   }, [editor, imageUrl, imageAlt]);
 
-  const insertImageFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const insertImageFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editor) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const src = ev.target?.result as string;
-      editor.chain().focus().setImage({ src, alt: file.name }).run();
-    };
-    reader.readAsDataURL(file);
     e.target.value = "";
+    // Upload to S3 instead of embedding base64 (which freezes the editor for large images)
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      toast.info("Uploading image...");
+      const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Upload failed");
+      }
+      const { url } = await res.json();
+      editor.chain().focus().setImage({ src: url, alt: file.name }).run();
+      toast.success("Image uploaded");
+    } catch (err: any) {
+      toast.error(`Image upload failed: ${err.message}`);
+    }
   }, [editor]);
 
   const insertVideo = useCallback(() => {
