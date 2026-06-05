@@ -85,6 +85,7 @@ import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import FormEmbedSharePanel from "@/components/admin/FormEmbedSharePanel";
 import FormSuccessModulesTab from "@/components/admin/FormSuccessModulesTab";
 import FormResultsTable from "@/components/admin/FormResultsTable";
+import FormAnalyticsDeep from "@/components/admin/FormAnalyticsDeep";
 import { mergeExtraConfig, isAdminOnlyItem, type SavedResultsFilter, type FormActionConfig } from "@shared/formItemUtils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -254,6 +255,11 @@ function FormList({ onSelect }: { onSelect: (id: number) => void }) {
           <p className="text-sm text-gray-500 mt-0.5">Build public forms, surveys, and quizzes with branding, analytics, and share links</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/admin/general-forms/analytics-dashboard">
+            <Button variant="outline" className="gap-2">
+              <BarChart2 className="w-4 h-4" /> Analytics Dashboards
+            </Button>
+          </Link>
           <Button variant="outline" onClick={() => setShowImport(true)} className="gap-2">
             <Link2 className="w-4 h-4" /> Import by URL
           </Button>
@@ -1989,16 +1995,6 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
 // ─── Analytics Tab ────────────────────────────────────────────────────────────
 function AnalyticsTab({ formId, template }: { formId: number; template: any }) {
   const { data: analytics, isLoading } = trpc.generalForm.getFormAnalytics.useQuery({ id: formId });
-  const { data: submissions, isLoading: subsLoading } = trpc.generalForm.listSubmissions.useQuery({ templateId: formId, pageSize: 50 });
-
-  const updateStatus = trpc.generalForm.updateSubmissionStatus.useMutation({
-    onSuccess: () => toast.success("Status updated"),
-    onError: (e) => toast.error(e.message),
-  });
-  const deleteSubmission = trpc.generalForm.deleteSubmission.useMutation({
-    onSuccess: () => toast.success("Deleted"),
-    onError: (e) => toast.error(e.message),
-  });
 
   if (isLoading) return <div className="flex items-center justify-center py-16 text-gray-400"><RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading analytics…</div>;
 
@@ -2068,68 +2064,7 @@ function AnalyticsTab({ formId, template }: { formId: number; template: any }) {
         </Card>
       )}
 
-      {/* Submissions table */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <FileText className="w-4 h-4" /> Submissions ({analytics?.totalSubmissions ?? 0})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {subsLoading ? (
-            <div className="text-center py-8 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin mx-auto" /></div>
-          ) : !submissions?.submissions?.length ? (
-            <div className="text-center py-8 text-gray-400">No submissions yet</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">ID</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">Submitted</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">Score</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">Status</th>
-                    <th className="text-right py-2 px-3 text-xs font-medium text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {submissions.submissions.map((sub: any) => (
-                    <tr key={sub.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="py-2 px-3 font-mono text-xs text-gray-400">#{sub.id}</td>
-                      <td className="py-2 px-3 text-gray-600">{new Date(sub.submittedAt).toLocaleString()}</td>
-                      <td className="py-2 px-3">
-                        {sub.maxScore > 0 ? (
-                          <span className="font-medium" style={{ color: BRAND }}>{sub.score}/{sub.maxScore}</span>
-                        ) : <span className="text-gray-400">—</span>}
-                      </td>
-                      <td className="py-2 px-3">
-                        <Select value={sub.status} onValueChange={v => updateStatus.mutate({ id: sub.id, status: v as any })}>
-                          <SelectTrigger className="h-6 text-xs w-28"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="submitted">Submitted</SelectItem>
-                            <SelectItem value="reviewed">Reviewed</SelectItem>
-                            <SelectItem value="draft">Draft</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="py-2 px-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-400 hover:text-red-600"
-                          onClick={() => { if (confirm("Delete this submission?")) deleteSubmission.mutate({ id: sub.id }); }}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <FormAnalyticsDeep formId={formId} template={template} />
     </div>
   );
 }
