@@ -30,6 +30,113 @@ function getStripeWebhookSecret(): string {
   return process.env.STRIPE_WEBHOOK_SECRET ?? "";
 }
 
+/**
+ * Universal user resolver for Stripe webhook handlers.
+ *
+ * Priority order:
+ *  1. user_id in metadata → parse directly
+ *  2. customer_email in metadata / session → look up or auto-create account
+ *
+ * When a new account is created a welcome email with a one-click access link
+ * is sent automatically so the buyer can reach their content immediately.
+ *
+ * @param session  Raw Stripe session / payment-intent object
+ * @param meta     Already-extracted metadata record
+ * @param brandMode  'aaus' | 'iheartecho' — controls which base URL is used
+ * @returns  Resolved numeric user ID, or null if resolution failed
+ */
+async function resolveUserFromSession(
+  session: Record<string, unknown>,
+  meta: Record<string, string>,
+  brandMode: "aaus" | "iheartecho" = "aaus",
+): Promise<number | null> {
+  // 1. Prefer explicit user_id from metadata
+  if (meta.user_id) {
+    const parsed = parseInt(meta.user_id, 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  // 2. Fall back to email-based lookup / auto-create
+  const customerEmail: string | undefined =
+    meta.customer_email ||
+    (session.customer_email as string | undefined) ||
+    (session.customer_details as Record<string, string> | undefined)?.email;
+
+  if (!customerEmail) return null;
+
+  const customerName: string | undefined =
+    meta.customer_name ||
+    (session.customer_details as Record<string, string> | undefined)?.name ||
+    undefined;
+
+  try {
+    const nameParts = (customerName || "").trim().split(" ");
+    const { user: autoUser, isNew, resetToken } = await getOrCreateUserByEmail({
+      email: customerEmail,
+      firstName: nameParts[0] || undefined,
+      lastName: nameParts.slice(1).join(" ") || undefined,
+      name: customerName || undefined,
+    });
+
+    if (isNew && resetToken) {
+      const baseUrl =
+        brandMode === "iheartecho"
+          ? "https://app.iheartecho.net"
+          : "https://app.allaboutultrasound.com";
+      const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+      const firstName = autoUser.firstName || nameParts[0] || "there";
+
+      let accessToken: string | null = null;
+      try {
+        accessToken = await getOrCreateAccessToken(autoUser.id);
+      } catch {}
+
+      const accessUrl = accessToken
+        ? `${baseUrl}/api/auth/auto-login?token=${accessToken}`
+        : setPasswordUrl;
+
+      try {
+        const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
+        const emailContent = buildPasswordResetEmail({
+          firstName,
+          resetUrl: setPasswordUrl,
+          brandMode,
+        });
+        const accessNote = accessToken
+          ? `<div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
+              <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Quick access link</p>
+              <p style="margin:0;font-size:13px;color:#475569;">Click below to access your content directly — no password needed:</p>
+              <p style="margin:8px 0 0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
+            </div>`
+          : "";
+        const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
+        await _sendEmail({
+          to: { name: customerName || firstName, email: customerEmail },
+          subject: `Welcome — your purchase is ready`,
+          htmlBody: enhancedBody,
+          previewText: `Access your content on ${
+            brandMode === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™"
+          }`,
+        });
+        console.log(
+          `[Stripe] resolveUserFromSession: new account created for ${customerEmail} (userId=${autoUser.id}), welcome email sent`,
+        );
+      } catch (emailErr) {
+        console.error(`[Stripe] resolveUserFromSession: failed to send welcome email to ${customerEmail}:`, emailErr);
+      }
+    } else {
+      console.log(
+        `[Stripe] resolveUserFromSession: resolved existing account for ${customerEmail} (userId=${autoUser.id})`,
+      );
+    }
+
+    return autoUser.id;
+  } catch (err) {
+    console.error(`[Stripe] resolveUserFromSession: failed for ${customerEmail}:`, err);
+    return null;
+  }
+}
+
 // Stripe Concierge product price ID (from the payment link)
 const CONCIERGE_PRICE_ID = "price_concierge_4997"; // update if Stripe price ID is known
 
@@ -125,12 +232,18 @@ async function handleMembershipCheckoutCompleted(session: Record<string, unknown
   const meta = (session.metadata as Record<string, string>) ?? {};
   if (meta.type !== "membership") return; // Not a membership purchase
 
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
   const planId = meta.plan_id ? parseInt(meta.plan_id) : null;
-  if (!userId || !planId) return;
+  if (!planId) return;
 
   const db = await getDb();
   if (!db) return;
+
+  let userId = await resolveUserFromSession(session, meta, "aaus");
+  if (!userId) {
+    console.warn(`[Stripe] Membership checkout: could not resolve user. Session: ${session.id}`);
+    await notifyOwner({ title: "⚠️ Membership — No User", content: `Membership purchase for plan ${planId} received but no user could be identified. Session: ${session.id}. Email: ${meta.customer_email ?? "unknown"}.` });
+    return;
+  }
 
   // Check idempotency
   const [existing] = await db
@@ -222,19 +335,24 @@ async function handleMembershipCheckoutCompleted(session: Record<string, unknown
 async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata as Record<string, string>) ?? {};
   const orderId = meta.order_id ? parseInt(meta.order_id) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
   const courseId = meta.course_id ? parseInt(meta.course_id) : null;
   const seats = meta.seats ? parseInt(meta.seats) : 1;
   const affiliateCode = meta.affiliate_code ?? null;
   const sessionId = session.id as string;
 
-  // If no order_id but we have user_id + course_id (e.g. hosted embedded checkout),
-  // still proceed with enrollment — we'll create an order row below.
-  if (!userId || !courseId) return; // Not an LMS order — missing required fields
+  if (!courseId) return; // Not an LMS order — missing required fields
   const isHostedCheckoutFallback = !orderId;
 
   const db = await getDb();
   if (!db) return;
+
+  // Resolve user — always falls back to email-based auto-create for guest checkouts
+  let userId = await resolveUserFromSession(session, meta, "aaus");
+  if (!userId) {
+    console.warn(`[Stripe] LMS checkout: could not resolve user. Session: ${session.id}`);
+    await notifyOwner({ title: "⚠️ LMS Purchase — No User", content: `LMS course ${courseId} purchase received but no user could be identified. Session: ${session.id}. Email: ${meta.customer_email ?? "unknown"}.` });
+    return;
+  }
 
   // Mark order as paid (also store subscription ID if this was a subscription checkout)
   const subscriptionIdForOrder = session.subscription as string | undefined;
@@ -534,11 +652,17 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
   if (meta.type !== "digital_bundle") return;
 
   const bundleId = meta.bundle_id ? parseInt(meta.bundle_id) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
-  if (!bundleId || !userId) return;
+  if (!bundleId) return;
 
   const db = await getDb();
   if (!db) return;
+
+  let userId = await resolveUserFromSession(session, meta, "aaus");
+  if (!userId) {
+    console.warn(`[Stripe] Digital bundle checkout: could not resolve user. Session: ${session.id}`);
+    await notifyOwner({ title: "⚠️ Digital Bundle — No User", content: `Bundle ${bundleId} purchase received but no user could be identified. Session: ${session.id}. Email: ${meta.customer_email ?? "unknown"}.` });
+    return;
+  }
 
   // Check if already purchased (idempotent)
   const [existing] = await db.select().from(digitalBundlePurchases)
@@ -606,15 +730,21 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
   if (meta.type !== "physical_product") return;
 
   const productId = meta.product_id ? parseInt(meta.product_id, 10) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
   const pricingOptionId = meta.pricing_option_id ? parseInt(meta.pricing_option_id, 10) : null;
-  if (!productId || !userId) {
-    console.warn("[Stripe] Physical product checkout missing productId or userId in metadata");
+  if (!productId) {
+    console.warn("[Stripe] Physical product checkout missing productId in metadata");
     return;
   }
 
   const db = await getDb();
   if (!db) return;
+
+  let userId = await resolveUserFromSession(session, meta, "aaus");
+  if (!userId) {
+    console.warn(`[Stripe] Physical product checkout: could not resolve user. Session: ${session.id}`);
+    await notifyOwner({ title: "⚠️ Physical Product — No User", content: `Physical product ${productId} purchase received but no user could be identified. Session: ${session.id}. Email: ${meta.customer_email ?? "unknown"}.` });
+    return;
+  }
 
   // Idempotency check — don't double-record
   const [existing] = await db.select({ id: physicalProductOrders.id })
@@ -677,18 +807,24 @@ async function handleBrandMembershipCheckoutCompleted(session: Record<string, un
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.type !== "brand_membership_upgrade") return; // Not a brand membership checkout
 
-  const userId = parseInt(meta.user_id, 10);
   const brand = meta.brand as "aaus" | "iheartecho";
   const subscriptionId = session.subscription as string | undefined;
   const customerId = session.customer as string | undefined;
 
-  if (!userId || !brand) {
-    console.warn("[Stripe] Brand membership checkout missing userId or brand in metadata");
+  if (!brand) {
+    console.warn("[Stripe] Brand membership checkout missing brand in metadata");
     return;
   }
 
   const db = await getDb();
   if (!db) return;
+
+  let userId = await resolveUserFromSession(session, meta, brand === "iheartecho" ? "ihe" : "aaus");
+  if (!userId) {
+    console.warn(`[Stripe] Brand membership checkout: could not resolve user. Session: ${session.id}`);
+    await notifyOwner({ title: "⚠️ Brand Membership — No User", content: `Brand membership (${brand}) purchase received but no user could be identified. Session: ${session.id}. Email: ${meta.customer_email ?? "unknown"}.` });
+    return;
+  }
 
   // Check if membership already exists
   const [existing] = await db
@@ -739,17 +875,18 @@ async function handleDualMembershipCheckoutCompleted(session: Record<string, unk
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.type !== "dual_membership") return;
 
-  const userId = parseInt(meta.user_id, 10);
   const subscriptionId = session.subscription as string | undefined;
   const customerId = session.customer as string | undefined;
 
-  if (!userId) {
-    console.warn("[Stripe] Dual membership checkout missing userId in metadata");
-    return;
-  }
-
   const db = await getDb();
   if (!db) return;
+
+  let userId = await resolveUserFromSession(session, meta, "aaus");
+  if (!userId) {
+    console.warn(`[Stripe] Dual membership checkout: could not resolve user. Session: ${session.id}`);
+    await notifyOwner({ title: "⚠️ Dual Membership — No User", content: `Dual membership purchase received but no user could be identified. Session: ${session.id}. Email: ${meta.customer_email ?? "unknown"}.` });
+    return;
+  }
 
   const brands: ("aaus" | "iheartecho")[] = ["aaus", "iheartecho"];
   for (const brand of brands) {
@@ -816,13 +953,15 @@ async function handleEmployerCheckoutCompleted(session: Record<string, unknown>)
   const productType = meta.product_type as string | undefined;
   if (productType !== "employer_job_post" && productType !== "employer_subscription") return;
 
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
+  const db = await getDb();
+  if (!db) return;
+
+  let userId = await resolveUserFromSession(session, meta, "aaus");
   if (!userId) {
-    console.warn("[Stripe] Employer checkout missing user_id in metadata");
+    console.warn(`[Stripe] Employer checkout: could not resolve user. Session: ${session.id}`);
+    await notifyOwner({ title: "⚠️ Employer Purchase — No User", content: `Employer ${productType} purchase received but no user could be identified. Session: ${session.id}. Email: ${meta.customer_email ?? "unknown"}.` });
     return;
   }
-
-  const db = await getDb();
 
   // Ensure employer profile exists
   const [existingProfile] = await db.select({ id: employerProfiles.id })
@@ -1279,12 +1418,18 @@ async function handleLmsBundlePurchaseCompleted(session: Record<string, unknown>
   if (meta.purchase_type !== "bundle_purchase") return;
 
   const bundleId = meta.bundle_id ? parseInt(meta.bundle_id) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
   const pricingOptionId = meta.pricing_option_id || null;
-  if (!bundleId || !userId) return;
+  if (!bundleId) return;
 
   const db = await getDb();
   if (!db) return;
+
+  let userId = await resolveUserFromSession(session, meta, "aaus");
+  if (!userId) {
+    console.warn(`[Stripe] LMS bundle purchase: could not resolve user. Session: ${session.id}`);
+    await notifyOwner({ title: "⚠️ LMS Bundle — No User", content: `Bundle ${bundleId} purchase received but no user could be identified. Session: ${session.id}. Email: ${meta.customer_email ?? "unknown"}.` });
+    return;
+  }
 
   const sessionId = session.id as string;
   console.log(`[Stripe] LMS bundle purchase — bundleId: ${bundleId}, userId: ${userId}, session: ${sessionId}`);
