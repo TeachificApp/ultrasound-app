@@ -73,6 +73,7 @@ const DownloadLandingPageBuilder = lazy(() => import("./pages/admin/DownloadLand
 const MyDownloads = lazy(() => import("./pages/MyDownloads"));
 const BundleLanding = lazy(() => import("./pages/BundleLanding"));
 const ProductLanding = lazy(() => import("./pages/ProductLanding"));
+const ProductsListing = lazy(() => import("./pages/ProductsListing"));
 const ProductLandingPageBuilder = lazy(() => import("./pages/admin/ProductLandingPageBuilder"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
@@ -449,6 +450,8 @@ function Router() {
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         {/* ── Physical Products ────────────────────────────────────────────────────────────────────────────── */}
+        {/* Products listing page */}
+        <Route path="/products">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductsListing /></Suspense>}</Route>
         {/* Product landing → root domain */}
         <Route path="/product/:slug" component={ProductLanding} />
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
@@ -689,6 +692,7 @@ function LMSRouter() {
       <Route path="/cohort/:courseId" component={CohortSchedule} />
       <Route path="/courses/:slug" component={CourseLanding} />
       <Route path="/downloads/:slug" component={DownloadLanding} />
+      <Route path="/products">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductsListing /></Suspense>}</Route>
       <Route path="/product/:slug" component={ProductLanding} />
       <Route path="/bundles/:slug" component={BundleLanding} />
       {/* ── Public Form Renderer — outside LMSLayout (full-screen, no nav) ── */}
@@ -978,23 +982,45 @@ function IHeartEchoRouter() {
 
 /**
  * FunnelRootRedirect — When a visitor lands on /:slug (no page slug),
- * fetch the first active page of that funnel and redirect to /:slug/:firstPageSlug.
+ * first check if it's a physical product slug (redirect to /product/:slug),
+ * then fetch the first active page of that funnel and redirect to /:slug/:firstPageSlug.
  */
 function FunnelRootRedirect() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug || "";
-  const { data, error } = trpc.funnelPublic.getFirstPage.useQuery(
-    { funnelSlug: slug },
+
+  // Check if this is a physical product slug first
+  const productQuery = trpc.products.getBySlug.useQuery(
+    { slug, preview: false },
     { enabled: !!slug, retry: false }
   );
 
+  const { data, error } = trpc.funnelPublic.getFirstPage.useQuery(
+    { funnelSlug: slug },
+    { enabled: !!slug && productQuery.isFetched && !productQuery.data, retry: false }
+  );
+
+  // If it's a product slug, redirect to the canonical product URL
+  if (productQuery.data) {
+    return <Redirect to={`/product/${slug}`} />;
+  }
+
+  // Still loading the product check
+  if (!productQuery.isFetched) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
   if (error) {
-    // Not a funnel slug — show 404
+    // Not a funnel slug either — show 404
     return <NotFound />;
   }
 
   if (!data) {
-    // Loading
+    // Loading funnel data
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />

@@ -832,7 +832,8 @@ export default function CheckoutPageEditorPage() {
 
   // ── Load entity info for the top bar ────────────────────────────────────────
   const courseQuery = trpc.lmsAdmin.getCourse.useQuery({ courseId: entityId }, { enabled: entityType === "course" });
-  const entityName = entityType === "course" ? (courseQuery.data?.title ?? "Course") : `${entityType} #${entityId}`;
+  const physProductQuery = trpc.productsAdmin.get.useQuery({ id: entityId }, { enabled: entityType === "physical" });
+  const entityName = entityType === "course" ? (courseQuery.data?.title ?? "Course") : entityType === "physical" ? (physProductQuery.data?.product?.title ?? `Product #${entityId}`) : `${entityType} #${entityId}`;
   const entitySlug = entityType === "course" ? (courseQuery.data?.slug ?? "") : "";
 
   // ── Load config ──────────────────────────────────────────────────────────────
@@ -885,10 +886,13 @@ export default function CheckoutPageEditorPage() {
   // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  // Initialise config from loaded data
-  if (!isLoading && config === null && configData !== undefined) {
-    setConfig(parseCheckoutPageConfig(configData.config));
-  }
+  // Initialise config from loaded data (useEffect to avoid setState-during-render)
+  useEffect(() => {
+    if (!isLoading && config === null && configData !== undefined) {
+      setConfig(parseCheckoutPageConfig(configData.config));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, configData]);
 
   const updateConfig = useCallback((next: CheckoutPageConfig) => {
     setConfig(next);

@@ -99,7 +99,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
                   <div className="text-sm text-muted-foreground mt-0.5">
                     {p.isFree ? "Free" : `$${Number(p.price).toFixed(2)}`}
                     {p.compareAtPrice ? <span className="line-through ml-1 text-xs">${Number(p.compareAtPrice).toFixed(2)}</span> : null}
-                    {" · "}/products/{p.slug}
+                    {" · "}/product/{p.slug}
                     {" · "}{p.orderCount} orders
                     {" · "}<span className="font-mono text-xs">ID: {p.id}</span>
                   </div>
@@ -691,7 +691,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               <div>
                 <Label className="text-sm">URL Slug</Label>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">/products/</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">/product/</span>
                   <Input value={form.slug ?? ""} onChange={e => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-") })} placeholder="product-url-slug" className="flex-1" />
                 </div>
               </div>
