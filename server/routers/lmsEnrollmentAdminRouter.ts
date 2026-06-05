@@ -92,6 +92,32 @@ import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
 import { processStripeSessionById } from "../webhooks/stripe";
+
+/**
+ * Check if a user has instructor access to a course.
+ * Checks both instructor_course_permissions (direct user.id) AND
+ * lms_course_instructors via lms_instructors profile link (user_id -> profile.id -> course assignment).
+ */
+async function hasInstructorCourseAccess(db: any, userId: number, courseId: number): Promise<boolean> {
+  // Check 1: instructor_course_permissions
+  const [perm] = await db.select({ id: instructorCoursePermissions.id })
+    .from(instructorCoursePermissions)
+    .where(and(eq(instructorCoursePermissions.instructorId, userId), eq(instructorCoursePermissions.courseId, courseId)))
+    .limit(1);
+  if (perm) return true;
+  // Check 2: lms_instructors profile -> lms_course_instructors
+  const [profile] = await db.select({ id: lmsInstructors.id })
+    .from(lmsInstructors)
+    .where(and(eq(lmsInstructors.userId, userId), eq(lmsInstructors.isActive, true)))
+    .limit(1);
+  if (!profile) return false;
+  const [ci] = await db.select({ id: lmsCourseInstructors.id })
+    .from(lmsCourseInstructors)
+    .where(and(eq(lmsCourseInstructors.instructorId, profile.id), eq(lmsCourseInstructors.courseId, courseId)))
+    .limit(1);
+  return !!ci;
+}
+
 export const lmsEnrollmentAdminRouter = router({
   listEnrollments: protectedProcedure
     .input(z.object({ courseId: z.number().optional(), page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(20) }))
@@ -2887,12 +2913,9 @@ CRITICAL REQUIREMENTS:
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Verify this instructor is assigned to the course
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(
-          eq(instructorCoursePermissions.instructorId, ctx.user.id),
-          eq(instructorCoursePermissions.courseId, input.courseId),
-        )).limit(1);
-      if (!perm) throw new TRPCError({ code: "FORBIDDEN", message: "You are not assigned to this course." });
+      if (!(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You are not assigned to this course." });
+      }
       // Get allowed metrics
       const permRows = await db.select({ metric: instructorAnalyticsPermissions.metric })
         .from(instructorAnalyticsPermissions)
@@ -2999,10 +3022,9 @@ CRITICAL REQUIREMENTS:
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId)))
-        .limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Not assigned to this course" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Not assigned to this course" });
+      }
       const [course] = await db.select({
         id: lmsCourses.id, title: lmsCourses.title, status: lmsCourses.status,
         thumbnailUrl: lmsCourses.thumbnailUrl, slug: lmsCourses.slug,
@@ -3038,9 +3060,7 @@ CRITICAL REQUIREMENTS:
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) throw new TRPCError({ code: "FORBIDDEN" });
       const [pos] = await db.select({ maxPos: max(lmsSections.position) }).from(lmsSections).where(eq(lmsSections.courseId, input.courseId));
       const nextPosition = (pos?.maxPos ?? -1) + 1;
       const [result] = await db.insert(lmsSections).values({ courseId: input.courseId, title: input.title, position: nextPosition }).$returningId();
@@ -3053,9 +3073,7 @@ CRITICAL REQUIREMENTS:
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) throw new TRPCError({ code: "FORBIDDEN" });
       const updates: Record<string, unknown> = {};
       if (input.title !== undefined) updates.title = input.title;
       if (input.position !== undefined) updates.position = input.position;
@@ -3069,9 +3087,7 @@ CRITICAL REQUIREMENTS:
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) throw new TRPCError({ code: "FORBIDDEN" });
       await db.delete(lmsLessons).where(eq(lmsLessons.sectionId, input.id));
       await db.delete(lmsSections).where(eq(lmsSections.id, input.id));
       return { success: true };
@@ -3083,9 +3099,7 @@ CRITICAL REQUIREMENTS:
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) throw new TRPCError({ code: "FORBIDDEN" });
       await Promise.all(input.sections.map(s => db.update(lmsSections).set({ position: s.position }).where(eq(lmsSections.id, s.id))));
       return { success: true };
     }),
@@ -3106,9 +3120,7 @@ CRITICAL REQUIREMENTS:
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) throw new TRPCError({ code: "FORBIDDEN" });
       const scopeWhere = input.sectionId
         ? and(eq(lmsLessons.courseId, input.courseId), eq(lmsLessons.sectionId, input.sectionId))
         : and(eq(lmsLessons.courseId, input.courseId), isNull(lmsLessons.sectionId));
@@ -3150,9 +3162,7 @@ CRITICAL REQUIREMENTS:
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) throw new TRPCError({ code: "FORBIDDEN" });
       const { id, courseId, ...rest } = input;
       const updates: Record<string, unknown> = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
       if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates as any).where(eq(lmsLessons.id, id));
@@ -3165,9 +3175,7 @@ CRITICAL REQUIREMENTS:
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) throw new TRPCError({ code: "FORBIDDEN" });
       await db.delete(lmsLessons).where(eq(lmsLessons.id, input.id));
       return { success: true };
     }),
@@ -3178,9 +3186,7 @@ CRITICAL REQUIREMENTS:
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) throw new TRPCError({ code: "FORBIDDEN" });
       await Promise.all(input.lessons.map(l => db.update(lmsLessons).set({ position: l.position }).where(eq(lmsLessons.id, l.id))));
       return { success: true };
     }),
@@ -3197,9 +3203,7 @@ CRITICAL REQUIREMENTS:
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [perm] = await db.select().from(instructorCoursePermissions)
-        .where(and(eq(instructorCoursePermissions.instructorId, ctx.user.id), eq(instructorCoursePermissions.courseId, input.courseId))).limit(1);
-      if (!perm && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.role !== "admin" && !(await hasInstructorCourseAccess(db, ctx.user.id, input.courseId))) throw new TRPCError({ code: "FORBIDDEN" });
       const buffer = Buffer.from(input.base64Data, "base64");
       const ext = input.fileName.split(".").pop() ?? "bin";
       const key = `instructor-uploads/${ctx.user.id}/${input.courseId}/${input.lessonId}-${Date.now()}.${ext}`;

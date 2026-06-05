@@ -389,7 +389,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
 }
 
 // ─── Content Tab ──────────────────────────────────────────────────────────────
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "products" | "bundles" | "memberships" | "communities";
+type ContentSubTab = "courses" | "quizzes" | "downloads" | "purchases" | "webinars" | "products" | "bundles" | "memberships" | "communities";
 
 function ContentTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
@@ -454,10 +454,13 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const communityMemberships = data.communityMemberships ?? [];
   const webinarRegistrations = data.webinarRegistrations ?? [];
 
+  const funnelPurchases = data.funnelPurchases ?? [];
+
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: courses.length },
     { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: quizzes.length },
     { key: "downloads",    label: "Downloads",    icon: Download,       count: downloads.length },
+    { key: "purchases",    label: "Purchases",    icon: ShoppingCart,   count: funnelPurchases.length },
     { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
     { key: "products",     label: "Products",     icon: Package,        count: physOrders.length },
     { key: "bundles",      label: "Bundles",      icon: Layers,         count: bundleEnrollments.length },
@@ -468,16 +471,16 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   return (
     <div className="space-y-6">
       {/* Sub-tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
+      <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 w-full flex-nowrap overflow-x-auto">
         {subTabs.map(t => (
           <button key={t.key} onClick={() => setContentTab(t.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
               contentTab === t.key ? "bg-white text-[#189aa1] shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}>
-            <t.icon className="w-3.5 h-3.5" />
+            <t.icon className="w-3 h-3 flex-shrink-0" />
             {t.label}
             {t.count > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+              <span className={`text-[10px] px-1 py-0.5 rounded-full font-semibold ${
                 contentTab === t.key ? "bg-[#189aa1]/10 text-[#189aa1]" : "bg-gray-200 text-gray-500"
               }`}>{t.count}</span>
             )}
@@ -587,6 +590,31 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200">
                   <Download className="w-3 h-3" /> Files
                 </a>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Purchases */}
+      {contentTab === "purchases" && (
+        <div className="space-y-3">
+          <SectionHeader title={`Funnel Purchases (${funnelPurchases.length})`} />
+          {funnelPurchases.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No funnel purchases.</p>
+          ) : (
+            funnelPurchases.map((p: any) => (
+              <div key={p.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                <div className="flex items-start justify-between gap-2 flex-wrap">
+                  <div>
+                    <h4 className="font-semibold text-gray-800 text-sm">{p.productName ?? "Purchase"}</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {p.productType} · {formatDate(p.purchasedAt)} · {formatCurrency(p.amountPaid, p.currency)}
+                    </p>
+                    {p.sourceType && <p className="text-xs text-gray-400 mt-0.5">Source: {p.sourceType}</p>}
+                  </div>
+                  <StatusBadge status={p.status ?? "completed"} />
+                </div>
               </div>
             ))
           )}

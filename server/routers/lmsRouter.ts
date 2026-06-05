@@ -3319,7 +3319,12 @@ export const lmsGroupRouter = router({
   getMyInstructorCourses: protectedProcedure
     .query(async ({ ctx }) => {
       const db = await getDb();
-      // Get all courses where this user is assigned as instructor
+
+      // Strategy: look up courses from TWO sources:
+      // 1. instructor_course_permissions (instructorId = users.id) — explicit edit permissions
+      // 2. lms_course_instructors via lms_instructors profile link (user_id -> instructor profile -> course assignments)
+
+      // Source 1: instructor_course_permissions (direct user.id reference)
       const perms = await db.select({
         permId: instructorCoursePermissions.id,
         courseId: instructorCoursePermissions.courseId,
@@ -3332,12 +3337,70 @@ export const lmsGroupRouter = router({
         .from(instructorCoursePermissions)
         .leftJoin(lmsCourses, eq(lmsCourses.id, instructorCoursePermissions.courseId))
         .where(eq(instructorCoursePermissions.instructorId, ctx.user.id));
-      // Get revenue share for each course
-      const enriched = await Promise.all(perms.map(async (p) => {
-        const [share] = await db.select({ revenueSharePct: lmsCourseInstructors.revenueSharePct })
+
+      // Source 2: lms_course_instructors via lms_instructors profile (user_id link)
+      const instructorProfiles = await db.select({ id: lmsInstructors.id })
+        .from(lmsInstructors)
+        .where(and(eq(lmsInstructors.userId, ctx.user.id), eq(lmsInstructors.isActive, true)));
+
+      const permCourseIds = new Set(perms.map(p => p.courseId));
+      let profileCourses: typeof perms = [];
+
+      if (instructorProfiles.length > 0) {
+        const profileId = instructorProfiles[0].id;
+        const ciRows = await db.select({
+          courseId: lmsCourseInstructors.courseId,
+          revenueSharePct: lmsCourseInstructors.revenueSharePct,
+        })
           .from(lmsCourseInstructors)
-          .where(and(eq(lmsCourseInstructors.courseId, p.courseId!), eq(lmsCourseInstructors.instructorId, ctx.user.id)))
-          .limit(1);
+          .where(eq(lmsCourseInstructors.instructorId, profileId));
+
+        // Only include courses not already in perms
+        const extraCourseIds = ciRows.filter(r => !permCourseIds.has(r.courseId)).map(r => r.courseId);
+        if (extraCourseIds.length > 0) {
+          const courses = await db.select({
+            id: lmsCourses.id,
+            title: lmsCourses.title,
+            status: lmsCourses.status,
+            slug: lmsCourses.slug,
+            thumbnailUrl: lmsCourses.thumbnailUrl,
+          })
+            .from(lmsCourses)
+            .where(sql`${lmsCourses.id} IN (${sql.join(extraCourseIds.map(id => sql`${id}`), sql`, `)})`);
+
+          profileCourses = courses.map(c => ({
+            permId: null as any,
+            courseId: c.id,
+            canSelfPublish: false,
+            courseTitle: c.title,
+            courseStatus: c.status,
+            courseSlug: c.slug,
+            courseThumbnail: c.thumbnailUrl,
+          }));
+        }
+      }
+
+      const allCourses = [...perms, ...profileCourses];
+
+      // Determine instructor profile ID for revenue share lookups
+      const profileId = instructorProfiles.length > 0 ? instructorProfiles[0].id : null;
+
+      // Get revenue share for each course
+      const enriched = await Promise.all(allCourses.map(async (p) => {
+        // Try looking up revenue share by profile ID first, then by user ID
+        let share: { revenueSharePct: number } | undefined;
+        if (profileId) {
+          [share] = await db.select({ revenueSharePct: lmsCourseInstructors.revenueSharePct })
+            .from(lmsCourseInstructors)
+            .where(and(eq(lmsCourseInstructors.courseId, p.courseId!), eq(lmsCourseInstructors.instructorId, profileId)))
+            .limit(1);
+        }
+        if (!share) {
+          [share] = await db.select({ revenueSharePct: lmsCourseInstructors.revenueSharePct })
+            .from(lmsCourseInstructors)
+            .where(and(eq(lmsCourseInstructors.courseId, p.courseId!), eq(lmsCourseInstructors.instructorId, ctx.user.id)))
+            .limit(1);
+        }
         // Get latest publish request status
         const [latestReq] = await db.select({
           id: instructorPublishRequests.id,

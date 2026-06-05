@@ -782,7 +782,7 @@ function MyContentTab() {
   // Auto-select first non-empty tab once data loads
   useEffect(() => {
     if (!data || autoTabSet) return;
-    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "webinars", "products", "bundles", "memberships", "communities", "purchases"];
+    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "purchases", "webinars", "products", "bundles", "memberships", "communities"];
     const counts: Record<ContentSubTab, number> = {
       courses:      data.courses?.length ?? 0,
       quizzes:      data.quizzes?.length ?? 0,
@@ -807,30 +807,30 @@ function MyContentTab() {
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: data?.courses.length ?? 0 },
     { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: data?.quizzes.length ?? 0 },
     { key: "downloads",    label: "Downloads",    icon: Download,       count: data?.downloads.length ?? 0 },
+    { key: "purchases",    label: "Purchases",    icon: ShoppingCart,   count: data?.funnelPurchases?.length ?? 0 },
     { key: "webinars",     label: "Webinars",     icon: Video,          count: data?.webinars?.length ?? 0 },
     { key: "products",     label: "Products",     icon: Package,        count: data?.physicalProducts.length ?? 0 },
     { key: "bundles",      label: "Bundles",      icon: Layers,         count: data?.bundles?.length ?? 0 },
     { key: "memberships",  label: "Memberships",  icon: Star,           count: 0 },
     { key: "communities",  label: "Communities",  icon: Users,          count: data?.communities?.length ?? 0 },
-    { key: "purchases",    label: "Purchases",    icon: ShoppingCart,   count: data?.funnelPurchases?.length ?? 0 },
   ];
 
   return (
     <div className="space-y-6">
       {/* Sub-tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
+      <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 w-full flex-nowrap overflow-x-auto">
         {subTabs.map(t => (
           <button
             key={t.key}
             onClick={() => setContentTab(t.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
               contentTab === t.key ? "bg-white text-[#189aa1] shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            <t.icon className="w-3.5 h-3.5" />
+            <t.icon className="w-3 h-3 flex-shrink-0" />
             {t.label}
             {t.count > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+              <span className={`text-[10px] px-1 py-0.5 rounded-full font-semibold ${
                 contentTab === t.key ? "bg-[#189aa1]/10 text-[#189aa1]" : "bg-gray-200 text-gray-500"
               }`}>{t.count}</span>
             )}
