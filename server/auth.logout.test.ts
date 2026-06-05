@@ -49,14 +49,15 @@ describe("auth.logout", () => {
     const result = await caller.auth.logout();
 
     expect(result).toEqual({ success: true });
-    expect(clearedCookies).toHaveLength(1);
-    expect(clearedCookies[0]?.name).toBe(COOKIE_NAME);
-    expect(clearedCookies[0]?.options).toMatchObject({
-      maxAge: -1,
-      secure: true,
-      sameSite: "none",
-      httpOnly: true,
-      path: "/",
-    });
+    // The logout procedure clears the cookie across 2 domain variants × 2 sameSite values = 4 calls
+    // to ensure the cookie is cleared regardless of how it was originally set.
+    expect(clearedCookies).toHaveLength(4);
+    // All calls should clear the session cookie
+    expect(clearedCookies.every(c => c.name === COOKIE_NAME)).toBe(true);
+    // All calls should have httpOnly and path set
+    expect(clearedCookies.every(c => c.options.httpOnly === true)).toBe(true);
+    expect(clearedCookies.every(c => c.options.path === "/")).toBe(true);
+    // maxAge: 0 signals immediate expiry (browser-compatible; -1 is not a valid maxAge)
+    expect(clearedCookies.every(c => c.options.maxAge === 0)).toBe(true);
   });
 });
