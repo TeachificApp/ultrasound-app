@@ -48,3 +48,9 @@ The server starts on port 3000 (auto-scans for next available port if busy). No 
 - App routes: `client/src/App.tsx`
 - Vite config: `vite.config.ts`
 - Test config: `vitest.config.ts` (tests only in `server/**/*.test.ts`)
+
+### General Form Builder — results table
+
+- **Admin-only fields**: Set via the field editor (`extraConfig.adminOnly`). Hidden on public forms; editable in the Results tab only.
+- **Saved filters & form actions**: Configured in Settings → “Results Table Filters & Actions”; persisted under `themeSettings._resultsSettings` (preserved when saving theme).
+- **Bulk operations**: Results tab supports multi-select, bulk field edit, and bulk delete via `generalForm.bulkUpdateSubmissions` / `bulkDeleteSubmissions`.
