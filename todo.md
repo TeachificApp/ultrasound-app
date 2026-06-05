@@ -4687,3 +4687,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix Trophy icon not imported in GeneralFormBuilder causing crash on /admin/general-forms
 - [x] Fix instructor portal showing no courses even when user profile is linked to instructor profile and listed as instructor on courses
 - [x] Fix logout not working - signing out signs user right back in, and incognito window shows user still logged in
+- [x] Split Subscriptions tab into "App Subscriptions" and "Learn Subscriptions" with manage/cancel
+- [x] Purchases tab shows all one-time transactions + subscription invoice payments from Stripe (unified payment history)

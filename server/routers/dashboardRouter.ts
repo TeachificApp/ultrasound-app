@@ -513,4 +513,135 @@ export const dashboardRouter = router({
 
     return certs;
   }),
+
+  // ── Purchases (all one-time transactions + subscription invoice payments) ────
+
+  getMyPurchases: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+    // 1. Funnel / embedded-checkout purchases (one-time)
+    const funnelRows = await db
+      .select({
+        id: funnelPurchases.id,
+        productName: funnelPurchases.productName,
+        productType: funnelPurchases.productType,
+        amountPaid: funnelPurchases.amountPaid,
+        currency: funnelPurchases.currency,
+        purchasedAt: funnelPurchases.purchasedAt,
+        orderBumps: funnelPurchases.orderBumps,
+        status: funnelPurchases.status,
+        sourceType: funnelPurchases.sourceType,
+      })
+      .from(funnelPurchases)
+      .where(eq(funnelPurchases.userId, ctx.user.id))
+      .orderBy(desc(funnelPurchases.purchasedAt));
+
+    // 2. LMS orders (one-time course purchases — exclude subscription orders)
+    const oneTimeOrders = await db
+      .select({
+        id: lmsOrders.id,
+        courseTitle: lmsCourses.title,
+        amount: lmsOrders.amount,
+        currency: lmsOrders.currency,
+        status: lmsOrders.status,
+        createdAt: lmsOrders.createdAt,
+      })
+      .from(lmsOrders)
+      .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
+      .where(and(eq(lmsOrders.userId, ctx.user.id), eq(lmsOrders.status, "paid")))
+      .orderBy(desc(lmsOrders.createdAt));
+
+    // 3. Fetch Stripe payment history for subscription invoices
+    // Find all stripeCustomerIds associated with this user
+    const membershipRows = await db
+      .select({ stripeCustomerId: brandMemberships.stripeCustomerId })
+      .from(brandMemberships)
+      .where(eq(brandMemberships.userId, ctx.user.id));
+
+    const customerIds = [...new Set(
+      membershipRows.map(m => m.stripeCustomerId).filter(Boolean) as string[]
+    )];
+
+    // Fetch recent paid invoices from Stripe for these customers
+    let stripeInvoices: Array<{
+      id: string;
+      description: string;
+      amount: number;
+      currency: string;
+      date: Date;
+      type: "subscription_payment";
+      invoiceUrl: string | null;
+    }> = [];
+
+    for (const custId of customerIds) {
+      try {
+        const invoices = await stripe.invoices.list({
+          customer: custId,
+          status: "paid",
+          limit: 50,
+        });
+        for (const inv of invoices.data) {
+          stripeInvoices.push({
+            id: inv.id,
+            description: inv.lines?.data?.[0]?.description ?? inv.description ?? "Subscription payment",
+            amount: inv.amount_paid,
+            currency: inv.currency,
+            date: new Date((inv.status_transitions?.paid_at ?? inv.created) * 1000),
+            type: "subscription_payment",
+            invoiceUrl: inv.hosted_invoice_url ?? null,
+          });
+        }
+      } catch (err) {
+        console.warn("[Dashboard] Failed to fetch Stripe invoices for customer:", custId, err);
+      }
+    }
+
+    // Combine all into a unified timeline
+    const allPurchases = [
+      ...funnelRows.map(p => ({
+        id: `funnel-${p.id}`,
+        description: p.productName,
+        type: "one_time" as const,
+        productType: p.productType,
+        amount: p.amountPaid,
+        currency: p.currency,
+        date: p.purchasedAt,
+        status: p.status,
+        sourceType: p.sourceType,
+        orderBumps: p.orderBumps,
+        invoiceUrl: null as string | null,
+      })),
+      ...oneTimeOrders
+        .filter(o => !membershipRows.length || true) // include all one-time orders
+        .map(o => ({
+          id: `order-${o.id}`,
+          description: o.courseTitle ?? "Course Purchase",
+          type: "one_time" as const,
+          productType: "course" as const,
+          amount: o.amount,
+          currency: o.currency,
+          date: o.createdAt,
+          status: o.status,
+          sourceType: null as string | null,
+          orderBumps: null as string | null,
+          invoiceUrl: null as string | null,
+        })),
+      ...stripeInvoices.map(inv => ({
+        id: `invoice-${inv.id}`,
+        description: inv.description,
+        type: "subscription_payment" as const,
+        productType: "subscription" as const,
+        amount: inv.amount,
+        currency: inv.currency,
+        date: inv.date,
+        status: "paid" as const,
+        sourceType: null as string | null,
+        orderBumps: null as string | null,
+        invoiceUrl: inv.invoiceUrl,
+      })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return allPurchases;
+  }),
 });

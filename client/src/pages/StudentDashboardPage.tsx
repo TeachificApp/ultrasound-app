@@ -1039,37 +1039,56 @@ function MyContentTab() {
 // ─── Purchases Tab (top-level) ───────────────────────────────────────────────
 
 function PurchasesTab() {
-  const { data, isLoading } = trpc.dashboard.getMyContent.useQuery();
+  const { data, isLoading } = trpc.dashboard.getMyPurchases.useQuery();
   const [receiptPurchase, setReceiptPurchase] = useState<any | null>(null);
 
   if (isLoading) return <LoadingSpinner />;
 
-  const purchases = data?.funnelPurchases ?? [];
+  const purchases = data ?? [];
 
   return (
     <div className="space-y-6">
       {purchases.length === 0 ? (
-        <EmptyState icon={ShoppingCart} title="No purchases yet" description="Complete a checkout to see your purchases here." />
+        <EmptyState icon={ShoppingCart} title="No purchases yet" description="Your payment history will appear here." />
       ) : (
         <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
           {purchases.map((p: any) => (
             <div key={p.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm text-gray-900 truncate">{p.productName}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{formatDate(p.purchasedAt)}</p>
+                <p className="font-medium text-sm text-gray-900 truncate">{p.description}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{formatDate(p.date)}</p>
               </div>
               <div className="flex items-center gap-3 ml-4 shrink-0">
-                <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amountPaid, p.currency)}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">
-                  {p.productType === "download" ? "Digital Download" : p.productType === "course" ? "Course" : p.productType === "quiz" ? "Quiz" : p.productType ? p.productType.charAt(0).toUpperCase() + p.productType.slice(1) : "Purchase"}
+                <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amount, p.currency)}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  p.type === "subscription_payment" ? "bg-purple-50 text-purple-700" : "bg-teal-50 text-teal-700"
+                }`}>
+                  {p.type === "subscription_payment" ? "Subscription" :
+                    p.productType === "download" ? "Digital Download" :
+                    p.productType === "course" ? "Course" :
+                    p.productType === "quiz" ? "Quiz" :
+                    p.productType ? p.productType.charAt(0).toUpperCase() + p.productType.slice(1) : "Purchase"}
                 </span>
-                <button
-                  onClick={() => setReceiptPurchase(p)}
-                  className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  Receipt
-                </button>
+                {p.invoiceUrl && (
+                  <a
+                    href={p.invoiceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Invoice
+                  </a>
+                )}
+                {p.type === "one_time" && (
+                  <button
+                    onClick={() => setReceiptPurchase(p)}
+                    className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Receipt
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -1088,10 +1107,10 @@ function PurchasesTab() {
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-semibold text-gray-900">{receiptPurchase.productName}</p>
+                    <p className="font-semibold text-gray-900">{receiptPurchase.description}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{receiptPurchase.productType === "download" ? "Digital Download" : receiptPurchase.productType === "course" ? "Course" : receiptPurchase.productType === "quiz" ? "Quiz" : receiptPurchase.productType ? receiptPurchase.productType.charAt(0).toUpperCase() + receiptPurchase.productType.slice(1) : "Purchase"}</p>
                   </div>
-                  <span className="text-sm font-bold text-gray-900">{formatCurrency(receiptPurchase.amountPaid, receiptPurchase.currency)}</span>
+                  <span className="text-sm font-bold text-gray-900">{formatCurrency(receiptPurchase.amount, receiptPurchase.currency)}</span>
                 </div>
                 {receiptPurchase.orderBumps && (() => {
                   try {
@@ -1116,13 +1135,13 @@ function PurchasesTab() {
                 })()}
                 <div className="border-t border-gray-200 pt-3 flex justify-between">
                   <span className="text-sm font-semibold text-gray-700">Total Paid</span>
-                  <span className="text-sm font-bold text-teal-700">{formatCurrency(receiptPurchase.amountPaid, receiptPurchase.currency)}</span>
+                  <span className="text-sm font-bold text-teal-700">{formatCurrency(receiptPurchase.amount, receiptPurchase.currency)}</span>
                 </div>
               </div>
               <div className="text-xs text-gray-500 space-y-1">
                 <div className="flex justify-between">
                   <span>Date</span>
-                  <span>{formatDate(receiptPurchase.purchasedAt)}</span>
+                  <span>{formatDate(receiptPurchase.date)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Status</span>
@@ -1194,21 +1213,21 @@ function SubscriptionsTab() {
 
   return (
     <div className="space-y-8">
-      {/* ── Brand Memberships ── */}
+      {/* ── App Subscriptions (UltrasoundAssist Premium / EchoAssist Premium) ── */}
       {memberships.length > 0 && (
         <div className="space-y-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-px flex-1 bg-gray-100" />
+            <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border bg-teal-50 text-teal-700 border-teal-200">
+              App Subscriptions
+            </span>
+            <div className="h-px flex-1 bg-gray-100" />
+          </div>
           {Object.entries(byBrand).map(([brand, subs]) => {
             const brandCfg = BRAND_CONFIG[brand] ?? { label: brand, color: "#6b7280", bg: "bg-gray-50", border: "border-gray-200" };
             return (
               <div key={brand}>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="h-px flex-1 bg-gray-100" />
-                  <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border"
-                    style={{ color: brandCfg.color, background: brandCfg.bg, borderColor: brandCfg.color + "40" }}>
-                    {brandCfg.label}
-                  </span>
-                  <div className="h-px flex-1 bg-gray-100" />
-                </div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 ml-1">{brandCfg.label}</p>
 
                 <div className="space-y-4">
                   {subs.map(sub => {
@@ -1301,13 +1320,13 @@ function SubscriptionsTab() {
         </div>
       )}
 
-      {/* ── Course Subscriptions ── */}
+      {/* ── Learn Subscriptions (courses, quizzes, downloads, products, etc.) ── */}
       {courseSubscriptions.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-4">
             <div className="h-px flex-1 bg-gray-100" />
-            <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border bg-teal-50 text-teal-700 border-teal-200">
-              Course Subscriptions
+            <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+              Learn Subscriptions
             </span>
             <div className="h-px flex-1 bg-gray-100" />
           </div>
