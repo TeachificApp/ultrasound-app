@@ -4689,3 +4689,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix logout not working - signing out signs user right back in, and incognito window shows user still logged in
 - [x] Split Subscriptions tab into "App Subscriptions" and "Learn Subscriptions" with manage/cancel
 - [x] Purchases tab shows all one-time transactions + subscription invoice payments from Stripe (unified payment history)
+- [x] Add "Preview as Student" link to Lesson Content Editor that opens student view in a new tab

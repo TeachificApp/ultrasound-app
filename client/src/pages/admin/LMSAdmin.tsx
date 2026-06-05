@@ -3948,6 +3948,7 @@ function CopyModuleDialog({
 
 function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndClose, prevLesson, nextLesson, onNavigateLesson }: { lesson: any; onClose: () => void; onSaved: () => void; onSavedAndClose?: () => void; prevLesson?: any; nextLesson?: any; onNavigateLesson?: (lesson: any) => void }) {
   const blockEditorRef = React.useRef<import('@/components/LessonBlockEditor').LessonBlockEditorHandle>(null);
+  const { openLearnLink } = useLearnLink();
   // Fetch the FULL lesson record (including contentBlocks, content, videoContent).
   // The course list view intentionally strips heavy columns for performance, so we
   // must re-fetch the full row here before the editor can render existing blocks.
@@ -4135,6 +4136,17 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             {(headerSaving || update.isPending) ? "Saving..." : "Save & Close"}
           </Button>
         </div>
+        {/* Preview as Student — opens lesson in new tab */}
+        {courseData?.slug && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs text-teal-600 border-teal-300 hover:bg-teal-50 shrink-0"
+            onClick={() => openLearnLink(`/courses/${courseData.slug}/player?lesson=${lesson.id}&preview=student`)}
+          >
+            <Eye className="w-3 h-3 mr-1" /> Preview as Student
+          </Button>
+        )}
         {/* Tab switcher — always rendered with fixed width so prev/next never shift */}
         <div className="flex gap-1 shrink-0">
           <button
