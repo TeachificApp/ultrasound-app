@@ -3395,10 +3395,6 @@ export const digitalBundlePurchases = mysqlTable("digital_bundle_purchases", {
   userId: int("user_id").notNull(),
   bundleId: int("bundle_id").notNull(),
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
-  purchaseType: mysqlEnum("purchase_type", ["one_time", "subscription"]).default("one_time").notNull(),
-  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
-  subscriptionStatus: varchar("subscription_status", { length: 50 }),
-  subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end"),
   purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
 });
 export type DigitalBundlePurchase = typeof digitalBundlePurchases.$inferSelect;

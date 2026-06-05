@@ -4690,7 +4690,3 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Split Subscriptions tab into "App Subscriptions" and "Learn Subscriptions" with manage/cancel
 - [x] Purchases tab shows all one-time transactions + subscription invoice payments from Stripe (unified payment history)
 - [x] Add "Preview as Student" link to Lesson Content Editor that opens student view in a new tab
-
-## Admin Pages & User Access Fixes (Jun 2026)
-- [x] Fix blank admin pages — added Suspense wrappers to all 88 lazy-loaded admin components across all routers (Router, LMSRouter, IHeartEchoRouter, AccreditationDivisionRouter)
-- [x] Link agonxxa125@gmail.com (Angelica Gonzalez, userId=5610078) to her Stripe transaction — created lms_enrollment 510001 for course 390001 (Breast Ultrasound Registry Review Quiz), updated lms_order 450002 with stripe_session_id and stripe_subscription_id, marked duplicate order 450001 as failed
