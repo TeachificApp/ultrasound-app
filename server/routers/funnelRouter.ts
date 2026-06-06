@@ -10,6 +10,8 @@ import { getDb, getOrCreateUserByEmail } from "../db";
 import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql, inArray, or, like, isNotNull } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
+import { computeFunnelCheckoutTotalCents } from "../lib/checkoutPricing";
+import { getStripeClient } from "../lib/stripeClient";
 
 function slugify(text: string): string {
   return text
@@ -618,7 +620,7 @@ export const funnelRouter = router({
             product_data: {
               name: page.customPriceLabel || page.title || "Funnel Product",
             },
-            unit_amount: Math.round(Number(page.customPrice) * 100),
+            unit_amount: Math.round(Number(page.customPrice)),
           },
           quantity: 1,
         });
@@ -628,8 +630,7 @@ export const funnelRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "No product configured for this page" });
       }
 
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       // Find thank you page for success redirect
       const allPages = await db.select().from(funnelPages)
@@ -641,28 +642,22 @@ export const funnelRouter = router({
         : `${input.origin}/${funnel.slug}/${page.slug}?success=1`;
       const cancelUrl = `${input.origin}/${funnel.slug}/${page.slug}`;
 
-      const funnelCheckoutMeta = {
-          type: "funnel_purchase",
-          funnel_id: funnel.id.toString(),
-          funnel_page_id: page.id.toString(),
-          user_id: ctx.user.id.toString(),
-          customer_email: ctx.user.email ?? "",
-        };
-
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,
         client_reference_id: ctx.user.id.toString(),
         allow_promotion_codes: true,
         line_items: lineItems,
-        metadata: funnelCheckoutMeta,
-        payment_intent_data: { metadata: funnelCheckoutMeta },
+        metadata: {
+          type: "funnel_purchase",
+          funnel_id: funnel.id.toString(),
+          funnel_page_id: page.id.toString(),
+          user_id: ctx.user.id.toString(),
+          customer_email: ctx.user.email ?? "",
+        },
         success_url: successUrl,
         cancel_url: cancelUrl,
       });
-
-      // Track conversion
-      await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${page.id}`);
       return { checkoutUrl: session.url };
     }),
 
@@ -1128,7 +1123,7 @@ export const funnelPublicRouter = router({
           price_data: {
             currency: "usd",
             product_data: { name: selectedProduct.name, description: selectedProduct.description || undefined },
-            unit_amount: Math.round(Number(selectedProduct.price) * 100),
+            unit_amount: Math.round(Number(selectedProduct.price)),
           },
           quantity: 1,
         },
@@ -1142,15 +1137,14 @@ export const funnelPublicRouter = router({
             price_data: {
               currency: "usd",
               product_data: { name: bump.title, description: bump.headline || undefined },
-              unit_amount: Math.round(Number(bump.price) * 100),
+              unit_amount: Math.round(Number(bump.price)),
             },
             quantity: 1,
           });
         }
       }
 
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       // Find thank you page for success redirect
       const allPages = await db.select().from(funnelPages)
@@ -1168,14 +1162,16 @@ export const funnelPublicRouter = router({
       const successUrl = resolveSuccessUrl(successRedirect);
       const cancelUrl = `${input.origin}/${funnel.slug}/${page.slug}`;
 
-      const funnelFormMeta = {
+      const funnelCheckoutMetadata = {
           type: "funnel_form_purchase",
           funnel_id: funnel.id.toString(),
           funnel_page_id: page.id.toString(),
           customer_email: input.email,
           customer_name: `${input.firstName || ""} ${input.lastName || ""}`.trim(),
           customer_phone: input.phone || "",
-          bumps_added: input.addedBumpIndexes.join(","),
+          bumps_added: input.addedBumpIndexes.length > 0 ? "1" : "",
+          bump_titles: input.addedBumpIndexes.map(i => orderBumps[i]?.title ?? "").join("|").slice(0, 490),
+          bump_prices: input.addedBumpIndexes.map(i => orderBumps[i]?.price ?? 0).join("|").slice(0, 490),
           user_id: ctx.user?.id?.toString() || "",
           product_name: selectedProduct.name?.slice(0, 490) ?? "",
           product_type: selectedProduct.productType ?? selectedProduct.type ?? "other",
@@ -1189,8 +1185,8 @@ export const funnelPublicRouter = router({
         customer_email: input.email,
         allow_promotion_codes: true,
         line_items: lineItems,
-        metadata: funnelFormMeta,
-        payment_intent_data: { metadata: funnelFormMeta },
+        metadata: funnelCheckoutMetadata,
+        payment_intent_data: { metadata: funnelCheckoutMetadata },
         success_url: successUrl,
         cancel_url: cancelUrl,
       });
@@ -1218,9 +1214,6 @@ export const funnelPublicRouter = router({
         userAgent: ua || null,
         sourcePage: input.origin ? `${input.origin}/${funnel.slug}/${page.slug}` : null,
       });
-
-      // Track conversion
-      await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${page.id}`);
       return { checkoutUrl: session.url };
     }),
 
@@ -1272,15 +1265,15 @@ export const funnelPublicRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid product selection" });
       }
 
-      // Calculate total amount in dollars
-      let totalAmount = Number(selectedProduct.price);
+      const { totalCents: serverTotalCents } = computeFunnelCheckoutTotalCents(checkoutBlock, {
+        selectedProductIndex: input.selectedProductIndex,
+        addedBumpIndexes: input.addedBumpIndexes,
+      });
+      let totalAmountCents = serverTotalCents;
       const bumpDetails: string[] = [];
       for (const bumpIdx of input.addedBumpIndexes) {
         const bump = orderBumps[bumpIdx];
-        if (bump && bump.price > 0) {
-          totalAmount += Number(bump.price);
-          bumpDetails.push(bump.title);
-        }
+        if (bump && bump.price > 0) bumpDetails.push(bump.title);
       }
 
       // ── FREE PRODUCT PATH ($0 total) ────────────────────────────────────────
@@ -1299,7 +1292,7 @@ export const funnelPublicRouter = router({
       };
       const successUrl = resolveSuccessUrl2(successRedirectRaw);
 
-      if (totalAmount === 0) {
+      if (totalAmountCents === 0) {
         // Free product — bypass Stripe entirely
         const customerName = `${input.firstName || ""} ${input.lastName || ""}`.trim();
         const brandMode = (checkoutBlock.data?.brandMode as string) || "aaus";
@@ -1410,9 +1403,6 @@ export const funnelPublicRouter = router({
           }
         }
 
-        // 5. Track conversion
-        await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${page.id}`);
-
         // 6. Send purchase confirmation email
         try {
           const { sendEmail, buildFunnelPurchaseConfirmationEmail } = await import("../_core/email");
@@ -1445,23 +1435,20 @@ export const funnelPublicRouter = router({
       }
       // ── END FREE PRODUCT PATH ────────────────────────────────────────────────
 
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       // Apply promo code discount if provided
-      let discountApplied = 0;
       if (input.promoCode) {
         try {
           const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode, active: true, limit: 1 });
           if (promoCodes.data.length > 0) {
             const coupon = promoCodes.data[0].coupon;
             if (coupon.percent_off) {
-              discountApplied = totalAmount * (coupon.percent_off / 100);
+              totalAmountCents -= Math.round(totalAmountCents * (coupon.percent_off / 100));
             } else if (coupon.amount_off) {
-              // amount_off from Stripe is in cents — convert to dollars
-              discountApplied = Math.min(coupon.amount_off / 100, totalAmount);
+              totalAmountCents -= Math.min(coupon.amount_off, totalAmountCents);
             }
-            totalAmount = Math.max(0.50, totalAmount - discountApplied);
+            totalAmountCents = Math.max(50, totalAmountCents);
           } else {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired promo code" });
           }
@@ -1470,9 +1457,11 @@ export const funnelPublicRouter = router({
         }
       }
 
-      if (totalAmount < 0.50) {
+      if (totalAmountCents < 50) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
       }
+
+      const totalAmount = totalAmountCents / 100;
       // Build description for the payment
       let description = selectedProduct.name;
       if (bumpDetails.length > 0) {
@@ -1481,7 +1470,7 @@ export const funnelPublicRouter = router({
 
       // Create PaymentIntent (Stripe requires amount in cents)
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(totalAmount * 100),
+        amount: totalAmountCents,
         currency: "usd",
         description,
         receipt_email: input.email,
@@ -1684,8 +1673,7 @@ export const funnelPublicRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       // ── Resolve product details ──────────────────────────────────────────────
       let productName = "";
       let unitAmount = 0; // in cents
@@ -1726,18 +1714,6 @@ export const funnelPublicRouter = router({
       // ── Build Stripe session ─────────────────────────────────────────────────
       const successUrl = `${input.origin}/my-dashboard?purchase=success&product=${encodeURIComponent(productName)}`;
       const cancelUrl = `${input.origin}`;
-      const quickCheckoutMeta = {
-        type: "funnel_form_purchase",
-        product_type: input.productType,
-        product_id: input.productId.toString(),
-        product_name: productName.slice(0, 490),
-        customer_email: input.email ?? "",
-        funnel_id: input.funnelId?.toString() ?? "",
-        funnel_page_id: input.pageId?.toString() ?? "",
-        user_id: ctx.user?.id?.toString() ?? "",
-        success_url: successUrl.slice(0, 490),
-        ...(input.productType === "course" ? { fulfillment_course_id: input.productId.toString() } : {}),
-      };
       const sessionParams: any = {
         mode: "payment",
         allow_promotion_codes: true,
@@ -1745,12 +1721,21 @@ export const funnelPublicRouter = router({
           price_data: {
             currency,
             product_data: { name: productName },
-            unit_amount: Math.round(Number(unitAmount) * 100),
+            unit_amount: Math.round(Number(unitAmount)),
           },
           quantity: 1,
         }],
-        metadata: quickCheckoutMeta,
-        payment_intent_data: { metadata: quickCheckoutMeta },
+        metadata: {
+          type: "funnel_form_purchase",
+          product_type: input.productType,
+          product_id: input.productId.toString(),
+          product_name: productName.slice(0, 490),
+          customer_email: input.email ?? "",
+          funnel_id: input.funnelId?.toString() ?? "",
+          funnel_page_id: input.pageId?.toString() ?? "",
+          user_id: ctx.user?.id?.toString() ?? "",
+          success_url: successUrl.slice(0, 490),
+        },
         success_url: successUrl,
         cancel_url: cancelUrl,
       };
@@ -1766,10 +1751,6 @@ export const funnelPublicRouter = router({
         } catch { /* ignore promo code errors */ }
       }
       const session = await stripe.checkout.sessions.create(sessionParams);
-      // Track conversion on the funnel page if context provided
-      if (input.pageId) {
-        await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${input.pageId}`);
-      }
       return { checkoutUrl: session.url };
     }),
 });
@@ -2402,280 +2383,5 @@ export const funnelAdminRouter = router({
         }
       }
       return result;
-    }),
-
-  /** Global contacts/leads across all funnels with conversion status */
-  globalContacts: protectedProcedure
-    .input(z.object({
-      page: z.number().min(1).default(1),
-      pageSize: z.number().min(1).max(200).default(50),
-      search: z.string().optional(),
-      funnelId: z.number().optional(),
-      conversionStatus: z.enum(["all", "lead", "registered", "purchaser"]).default("all"),
-    }))
-    .query(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      // Build WHERE conditions
-      const conditions: ReturnType<typeof eq>[] = [];
-      if (input.funnelId) conditions.push(eq(funnelLeads.funnelId, input.funnelId));
-
-      // Get all leads with funnel name and user match
-      const rows = await db
-        .select({
-          id: funnelLeads.id,
-          email: funnelLeads.email,
-          name: funnelLeads.name,
-          phone: funnelLeads.phone,
-          source: funnelLeads.source,
-          tags: funnelLeads.tags,
-          funnelId: funnelLeads.funnelId,
-          funnelName: funnels.name,
-          userId: funnelLeads.userId,
-          createdAt: funnelLeads.createdAt,
-          userCreatedAt: users.createdAt,
-        })
-        .from(funnelLeads)
-        .leftJoin(funnels, eq(funnelLeads.funnelId, funnels.id))
-        .leftJoin(users, eq(funnelLeads.userId, users.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(funnelLeads.createdAt));
-
-      // Check purchaser status for each lead by email
-      const emails = [...new Set(rows.map(r => r.email).filter(Boolean))];
-      let purchaserEmails = new Set<string>();
-      if (emails.length > 0) {
-        const purchasers = await db
-          .select({ email: users.email })
-          .from(users)
-          .where(and(
-            inArray(users.email, emails),
-            or(
-              isNotNull(
-                db.select({ id: lmsOrders.id }).from(lmsOrders).where(eq(lmsOrders.userId, users.id)).limit(1)
-              ),
-              isNotNull(
-                db.select({ id: digitalPurchases.id }).from(digitalPurchases).where(eq(digitalPurchases.userId, users.id)).limit(1)
-              )
-            )
-          ));
-        purchaserEmails = new Set(purchasers.map(p => p.email).filter(Boolean) as string[]);
-      }
-
-      // Enrich with conversion status
-      const enriched = rows.map(r => {
-        let conversionStatus: "lead" | "registered" | "purchaser" = "lead";
-        if (r.userId) {
-          conversionStatus = purchaserEmails.has(r.email ?? "") ? "purchaser" : "registered";
-        }
-        return {
-          ...r,
-          conversionStatus,
-          registeredAt: r.userCreatedAt ?? null,
-        };
-      });
-
-      // Filter by conversion status
-      const filtered = input.conversionStatus === "all"
-        ? enriched
-        : enriched.filter(r => r.conversionStatus === input.conversionStatus);
-
-      // Apply search filter
-      const searched = input.search
-        ? filtered.filter(r =>
-            r.email?.toLowerCase().includes(input.search!.toLowerCase()) ||
-            r.name?.toLowerCase().includes(input.search!.toLowerCase()) ||
-            r.funnelName?.toLowerCase().includes(input.search!.toLowerCase())
-          )
-        : filtered;
-
-      // Deduplicate by email (keep most recent)
-      const seen = new Map<string, typeof searched[0]>();
-      for (const r of searched) {
-        const key = r.email ?? `id-${r.id}`;
-        if (!seen.has(key) || (r.createdAt && seen.get(key)!.createdAt && r.createdAt > seen.get(key)!.createdAt!)) {
-          seen.set(key, r);
-        }
-      }
-      const deduped = Array.from(seen.values());
-
-      // Paginate
-      const total = deduped.length;
-      const offset = (input.page - 1) * input.pageSize;
-      const contacts = deduped.slice(offset, offset + input.pageSize);
-
-      return { contacts, total };
-    }),
-
-  /** Conversion funnel metrics: Lead → Registered → Purchaser */
-  conversionFunnel: protectedProcedure
-    .input(z.object({ funnelId: z.number().optional() }))
-    .query(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      // Get all leads (optionally filtered by funnel)
-      const leadsQuery = db
-        .select({ email: funnelLeads.email, funnelId: funnelLeads.funnelId, funnelName: funnels.name, userId: funnelLeads.userId, createdAt: funnelLeads.createdAt })
-        .from(funnelLeads)
-        .leftJoin(funnels, eq(funnelLeads.funnelId, funnels.id));
-
-      const allLeads = input.funnelId
-        ? await leadsQuery.where(eq(funnelLeads.funnelId, input.funnelId))
-        : await leadsQuery;
-
-      // Unique emails
-      const uniqueEmails = [...new Set(allLeads.map(l => l.email).filter(Boolean))] as string[];
-      const totalLeads = uniqueEmails.length;
-
-      // Count registered users (have a user account)
-      const registeredRows = await db
-        .select({ email: users.email })
-        .from(users)
-        .where(inArray(users.email, uniqueEmails.length > 0 ? uniqueEmails : [""]))
-      const registeredEmails = new Set(registeredRows.map(r => r.email).filter(Boolean) as string[]);
-      const registeredUsers = registeredEmails.size;
-
-      // Count purchasers (have at least one order)
-      let purchaserCount = 0;
-      if (registeredEmails.size > 0) {
-        const userRows = await db
-          .select({ id: users.id, email: users.email })
-          .from(users)
-          .where(inArray(users.email, [...registeredEmails]));
-        const userIds = userRows.map(u => u.id);
-        if (userIds.length > 0) {
-          const [lmsOrderCount] = await db
-            .select({ count: sql<number>`COUNT(DISTINCT user_id)` })
-            .from(lmsOrders)
-            .where(inArray(lmsOrders.userId, userIds));
-          const [dpCount] = await db
-            .select({ count: sql<number>`COUNT(DISTINCT user_id)` })
-            .from(digitalPurchases)
-            .where(inArray(digitalPurchases.userId, userIds));
-          purchaserCount = Math.min(registeredUsers, (lmsOrderCount?.count ?? 0) + (dpCount?.count ?? 0));
-        }
-      }
-
-      // Per-funnel breakdown
-      const funnelMap = new Map<number, { funnelId: number; funnelName: string; emails: Set<string> }>();
-      for (const lead of allLeads) {
-        if (!lead.funnelId || !lead.email) continue;
-        if (!funnelMap.has(lead.funnelId)) {
-          funnelMap.set(lead.funnelId, { funnelId: lead.funnelId, funnelName: lead.funnelName ?? "Unknown", emails: new Set() });
-        }
-        funnelMap.get(lead.funnelId)!.emails.add(lead.email);
-      }
-
-      const byFunnel = await Promise.all([...funnelMap.values()].map(async f => {
-        const fEmails = [...f.emails];
-        const fRegistered = fEmails.filter(e => registeredEmails.has(e)).length;
-        const fUserRows = await db.select({ id: users.id }).from(users).where(inArray(users.email, fEmails.length > 0 ? fEmails : [""]));
-        const fUserIds = fUserRows.map(u => u.id);
-        let fPurchasers = 0;
-        if (fUserIds.length > 0) {
-          const [c1] = await db.select({ count: sql<number>`COUNT(DISTINCT user_id)` }).from(lmsOrders).where(inArray(lmsOrders.userId, fUserIds));
-          const [c2] = await db.select({ count: sql<number>`COUNT(DISTINCT user_id)` }).from(digitalPurchases).where(inArray(digitalPurchases.userId, fUserIds));
-          fPurchasers = Math.min(fRegistered, (c1?.count ?? 0) + (c2?.count ?? 0));
-        }
-        return {
-          funnelId: f.funnelId,
-          funnelName: f.funnelName,
-          leads: fEmails.length,
-          registered: fRegistered,
-          purchasers: fPurchasers,
-          registrationRate: fEmails.length > 0 ? Math.round((fRegistered / fEmails.length) * 100) : 0,
-          purchaseRate: fRegistered > 0 ? Math.round((fPurchasers / fRegistered) * 100) : 0,
-        };
-      }));
-
-      // Recent leads
-      const recentLeads = allLeads
-        .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
-        .slice(0, 10)
-        .map(l => ({ email: l.email, name: null as string | null, funnelName: l.funnelName, createdAt: l.createdAt }));
-
-      return {
-        totalLeads,
-        registeredUsers,
-        purchasers: purchaserCount,
-        leadToRegisteredRate: totalLeads > 0 ? Math.round((registeredUsers / totalLeads) * 100) : 0,
-        registeredToPurchaserRate: registeredUsers > 0 ? Math.round((purchaserCount / registeredUsers) * 100) : 0,
-        overallConversionRate: totalLeads > 0 ? Math.round((purchaserCount / totalLeads) * 100) : 0,
-        byFunnel,
-        recentLeads,
-      };
-    }),
-
-  /** Export all contacts as CSV */
-  exportAllContactsCSV: protectedProcedure
-    .input(z.object({ funnelId: z.number().optional() }))
-    .query(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const conditions: ReturnType<typeof eq>[] = [];
-      if (input.funnelId) conditions.push(eq(funnelLeads.funnelId, input.funnelId));
-
-      const rows = await db
-        .select({
-          id: funnelLeads.id,
-          email: funnelLeads.email,
-          name: funnelLeads.name,
-          phone: funnelLeads.phone,
-          source: funnelLeads.source,
-          tags: funnelLeads.tags,
-          funnelName: funnels.name,
-          userId: funnelLeads.userId,
-          createdAt: funnelLeads.createdAt,
-          userCreatedAt: users.createdAt,
-        })
-        .from(funnelLeads)
-        .leftJoin(funnels, eq(funnelLeads.funnelId, funnels.id))
-        .leftJoin(users, eq(funnelLeads.userId, users.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(funnelLeads.createdAt));
-
-      const emails = [...new Set(rows.map(r => r.email).filter(Boolean))] as string[];
-      let purchaserEmails = new Set<string>();
-      if (emails.length > 0) {
-        const purchaserUsers = await db
-          .select({ email: users.email, id: users.id })
-          .from(users)
-          .where(inArray(users.email, emails));
-        const purchaserUserIds = purchaserUsers.map(u => u.id);
-        if (purchaserUserIds.length > 0) {
-          const [c1] = await db.select({ count: sql<number>`COUNT(DISTINCT user_id)` }).from(lmsOrders).where(inArray(lmsOrders.userId, purchaserUserIds));
-          if ((c1?.count ?? 0) > 0) {
-            const pRows = await db.select({ userId: lmsOrders.userId }).from(lmsOrders).where(inArray(lmsOrders.userId, purchaserUserIds));
-            const pUserIds = new Set(pRows.map(r => r.userId));
-            purchaserEmails = new Set(purchaserUsers.filter(u => pUserIds.has(u.id)).map(u => u.email).filter(Boolean) as string[]);
-          }
-        }
-      }
-
-      const header = "ID,Email,Name,Phone,Funnel,Status,Source,Tags,Lead Captured,Registered At";
-      const csvRows = rows.map(r => {
-        const status = r.userId ? (purchaserEmails.has(r.email ?? "") ? "purchaser" : "registered") : "lead";
-        const escape = (v: string | null | undefined) => `"${(v ?? "").replace(/"/g, '""')}"`;
-        return [
-          r.id,
-          escape(r.email),
-          escape(r.name),
-          escape(r.phone),
-          escape(r.funnelName),
-          status,
-          escape(r.source),
-          escape(r.tags),
-          r.createdAt ? new Date(r.createdAt).toISOString() : "",
-          r.userCreatedAt ? new Date(r.userCreatedAt).toISOString() : "",
-        ].join(",");
-      });
-
-      return { csvContent: [header, ...csvRows].join("\n"), total: rows.length };
     }),
 });

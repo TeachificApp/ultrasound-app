@@ -8,27 +8,24 @@
  *   https://buy.stripe.com/7sYcN475Lcs94Nm3hH9R604
  *
  * When a payment completes, this webhook:
- *  1. Verifies the Stripe signature (if getStripeWebhookSecret() is set)
+ *  1. Verifies the Stripe signature (if STRIPE_WEBHOOK_SECRET is set)
  *  2. Identifies the buyer by email
  *  3. Marks hasConcierge = true on their diySubscription
  *  4. Sends an owner notification via notifyOwner()
  *  5. Logs the event to webhookEvents table
  */
-import express, { type Express, type Request, type Response } from "express";
+import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, pendingFulfillments, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, communityMembers, bundles, bundleItems, bundleEnrollments, webinarRegistrations, funnelPages } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
-import { createPendingFulfillmentRecord, executeFulfillment, getCourseSlug } from "../lib/fulfillmentEngine";
 
 // Stripe webhook secret — optional but strongly recommended in production
-function getStripeWebhookSecret(): string {
-  return process.env.STRIPE_WEBHOOK_SECRET ?? "";
-}
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
 
 // Stripe Concierge product price ID (from the payment link)
 const CONCIERGE_PRICE_ID = "price_concierge_4997"; // update if Stripe price ID is known
@@ -155,12 +152,17 @@ async function handleMembershipCheckoutCompleted(session: Record<string, unknown
   // Get plan info for notification
   const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.id, planId)).limit(1);
 
-  // Create new subscription record (schema: membership_subscriptions)
+  // Create new subscription record
   await db.insert(membershipSubscriptions).values({
     userId,
     planId,
     status: "active",
     stripeSubscriptionId: stripeSubscriptionId ?? null,
+    stripeCheckoutSessionId: sessionId,
+    currentPeriodStart: Date.now(),
+    currentPeriodEnd: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   });
 
   // Increment discount code usage if one was applied
@@ -223,59 +225,24 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
   const affiliateCode = meta.affiliate_code ?? null;
   const sessionId = session.id as string;
 
-  // If no order_id but we have user_id + course_id (e.g. hosted embedded checkout),
-  // still proceed with enrollment — we'll create an order row below.
-  if (!userId || !courseId) return; // Not an LMS order — missing required fields
-  const isHostedCheckoutFallback = !orderId;
+  if (!orderId || !userId || !courseId) return; // Not an LMS order
 
   const db = await getDb();
   if (!db) return;
 
   // Mark order as paid (also store subscription ID if this was a subscription checkout)
   const subscriptionIdForOrder = session.subscription as string | undefined;
-  let resolvedOrderId = orderId;
-
-  if (isHostedCheckoutFallback) {
-    // No order_id in metadata (older hosted checkout sessions) — create one now
-    // First check if there's already a pending order for this user+course+session
-    const [existingOrder] = await db.select({ id: lmsOrders.id })
-      .from(lmsOrders)
-      .where(and(eq(lmsOrders.userId, userId!), eq(lmsOrders.courseId, courseId!), eq(lmsOrders.stripeSessionId, sessionId)))
-      .limit(1);
-    if (existingOrder) {
-      resolvedOrderId = existingOrder.id;
-      await db.update(lmsOrders).set({
-        status: "paid",
-        ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
-      }).where(eq(lmsOrders.id, existingOrder.id));
-    } else {
-      const amountTotal = (session.amount_total as number) ?? 0;
-      const [newOrder] = await db.insert(lmsOrders).values({
-        userId: userId!,
-        courseId: courseId!,
-        amount: amountTotal,
-        currency: (session.currency as string) ?? "usd",
-        stripeSessionId: sessionId,
-        ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
-        status: "paid",
-        seats,
-      }).$returningId();
-      resolvedOrderId = newOrder?.id ?? null;
-    }
-    console.log(`[Stripe] Hosted checkout fallback: created/found order ${resolvedOrderId} for user ${userId}, course ${courseId}`);
-  } else {
-    await db.update(lmsOrders).set({
-      status: "paid",
-      stripeSessionId: sessionId,
-      ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
-    }).where(eq(lmsOrders.id, orderId!));
-  }
+  await db.update(lmsOrders).set({
+    status: "paid",
+    stripeSessionId: sessionId,
+    ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
+  }).where(eq(lmsOrders.id, orderId));
 
   // Enroll user (and extra seats if group purchase)
   const [existingEnrollment] = await db.select().from(lmsEnrollments)
     .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
   if (!existingEnrollment) {
-    await db.insert(lmsEnrollments).values({ userId: userId!, courseId: courseId!, orderId: resolvedOrderId, affiliateCode });
+    await db.insert(lmsEnrollments).values({ userId, courseId, orderId, affiliateCode });
   }
 
   // Track affiliate conversion
@@ -298,7 +265,7 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
 
   await notifyOwner({
     title: "🎓 New LMS Course Purchase",
-    content: `User ID ${userId} purchased course ID ${courseId} (${seats} seat${seats > 1 ? 's' : ''}). Order #${resolvedOrderId ?? 'N/A'}${isHostedCheckoutFallback ? ' (hosted checkout)' : ''}. Amount: $${((session.amount_total as number ?? 0) / 100).toFixed(2)}.`,
+    content: `User ID ${userId} purchased course ID ${courseId} (${seats} seat${seats > 1 ? 's' : ''}). Order #${orderId}. Amount: $${((session.amount_total as number ?? 0) / 100).toFixed(2)}.`,
   });
   // Log purchase + enrollment to unified activity log (fire-and-forget)
   try {
@@ -309,67 +276,26 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
       description: `Purchased course: ${courseRow?.title ?? `Course #${courseId}`}`,
       courseId,
       contentTitle: courseRow?.title ?? null,
-      metadata: { orderId: resolvedOrderId, seats, amountCents: session.amount_total, sessionId },
+      metadata: { orderId, seats, amountCents: session.amount_total, sessionId },
     });
     if (!existingEnrollment) {
       await db.insert(userActivityLogs).values({
-        userId: userId!,
+        userId,
         eventType: 'course_enroll',
         description: `Enrolled in course: ${courseRow?.title ?? `Course #${courseId}`}`,
-        courseId: courseId!,
+        courseId,
         contentTitle: courseRow?.title ?? null,
-        metadata: { orderId: resolvedOrderId, enrollmentType: 'paid' },
+        metadata: { orderId, enrollmentType: 'paid' },
       });
     }
   } catch (_e) { /* non-blocking */ }
-  if (resolvedOrderId) {
-    await fulfillOrderBumpPurchase(db, meta, {
-      userId: userId!,
-      sessionId,
-      triggerOrderType: "course",
-      triggerOrderId: resolvedOrderId,
-    });
-  }
-  console.log(`[Stripe] LMS order ${resolvedOrderId ?? 'N/A'} fulfilled for user ${userId}, course ${courseId}${isHostedCheckoutFallback ? ' (hosted checkout fallback)' : ''}`);
-
-
-  try {
-    const customerEmail = (session.customer_email as string)
-      ?? (session.customer_details as Record<string, string>)?.email;
-    if (customerEmail) {
-      const [courseRow] = await db
-        .select({ title: lmsCourses.title, slug: lmsCourses.slug })
-        .from(lmsCourses)
-        .where(eq(lmsCourses.id, courseId))
-        .limit(1);
-      const baseUrl = "https://app.allaboutultrasound.com";
-      const coursePlayerUrl = courseRow?.slug
-        ? `${baseUrl}/courses/${courseRow.slug}`
-        : `${baseUrl}/my-dashboard`;
-      let autoLoginUrl = coursePlayerUrl;
-      try {
-        const token = await generateAutoLoginToken(userId!, coursePlayerUrl);
-        autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(baseUrl).hostname)}`;
-      } catch { /* fall back */ }
-      const user = await getUserByEmail(customerEmail);
-      const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
-      const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
-        firstName,
-        productName: courseRow?.title ?? `Course #${courseId}`,
-        amountPaid: (session.amount_total as number) ?? 0,
-        loginUrl: autoLoginUrl,
-        brandMode: "aaus",
-      });
-      await sendEmail({
-        to: { name: user?.name || firstName, email: customerEmail },
-        subject,
-        htmlBody,
-        previewText,
-      });
-    }
-  } catch (emailErr) {
-    console.error("[Stripe] Failed to send LMS purchase confirmation email:", emailErr);
-  }
+  await fulfillOrderBumpPurchase(db, meta, {
+    userId,
+    sessionId,
+    triggerOrderType: "course",
+    triggerOrderId: orderId,
+  });
+  console.log(`[Stripe] LMS order ${orderId} fulfilled for user ${userId}, course ${courseId}`);
 }
 
 async function handleDigitalDownloadCheckoutCompleted(session: Record<string, unknown>) {
@@ -412,7 +338,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
           console.error(`[Stripe] Failed to generate access token for ${customerEmail}:`, atErr);
         }
         const accessUrl = accessTokenForEmail
-          ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}&host=${encodeURIComponent(new URL(baseUrl).hostname)}`
+          ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}`
           : setPasswordUrl;
         try {
           const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
@@ -434,7 +360,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
             to: { name: customerName || firstName, email: customerEmail },
             subject,
             htmlBody: enhancedBody,
-            previewText: `Access your download on All About Ultrasound™`,
+            previewText: `Access your download on All About Ultrasound`,
           });
           console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${userId}) and sent welcome email`);
         } catch (emailErr) {
@@ -548,7 +474,7 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
     return;
   }
 
-  // Record bundle purchase (schema: digital_bundle_purchases — session id only)
+  // Record bundle purchase
   await db.insert(digitalBundlePurchases).values({
     userId,
     bundleId,
@@ -789,7 +715,7 @@ async function handleDualMembershipCheckoutCompleted(session: Record<string, unk
 
   await notifyOwner({
     title: "⭐⭐ New Dual Membership Subscription",
-    content: `User ID ${userId} (${meta.customer_email}) subscribed to the All Access Dual Membership ($12.99/mo). Both AAUS + iHeartEcho™ premium granted. Subscription: ${subscriptionId ?? "N/A"}.`,
+    content: `User ID ${userId} (${meta.customer_email}) subscribed to the All Access Dual Membership ($12.99/mo). Both AAUS + iHeartEcho premium granted. Subscription: ${subscriptionId ?? "N/A"}.`,
   });
 
   console.log(`[Stripe] Dual membership recorded: user ${userId}, both brands, subscription ${subscriptionId}`);
@@ -811,57 +737,44 @@ async function handleEmployerCheckoutCompleted(session: Record<string, unknown>)
   }
 
   const db = await getDb();
-  if (!db) return;
 
-  const paymentIntentId = (session.payment_intent as string) ?? null;
-  const subscriptionId = (session.subscription as string) ?? meta.subscription_id ?? null;
-
-  // Ensure employer profile exists (schema: employer_profiles.id → employer_subscriptions.employer_id)
+  // Ensure employer profile exists
   const [existingProfile] = await db.select({ id: employerProfiles.id })
     .from(employerProfiles).where(eq(employerProfiles.userId, userId)).limit(1);
-  const employerId = existingProfile?.id ?? (
-    await db.insert(employerProfiles).values({ userId, companyName: meta.company_name ?? "My Company" })
+  const profileId = existingProfile?.id ?? (
+    await db.insert(employerProfiles).values({ userId, companyName: meta.company_name ?? "My Company", status: "active" })
       .then(([r]: any) => (r as { insertId: number }).insertId)
   );
 
   if (productType === "employer_job_post") {
     // Add 1 job post credit
     const [existing] = await db.select().from(employerSubscriptions)
-      .where(and(eq(employerSubscriptions.employerId, employerId), eq(employerSubscriptions.plan, "job_post"))).limit(1);
+      .where(and(eq(employerSubscriptions.employerProfileId, profileId), eq(employerSubscriptions.plan, "job_post"))).limit(1);
     if (existing) {
       await db.update(employerSubscriptions)
         .set({ jobCredits: sql`${employerSubscriptions.jobCredits} + 1`, status: "active" })
         .where(eq(employerSubscriptions.id, existing.id));
     } else {
       await db.insert(employerSubscriptions).values({
-        employerId,
-        plan: "job_post",
-        status: "active",
-        stripePaymentIntentId: paymentIntentId,
-        jobCredits: 1,
+        employerProfileId: profileId, plan: "job_post", status: "active",
+        stripeSessionId: session.id as string, jobCredits: 1,
       });
     }
     console.log(`[Stripe] Employer job post credit added for userId=${userId}`);
   } else if (productType === "employer_subscription") {
     // Upsert unlimited subscription
     const [existing] = await db.select().from(employerSubscriptions)
-      .where(and(eq(employerSubscriptions.employerId, employerId), eq(employerSubscriptions.plan, "unlimited"))).limit(1);
+      .where(and(eq(employerSubscriptions.employerProfileId, profileId), eq(employerSubscriptions.plan, "unlimited"))).limit(1);
     const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
     if (existing) {
       await db.update(employerSubscriptions)
-        .set({
-          status: "active",
-          currentPeriodEnd: periodEnd,
-          stripeSubscriptionId: subscriptionId ?? existing.stripeSubscriptionId,
-        })
+        .set({ status: "active", currentPeriodEnd: periodEnd, stripeSubscriptionId: meta.subscription_id ?? existing.stripeSubscriptionId })
         .where(eq(employerSubscriptions.id, existing.id));
     } else {
       await db.insert(employerSubscriptions).values({
-        employerId,
-        plan: "unlimited",
-        status: "active",
-        stripePaymentIntentId: paymentIntentId,
-        stripeSubscriptionId: subscriptionId,
+        employerProfileId: profileId, plan: "unlimited", status: "active",
+        stripeSessionId: session.id as string,
+        stripeSubscriptionId: meta.subscription_id,
         currentPeriodEnd: periodEnd,
       });
     }
@@ -921,10 +834,40 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
  * This is triggered when a user pays inline via Stripe Elements (PaymentIntent flow)
  * instead of being redirected to Stripe Checkout.
  */
+
+/**
+ * Handle checkout.session.completed for funnel redirect checkout (Stripe Checkout).
+ */
+async function handleFunnelCheckoutSessionCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  if (meta.type !== "funnel_form_purchase") return;
+
+  const sessionId = session.id as string;
+  const db = await getDb();
+  if (!db) return;
+
+  const [existingBySession] = await db.select({ id: funnelPurchases.id })
+    .from(funnelPurchases)
+    .where(eq(funnelPurchases.stripeCheckoutSessionId, sessionId))
+    .limit(1);
+  if (existingBySession) {
+    console.log(`[Stripe] Funnel checkout session already processed: ${sessionId}`);
+    return;
+  }
+
+  const piId = (session.payment_intent as string) || sessionId;
+  await handleFunnelPaymentIntentSucceeded({
+    metadata: meta,
+    amount: session.amount_total,
+    id: piId,
+    checkout_session_id: sessionId,
+  });
+}
+
 async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, unknown>) {
   const meta = (paymentIntent.metadata ?? {}) as Record<string, string>;
   // Handle both funnel_form_purchase and embedded_checkout_purchase
-  const validTypes = ["funnel_form_purchase", "embedded_checkout_purchase", "funnel_purchase"];
+  const validTypes = ["funnel_form_purchase", "embedded_checkout_purchase"];
   if (!validTypes.includes(meta.type)) return;
 
   const funnelId = meta.funnel_id ? parseInt(meta.funnel_id) : null;
@@ -940,9 +883,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   const bumpsAdded = meta.bumps_added ?? "";
   const bumpTitles = meta.bump_titles ?? "";
   const bumpPrices = meta.bump_prices ?? "";
-  // amount from Stripe is in CENTS — convert to dollars for display and DB storage
-  const amountCents = paymentIntent.amount as number;
-  const amountDollars = (amountCents ?? 0) / 100;
+  const amount = paymentIntent.amount as number;
   const piId = paymentIntent.id as string;
   // Shipping address (only for physical products)
   const shippingName = meta.shipping_name ?? null;
@@ -953,7 +894,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   const shippingPostalCode = meta.shipping_postal_code ?? null;
   const shippingCountry = meta.shipping_country ?? null;
 
-  console.log(`[Stripe] payment_intent.succeeded — ${meta.type} — email: ${customerEmail}, amount: $${amountDollars.toFixed(2)}, PI: ${piId}`);
+  console.log(`[Stripe] payment_intent.succeeded — ${meta.type} — email: ${customerEmail}, amount: ${amount}, PI: ${piId}`);
 
   const db = await getDb();
   if (!db) return;
@@ -973,10 +914,12 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         name: customerName || undefined,
       });
       resolvedUserId = autoUser.id;
-        if (isNew && resetToken) {
-        // Always use canonical brand URL — never derive from success_url (which may contain sandbox/dev ports)
+      if (isNew && resetToken) {
+        // Determine login URL from success_url or brand
         const brandMode = (meta.brand_mode as string) || "aaus";
-        const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
+        const baseUrl = meta.success_url
+          ? meta.success_url.split("/").slice(0, 3).join("/")
+          : brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
         const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
         const firstName = autoUser.firstName || nameParts[0] || "there";
         // Generate persistent access token for the new account
@@ -1013,7 +956,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
             to: { name: customerName || firstName, email: customerEmail },
             subject,
             htmlBody: enhancedBody,
-            previewText: `Access your ${meta.product_name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™"}`,
+            previewText: `Access your ${meta.product_name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
           });
           console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${resolvedUserId}) and sent welcome email with access token`);
         } catch (emailErr) {
@@ -1041,7 +984,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
           let autoLoginUrlExisting = loginUrlExisting;
           try {
             const token = await generateAutoLoginToken(resolvedUserId!, loginUrlExisting);
-            autoLoginUrlExisting = `${baseUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(baseUrl).hostname)}`;
+            autoLoginUrlExisting = `${baseUrl}/api/auth/auto-login?token=${token}`;
           } catch { /* fall back to plain URL */ }
           const firstName = (customerName || "").split(" ")[0] || "there";
           const bumpTitleArr = bumpTitles ? bumpTitles.split("|") : [];
@@ -1050,7 +993,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
           const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
             firstName,
             productName,
-            amountPaid: amountDollars ?? 0,
+            amountPaid: amount ?? 0,
             orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
             loginUrl: autoLoginUrlExisting,
             brandMode: brandMode as any,
@@ -1067,19 +1010,24 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   }
   // ── END AUTO-ACCOUNT CREATION ────────────────────────────────────────────
 
-  // Idempotency check (PaymentIntent and/or Checkout Session)
-  const checkoutSessionId = meta.checkout_session_id ?? null;
-  let existingPurchase: { id: number } | undefined;
-  [existingPurchase] = await db.select({ id: funnelPurchases.id })
-    .from(funnelPurchases)
-    .where(eq(funnelPurchases.stripePaymentIntentId, piId))
-    .limit(1);
-  if (!existingPurchase && checkoutSessionId) {
-    [existingPurchase] = await db.select({ id: funnelPurchases.id })
+  const checkoutSessionId = paymentIntent.checkout_session_id as string | undefined;
+
+  // Idempotency check
+  if (checkoutSessionId) {
+    const [existingBySession] = await db.select({ id: funnelPurchases.id })
       .from(funnelPurchases)
       .where(eq(funnelPurchases.stripeCheckoutSessionId, checkoutSessionId))
       .limit(1);
+    if (existingBySession) {
+      console.log(`[Stripe] Funnel purchase already recorded for checkout session ${checkoutSessionId}`);
+      return;
+    }
   }
+
+  const [existingPurchase] = await db.select({ id: funnelPurchases.id })
+    .from(funnelPurchases)
+    .where(eq(funnelPurchases.stripePaymentIntentId, piId))
+    .limit(1);
 
   if (!existingPurchase) {
     // Build order bumps JSON
@@ -1102,10 +1050,10 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       productName,
       productType,
       orderBumps: orderBumpsJson,
-      amountPaid: amountDollars, // stored in DOLLARS (not cents)
+      amountPaid: amount,
       currency: "usd",
       stripePaymentIntentId: piId,
-      stripeCheckoutSessionId: checkoutSessionId,
+      stripeCheckoutSessionId: checkoutSessionId ?? null,
       sourceType: sourceType as any,
       sourceFunnelId: funnelId,
       sourceFunnelPageId: funnelPageId,
@@ -1124,12 +1072,8 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   } else {
     // Record already exists (created as "pending" by createPaymentIntent) — update to paid
     await db.update(funnelPurchases)
-      .set({
-        status: "paid",
-        userId: resolvedUserId || undefined,
-        stripeCheckoutSessionId: checkoutSessionId ?? undefined,
-      })
-      .where(eq(funnelPurchases.id, existingPurchase.id));
+      .set({ status: "paid", userId: resolvedUserId || undefined })
+      .where(eq(funnelPurchases.stripePaymentIntentId, piId));
     console.log(`[Stripe] Updated existing funnel purchase to paid: PI ${piId}, user ${resolvedUserId}`);
   }
 
@@ -1139,68 +1083,183 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
     await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${funnelPageId}`);
   }
 
-  // ── AUTO-FULFILLMENT via FulfillmentEngine ───────────────────────────────
-  // Parse additional access items from metadata
-  let additionalAccessItems: Array<{ type: string; productId?: number; brand?: string; label: string }> | null = null;
-  if (meta.additional_access) {
-    try {
-      additionalAccessItems = JSON.parse(meta.additional_access);
-    } catch { /* ignore parse errors */ }
-  }
-
+  // ── AUTO-FULFILLMENT ────────────────────────────────────────────────────
+  // 1. LMS course enrollment (from fulfillment_course_id OR product_id when product_type=course)
   const fulfillmentCourseId = meta.fulfillment_course_id
     ? parseInt(meta.fulfillment_course_id)
     : (meta.product_type === "course" && meta.product_id ? parseInt(meta.product_id) : null);
-  const fulfillmentProductId = meta.product_id ? parseInt(meta.product_id) : null;
-  const fulfillmentBrand = (meta.fulfillment_brand as "aaus" | "iheartecho" | "both" | undefined) ?? null;
-
-  // Create or find the pending_fulfillments record
-  let pendingFulfillmentId: number | undefined;
-  try {
-    pendingFulfillmentId = await createPendingFulfillmentRecord(db as any, {
-      stripePaymentIntentId: piId,
-      userId: resolvedUserId,
-      email: customerEmail || "",
-      customerName: customerName || null,
-      productName,
-      productType,
-      courseId: fulfillmentCourseId,
-      productId: fulfillmentProductId,
-      fulfillmentBrand,
-      additionalAccess: additionalAccessItems,
-      amountPaid: amountDollars,
-    });
-  } catch (pfErr) {
-    console.error(`[Stripe] Failed to create pending_fulfillment record for PI ${piId}:`, pfErr);
+  if (fulfillmentCourseId && resolvedUserId) {
+    try {
+      const [existingEnrollment] = await db
+        .select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, resolvedUserId), eq(lmsEnrollments.courseId, fulfillmentCourseId)))
+        .limit(1);
+      if (!existingEnrollment) {
+        await db.insert(lmsEnrollments).values({
+          userId: resolvedUserId,
+          courseId: fulfillmentCourseId,
+          orderId: null,
+          affiliateCode: null,
+        });
+        console.log(`[Stripe] Auto-enrolled user ${resolvedUserId} in LMS course ${fulfillmentCourseId} after payment ${piId}`);
+      } else {
+        console.log(`[Stripe] User ${resolvedUserId} already enrolled in course ${fulfillmentCourseId} — skipping`);
+      }
+    } catch (err) {
+      console.error(`[Stripe] Failed to auto-enroll user ${resolvedUserId} in course ${fulfillmentCourseId}:`, err);
+    }
   }
 
-  // Execute fulfillment using the engine
-  const fulfillmentResult = await executeFulfillment(db as any, {
-    stripePaymentIntentId: piId,
-    userId: resolvedUserId,
-    email: customerEmail || "",
-    customerName: customerName || null,
-    productName,
-    productType,
-    courseId: fulfillmentCourseId,
-    productId: fulfillmentProductId,
-    fulfillmentBrand,
-    additionalAccess: additionalAccessItems,
-    amountPaid: amountDollars,
-  }, pendingFulfillmentId);
+  // 1b. Digital download access grant (product_type=download)
+  const fulfillmentDownloadId = meta.product_type === "download" && meta.product_id ? parseInt(meta.product_id) : null;
+  if (fulfillmentDownloadId && resolvedUserId) {
+    try {
+      const { digitalPurchases: dp } = await import("../../drizzle/schema");
+      const [existingDl] = await db.select({ id: dp.id })
+        .from(dp)
+        .where(and(eq(dp.userId, resolvedUserId), eq(dp.productId, fulfillmentDownloadId)))
+        .limit(1);
+      if (!existingDl) {
+        await db.insert(dp).values({ userId: resolvedUserId, productId: fulfillmentDownloadId, stripeCheckoutSessionId: piId });
+        console.log(`[Stripe] Granted download access: user ${resolvedUserId}, product ${fulfillmentDownloadId} after payment ${piId}`);
+      } else {
+        console.log(`[Stripe] Download already granted: user ${resolvedUserId}, product ${fulfillmentDownloadId} — skipping`);
+      }
+    } catch (err) {
+      console.error(`[Stripe] Failed to grant download access user ${resolvedUserId}, product ${fulfillmentDownloadId}:`, err);
+    }
+  }
 
-  const fulfillmentNote = fulfillmentResult.notes.join(", ");
-  if (!fulfillmentResult.success) {
-    console.error(`[Stripe] Fulfillment FAILED for PI ${piId}: ${fulfillmentResult.error}`);
-  } else {
-    console.log(`[Stripe] Fulfillment complete for PI ${piId}: ${fulfillmentNote || "(no access items)"} `);
+  // 1c. Digital bundle access grant (product_type=bundle)
+  const fulfillmentBundleId = meta.product_type === "bundle" && meta.product_id ? parseInt(meta.product_id) : null;
+  if (fulfillmentBundleId && resolvedUserId) {
+    try {
+      const { digitalBundlePurchases: dbp, digitalBundleItems: dbi, digitalPurchases: dp } = await import("../../drizzle/schema");
+      const [existingBundle] = await db.select({ id: dbp.id })
+        .from(dbp)
+        .where(and(eq(dbp.userId, resolvedUserId), eq(dbp.bundleId, fulfillmentBundleId)))
+        .limit(1);
+      if (!existingBundle) {
+        await db.insert(dbp).values({ userId: resolvedUserId, bundleId: fulfillmentBundleId, stripeCheckoutSessionId: piId });
+        const bundleItems = await db.select().from(dbi).where(eq(dbi.bundleId, fulfillmentBundleId));
+        for (const item of bundleItems) {
+          const [existingDl] = await db.select({ id: dp.id }).from(dp)
+            .where(and(eq(dp.userId, resolvedUserId), eq(dp.productId, item.productId))).limit(1);
+          if (!existingDl) {
+            await db.insert(dp).values({ userId: resolvedUserId, productId: item.productId, stripeCheckoutSessionId: piId });
+          }
+        }
+        console.log(`[Stripe] Granted bundle access: user ${resolvedUserId}, bundle ${fulfillmentBundleId} after payment ${piId}`);
+      } else {
+        console.log(`[Stripe] Bundle already granted: user ${resolvedUserId}, bundle ${fulfillmentBundleId} — skipping`);
+      }
+    } catch (err) {
+      console.error(`[Stripe] Failed to grant bundle access user ${resolvedUserId}, bundle ${fulfillmentBundleId}:`, err);
+    }
+  }
+
+  // 2. Brand membership grant (aaus, iheartecho, or both)
+  const fulfillmentBrand = meta.fulfillment_brand as "aaus" | "iheartecho" | "both" | undefined;
+  if (fulfillmentBrand && resolvedUserId) {
+    const brandsToGrant: ("aaus" | "iheartecho")[] =
+      fulfillmentBrand === "both" ? ["aaus", "iheartecho"] : [fulfillmentBrand];
+    for (const brand of brandsToGrant) {
+      try {
+        const [existing] = await db
+          .select({ id: brandMemberships.id })
+          .from(brandMemberships)
+          .where(and(eq(brandMemberships.userId, resolvedUserId), eq(brandMemberships.brand, brand)))
+          .limit(1);
+        if (existing) {
+          await db.update(brandMemberships)
+            .set({ tier: "premium", status: "active", source: "stripe", grantedAt: new Date() })
+            .where(eq(brandMemberships.id, existing.id));
+        } else {
+          await db.insert(brandMemberships).values({
+            userId: resolvedUserId,
+            brand,
+            tier: "premium",
+            status: "active",
+            source: "stripe",
+            stripeSubscriptionId: null,
+            stripeCustomerId: null,
+          });
+        }
+        console.log(`[Stripe] Granted ${brand} premium membership to user ${resolvedUserId} after payment ${piId}`);
+      } catch (err) {
+        console.error(`[Stripe] Failed to grant ${brand} membership to user ${resolvedUserId}:`, err);
+      }
+    }
+  }
+  // 3. Additional access items (bonus — no extra charge)
+  // These are extra products/courses/downloads granted alongside the primary product.
+  const additionalAccessNotes: string[] = [];
+  if (meta.additional_access && resolvedUserId) {
+    try {
+      const accessItems = JSON.parse(meta.additional_access) as Array<{
+        type: string; productId?: number; brand?: string; label: string;
+      }>;
+      for (const item of accessItems) {
+        try {
+          if (item.type === "course" && item.productId) {
+            const [existing] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+              .where(and(eq(lmsEnrollments.userId, resolvedUserId!), eq(lmsEnrollments.courseId, item.productId))).limit(1);
+            if (!existing) {
+              await db.insert(lmsEnrollments).values({ userId: resolvedUserId!, courseId: item.productId, orderId: null, affiliateCode: null });
+              console.log(`[Stripe] Additional access: enrolled user ${resolvedUserId} in course ${item.productId} (${item.label})`);
+            }
+            additionalAccessNotes.push(`Course: ${item.label}`);
+          } else if (item.type === "download" && item.productId) {
+            const { digitalPurchases: dp } = await import("../../drizzle/schema");
+            const [existing] = await db.select({ id: dp.id }).from(dp)
+              .where(and(eq(dp.userId, resolvedUserId!), eq(dp.productId, item.productId))).limit(1);
+            if (!existing) {
+              await db.insert(dp).values({ userId: resolvedUserId!, productId: item.productId, stripeCheckoutSessionId: piId });
+              console.log(`[Stripe] Additional access: granted download ${item.productId} (${item.label}) to user ${resolvedUserId}`);
+            }
+            additionalAccessNotes.push(`Download: ${item.label}`);
+          } else if (item.type === "membership" && item.brand) {
+            const brandsToGrant: ("aaus" | "iheartecho")[] =
+              item.brand === "both" ? ["aaus", "iheartecho"] : [item.brand as "aaus" | "iheartecho"];
+            for (const brand of brandsToGrant) {
+              const [existing] = await db.select({ id: brandMemberships.id }).from(brandMemberships)
+                .where(and(eq(brandMemberships.userId, resolvedUserId!), eq(brandMemberships.brand, brand))).limit(1);
+              if (existing) {
+                await db.update(brandMemberships)
+                  .set({ tier: "premium", status: "active", source: "stripe", grantedAt: new Date() })
+                  .where(eq(brandMemberships.id, existing.id));
+              } else {
+                await db.insert(brandMemberships).values({
+                  userId: resolvedUserId!, brand, tier: "premium", status: "active", source: "stripe",
+                  stripeSubscriptionId: null, stripeCustomerId: null,
+                });
+              }
+              console.log(`[Stripe] Additional access: granted ${brand} membership to user ${resolvedUserId}`);
+            }
+            additionalAccessNotes.push(`Membership: ${item.label}`);
+          }
+        } catch (itemErr) {
+          console.error(`[Stripe] Failed to grant additional access item "${item.label}" to user ${userId}:`, itemErr);
+        }
+      }
+    } catch (parseErr) {
+      console.error(`[Stripe] Failed to parse additional_access metadata:`, parseErr);
+    }
   }
   // ── END AUTO-FULFILLMENT ────────────────────────────────────────────────
 
   // Notify owner
+  const fulfillmentNote = [
+    fulfillmentCourseId ? `Course enrollment: #${fulfillmentCourseId}` : null,
+    fulfillmentDownloadId ? `Download access: #${fulfillmentDownloadId}` : null,
+    fulfillmentBundleId ? `Bundle access: #${fulfillmentBundleId}` : null,
+    fulfillmentBrand ? `Brand access: ${fulfillmentBrand}` : null,
+    ...additionalAccessNotes.map(n => `Bonus: ${n}`),
+  ].filter(Boolean).join(", ");
   await notifyOwner({
     title: `💰 New Funnel Purchase — ${productName}`,
-    content: `Payment succeeded.\nProduct: ${productName}\nEmail: ${customerEmail}\nName: ${customerName}\nAmount: $${amountDollars.toFixed(2)}\nType: ${meta.type}\nPaymentIntent: ${piId}\nUser ID: ${resolvedUserId || "guest"}${!userId && resolvedUserId ? " (auto-created)" : ""}${fulfillmentNote ? `\nFulfillment: ${fulfillmentNote}` : ""}${fulfillmentResult.error ? `\n⚠️ Fulfillment error: ${fulfillmentResult.error}` : ""}`,
+    content: `Payment succeeded.\nProduct: ${productName}\nEmail: ${customerEmail}\nName: ${customerName}\nAmount: $${((amount ?? 0) / 100).toFixed(2)}\nType: ${meta.type}\nPaymentIntent: ${piId}\nUser ID: ${resolvedUserId || "guest"}${!userId && resolvedUserId ? " (auto-created)" : ""}${fulfillmentNote ? `\nFulfillment: ${fulfillmentNote}` : ""}`,
   });
 
   // Send buyer purchase confirmation email
@@ -1215,11 +1274,13 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
       let loginUrl = `${baseUrl}/my-dashboard`;
       if (fulfillmentCourseId) {
-        const courseSlug = await getCourseSlug(db as any, fulfillmentCourseId);
-        if (courseSlug) loginUrl = `${baseUrl}/courses/${courseSlug}`;
-      } else if (productType === "download") {
+        try {
+          const [courseRow] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, fulfillmentCourseId)).limit(1);
+          if (courseRow?.slug) loginUrl = `${baseUrl}/courses/${courseRow.slug}`;
+        } catch { /* keep default */ }
+      } else if (fulfillmentDownloadId) {
         loginUrl = `${baseUrl}/my-downloads`;
-      } else if (productType === "bundle") {
+      } else if (fulfillmentBundleId) {
         loginUrl = `${baseUrl}/my-downloads`;
       } else if (fulfillmentBrand) {
         loginUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net/my-dashboard" : "https://app.allaboutultrasound.com/my-dashboard";
@@ -1229,15 +1290,16 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       if (resolvedUserId) {
         try {
           const token = await generateAutoLoginToken(resolvedUserId, loginUrl);
-          autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(baseUrl).hostname)}`;
+          autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
         } catch (tokenErr) {
           console.error(`[Stripe] Failed to generate auto-login token for user ${resolvedUserId}:`, tokenErr);
+          // Fall back to plain loginUrl
         }
       }
       const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
         firstName,
         productName,
-        amountPaid: amountDollars,
+        amountPaid: amount ?? 0,
         orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
         loginUrl: autoLoginUrl,
         brandMode: brandMode as any,
@@ -1248,170 +1310,6 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       console.error(`[Stripe] Failed to send purchase confirmation email to ${customerEmail}:`, err);
     }
   }
-}
-
-async function enrichFunnelCheckoutMetadata(meta: Record<string, string>): Promise<Record<string, string>> {
-  const enriched = { ...meta };
-  if (meta.type !== "funnel_purchase" || !meta.funnel_page_id) return enriched;
-  const pageId = parseInt(meta.funnel_page_id);
-  if (Number.isNaN(pageId)) return enriched;
-  const db = await getDb();
-  if (!db) return enriched;
-  const [page] = await db.select().from(funnelPages).where(eq(funnelPages.id, pageId)).limit(1);
-  if (!page) return enriched;
-  if (!enriched.product_type && page.productType) {
-    enriched.product_type = page.productType === "custom" ? "other" : page.productType;
-  }
-  if (!enriched.product_id && page.productId) enriched.product_id = page.productId.toString();
-  if (!enriched.product_name) enriched.product_name = page.customPriceLabel || page.title || "Funnel Product";
-  if (page.productType === "course" && page.productId && !enriched.fulfillment_course_id) {
-    enriched.fulfillment_course_id = page.productId.toString();
-  }
-  return enriched;
-}
-
-/**
- * Handle LMS Bundle purchase completion.
- * Triggered when a user completes a Stripe checkout for a paid LMS bundle.
- * Enrolls the user in all bundle courses, grants download access, registers for webinars.
- */
-async function handleLmsBundlePurchaseCompleted(session: Record<string, unknown>) {
-  const meta = (session.metadata as Record<string, string>) ?? {};
-  if (meta.purchase_type !== "bundle_purchase") return;
-
-  const bundleId = meta.bundle_id ? parseInt(meta.bundle_id) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
-  const pricingOptionId = meta.pricing_option_id || null;
-  if (!bundleId || !userId) return;
-
-  const db = await getDb();
-  if (!db) return;
-
-  const sessionId = session.id as string;
-  console.log(`[Stripe] LMS bundle purchase — bundleId: ${bundleId}, userId: ${userId}, session: ${sessionId}`);
-
-  // Idempotency: check if already enrolled
-  const [existingEnrollment] = await db.select({ id: bundleEnrollments.id })
-    .from(bundleEnrollments)
-    .where(and(eq(bundleEnrollments.bundleId, bundleId), eq(bundleEnrollments.userId, userId)))
-    .limit(1);
-  if (existingEnrollment) {
-    console.log(`[Stripe] LMS bundle already enrolled: user ${userId}, bundle ${bundleId}`);
-    return;
-  }
-
-  // Create bundle enrollment
-  await db.insert(bundleEnrollments).values({
-    bundleId,
-    userId,
-    pricingOptionId,
-    stripePaymentIntentId: (session.payment_intent as string) ?? null,
-  });
-
-  // Fetch all items in this bundle
-  const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, bundleId));
-
-  const grantedItems: string[] = [];
-
-  for (const item of items) {
-    try {
-      if (item.itemType === "course") {
-        // Enroll in LMS course
-        const [existingCourseEnr] = await db.select({ id: lmsEnrollments.id })
-          .from(lmsEnrollments)
-          .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, userId)))
-          .limit(1);
-        if (!existingCourseEnr) {
-          await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId, enrollmentType: "full" });
-          grantedItems.push(`course:${item.itemId}`);
-        }
-      } else if (item.itemType === "download") {
-        // Grant digital download access
-        const [existingPurchase] = await db.select({ id: digitalPurchases.id })
-          .from(digitalPurchases)
-          .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, item.itemId)))
-          .limit(1);
-        if (!existingPurchase) {
-          await db.insert(digitalPurchases).values({
-            userId,
-            productId: item.itemId,
-            stripeCheckoutSessionId: sessionId,
-          });
-          grantedItems.push(`download:${item.itemId}`);
-          // Send download confirmation email
-          try { await sendPurchaseConfirmationEmail(userId, item.itemId); } catch {}
-        }
-      } else if (item.itemType === "webinar") {
-        // Register for webinar
-        const [existingReg] = await db.select({ id: webinarRegistrations.id })
-          .from(webinarRegistrations)
-          .where(and(eq(webinarRegistrations.webinarId, item.itemId), eq(webinarRegistrations.userId, userId)))
-          .limit(1);
-        if (!existingReg) {
-          await db.insert(webinarRegistrations).values({
-            webinarId: item.itemId,
-            userId,
-          });
-          grantedItems.push(`webinar:${item.itemId}`);
-        }
-      } else if (item.itemType === "product") {
-        // Record physical product order (no shipping info available from bundle checkout)
-        // We'll mark as "pending_shipping" so admin knows to follow up
-        grantedItems.push(`product:${item.itemId} (pending admin fulfillment)`);
-      } else if (item.itemType === "quiz") {
-        // Quizzes don't have a separate access table — they're accessible to enrolled users
-        // Just note it was included
-        grantedItems.push(`quiz:${item.itemId}`);
-      }
-    } catch (itemErr) {
-      console.error(`[Stripe] Failed to grant bundle item ${item.itemType}:${item.itemId} to user ${userId}:`, itemErr);
-    }
-  }
-
-  // Log activity
-  try {
-    const [bundleRow] = await db.select({ title: bundles.title }).from(bundles).where(eq(bundles.id, bundleId)).limit(1);
-    await db.insert(userActivityLogs).values({
-      userId,
-      eventType: "purchase",
-      description: `Purchased bundle: ${bundleRow?.title ?? `Bundle #${bundleId}`}`,
-      metadata: { bundleId, items: grantedItems, sessionId, amountCents: session.amount_total },
-    });
-  } catch {} // non-blocking
-
-  await notifyOwner({
-    title: "\uD83C\uDF81 New LMS Bundle Purchase",
-    content: `User ID ${userId} purchased LMS bundle ID ${bundleId} (${items.length} items: ${grantedItems.join(", ")}). Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
-  });
-
-  console.log(`[Stripe] LMS bundle fulfilled: user ${userId}, bundle ${bundleId}, granted: ${grantedItems.join(", ")}`);
-}
-
-async function handleFunnelCheckoutSessionCompleted(session: Record<string, unknown>) {
-  const rawMeta = (session.metadata as Record<string, string>) ?? {};
-  if (!["funnel_purchase", "funnel_form_purchase"].includes(rawMeta.type)) return;
-
-  let meta = await enrichFunnelCheckoutMetadata({ ...rawMeta });
-  meta.checkout_session_id = session.id as string;
-
-  const customerEmail = meta.customer_email
-    ?? (session.customer_email as string)
-    ?? (session.customer_details as Record<string, string>)?.email;
-  if (customerEmail && !meta.customer_email) meta.customer_email = customerEmail;
-
-  const customerDetails = session.customer_details as Record<string, string> | undefined;
-  if (!meta.customer_name && customerDetails?.name) meta.customer_name = customerDetails.name;
-
-  const paymentIntentRaw = session.payment_intent;
-  const paymentIntentId = typeof paymentIntentRaw === "string"
-    ? paymentIntentRaw
-    : (paymentIntentRaw as { id?: string } | undefined)?.id ?? `cs_${session.id}`;
-
-  await handleFunnelPaymentIntentSucceeded({
-    id: paymentIntentId,
-    amount: session.amount_total as number,
-    metadata: meta,
-  });
 }
 
 /**
@@ -1457,7 +1355,7 @@ async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
   const updatePaymentUrl = `${baseUrl}/dashboard`;
 
   // Send payment failed email
-  const productName = membership ? `Your ${brandMode === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™"} Membership` : "Your Subscription";
+  const productName = membership ? `Your ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"} Membership` : "Your Subscription";
   try {
     const { subject, htmlBody, previewText } = buildPaymentFailedEmail({
       firstName,
@@ -1485,240 +1383,55 @@ async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
   } else if (shouldCancel && subscriptionId && !membership) {
     console.warn(`[Stripe] invoice.payment_failed: no brand membership found for subscription ${subscriptionId} — cannot revoke access`);
   }
+}
 
-  // ── LMS Course/Quiz/Cohort: revoke on final failure ──────────────────────
-  if (shouldCancel && subscriptionId) {
+function stripeWebhookRawBody(req: Request, res: Response, next: () => void) {
+  let data = "";
+  req.setEncoding("utf8");
+  req.on("data", (chunk: string) => { data += chunk; });
+  req.on("end", () => {
+    (req as Request & { rawBody: string }).rawBody = data;
+    next();
+  });
+}
+
+async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Response) {
+  const rawBody = req.rawBody ?? "";
+  const sig = req.headers["stripe-signature"] as string | undefined;
+  let event: Record<string, unknown>;
+
+  if (STRIPE_WEBHOOK_SECRET) {
+    if (!sig) {
+      console.error("[Stripe] Webhook rejected: missing stripe-signature header");
+      res.status(400).json({ error: "Missing stripe-signature header" });
+      return;
+    }
     try {
-      const [order] = await db.select().from(lmsOrders)
-        .where(eq(lmsOrders.stripeSubscriptionId, subscriptionId)).limit(1);
-      if (order) {
-        await db.delete(lmsEnrollments)
-          .where(and(eq(lmsEnrollments.userId, order.userId), eq(lmsEnrollments.courseId, order.courseId)));
-        await db.update(lmsOrders).set({ status: "failed" }).where(eq(lmsOrders.id, order.id));
-        console.log(`[Stripe] LMS enrollment revoked after failed payments: userId=${order.userId} courseId=${order.courseId}`);
-        await notifyOwner({
-          title: "⚠️ LMS Access Revoked — Failed Payments",
-          content: `Subscription ${subscriptionId} for ${customerEmail} failed ${attemptCount} times. LMS access revoked for userId=${order.userId}, courseId=${order.courseId}.`,
-        });
-      }
+      const crypto = await import("crypto");
+      const parts = sig.split(",");
+      const tPart = parts.find((p) => p.startsWith("t="));
+      const v1Part = parts.find((p) => p.startsWith("v1="));
+      if (!tPart || !v1Part) throw new Error("Invalid signature format");
+      const timestamp = tPart.slice(2);
+      const expectedSig = v1Part.slice(3);
+      const payload = `${timestamp}.${rawBody}`;
+      const hmac = crypto.createHmac("sha256", STRIPE_WEBHOOK_SECRET).update(payload).digest("hex");
+      if (hmac !== expectedSig) throw new Error("Signature mismatch");
+      event = JSON.parse(rawBody) as Record<string, unknown>;
     } catch (err) {
-      console.error(`[Stripe] handleInvoicePaymentFailed: LMS revocation error for sub ${subscriptionId}:`, err);
+      console.error("[Stripe] Webhook signature verification failed:", err);
+      res.status(400).json({ error: "Invalid signature" });
+      return;
     }
-  }
-
-  // ── Membership subscription: mark past_due or cancel ────────────────────
-  if (subscriptionId) {
+  } else {
     try {
-      const [sub] = await db.select().from(membershipSubscriptions)
-        .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
-      if (sub) {
-        if (shouldCancel) {
-          await db.update(membershipSubscriptions)
-            .set({ status: "cancelled", updatedAt: new Date() })
-            .where(eq(membershipSubscriptions.id, sub.id));
-          // Revoke brand memberships
-          const accessItems = await db.select().from(membershipPlanAccess).where(eq(membershipPlanAccess.planId, sub.planId));
-          for (const item of accessItems) {
-            const brand = item.itemType.startsWith("ultrasoundassist") ? "all_about_ultrasound" : item.itemType.startsWith("echoassist") ? "iheartecho" : null;
-            if (!brand) continue;
-            await db.update(brandMemberships)
-              .set({ status: "cancelled", tier: "free" })
-              .where(and(eq(brandMemberships.userId, sub.userId), eq(brandMemberships.brand, brand as any)));
-          }
-          console.log(`[Stripe] Membership cancelled after failed payments: userId=${sub.userId} planId=${sub.planId}`);
-        } else {
-          // Grace period — mark as past_due
-          await db.update(membershipSubscriptions)
-            .set({ status: "past_due", updatedAt: new Date() })
-            .where(eq(membershipSubscriptions.id, sub.id));
-          console.log(`[Stripe] Membership marked past_due: userId=${sub.userId} planId=${sub.planId}`);
-        }
-      }
-    } catch (err) {
-      console.error(`[Stripe] handleInvoicePaymentFailed: membership update error for sub ${subscriptionId}:`, err);
+      event = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      res.status(400).json({ error: "Invalid JSON" });
+      return;
     }
   }
 
-  // Paid community subscription revoke: community_members has stripe_payment_intent_id only
-  // (no stripe_subscription_id column). Skip until schema supports subscription linkage.
-}
-
-/**
- * Handle invoice.paid — subscription renewal confirmed.
- * Restores/confirms access for LMS courses, memberships, and paid communities.
- */
-async function handleInvoicePaid(invoice: Record<string, unknown>) {
-  const subscriptionId = invoice.subscription as string | null;
-  if (!subscriptionId) return; // One-time payment invoice, not a subscription renewal
-
-  const periodEnd = invoice.lines
-    ? (() => {
-        try {
-          const lines = (invoice.lines as any)?.data as any[];
-          const periodEndTs = lines?.[0]?.period?.end;
-          return periodEndTs ? periodEndTs * 1000 : null;
-        } catch { return null; }
-      })()
-    : null;
-
-  const db = await getDb();
-  if (!db) return;
-
-  console.log(`[Stripe] invoice.paid — sub: ${subscriptionId}, periodEnd: ${periodEnd}`);
-
-  // ── 1. LMS Course/Quiz/Cohort enrollment ────────────────────────────────
-  try {
-    const [order] = await db.select().from(lmsOrders)
-      .where(eq(lmsOrders.stripeSubscriptionId, subscriptionId)).limit(1);
-    if (order) {
-      // Ensure enrollment still exists (may have been revoked on a previous failed payment)
-      const [enrollment] = await db.select().from(lmsEnrollments)
-        .where(and(eq(lmsEnrollments.userId, order.userId), eq(lmsEnrollments.courseId, order.courseId))).limit(1);
-      if (!enrollment) {
-        // Re-enroll
-        await db.insert(lmsEnrollments).values({
-          userId: order.userId,
-          courseId: order.courseId,
-          enrollmentType: "full",
-          orderId: order.id,
-        });
-        console.log(`[Stripe] LMS re-enrolled userId=${order.userId} courseId=${order.courseId} on renewal`);
-      } else {
-        console.log(`[Stripe] LMS enrollment confirmed on renewal: userId=${order.userId} courseId=${order.courseId}`);
-      }
-      // Update order status to paid
-      await db.update(lmsOrders).set({ status: "paid" }).where(eq(lmsOrders.id, order.id));
-    }
-  } catch (err) {
-    console.error(`[Stripe] handleInvoicePaid: LMS renewal error for sub ${subscriptionId}:`, err);
-  }
-
-  // ── 2. Membership subscription ──────────────────────────────────────────
-  try {
-    const [sub] = await db.select().from(membershipSubscriptions)
-      .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
-    if (sub) {
-      await db.update(membershipSubscriptions)
-        .set({ status: "active", currentPeriodEnd: periodEnd ?? undefined, updatedAt: new Date() })
-        .where(eq(membershipSubscriptions.id, sub.id));
-      // Also ensure brand membership is active
-      const accessItems = await db.select().from(membershipPlanAccess).where(eq(membershipPlanAccess.planId, sub.planId));
-      for (const item of accessItems) {
-        const brand = item.itemType.startsWith("ultrasoundassist") ? "all_about_ultrasound" : item.itemType.startsWith("echoassist") ? "iheartecho" : null;
-        if (!brand) continue;
-        const tier = item.itemType.endsWith("_premium") ? "premium" : "free";
-        const [bm] = await db.select().from(brandMemberships)
-          .where(and(eq(brandMemberships.userId, sub.userId), eq(brandMemberships.brand, brand as any))).limit(1);
-        if (bm && bm.status !== "active") {
-          await db.update(brandMemberships).set({ status: "active", tier: tier as any })
-            .where(eq(brandMemberships.id, bm.id));
-        }
-      }
-      console.log(`[Stripe] Membership subscription renewed: userId=${sub.userId} planId=${sub.planId}`);
-    }
-  } catch (err) {
-    console.error(`[Stripe] handleInvoicePaid: membership renewal error for sub ${subscriptionId}:`, err);
-  }
-
-  // Community / digital-bundle subscription renewals require columns not present on
-  // community_members or digital_bundle_purchases — handled at checkout.session.completed only.
-}
-
-/**
- * Handle customer.subscription.deleted — subscription fully cancelled.
- * Revokes access for LMS courses, memberships, and paid communities.
- */
-async function handleSubscriptionCancelled(subscription: Record<string, unknown>) {
-  const subscriptionId = subscription.id as string;
-  if (!subscriptionId) return;
-
-  const db = await getDb();
-  if (!db) return;
-
-  console.log(`[Stripe] customer.subscription.deleted — sub: ${subscriptionId}`);
-
-  // ── 1. LMS Course/Quiz/Cohort enrollment ────────────────────────────────
-  try {
-    const [order] = await db.select().from(lmsOrders)
-      .where(eq(lmsOrders.stripeSubscriptionId, subscriptionId)).limit(1);
-    if (order) {
-      // Remove enrollment — user loses access
-      await db.delete(lmsEnrollments)
-        .where(and(eq(lmsEnrollments.userId, order.userId), eq(lmsEnrollments.courseId, order.courseId)));
-      // Mark order failed — lms_orders.status enum: pending | paid | failed | refunded
-      await db.update(lmsOrders).set({ status: "failed" }).where(eq(lmsOrders.id, order.id));
-      console.log(`[Stripe] LMS enrollment revoked on cancellation: userId=${order.userId} courseId=${order.courseId}`);
-      await notifyOwner({
-        title: "📚 LMS Subscription Cancelled",
-        content: `Subscription ${subscriptionId} cancelled. LMS access revoked for userId=${order.userId}, courseId=${order.courseId}.`,
-      });
-    }
-  } catch (err) {
-    console.error(`[Stripe] handleSubscriptionCancelled: LMS revocation error for sub ${subscriptionId}:`, err);
-  }
-
-  // ── 2. Membership subscription ──────────────────────────────────────────
-  try {
-    const [sub] = await db.select().from(membershipSubscriptions)
-      .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
-    if (sub) {
-      await db.update(membershipSubscriptions)
-        .set({ status: "cancelled", updatedAt: new Date() })
-        .where(eq(membershipSubscriptions.id, sub.id));
-      // Revoke brand memberships granted by this plan
-      const accessItems = await db.select().from(membershipPlanAccess).where(eq(membershipPlanAccess.planId, sub.planId));
-      for (const item of accessItems) {
-        const brand = item.itemType.startsWith("ultrasoundassist") ? "all_about_ultrasound" : item.itemType.startsWith("echoassist") ? "iheartecho" : null;
-        if (!brand) continue;
-        await db.update(brandMemberships)
-          .set({ status: "cancelled", tier: "free" })
-          .where(and(eq(brandMemberships.userId, sub.userId), eq(brandMemberships.brand, brand as any)));
-      }
-      console.log(`[Stripe] Membership subscription cancelled: userId=${sub.userId} planId=${sub.planId}`);
-      await notifyOwner({
-        title: "🎫 Membership Subscription Cancelled",
-        content: `Subscription ${subscriptionId} cancelled. Membership access revoked for userId=${sub.userId}, planId=${sub.planId}.`,
-      });
-    }
-  } catch (err) {
-    console.error(`[Stripe] handleSubscriptionCancelled: membership revocation error for sub ${subscriptionId}:`, err);
-  }
-
-  // Community / digital-bundle subscription cancellation: no stripe_subscription_id on those tables.
-}
-
-/**
- * Re-process a Stripe checkout.session.completed event by session ID.
- * Used by the admin "Missed Payments" recovery tool.
- * Returns a summary of what was done.
- */
-export async function processStripeSessionById(sessionId: string): Promise<{ ok: boolean; message: string; actions: string[] }> {
-  const actions: string[] = [];
-  try {
-    const Stripe = (await import("stripe")).default;
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
-    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["line_items", "subscription"] });
-    if (session.status !== "complete" && session.payment_status !== "paid") {
-      return { ok: false, message: `Session ${sessionId} is not completed (status: ${session.status}, payment_status: ${session.payment_status})`, actions };
-    }
-    const sessionObj = session as unknown as Record<string, unknown>;
-    await handleCheckoutSessionCompleted(sessionObj); actions.push("handleCheckoutSessionCompleted");
-    await handleEmployerCheckoutCompleted(sessionObj); actions.push("handleEmployerCheckoutCompleted");
-    await handleLmsCheckoutCompleted(sessionObj); actions.push("handleLmsCheckoutCompleted");
-    await handleDigitalDownloadCheckoutCompleted(sessionObj); actions.push("handleDigitalDownloadCheckoutCompleted");
-    await handleDigitalBundleCheckoutCompleted(sessionObj); actions.push("handleDigitalBundleCheckoutCompleted");
-    await handleBrandMembershipCheckoutCompleted(sessionObj); actions.push("handleBrandMembershipCheckoutCompleted");
-    await handleDualMembershipCheckoutCompleted(sessionObj); actions.push("handleDualMembershipCheckoutCompleted");
-    await handlePhysicalProductCheckoutCompleted(sessionObj); actions.push("handlePhysicalProductCheckoutCompleted");
-    await handleMembershipCheckoutCompleted(sessionObj); actions.push("handleMembershipCheckoutCompleted");
-    await handleLmsBundlePurchaseCompleted(sessionObj); actions.push("handleLmsBundlePurchaseCompleted");
-    return { ok: true, message: `Session ${sessionId} re-processed successfully`, actions };
-  } catch (err: any) {
-    return { ok: false, message: `Failed to re-process session ${sessionId}: ${err?.message ?? String(err)}`, actions };
-  }
-}
-
-async function processStripeEvent(event: Record<string, unknown>, rawBody: string): Promise<void> {
   const eventType = event.type as string;
   const eventId = event.id as string;
   const logDb = await getDb();
@@ -1737,29 +1450,24 @@ async function processStripeEvent(event: Record<string, unknown>, rawBody: strin
   } catch (err) {
     console.warn("[Stripe] Failed to log webhook event:", err);
   }
+
   try {
     const sessionObj = (event.data as { object: Record<string, unknown> }).object;
     if (eventType === "checkout.session.completed") {
+      await handleFunnelCheckoutSessionCompleted(sessionObj);
       await handleCheckoutSessionCompleted(sessionObj);
       await handleEmployerCheckoutCompleted(sessionObj);
       await handleLmsCheckoutCompleted(sessionObj);
-      await handleFunnelCheckoutSessionCompleted(sessionObj);
       await handleDigitalDownloadCheckoutCompleted(sessionObj);
       await handleDigitalBundleCheckoutCompleted(sessionObj);
       await handleBrandMembershipCheckoutCompleted(sessionObj);
       await handleDualMembershipCheckoutCompleted(sessionObj);
       await handlePhysicalProductCheckoutCompleted(sessionObj);
       await handleMembershipCheckoutCompleted(sessionObj);
-      await handleLmsBundlePurchaseCompleted(sessionObj);
     } else if (eventType === "payment_intent.succeeded") {
       await handleFunnelPaymentIntentSucceeded(sessionObj);
-    } else if (eventType === "customer.subscription.deleted") {
+    } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
       await handleBrandSubscriptionLifecycle(sessionObj, eventType);
-      await handleSubscriptionCancelled(sessionObj);
-    } else if (eventType === "customer.subscription.updated") {
-      await handleBrandSubscriptionLifecycle(sessionObj, eventType);
-    } else if (eventType === "invoice.paid") {
-      await handleInvoicePaid(sessionObj);
     } else if (eventType === "invoice.payment_failed") {
       await handleInvoicePaymentFailed(sessionObj);
     } else {
@@ -1768,64 +1476,12 @@ async function processStripeEvent(event: Record<string, unknown>, rawBody: strin
   } catch (err) {
     console.error(`[Stripe] Error handling event ${eventType}:`, err);
   }
-}
 
-async function verifyAndParseStripeEvent(
-  rawBody: Buffer,
-  sig: string | undefined
-): Promise<{ event: Record<string, unknown> } | { error: string; status: number }> {
-  const rawBodyStr = rawBody.toString("utf8");
-  const secret = getStripeWebhookSecret();
-  if (secret && sig) {
-    try {
-      const crypto = await import("crypto");
-      const parts = sig.split(",");
-      const tPart = parts.find((p) => p.startsWith("t="));
-      const v1Part = parts.find((p) => p.startsWith("v1="));
-      if (!tPart || !v1Part) throw new Error("Invalid signature format");
-      const timestamp = tPart.slice(2);
-      const expectedSig = v1Part.slice(3);
-      const payload = `${timestamp}.${rawBodyStr}`;
-      const hmac = crypto.createHmac("sha256", secret).update(payload).digest("hex");
-      if (hmac !== expectedSig) throw new Error("Signature mismatch");
-      return { event: JSON.parse(rawBodyStr) as Record<string, unknown> };
-    } catch (err) {
-      console.error("[Stripe] Webhook signature verification failed:", err);
-      return { error: "Invalid signature", status: 400 };
-    }
-  }
-  try {
-    return { event: JSON.parse(rawBodyStr) as Record<string, unknown> };
-  } catch {
-    return { error: "Invalid JSON", status: 400 };
-  }
-}
-
-function stripeWebhookRequestHandler(req: Request, res: Response): void {
-  const rawBody = req.body as Buffer;
-  const sig = req.headers["stripe-signature"] as string | undefined;
-  void (async () => {
-    const parsed = await verifyAndParseStripeEvent(rawBody, sig);
-    if ("error" in parsed) {
-      res.status(parsed.status).json({ error: parsed.error });
-      return;
-    }
-    res.status(200).json({ received: true });
-    setImmediate(() => {
-      processStripeEvent(parsed.event, rawBody.toString("utf8")).catch((err) => {
-        console.error("[Stripe] Async webhook processing failed:", err);
-      });
-    });
-  })().catch((err) => {
-    console.error("[Stripe] Webhook handler error:", err);
-    if (!res.headersSent) res.status(500).json({ error: "Webhook handler error" });
-  });
+  res.json({ received: true });
 }
 
 export function registerStripeWebhook(app: Express) {
-  const rawJson = express.raw({ type: "application/json" });
-  for (const path of ["/api/webhooks/stripe", "/api/stripe/webhook"]) {
-    app.post(path, rawJson, stripeWebhookRequestHandler);
-  }
+  app.post("/api/webhooks/stripe", stripeWebhookRawBody, stripeWebhookHandler);
+  app.post("/api/stripe/webhook", stripeWebhookRawBody, stripeWebhookHandler);
   console.log("[Stripe] Webhook registered at /api/webhooks/stripe and /api/stripe/webhook");
 }

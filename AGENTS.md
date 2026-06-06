@@ -17,9 +17,12 @@ Single full-stack TypeScript monolith (Express + React/Vite + tRPC). Not a monor
 ### Running the dev server
 
 ```bash
-export JWT_SECRET="any-32-char-string"
+export JWT_SECRET="any-32-char-string-at-least-32"
+export STRIPE_SECRET_KEY="sk_test_dummy_key_for_local_dev"  # any non-empty test key
 pnpm dev
 ```
+
+Both `JWT_SECRET` and `STRIPE_SECRET_KEY` are required to start the server (`dashboardRouter.ts` instantiates Stripe at import time). Use a dummy `sk_test_…` value for local dev when Stripe is not configured.
 
 The server starts on port 3000 (auto-scans for next available port if busy). No database is required to start — the app handles missing `DATABASE_URL` gracefully, returning "DB unavailable" errors from tRPC endpoints.
 
@@ -31,11 +34,11 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 1. **Vite HMR in Cloud VMs**: The `vite.config.ts` sets `hmr.clientPort: 443` and `hmr.protocol: "wss"` for the Manus sandbox proxy. In Cloud Agent VMs, this causes Chrome to hang when loading the dev server UI (hundreds of module requests + failed WSS connection). **Workaround**: Use `pnpm build && node dist/index.js` to verify UI rendering in browser, or rely on curl/tests for API verification. The dev server itself works correctly for API development.
 
-2. **Tests without DATABASE_URL**: 807/817 tests pass without a database. The 10 failures are in `server/scanCoachAdmin.test.ts` — these specifically require a live MySQL connection and throw "DB unavailable". All other test files mock or skip DB-dependent paths gracefully.
+2. **Tests without DATABASE_URL**: Run tests with `JWT_SECRET` and `STRIPE_SECRET_KEY` set (same as dev server); otherwise any test file that imports `appRouter` fails at collection time. Without a database, expect ~10 failures in `server/scanCoachAdmin.test.ts` (live MySQL required) plus a handful of env-gated failures (SendGrid, Thinkific GraphQL, LMS email vars). The majority of the ~817 tests pass without `DATABASE_URL`.
 
-3. **TypeScript check has pre-existing errors**: `tsc --noEmit` reports ~18 type errors in client-side pages (mostly type mismatches between tRPC router returns and component usage). These are pre-existing and do not block the build or tests.
+3. **TypeScript check has pre-existing errors**: `tsc --noEmit` reports type errors in client-side pages and some server files (mostly type mismatches between tRPC router returns and component usage). These are pre-existing and do not block the build or tests.
 
-4. **Environment variables**: See `RAILWAY_DEPLOY.md` for the full list. For local dev, only `JWT_SECRET` is strictly required to start the server. `DATABASE_URL` (MySQL connection string) is needed for any DB-dependent features.
+4. **Environment variables**: See `RAILWAY_DEPLOY.md` for the full list. For local dev, `JWT_SECRET` and `STRIPE_SECRET_KEY` (dummy test key OK) are required to start the server or run tests that load `appRouter`. `DATABASE_URL` (MySQL connection string) is needed for any DB-dependent features.
 
 5. **pnpm build scripts warning**: On fresh `pnpm install`, you'll see a warning about ignored build scripts for `@tailwindcss/oxide`, `core-js`, `esbuild`. These packages still work correctly without running their postinstall scripts in this environment.
 
@@ -48,6 +51,7 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 6. **Stripe webhooks**: `registerStripeWebhook(app)` is registered **before** `express.json()` so raw body + signature verification work. Production endpoint: `https://app.allaboutultrasound.com/api/stripe/webhook` (also `/api/webhooks/stripe`). The handler responds 200 immediately and processes events asynchronously to avoid Stripe timeouts.
 
 7. **SDMS CME tables**: Run `scripts/sdms-cme-migration.sql` against MySQL before using SDMS CME features. Admin configures per-activity SDMS settings under LMS course/cohort Settings or Webinar Settings. Learner CME module appears in the course player when enabled. API credentials are AES-encrypted at rest using `JWT_SECRET`; never exposed to the client.
+6. **No ESLint script**: Formatting is via Prettier only (`pnpm format` / `pnpm exec prettier --check .`). There is no `pnpm lint` target in `package.json`.
 
 ### Key file locations
 
