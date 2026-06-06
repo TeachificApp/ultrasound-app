@@ -43,48 +43,53 @@ export const DIY_PLANS = {
   starter: {
     name: "Accreditation Starter",
     price: "$397/mo",
+    stripePriceCents: 39700,
     totalSeats: 5,
     labAdminSeats: 1,
     memberSeats: 4,
     isUnlimitedMembers: false,
-    checkoutUrl: "https://member.allaboutultrasound.com/enroll/3706401?price_id=4655411",
+    checkoutUrl: "/diy-accreditation/plans",
     thinkificProductId: 3706401,
     bestFor: "Small labs, new echo labs, or single-location clinics beginning the accreditation process.",
   },
   professional: {
     name: "Accreditation Professional",
     price: "$997/mo",
+    stripePriceCents: 99700,
     totalSeats: 15,
     labAdminSeats: 2,
     memberSeats: 13,
     isUnlimitedMembers: false,
-    checkoutUrl: "https://member.allaboutultrasound.com/enroll/3706397?price_id=4655406",
+    checkoutUrl: "/diy-accreditation/plans",
     thinkificProductId: 3706397,
     bestFor: "Growing labs implementing structured QA/QI and peer review programs.",
   },
   advanced: {
     name: "Accreditation Advanced",
     price: "$1,697/mo",
+    stripePriceCents: 169700,
     totalSeats: 50,
     labAdminSeats: 5,
     memberSeats: 45,
     isUnlimitedMembers: false,
-    checkoutUrl: "https://member.allaboutultrasound.com/enroll/3706392?price_id=4655402",
+    checkoutUrl: "/diy-accreditation/plans",
     thinkificProductId: 3706392,
     bestFor: "Large labs, multi-site organizations, hospital departments, and IDTF groups.",
   },
   partner: {
     name: "Accreditation Partner",
     price: "$2,497/mo",
+    stripePriceCents: 249700,
     totalSeats: 9999, // unlimited
     labAdminSeats: 10,
     memberSeats: 9999, // unlimited
     isUnlimitedMembers: true,
-    checkoutUrl: "https://member.allaboutultrasound.com/enroll/3706344?price_id=4655349",
+    checkoutUrl: "/diy-accreditation/plans",
     thinkificProductId: 3706344,
     bestFor: "Labs that want ongoing expert guidance while using the platform.",
   },
 } as const;
+export type DiyPlanKey = "starter" | "professional" | "advanced" | "partner";
 
 export const CONCIERGE_CHECKOUT_URL = "https://buy.stripe.com/7sYcN475Lcs94Nm3hH9R604";
 export const THINKIFIC_FREE_MEMBERSHIP_URL = "https://member.allaboutultrasound.com/bundles/free-membership";
@@ -752,5 +757,52 @@ export const diyRouter = router({
         .where(eq(diySubscriptions.orgId, input.orgId));
 
       return { success: true };
+    }),
+
+  // ── Create Stripe Checkout for DIY Accreditation plan ───────────────────────
+  createDiyCheckout: protectedProcedure
+    .input(z.object({
+      plan: z.enum(["starter", "professional", "advanced", "partner"]),
+      orgName: z.string().min(2).max(300).optional(),
+      origin: z.string().url(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const planConfig = DIY_PLANS[input.plan];
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        customer_email: ctx.user.email ?? undefined,
+        allow_promotion_codes: true,
+        line_items: [{
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: planConfig.name,
+              description: `DIY Accreditation — ${planConfig.bestFor}`,
+              metadata: { diy_plan: input.plan, product_type: "diy_accreditation" },
+            },
+            unit_amount: planConfig.stripePriceCents,
+            recurring: { interval: "month", interval_count: 1 },
+          },
+          quantity: 1,
+        }],
+        subscription_data: {
+          description: `${planConfig.name} — Monthly Subscription`,
+          metadata: { user_id: ctx.user.id.toString(), diy_plan: input.plan, product_type: "diy_accreditation" },
+        },
+        success_url: `${input.origin}/diy-accreditation/welcome?plan=${input.plan}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${input.origin}/diy-accreditation/plans`,
+        client_reference_id: ctx.user.id.toString(),
+        metadata: {
+          user_id: ctx.user.id.toString(),
+          customer_email: ctx.user.email ?? "",
+          customer_name: ctx.user.name ?? "",
+          diy_plan: input.plan,
+          org_name: input.orgName ?? "My Organization",
+          product_type: "diy_accreditation",
+        },
+      });
+      return { checkoutUrl: session.url };
     }),
 });

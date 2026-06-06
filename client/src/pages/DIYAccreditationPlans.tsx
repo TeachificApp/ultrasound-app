@@ -12,9 +12,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Shield, Zap, Star, Crown, Check, Lock, Users, Building2,
   ClipboardList, FileText, BarChart2, BookOpen, ChevronDown,
-  ChevronUp, ExternalLink
+  ChevronUp, Loader2
 } from "lucide-react";
 import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 const BRAND = "#189aa1";
 const BRAND_DARK = "#0e4a50";
@@ -168,6 +170,32 @@ const FAQS = [
 export default function DIYAccreditationPlans() {
   const { isAuthenticated } = useAuth();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const createDiyCheckout = trpc.diy.createDiyCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, "_blank");
+        toast.success("Redirecting to checkout...");
+      }
+      setLoadingPlan(null);
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to start checkout. Please try again.");
+      setLoadingPlan(null);
+    },
+  });
+
+  function handleGetStarted(planId: string) {
+    if (!isAuthenticated) {
+      window.location.href = "/login?returnTo=/diy-accreditation/plans";
+      return;
+    }
+    setLoadingPlan(planId);
+    createDiyCheckout.mutate({
+      plan: planId as "starter" | "professional" | "advanced" | "partner",
+      origin: window.location.origin,
+    });
+  }
 
   return (
     <Layout>
@@ -298,12 +326,18 @@ export default function DIYAccreditationPlans() {
                   <p className="text-xs text-gray-500 italic mb-4 leading-relaxed">{plan.bestFor}</p>
 
                   {/* CTA */}
-                  <a href={plan.checkoutUrl} target="_blank" rel="noopener noreferrer" className="block">
-                    <Button className="w-full text-white font-semibold"
-                      style={{ background: plan.popular ? BRAND : plan.color }}>
-                      Get Started <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
-                    </Button>
-                  </a>
+                  <Button
+                    className="w-full text-white font-semibold"
+                    style={{ background: plan.popular ? BRAND : plan.color }}
+                    disabled={loadingPlan === plan.id}
+                    onClick={() => handleGetStarted(plan.id)}
+                  >
+                    {loadingPlan === plan.id ? (
+                      <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Processing...</>
+                    ) : (
+                      "Get Started"
+                    )}
+                  </Button>
                 </div>
 
                 {/* Features */}

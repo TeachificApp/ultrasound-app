@@ -1620,6 +1620,7 @@ export const diySubscriptions = mysqlTable("diySubscriptions", {
   // Billing cycle
   billingCycleStart: timestamp("billingCycleStart"),
   billingCycleEnd: timestamp("billingCycleEnd"),
+  currentPeriodEnd: timestamp("currentPeriodEnd"),
   trialEndsAt: timestamp("trialEndsAt"),
   canceledAt: timestamp("canceledAt"),
   notes: text("notes"),

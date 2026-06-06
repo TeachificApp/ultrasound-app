@@ -1,14 +1,16 @@
 /**
- * Register.tsx — Redirects to Thinkific Free Membership enrollment.
- * All new user registrations are handled through Thinkific.
- * Once enrolled, the Thinkific webhook grants the user access to the app.
+ * Register.tsx — Native free membership registration.
+ * Users sign up directly through the app's OAuth flow.
+ * Free membership is granted automatically on first login.
+ * Existing Thinkific members are synced nightly and also receive free access.
  */
 import { useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { getThinkificFreeUrl } from "@/const";
-import { Loader2, Heart, ExternalLink, CheckCircle2 } from "lucide-react";
+import { getLoginUrl } from "@/const";
+import { Loader2, Heart, CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 const BRAND = "#189aa1";
@@ -21,14 +23,6 @@ export default function Register() {
   useEffect(() => {
     if (!loading && isAuthenticated) navigate("/");
   }, [isAuthenticated, loading, navigate]);
-
-  // Auto-redirect to Thinkific enrollment after a short delay
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      window.location.href = getThinkificFreeUrl();
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, []);
 
   if (loading) {
     return (
@@ -56,7 +50,7 @@ export default function Register() {
           Create Your Free Account
         </h1>
         <p className="text-gray-500 text-sm mb-6">
-          All About Ultrasound™ membership is managed through All About Ultrasound™. You'll be redirected to complete your free enrollment.
+          Sign up in seconds and get instant access to free tools. No credit card required.
         </p>
 
         {/* Benefits */}
@@ -74,38 +68,25 @@ export default function Register() {
           ))}
         </div>
 
-        {/* Redirect notice */}
-        <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-5">
-          <Loader2 className="w-4 h-4 animate-spin" style={{ color: BRAND }} />
-          <span>Redirecting to enrollment in a moment…</span>
-        </div>
-
-        {/* Manual redirect button */}
-        <a href={getThinkificFreeUrl()} className="block w-full">
-          <Button className="w-full gap-2 text-white" style={{ background: BRAND }}>
-            <ExternalLink className="w-4 h-4" />
-            Go to Free Enrollment Now
+        {/* CTA */}
+        <a href={getLoginUrl("/")} className="block w-full">
+          <Button className="w-full gap-2 text-white text-base py-5" style={{ background: BRAND }}>
+            Get Started — It's Free
+            <ArrowRight className="w-4 h-4" />
           </Button>
         </a>
 
         <p className="text-xs text-gray-400 mt-4">
           Already have an account?{" "}
-          <a href="/login" className="font-medium hover:underline" style={{ color: BRAND }}>
+          <Link href="/login" className="font-medium hover:underline" style={{ color: BRAND }}>
             Sign in
-          </a>
+          </Link>
         </p>
-
         <p className="text-xs text-gray-400 mt-2">
-          Want to learn more first?{" "}
-          <a
-            href={THINKIFIC_FREE_MEMBERSHIP_PAGE}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium hover:underline"
-            style={{ color: BRAND }}
-          >
-            View membership details
-          </a>
+          Want premium features?{" "}
+          <Link href="/premium" className="font-medium hover:underline" style={{ color: BRAND }}>
+            View plans
+          </Link>
         </p>
       </div>
     </div>

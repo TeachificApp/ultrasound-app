@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -1313,6 +1313,176 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
 }
 
 /**
+ * Handle invoice.paid — confirm subscription renewal and extend expiresAt for all brand/DIY memberships.
+ */
+async function handleInvoicePaid(invoice: Record<string, unknown>) {
+  const subscriptionId = invoice.subscription as string | null;
+  if (!subscriptionId) return;
+  const db = await getDb();
+  if (!db) return;
+  const periodEnd = (invoice.lines as any)?.data?.[0]?.period?.end as number | undefined;
+  const expiresAt = periodEnd ? new Date(periodEnd * 1000) : null;
+  // Update brandMemberships
+  const [membership] = await db.select().from(brandMemberships)
+    .where(eq(brandMemberships.stripeSubscriptionId, subscriptionId)).limit(1);
+  if (membership) {
+    await db.update(brandMemberships)
+      .set({ status: "active", tier: "premium", ...(expiresAt ? { expiresAt } : {}) })
+      .where(eq(brandMemberships.stripeSubscriptionId, subscriptionId));
+    console.log(`[Stripe] invoice.paid — brand membership renewed: user ${membership.userId}, brand ${membership.brand}`);
+    // For dual memberships, update both brand rows
+    if (membership.source === "stripe_dual") {
+      await db.update(brandMemberships)
+        .set({ status: "active", tier: "premium", ...(expiresAt ? { expiresAt } : {}) })
+        .where(and(eq(brandMemberships.userId, membership.userId), eq(brandMemberships.source, "stripe_dual")));
+    }
+  }
+  // Update membershipSubscriptions
+  const [memSub] = await db.select().from(membershipSubscriptions)
+    .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
+  if (memSub) {
+    await db.update(membershipSubscriptions)
+      .set({ status: "active", ...(expiresAt ? { currentPeriodEnd: expiresAt.getTime() } : {}) })
+      .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId));
+    console.log(`[Stripe] invoice.paid — membership subscription renewed: id ${memSub.id}`);
+  }
+  // Update DIY subscriptions
+  const [diySub] = await db.select().from(diySubscriptions)
+    .where(eq(diySubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
+  if (diySub) {
+    await db.update(diySubscriptions)
+      .set({ status: "active", ...(expiresAt ? { currentPeriodEnd: expiresAt } : {}) })
+      .where(eq(diySubscriptions.stripeSubscriptionId, subscriptionId));
+    console.log(`[Stripe] invoice.paid — DIY subscription renewed: id ${diySub.id}`);
+  }
+}
+
+// DIY plan config (mirrors diyRouter.ts DIY_PLANS)
+const DIY_PLAN_CONFIG: Record<string, { totalSeats: number; labAdminSeats: number; memberSeats: number; isUnlimitedMembers: boolean; thinkificProductId: number }> = {
+  starter:      { totalSeats: 5,    labAdminSeats: 1,  memberSeats: 4,    isUnlimitedMembers: false, thinkificProductId: 3706401 },
+  professional: { totalSeats: 15,   labAdminSeats: 2,  memberSeats: 13,   isUnlimitedMembers: false, thinkificProductId: 3706397 },
+  advanced:     { totalSeats: 50,   labAdminSeats: 5,  memberSeats: 45,   isUnlimitedMembers: false, thinkificProductId: 3706392 },
+  partner:      { totalSeats: 9999, labAdminSeats: 10, memberSeats: 9999, isUnlimitedMembers: true,  thinkificProductId: 3706344 },
+};
+
+/**
+ * Handle DIY Accreditation checkout.session.completed — create org + subscription natively.
+ */
+async function handleDiyCheckoutCompleted(session: Record<string, unknown>) {
+  const metadata = (session.metadata as Record<string, string>) ?? {};
+  if (metadata.product_type !== "diy_accreditation") return;
+  const customerEmail = (session.customer_email as string)
+    ?? (session.customer_details as Record<string, string>)?.email;
+  const plan = metadata.diy_plan as "starter" | "professional" | "advanced" | "partner" | undefined;
+  const orgName = metadata.org_name ?? "My Organization";
+  const subscriptionId = session.subscription as string | null;
+  const customerId = session.customer as string | null;
+  if (!customerEmail || !plan || !DIY_PLAN_CONFIG[plan]) {
+    console.warn("[Stripe] handleDiyCheckoutCompleted: missing email, plan, or unknown plan in metadata");
+    return;
+  }
+  const db = await getDb();
+  if (!db) return;
+  const planConfig = DIY_PLAN_CONFIG[plan];
+  const user = await getOrCreateUserByEmail({ email: customerEmail });
+  if (!user?.user) {
+    console.warn(`[Stripe] handleDiyCheckoutCompleted: could not find/create user for ${customerEmail}`);
+    return;
+  }
+  const userId = user.user.id;
+  // Check if user already owns an org
+  const [existing] = await db.select().from(diyOrganizations)
+    .where(eq(diyOrganizations.ownerUserId, userId)).limit(1);
+  if (existing) {
+    const [existingSub] = await db.select().from(diySubscriptions)
+      .where(eq(diySubscriptions.orgId, existing.id)).limit(1);
+    if (existingSub) {
+      await db.update(diySubscriptions).set({
+        plan, status: "active",
+        totalSeats: planConfig.totalSeats, labAdminSeats: planConfig.labAdminSeats,
+        memberSeats: planConfig.memberSeats, isUnlimitedMembers: planConfig.isUnlimitedMembers,
+        stripeSubscriptionId: subscriptionId ?? existingSub.stripeSubscriptionId,
+        stripeCustomerId: customerId ?? existingSub.stripeCustomerId,
+      }).where(eq(diySubscriptions.id, existingSub.id));
+    }
+    return;
+  }
+  // Create new org
+  const [orgResult] = await db.insert(diyOrganizations).values({ ownerUserId: userId, name: orgName });
+  const orgId = (orgResult as any).insertId as number;
+  const [subResult] = await db.insert(diySubscriptions).values({
+    orgId, plan, status: "active",
+    totalSeats: planConfig.totalSeats, labAdminSeats: planConfig.labAdminSeats,
+    memberSeats: planConfig.memberSeats, isUnlimitedMembers: planConfig.isUnlimitedMembers,
+    thinkificProductId: planConfig.thinkificProductId,
+    stripeSubscriptionId: subscriptionId ?? null, stripeCustomerId: customerId ?? null,
+  });
+  const diySubId = (subResult as any).insertId as number;
+  await db.insert(diyOrgMembers).values({
+    orgId, subscriptionId: diySubId, userId,
+    inviteEmail: customerEmail,
+    displayName: user.user.name ?? user.user.displayName ?? null,
+    diyRole: "super_admin",
+    canManageWorkflows: true, canUploadPolicies: true, canAssignTasks: true,
+    canManageStaff: true, canViewAnalytics: true, canViewPolicyBuilder: true,
+    canViewCaseStudies: true, canViewReadiness: true,
+    inviteStatus: "accepted", joinedAt: new Date(), isActive: true,
+  });
+  await db.insert(userRoles).values({ userId, role: "diy_admin", grantedByLabId: orgId, assignedByUserId: userId });
+  // Grant AAUS premium access for Lab Admins
+  const [existingMem] = await db.select().from(brandMemberships)
+    .where(and(eq(brandMemberships.userId, userId), eq(brandMemberships.brand, "aaus"))).limit(1);
+  if (!existingMem) {
+    await db.insert(brandMemberships).values({ userId, brand: "aaus", tier: "premium", status: "active", source: "diy_accreditation" });
+  } else if (existingMem.tier !== "premium") {
+    await db.update(brandMemberships).set({ tier: "premium", status: "active", source: "diy_accreditation" })
+      .where(eq(brandMemberships.id, existingMem.id));
+  }
+  await notifyOwner({
+    title: `New DIY Accreditation Org: ${orgName}`,
+    content: `Plan: ${plan}\nOrg: ${orgName}\nOwner: ${customerEmail}\nUser ID: ${userId}\nStripe Sub: ${subscriptionId ?? "N/A"}`,
+  });
+  console.log(`[Stripe] DIY checkout completed: org ${orgId}, plan ${plan}, user ${userId}`);
+}
+
+/**
+ * Handle DIY subscription lifecycle (renewal, cancellation, plan change).
+ */
+async function handleDiySubscriptionLifecycle(subscription: Record<string, unknown>, eventType: string) {
+  const subscriptionId = subscription.id as string;
+  if (!subscriptionId) return;
+  const db = await getDb();
+  if (!db) return;
+  const [diySub] = await db.select().from(diySubscriptions)
+    .where(eq(diySubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
+  if (!diySub) return;
+  const status = subscription.status as string;
+  const periodEnd = subscription.current_period_end as number | undefined;
+  const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
+  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
+    await db.update(diySubscriptions)
+      .set({ status: "canceled" })
+      .where(eq(diySubscriptions.id, diySub.id));
+    console.log(`[Stripe] DIY subscription cancelled: sub ${diySub.id}`);
+  } else if (status === "past_due") {
+    await db.update(diySubscriptions)
+      .set({ status: "past_due" })
+      .where(eq(diySubscriptions.id, diySub.id));
+  } else if (status === "active") {
+    const items = (subscription.items as any)?.data as Array<{ price: { metadata?: Record<string, string> } }> | undefined;
+    const newPlan = items?.[0]?.price?.metadata?.diy_plan as string | undefined;
+    const planUpdate = newPlan && DIY_PLAN_CONFIG[newPlan] ? {
+      plan: newPlan as "starter" | "professional" | "advanced" | "partner",
+      ...DIY_PLAN_CONFIG[newPlan],
+    } : {};
+    await db.update(diySubscriptions)
+      .set({ status: "active", ...(currentPeriodEnd ? { currentPeriodEnd } : {}), ...planUpdate })
+      .where(eq(diySubscriptions.id, diySub.id));
+    console.log(`[Stripe] DIY subscription active: sub ${diySub.id}${newPlan ? `, plan: ${newPlan}` : ""}`);
+  }
+}
+
+/**
  * Handle invoice.payment_failed — retry for 3 days, then cancel subscription and revoke access.
  * Logic:
  *   - Always send a payment failed email with a link to update payment method.
@@ -1464,10 +1634,14 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       await handleDualMembershipCheckoutCompleted(sessionObj);
       await handlePhysicalProductCheckoutCompleted(sessionObj);
       await handleMembershipCheckoutCompleted(sessionObj);
+      await handleDiyCheckoutCompleted(sessionObj);
     } else if (eventType === "payment_intent.succeeded") {
       await handleFunnelPaymentIntentSucceeded(sessionObj);
     } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
       await handleBrandSubscriptionLifecycle(sessionObj, eventType);
+      await handleDiySubscriptionLifecycle(sessionObj, eventType);
+    } else if (eventType === "invoice.paid") {
+      await handleInvoicePaid(sessionObj);
     } else if (eventType === "invoice.payment_failed") {
       await handleInvoicePaymentFailed(sessionObj);
     } else {

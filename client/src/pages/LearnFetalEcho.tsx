@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
 import { ArrowLeft, BookOpen, Crown, ExternalLink, GraduationCap, Heart, Lock } from "lucide-react";
-import { THINKIFIC_LINKS } from "@shared/appConstants";
 
 const courses = [
   {
@@ -85,9 +84,9 @@ export default function LearnFetalEcho() {
                 <span className="font-semibold">Premium</span>
                 <span className="text-muted-foreground"> unlocks all courses</span>
               </div>
-              <a href={THINKIFIC_LINKS.premiumMonthly} target="_blank" rel="noopener noreferrer">
+              <Link href="/premium">
                 <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs">Upgrade</Button>
-              </a>
+              </Link>
             </CardContent>
           </Card>
         )}
@@ -144,17 +143,17 @@ export default function LearnFetalEcho() {
                   </div>
 
                   {isLocked ? (
-                    <a href={THINKIFIC_LINKS.premiumMonthly} target="_blank" rel="noopener noreferrer">
+                    <Link href="/premium">
                       <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs w-full gap-1">
                         <Crown size={12} /> Upgrade to Access
                       </Button>
-                    </a>
+                    </Link>
                   ) : (
-                    <a href={THINKIFIC_LINKS.freeMembership} target="_blank" rel="noopener noreferrer">
+                    <Link href="/register">
                       <Button size="sm" className="w-full gap-1 text-xs">
-                        <ExternalLink size={12} /> Start Course on Thinkific
+                        <ExternalLink size={12} /> Get Free Access
                       </Button>
-                    </a>
+                    </Link>
                   )}
                 </CardContent>
               </Card>
