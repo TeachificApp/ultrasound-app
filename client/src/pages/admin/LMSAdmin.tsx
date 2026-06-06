@@ -66,6 +66,7 @@ import { WebinarsAdmin } from "./WebinarsAdmin";
 import BundlesAdmin from "./BundlesAdmin";
 import MembershipsAdmin from "./MembershipsAdmin";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
+import { CohortResourcesAdminSection } from "@/components/cohort/CohortResourcesAdminSection";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -10261,7 +10262,7 @@ function CurriculumEmbedTab({ course }: { course: any }) {
 }
 
 function CohortTab({ courseId }: { courseId: number }) {
-  const [activeTab, setActiveTab] = useState<"settings" | "groups" | "sessions" | "assignments" | "recordings" | "discussions">("settings");
+  const [activeTab, setActiveTab] = useState<"settings" | "groups" | "sessions" | "assignments" | "recordings" | "resources" | "discussions">("settings");
   // Multi-cohort mode toggle
   const { data: courseData, refetch: refetchCourse } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
   const updateCourse = trpc.lmsAdmin.updateCourse.useMutation({ onSuccess: () => { refetchCourse(); toast.success("Cohort settings saved"); }, onError: (e) => toast.error(e.message) });
@@ -10703,11 +10704,11 @@ function CohortTab({ courseId }: { courseId: number }) {
     <div className="space-y-4">
       {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-gray-200 pb-0">
-        {(["settings", "groups", "sessions", "assignments", "recordings", "discussions"] as const).map(t => (
+        {(["settings", "groups", "sessions", "assignments", "recordings", "resources", "discussions"] as const).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize",
               activeTab === t ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700")}>
-            {t === "sessions" ? "Live Sessions" : t === "assignments" ? "Assignments" : t === "recordings" ? "Recordings" : t === "groups" ? "Cohort Groups" : t === "discussions" ? "Discussions" : "Settings"}
+            {t === "sessions" ? "Live Sessions" : t === "assignments" ? "Assignments" : t === "recordings" ? "Recordings" : t === "resources" ? "Resources" : t === "groups" ? "Cohort Groups" : t === "discussions" ? "Discussions" : "Settings"}
           </button>
         ))}
       </div>
@@ -10975,6 +10976,18 @@ function CohortTab({ courseId }: { courseId: number }) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Resources Tab */}
+      {activeTab === "resources" && (
+        <CohortResourcesAdminSection
+          courseId={courseId}
+          multiCohortMode={multiCohortMode}
+          cohortGroups={cohortGroups as { id: number; name: string }[]}
+          effectiveGroupId={effectiveGroupId}
+          contentGroupId={contentGroupId}
+          onContentGroupChange={setContentGroupId}
+        />
       )}
 
       {/* Recordings Tab */}

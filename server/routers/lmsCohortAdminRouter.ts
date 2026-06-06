@@ -19,6 +19,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or } from "drizzle-orm";
+import { enrichCohortResources } from "../lib/cohortResources";
 import { randomBytes } from "crypto";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
@@ -69,6 +70,7 @@ import {
   lmsCohortSessions,
   lmsCohortAssignments,
   lmsCohortRecordings,
+  lmsCohortResources,
   lmsCohortSubmissions,
   mediaUploadFolders,
   mediaUploadResponses,
@@ -441,6 +443,158 @@ export const lmsCohortAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(lmsCohortRecordings).where(eq(lmsCohortRecordings.id, input.id));
+      return { success: true };
+    }),
+
+  // ── Cohort Resources ───────────────────────────────────────────────────────────
+  listCohortResources: protectedProcedure
+    .input(z.object({ courseId: z.number(), cohortGroupId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const whereClause = input.cohortGroupId
+        ? and(
+            eq(lmsCohortResources.courseId, input.courseId),
+            or(isNull(lmsCohortResources.cohortGroupId), eq(lmsCohortResources.cohortGroupId, input.cohortGroupId)),
+          )
+        : eq(lmsCohortResources.courseId, input.courseId);
+      const rows = await db
+        .select()
+        .from(lmsCohortResources)
+        .where(whereClause)
+        .orderBy(asc(lmsCohortResources.position), asc(lmsCohortResources.createdAt));
+      return enrichCohortResources(db, rows);
+    }),
+
+  listDownloadsForCohortResource: protectedProcedure
+    .input(z.object({ search: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db
+        .select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug })
+        .from(digitalProducts)
+        .where(eq(digitalProducts.status, "published"))
+        .orderBy(asc(digitalProducts.title))
+        .limit(100);
+      if (!input?.search?.trim()) return rows;
+      const q = input.search.trim().toLowerCase();
+      return rows.filter((r) => r.title.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q));
+    }),
+
+  createCohortResource: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      scope: z.enum(["course", "cohort"]),
+      cohortGroupId: z.number().optional(),
+      title: z.string().min(1).max(255),
+      description: z.string().optional(),
+      cardImageUrl: z.string().optional(),
+      actionType: z.enum(["link", "download"]),
+      linkUrl: z.string().optional(),
+      downloadSource: z.enum(["upload", "media_repo", "download_product"]).optional(),
+      fileUrl: z.string().optional(),
+      fileKey: z.string().optional(),
+      fileName: z.string().optional(),
+      mediaAssetId: z.number().optional(),
+      downloadProductId: z.number().optional(),
+      status: z.enum(["draft", "published"]).default("draft"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (input.actionType === "link" && !input.linkUrl?.trim()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Link URL is required for link resources" });
+      }
+      if (input.actionType === "download") {
+        if (!input.downloadSource) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Download source is required" });
+        }
+        if (input.downloadSource === "upload" && !input.fileUrl?.trim()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Upload a file or provide a file URL" });
+        }
+        if (input.downloadSource === "media_repo" && !input.mediaAssetId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Select a media repository file" });
+        }
+        if (input.downloadSource === "download_product" && !input.downloadProductId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Select a download product" });
+        }
+      }
+      if (input.scope === "cohort" && !input.cohortGroupId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cohort group is required for cohort-only resources" });
+      }
+      const [{ maxPos }] = await db
+        .select({ maxPos: sql<number>`COALESCE(MAX(position),0)` })
+        .from(lmsCohortResources)
+        .where(eq(lmsCohortResources.courseId, input.courseId));
+      const [result] = await db.insert(lmsCohortResources).values({
+        courseId: input.courseId,
+        cohortGroupId: input.scope === "cohort" ? (input.cohortGroupId ?? null) : null,
+        title: input.title.trim(),
+        description: input.description ?? null,
+        cardImageUrl: input.cardImageUrl ?? null,
+        actionType: input.actionType,
+        linkUrl: input.actionType === "link" ? input.linkUrl!.trim() : null,
+        downloadSource: input.actionType === "download" ? input.downloadSource! : null,
+        fileUrl: input.downloadSource === "upload" ? (input.fileUrl ?? null) : null,
+        fileKey: input.downloadSource === "upload" ? (input.fileKey ?? null) : null,
+        fileName: input.downloadSource === "upload" ? (input.fileName ?? null) : null,
+        mediaAssetId: input.downloadSource === "media_repo" ? (input.mediaAssetId ?? null) : null,
+        downloadProductId: input.downloadSource === "download_product" ? (input.downloadProductId ?? null) : null,
+        status: input.status,
+        position: Number(maxPos) + 1,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  updateCohortResource: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      scope: z.enum(["course", "cohort"]).optional(),
+      cohortGroupId: z.number().nullable().optional(),
+      title: z.string().min(1).max(255).optional(),
+      description: z.string().nullable().optional(),
+      cardImageUrl: z.string().nullable().optional(),
+      actionType: z.enum(["link", "download"]).optional(),
+      linkUrl: z.string().nullable().optional(),
+      downloadSource: z.enum(["upload", "media_repo", "download_product"]).nullable().optional(),
+      fileUrl: z.string().nullable().optional(),
+      fileKey: z.string().nullable().optional(),
+      fileName: z.string().nullable().optional(),
+      mediaAssetId: z.number().nullable().optional(),
+      downloadProductId: z.number().nullable().optional(),
+      status: z.enum(["draft", "published"]).optional(),
+      position: z.number().int().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, scope, cohortGroupId, ...rest } = input;
+      const updates: Record<string, unknown> = Object.fromEntries(
+        Object.entries(rest).filter(([, v]) => v !== undefined),
+      );
+      if (scope !== undefined) {
+        updates.cohortGroupId = scope === "cohort" ? (cohortGroupId ?? null) : null;
+      } else if (cohortGroupId !== undefined) {
+        updates.cohortGroupId = cohortGroupId;
+      }
+      if (Object.keys(updates).length > 0) {
+        await db.update(lmsCohortResources).set(updates).where(eq(lmsCohortResources.id, id));
+      }
+      return { success: true };
+    }),
+
+  deleteCohortResource: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCohortResources).where(eq(lmsCohortResources.id, input.id));
       return { success: true };
     }),
 
