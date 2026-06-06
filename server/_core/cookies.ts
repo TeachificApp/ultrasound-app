@@ -1,6 +1,14 @@
-import type { CookieOptions, Request } from "express";
+import type { CookieOptions, Request, Response } from "express";
+import { COOKIE_NAME, DEMO_COOKIE_NAME } from "@shared/const";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/** Cookie domains that may have been used across AAUS / iHeartEcho deployments. */
+export const KNOWN_COOKIE_DOMAINS = [
+  ".allaboutultrasound.com",
+  ".iheartecho.com",
+  ".iheartecho.net",
+] as const;
 
 function isIpAddress(host: string) {
   // Basic IPv4 check and IPv6 presence detection.
@@ -106,21 +114,62 @@ function getPublicHostname(req: Request): string {
     }
   }
 
-  // 5. CANONICAL_ROOT_DOMAIN env var — hardcoded production domain.
-  //    This is the most reliable fallback for browser GET requests (OAuth callback,
-  //    magic-link redirect, auto-login) where no JS headers are available.
-  //    When set, it contains the primary public hostname e.g. "app.allaboutultrasound.com".
+  // 5. host query param — encoded in magic-link / auto-login URLs for GET redirects
+  const hostQuery = req.query?.host;
+  if (typeof hostQuery === "string" && hostQuery.trim()) {
+    const cleaned = hostQuery.trim().split(":")[0];
+    if (cleaned && !LOCAL_HOSTS.has(cleaned) && !isIpAddress(cleaned) && !isInternalHost(cleaned)) {
+      return cleaned;
+    }
+  }
+
+  // 6. CANONICAL_ROOT_DOMAIN env var — production fallback when Cloudflare rewrites Host to .run.app
   const canonicalDomain = process.env.CANONICAL_ROOT_DOMAIN;
   if (canonicalDomain) {
-    // Strip protocol if present (e.g. "https://app.allaboutultrasound.com" → "app.allaboutultrasound.com")
     const cleaned = canonicalDomain.replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
     if (cleaned && !isInternalHost(cleaned)) {
       return cleaned;
     }
   }
 
-  // 6. Fall back to req.hostname — may be internal Cloud Run hostname in production
+  // 7. IHE_CANONICAL_ROOT_DOMAIN — same for app.iheartecho.com GET auth flows
+  const iheCanonical = process.env.IHE_CANONICAL_ROOT_DOMAIN;
+  if (iheCanonical) {
+    const cleaned = iheCanonical.replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
+    if (cleaned && !isInternalHost(cleaned)) {
+      return cleaned;
+    }
+  }
+
+  // 8. Fall back to req.hostname — may be internal Cloud Run hostname in production
   return req.hostname || (req.headers.host ?? "").split(":")[0];
+}
+
+/** Extract public hostname from Origin header (reliable on POST /api/auth/login). */
+export function hostnameFromRequestOrigin(req: Request): string | undefined {
+  const origin = req.headers.origin;
+  if (!origin) return undefined;
+  const host = extractHostFromUrl(Array.isArray(origin) ? origin[0] : origin);
+  if (host && !LOCAL_HOSTS.has(host) && !isIpAddress(host) && !isInternalHost(host)) {
+    return host;
+  }
+  return undefined;
+}
+
+/** Resolve hostname override for cookie scoping on auth routes. */
+export function resolveAuthHostname(req: Request, explicitHost?: string): string | undefined {
+  if (explicitHost) {
+    const cleaned = explicitHost.split(":")[0];
+    if (cleaned && !isInternalHost(cleaned)) return cleaned;
+  }
+  const fromOrigin = hostnameFromRequestOrigin(req);
+  if (fromOrigin) return fromOrigin;
+  const xApp = req.headers["x-app-hostname"];
+  if (xApp) {
+    const cleaned = (Array.isArray(xApp) ? xApp[0] : xApp).split(":")[0];
+    if (cleaned && !isInternalHost(cleaned)) return cleaned;
+  }
+  return undefined;
 }
 
 export function getSessionCookieOptions(
@@ -136,4 +185,31 @@ export function getSessionCookieOptions(
     secure: isSecureRequest(req),
     ...(domain ? { domain } : {}),
   };
+}
+
+/** Clear session cookies across every domain variant that may have been set. */
+export function clearSessionCookies(
+  res: Pick<Response, "clearCookie">,
+  req: Request,
+  cookieNames: string[] = [COOKIE_NAME, DEMO_COOKIE_NAME],
+) {
+  const opts = getSessionCookieOptions(req);
+  const isProduction = !!(
+    req.headers["x-forwarded-proto"] ||
+    req.headers["x-forwarded-host"] ||
+    process.env.NODE_ENV === "production"
+  );
+  const secure = isProduction ? true : opts.secure;
+  const domains = new Set<string | undefined>([opts.domain, undefined, ...KNOWN_COOKIE_DOMAINS]);
+  const sameSites: Array<"none" | "lax" | "strict"> = ["none", "lax"];
+
+  for (const name of cookieNames) {
+    for (const domain of domains) {
+      for (const sameSite of sameSites) {
+        const clearOpts: CookieOptions = { httpOnly: true, path: "/", sameSite, secure, maxAge: 0 };
+        if (domain) clearOpts.domain = domain;
+        res.clearCookie(name, clearOpts);
+      }
+    }
+  }
 }
