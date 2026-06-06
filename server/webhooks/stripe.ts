@@ -349,7 +349,7 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
       let autoLoginUrl = coursePlayerUrl;
       try {
         const token = await generateAutoLoginToken(userId!, coursePlayerUrl);
-        autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
+        autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(baseUrl).hostname)}`;
       } catch { /* fall back */ }
       const user = await getUserByEmail(customerEmail);
       const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
@@ -412,7 +412,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
           console.error(`[Stripe] Failed to generate access token for ${customerEmail}:`, atErr);
         }
         const accessUrl = accessTokenForEmail
-          ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}`
+          ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}&host=${encodeURIComponent(new URL(baseUrl).hostname)}`
           : setPasswordUrl;
         try {
           const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
@@ -1041,7 +1041,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
           let autoLoginUrlExisting = loginUrlExisting;
           try {
             const token = await generateAutoLoginToken(resolvedUserId!, loginUrlExisting);
-            autoLoginUrlExisting = `${baseUrl}/api/auth/auto-login?token=${token}`;
+            autoLoginUrlExisting = `${baseUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(baseUrl).hostname)}`;
           } catch { /* fall back to plain URL */ }
           const firstName = (customerName || "").split(" ")[0] || "there";
           const bumpTitleArr = bumpTitles ? bumpTitles.split("|") : [];
@@ -1229,7 +1229,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       if (resolvedUserId) {
         try {
           const token = await generateAutoLoginToken(resolvedUserId, loginUrl);
-          autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
+          autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(baseUrl).hostname)}`;
         } catch (tokenErr) {
           console.error(`[Stripe] Failed to generate auto-login token for user ${resolvedUserId}:`, tokenErr);
         }

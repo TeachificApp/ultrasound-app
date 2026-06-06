@@ -48,6 +48,10 @@ function getRootDomain(hostname: string): string | undefined {
  * public hostname. req.hostname may be the internal Cloud Run hostname (.run.app)
  * which is wrong for cookie domain scoping.
  */
+function extractHostFromUrl(url: string): string {
+  try { return new URL(url).hostname; } catch { return ""; }
+}
+
 function getPublicHostname(req: Request): string {
   // x-forwarded-host is set by Cloudflare/nginx to the original public hostname
   const xForwardedHost = req.headers["x-forwarded-host"];
@@ -67,15 +71,33 @@ function getPublicHostname(req: Request): string {
       return cleaned;
     }
   }
+  // Origin header is always present on cross-origin fetch/XHR requests and contains the real public hostname.
+  // This is the most reliable fallback when Cloudflare does not forward x-forwarded-host.
+  const origin = req.headers["origin"];
+  if (origin) {
+    const originHost = extractHostFromUrl(Array.isArray(origin) ? origin[0] : origin);
+    if (originHost && !LOCAL_HOSTS.has(originHost) && !isIpAddress(originHost)) {
+      return originHost;
+    }
+  }
+  // Referer header as last resort before falling back to internal hostname
+  const referer = req.headers["referer"];
+  if (referer) {
+    const refHost = extractHostFromUrl(Array.isArray(referer) ? referer[0] : referer);
+    if (refHost && !LOCAL_HOSTS.has(refHost) && !isIpAddress(refHost)) {
+      return refHost;
+    }
+  }
   // Fall back to req.hostname (Express with trust proxy=1 resolves this from x-forwarded-host too,
   // but only if the proxy is trusted — use our own resolution as belt-and-suspenders)
   return req.hostname || (req.headers.host ?? "").split(":")[0];
 }
 
 export function getSessionCookieOptions(
-  req: Request
+  req: Request,
+  hostnameOverride?: string
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  const hostname = getPublicHostname(req);
+  const hostname = hostnameOverride || getPublicHostname(req);
   const domain = getRootDomain(hostname);
   return {
     httpOnly: true,

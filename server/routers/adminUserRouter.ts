@@ -780,10 +780,12 @@ export const adminUserRouter = router({
       const firstName = (purchase.name || recipientEmail.split("@")[0]).split(" ")[0];
 
       // Generate a fresh auto-login token
-      let loginUrl = `${process.env.VITE_OAUTH_PORTAL_URL || "https://app.allaboutultrasound.com"}/dashboard`;
+      const _resendBaseUrl = process.env.VITE_OAUTH_PORTAL_URL || "https://app.allaboutultrasound.com";
+      let loginUrl = `${_resendBaseUrl}/dashboard`;
       if (purchase.userId) {
         try {
-          loginUrl = await generateAutoLoginToken(purchase.userId, loginUrl);
+          const _resendToken = await generateAutoLoginToken(purchase.userId, loginUrl);
+          loginUrl = `${_resendBaseUrl}/api/auth/auto-login?token=${_resendToken}&host=${encodeURIComponent(new URL(_resendBaseUrl).hostname)}`;
         } catch (e) {
           console.warn("[ResendEmail] Could not generate auto-login token:", e);
         }
@@ -2230,9 +2232,13 @@ export const adminUserRouter = router({
       if (!logEntry) throw new TRPCError({ code: "NOT_FOUND", message: "Email log entry not found" });
       // Build a simple resend wrapper — forward the original subject/recipient
       // We don't store the original HTML body, so we send a plain-text notice with a re-login link
-      let loginUrl = `${process.env.VITE_OAUTH_PORTAL_URL || "https://app.allaboutultrasound.com"}/dashboard`;
+      const _resendLogBaseUrl = process.env.VITE_OAUTH_PORTAL_URL || "https://app.allaboutultrasound.com";
+      let loginUrl = `${_resendLogBaseUrl}/dashboard`;
       if (logEntry.userId) {
-        try { loginUrl = await generateAutoLoginToken(logEntry.userId, loginUrl); } catch {}
+        try {
+          const _resendLogToken = await generateAutoLoginToken(logEntry.userId, loginUrl);
+          loginUrl = `${_resendLogBaseUrl}/api/auth/auto-login?token=${_resendLogToken}&host=${encodeURIComponent(new URL(_resendLogBaseUrl).hostname)}`;
+        } catch {}
       }
       const htmlBody = `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">

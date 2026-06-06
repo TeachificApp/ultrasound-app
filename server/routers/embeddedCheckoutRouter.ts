@@ -496,7 +496,7 @@ export const embeddedCheckoutRouter = router({
           if (userId) {
             try {
               const token = await generateAutoLoginToken(userId, loginUrl);
-              autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
+              autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(baseUrl).hostname)}`;
             } catch (tokenErr) {
               console.error(`[FreeOrder] Failed to generate auto-login token for user ${userId}:`, tokenErr);
             }
@@ -585,7 +585,7 @@ export const embeddedCheckoutRouter = router({
       try {
         const token = await generateAutoLoginToken(ctx.user.id, input.redirectUrl);
         const baseUrl = input.redirectUrl.startsWith("http") ? new URL(input.redirectUrl).origin : "";
-        return { url: `${baseUrl}/api/auth/auto-login?token=${token}` };
+        return { url: `${baseUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(baseUrl).hostname)}` };
       } catch (err) {
         console.error("[generateAutoLoginUrl] Error:", err);
         return { url: input.redirectUrl };

@@ -549,8 +549,12 @@ export const appRouter = router({
           : gbc(brandMode).appUrl;
         // Use server-side GET redirect — bypasses Cloudflare stripping Set-Cookie on XHR/fetch responses.
         // The browser follows a full page navigation so the session cookie is preserved correctly.
+        // Encode the public hostname in the URL so the server can use it for cookie domain scoping.
+        // Cloudflare rewrites the Host header to the internal Cloud Run hostname, so we can't rely on req.hostname.
         const returnToParam = input.returnTo ? `&returnTo=${encodeURIComponent(input.returnTo)}` : '';
-        const magicUrl = `${appUrl}/api/auth/magic-verify?token=${token}${returnToParam}`;
+        const appHostname = new URL(appUrl).hostname;
+        const hostParam = `&host=${encodeURIComponent(appHostname)}`;
+        const magicUrl = `${appUrl}/api/auth/magic-verify?token=${token}${returnToParam}${hostParam}`;
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });

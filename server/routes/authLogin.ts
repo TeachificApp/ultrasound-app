@@ -105,7 +105,7 @@ export function registerAuthLoginRoute(app: Express) {
    * The browser follows a full page navigation so the cookie is preserved.
    */
   app.get("/api/auth/magic-verify", async (req: Request, res: Response) => {
-    const { token, returnTo } = req.query as Record<string, string>;
+    const { token, returnTo, host: hostParam } = req.query as Record<string, string>;
     const successRedirect = returnTo && returnTo.startsWith("/") ? returnTo : "/my-dashboard";
     if (!token) {
       return res.redirect(`/auth/magic-error?reason=missing_token`);
@@ -131,7 +131,9 @@ export function registerAuthLoginRoute(app: Express) {
       await ensureUserRole(user.id);
 
       const sessionToken = await sdk.createSessionToken(openId, { name: user.name ?? user.email ?? "", expiresInMs: ONE_YEAR_MS });
-      const cookieOptions = getSessionCookieOptions(req);
+      // Use the host param encoded in the magic link URL for cookie domain scoping.
+      // Cloudflare rewrites the Host header to the internal Cloud Run hostname, so we can't rely on req.hostname.
+      const cookieOptions = getSessionCookieOptions(req, hostParam || undefined);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, redirecting to ${successRedirect}`);

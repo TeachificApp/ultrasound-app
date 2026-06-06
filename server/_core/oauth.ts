@@ -43,7 +43,16 @@ export function registerOAuthRoutes(app: Express) {
         expiresInMs: ONE_YEAR_MS,
       });
 
-      const cookieOptions = getSessionCookieOptions(req);
+      // Decode the state (base64-encoded redirect URI) to get the public hostname.
+      // Cloudflare rewrites the Host header to the internal Cloud Run hostname,
+      // so we extract the hostname from the state parameter instead.
+      let stateHostname: string | undefined;
+      try {
+        const decodedState = Buffer.from(state, 'base64').toString('utf8');
+        const stateUrl = new URL(decodedState);
+        stateHostname = stateUrl.hostname || undefined;
+      } catch { /* ignore decode errors */ }
+      const cookieOptions = getSessionCookieOptions(req, stateHostname);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       // Track login event + Thinkific free-member sync (fire-and-forget, non-blocking)

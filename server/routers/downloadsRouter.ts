@@ -1563,7 +1563,7 @@ export async function sendPurchaseConfirmationEmail(userId: number, productId: n
   try {
     const { generateAutoLoginToken } = await import('../routes/autoLogin');
     const token = await generateAutoLoginToken(userId, filesUrl);
-    accessUrl = `${appUrl}/api/auth/auto-login?token=${token}`;
+    accessUrl = `${appUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(appUrl).hostname)}`;
   } catch (tokenErr) {
     console.error(`[sendPurchaseConfirmationEmail] Failed to generate auto-login token for user ${userId}:`, tokenErr);
   }

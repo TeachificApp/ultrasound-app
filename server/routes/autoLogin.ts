@@ -60,7 +60,7 @@ export async function generateAutoLoginToken(
  */
 export function registerAutoLoginRoute(app: Express) {
   app.get("/api/auth/auto-login", async (req: Request, res: Response) => {
-    const { token } = req.query as Record<string, string>;
+    const { token, host: hostParam } = req.query as Record<string, string>;
 
     if (!token) {
       return res.redirect("/?error=missing_token");
@@ -114,7 +114,9 @@ export function registerAutoLoginRoute(app: Express) {
         name: user.name ?? user.email ?? "",
         expiresInMs: ONE_YEAR_MS,
       });
-      const cookieOptions = getSessionCookieOptions(req);
+      // Use the host param encoded in the auto-login URL for cookie domain scoping.
+      // Cloudflare rewrites the Host header to the internal Cloud Run hostname.
+      const cookieOptions = getSessionCookieOptions(req, hostParam || undefined);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       // Update last signed in
