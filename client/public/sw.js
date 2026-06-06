@@ -48,21 +48,20 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Network-first for everything else; fall back to cache only on network error.
-  // Always return a real Response — never undefined.
+  // Always return a real Response — never undefined (avoids "Failed to convert value to Response").
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cache successful navigation responses for offline shell
+    (async () => {
+      try {
+        const response = await fetch(event.request);
         if (dest === "document" && response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
         }
         return response;
-      })
-      .catch(() =>
-        caches.match(event.request).then(
-          (cached) => cached ?? new Response("Network error", { status: 503, statusText: "Service Unavailable" })
-        )
-      )
+      } catch {
+        const cached = await caches.match(event.request);
+        return cached ?? new Response("Network error", { status: 503, statusText: "Service Unavailable" });
+      }
+    })()
   );
 });
