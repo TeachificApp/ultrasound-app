@@ -478,6 +478,47 @@ export default function CohortSchedule() {
     { courseId: id },
     { enabled: !!user && id > 0 }
   );
+  // Discussion state — must be declared before any early returns (Rules of Hooks)
+  const [discBody, setDiscBody] = useState("");
+  const [discMedia, setDiscMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
+  const [discUploading, setDiscUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState("sessions");
+  const { data: discData, refetch: refetchDisc } = trpc.lmsLearner.getCohortDiscussions.useQuery(
+    { courseId: id },
+    { enabled: activeTab === "discussions" && !!user && id > 0 }
+  );
+  const postDisc = trpc.lmsLearner.postStudentCohortMessage.useMutation({
+    onSuccess: () => { refetchDisc(); setDiscBody(""); setDiscMedia([]); },
+    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
+  });
+  const deleteDisc = trpc.lmsLearner.deleteStudentCohortMessage.useMutation({
+    onSuccess: () => refetchDisc(),
+    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
+  });
+  const { data: notifPref, refetch: refetchNotifPref } = trpc.lmsLearner.getCohortNotifPref.useQuery(
+    undefined,
+    { enabled: activeTab === "discussions" && !!user }
+  );
+  const setNotifPref = trpc.lmsLearner.setCohortNotifPref.useMutation({
+    onSuccess: () => { refetchNotifPref(); const toast = (window as any).__toast; if (toast) toast.success(notifPref?.cohortDiscussions ? "Cohort notifications disabled" : "Cohort notifications enabled"); },
+    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
+  });
+  const handleDiscMediaUpload = async (file: File) => {
+    setDiscUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload/cohort-media", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const json = await res.json();
+      setDiscMedia(prev => [...prev, { url: json.url, mimeType: file.type, fileName: file.name }]);
+    } catch (e: any) {
+      const toast = (window as any).__toast;
+      if (toast) toast.error(e.message ?? "Upload failed");
+    } finally {
+      setDiscUploading(false);
+    }
+  };
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -541,46 +582,6 @@ export default function CohortSchedule() {
   }
 
   const { course, sessions, assignments, recordings, mySubmissions, myGroup } = data as any;
-  const [discBody, setDiscBody] = useState("");
-  const [discMedia, setDiscMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
-  const [discUploading, setDiscUploading] = useState(false);
-  const [activeTab, setActiveTab] = useState("sessions");
-  const { data: discData, refetch: refetchDisc } = trpc.lmsLearner.getCohortDiscussions.useQuery(
-    { courseId: id },
-    { enabled: activeTab === "discussions" }
-  );
-  const postDisc = trpc.lmsLearner.postStudentCohortMessage.useMutation({
-    onSuccess: () => { refetchDisc(); setDiscBody(""); setDiscMedia([]); },
-    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
-  });
-  const deleteDisc = trpc.lmsLearner.deleteStudentCohortMessage.useMutation({
-    onSuccess: () => refetchDisc(),
-    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
-  });
-  const { data: notifPref, refetch: refetchNotifPref } = trpc.lmsLearner.getCohortNotifPref.useQuery(
-    undefined,
-    { enabled: activeTab === "discussions" }
-  );
-  const setNotifPref = trpc.lmsLearner.setCohortNotifPref.useMutation({
-    onSuccess: () => { refetchNotifPref(); const toast = (window as any).__toast; if (toast) toast.success(notifPref?.cohortDiscussions ? "Cohort notifications disabled" : "Cohort notifications enabled"); },
-    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
-  });
-  const handleDiscMediaUpload = async (file: File) => {
-    setDiscUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload/cohort-media", { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Upload failed");
-      const json = await res.json();
-      setDiscMedia(prev => [...prev, { url: json.url, mimeType: file.type, fileName: file.name }]);
-    } catch (e: any) {
-      const toast = (window as any).__toast;
-      if (toast) toast.error(e.message ?? "Upload failed");
-    } finally {
-      setDiscUploading(false);
-    }
-  };
   const upcomingSessions = sessions.filter((s: any) => isUpcoming(s.sessionDate));
   const pastSessions = sessions.filter((s: any) => isPast(s.sessionDate));
   const pendingAssignments = assignments.filter((a: any) => a.dueDate && isUpcoming(a.dueDate));
