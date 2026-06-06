@@ -1981,12 +1981,33 @@ function LiveSessionBlockPreview({ d }: { d: Record<string, any> }) {
 // ─── Cohort Class Block Preview ─────────────────────────────────────────────────
 function CohortClassBlockPreview({ d }: { d: Record<string, any> }) {
   const accent = d.accentColor ?? "#179ca3";
-  const sessions: Array<{ date: string; time: string; topic: string; meetingUrl?: string }> = d.sessions ?? [];
+  const sessions: Array<{ date: string; time: string; topic: string; meetingUrl?: string; recordingUrl?: string }> = d.sessions ?? [];
   const platformLabel: Record<string, string> = { zoom: "Zoom", teams: "Teams", meet: "Google Meet", webex: "Webex", other: d.platformCustomName ?? "Meeting" };
   const platform = d.platform ?? "zoom";
+
+  const now = Date.now();
+  const replays = sessions.filter(s => s.recordingUrl);
+  const upcoming = sessions.filter(s => {
+    if (!s.date) return true;
+    return new Date(s.date).getTime() >= now - 24 * 60 * 60 * 1000;
+  });
+  const past = sessions.filter(s => {
+    if (!s.date) return false;
+    return new Date(s.date).getTime() < now - 24 * 60 * 60 * 1000;
+  });
+
+  const [activeTab, setActiveTab] = useState<"sessions" | "replays">(replays.length > 0 ? "sessions" : "sessions");
+
+  const tabs = [
+    { id: "sessions" as const, label: "Live Sessions", count: sessions.length },
+    ...(replays.length > 0 ? [{ id: "replays" as const, label: "Replays", count: replays.length }] : []),
+  ];
+
+  const isDirectVideo = (url: string) => /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(url);
+
   return (
     <div className="px-6 py-8" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-start gap-4 mb-6">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-white" style={{ backgroundColor: accent }}>
@@ -1997,51 +2018,107 @@ function CohortClassBlockPreview({ d }: { d: Record<string, any> }) {
             {d.description && <p className="text-sm text-gray-500 mt-1">{d.description}</p>}
           </div>
         </div>
-        {/* Class details */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          {d.startDate && (
-            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Start Date</p>
-              <p className="text-sm font-semibold text-gray-800">{new Date(d.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          {[
+            ...(upcoming.length > 0 ? [{ label: "Upcoming Sessions", value: upcoming.length, color: accent }] : []),
+            ...(past.length > 0 ? [{ label: "Past Sessions", value: past.length, color: "#6b7280" }] : []),
+            ...(d.startDate ? [{ label: "Start Date", value: new Date(d.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }), color: accent }] : []),
+            ...(replays.length > 0 ? [{ label: "Recordings", value: replays.length, color: accent }] : []),
+            ...(d.maxStudents ? [{ label: "Class Size", value: `Max ${d.maxStudents}`, color: "#6b7280" }] : []),
+            ...(d.instructorName ? [{ label: "Instructor", value: d.instructorName, color: "#6b7280" }] : []),
+          ].slice(0, 4).map(stat => (
+            <div key={stat.label} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+              <p className="text-xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{stat.label}</p>
             </div>
-          )}
-          {d.endDate && (
-            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">End Date</p>
-              <p className="text-sm font-semibold text-gray-800">{new Date(d.endDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>
-            </div>
-          )}
-          {d.maxStudents && (
-            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Class Size</p>
-              <p className="text-sm font-semibold text-gray-800">Max {d.maxStudents} students</p>
-            </div>
-          )}
-          {d.instructorName && (
-            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Instructor</p>
-              <p className="text-sm font-semibold text-gray-800">{d.instructorName}</p>
-            </div>
-          )}
+          ))}
         </div>
-        {/* Session schedule */}
-        {sessions.length > 0 && (
-          <div className="mb-6">
-            <h4 className="text-sm font-bold text-gray-700 mb-3">Class Schedule</h4>
-            <div className="space-y-2">
-              {sessions.map((s, i) => (
-                <div key={i} className="flex items-center gap-3 bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: accent }}>{i + 1}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{s.topic || `Session ${i + 1}`}</p>
-                    <p className="text-xs text-gray-400">{s.date} {s.time && `· ${s.time}`}</p>
+        {/* Tabs */}
+        {tabs.length > 1 && (
+          <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  activeTab === tab.id
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {tab.id === "sessions" && (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                )}
+                {tab.id === "replays" && (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                )}
+                {tab.label}
+                <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ backgroundColor: activeTab === tab.id ? `${accent}20` : "transparent", color: activeTab === tab.id ? accent : "#9ca3af" }}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {/* Sessions tab */}
+        {activeTab === "sessions" && sessions.length > 0 && (
+          <div className="space-y-2 mb-6">
+            {sessions.map((s, i) => (
+              <div key={i} className="flex items-center gap-3 bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: accent }}>{i + 1}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{s.topic || `Session ${i + 1}`}</p>
+                  <p className="text-xs text-gray-400">{s.date} {s.time && `· ${s.time}`}</p>
+                </div>
+                {s.recordingUrl && (
+                  <span className="text-xs px-2 py-1 rounded-full font-semibold" style={{ backgroundColor: `${accent}15`, color: accent }}>Recording</span>
+                )}
+                {s.meetingUrl && (
+                  <span className="text-xs px-2 py-1 rounded-full text-white" style={{ backgroundColor: accent }}>{platformLabel[platform]}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {activeTab === "sessions" && sessions.length === 0 && (
+          <div className="text-center py-8 text-gray-400 text-sm">No sessions scheduled yet.</div>
+        )}
+        {/* Replays tab */}
+        {activeTab === "replays" && (
+          <div className="space-y-6 mb-6">
+            {replays.map((s, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${accent}15` }}>
+                    <svg className="w-5 h-5" style={{ color: accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </div>
-                  {s.meetingUrl && (
-                    <span className="text-xs px-2 py-1 rounded-full text-white" style={{ backgroundColor: accent }}>{platformLabel[platform]}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base font-bold text-gray-900">{s.topic || `Session ${sessions.indexOf(s) + 1}`}</p>
+                    {s.date && <p className="text-xs text-gray-400">{s.date} {s.time && `· ${s.time}`}</p>}
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded-full font-semibold" style={{ backgroundColor: `${accent}15`, color: accent }}>Recording</span>
+                </div>
+                <div className="aspect-video bg-black">
+                  {isDirectVideo(s.recordingUrl!) ? (
+                    <video
+                      src={s.recordingUrl}
+                      controls
+                      playsInline
+                      className="w-full h-full"
+                    />
+                  ) : (
+                    <iframe
+                      src={s.recordingUrl}
+                      className="w-full h-full border-0"
+                      allowFullScreen
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      title={s.topic || `Session ${sessions.indexOf(s) + 1} Recording`}
+                    />
                   )}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         )}
         {/* CTA */}

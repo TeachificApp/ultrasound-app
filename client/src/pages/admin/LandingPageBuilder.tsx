@@ -7903,10 +7903,10 @@ function LiveSessionBlockSettings({ d, set }: { d: Record<string, any>; set: (ke
 
 // ─── Cohort Class Block Settings ─────────────────────────────────────────────
 function CohortClassBlockSettings({ d, set }: { d: Record<string, any>; set: (key: string, value: any) => void }) {
-  const sessions: Array<{ date: string; time: string; topic: string; meetingUrl?: string }> = d.sessions ?? [];
+  const sessions: Array<{ date: string; time: string; topic: string; meetingUrl?: string; recordingUrl?: string }> = d.sessions ?? [];
 
   const addSession = () => {
-    set("sessions", [...sessions, { date: "", time: "", topic: "", meetingUrl: "" }]);
+    set("sessions", [...sessions, { date: "", time: "", topic: "", meetingUrl: "", recordingUrl: "" }]);
   };
   const updateSession = (i: number, field: string, val: string) => {
     const next = sessions.map((s, idx) => idx === i ? { ...s, [field]: val } : s);
@@ -8031,6 +8031,7 @@ function CohortClassBlockSettings({ d, set }: { d: Record<string, any>; set: (ke
                 />
               </div>
               <DebouncedInput value={s.meetingUrl ?? ""} onChange={v => updateSession(i, "meetingUrl", v)} className="h-7 text-xs" placeholder="Meeting URL (optional)" />
+              <DebouncedInput value={s.recordingUrl ?? ""} onChange={v => updateSession(i, "recordingUrl", v)} className="h-7 text-xs" placeholder="Recording / Replay URL (optional)" />
             </div>
           ))}
         </div>
