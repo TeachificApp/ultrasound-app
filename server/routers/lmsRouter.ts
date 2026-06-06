@@ -2073,7 +2073,9 @@ export const lmsLearnerRouter = router({
           const html = await resp.text();
           const wistiaMatch = html.match(/wistia_async_(\w+)/);
           if (wistiaMatch) {
-            resolvedEmbedUrl = `https://fast.wistia.net/embed/iframe/${wistiaMatch[1]}?videoFoam=true&autoPlay=false`;
+            // Strip '#' from hex color for Wistia playerColor param
+            const wistiaColor = primaryColor.replace(/^#/, '');
+            resolvedEmbedUrl = `https://fast.wistia.net/embed/iframe/${wistiaMatch[1]}?videoFoam=true&autoPlay=false&playerColor=${wistiaColor}`;
           }
         } catch (_) {
           // Ignore resolution errors - fall back to direct URL
