@@ -1927,7 +1927,8 @@ export const lmsLearnerRouter = router({
           const posterName = poster?.displayName || poster?.name || "A student";
           const courseName = course?.title ?? "your cohort course";
           const groupName = group?.name ?? "";
-          const snippet = input.body ? (input.body.length > 200 ? input.body.slice(0, 200) + "…" : input.body) : "[media attachment]";
+          const plainBody = input.body ? input.body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "";
+          const snippet = plainBody ? (plainBody.length > 200 ? plainBody.slice(0, 200) + "…" : plainBody) : "[media attachment]";
           const discussionUrl = `https://learn.allaboutultrasound.com/courses/${course?.slug ?? input.courseId}?tab=cohort&cohortTab=discussions`;
           // Collect admins + cohort staff (exclude the poster)
           const adminUsers = await db.select({ id: users.id, email: users.email, name: users.name, displayName: users.displayName, notificationPrefs: users.notificationPrefs })

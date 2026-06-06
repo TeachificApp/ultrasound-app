@@ -1646,12 +1646,15 @@ export default function RichTextEditor({
  */
 export function RichTextDisplay({
   html,
+  content,
   className,
 }: {
-  html: string;
+  html?: string;
+  content?: string;
   className?: string;
 }) {
-  if (!html) return null;
+  const resolvedHtml = html ?? content ?? "";
+  if (!resolvedHtml) return null;
   return (
     <div
       className={cn(
@@ -1680,7 +1683,7 @@ export function RichTextDisplay({
         "[&_tr:nth-child(even)_td]:bg-gray-50",
         className,
       )}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: resolvedHtml }}
     />
   );
 }

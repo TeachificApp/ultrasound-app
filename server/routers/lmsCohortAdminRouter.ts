@@ -1121,7 +1121,7 @@ export const lmsCohortAdminRouter = router({
     .input(z.object({
       cohortGroupId: z.number(),
       courseId: z.number(),
-      body: z.string().max(5000).optional(),
+      body: z.string().max(500000).optional(),
       mediaUrls: z.array(z.object({
         url: z.string(),
         mimeType: z.string(),

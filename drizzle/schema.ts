@@ -5361,7 +5361,7 @@ export const lmsCohortMessages = mysqlTable("lms_cohort_messages", {
   cohortGroupId: int("cohort_group_id").notNull(),
   courseId: int("course_id").notNull(),
   userId: int("user_id").notNull(),
-  body: text("body"),
+  body: longtext("body"),
   // JSON array of { url, mimeType, fileName } objects
   mediaUrls: json("media_urls").$type<{ url: string; mimeType: string; fileName: string }[]>(),
   isAdminPost: boolean("is_admin_post").default(false).notNull(),
