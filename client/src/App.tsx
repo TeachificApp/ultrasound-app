@@ -23,6 +23,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import { usePageViewTracker } from "./hooks/useAnalytics";
 import { useSsoConsumer } from "./hooks/useSsoConsumer";
 import { useCrossDomainSso } from "./hooks/useCrossDomainSso";
+import PlatformAdmin from "./pages/PlatformAdmin";
 import { PerBrandAdminRoutes, PerBrandUserRoutes } from "./routes/perBrandRouteHelpers";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
@@ -193,7 +194,6 @@ const PublicFormAnalyticsReport = lazy(() => import("./pages/PublicFormAnalytics
 const PublicFormAnalyticsDashboard = lazy(() => import("./pages/PublicFormAnalyticsDashboard"));
 const EmailAdmin = lazy(() => import("./pages/EmailAdmin"));
 const EmailCampaignDashboard = lazy(() => import("./pages/EmailCampaignDashboard"));
-const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const EducatorAssist = lazy(() => import("./pages/EducatorAssist"));
 const SonoQuizCreator = lazy(() => import("./pages/SonoQuizCreator"));
 const SonoQuizHost = lazy(() => import("./pages/SonoQuizHost"));
@@ -520,7 +520,7 @@ function Router() {
         <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
         <Route path="/admin">{() => { window.location.replace("/platform-admin"); return null; }}</Route>
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><PlatformAdmin /></Suspense></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <EducatorAssist />}</Route>
         {/* ── SonoQuiz (admin-only during testing) ──────────────────────── */}
@@ -772,7 +772,7 @@ function LMSRouter() {
         <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><PlatformAdmin /></Suspense></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         {/* Auth pages (needed for login flow) */}
         <Route path="/login" component={Login} />
         <Route path="/forgot-password" component={ForgotPassword} />
@@ -975,7 +975,7 @@ function IHeartEchoRouter() {
         <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><PlatformAdmin /></Suspense></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <RoleGuard roles={["education_manager", "education_admin", "education_student"]} allowAdmin={true}><EducatorAssist /></RoleGuard>}</Route>
         <Route path="/educator-admin">{() => <RoleGuard roles={["education_admin", "education_manager"]} allowAdmin={true}><EducatorAdmin /></RoleGuard>}</Route>
@@ -996,6 +996,22 @@ function IHeartEchoRouter() {
   );
 }
 
+/** Single-segment paths that are app routes, never funnel slugs (/:slug catch-all guard). */
+const RESERVED_FUNNEL_SLUGS = new Set([
+  "platform-admin", "login", "register", "logout", "admin", "premium", "profile",
+  "enrolled", "upgrade-success", "my-dashboard", "my-team", "my-downloads",
+  "education-library", "downloads", "courses", "products", "forms", "community",
+  "career-network", "careernetwork", "employer", "accreditation", "lab-admin",
+  "diy-member", "diy-register", "magic-link", "verify-email", "forgot-password",
+  "reset-password", "unsubscribe", "flashcards", "case-library", "registry-review",
+  "cme", "quickfire", "soundbytes", "ultrasound-assist", "scan-coach-hub",
+  "calculators", "clinical-intelligence", "pocus-assist", "pocus-assist-hub",
+  "fetal-echo-assist", "learn-fetal-echo", "affiliate-dashboard", "instructor-portal",
+  "educator-assist", "educator-admin", "student-dashboard", "image-quality-review",
+  "accreditation-manager", "accreditation-navigator", "diy-accreditation-plans",
+  "memberships", "my-memberships", "404", "terms", "privacy", "contact",
+]);
+
 /**
  * FunnelRootRedirect — When a visitor lands on /:slug (no page slug),
  * first check if it's a physical product slug (redirect to /product/:slug),
@@ -1004,6 +1020,10 @@ function IHeartEchoRouter() {
 function FunnelRootRedirect() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug || "";
+
+  if (RESERVED_FUNNEL_SLUGS.has(slug)) {
+    return <NotFound />;
+  }
 
   // Check if this is a physical product slug first
   const productQuery = trpc.products.getBySlug.useQuery(
@@ -1093,7 +1113,7 @@ function AccreditationDivisionRouter() {
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/lab-admin">{() => <RoleGuard roles={["diy_admin"]} allowAdmin={false}><LabAdmin /></RoleGuard>}</Route>
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><PlatformAdmin /></Suspense></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/accreditation-readiness">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={true}><AccreditationReadiness /></RoleGuard>}</Route>
         {/* ── Public Form Renderer ─────────────────────────────────────────── */}

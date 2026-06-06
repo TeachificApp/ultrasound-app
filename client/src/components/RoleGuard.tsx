@@ -16,7 +16,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Link, useLocation } from "wouter";
+import { Link, Redirect, useLocation } from "wouter";
 import { Loader2, ShieldAlert, ArrowLeft, CheckCircle2, Send, Crown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -90,12 +90,6 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
     [roles],
   );
 
-  useEffect(() => {
-    if (loading || isAuthenticated || user || !isAdminRole) return;
-    const returnPath = window.location.pathname + window.location.search;
-    window.location.href = getLoginUrl(returnPath);
-  }, [loading, isAuthenticated, user, isAdminRole]);
-
   const requestAccess = trpc.system.requestAccess.useMutation({
     onSuccess: (data) => {
       setRequested(true);
@@ -125,14 +119,8 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
   // Not authenticated — handle based on role type
   if (!isAuthenticated || !user) {
     if (isAdminRole) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-[#189aa1]" />
-            <p className="text-sm text-muted-foreground">Redirecting to login…</p>
-          </div>
-        </div>
-      );
+      const returnPath = window.location.pathname + window.location.search;
+      return <Redirect to={getLoginUrl(returnPath)} />;
     }
     // For content roles (premium_user, diy_user), show blurred overlay with login/upgrade CTA
     const hasPremiumRole = roles.includes("premium_user");
