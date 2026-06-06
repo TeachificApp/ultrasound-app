@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import MediaRedirect from "@/pages/MediaRedirect";
-import { Route, Switch, useParams } from "wouter";
+import { Route, Switch, useLocation, useParams } from "wouter";
 import { HardRedirect } from "@/components/HardRedirect";
 import { useEffect, lazy, Suspense } from "react";
 import { trpc } from "./lib/trpc";
@@ -25,7 +25,7 @@ import { usePageViewTracker } from "./hooks/useAnalytics";
 import { useSsoConsumer } from "./hooks/useSsoConsumer";
 import { useCrossDomainSso } from "./hooks/useCrossDomainSso";
 import PlatformAdmin from "./pages/PlatformAdmin";
-import { PerBrandAdminRoutes, PerBrandUserRoutes } from "./routes/perBrandRouteHelpers";
+import { perBrandAdminRouteElements, perBrandUserRouteElements } from "./routes/perBrandRouteHelpers";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
 import Home from "./pages/Home";
@@ -65,8 +65,9 @@ const ContactsAdmin = lazy(() => import("./pages/admin/ContactsAdmin"));
 const CheckoutPageEditorPage = lazy(() => import("./pages/admin/CheckoutPageEditorPage"));
 const AdminLessonComments = lazy(() => import("./pages/admin/AdminLessonComments"));
 const SharingMonitor = lazy(() => import("./pages/admin/SharingMonitor"));
-const PublicFunnelPage = lazy(() => import("./pages/PublicFunnelPage"));
-const StandaloneLandingPage = lazy(() => import("./pages/StandaloneLandingPage"));
+// Eager — marketing funnel pages must render outside the Router outer Suspense boundary.
+import PublicFunnelPage from "./pages/PublicFunnelPage";
+import StandaloneLandingPage from "./pages/StandaloneLandingPage";
 
 // ── Digital Downloads ──────────────────────────────────────────────────────────
 const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
@@ -290,6 +291,10 @@ const CareerProfile = lazy(() => import("./pages/CareerProfile"));
 const CareerNetworkAdmin = lazy(() => import("./pages/admin/CareerNetworkAdmin"));
 const EmployerDashboard = lazy(() => import("./pages/EmployerDashboard"));
 
+function LearnAdminRedirect({ rest }: { rest?: string }) {
+  return <HardRedirect to={`${LEARN_APP_URL}/admin/${rest ?? ""}`} />;
+}
+
 function Router() {
   usePageViewTracker();
   useCrossDomainSso(); // Silently sign user into all other domains as free member
@@ -421,10 +426,10 @@ function Router() {
         <Route path="/learn-fetal-echo" component={LearnFetalEcho} />
 
         {/* ── LMS Engines ───────────────────────────────────────────────── */}
-        <PerBrandUserRoutes routes={[
+        {perBrandUserRouteElements([
           { base: "/quickfire", component: QuickFire },
           { base: "/soundbytes", component: SoundBytes },
-        ]} />
+        ])}
         <Route path="/flashcards" component={FlashcardDeck} />
         <Route path="/case-library" component={CaseLibrary} />
         <Route path="/registry-review" component={RegistryReviewHub} />
@@ -472,7 +477,7 @@ function Router() {
 
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
         <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><CommunityAdmin /></Suspense></RoleGuard>}</Route>
-        <PerBrandAdminRoutes routes={[
+        {perBrandAdminRouteElements([
           { base: "/admin/cases", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard> },
           { base: "/admin/quickfire", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard> },
           { base: "/admin/challenge-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard> },
@@ -481,7 +486,7 @@ function Router() {
           { base: "/admin/navigator", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard> },
           { base: "/admin/thinkific-webhook", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard> },
           { base: "/admin/soundbytes", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SoundBytesAdmin /></RoleGuard> },
-        ]} />
+        ])}
         <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelPageEditor /></Suspense></RoleGuard>}</Route>
@@ -544,7 +549,7 @@ function Router() {
         <Route path="/my-memberships">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MyMemberships /></Suspense>}</Route>
 
         {/* ── Admin catch-all: any /admin/* not explicitly listed above → redirect to learn domain ── */}
-        <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
+        <Route path="/admin/:rest*">{(params: { rest?: string }) => <LearnAdminRedirect rest={params.rest} />}</Route>
 
         {/* ── Physician Over-Read (public, token-based) ─────────────────── */}
         <Route path="/physician-review/:token" component={PhysicianOverReadForm} />
@@ -611,7 +616,7 @@ function MembersRouter() {
       <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/contacts">{() => { window.location.replace("/admin/funnels?tab=contacts"); return null; }}</Route>
-      <PerBrandAdminRoutes routes={[
+      {perBrandAdminRouteElements([
         { base: "/admin/cases", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard> },
         { base: "/admin/quickfire", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard> },
         { base: "/admin/challenge-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard> },
@@ -620,7 +625,7 @@ function MembersRouter() {
         { base: "/admin/navigator", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard> },
         { base: "/admin/thinkific-webhook", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard> },
         { base: "/admin/soundbytes", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SoundBytesAdmin /></RoleGuard> },
-      ]} />
+      ])}
       <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
       <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><AdminDiscountCodesPage /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
@@ -897,10 +902,10 @@ function IHeartEchoRouter() {
         <Route path="/ecg-assist" component={ECGAssist} />
 
         {/* ── LMS Engines ────────────────────────────────────────────── */}
-        <PerBrandUserRoutes routes={[
+        {perBrandUserRouteElements([
           { base: "/quickfire", component: QuickFire },
           { base: "/soundbytes", component: SoundBytesPage },
-        ]} />
+        ])}
         <Route path="/leaderboard" component={Leaderboard} />
         <Route path="/flashcards" component={FlashcardDeck} />
         <Route path="/case-library" component={CaseLibrary} />
@@ -927,7 +932,7 @@ function IHeartEchoRouter() {
         <Route path="/admin/career-network">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CareerNetworkAdmin /></RoleGuard>}</Route>
 
         {/* ── Admin ──────────────────────────────────────────────────── */}
-        <PerBrandAdminRoutes routes={[
+        {perBrandAdminRouteElements([
           { base: "/admin/cases", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard> },
           { base: "/admin/quickfire", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard> },
           { base: "/admin/scancoach", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard> },
@@ -936,7 +941,7 @@ function IHeartEchoRouter() {
           { base: "/admin/thinkific-webhook", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard> },
           { base: "/admin/challenge-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard> },
           { base: "/admin/social-content", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard> },
-        ]} />
+        ])}
         <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>

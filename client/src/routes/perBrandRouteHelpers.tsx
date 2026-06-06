@@ -1,7 +1,11 @@
 /**
  * Reusable wouter routes for per-brand clinical tools (`-aaus` / `-ihe` suffixes).
+ *
+ * IMPORTANT: Return a flat array of <Route> elements for use inside <Switch>.
+ * Do NOT wrap in a custom component — wouter Switch treats children without
+ * `path` as `*` and stops before later routes (blank funnel/admin pages).
  */
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Route } from "wouter";
 import BrandPathRedirect from "@/components/BrandPathRedirect";
 import { withBrandTag } from "@shared/brandScopedRoutes";
@@ -11,35 +15,32 @@ type BrandedRouteDef = {
   render: () => ReactNode;
 };
 
-function BrandedRoutes({ routes }: { routes: BrandedRouteDef[] }) {
-  return (
-    <>
-      {routes.map(({ base, render }) => (
-        <Fragment key={base}>
-          <Route path={withBrandTag(base, "aaus")}>{render}</Route>
-          <Route path={withBrandTag(base, "iheartecho")}>{render}</Route>
-          <Route path={base}>{() => <BrandPathRedirect basePath={base} />}</Route>
-        </Fragment>
-      ))}
-    </>
+function brandedRouteElements({ base, render }: BrandedRouteDef) {
+  return [
+    <Route key={`${base}-aaus`} path={withBrandTag(base, "aaus")}>
+      {render}
+    </Route>,
+    <Route key={`${base}-ihe`} path={withBrandTag(base, "iheartecho")}>
+      {render}
+    </Route>,
+    <Route key={base} path={base}>
+      {() => <BrandPathRedirect basePath={base} />}
+    </Route>,
+  ];
+}
+
+export function perBrandUserRouteElements(routes: {
+  base: string;
+  component: React.ComponentType;
+}[]) {
+  return routes.flatMap(({ base, component: Component }) =>
+    brandedRouteElements({
+      base,
+      render: () => <Component />,
+    }),
   );
 }
 
-export function PerBrandUserRoutes({
-  routes,
-}: {
-  routes: { base: string; component: React.ComponentType }[];
-}) {
-  return (
-    <BrandedRoutes
-      routes={routes.map(({ base, component: Component }) => ({
-        base,
-        render: () => <Component />,
-      }))}
-    />
-  );
-}
-
-export function PerBrandAdminRoutes({ routes }: { routes: BrandedRouteDef[] }) {
-  return <BrandedRoutes routes={routes} />;
+export function perBrandAdminRouteElements(routes: BrandedRouteDef[]) {
+  return routes.flatMap(brandedRouteElements);
 }
