@@ -43,6 +43,8 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 7. **PR #20 `isAdminOrAuthPath` reverted**: Do not skip the Router outer `<Suspense>` for admin paths — lazy admin pages need it. `/platform-admin` stays fixed via eager `PlatformAdmin` + `AdminLoginRedirect` (`window.location.replace`, not wouter `Redirect`). Funnel `/:slug` redirects use `HardRedirect` for the same reason.
 
+8. **wouter `<Switch>` + wrapper components**: Never place custom components (e.g. `PerBrandAdminRoutes`) as direct `<Switch>` children — wouter treats missing `path` as `*` and stops before later routes (blank funnel/admin pages). Use `perBrandAdminRouteElements()` / `perBrandUserRouteElements()` from `client/src/routes/perBrandRouteHelpers.tsx` to spread flat `<Route>` elements inside `<Switch>`.
+
 6. **Stripe webhooks**: `registerStripeWebhook(app)` is registered **before** `express.json()` so raw body + signature verification work. Production endpoint: `https://app.allaboutultrasound.com/api/stripe/webhook` (also `/api/webhooks/stripe`). The handler responds 200 immediately and processes events asynchronously to avoid Stripe timeouts.
 
 7. **SDMS CME tables**: Run `scripts/sdms-cme-migration.sql` against MySQL before using SDMS CME features. Admin configures per-activity SDMS settings under LMS course/cohort Settings or Webinar Settings. Learner CME module appears in the course player when enabled. API credentials are AES-encrypted at rest using `JWT_SECRET`; never exposed to the client.
