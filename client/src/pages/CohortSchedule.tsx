@@ -10,8 +10,9 @@ import {
   Calendar, Clock, Video, ExternalLink, PlayCircle, FileText,
   Upload, Link2, CheckCircle, AlertCircle, BookOpen, ChevronLeft,
   Eye, Film, CheckCircle2, Download, ChevronRight, CalendarDays,
-  Plus,
+  Plus, MessageCircle,
 } from "lucide-react";
+import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { Link, useParams, useLocation, useSearch } from "wouter";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -540,6 +541,46 @@ export default function CohortSchedule() {
   }
 
   const { course, sessions, assignments, recordings, mySubmissions, myGroup } = data as any;
+  const [discBody, setDiscBody] = useState("");
+  const [discMedia, setDiscMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
+  const [discUploading, setDiscUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState("sessions");
+  const { data: discData, refetch: refetchDisc } = trpc.lmsLearner.getCohortDiscussions.useQuery(
+    { courseId: id },
+    { enabled: activeTab === "discussions" }
+  );
+  const postDisc = trpc.lmsLearner.postStudentCohortMessage.useMutation({
+    onSuccess: () => { refetchDisc(); setDiscBody(""); setDiscMedia([]); },
+    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
+  });
+  const deleteDisc = trpc.lmsLearner.deleteStudentCohortMessage.useMutation({
+    onSuccess: () => refetchDisc(),
+    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
+  });
+  const { data: notifPref, refetch: refetchNotifPref } = trpc.lmsLearner.getCohortNotifPref.useQuery(
+    undefined,
+    { enabled: activeTab === "discussions" }
+  );
+  const setNotifPref = trpc.lmsLearner.setCohortNotifPref.useMutation({
+    onSuccess: () => { refetchNotifPref(); const toast = (window as any).__toast; if (toast) toast.success(notifPref?.cohortDiscussions ? "Cohort notifications disabled" : "Cohort notifications enabled"); },
+    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
+  });
+  const handleDiscMediaUpload = async (file: File) => {
+    setDiscUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload/cohort-media", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const json = await res.json();
+      setDiscMedia(prev => [...prev, { url: json.url, mimeType: file.type, fileName: file.name }]);
+    } catch (e: any) {
+      const toast = (window as any).__toast;
+      if (toast) toast.error(e.message ?? "Upload failed");
+    } finally {
+      setDiscUploading(false);
+    }
+  };
   const upcomingSessions = sessions.filter((s: any) => isUpcoming(s.sessionDate));
   const pastSessions = sessions.filter((s: any) => isPast(s.sessionDate));
   const pendingAssignments = assignments.filter((a: any) => a.dueDate && isUpcoming(a.dueDate));
@@ -612,7 +653,7 @@ export default function CohortSchedule() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
-        <Tabs defaultValue="sessions">
+        <Tabs defaultValue="sessions" onValueChange={setActiveTab}>
           <TabsList className="mb-6 flex-wrap h-auto gap-1 py-1">
             <TabsTrigger value="sessions" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
               <Video className="w-4 h-4" />
@@ -637,6 +678,13 @@ export default function CohortSchedule() {
               Replays
               {(recordings ?? []).length > 0 && (
                 <Badge className="ml-1 bg-teal-500 text-white text-xs px-1.5 py-0">{recordings.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="discussions" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+              <MessageCircle className="w-4 h-4" />
+              Discussions
+              {(discData?.messages?.length ?? 0) > 0 && (
+                <Badge className="ml-1 bg-teal-500 text-white text-xs px-1.5 py-0">{discData!.messages.length}</Badge>
               )}
             </TabsTrigger>
           </TabsList>
@@ -739,6 +787,95 @@ export default function CohortSchedule() {
                 ))}
               </div>
             )}
+          </TabsContent>
+          {/* Discussions Tab */}
+          <TabsContent value="discussions">
+            <div className="space-y-4">
+              {!discData?.cohortGroupId && (
+                <Card className="text-center py-16"><CardContent className="pt-6">
+                  <MessageCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">You are not assigned to a cohort group yet.</p>
+                  <p className="text-gray-400 text-sm mt-1">Discussions will appear here once you are placed in a group.</p>
+                </CardContent></Card>
+              )}
+              {discData?.cohortGroupId && (
+                <>
+                  {/* Notification toggle */}
+                  <div className="flex items-center justify-end">
+                    <button
+                      onClick={() => setNotifPref.mutate({ cohortDiscussions: !(notifPref?.cohortDiscussions ?? true) })}
+                      disabled={setNotifPref.isPending}
+                      title={notifPref?.cohortDiscussions !== false ? "Disable discussion notifications" : "Enable discussion notifications"}
+                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        notifPref?.cohortDiscussions !== false
+                          ? "bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100"
+                          : "bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill={notifPref?.cohortDiscussions !== false ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                      {notifPref?.cohortDiscussions !== false ? "Notifications On" : "Notifications Off"}
+                    </button>
+                  </div>
+                  {/* Post composer */}
+                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                    <RichTextEditor value={discBody} onChange={setDiscBody} placeholder="Share something with your cohort..." minHeight={80} />
+                    {discMedia.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {discMedia.map((m, i) => (
+                          <div key={i} className="relative">
+                            {m.mimeType.startsWith('image/') ? <img src={m.url} alt={m.fileName} className="w-20 h-20 object-cover rounded-lg" /> : <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-500 text-center p-1">{m.fileName}</div>}
+                            <button onClick={() => setDiscMedia(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <label className="cursor-pointer text-xs text-teal-600 hover:underline">
+                        {discUploading ? 'Uploading...' : '+ Add Image/Video'}
+                        <input type="file" accept="image/*,video/*" className="hidden" disabled={discUploading} onChange={e => { if (e.target.files?.[0]) handleDiscMediaUpload(e.target.files[0]); e.target.value = ''; }} />
+                      </label>
+                      <button disabled={((!discBody.trim() || discBody === '<p></p>') && discMedia.length === 0) || postDisc.isPending} onClick={() => postDisc.mutate({ courseId: id, body: (discBody && discBody !== '<p></p>') ? discBody : undefined, mediaUrls: discMedia.length > 0 ? discMedia : undefined })} className="ml-auto px-4 py-1.5 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                        {postDisc.isPending ? 'Posting...' : 'Post'}
+                      </button>
+                    </div>
+                  </div>
+                  {/* Messages */}
+                  <div className="space-y-3">
+                    {(discData.messages ?? []).length === 0 && <p className="text-sm text-gray-400 text-center py-8">No discussions yet. Be the first to post!</p>}
+                    {(discData.messages ?? []).map((msg: any) => (
+                      <div key={msg.id} className={`bg-white border rounded-xl p-4 space-y-2 ${msg.isPinned ? 'border-yellow-300 bg-yellow-50/30' : 'border-gray-200'}`}>
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            {msg.userAvatar ? (
+                              <img src={msg.userAvatar} alt={msg.userDisplayName || msg.userName} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-bold text-teal-700">{(msg.userDisplayName || msg.userName || '?')[0].toUpperCase()}</span>
+                              </div>
+                            )}
+                            <span className="text-sm font-semibold text-gray-800">{msg.userDisplayName || msg.userName}</span>
+                            {msg.isAdminPost && <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">Instructor</span>}
+                            {msg.isPinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">📌 Pinned</span>}
+                            <span className="text-xs text-gray-400">{new Date(msg.createdAt).toLocaleString()}</span>
+                          </div>
+                          {msg.userId === (discData as any).currentUserId && (
+                            <button onClick={() => { if (confirm('Delete your message?')) deleteDisc.mutate({ id: msg.id, courseId: id }); }} className="text-xs text-red-400 hover:underline">Delete</button>
+                          )}
+                        </div>
+                        {msg.body && (msg.body.startsWith('<') ? <RichTextDisplay content={msg.body} className="text-sm text-gray-700" /> : <p className="text-sm text-gray-700 whitespace-pre-wrap">{msg.body}</p>)}
+                        {(msg.mediaUrls as any[])?.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {(msg.mediaUrls as any[]).map((m: any, i: number) => (
+                              m.mimeType?.startsWith('image/') ? <img key={i} src={m.url} alt={m.fileName} className="w-24 h-24 object-cover rounded-lg" /> : <a key={i} href={m.url} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline">{m.fileName}</a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </div>
@@ -915,15 +1052,30 @@ function AssignmentCard({ assignment, overdue, courseId, mySubmission, onOpen }:
 
 // ─── RecordingCard ────────────────────────────────────────────────────────────
 
+function getVideoEmbedUrl(url: string): { type: "iframe" | "video"; src: string } {
+  if (!url) return { type: "video", src: url };
+  // YouTube
+  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\.\w-]+)/);
+  if (ytMatch) return { type: "iframe", src: `https://www.youtube.com/embed/${ytMatch[1]}?rel=0` };
+  // Vimeo
+  const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\.?\d+)/);
+  if (vimeoMatch) return { type: "iframe", src: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
+  // Direct video file
+  if (/\.(mp4|webm|ogg|mov)([?#]|$)/i.test(url)) return { type: "video", src: url };
+  // Anything else (Loom, Wistia, custom embed URLs) — try as iframe
+  return { type: "iframe", src: url };
+}
+
 function RecordingCard({ recording }: { recording: any }) {
   const hasVideo = !!recording.videoUrl;
   const hasEmbed = !!recording.embedCode;
+  const embed = hasVideo && !hasEmbed ? getVideoEmbedUrl(recording.videoUrl) : null;
 
   return (
     <Card className="border border-gray-200 bg-white">
       <CardContent className="p-4">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-teal-100">
+        <div className="flex items-start gap-4 mb-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-teal-100">
             <Film className="w-5 h-5 text-teal-600" />
           </div>
           <div className="flex-1 min-w-0">
@@ -932,39 +1084,52 @@ function RecordingCard({ recording }: { recording: any }) {
               <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs flex-shrink-0">Recording</Badge>
             </div>
             {recording.description && (
-              <p className="text-gray-500 text-sm mt-1 line-clamp-2">{recording.description}</p>
+              <p className="text-gray-500 text-sm mt-1">{recording.description}</p>
             )}
             {recording.sessionDate && (
-              <div className="flex items-center gap-1 mt-2 text-sm text-gray-500">
+              <div className="flex items-center gap-1 mt-1 text-sm text-gray-500">
                 <Calendar className="w-3.5 h-3.5" />
                 Session: {fmtDate(recording.sessionDate)}
               </div>
             )}
-            {hasEmbed && (
-              <div className="mt-3 rounded-lg overflow-hidden border border-gray-200"
-                dangerouslySetInnerHTML={{ __html: recording.embedCode }}
-              />
-            )}
-            {hasVideo && !hasEmbed && (
-              <div className="mt-3">
-                <video
-                  src={recording.videoUrl}
-                  controls
-                  className="w-full rounded-lg border border-gray-200 max-h-[360px]"
-                  preload="metadata"
-                />
-              </div>
-            )}
-            {!hasEmbed && recording.externalUrl && (
-              <Button size="sm" variant="outline" className="mt-3 h-8 text-xs gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50" asChild>
-                <a href={recording.externalUrl} target="_blank" rel="noopener noreferrer">
-                  <PlayCircle className="w-3.5 h-3.5" />
-                  Watch Recording
-                </a>
-              </Button>
-            )}
           </div>
         </div>
+        {/* Raw embed code (e.g. copy-pasted iframe HTML) */}
+        {hasEmbed && (
+          <div className="w-full aspect-video rounded-lg overflow-hidden border border-gray-200"
+            dangerouslySetInnerHTML={{ __html: recording.embedCode }}
+          />
+        )}
+        {/* Video URL — detect type and render appropriately */}
+        {embed && (
+          <div className="w-full aspect-video bg-black rounded-lg overflow-hidden">
+            {embed.type === "iframe" ? (
+              <iframe
+                src={embed.src}
+                className="w-full h-full"
+                allowFullScreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                title={recording.title}
+                style={{ border: "none" }}
+              />
+            ) : (
+              <video
+                src={embed.src}
+                controls
+                className="w-full h-full"
+                preload="metadata"
+              />
+            )}
+          </div>
+        )}
+        {!hasEmbed && !hasVideo && recording.externalUrl && (
+          <Button size="sm" variant="outline" className="mt-2 h-8 text-xs gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50" asChild>
+            <a href={recording.externalUrl} target="_blank" rel="noopener noreferrer">
+              <PlayCircle className="w-3.5 h-3.5" />
+              Watch Recording
+            </a>
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

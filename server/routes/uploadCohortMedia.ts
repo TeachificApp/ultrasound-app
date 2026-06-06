@@ -1,7 +1,7 @@
 /**
  * POST /api/upload/cohort-media
  *
- * Admin-only multipart upload for cohort group discussion media (images + videos).
+ * Authenticated upload for cohort group discussion media (images + videos).
  * Accepts a single `file` field (image or video, max 100 MB).
  * Returns { url, fileKey, mimeType }.
  */
@@ -32,7 +32,7 @@ router.post(
     try {
       let user: any = null;
       try { user = await sdk.authenticateRequest(req); } catch {}
-      if (!user || user.role !== "admin") {
+      if (!user) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -43,7 +43,7 @@ router.post(
       const { originalname, mimetype, buffer } = req.file;
       const ext = originalname.split(".").pop()?.toLowerCase() ?? "bin";
       const suffix = randomBytes(6).toString("hex");
-      const fileKey = `cohort-media/${suffix}.${ext}`;
+      const fileKey = `cohort-media/${user.id}/${suffix}.${ext}`;
       const { url } = await storagePut(fileKey, buffer, mimetype);
       res.json({ url, fileKey, mimeType: mimetype });
     } catch (err: any) {
