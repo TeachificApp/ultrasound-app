@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { PremiumPearlGate } from "@/components/PremiumPearlGate";
+import { getLoginUrl } from "@/const";
 
 type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager" | "education_manager" | "education_admin" | "education_student" | "platform_owner" | "platform_moderator" | "instructor" | "team_admin" | "affiliate";
 
@@ -97,10 +98,27 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
     );
   }
 
-  // Not authenticated — show blurred overlay with login CTA over actual content
+  // Not authenticated — handle based on role type
   if (!isAuthenticated || !user) {
-    // If premium_user is in roles, always show login overlay (not DIY)
-    // so unauthenticated users are prompted to sign in, not to join DIY
+    // Admin/management roles have no public teaser content — redirect straight to login
+    const isAdminRole = roles.some(r =>
+      ["platform_admin", "platform_owner", "platform_moderator",
+       "education_admin", "education_manager", "diy_admin",
+       "team_admin", "accreditation_manager", "instructor"].includes(r)
+    );
+    if (isAdminRole) {
+      // Hard redirect to login, preserving the current path as return destination
+      window.location.href = getLoginUrl();
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-[#189aa1]" />
+            <p className="text-sm text-muted-foreground">Redirecting to login…</p>
+          </div>
+        </div>
+      );
+    }
+    // For content roles (premium_user, diy_user), show blurred overlay with login/upgrade CTA
     const hasPremiumRole = roles.includes("premium_user");
     const isDiyOnlyGate = !hasPremiumRole && roles.some(r => ["diy_admin", "diy_user"].includes(r));
     return (
