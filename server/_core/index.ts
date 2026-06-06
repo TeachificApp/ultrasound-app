@@ -162,6 +162,14 @@ async function startServer() {
     const hasCookie = cookieHeader.includes("app_session_id");
     res.json({ resolved, xAppHostname, xForwardedHost, origin, referer, host, reqHostname, brand, brandMode, cookieDomain: cookieOpts.domain || '(none)', cookieSameSite: cookieOpts.sameSite, cookieHeader: cookieHeader.substring(0, 300), hasCookie });
   });
+  // Test endpoint to verify Set-Cookie headers pass through Cloudflare
+  app.get("/api/debug/set-test-cookie", (req, res) => {
+    const cookieOpts = getSessionCookieOptions(req);
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.cookie("test_cookie", "hello_from_server", { ...cookieOpts, maxAge: 60000 });
+    const cookieHeader = req.headers.cookie || "";
+    res.json({ cookieSet: true, domain: cookieOpts.domain || '(none)', sameSite: cookieOpts.sameSite, secure: cookieOpts.secure, cookieHeader: cookieHeader.substring(0, 200) });
+  });
   // Build version debug endpoint to verify deployed code
   app.get("/api/debug/build-version", (_req, res) => {
     res.json({ version: "2026-05-14-v2-api-media", deployedAt: new Date().toISOString(), spaRegex: "^/(?!media/|api/|manus-storage/).*" });
@@ -402,6 +410,13 @@ async function startServer() {
     }
   });
 
+  // Prevent Cloudflare (and any other CDN/proxy) from caching API responses or stripping Set-Cookie headers.
+  // Without this, Cloudflare strips Set-Cookie from responses it considers cacheable, breaking auth.
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.setHeader("Pragma", "no-cache");
+    next();
+  });
   // tRPC API
   app.use(
     "/api/trpc",
