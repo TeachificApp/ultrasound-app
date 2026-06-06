@@ -10,8 +10,9 @@ import {
   Calendar, Clock, Video, ExternalLink, PlayCircle, FileText,
   Upload, Link2, CheckCircle, AlertCircle, BookOpen, ChevronLeft,
   Eye, Film, CheckCircle2, Download, ChevronRight, CalendarDays,
-  Plus, MessageCircle, LayoutGrid, List,
+  Plus, MessageCircle, LayoutGrid, List, FolderOpen,
 } from "lucide-react";
+import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { Link, useParams, useLocation, useSearch } from "wouter";
 
@@ -583,7 +584,7 @@ export default function CohortSchedule() {
     );
   }
 
-  const { course, sessions, assignments, recordings, mySubmissions, myGroup } = data as any;
+  const { course, sessions, assignments, recordings, resources = [], mySubmissions, myGroup } = data as any;
   const upcomingSessions = sessions.filter((s: any) => isUpcoming(s.sessionDate));
   const pastSessions = sessions.filter((s: any) => isPast(s.sessionDate));
   const pendingAssignments = assignments.filter((a: any) => a.dueDate && isUpcoming(a.dueDate));
@@ -681,6 +682,13 @@ export default function CohortSchedule() {
               Replays
               {(recordings ?? []).length > 0 && (
                 <Badge className="ml-1 bg-teal-500 text-white text-xs px-1.5 py-0">{recordings.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="resources" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+              <FolderOpen className="w-4 h-4" />
+              Resources
+              {(resources ?? []).length > 0 && (
+                <Badge className="ml-1 bg-teal-500 text-white text-xs px-1.5 py-0">{resources.length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="discussions" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
@@ -827,6 +835,25 @@ export default function CohortSchedule() {
               </div>
             )}
           </TabsContent>
+          {/* Resources Tab */}
+          <TabsContent value="resources">
+            {(resources ?? []).length === 0 ? (
+              <Card className="text-center py-16">
+                <CardContent className="pt-6">
+                  <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">No resources yet</p>
+                  <p className="text-gray-400 text-sm mt-1">Links and downloads from your instructor will appear here.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {resources.map((res: any) => (
+                  <CohortResourceCard key={res.id} resource={res} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
           {/* Discussions Tab */}
           <TabsContent value="discussions">
             <div className="space-y-4">

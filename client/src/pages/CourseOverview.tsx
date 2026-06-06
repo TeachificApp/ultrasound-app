@@ -23,11 +23,12 @@ import {
   Award, BookOpen, CheckCircle, ChevronDown, ChevronRight, Clock, Edit3, Eye,
   Lock, PlayCircle, User, FileText, HelpCircle, Download, Monitor,
   ArrowRight, ListChecks, ExternalLink, Video, Film, Upload, Link2,
-  CheckCircle2, Calendar, AlertCircle, ChevronLeft, CalendarDays,
+  CheckCircle2, Calendar, AlertCircle, ChevronLeft, CalendarDays, FolderOpen,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -698,7 +699,7 @@ function isDueSoonDate(d: Date | string | null | undefined) {
 
 function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: number; cohortData: any; isLoading: boolean }) {
   const [, navigate] = useLocation();
-  const [cohortTab, setCohortTab] = useState<"sessions" | "assignments" | "replays" | "discussions">("sessions");
+  const [cohortTab, setCohortTab] = useState<"sessions" | "assignments" | "replays" | "resources" | "discussions">("sessions");
   const [discBody, setDiscBody] = useState("");
   const [discMedia, setDiscMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
   const [discUploading, setDiscUploading] = useState(false);
@@ -763,7 +764,7 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
     );
   }
 
-  const { sessions = [], assignments = [], recordings = [], mySubmissions = [] } = cohortData;
+  const { sessions = [], assignments = [], recordings = [], resources = [], mySubmissions = [] } = cohortData;
   const upcomingSessions = sessions.filter((s: any) => isUpcomingDate(s.sessionDate));
   const pastSessions = sessions.filter((s: any) => isPastDate(s.sessionDate));
   const pendingAssignments = assignments.filter((a: any) => a.dueDate && isUpcomingDate(a.dueDate));
@@ -800,6 +801,7 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
           { key: "sessions", label: "Live Sessions", icon: <Video className="w-4 h-4" />, count: upcomingSessions.length },
           { key: "assignments", label: "Assignments", icon: <FileText className="w-4 h-4" />, count: pendingAssignments.length },
           { key: "replays", label: "Replays", icon: <Film className="w-4 h-4" />, count: recordings.length },
+          { key: "resources", label: "Resources", icon: <FolderOpen className="w-4 h-4" />, count: resources.length },
           { key: "discussions", label: "Discussions", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>, count: discData?.messages?.length ?? 0 },
         ] as const).map(({ key, label, icon, count }) => (
           <button
@@ -910,6 +912,25 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
           ) : (
             <div className="space-y-4">
               {recordings.map((rec: any) => <CohortRecordingCard key={rec.id} recording={rec} />)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Resources tab */}
+      {cohortTab === "resources" && (
+        <div className="space-y-4">
+          {resources.length === 0 ? (
+            <Card className="text-center py-16"><CardContent className="pt-6">
+              <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No resources yet</p>
+              <p className="text-gray-400 text-sm mt-1">Links and downloads from your instructor will appear here.</p>
+            </CardContent></Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {resources.map((res: any) => (
+                <CohortResourceCard key={res.id} resource={res} />
+              ))}
             </div>
           )}
         </div>

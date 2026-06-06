@@ -33,6 +33,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
+import { enrichCohortResources } from "../lib/cohortResources";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
   lmsCourses,
@@ -74,6 +75,7 @@ import {
   lmsCohortSessions,
   lmsCohortAssignments,
   lmsCohortRecordings,
+  lmsCohortResources,
   lmsCohortSubmissions,
   mediaUploadFolders,
   mediaUploadResponses,
@@ -1698,7 +1700,17 @@ export const lmsLearnerRouter = router({
       }
       // When multi-cohort mode is on, filter content by the student's group
       const groupId = course.multiCohortMode && myGroup ? myGroup.id : null;
-      const [sessions, assignments, recordings, mySubmissions] = await Promise.all([
+      const resourceWhere = groupId
+        ? and(
+            eq(lmsCohortResources.courseId, input.courseId),
+            eq(lmsCohortResources.status, "published"),
+            or(isNull(lmsCohortResources.cohortGroupId), eq(lmsCohortResources.cohortGroupId, groupId)),
+          )
+        : and(
+            eq(lmsCohortResources.courseId, input.courseId),
+            eq(lmsCohortResources.status, "published"),
+          );
+      const [sessions, assignments, recordings, resourceRows, mySubmissions] = await Promise.all([
         db.select().from(lmsCohortSessions)
           .where(groupId
             ? and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.cohortGroupId, groupId))
@@ -1714,10 +1726,14 @@ export const lmsLearnerRouter = router({
             ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published"), eq(lmsCohortRecordings.cohortGroupId, groupId))
             : and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published")))
           .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt)),
+        db.select().from(lmsCohortResources)
+          .where(resourceWhere)
+          .orderBy(asc(lmsCohortResources.position), asc(lmsCohortResources.createdAt)),
         db.select().from(lmsCohortSubmissions)
           .where(eq(lmsCohortSubmissions.userId, ctx.user.id)),
       ]);
-      return { course, sessions, assignments, recordings, mySubmissions, myGroup };
+      const resources = await enrichCohortResources(db, resourceRows);
+      return { course, sessions, assignments, recordings, resources, mySubmissions, myGroup };
     }),
 
   /** Get the learner's assigned cohort group for a course */

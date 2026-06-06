@@ -5248,6 +5248,31 @@ export const lmsCohortRecordings = mysqlTable("lms_cohort_recordings", {
 export type LmsCohortRecording = typeof lmsCohortRecordings.$inferSelect;
 export type InsertLmsCohortRecording = typeof lmsCohortRecordings.$inferInsert;
 
+// ─── Cohort Resources (My Cohort → Resources tab) ─────────────────────────────
+export const lmsCohortResources = mysqlTable("lms_cohort_resources", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  /** null = entire course (all cohorts, including future); set = this cohort group only */
+  cohortGroupId: int("cohort_group_id"),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  cardImageUrl: text("card_image_url"),
+  actionType: mysqlEnum("action_type", ["link", "download"]).default("link").notNull(),
+  linkUrl: text("link_url"),
+  downloadSource: mysqlEnum("download_source", ["upload", "media_repo", "download_product"]),
+  fileUrl: text("file_url"),
+  fileKey: varchar("file_key", { length: 512 }),
+  fileName: varchar("file_name", { length: 512 }),
+  mediaAssetId: int("media_asset_id"),
+  downloadProductId: int("download_product_id"),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  position: int("position").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCohortResource = typeof lmsCohortResources.$inferSelect;
+export type InsertLmsCohortResource = typeof lmsCohortResources.$inferInsert;
+
 // ─── Cohort Assignment Submissions ───────────────────────────────────────────
 export const lmsCohortSubmissions = mysqlTable("lms_cohort_submissions", {
   id: int("id").autoincrement().primaryKey(),
