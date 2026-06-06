@@ -10,7 +10,7 @@
  */
 const host = self.location.hostname;
 const isIHE = host.indexOf("iheartecho") !== -1;
-const CACHE_NAME = isIHE ? "iheartecho-v3" : "ultrasound-assist-v3";
+const CACHE_NAME = isIHE ? "iheartecho-v4" : "ultrasound-assist-v4";
 const SHELL_URLS = ["/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

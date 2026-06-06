@@ -6,7 +6,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import MediaRedirect from "@/pages/MediaRedirect";
-import { Route, Switch, useLocation, useParams, Redirect } from "wouter";
+import { Route, Switch, useParams } from "wouter";
+import { HardRedirect } from "@/components/HardRedirect";
 import { useEffect, lazy, Suspense } from "react";
 import { trpc } from "./lib/trpc";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -289,22 +290,9 @@ const CareerProfile = lazy(() => import("./pages/CareerProfile"));
 const CareerNetworkAdmin = lazy(() => import("./pages/admin/CareerNetworkAdmin"));
 const EmployerDashboard = lazy(() => import("./pages/EmployerDashboard"));
 
-/** Admin/auth paths must not sit under the Router's outer Suspense — wouter Redirect (and
- *  similar effects) render null and get unmounted when the boundary re-suspends. */
-function isAdminOrAuthPath(path: string): boolean {
-  return (
-    path === "/platform-admin" ||
-    path.startsWith("/admin/") ||
-    path === "/admin" ||
-    path === "/login" ||
-    path.startsWith("/login?")
-  );
-}
-
 function Router() {
   usePageViewTracker();
   useCrossDomainSso(); // Silently sign user into all other domains as free member
-  const [location] = useLocation();
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
@@ -558,11 +546,6 @@ function Router() {
         {/* ── Admin catch-all: any /admin/* not explicitly listed above → redirect to learn domain ── */}
         <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
 
-        {/* ── Public Funnel Pages ────────────────────────────────────── */}
-        <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>
-        <Route path="/:slug/:pageSlug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PublicFunnelPage /></Suspense>}</Route>
-        <Route path="/p/:slug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><StandaloneLandingPage /></Suspense>}</Route>
-
         {/* ── Physician Over-Read (public, token-based) ─────────────────── */}
         <Route path="/physician-review/:token" component={PhysicianOverReadForm} />
 
@@ -572,11 +555,13 @@ function Router() {
         <Route path="/terms" component={() => { window.location.replace("https://www.allaboutultrasound.com/terms-of-service.html"); return null; }} />
         <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
         <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
+        {/* ── Public Funnel Pages (catch-all — must be last before NotFound) ── */}
+        <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
+        <Route path="/:slug/:pageSlug">{() => <PublicFunnelPageRoute />}</Route>
+        <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>
         <Route component={NotFound} />
       </Switch>
   );
-  const path = location.split("?")[0];
-  if (isAdminOrAuthPath(path)) return routeSwitch;
   return <Suspense fallback={pageFallback}>{routeSwitch}</Suspense>;
 }
 
@@ -804,16 +789,13 @@ function LMSRouter() {
         <Route path="/ref/:slug" component={AffiliateRedirect} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
-            {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
-            <Route path="/:slug"><FunnelRootRedirect /></Route>
-            <Route path="/:slug/:pageSlug">
-              <Suspense fallback={pageFallback}>
-                <PublicFunnelPage />
-              </Suspense>
-            </Route>
             {/* Fallback */}
             <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
             <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
+            {/* Funnel pages — catch-all last */}
+            <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
+            <Route path="/:slug/:pageSlug">{() => <PublicFunnelPageRoute />}</Route>
+            <Route path="/:slug"><FunnelRootRedirect /></Route>
             <Route component={NotFound} />
           </Switch>
           </Suspense>
@@ -830,7 +812,6 @@ function LMSRouter() {
 function IHeartEchoRouter() {
   usePageViewTracker();
   useCrossDomainSso(); // Silently sign user into all other domains as free member
-  const [location] = useLocation();
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
@@ -1007,8 +988,6 @@ function IHeartEchoRouter() {
         <Route path="/media/:slug" component={MediaRedirect} />
       </Switch>
   );
-  const path = location.split("?")[0];
-  if (isAdminOrAuthPath(path)) return routeSwitch;
   return <Suspense fallback={pageFallback}>{routeSwitch}</Suspense>;
 }
 
@@ -1027,6 +1006,16 @@ const RESERVED_FUNNEL_SLUGS = new Set([
   "accreditation-manager", "accreditation-navigator", "diy-accreditation-plans",
   "memberships", "my-memberships", "404", "terms", "privacy", "contact",
 ]);
+
+/** Guards /:slug/:pageSlug — never treat reserved or /admin paths as funnels. */
+function PublicFunnelPageRoute() {
+  const params = useParams<{ slug: string; pageSlug: string }>();
+  const slug = params.slug ?? "";
+  if (slug === "admin" || slug === "p" || RESERVED_FUNNEL_SLUGS.has(slug)) {
+    return <NotFound />;
+  }
+  return <PublicFunnelPage />;
+}
 
 /**
  * FunnelRootRedirect — When a visitor lands on /:slug (no page slug),
@@ -1054,7 +1043,7 @@ function FunnelRootRedirect() {
 
   // If it's a product slug, redirect to the canonical product URL
   if (productQuery.data) {
-    return <Redirect to={`/product/${slug}`} />;
+    return <HardRedirect to={`/product/${slug}`} />;
   }
 
   // Still loading the product check
@@ -1080,7 +1069,7 @@ function FunnelRootRedirect() {
     );
   }
 
-  return <Redirect to={`/${data.funnelSlug}/${data.firstPageSlug}`} />;
+  return <HardRedirect to={`/${data.funnelSlug}/${data.firstPageSlug}`} />;
 }
 
 /** Mounts the upgrade prompt only for free, authenticated, non-admin users */
