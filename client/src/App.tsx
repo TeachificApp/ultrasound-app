@@ -543,6 +543,9 @@ function Router() {
         <Route path="/my-memberships/:slug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MyMemberships /></Suspense>}</Route>
         <Route path="/my-memberships">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MyMemberships /></Suspense>}</Route>
 
+        {/* ── Admin catch-all: any /admin/* not explicitly listed above → redirect to learn domain ── */}
+        <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
+
         {/* ── Public Funnel Pages ────────────────────────────────────── */}
         <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>
         <Route path="/:slug/:pageSlug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PublicFunnelPage /></Suspense>}</Route>
