@@ -49,7 +49,7 @@ const PLANS = [
       "Peer review submission",
       "Limited analytics & reporting (no drill-downs or export)",
     ],
-    checkoutUrl: "https://member.allaboutultrasound.com/enroll/3706401?price_id=4655411",
+    checkoutUrl: "/premium",
   },
   {
     id: "professional",
@@ -80,7 +80,7 @@ const PLANS = [
       "IAC-ready PDF bundles",
       "Lab Admin — All About Ultrasound™ App access included",
     ],
-    checkoutUrl: "https://member.allaboutultrasound.com/enroll/3706397?price_id=4655406",
+    checkoutUrl: "/premium",
   },
   {
     id: "advanced",
@@ -108,7 +108,7 @@ const PLANS = [
       "All Lab Admins — All About Ultrasound™ App access included",
       "Accreditation Concierge™ add-on available",
     ],
-    checkoutUrl: "https://member.allaboutultrasound.com/enroll/3706392?price_id=4655402",
+    checkoutUrl: "/premium",
   },
   {
     id: "partner",
@@ -137,7 +137,7 @@ const PLANS = [
       "All Lab Admins — All About Ultrasound™ App access included",
       "Accreditation Concierge™ add-on available",
     ],
-    checkoutUrl: "https://member.allaboutultrasound.com/enroll/3706344?price_id=4655349",
+    checkoutUrl: "/premium",
   },
 ] as const;
 

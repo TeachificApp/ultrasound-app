@@ -40,7 +40,7 @@ export function PremiumOverlay({ children, featureName, checkoutUrl }: PremiumOv
   const isLoading = loading;
   const isLoggedIn = isAuthenticated;
   const returnUrl = typeof window !== "undefined" ? `${window.location.origin}/enrolled` : "";
-  const upgradeUrl = checkoutUrl ?? `https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974${returnUrl ? `&redirect_url=${encodeURIComponent(returnUrl)}` : ""}`;
+  const upgradeUrl = checkoutUrl ?? "/premium";
 
   return (
     <div className="relative rounded-xl overflow-hidden">

@@ -1,14 +1,14 @@
 /**
  * Premium Access Router
  *
- * Handles premium membership status for the All About Ultrasound™ App Premium Access
- * membership ($9.99/month) sold via Thinkific at:
- * https://member.allaboutultrasound.com/enroll/3703267?price_id=4651832
+ * Handles premium membership status for UltrasoundAssist™ and EchoAssist™.
+ * All premium purchases now route through Stripe via the brandMembershipRouter.
+ * The Thinkific free membership sync is preserved separately.
  *
  * Procedures:
- *  - premium.getStatus        — returns the current user's premium status
- *  - premium.checkAndSync     — re-checks Thinkific and syncs isPremium in DB (protected)
- *  - premium.syncByEmail      — public: check Thinkific by email and sync if user exists in DB
+ *  - premium.getStatus        — returns the current user's premium status (checks brandMemberships)
+ *  - premium.checkAndSync     — re-checks brandMemberships + legacy isPremium flag (protected)
+ *  - premium.syncByEmail      — public: check premium by email (for post-checkout confirmation)
  *  - premium.adminGrant       — admin: manually grant premium to a user by email
  *  - premium.adminRevoke      — admin: manually revoke premium from a user by email
  *  - premium.adminListPremium — admin: list all premium users
@@ -17,37 +17,54 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getUserByEmail, getUserById, setPremiumStatus } from "../db";
-import {
-  getOrdersByEmail,
-  IHEARTECHO_PREMIUM_PRODUCT_ID,
-} from "../thinkific";
-
-/** The Thinkific membership product slug for UltrasoundAssist™ Premium Access */
-export const PREMIUM_MEMBERSHIP_SLUG = "ultrasoundassist-app-premium-membership";
+import { getDb } from "../db";
+import { brandMemberships } from "../../drizzle/schema";
+import { and, eq } from "drizzle-orm";
 
 /**
- * Check if a user has a completed order for the All About Ultrasound™ Premium Access product on Thinkific.
- *
- * The premium product is sold as a subscription (product_id=3703267, "All About Ultrasound™ App - Premium Access").
- * It does NOT appear in the enrollments endpoint — we query the orders endpoint directly by email.
- *
- * We query by email directly (not by user lookup) because the /users?query= endpoint
- * returns Internal Server Error for some emails on the Thinkific API.
- *
- * Note: We do not check for subscription cancellation here because the webhook handles revocation.
- * This function is used as a fallback sync for users who return from checkout.
+ * Check if a user has active premium via brandMemberships table (Stripe-based).
+ * Returns true if the user has an active premium membership for the given brand.
  */
-export async function checkThinkificPremiumByEmail(email: string): Promise<boolean> {
+async function checkStripePremiumByUserId(userId: number, brand: string = "aaus"): Promise<boolean> {
   try {
-    const orders = await getOrdersByEmail(email);
-    // A user has premium if they have a Complete order for the premium product
-    return orders.some(
-      (o) =>
-        o.product_id === IHEARTECHO_PREMIUM_PRODUCT_ID &&
-        o.status.toLowerCase() === "complete"
-    );
+    const db = await getDb();
+    if (!db) return false;
+    const [membership] = await db
+      .select()
+      .from(brandMemberships)
+      .where(
+        and(
+          eq(brandMemberships.userId, userId),
+          eq(brandMemberships.brand, brand),
+          eq(brandMemberships.tier, "premium"),
+          eq(brandMemberships.status, "active")
+        )
+      )
+      .limit(1);
+    if (!membership) return false;
+    // Check expiry
+    if (membership.expiresAt && new Date(membership.expiresAt) < new Date()) return false;
+    return true;
   } catch (err) {
-    console.error("[Premium] Error checking Thinkific premium status:", err);
+    console.error("[Premium] Error checking Stripe premium status:", err);
+    return false;
+  }
+}
+
+/**
+ * Check premium by email — looks up user, then checks brandMemberships.
+ */
+async function checkPremiumByEmail(email: string): Promise<boolean> {
+  try {
+    const user = await getUserByEmail(email);
+    if (!user) return false;
+    // Check brandMemberships for both brands
+    const hasAaus = await checkStripePremiumByUserId(user.id, "aaus");
+    if (hasAaus) return true;
+    const hasIhe = await checkStripePremiumByUserId(user.id, "iheartecho");
+    return hasIhe;
+  } catch (err) {
+    console.error("[Premium] Error checking premium by email:", err);
     return false;
   }
 }
@@ -62,24 +79,37 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
 export const premiumRouter = router({
   /**
    * Get the current user's premium status.
+   * Now checks brandMemberships (Stripe) instead of Thinkific.
    */
   getStatus: protectedProcedure.query(async ({ ctx }) => {
     const user = await getUserById(ctx.user.id);
     if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
-    // Admin users always have full premium access — never show upgrade prompts to admins
-    const isPremium = ctx.user.role === "admin" ? true : user.isPremium;
+    // Admin users always have full premium access
+    if (ctx.user.role === "admin") {
+      return {
+        isPremium: true,
+        premiumGrantedAt: user.premiumGrantedAt ?? null,
+        premiumSource: "admin",
+        checkoutUrl: "/premium",
+        manageUrl: "/premium",
+      };
+    }
+    // Check brandMemberships (Stripe-based)
+    const hasBrandPremium = await checkStripePremiumByUserId(ctx.user.id, ctx.brand ?? "aaus");
+    const isPremium = hasBrandPremium || user.isPremium;
     return {
       isPremium,
       premiumGrantedAt: user.premiumGrantedAt ?? null,
       premiumSource: user.premiumSource ?? null,
-      checkoutUrl: "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974",
-      manageUrl: `https://member.allaboutultrasound.com/account/billing`,
+      checkoutUrl: "/premium",
+      manageUrl: "/premium",
     };
   }),
 
   /**
-   * Re-check Thinkific and sync the user's isPremium flag.
-   * Called when a logged-in user returns from the Thinkific checkout page.
+   * Re-check premium status and sync the user's isPremium flag.
+   * Called when a logged-in user returns from Stripe checkout.
+   * Checks brandMemberships table (Stripe) for active premium.
    */
   checkAndSync: protectedProcedure.mutation(async ({ ctx }) => {
     const user = await getUserById(ctx.user.id);
@@ -87,7 +117,7 @@ export const premiumRouter = router({
     if (!user.email) {
       return { isPremium: false, changed: false, message: "No email on account" };
     }
-    // First check if the DB already has premium set (e.g. via webhook pending account)
+    // If already premium in DB, confirm it
     if (user.isPremium) {
       return {
         isPremium: true,
@@ -95,49 +125,43 @@ export const premiumRouter = router({
         message: "Premium access is active",
       };
     }
-    const hasPremium = await checkThinkificPremiumByEmail(user.email);
+    // Check brandMemberships (Stripe-based)
+    const hasPremium = await checkStripePremiumByUserId(ctx.user.id, ctx.brand ?? "aaus");
     const changed = hasPremium !== user.isPremium;
-    if (changed) {
-      await setPremiumStatus(user.id, hasPremium, "thinkific");
+    if (changed && hasPremium) {
+      await setPremiumStatus(user.id, true, "stripe");
     }
     return {
       isPremium: hasPremium,
       changed,
       message: changed
         ? hasPremium
-          ? "UltrasoundAssist™ Premium access granted — welcome!"
+          ? "Premium access granted — welcome!"
           : "Premium access has been removed"
         : hasPremium
         ? "Premium access is active"
-        : "No active premium membership found",
+        : "No active premium membership found. Visit /premium to subscribe.",
     };
   }),
 
   /**
-   * Public: check Thinkific by email and sync premium status if the user exists in DB.
-   * Used on the /upgrade-success page for users who aren't logged in yet.
-   * Returns whether premium was found on Thinkific (does NOT expose user data).
+   * Public: check premium by email and sync status if the user exists in DB.
+   * Used on the /upgrade-success page for users who completed Stripe checkout.
    */
   syncByEmail: publicProcedure
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input }) => {
       const email = input.email.toLowerCase().trim();
-      // Check if user exists in our DB
       const user = await getUserByEmail(email);
       if (!user) {
-        // Check Thinkific anyway — if they have premium there, we'll note it
-        // but can't grant it until they create an account
-        const hasPremiumOnThinkific = await checkThinkificPremiumByEmail(email);
         return {
           userExists: false,
           isPremium: false,
-          premiumOnThinkific: hasPremiumOnThinkific,
-          message: hasPremiumOnThinkific
-            ? "Purchase confirmed on Thinkific. Create your UltrasoundAssist™ account with this email to activate premium."
-            : "No premium membership found for this email on Thinkific.",
+          premiumOnThinkific: false,
+          message: "No account found for this email. Create your account first, then your premium access will be activated.",
         };
       }
-      // User exists — check if they already have premium in DB
+      // Check if already premium in DB
       if (user.isPremium) {
         return {
           userExists: true,
@@ -146,18 +170,20 @@ export const premiumRouter = router({
           message: "Premium access is already active on your account.",
         };
       }
-      // Check Thinkific and sync
-      const hasPremium = await checkThinkificPremiumByEmail(email);
-      if (hasPremium) {
-        await setPremiumStatus(user.id, true, "thinkific");
+      // Check brandMemberships (Stripe)
+      const hasAaus = await checkStripePremiumByUserId(user.id, "aaus");
+      const hasIhe = await checkStripePremiumByUserId(user.id, "iheartecho");
+      const hasPremium = hasAaus || hasIhe;
+      if (hasPremium && !user.isPremium) {
+        await setPremiumStatus(user.id, true, "stripe");
       }
       return {
         userExists: true,
         isPremium: hasPremium,
-        premiumOnThinkific: hasPremium,
+        premiumOnThinkific: hasPremium, // Keep field name for backward compat
         message: hasPremium
           ? "Premium access granted! Sign in to access all premium features."
-          : "No active premium membership found for this email on Thinkific.",
+          : "No active premium membership found. Your Stripe payment may still be processing — try again in a moment.",
       };
     }),
 
@@ -186,7 +212,7 @@ export const premiumRouter = router({
     }),
 
   /**
-   * Admin: list recent Thinkific webhook events.
+   * Admin: list recent webhook events (kept for monitoring).
    */
   adminGetWebhookEvents: adminProcedure
     .input(z.object({ limit: z.number().min(1).max(200).default(50) }).optional())

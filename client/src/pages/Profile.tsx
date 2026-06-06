@@ -27,7 +27,7 @@ const ROLE_CONFIG: Record<string, {
     description: "Access to TEE, ICE, Strain & Structural Heart Navigators and premium EchoAssist™ modules.",
     color: "#189aa1",
     icon: Star,
-    manageUrl: "https://member.allaboutultrasound.com/account/billing",
+    manageUrl: "/premium",
     manageLabel: "Manage Premium Subscription",
   },
   diy_user: {
@@ -35,7 +35,7 @@ const ROLE_CONFIG: Record<string, {
     description: "Access to the DIY Accreditation Tool™ for lab accreditation preparation.",
     color: "#f59e0b",
     icon: Award,
-    manageUrl: "https://member.allaboutultrasound.com/account/billing",
+    manageUrl: "/premium",
     manageLabel: "Manage DIY Subscription",
   },
   diy_admin: {
@@ -621,7 +621,7 @@ export default function Profile() {
                           </div>
                           <p className="text-xs text-gray-500 leading-relaxed">Full access to all All About Ultrasound™ premium features — $9.97/month.</p>
                           <a
-                            href="https://member.allaboutultrasound.com/account/billing"
+                            href="/premium"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold hover:underline"

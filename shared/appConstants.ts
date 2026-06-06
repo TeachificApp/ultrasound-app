@@ -3,9 +3,9 @@ export const AAUS_LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401
 export const THINKIFIC_LINKS = {
   freeMembership: "https://member.allaboutultrasound.com/bundles/ultrasoundassist-app-free-member-access",
   freeRegister: "https://member.allaboutultrasound.com/enroll/3714918?price_id=4664963",
-  premiumMembership: "https://member.allaboutultrasound.com/bundles/ultrasoundassist-app-premium-membership",
-  premiumMonthly: "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974",
-  premiumAnnual: "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664977",
+  premiumMembership: "/premium",
+  premiumMonthly: "/premium",
+  premiumAnnual: "/premium",
   community: "https://member.allaboutultrasound.com/communities",
   learnFetalEcho: "https://member.allaboutultrasound.com/courses/fetal-echo",
   cmeHub: "https://member.allaboutultrasound.com/collections",

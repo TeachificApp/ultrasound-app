@@ -331,11 +331,7 @@ function UpgradeCard({
 }) {
   const returnUrl =
     typeof window !== "undefined" ? `${window.location.origin}/enrolled` : "";
-  const upgradeUrl =
-    checkoutUrl ??
-    `https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974${
-      returnUrl ? `&redirect_url=${encodeURIComponent(returnUrl)}` : ""
-    }`;
+  const upgradeUrl = checkoutUrl ?? "/premium";
 
   return (
     <div

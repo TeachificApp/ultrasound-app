@@ -4696,3 +4696,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CohortReplayPlayer page: dedicated video player page with breadcrumb back to Replays tab, smart embed detection (YouTube/Vimeo/MP4/iframe), progress tracking (% watched, play/pause/complete events)
 - [x] Cohort recording progress tracking: DB table + tRPC procedures (getCohortRecording, getCohortRecordingProgress, trackCohortRecordingProgress)
 - [x] Admin cohort discussions: replace plain textarea with RichTextEditor (both "Post as Admin" panel and per-group discussion compose box); render messages with RichTextDisplay
+- [x] Route all premium membership purchases through Stripe instead of Thinkific
+- [x] Update premiumRouter to check brandMemberships (Stripe) for premium status
+- [x] Replace all frontend Thinkific premium checkout URLs with /premium (Stripe page)
+- [x] Keep Thinkific free membership sync and daily member import unchanged
+- [x] Update UpgradeSuccess page to work with Stripe flow

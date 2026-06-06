@@ -177,7 +177,7 @@ export default function VerifyEmail() {
                     </>
                   ) : (
                     <>
-                      <a href="https://member.allaboutultrasound.com/enroll/3707211?price_id=4656299" target="_blank" rel="noopener noreferrer" className="w-full">
+                      <a href="/premium" target="_blank" rel="noopener noreferrer" className="w-full">
                         <Button className="w-full font-semibold text-white" style={{ background: "#189aa1" }}>
                           Create a new account
                         </Button>

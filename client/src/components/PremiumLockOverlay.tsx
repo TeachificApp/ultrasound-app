@@ -102,7 +102,7 @@ export default function PremiumLockOverlay({
 
             {/* CTA */}
             <a
-              href="https://member.allaboutultrasound.com"
+              href="/premium"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"

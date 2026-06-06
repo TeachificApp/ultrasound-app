@@ -14,7 +14,7 @@ import { X, Zap, Star, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const PREMIUM_URL =
-  "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974";
+  "/premium";
 
 const FIRST_USE_DELAY_MS = 60 * 1000; // 60 seconds — shown once per session
 

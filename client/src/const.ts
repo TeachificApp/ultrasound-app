@@ -3,15 +3,15 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 // ─── AAUS (All About Ultrasound) Thinkific URLs ─────────────────────────────
 export const THINKIFIC_FREE_MEMBERSHIP_URL = "https://member.allaboutultrasound.com/enroll/3714918?price_id=4664963";
 export const THINKIFIC_FREE_MEMBERSHIP_PAGE = "https://member.allaboutultrasound.com/bundles/ultrasoundassist-app-free-member-access";
-export const THINKIFIC_PREMIUM_MONTHLY_URL = "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974";
-export const THINKIFIC_PREMIUM_ANNUAL_URL = "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664977";
-export const THINKIFIC_PREMIUM_MEMBERSHIP_PAGE = "https://member.allaboutultrasound.com/bundles/ultrasoundassist-app-premium-membership";
-export const THINKIFIC_PREMIUM_PAGE = "https://member.allaboutultrasound.com/bundles/ultrasoundassist-app-premium-membership";
+export const THINKIFIC_PREMIUM_MONTHLY_URL = "/premium";
+export const THINKIFIC_PREMIUM_ANNUAL_URL = "/premium";
+export const THINKIFIC_PREMIUM_MEMBERSHIP_PAGE = "/premium";
+export const THINKIFIC_PREMIUM_PAGE = "/premium";
 
 // ─── iHeartEcho Thinkific URLs ───────────────────────────────────────────────
 export const IHE_THINKIFIC_FREE_URL = "https://member.allaboutultrasound.com/enroll/3707211?price_id=4656299";
-export const IHE_THINKIFIC_PREMIUM_MONTHLY_URL = "https://member.allaboutultrasound.com/enroll/3703267?price_id=4651832";
-export const IHE_THINKIFIC_PREMIUM_ANNUAL_URL = "https://member.allaboutultrasound.com/enroll/3703267?price_id=4656275";
+export const IHE_THINKIFIC_PREMIUM_MONTHLY_URL = "/premium";
+export const IHE_THINKIFIC_PREMIUM_ANNUAL_URL = "/premium";
 
 /**
  * Brand-aware helpers — detect hostname and return the correct Thinkific URL.
@@ -24,17 +24,9 @@ export const getThinkificFreeUrl = () => {
   return `${base}&redirect_url=${encodeURIComponent(returnUrl)}`;
 };
 
-export const getThinkificPremiumMonthlyUrlBrand = () => {
-  const base = isIHE() ? IHE_THINKIFIC_PREMIUM_MONTHLY_URL : THINKIFIC_PREMIUM_MONTHLY_URL;
-  const returnUrl = `${window.location.origin}/enrolled`;
-  return `${base}&redirect_url=${encodeURIComponent(returnUrl)}`;
-};
+export const getThinkificPremiumMonthlyUrlBrand = () => "/premium";
 
-export const getThinkificPremiumAnnualUrlBrand = () => {
-  const base = isIHE() ? IHE_THINKIFIC_PREMIUM_ANNUAL_URL : THINKIFIC_PREMIUM_ANNUAL_URL;
-  const returnUrl = `${window.location.origin}/enrolled`;
-  return `${base}&redirect_url=${encodeURIComponent(returnUrl)}`;
-};
+export const getThinkificPremiumAnnualUrlBrand = () => "/premium";
 
 /**
  * Free membership enrollment URL with origin-tracking redirect.
@@ -50,19 +42,13 @@ export const getThinkificFreeEnrollUrl = () => {
  * Premium monthly enrollment URL with origin-tracking redirect.
  * Users who purchase Premium are sent back to /enrolled after checkout.
  */
-export const getThinkificPremiumMonthlyUrl = () => {
-  const returnUrl = `${window.location.origin}/enrolled`;
-  return `${THINKIFIC_PREMIUM_MONTHLY_URL}&redirect_url=${encodeURIComponent(returnUrl)}`;
-};
+export const getThinkificPremiumMonthlyUrl = () => "/premium";
 
 /**
  * Premium annual enrollment URL with origin-tracking redirect.
  * Users who purchase Premium (annual) are sent back to /enrolled after checkout.
  */
-export const getThinkificPremiumAnnualUrl = () => {
-  const returnUrl = `${window.location.origin}/enrolled`;
-  return `${THINKIFIC_PREMIUM_ANNUAL_URL}&redirect_url=${encodeURIComponent(returnUrl)}`;
-};
+export const getThinkificPremiumAnnualUrl = () => "/premium";
 
 /** Local login page, optionally preserving post-login return path. */
 export const getLoginUrl = (returnTo?: string) => {

@@ -37,7 +37,7 @@ const BRAND = "#189aa1";
 const BRAND_DARK = "#0e4a50";
 const NAVY = "#0e1e2e";
 
-const PREMIUM_URL = "https://member.allaboutultrasound.com/enroll/3703267?price_id=4651832";
+const PREMIUM_URL = "/premium";
 const DIY_PLANS_PATH = "/diy-accreditation-plans";
 
 // ─── Navigator Features ───────────────────────────────────────────────────────
@@ -144,26 +144,26 @@ const DIY_PLANS = [
     name: "Accreditation Starter",
     tagline: "Begin your accreditation journey",
     seats: "1 Lab Admin · 4 Member Seats · 5 Total",
-    url: "https://member.allaboutultrasound.com/enroll/3706401?price_id=4655411",
+    url: "/premium",
   },
   {
     name: "Accreditation Professional",
     tagline: "Structured QA/QI for growing labs",
     seats: "2 Lab Admins · 13 Member Seats · 15 Total",
-    url: "https://member.allaboutultrasound.com/enroll/3706397?price_id=4655406",
+    url: "/premium",
     popular: true,
   },
   {
     name: "Accreditation Advanced",
     tagline: "Multi-site & large lab solution",
     seats: "5 Lab Admins · 45 Member Seats · 50 Total",
-    url: "https://member.allaboutultrasound.com/enroll/3706392?price_id=4655402",
+    url: "/premium",
   },
   {
     name: "Accreditation Partner",
     tagline: "Unlimited seats + expert guidance",
     seats: "10 Lab Admins · Unlimited Member Seats",
-    url: "https://member.allaboutultrasound.com/enroll/3706344?price_id=4655349",
+    url: "/premium",
   },
 ];
 

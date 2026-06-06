@@ -142,8 +142,7 @@ function UpgradePrompt({
   featureName?: string;
   checkoutUrl?: string;
 }) {
-  const returnUrl = typeof window !== "undefined" ? `${window.location.origin}/enrolled` : "";
-  const url = checkoutUrl ?? `https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974${returnUrl ? `&redirect_url=${encodeURIComponent(returnUrl)}` : ""}`;
+  const url = checkoutUrl ?? "/premium";
 
   return (
     <div className="rounded-2xl border border-amber-200/80 bg-white/95 shadow-2xl p-7 text-center">
@@ -171,12 +170,12 @@ function UpgradePrompt({
 
       {/* CTAs */}
       <div className="flex flex-col gap-2.5">
-        <a href={url} target="_blank" rel="noopener noreferrer">
+        <Link href={url}>
           <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white w-full font-semibold">
             <Crown className="w-4 h-4 mr-1.5" />
             Upgrade — $9.97/month
           </Button>
-        </a>
+        </Link>
         <Link href="/premium">
           <Button variant="outline" className="w-full">
             Learn More <ArrowRight className="w-4 h-4 ml-1" />

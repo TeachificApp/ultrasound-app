@@ -369,10 +369,10 @@ export default function DIYRegister() {
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
           <a href={
-            selectedPlan === "starter" ? "https://member.allaboutultrasound.com/enroll/3706401?price_id=4655411"
-            : selectedPlan === "professional" ? "https://member.allaboutultrasound.com/enroll/3706397?price_id=4655406"
-            : selectedPlan === "advanced" ? "https://member.allaboutultrasound.com/enroll/3706392?price_id=4655402"
-            : "https://member.allaboutultrasound.com/enroll/3706344?price_id=4655349"
+            selectedPlan === "starter" ? "/premium"
+            : selectedPlan === "professional" ? "/premium"
+            : selectedPlan === "advanced" ? "/premium"
+            : "/premium"
           } target="_blank" rel="noopener noreferrer">
             <Button style={{ background: BRAND }} className="text-white w-full sm:w-auto">
               Complete Payment →

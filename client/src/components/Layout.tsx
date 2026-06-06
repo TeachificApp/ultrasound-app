@@ -357,7 +357,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* AAUS Store */}
         <div className="px-3 pb-2">
           <a
-            href="https://member.allaboutultrasound.com"
+            href="/premium"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all duration-150 group w-full"
@@ -501,7 +501,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       {allBadges.length > 0 && (
                         <div className="px-4 py-2.5 border-b border-gray-100">
                           <a
-                            href="https://member.allaboutultrasound.com/account/billing"
+                            href="/premium"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 hover:text-[#189aa1] transition-colors flex items-center gap-1"
@@ -512,7 +512,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             {allBadges.map(({ label, color }) => (
                               <a
                                 key={label}
-                                href="https://member.allaboutultrasound.com/account/billing"
+                                href="/premium"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold hover:opacity-80 transition-opacity"

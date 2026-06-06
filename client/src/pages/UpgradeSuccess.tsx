@@ -257,7 +257,7 @@ export default function UpgradeSuccess() {
                         <strong>{email}</strong> and premium will be activated automatically.
                       </p>
                     </div>
-                    <a href="https://member.allaboutultrasound.com/enroll/3707211?price_id=4656299" target="_blank" rel="noopener noreferrer" className="w-full">
+                    <a href="/login" target="_blank" rel="noopener noreferrer" className="w-full">
                       <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold w-full">
                         <ArrowRight className="w-4 h-4 mr-2" />
                         Create Free Account
