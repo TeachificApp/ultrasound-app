@@ -168,7 +168,7 @@ async function startServer() {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.cookie("test_cookie", "hello_from_server", { ...cookieOpts, maxAge: 60000 });
     const cookieHeader = req.headers.cookie || "";
-    res.json({ cookieSet: true, domain: cookieOpts.domain || '(none)', sameSite: cookieOpts.sameSite, secure: cookieOpts.secure, cookieHeader: cookieHeader.substring(0, 200) });
+    res.json({ cookieSet: true, domain: cookieOpts.domain || '(none)', sameSite: cookieOpts.sameSite, secure: cookieOpts.secure, cookieHeader: cookieHeader.substring(0, 200), canonicalRootDomain: process.env.CANONICAL_ROOT_DOMAIN || '(not set)', nodeEnv: process.env.NODE_ENV });
   });
   // Build version debug endpoint to verify deployed code
   app.get("/api/debug/build-version", (_req, res) => {
