@@ -4,7 +4,8 @@
  * Route: /cohort/:courseId/replay/:recordingId
  *
  * Features:
- * - Smart video rendering (YouTube/Vimeo iframe, direct MP4/WebM video tag, generic iframe)
+ * - Plyr.js video player with full CSS custom-property theming (course primaryColor)
+ * - Smart video rendering (YouTube/Vimeo via Plyr embed, direct MP4/WebM, generic iframe)
  * - Video progress tracking (play, pause, progress milestones, complete)
  * - Breadcrumb navigation back to cohort replays tab
  */
@@ -19,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   ChevronLeft, Film, Calendar, Clock, AlertCircle, BookOpen,
 } from "lucide-react";
+import Plyr from "plyr";
+import "plyr/dist/plyr.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,29 +40,164 @@ function fmtDuration(secs: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-/** Detect video URL type and return embed info */
-function getVideoEmbed(url: string): { type: "iframe" | "video"; src: string } {
-  if (!url) return { type: "video", src: url };
+/** Detect video URL type and return Plyr provider info */
+type EmbedInfo =
+  | { kind: "plyr-video"; src: string }
+  | { kind: "plyr-youtube"; videoId: string }
+  | { kind: "plyr-vimeo"; videoId: string }
+  | { kind: "plyr-wistia"; videoId: string }
+  | { kind: "iframe"; src: string };
+
+function getEmbedInfo(url: string): EmbedInfo {
+  if (!url) return { kind: "plyr-video", src: url };
   // YouTube
   const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w.-]+)/);
-  if (ytMatch) return { type: "iframe", src: `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&enablejsapi=1` };
+  if (ytMatch) return { kind: "plyr-youtube", videoId: ytMatch[1] };
   // Vimeo
   const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if (vimeoMatch) return { type: "iframe", src: `https://player.vimeo.com/video/${vimeoMatch[1]}?api=1` };
+  if (vimeoMatch) return { kind: "plyr-vimeo", videoId: vimeoMatch[1] };
+  // Wistia embed URL (fast.wistia.net/embed/iframe/XXXX)
+  const wistiaMatch = url.match(/fast\.wistia\.(?:net|com)\/embed\/iframe\/([\w-]+)/);
+  if (wistiaMatch) return { kind: "plyr-wistia", videoId: wistiaMatch[1] };
   // Direct video file
-  if (/\.(mp4|webm|ogg|mov)([?#]|$)/i.test(url)) return { type: "video", src: url };
-  // Generic iframe fallback
-  return { type: "iframe", src: url };
+  if (/\.(mp4|webm|ogg|mov)([?#]|$)/i.test(url)) return { kind: "plyr-video", src: url };
+  // Generic iframe fallback (can't use Plyr)
+  return { kind: "iframe", src: url };
+}
+
+// ─── Plyr Video Component ─────────────────────────────────────────────────────
+
+interface PlyrVideoProps {
+  embed: EmbedInfo;
+  primaryColor: string;
+  accentColor: string;
+  posterUrl?: string | null;
+  onReady?: (player: Plyr) => void;
+}
+
+function PlyrVideo({ embed, primaryColor, accentColor, posterUrl, onReady }: PlyrVideoProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<Plyr | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const container = containerRef.current;
+
+    let element: HTMLElement;
+
+    if (embed.kind === "plyr-youtube") {
+      const div = document.createElement("div");
+      div.setAttribute("data-plyr-provider", "youtube");
+      div.setAttribute("data-plyr-embed-id", embed.videoId);
+      container.appendChild(div);
+      element = div;
+    } else if (embed.kind === "plyr-vimeo") {
+      const div = document.createElement("div");
+      div.setAttribute("data-plyr-provider", "vimeo");
+      div.setAttribute("data-plyr-embed-id", embed.videoId);
+      container.appendChild(div);
+      element = div;
+    } else if (embed.kind === "plyr-wistia") {
+      const div = document.createElement("div");
+      div.setAttribute("data-plyr-provider", "vimeo"); // Wistia uses iframe approach
+      // Wistia doesn't have native Plyr support - use iframe fallback rendered below
+      container.appendChild(div);
+      element = div;
+    } else {
+      // plyr-video
+      const video = document.createElement("video");
+      video.src = (embed as any).src ?? "";
+      video.setAttribute("playsinline", "");
+      video.setAttribute("controls", "");
+      video.setAttribute("preload", "metadata");
+      if (posterUrl) video.setAttribute("poster", posterUrl);
+      container.appendChild(video);
+      element = video;
+    }
+
+    const player = new Plyr(element, {
+      controls: [
+        "play-large", "play", "rewind", "fast-forward",
+        "progress", "current-time", "duration",
+        "mute", "volume", "captions", "settings", "pip", "fullscreen",
+      ],
+      settings: ["quality", "speed"],
+      speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+      youtube: { noCookie: true, rel: 0 },
+      vimeo: { byline: false, portrait: false, title: false },
+    });
+
+    playerRef.current = player;
+    if (onReady) player.on("ready", () => onReady(player));
+
+    return () => {
+      player.destroy();
+      // Remove created element
+      if (container.contains(element)) container.removeChild(element);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embed.kind, (embed as any).src ?? (embed as any).videoId]);
+
+  // Build CSS vars for Plyr theming
+  const cssVars = `
+    .plyr {
+      --plyr-color-main: ${primaryColor};
+      --plyr-range-fill-background: ${primaryColor};
+      --plyr-range-thumb-background: ${primaryColor};
+      --plyr-video-control-color: #fff;
+      --plyr-video-control-color-hover: #fff;
+      --plyr-video-control-background-hover: ${primaryColor}cc;
+      --plyr-control-icon-size: 18px;
+      --plyr-control-spacing: 10px;
+      --plyr-video-controls-background: linear-gradient(rgba(0,0,0,0), ${primaryColor}cc);
+      --plyr-badge-background: ${primaryColor};
+      --plyr-menu-background: rgba(20,20,20,0.92);
+      --plyr-tooltip-background: rgba(20,20,20,0.92);
+      --plyr-tooltip-color: #fff;
+      --plyr-range-track-height: 4px;
+      --plyr-range-thumb-height: 14px;
+      --plyr-range-thumb-width: 14px;
+      --plyr-font-size-base: 14px;
+    }
+    .plyr--full-ui input[type=range] {
+      accent-color: ${primaryColor};
+    }
+    .plyr__progress__buffer {
+      background: ${accentColor}55;
+    }
+    .plyr__volume input[type=range] {
+      accent-color: ${primaryColor};
+    }
+    .plyr__control--overlaid {
+      background: ${primaryColor}cc !important;
+    }
+    .plyr__control--overlaid:hover {
+      background: ${primaryColor} !important;
+    }
+    .plyr__control.plyr__tab-focus,
+    .plyr__control:hover,
+    .plyr__control[aria-expanded=true] {
+      background: ${primaryColor}cc;
+    }
+    .plyr--video .plyr__control.plyr__tab-focus,
+    .plyr--video .plyr__control:hover,
+    .plyr--video .plyr__control[aria-expanded=true] {
+      background: ${primaryColor};
+    }
+  `;
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: cssVars }} />
+      <div ref={containerRef} className="w-full h-full" />
+    </>
+  );
 }
 
 // ─── Progress Tracker Hook ────────────────────────────────────────────────────
 
-/**
- * Attaches to a <video> element and reports progress milestones (25/50/75/90%)
- * plus play, pause, and ended events via the trackCohortRecordingProgress mutation.
- */
-function useVideoProgressTracker(
-  videoRef: React.RefObject<HTMLVideoElement | null>,
+function usePlyrProgressTracker(
+  playerRef: React.RefObject<Plyr | null>,
   opts: {
     recordingId: number;
     courseId: number;
@@ -78,27 +216,27 @@ function useVideoProgressTracker(
 
   const report = useCallback(
     (eventType: "play" | "pause" | "progress" | "complete") => {
-      const vid = videoRef.current;
-      if (!vid || !opts.enabled) return;
-      const positionSec = Math.floor(vid.currentTime);
-      const durationSec = Math.floor(vid.duration || 0);
+      const player = playerRef.current;
+      if (!player || !opts.enabled) return;
+      const positionSec = Math.floor(player.currentTime ?? 0);
+      const durationSec = Math.floor(player.duration ?? 0);
       const percentWatched = durationSec > 0 ? Math.min(100, Math.floor((positionSec / durationSec) * 100)) : 0;
       opts.onTrack({ recordingId: opts.recordingId, courseId: opts.courseId, positionSec, durationSec, percentWatched, eventType });
     },
-    [opts, videoRef]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [opts.recordingId, opts.courseId, opts.enabled, opts.onTrack]
   );
 
-  useEffect(() => {
-    const vid = videoRef.current;
-    if (!vid || !opts.enabled) return;
+  const handleReady = useCallback((player: Plyr) => {
+    (playerRef as React.MutableRefObject<Plyr | null>).current = player;
 
-    const onPlay = () => report("play");
-    const onPause = () => report("pause");
-    const onEnded = () => report("complete");
-    const onTimeUpdate = () => {
-      const dur = vid.duration || 0;
+    player.on("play", () => report("play"));
+    player.on("pause", () => report("pause"));
+    player.on("ended", () => report("complete"));
+    player.on("timeupdate", () => {
+      const dur = player.duration ?? 0;
       if (dur <= 0) return;
-      const pct = Math.floor((vid.currentTime / dur) * 100);
+      const pct = Math.floor(((player.currentTime ?? 0) / dur) * 100);
       for (const milestone of [25, 50, 75, 90]) {
         if (pct >= milestone && !reportedMilestones.current.has(milestone)) {
           reportedMilestones.current.add(milestone);
@@ -106,22 +244,10 @@ function useVideoProgressTracker(
           break;
         }
       }
-    };
+    });
+  }, [report, playerRef]);
 
-    vid.addEventListener("play", onPlay);
-    vid.addEventListener("pause", onPause);
-    vid.addEventListener("ended", onEnded);
-    vid.addEventListener("timeupdate", onTimeUpdate);
-
-    return () => {
-      vid.removeEventListener("play", onPlay);
-      vid.removeEventListener("pause", onPause);
-      vid.removeEventListener("ended", onEnded);
-      vid.removeEventListener("timeupdate", onTimeUpdate);
-      // Report final position on unmount
-      report("pause");
-    };
-  }, [videoRef, opts.enabled, report]);
+  return { handleReady };
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -134,7 +260,7 @@ export default function CohortReplayPlayer() {
   const courseId = parseInt(courseIdStr ?? "0", 10);
   const recordingId = parseInt(recordingIdStr ?? "0", 10);
   const { user, isLoading: authLoading } = useAuth();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const plyrRef = useRef<Plyr | null>(null);
 
   const { data, isLoading, error } = trpc.lmsLearner.getCohortRecording.useQuery(
     { courseId, recordingId },
@@ -150,7 +276,7 @@ export default function CohortReplayPlayer() {
     [trackProgress]
   );
 
-  useVideoProgressTracker(videoRef, {
+  const { handleReady } = usePlyrProgressTracker(plyrRef, {
     recordingId,
     courseId,
     enabled: !!user && !!data?.recording,
@@ -206,47 +332,19 @@ export default function CohortReplayPlayer() {
   // Theme colors from course
   const primaryColor = (data as any).primaryColor as string ?? "#179ca3";
   const accentColor = (data as any).accentColor as string ?? "#0d9488";
-  // Use server-resolved embed URL (e.g. Wistia extracted from Thinkific proxy) if available
+
+  // Resolve embed info
   const resolvedEmbedUrl = (recording as any).resolvedEmbedUrl as string | null;
-  const embed = resolvedEmbedUrl
-    ? { type: "iframe" as const, src: resolvedEmbedUrl }
-    : recording.videoUrl
-    ? getVideoEmbed(recording.videoUrl)
-    : null;
-  const hasEmbed = !!(recording as any).embedCode;
+  const rawUrl = resolvedEmbedUrl ?? recording.videoUrl ?? "";
+  const embed = rawUrl ? getEmbedInfo(rawUrl) : null;
+  const hasCustomEmbed = !!(recording as any).embedCode;
   const durationSecs = recording.durationSeconds ?? 0;
-  // CSS custom properties for themed video controls (applied via a style block)
-  const playerCssVars = `
-    :root {
-      --player-primary: ${primaryColor};
-      --player-accent: ${accentColor};
-      --player-primary-t: ${primaryColor}cc;
-    }
-    video::-webkit-media-controls-panel {
-      background: linear-gradient(to top, ${primaryColor}cc 0%, transparent 60%) !important;
-    }
-    video::-webkit-media-controls-play-button,
-    video::-webkit-media-controls-mute-button,
-    video::-webkit-media-controls-fullscreen-button,
-    video::-webkit-media-controls-timeline,
-    video::-webkit-media-controls-volume-slider,
-    video::-webkit-media-controls-current-time-display,
-    video::-webkit-media-controls-time-remaining-display {
-      color: #fff !important;
-      filter: drop-shadow(0 0 2px ${primaryColor}99);
-    }
-    video::-webkit-media-controls-timeline {
-      accent-color: ${primaryColor};
-    }
-    video::-webkit-media-controls-volume-slider {
-      accent-color: ${primaryColor};
-    }
-  `;
+
+  // Wistia videos: use iframe directly (Plyr doesn't support Wistia natively)
+  const isWistia = embed?.kind === "plyr-wistia";
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Inject themed video control styles */}
-      <style dangerouslySetInnerHTML={{ __html: playerCssVars }} />
       {/* ── Header / Breadcrumb ── */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
@@ -265,33 +363,36 @@ export default function CohortReplayPlayer() {
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
         {/* Video Player */}
-        <div className="bg-black rounded-xl overflow-hidden shadow-lg" style={{ boxShadow: `0 4px 32px ${primaryColor}33` }}>
-          {hasEmbed ? (
+        <div
+          className="bg-black rounded-xl overflow-hidden"
+          style={{ boxShadow: `0 4px 32px ${primaryColor}44` }}
+        >
+          {hasCustomEmbed ? (
             <div
               className="w-full aspect-video"
-              dangerouslySetInnerHTML={{ __html: recording.embedCode! }}
+              dangerouslySetInnerHTML={{ __html: (recording as any).embedCode! }}
             />
-          ) : embed ? (
+          ) : embed && !isWistia ? (
             <div className="w-full aspect-video">
-              {embed.type === "iframe" ? (
-                <iframe
-                  src={embed.src}
-                  className="w-full h-full"
-                  allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                  title={recording.title}
-                  style={{ border: "none" }}
-                />
-              ) : (
-                <video
-                  ref={videoRef}
-                  src={embed.src}
-                  controls
-                  className="w-full h-full"
-                  preload="metadata"
-                  poster={recording.thumbnailUrl ?? undefined}
-                />
-              )}
+              <PlyrVideo
+                embed={embed}
+                primaryColor={primaryColor}
+                accentColor={accentColor}
+                posterUrl={recording.thumbnailUrl}
+                onReady={handleReady}
+              />
+            </div>
+          ) : embed && isWistia ? (
+            // Wistia: use their native iframe embed (Plyr doesn't support Wistia)
+            <div className="w-full aspect-video">
+              <iframe
+                src={rawUrl}
+                className="w-full h-full"
+                allowFullScreen
+                allow="autoplay; fullscreen"
+                title={recording.title}
+                style={{ border: "none" }}
+              />
             </div>
           ) : (
             <div className="w-full aspect-video flex items-center justify-center bg-gray-900">
@@ -309,7 +410,12 @@ export default function CohortReplayPlayer() {
             <div className="flex-1 min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">{recording.title}</h1>
               <div className="flex items-center gap-3 mt-2 flex-wrap">
-                <Badge className="text-xs" style={{ backgroundColor: `${primaryColor}22`, color: primaryColor, borderColor: `${primaryColor}44` }}>Recording</Badge>
+                <Badge
+                  className="text-xs"
+                  style={{ backgroundColor: `${primaryColor}22`, color: primaryColor, borderColor: `${primaryColor}44` }}
+                >
+                  Recording
+                </Badge>
                 {durationSecs > 0 && (
                   <span className="flex items-center gap-1 text-sm text-gray-500">
                     <Clock className="w-3.5 h-3.5" />
@@ -333,7 +439,10 @@ export default function CohortReplayPlayer() {
                 <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all"
-                    style={{ width: `${progress.percentWatched}%`, backgroundColor: progress.completed ? "#22c55e" : primaryColor }}
+                    style={{
+                      width: `${progress.percentWatched}%`,
+                      backgroundColor: progress.completed ? "#22c55e" : primaryColor,
+                    }}
                   />
                 </div>
               </div>
