@@ -1681,6 +1681,8 @@ export const lmsLearnerRouter = router({
         description: lmsCourses.description, thumbnailUrl: lmsCourses.thumbnailUrl,
         enrollmentCloseDate: lmsCourses.enrollmentCloseDate,
         multiCohortMode: lmsCourses.multiCohortMode,
+        primaryColor: lmsCourses.primaryColor,
+        accentColor: lmsCourses.accentColor,
       }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       // Get the user's cohort group assignment first (needed for filtering)
@@ -2057,6 +2059,11 @@ export const lmsLearnerRouter = router({
       const [progress] = await db.select().from(lmsCohortRecordingProgress)
         .where(and(eq(lmsCohortRecordingProgress.userId, ctx.user.id), eq(lmsCohortRecordingProgress.recordingId, input.recordingId)))
         .limit(1);
+      // Fetch course theme colors
+      const [courseTheme] = await db.select({ primaryColor: lmsCourses.primaryColor, accentColor: lmsCourses.accentColor })
+        .from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      const primaryColor = courseTheme?.primaryColor ?? "#179ca3";
+      const accentColor = courseTheme?.accentColor ?? "#0d9488";
       // Resolve Thinkific proxy URLs to Wistia embed URLs server-side
       // (Thinkific proxy has x-frame-options: SAMEORIGIN so can't be iframed directly)
       let resolvedEmbedUrl: string | null = null;
@@ -2072,7 +2079,7 @@ export const lmsLearnerRouter = router({
           // Ignore resolution errors - fall back to direct URL
         }
       }
-      return { recording: { ...recording, resolvedEmbedUrl }, session, progress: progress ?? null };
+      return { recording: { ...recording, resolvedEmbedUrl }, session, progress: progress ?? null, primaryColor, accentColor };
     }),
 
   /** Get recording progress for all recordings in a course for the current user */

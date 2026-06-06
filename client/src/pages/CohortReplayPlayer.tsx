@@ -203,6 +203,9 @@ export default function CohortReplayPlayer() {
   }
 
   const { recording, session, progress } = data;
+  // Theme colors from course
+  const primaryColor = (data as any).primaryColor as string ?? "#179ca3";
+  const accentColor = (data as any).accentColor as string ?? "#0d9488";
   // Use server-resolved embed URL (e.g. Wistia extracted from Thinkific proxy) if available
   const resolvedEmbedUrl = (recording as any).resolvedEmbedUrl as string | null;
   const embed = resolvedEmbedUrl
@@ -212,13 +215,42 @@ export default function CohortReplayPlayer() {
     : null;
   const hasEmbed = !!(recording as any).embedCode;
   const durationSecs = recording.durationSeconds ?? 0;
+  // CSS custom properties for themed video controls (applied via a style block)
+  const playerCssVars = `
+    :root {
+      --player-primary: ${primaryColor};
+      --player-accent: ${accentColor};
+      --player-primary-t: ${primaryColor}cc;
+    }
+    video::-webkit-media-controls-panel {
+      background: linear-gradient(to top, ${primaryColor}cc 0%, transparent 60%) !important;
+    }
+    video::-webkit-media-controls-play-button,
+    video::-webkit-media-controls-mute-button,
+    video::-webkit-media-controls-fullscreen-button,
+    video::-webkit-media-controls-timeline,
+    video::-webkit-media-controls-volume-slider,
+    video::-webkit-media-controls-current-time-display,
+    video::-webkit-media-controls-time-remaining-display {
+      color: #fff !important;
+      filter: drop-shadow(0 0 2px ${primaryColor}99);
+    }
+    video::-webkit-media-controls-timeline {
+      accent-color: ${primaryColor};
+    }
+    video::-webkit-media-controls-volume-slider {
+      accent-color: ${primaryColor};
+    }
+  `;
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Inject themed video control styles */}
+      <style dangerouslySetInnerHTML={{ __html: playerCssVars }} />
       {/* ── Header / Breadcrumb ── */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-gray-600 hover:text-teal-700 -ml-2" asChild>
+          <Button variant="ghost" size="sm" className="gap-1.5 -ml-2" style={{ color: primaryColor }} asChild>
             <Link href={`/cohort/${courseId}?tab=replays`}>
               <ChevronLeft className="w-4 h-4" />
               Back to Replays
@@ -233,7 +265,7 @@ export default function CohortReplayPlayer() {
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
         {/* Video Player */}
-        <div className="bg-black rounded-xl overflow-hidden shadow-lg">
+        <div className="bg-black rounded-xl overflow-hidden shadow-lg" style={{ boxShadow: `0 4px 32px ${primaryColor}33` }}>
           {hasEmbed ? (
             <div
               className="w-full aspect-video"
@@ -277,7 +309,7 @@ export default function CohortReplayPlayer() {
             <div className="flex-1 min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">{recording.title}</h1>
               <div className="flex items-center gap-3 mt-2 flex-wrap">
-                <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs">Recording</Badge>
+                <Badge className="text-xs" style={{ backgroundColor: `${primaryColor}22`, color: primaryColor, borderColor: `${primaryColor}44` }}>Recording</Badge>
                 {durationSecs > 0 && (
                   <span className="flex items-center gap-1 text-sm text-gray-500">
                     <Clock className="w-3.5 h-3.5" />
@@ -300,8 +332,8 @@ export default function CohortReplayPlayer() {
                 </div>
                 <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${progress.completed ? "bg-green-500" : "bg-teal-500"}`}
-                    style={{ width: `${progress.percentWatched}%` }}
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${progress.percentWatched}%`, backgroundColor: progress.completed ? "#22c55e" : primaryColor }}
                   />
                 </div>
               </div>
@@ -317,14 +349,14 @@ export default function CohortReplayPlayer() {
           )}
 
           {session && (
-            <Card className="border-gray-200 bg-teal-50/50">
+            <Card className="border-gray-200" style={{ backgroundColor: `${primaryColor}0d` }}>
               <CardContent className="p-4">
-                <h3 className="text-sm font-semibold text-teal-800 mb-2">Session Details</h3>
+                <h3 className="text-sm font-semibold mb-2" style={{ color: primaryColor }}>Session Details</h3>
                 <div className="space-y-1">
                   {session.title && <p className="text-sm text-gray-700 font-medium">{session.title}</p>}
                   {session.sessionDate && (
                     <p className="text-sm text-gray-500 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-teal-500" />
+                      <Calendar className="w-3.5 h-3.5" style={{ color: primaryColor }} />
                       {fmtDate(session.sessionDate)}
                     </p>
                   )}
