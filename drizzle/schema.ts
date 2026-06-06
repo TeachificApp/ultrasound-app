@@ -6297,3 +6297,24 @@ export const marketingSitePages = mysqlTable("marketingSitePages", {
 });
 export type MarketingSitePage = typeof marketingSitePages.$inferSelect;
 export type InsertMarketingSitePage = typeof marketingSitePages.$inferInsert;
+
+// ─── Cohort Recording Progress ────────────────────────────────────────────────
+/** One row per user per recording — tracks watch progress for cohort replays */
+export const lmsCohortRecordingProgress = mysqlTable("lms_cohort_recording_progress", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  recordingId: int("recording_id").notNull(),
+  courseId: int("course_id").notNull(),
+  positionSec: int("position_sec").default(0).notNull(),
+  durationSec: int("duration_sec").default(0).notNull(),
+  percentWatched: int("percent_watched").default(0).notNull(),
+  completed: boolean("completed").default(false).notNull(),
+  playCount: int("play_count").default(0).notNull(),
+  firstPlayedAt: timestamp("first_played_at"),
+  lastPlayedAt: timestamp("last_played_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCohortRecordingProgress = typeof lmsCohortRecordingProgress.$inferSelect;
+export type InsertLmsCohortRecordingProgress = typeof lmsCohortRecordingProgress.$inferInsert;

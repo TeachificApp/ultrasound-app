@@ -32,7 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-import RichTextEditor from "@/components/RichTextEditor";
+import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import {
   BookOpen, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Clock, Copy, Download, Edit2, HelpCircle, Pencil, Plus, Trash2,
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle, AlertTriangle,
@@ -11539,7 +11539,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                                     <span className="text-xs text-gray-400">{new Date(msg.createdAt).toLocaleString()}</span>
                                     <button onClick={() => { if (confirm("Delete this message?")) deleteMessage.mutate({ id: msg.id }); }} className="ml-auto text-xs text-red-400 hover:text-red-600">Delete</button>
                                   </div>
-                                  {msg.body && <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap">{msg.body}</p>}
+                                  {msg.body && <RichTextDisplay content={msg.body} className="text-sm text-gray-700 mt-0.5" />}
                                   {msg.mediaUrls && msg.mediaUrls.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-1">
                                       {msg.mediaUrls.map((m: any, i: number) => (
@@ -11559,13 +11559,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                           </div>
                           {/* Compose */}
                           <div className="border-t border-teal-200 pt-3 space-y-2">
-                            <textarea
-                              value={messageBody}
-                              onChange={e => setMessageBody(e.target.value)}
-                              rows={2}
-                              placeholder="Write a message to this cohort group..."
-                              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            />
+                            <RichTextEditor value={messageBody} onChange={setMessageBody} placeholder="Write a message to this cohort group..." />
                             {messageMedia.length > 0 && (
                               <div className="flex flex-wrap gap-2">
                                 {messageMedia.map((m, i) => (
@@ -11918,7 +11912,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                 {cohortGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
-            <textarea value={discBody} onChange={e => setDiscBody(e.target.value)} placeholder="Write a message to the cohort..." className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" rows={3} />
+            <RichTextEditor value={discBody} onChange={setDiscBody} placeholder="Write a message to the cohort..." />
             {discMedia.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {discMedia.map((m, i) => (
@@ -11965,7 +11959,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                     <button onClick={() => { if (confirm('Delete this message?')) moderateDelete.mutate({ id: msg.id }); }} className="text-xs text-red-500 hover:underline">Delete</button>
                   </div>
                 </div>
-                {msg.body && <p className="text-sm text-gray-700 whitespace-pre-wrap">{msg.body}</p>}
+                {msg.body && <RichTextDisplay content={msg.body} className="text-sm text-gray-700" />}
                 {(msg.mediaUrls as any[])?.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {(msg.mediaUrls as any[]).map((m: any, i: number) => (

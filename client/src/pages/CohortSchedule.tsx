@@ -10,7 +10,7 @@ import {
   Calendar, Clock, Video, ExternalLink, PlayCircle, FileText,
   Upload, Link2, CheckCircle, AlertCircle, BookOpen, ChevronLeft,
   Eye, Film, CheckCircle2, Download, ChevronRight, CalendarDays,
-  Plus, MessageCircle,
+  Plus, MessageCircle, LayoutGrid, List,
 } from "lucide-react";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { Link, useParams, useLocation, useSearch } from "wouter";
@@ -495,6 +495,7 @@ export default function CohortSchedule() {
     onSuccess: () => refetchDisc(),
     onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
   });
+  const [replayView, setReplayView] = useState<"grid" | "list">("grid");
   const { data: notifPref, refetch: refetchNotifPref } = trpc.lmsLearner.getCohortNotifPref.useQuery(
     undefined,
     { enabled: activeTab === "discussions" && !!user }
@@ -777,15 +778,51 @@ export default function CohortSchedule() {
           <TabsContent value="replays">
             {(recordings ?? []).length === 0 ? (
               <Card className="text-center py-16">
-                <Film className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">No recordings yet</p>
-                <p className="text-gray-400 text-sm mt-1">Session recordings will appear here once uploaded by your instructor.</p>
+                <CardContent className="pt-6">
+                  <Film className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">No recordings yet</p>
+                  <p className="text-gray-400 text-sm mt-1">Session recordings will appear here once uploaded by your instructor.</p>
+                </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {recordings.map((rec: any) => (
-                  <RecordingCard key={rec.id} recording={rec} />
-                ))}
+              <div>
+                {/* Toolbar: count + grid/list toggle */}
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-gray-500">{recordings.length} recording{recordings.length !== 1 ? "s" : ""}</p>
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setReplayView("grid")}
+                      className={`p-1.5 rounded-md transition-colors ${
+                        replayView === "grid" ? "bg-white shadow-sm text-teal-600" : "text-gray-400 hover:text-gray-600"
+                      }`}
+                      title="Grid view"
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setReplayView("list")}
+                      className={`p-1.5 rounded-md transition-colors ${
+                        replayView === "list" ? "bg-white shadow-sm text-teal-600" : "text-gray-400 hover:text-gray-600"
+                      }`}
+                      title="List view"
+                    >
+                      <List className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                {replayView === "grid" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {recordings.map((rec: any) => (
+                      <RecordingGridCard key={rec.id} recording={rec} courseId={id} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {recordings.map((rec: any) => (
+                      <RecordingListRow key={rec.id} recording={rec} courseId={id} />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
@@ -1051,7 +1088,7 @@ function AssignmentCard({ assignment, overdue, courseId, mySubmission, onOpen }:
   );
 }
 
-// ─── RecordingCard ────────────────────────────────────────────────────────────
+// ─── Recording Card Components ──────────────────────────────────────────────────
 
 function getVideoEmbedUrl(url: string): { type: "iframe" | "video"; src: string } {
   if (!url) return { type: "video", src: url };
@@ -1067,72 +1104,75 @@ function getVideoEmbedUrl(url: string): { type: "iframe" | "video"; src: string 
   return { type: "iframe", src: url };
 }
 
-function RecordingCard({ recording }: { recording: any }) {
-  const hasVideo = !!recording.videoUrl;
-  const hasEmbed = !!recording.embedCode;
-  const embed = hasVideo && !hasEmbed ? getVideoEmbedUrl(recording.videoUrl) : null;
-
+/** Grid card — thumbnail + title + progress, links to player page */
+function RecordingGridCard({ recording, courseId }: { recording: any; courseId: number }) {
+  const hasThumbnail = !!recording.thumbnailUrl;
+  const durationMins = recording.durationSeconds ? Math.round(recording.durationSeconds / 60) : null;
   return (
-    <Card className="border border-gray-200 bg-white">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-4 mb-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-teal-100">
-            <Film className="w-5 h-5 text-teal-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 flex-wrap">
-              <h3 className="font-semibold text-gray-900 text-base leading-tight">{recording.title}</h3>
-              <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs flex-shrink-0">Recording</Badge>
+    <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
+      <Card className="border border-gray-200 bg-white hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group overflow-hidden">
+        {/* Thumbnail */}
+        <div className="w-full aspect-video bg-gradient-to-br from-teal-50 to-teal-100 relative overflow-hidden">
+          {hasThumbnail ? (
+            <img src={recording.thumbnailUrl} alt={recording.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Film className="w-10 h-10 text-teal-300" />
             </div>
-            {recording.description && (
-              <p className="text-gray-500 text-sm mt-1">{recording.description}</p>
-            )}
-            {recording.sessionDate && (
-              <div className="flex items-center gap-1 mt-1 text-sm text-gray-500">
-                <Calendar className="w-3.5 h-3.5" />
-                Session: {fmtDate(recording.sessionDate)}
-              </div>
-            )}
+          )}
+          {/* Play overlay */}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors">
+            <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+              <PlayCircle className="w-7 h-7 text-teal-600" />
+            </div>
           </div>
+          {/* Duration badge */}
+          {durationMins && (
+            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+              {fmtDuration(durationMins)}
+            </div>
+          )}
         </div>
-        {/* Raw embed code (e.g. copy-pasted iframe HTML) */}
-        {hasEmbed && (
-          <div className="w-full aspect-video rounded-lg overflow-hidden border border-gray-200"
-            dangerouslySetInnerHTML={{ __html: recording.embedCode }}
-          />
+        <CardContent className="p-3">
+          <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 group-hover:text-teal-700 transition-colors">
+            {recording.title}
+          </h3>
+          {recording.sessionDate && (
+            <p className="text-gray-400 text-xs mt-1 flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {fmtDate(recording.sessionDate)}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+/** List row — compact single-line row, links to player page */
+function RecordingListRow({ recording, courseId }: { recording: any; courseId: number }) {
+  const durationMins = recording.durationSeconds ? Math.round(recording.durationSeconds / 60) : null;
+  return (
+    <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
+      <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-teal-300 hover:bg-teal-50/30 transition-all cursor-pointer group">
+        <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0 group-hover:bg-teal-200 transition-colors">
+          <PlayCircle className="w-5 h-5 text-teal-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-gray-900 text-sm truncate group-hover:text-teal-700 transition-colors">{recording.title}</p>
+          {recording.sessionDate && (
+            <p className="text-gray-400 text-xs flex items-center gap-1 mt-0.5">
+              <Calendar className="w-3 h-3" />
+              {fmtDate(recording.sessionDate)}
+            </p>
+          )}
+        </div>
+        {durationMins && (
+          <span className="text-xs text-gray-400 flex-shrink-0">{fmtDuration(durationMins)}</span>
         )}
-        {/* Video URL — detect type and render appropriately */}
-        {embed && (
-          <div className="w-full aspect-video bg-black rounded-lg overflow-hidden">
-            {embed.type === "iframe" ? (
-              <iframe
-                src={embed.src}
-                className="w-full h-full"
-                allowFullScreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                title={recording.title}
-                style={{ border: "none" }}
-              />
-            ) : (
-              <video
-                src={embed.src}
-                controls
-                className="w-full h-full"
-                preload="metadata"
-              />
-            )}
-          </div>
-        )}
-        {!hasEmbed && !hasVideo && recording.externalUrl && (
-          <Button size="sm" variant="outline" className="mt-2 h-8 text-xs gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50" asChild>
-            <a href={recording.externalUrl} target="_blank" rel="noopener noreferrer">
-              <PlayCircle className="w-3.5 h-3.5" />
-              Watch Recording
-            </a>
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-teal-500 transition-colors flex-shrink-0" />
+      </div>
+    </Link>
   );
 }
 

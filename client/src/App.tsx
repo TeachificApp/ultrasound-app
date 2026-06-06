@@ -57,6 +57,7 @@ const CoursePlayer = lazy(() => import("./pages/CoursePlayer"));
 const CourseOverview = lazy(() => import("./pages/CourseOverview"));
 const CohortSchedule = lazy(() => import("./pages/CohortSchedule"));
 const AssignmentDetail = lazy(() => import("./pages/AssignmentDetail"));
+const CohortReplayPlayer = lazy(() => import("./pages/CohortReplayPlayer"));
 const LMSAdmin = lazy(() => import("./pages/admin/LMSAdmin"));
 const LandingPageBuilder = lazy(() => import("./pages/admin/LandingPageBuilder"));
 const FunnelBuilder = lazy(() => import("./pages/admin/FunnelBuilder"));
@@ -705,6 +706,7 @@ function LMSRouter() {
       </Route>
       {/* Course/download landing pages render directly on learn subdomain */}
       <Route path="/cohort/:courseId/assignment/:assignmentId" component={AssignmentDetail} />
+      <Route path="/cohort/:courseId/replay/:recordingId" component={CohortReplayPlayer} />
       <Route path="/cohort/:courseId" component={CohortSchedule} />
       <Route path="/courses/:slug" component={CourseLanding} />
       <Route path="/downloads/:slug" component={DownloadLanding} />

@@ -4690,3 +4690,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Split Subscriptions tab into "App Subscriptions" and "Learn Subscriptions" with manage/cancel
 - [x] Purchases tab shows all one-time transactions + subscription invoice payments from Stripe (unified payment history)
 - [x] Add "Preview as Student" link to Lesson Content Editor that opens student view in a new tab
+
+## Cohort Replay Player & Admin Discussion Rich Text (Jun 2026)
+- [x] Cohort Replays tab: grid/list toggle display with clickable cards linking to individual player pages
+- [x] CohortReplayPlayer page: dedicated video player page with breadcrumb back to Replays tab, smart embed detection (YouTube/Vimeo/MP4/iframe), progress tracking (% watched, play/pause/complete events)
+- [x] Cohort recording progress tracking: DB table + tRPC procedures (getCohortRecording, getCohortRecordingProgress, trackCohortRecordingProgress)
+- [x] Admin cohort discussions: replace plain textarea with RichTextEditor (both "Post as Admin" panel and per-group discussion compose box); render messages with RichTextDisplay

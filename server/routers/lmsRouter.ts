@@ -87,6 +87,7 @@ import {
   userRoles,
   userActivityLogs,
   lmsDefaultTeamTiers,
+  lmsCohortRecordingProgress,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
@@ -2024,6 +2025,114 @@ export const lmsLearnerRouter = router({
       prefs.cohortDiscussions = input.cohortDiscussions;
       await db.update(users).set({ notificationPrefs: JSON.stringify(prefs) }).where(eq(users.id, ctx.user.id));
       return { success: true, cohortDiscussions: input.cohortDiscussions };
+    }),
+
+  /** Get a single cohort recording by ID (for the player page) */
+  getCohortRecording: protectedProcedure
+    .input(z.object({ recordingId: z.number().int().positive(), courseId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Verify enrollment (or admin)
+      const isAdmin = ctx.user.role === "admin";
+      if (!isAdmin) {
+        const [enrollment] = await db.select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId)))
+          .limit(1);
+        if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
+      }
+      const [recording] = await db.select().from(lmsCohortRecordings)
+        .where(and(eq(lmsCohortRecordings.id, input.recordingId), eq(lmsCohortRecordings.courseId, input.courseId)))
+        .limit(1);
+      if (!recording) throw new TRPCError({ code: "NOT_FOUND", message: "Recording not found" });
+      // Get the session info if linked
+      let session = null;
+      if (recording.sessionId) {
+        const [s] = await db.select().from(lmsCohortSessions).where(eq(lmsCohortSessions.id, recording.sessionId)).limit(1);
+        session = s ?? null;
+      }
+      // Get user's progress for this recording
+      const [progress] = await db.select().from(lmsCohortRecordingProgress)
+        .where(and(eq(lmsCohortRecordingProgress.userId, ctx.user.id), eq(lmsCohortRecordingProgress.recordingId, input.recordingId)))
+        .limit(1);
+      return { recording, session, progress: progress ?? null };
+    }),
+
+  /** Get recording progress for all recordings in a course for the current user */
+  getCohortRecordingProgress: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(lmsCohortRecordingProgress)
+        .where(and(eq(lmsCohortRecordingProgress.userId, ctx.user.id), eq(lmsCohortRecordingProgress.courseId, input.courseId)));
+      // Return as a map keyed by recordingId for easy lookup
+      const progressMap: Record<number, typeof rows[0]> = {};
+      for (const row of rows) progressMap[row.recordingId] = row;
+      return progressMap;
+    }),
+
+  /** Track/update recording progress for the current user (upsert) */
+  trackCohortRecordingProgress: protectedProcedure
+    .input(z.object({
+      recordingId: z.number().int().positive(),
+      courseId: z.number().int().positive(),
+      positionSec: z.number().int().min(0),
+      durationSec: z.number().int().min(0),
+      percentWatched: z.number().int().min(0).max(100),
+      eventType: z.enum(["play", "pause", "progress", "complete"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const completed = input.percentWatched >= 90;
+      const now = new Date();
+      // Check if row exists
+      const [existing] = await db.select().from(lmsCohortRecordingProgress)
+        .where(and(eq(lmsCohortRecordingProgress.userId, ctx.user.id), eq(lmsCohortRecordingProgress.recordingId, input.recordingId)))
+        .limit(1);
+      if (existing) {
+        const updateData: Record<string, unknown> = {
+          positionSec: input.positionSec,
+          durationSec: input.durationSec,
+          percentWatched: Math.max(existing.percentWatched, input.percentWatched),
+          completed: existing.completed || completed,
+          lastPlayedAt: now,
+        };
+        if (input.eventType === "play") updateData.playCount = (existing.playCount ?? 0) + 1;
+        if (completed && !existing.completed) updateData.completedAt = now;
+        await db.update(lmsCohortRecordingProgress).set(updateData).where(eq(lmsCohortRecordingProgress.id, existing.id));
+      } else {
+        await db.insert(lmsCohortRecordingProgress).values({
+          userId: ctx.user.id,
+          recordingId: input.recordingId,
+          courseId: input.courseId,
+          positionSec: input.positionSec,
+          durationSec: input.durationSec,
+          percentWatched: input.percentWatched,
+          completed,
+          playCount: input.eventType === "play" ? 1 : 0,
+          firstPlayedAt: input.eventType === "play" ? now : null,
+          lastPlayedAt: now,
+          completedAt: completed ? now : null,
+        });
+      }
+      // Log to userActivityLogs for analytics
+      if (input.eventType === "play" || input.eventType === "complete") {
+        await db.insert(userActivityLogs).values({
+          userId: ctx.user.id,
+          eventType: input.eventType === "complete" ? "video_complete" : "video_play",
+          courseId: input.courseId,
+          metadata: JSON.stringify({
+            recordingId: input.recordingId,
+            positionSec: input.positionSec,
+            durationSec: input.durationSec,
+            percentWatched: input.percentWatched,
+          }),
+        }).catch(() => {});
+      }
+      return { success: true, completed };
     }),
 
   /**
