@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  ChevronLeft, Film, Calendar, Clock, AlertCircle, BookOpen, PlayCircle,
+  ChevronLeft, Film, Calendar, Clock, AlertCircle, BookOpen,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -203,8 +203,14 @@ export default function CohortReplayPlayer() {
   }
 
   const { recording, session, progress } = data;
-  const embed = recording.videoUrl ? getVideoEmbed(recording.videoUrl) : null;
-  const hasEmbed = !!recording.embedCode;
+  // Use server-resolved embed URL (e.g. Wistia extracted from Thinkific proxy) if available
+  const resolvedEmbedUrl = (recording as any).resolvedEmbedUrl as string | null;
+  const embed = resolvedEmbedUrl
+    ? { type: "iframe" as const, src: resolvedEmbedUrl }
+    : recording.videoUrl
+    ? getVideoEmbed(recording.videoUrl)
+    : null;
+  const hasEmbed = !!(recording as any).embedCode;
   const durationSecs = recording.durationSeconds ?? 0;
 
   return (
@@ -254,19 +260,6 @@ export default function CohortReplayPlayer() {
                   poster={recording.thumbnailUrl ?? undefined}
                 />
               )}
-            </div>
-          ) : recording.externalUrl ? (
-            <div className="w-full aspect-video flex items-center justify-center bg-gradient-to-br from-teal-900 to-teal-800">
-              <div className="text-center">
-                <Film className="w-16 h-16 text-teal-300 mx-auto mb-4" />
-                <p className="text-white font-medium mb-4">{recording.title}</p>
-                <Button asChild className="bg-teal-500 hover:bg-teal-400 text-white">
-                  <a href={recording.externalUrl} target="_blank" rel="noopener noreferrer">
-                    <PlayCircle className="w-4 h-4 mr-2" />
-                    Watch Recording
-                  </a>
-                </Button>
-              </div>
             </div>
           ) : (
             <div className="w-full aspect-video flex items-center justify-center bg-gray-900">

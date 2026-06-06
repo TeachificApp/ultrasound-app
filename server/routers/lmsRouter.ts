@@ -2057,7 +2057,22 @@ export const lmsLearnerRouter = router({
       const [progress] = await db.select().from(lmsCohortRecordingProgress)
         .where(and(eq(lmsCohortRecordingProgress.userId, ctx.user.id), eq(lmsCohortRecordingProgress.recordingId, input.recordingId)))
         .limit(1);
-      return { recording, session, progress: progress ?? null };
+      // Resolve Thinkific proxy URLs to Wistia embed URLs server-side
+      // (Thinkific proxy has x-frame-options: SAMEORIGIN so can't be iframed directly)
+      let resolvedEmbedUrl: string | null = null;
+      if (recording.videoUrl && recording.videoUrl.includes('platform.thinkific.com/videoproxy')) {
+        try {
+          const resp = await fetch(recording.videoUrl, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0' } });
+          const html = await resp.text();
+          const wistiaMatch = html.match(/wistia_async_(\w+)/);
+          if (wistiaMatch) {
+            resolvedEmbedUrl = `https://fast.wistia.net/embed/iframe/${wistiaMatch[1]}?videoFoam=true&autoPlay=false`;
+          }
+        } catch (_) {
+          // Ignore resolution errors - fall back to direct URL
+        }
+      }
+      return { recording: { ...recording, resolvedEmbedUrl }, session, progress: progress ?? null };
     }),
 
   /** Get recording progress for all recordings in a course for the current user */
