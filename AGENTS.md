@@ -39,6 +39,10 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 5. **pnpm build scripts warning**: On fresh `pnpm install`, you'll see a warning about ignored build scripts for `@tailwindcss/oxide`, `core-js`, `esbuild`. These packages still work correctly without running their postinstall scripts in this environment.
 
+6. **Production build requires analytics env vars OR safe strip**: `vite.config.ts` removes the umami `<script>` when `VITE_ANALYTICS_ENDPOINT` / `VITE_ANALYTICS_WEBSITE_ID` are unset. Use `VITE_ANALYTICS_ENDPOINT=... VITE_ANALYTICS_WEBSITE_ID=... pnpm build` for production-like builds. A broken build strips `#root` and JS if the old greedy regex matched — see `transformAnalyticsIndexHtml` in `vite.config.ts`.
+
+7. **PR #20 `isAdminOrAuthPath` reverted**: Do not skip the Router outer `<Suspense>` for admin paths — lazy admin pages need it. `/platform-admin` stays fixed via eager `PlatformAdmin` + `AdminLoginRedirect` (`window.location.replace`, not wouter `Redirect`). Funnel `/:slug` redirects use `HardRedirect` for the same reason.
+
 6. **Stripe webhooks**: `registerStripeWebhook(app)` is registered **before** `express.json()` so raw body + signature verification work. Production endpoint: `https://app.allaboutultrasound.com/api/stripe/webhook` (also `/api/webhooks/stripe`). The handler responds 200 immediately and processes events asynchronously to avoid Stripe timeouts.
 
 7. **SDMS CME tables**: Run `scripts/sdms-cme-migration.sql` against MySQL before using SDMS CME features. Admin configures per-activity SDMS settings under LMS course/cohort Settings or Webinar Settings. Learner CME module appears in the course player when enabled. API credentials are AES-encrypted at rest using `JWT_SECRET`; never exposed to the client.

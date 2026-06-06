@@ -160,26 +160,29 @@ function vitePluginManusDebugCollector(): Plugin {
 // browser never tries to load a bogus URL like /AVITE_ANALYTICS_ENDPOINT/umami
 // which throws "Unexpected token '<'" and can white-screen the app.
 // =============================================================================
+/** Umami analytics block only — must not match the inline brand script in <head>. */
+export const UMAMI_ANALYTICS_SCRIPT_RE =
+  /<script\b[^>]*%VITE_ANALYTICS_ENDPOINT%[^>]*>[\s\S]*?<\/script>/g;
+
+export function transformAnalyticsIndexHtml(html: string): string {
+  const endpoint = process.env.VITE_ANALYTICS_ENDPOINT;
+  const websiteId = process.env.VITE_ANALYTICS_WEBSITE_ID;
+  if (endpoint && websiteId) {
+    return html
+      .replace(/%VITE_ANALYTICS_ENDPOINT%/g, endpoint)
+      .replace(/%VITE_ANALYTICS_WEBSITE_ID%/g, websiteId);
+  }
+  // Vars missing — strip only the umami block (never the inline <head> script).
+  return html.replace(UMAMI_ANALYTICS_SCRIPT_RE, "");
+}
+
 function vitePluginAnalyticsHtml(): Plugin {
   return {
     name: "manus-analytics-html",
     // enforce: 'pre' ensures this runs before Vite's own HTML transform
     enforce: "pre" as const,
     transformIndexHtml(html: string) {
-      const endpoint = process.env.VITE_ANALYTICS_ENDPOINT;
-      const websiteId = process.env.VITE_ANALYTICS_WEBSITE_ID;
-      if (endpoint && websiteId) {
-        // Both vars present — substitute them in
-        return html
-          .replace(/%VITE_ANALYTICS_ENDPOINT%/g, endpoint)
-          .replace(/%VITE_ANALYTICS_WEBSITE_ID%/g, websiteId);
-      }
-      // Vars missing — strip the entire umami <script> block so no broken
-      // placeholder URL reaches the browser
-      return html.replace(
-        /<script[\s\S]*?%VITE_ANALYTICS_ENDPOINT%[\s\S]*?<\/script>/g,
-        ""
-      );
+      return transformAnalyticsIndexHtml(html);
     },
   };
 }
