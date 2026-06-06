@@ -482,7 +482,8 @@ export default function CohortSchedule() {
   const [discBody, setDiscBody] = useState("");
   const [discMedia, setDiscMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
   const [discUploading, setDiscUploading] = useState(false);
-  const [activeTab, setActiveTab] = useState("sessions");
+  const initialTab = urlParams.get("tab") ?? "sessions";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const { data: discData, refetch: refetchDisc } = trpc.lmsLearner.getCohortDiscussions.useQuery(
     { courseId: id },
     { enabled: activeTab === "discussions" && !!user && id > 0 }
@@ -655,7 +656,7 @@ export default function CohortSchedule() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
-        <Tabs defaultValue="sessions" onValueChange={setActiveTab}>
+        <Tabs defaultValue={initialTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6 flex-wrap h-auto gap-1 py-1">
             <TabsTrigger value="sessions" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
               <Video className="w-4 h-4" />
