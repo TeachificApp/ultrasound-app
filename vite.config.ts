@@ -154,7 +154,37 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins: PluginOption[] = [react(), tailwindcss()];
+// =============================================================================
+// Analytics HTML plugin — replaces %VITE_ANALYTICS_*% in index.html at build
+// time. If env vars are not set, removes the umami <script> entirely so the
+// browser never tries to load a bogus URL like /AVITE_ANALYTICS_ENDPOINT/umami
+// which throws "Unexpected token '<'" and can white-screen the app.
+// =============================================================================
+function vitePluginAnalyticsHtml(): Plugin {
+  return {
+    name: "manus-analytics-html",
+    // enforce: 'pre' ensures this runs before Vite's own HTML transform
+    enforce: "pre" as const,
+    transformIndexHtml(html: string) {
+      const endpoint = process.env.VITE_ANALYTICS_ENDPOINT;
+      const websiteId = process.env.VITE_ANALYTICS_WEBSITE_ID;
+      if (endpoint && websiteId) {
+        // Both vars present — substitute them in
+        return html
+          .replace(/%VITE_ANALYTICS_ENDPOINT%/g, endpoint)
+          .replace(/%VITE_ANALYTICS_WEBSITE_ID%/g, websiteId);
+      }
+      // Vars missing — strip the entire umami <script> block so no broken
+      // placeholder URL reaches the browser
+      return html.replace(
+        /<script[\s\S]*?%VITE_ANALYTICS_ENDPOINT%[\s\S]*?<\/script>/g,
+        ""
+      );
+    },
+  };
+}
+
+const plugins: PluginOption[] = [react(), tailwindcss(), vitePluginAnalyticsHtml()];
 if (jsxLocPlugin) plugins.push(jsxLocPlugin());
 if (vitePluginManusRuntime) plugins.push(vitePluginManusRuntime());
 if (process.env.NODE_ENV !== "production") plugins.push(vitePluginManusDebugCollector());
