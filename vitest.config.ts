@@ -15,5 +15,12 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    deps: {
+      optimizer: {
+        ssr: {
+          include: ["regexparam"],
+        },
+      },
+    },
   },
 });
