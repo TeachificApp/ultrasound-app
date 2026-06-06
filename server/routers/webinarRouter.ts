@@ -14,6 +14,37 @@ import { nanoid } from "nanoid";
 
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80); }
 async function assertAdmin(ctx: any) { if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" }); }
+
+/** Checkout page config is stored in salesPageBlocksJson (no dedicated schema column). */
+function webinarCheckoutConfigToString(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
+}
+
+type WebinarPricingOption = { id?: string; price?: number; label?: string; type?: string };
+
+function parseWebinarPricingOptions(raw: string | null): WebinarPricingOption[] {
+  try { return JSON.parse(raw || "[]"); } catch { return []; }
+}
+
+function resolveWebinarPricing(
+  webinar: { accessType: string; pricingOptions: string | null },
+  pricingOptionId?: string,
+) {
+  if (webinar.accessType === "free") {
+    return { isFree: true, priceCents: 0, selectedOption: null as WebinarPricingOption | null };
+  }
+  const options = parseWebinarPricingOptions(webinar.pricingOptions);
+  const selected = pricingOptionId
+    ? options.find(p => p.id === pricingOptionId)
+    : options[0];
+  if (!selected && options.length === 0) {
+    return { isFree: true, priceCents: 0, selectedOption: null as WebinarPricingOption | null };
+  }
+  const priceCents = Math.round(Number(selected?.price ?? 0) * 100);
+  return { isFree: priceCents <= 0, priceCents, selectedOption: selected ?? null };
+}
 async function uniqueSlug(db: any, base: string) {
   let slug = base, i = 0;
   while (true) {
@@ -284,9 +315,9 @@ export const webinarSessionRouter = router({
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [w] = await db.select({ checkoutPageConfig: webinars.checkoutPageConfig }).from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
+      const [w] = await db.select({ salesPageBlocksJson: webinars.salesPageBlocksJson }).from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
       if (!w) throw new TRPCError({ code: "NOT_FOUND" });
-      return { config: w.checkoutPageConfig ?? null };
+      return { config: webinarCheckoutConfigToString(w.salesPageBlocksJson) };
     }),
 
   saveCheckoutPageConfig: protectedProcedure
@@ -294,8 +325,9 @@ export const webinarSessionRouter = router({
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      try { JSON.parse(input.config); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid JSON config" }); }
-      await db.update(webinars).set({ checkoutPageConfig: input.config }).where(eq(webinars.id, input.webinarId));
+      let parsed: unknown;
+      try { parsed = JSON.parse(input.config); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid JSON config" }); }
+      await db.update(webinars).set({ salesPageBlocksJson: parsed }).where(eq(webinars.id, input.webinarId));
       return { success: true };
     }),
 
@@ -306,9 +338,10 @@ export const webinarSessionRouter = router({
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [webinar] = await db.select().from(webinars).where(eq(webinars.slug, input.webinarSlug)).limit(1);
       if (!webinar) throw new TRPCError({ code: "NOT_FOUND", message: "Webinar not found" });
-      const isFree = !webinar.price || Number(webinar.price) === 0;
+      const { isFree, priceCents } = resolveWebinarPricing(webinar, input.pricingOptionId);
+      const subtitle = webinar.hostTitle ?? null;
       if (isFree) {
-        return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: webinar.subtitle ?? null, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: null, brand: webinar.brand ?? "all_about_ultrasound" };
+        return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: subtitle, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: null, brand: webinar.brand ?? "all_about_ultrasound" };
       }
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
@@ -325,21 +358,21 @@ export const webinarSessionRouter = router({
             currency: "usd",
             product_data: {
               name: webinar.title,
-              description: webinar.subtitle ?? undefined,
+              description: subtitle ?? undefined,
               images: webinar.thumbnailUrl ? [webinar.thumbnailUrl] : undefined,
             },
-            unit_amount: Math.round(Number(webinar.price ?? 0)),
+            unit_amount: priceCents,
           },
           quantity: 1,
         }],
         metadata: { type: "webinar", webinar_id: webinar.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=webinar`,
-      });
+      } as any);
       return {
         clientSecret: session.client_secret!,
         free: false,
         courseTitle: webinar.title,
-        courseSubtitle: webinar.subtitle ?? null,
+        courseSubtitle: subtitle,
         courseDescription: webinar.description ?? null,
         courseThumbnail: webinar.thumbnailUrl ?? null,
         primaryColor: "#189aa1",
@@ -351,7 +384,7 @@ export const webinarSessionRouter = router({
         termsUrl: settings?.termsUrl ?? "",
         privacyUrl: settings?.privacyUrl ?? "",
         productName: webinar.title,
-        displayPrice: Math.round(Number(webinar.price ?? 0)),
+        displayPrice: priceCents,
         pricingType: "one_time",
         isSubscription: false,
         billingLabel: null,
@@ -369,8 +402,8 @@ export const webinarCheckoutPublicRouter = router({
     .input(z.object({ webinarSlug: z.string() }))
     .query(async ({ input }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [webinar] = await db.select({ checkoutPageConfig: webinars.checkoutPageConfig }).from(webinars).where(eq(webinars.slug, input.webinarSlug)).limit(1);
+      const [webinar] = await db.select({ salesPageBlocksJson: webinars.salesPageBlocksJson }).from(webinars).where(eq(webinars.slug, input.webinarSlug)).limit(1);
       if (!webinar) throw new TRPCError({ code: "NOT_FOUND" });
-      return { config: webinar.checkoutPageConfig ?? null, courseStats: { totalLessons: 0, totalSections: 0, hasCertificate: false } };
+      return { config: webinarCheckoutConfigToString(webinar.salesPageBlocksJson), courseStats: { totalLessons: 0, totalSections: 0, hasCertificate: false } };
     }),
 });
