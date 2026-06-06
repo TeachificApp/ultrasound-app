@@ -17,7 +17,8 @@ const queryClient = new QueryClient();
 // Input/textarea interactions are never blocked (browser handles those natively).
 
 function isAdminRoute(): boolean {
-  return window.location.pathname.startsWith("/admin");
+  const path = window.location.pathname;
+  return path === "/platform-admin" || path.startsWith("/admin");
 }
 
 function isFormElement(target: EventTarget | null): boolean {

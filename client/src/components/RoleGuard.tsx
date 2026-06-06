@@ -16,7 +16,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Link, Redirect, useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
+import { AdminLoginRedirect } from "@/components/AdminLoginRedirect";
 import { Loader2, ShieldAlert, ArrowLeft, CheckCircle2, Send, Crown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -120,7 +121,7 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
   if (!isAuthenticated || !user) {
     if (isAdminRole) {
       const returnPath = window.location.pathname + window.location.search;
-      return <Redirect to={getLoginUrl(returnPath)} />;
+      return <AdminLoginRedirect returnPath={returnPath} />;
     }
     // For content roles (premium_user, diy_user), show blurred overlay with login/upgrade CTA
     const hasPremiumRole = roles.includes("premium_user");

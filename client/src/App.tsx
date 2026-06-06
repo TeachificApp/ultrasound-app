@@ -289,20 +289,33 @@ const CareerProfile = lazy(() => import("./pages/CareerProfile"));
 const CareerNetworkAdmin = lazy(() => import("./pages/admin/CareerNetworkAdmin"));
 const EmployerDashboard = lazy(() => import("./pages/EmployerDashboard"));
 
+/** Admin/auth paths must not sit under the Router's outer Suspense — wouter Redirect (and
+ *  similar effects) render null and get unmounted when the boundary re-suspends. */
+function isAdminOrAuthPath(path: string): boolean {
+  return (
+    path === "/platform-admin" ||
+    path.startsWith("/admin/") ||
+    path === "/admin" ||
+    path === "/login" ||
+    path.startsWith("/login?")
+  );
+}
+
 function Router() {
   usePageViewTracker();
   useCrossDomainSso(); // Silently sign user into all other domains as free member
+  const [location] = useLocation();
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
     </div>
   );
-  return (
-    <Suspense fallback={pageFallback}>
+  const routeSwitch = (
       <Switch>
         {/* ── Public ────────────────────────────────────────────────────── */}
         <Route path="/" component={Home} />
         <Route path="/login" component={Login} />
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/register" component={Register} />
         <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/forgot-password" component={ForgotPassword} />
@@ -520,7 +533,6 @@ function Router() {
         <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
         <Route path="/admin">{() => { window.location.replace("/platform-admin"); return null; }}</Route>
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <EducatorAssist />}</Route>
         {/* ── SonoQuiz (admin-only during testing) ──────────────────────── */}
@@ -562,8 +574,10 @@ function Router() {
         <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
         <Route component={NotFound} />
       </Switch>
-    </Suspense>
   );
+  const path = location.split("?")[0];
+  if (isAdminOrAuthPath(path)) return routeSwitch;
+  return <Suspense fallback={pageFallback}>{routeSwitch}</Suspense>;
 }
 
 /** MembersRouter — Routes for members.allaboutultrasound.com (profile/dashboard/subscriptions hub) */
@@ -591,7 +605,7 @@ function MembersRouter() {
       <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
       <Route path="/admin/user-analytics">{() => { window.location.replace("/admin/members?tab=members"); return null; }}</Route>
       <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
-      <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembersLayout><PlatformAdmin /></MembersLayout></Suspense></RoleGuard>}</Route>
+      <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembersLayout><PlatformAdmin /></MembersLayout></RoleGuard>}</Route>
       {/* Redirect remaining /admin/* routes to learn subdomain — explicit routes before catch-all */}
       <Route path="/admin/lms">{() => { window.location.replace(`${LEARN_APP_URL}/admin/lms`); return null; }}</Route>
       <Route path="/admin/lms/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/lms/${params.rest ?? ""}`); return null; }}</Route>
@@ -816,17 +830,18 @@ function LMSRouter() {
 function IHeartEchoRouter() {
   usePageViewTracker();
   useCrossDomainSso(); // Silently sign user into all other domains as free member
+  const [location] = useLocation();
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
     </div>
   );
-  return (
-    <Suspense fallback={pageFallback}>
+  const routeSwitch = (
       <Switch>
         {/* ── Public ────────────────────────────────────────────────────── */}
         <Route path="/" component={IHeartEchoHome} />
         <Route path="/login" component={Login} />
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/register" component={Register} />
         <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/forgot-password" component={ForgotPassword} />
@@ -975,7 +990,6 @@ function IHeartEchoRouter() {
         <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <RoleGuard roles={["education_manager", "education_admin", "education_student"]} allowAdmin={true}><EducatorAssist /></RoleGuard>}</Route>
         <Route path="/educator-admin">{() => <RoleGuard roles={["education_admin", "education_manager"]} allowAdmin={true}><EducatorAdmin /></RoleGuard>}</Route>
@@ -992,8 +1006,10 @@ function IHeartEchoRouter() {
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
       </Switch>
-    </Suspense>
   );
+  const path = location.split("?")[0];
+  if (isAdminOrAuthPath(path)) return routeSwitch;
+  return <Suspense fallback={pageFallback}>{routeSwitch}</Suspense>;
 }
 
 /** Single-segment paths that are app routes, never funnel slugs (/:slug catch-all guard). */

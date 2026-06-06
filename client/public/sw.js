@@ -10,7 +10,7 @@
  */
 const host = self.location.hostname;
 const isIHE = host.indexOf("iheartecho") !== -1;
-const CACHE_NAME = isIHE ? "iheartecho-v2" : "ultrasound-assist-v2";
+const CACHE_NAME = isIHE ? "iheartecho-v3" : "ultrasound-assist-v3";
 const SHELL_URLS = ["/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
@@ -29,13 +29,17 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+function isAdminDocumentPath(pathname) {
+  return pathname === "/platform-admin" || pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
 self.addEventListener("fetch", (event) => {
   const url = event.request.url;
   const dest = event.request.destination;
 
   // Never intercept: API calls, cross-origin requests, scripts, styles,
-  // fonts, or workers — let these go straight to the network so a stale
-  // SW cache never returns undefined (which throws TypeError: Failed to fetch)
+  // fonts, workers, or admin HTML navigations — let these go straight to
+  // the network so a stale SW cache never returns 503 HTML for admin routes.
   if (
     url.includes("/api/") ||
     !url.startsWith(self.location.origin) ||
@@ -44,6 +48,15 @@ self.addEventListener("fetch", (event) => {
     dest === "font" ||
     dest === "worker"
   ) {
+    return;
+  }
+
+  try {
+    const path = new URL(url).pathname;
+    if (dest === "document" && isAdminDocumentPath(path)) {
+      return;
+    }
+  } catch {
     return;
   }
 
