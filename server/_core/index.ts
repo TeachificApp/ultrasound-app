@@ -158,7 +158,9 @@ async function startServer() {
     const brand = detectBrandFromHostname(resolved);
     const brandMode = detectBrandMode(resolved);
     const cookieOpts = getSessionCookieOptions(req);
-    res.json({ resolved, xAppHostname, xForwardedHost, origin, referer, host, reqHostname, brand, brandMode, cookieDomain: cookieOpts.domain || '(none)', cookieSameSite: cookieOpts.sameSite });
+    const cookieHeader = req.headers.cookie || "";
+    const hasCookie = cookieHeader.includes("app_session_id");
+    res.json({ resolved, xAppHostname, xForwardedHost, origin, referer, host, reqHostname, brand, brandMode, cookieDomain: cookieOpts.domain || '(none)', cookieSameSite: cookieOpts.sameSite, cookieHeader: cookieHeader.substring(0, 300), hasCookie });
   });
   // Build version debug endpoint to verify deployed code
   app.get("/api/debug/build-version", (_req, res) => {
