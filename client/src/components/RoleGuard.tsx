@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation } from "wouter";
 import { Loader2, ShieldAlert, ArrowLeft, CheckCircle2, Send, Crown } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { PremiumPearlGate } from "@/components/PremiumPearlGate";
@@ -72,6 +72,30 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
   const [message, setMessage] = useState("");
   const [requested, setRequested] = useState(false);
 
+  const isAdminRole = useMemo(
+    () =>
+      roles.some(r =>
+        [
+          "platform_admin",
+          "platform_owner",
+          "platform_moderator",
+          "education_admin",
+          "education_manager",
+          "diy_admin",
+          "team_admin",
+          "accreditation_manager",
+          "instructor",
+        ].includes(r),
+      ),
+    [roles],
+  );
+
+  useEffect(() => {
+    if (loading || isAuthenticated || user || !isAdminRole) return;
+    const returnPath = window.location.pathname + window.location.search;
+    window.location.href = getLoginUrl(returnPath);
+  }, [loading, isAuthenticated, user, isAdminRole]);
+
   const requestAccess = trpc.system.requestAccess.useMutation({
     onSuccess: (data) => {
       setRequested(true);
@@ -100,15 +124,7 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
 
   // Not authenticated — handle based on role type
   if (!isAuthenticated || !user) {
-    // Admin/management roles have no public teaser content — redirect straight to login
-    const isAdminRole = roles.some(r =>
-      ["platform_admin", "platform_owner", "platform_moderator",
-       "education_admin", "education_manager", "diy_admin",
-       "team_admin", "accreditation_manager", "instructor"].includes(r)
-    );
     if (isAdminRole) {
-      // Hard redirect to login, preserving the current path as return destination
-      window.location.href = getLoginUrl();
       return (
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="flex flex-col items-center gap-3">

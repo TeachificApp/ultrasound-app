@@ -64,5 +64,9 @@ export const getThinkificPremiumAnnualUrl = () => {
   return `${THINKIFIC_PREMIUM_ANNUAL_URL}&redirect_url=${encodeURIComponent(returnUrl)}`;
 };
 
-// Return the local magic-link login page.
-export const getLoginUrl = () => "/login";
+/** Local login page, optionally preserving post-login return path. */
+export const getLoginUrl = (returnTo?: string) => {
+  if (!returnTo || returnTo === "/login") return "/login";
+  const path = returnTo.startsWith("/") ? returnTo : `/${returnTo}`;
+  return `/login?returnTo=${encodeURIComponent(path)}`;
+};

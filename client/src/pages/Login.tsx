@@ -69,6 +69,8 @@ export default function Login() {
   const [lastName, setLastName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [sent, setSent] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Read returnTo from URL so magic link redirects back after login.
   // Sanitize: never redirect back to auth pages (would cause a loop).
@@ -100,17 +102,6 @@ export default function Login() {
     onSuccess: () => setSent(true),
   });
 
-  // ── Password login mutation ──
-  const loginMutation = trpc.auth.loginWithPassword.useMutation({
-    onSuccess: () => {
-      // Reload to pick up the new session cookie
-      window.location.href = postLoginUrl;
-    },
-    onError: (err) => {
-      toast.error(err.message || "Sign-in failed. Please check your credentials.");
-    },
-  });
-
   // ── Register mutation ──
   const registerMutation = trpc.auth.registerWithPassword.useMutation({
     onSuccess: () => {
@@ -128,11 +119,41 @@ export default function Login() {
     requestMutation.mutate({ email: trimmed, origin: window.location.origin, returnTo });
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim().toLowerCase();
-    if (!trimmed || !password || loginMutation.isPending) return;
-    loginMutation.mutate({ email: trimmed, password });
+    if (!trimmed || !password || passwordLoading) return;
+    setPasswordLoading(true);
+    setPasswordError(null);
+    try {
+      const resp = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-App-Hostname": window.location.hostname,
+        },
+        body: JSON.stringify({
+          email: trimmed,
+          password,
+          host: window.location.hostname,
+        }),
+      });
+      const data = (await resp.json()) as { error?: string };
+      if (!resp.ok) {
+        const message = data.error || "Sign-in failed. Please check your credentials.";
+        setPasswordError(message);
+        toast.error(message);
+        return;
+      }
+      window.location.href = postLoginUrl;
+    } catch {
+      const message = "Sign-in failed. Please try again.";
+      setPasswordError(message);
+      toast.error(message);
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
@@ -155,7 +176,7 @@ export default function Login() {
     setMode(newMode);
     setSent(false);
     setPassword("");
-    loginMutation.reset();
+    setPasswordError(null);
     registerMutation.reset();
     requestMutation.reset();
   };
@@ -401,7 +422,7 @@ export default function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     className="h-11"
-                    disabled={loginMutation.isPending}
+                    disabled={passwordLoading}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -421,7 +442,7 @@ export default function Login() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       className="h-11 pr-10"
-                      disabled={loginMutation.isPending}
+                      disabled={passwordLoading}
                     />
                     <button
                       type="button"
@@ -432,12 +453,12 @@ export default function Login() {
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
-                  {loginMutation.isError && (
+                  {passwordError && (
                     <div className="mt-1">
                       <p className="text-xs text-red-500">
-                        {loginMutation.error?.message || "Sign-in failed. Please check your credentials."}
+                        {passwordError}
                       </p>
-                      {loginMutation.error?.message?.includes("magic link") && (
+                      {passwordError.includes("magic link") && (
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
@@ -460,11 +481,11 @@ export default function Login() {
                 </div>
                 <Button
                   type="submit"
-                  disabled={loginMutation.isPending || !email.trim() || !password}
+                  disabled={passwordLoading || !email.trim() || !password}
                   className="w-full h-11 font-semibold text-white"
                   style={{ background: "linear-gradient(135deg, #189aa1 0%, #0e7a80 100%)" }}
                 >
-                  {loginMutation.isPending ? (
+                  {passwordLoading ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Signing in&hellip;</>
                   ) : "Sign In"}
                 </Button>

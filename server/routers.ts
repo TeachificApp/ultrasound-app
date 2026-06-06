@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { COOKIE_NAME, DEMO_COOKIE_NAME, TWO_HOURS_MS } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
+import { clearSessionCookies, getSessionCookieOptions, resolveAuthHostname } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
@@ -222,18 +222,7 @@ export const appRouter = router({
       };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
-      const opts = getSessionCookieOptions(ctx.req);
-      const isProduction = !!(ctx.req.headers["x-forwarded-proto"] || ctx.req.headers["x-forwarded-host"]);
-      const secure = isProduction ? true : opts.secure;
-      const domains: (string | undefined)[] = [opts.domain, undefined];
-      const sameSites: ("none" | "lax" | "strict")[] = ["none", "lax"];
-      for (const domain of domains) {
-        for (const sameSite of sameSites) {
-          const clearOpts: any = { httpOnly: true, path: "/", sameSite, secure, maxAge: 0 };
-          if (domain) clearOpts.domain = domain;
-          ctx.res.clearCookie(COOKIE_NAME, clearOpts);
-        }
-      }
+      clearSessionCookies(ctx.res, ctx.req, [COOKIE_NAME]);
       return { success: true } as const;
     }),
 
@@ -622,7 +611,8 @@ export const appRouter = router({
           name,
           expiresInMs: ONE_YEAR_MS,
         });
-        const cookieOptions = getSessionCookieOptions(ctx.req);
+        const hostnameOverride = resolveAuthHostname(ctx.req);
+        const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
         return { success: true };

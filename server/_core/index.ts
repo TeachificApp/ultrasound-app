@@ -42,7 +42,7 @@ import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
 import { registerCurriculumEmbedRoutes } from "../routes/curriculumEmbedRoutes";
 import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
 import { sdmsCmeDailySummaryHandler } from "../routes/sdmsCmeDailySummary";
-import { getSessionCookieOptions } from "./cookies";
+import { clearSessionCookies, getSessionCookieOptions } from "./cookies";
 import { COOKIE_NAME, DEMO_COOKIE_NAME } from "../../shared/const";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -244,34 +244,7 @@ async function startServer() {
   registerCurriculumEmbedRoutes(app);
   // Dedicated logout route — bypasses tRPC batching so Set-Cookie clear is never merged with other responses
   app.post("/api/auth/logout", (req, res) => {
-    const opts = getSessionCookieOptions(req);
-    // In production all domains are HTTPS — force secure:true to ensure cookie match
-    const isProduction = !!(req.headers["x-forwarded-proto"] || req.headers["x-forwarded-host"]);
-    const secure = isProduction ? true : opts.secure;
-    console.log("[Logout] opts:", JSON.stringify(opts), "secure:", secure);
-    console.log("[Logout] headers:", JSON.stringify({ xAppHostname: req.headers["x-app-hostname"], xFwdHost: req.headers["x-forwarded-host"], host: req.headers.host }));
-
-    // Strategy: clear the cookie with every possible combination of domain/sameSite
-    // that could have been used when it was originally set. The browser will ignore
-    // Set-Cookie clears that don't match, so sending extras is harmless.
-    const domains: (string | undefined)[] = [opts.domain, undefined];
-    const sameSites: ("none" | "lax" | "strict")[] = ["none", "lax"];
-
-    for (const domain of domains) {
-      for (const sameSite of sameSites) {
-        const clearOpts: any = { httpOnly: true, path: "/", sameSite, secure, maxAge: 0 };
-        if (domain) clearOpts.domain = domain;
-        res.clearCookie(COOKIE_NAME, clearOpts);
-      }
-    }
-
-    // Also clear the demo session cookie if present
-    for (const domain of domains) {
-      const clearOpts: any = { httpOnly: true, path: "/", sameSite: "none" as const, secure, maxAge: 0 };
-      if (domain) clearOpts.domain = domain;
-      res.clearCookie(DEMO_COOKIE_NAME, clearOpts);
-    }
-
+    clearSessionCookies(res, req);
     res.json({ success: true });
   });
   // Google OAuth2 routes for per-form Google Sheets integration

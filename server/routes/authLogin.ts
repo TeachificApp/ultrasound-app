@@ -24,7 +24,7 @@ import * as bcrypt from "bcryptjs";
 import { getDb, ensureUserRole } from "../db";
 import { users, accessTokenUses, ipSecurityFlags, userLoginEvents } from "../../drizzle/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
-import { getSessionCookieOptions } from "../_core/cookies";
+import { getSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
@@ -40,7 +40,7 @@ export function registerAuthLoginRoute(app: Express) {
    */
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
-      const { email, password } = req.body ?? {};
+      const { email, password, host } = req.body ?? {};
 
       if (!email || !password) {
         return res.status(400).json({ error: "Email and password are required." });
@@ -85,7 +85,8 @@ export function registerAuthLoginRoute(app: Express) {
         name: user.name ?? normalizedEmail,
         expiresInMs: ONE_YEAR_MS,
       });
-      const cookieOptions = getSessionCookieOptions(req);
+      const hostnameOverride = resolveAuthHostname(req, typeof host === "string" ? host : undefined);
+      const cookieOptions = getSessionCookieOptions(req, hostnameOverride);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       return res.status(200).json({
