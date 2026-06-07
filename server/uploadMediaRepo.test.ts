@@ -16,6 +16,7 @@ function resolveMimeType(mimeType: string, fileName: string): string {
   const ext = path.extname(fileName).toLowerCase();
   const extMap: Record<string, string> = {
     ".zip": "application/zip",
+    ".quiz": "application/zip",
     ".html": "text/html",
     ".htm": "text/html",
     ".pdf": "application/pdf",
@@ -39,7 +40,7 @@ function resolveMimeType(mimeType: string, fileName: string): string {
 function detectMediaType(mimeType: string, fileName?: string): string {
   if (fileName) {
     const ext = path.extname(fileName).toLowerCase();
-    if (ext === ".zip") return "zip";
+    if (ext === ".zip" || ext === ".quiz") return "zip";
     if (ext === ".html" || ext === ".htm") return "html";
     if (ext === ".pdf") return "document";
     if (ext === ".mp4" || ext === ".webm" || ext === ".mov" || ext === ".avi") return "video";
@@ -98,6 +99,11 @@ describe("detectMediaType", () => {
   it("detects zip from .zip extension regardless of MIME type", () => {
     expect(detectMediaType("application/octet-stream", "scorm.zip")).toBe("zip");
     expect(detectMediaType("application/zip", "scorm.zip")).toBe("zip");
+  });
+
+  it("detects iSpring .quiz as zip for upload handling", () => {
+    expect(detectMediaType("application/octet-stream", "Pediatric Echo.quiz")).toBe("zip");
+    expect(resolveMimeType("application/octet-stream", "Pediatric Echo.quiz")).toBe("application/zip");
   });
 
   it("detects video from .mp4 extension", () => {

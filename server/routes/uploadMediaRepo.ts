@@ -89,7 +89,7 @@ function generateSlug(title: string): string {
 function detectMediaType(mimeType: string, fileName?: string): string {
   if (fileName) {
     const ext = path.extname(fileName).toLowerCase();
-    if (ext === ".zip") return "zip";
+    if (ext === ".zip" || ext === ".quiz") return "zip";
     if (ext === ".html" || ext === ".htm") return "html";
     if (ext === ".pdf") return "document";
     if (ext === ".mp4" || ext === ".webm" || ext === ".mov" || ext === ".avi") return "video";
@@ -111,6 +111,7 @@ function resolveMimeType(mimeType: string, fileName: string): string {
   const ext = path.extname(fileName).toLowerCase();
   const extMap: Record<string, string> = {
     ".zip": "application/zip",
+    ".quiz": "application/zip",
     ".html": "text/html",
     ".htm": "text/html",
     ".pdf": "application/pdf",
@@ -477,7 +478,7 @@ async function finalizeUpload(
   try {
     // Auto-detect SCORM packages: if the file is a ZIP, peek inside to check for
     // imsmanifest.xml or a root-level index.html and upgrade mediaType to "scorm".
-    if (mediaType === "zip") {
+    if (mediaType === "zip" || fileName.toLowerCase().endsWith(".quiz")) {
       try {
         const https = await import("https");
         const http = await import("http");
