@@ -733,15 +733,25 @@ function ScormHealthDialog({
   open,
   onClose,
   onOpenAsset,
+  pendingReExtractScope,
+  onPendingReExtractHandled,
 }: {
   open: boolean;
   onClose: () => void;
   onOpenAsset: (assetId: number, reExtract?: boolean) => void;
+  pendingReExtractScope?: "alerted" | "unhealthy" | null;
+  onPendingReExtractHandled?: () => void;
 }) {
+  const utils = trpc.useUtils();
   const { data, isLoading, refetch } = trpc.mediaRepo.listScormHealth.useQuery(undefined, { enabled: open });
+  const { data: meta, refetch: refetchMeta } = trpc.mediaRepo.getScormHealthMeta.useQuery(undefined, {
+    enabled: open,
+  });
   const scanMutation = trpc.mediaRepo.runScormHealthScanNow.useMutation({
     onSuccess: (result) => {
       refetch();
+      refetchMeta();
+      utils.mediaRepo.getScormHealthMeta.invalidate();
       const msg = result.emailed
         ? `Scan complete — ${result.unhealthy} unhealthy, alert email sent`
         : `Scan complete — ${result.unhealthy} unhealthy`;
@@ -750,10 +760,51 @@ function ScormHealthDialog({
     },
     onError: (e) => toast.error(e.message),
   });
+  const reExtractMutation = trpc.mediaRepo.reExtractUnhealthyScorm.useMutation({
+    onSuccess: (result) => {
+      refetch();
+      refetchMeta();
+      utils.mediaRepo.listScormHealth.invalidate();
+      toast.success(
+        `Re-extraction queued for ${result.queued} package${result.queued === 1 ? "" : "s"}${result.skipped ? ` (${result.skipped} skipped)` : ""}`,
+      );
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const rows = data ?? [];
   const unhealthy = rows.filter((r) => r.health === "unhealthy");
   const preparing = rows.filter((r) => r.health === "preparing");
+  const alertedCount = meta?.lastAlertedStillUnhealthy ?? 0;
+
+  function handleReExtract(scope: "alerted" | "unhealthy") {
+    const count = scope === "alerted" ? alertedCount : unhealthy.length;
+    if (count === 0) {
+      toast.info(scope === "alerted" ? "No alerted packages need re-extraction" : "No unhealthy packages to re-extract");
+      return;
+    }
+    const label =
+      scope === "alerted"
+        ? `Re-extract ${count} package${count === 1 ? "" : "s"} from the last health alert?`
+        : `Re-extract all ${count} currently unhealthy package${count === 1 ? "" : "s"}?`;
+    if (!window.confirm(`${label}\n\nThe heartbeat cron will process them one at a time (~60s each).`)) return;
+    reExtractMutation.mutate({ scope });
+  }
+
+  const pendingReExtractStarted = useRef(false);
+  useEffect(() => {
+    if (!open || !pendingReExtractScope || pendingReExtractStarted.current) return;
+    pendingReExtractStarted.current = true;
+    reExtractMutation.mutate(
+      { scope: pendingReExtractScope },
+      {
+        onSettled: () => {
+          pendingReExtractStarted.current = false;
+          onPendingReExtractHandled?.();
+        },
+      },
+    );
+  }, [open, pendingReExtractScope, onPendingReExtractHandled, reExtractMutation]);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -766,7 +817,37 @@ function ScormHealthDialog({
           <p className="text-sm text-muted-foreground">
             {rows.length} package{rows.length === 1 ? "" : "s"} tracked · {unhealthy.length} unhealthy · {preparing.length} preparing
           </p>
+          {meta?.lastAlertAt && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Last alert: {new Date(meta.lastAlertAt).toLocaleString()}
+              {alertedCount > 0 ? ` · ${alertedCount} alerted still unhealthy` : ""}
+            </p>
+          )}
         </DialogHeader>
+        {(alertedCount > 0 || unhealthy.length > 0) && (
+          <div className="px-5 py-3 border-b border-border bg-muted/30 shrink-0 flex flex-wrap gap-2 items-center">
+            <p className="text-xs font-medium text-muted-foreground mr-1">Bulk actions:</p>
+            <Button
+              size="sm"
+              variant="default"
+              disabled={reExtractMutation.isPending || alertedCount === 0}
+              onClick={() => handleReExtract("alerted")}
+              title="Re-extract only packages from the last health alert email that are still unhealthy"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${reExtractMutation.isPending ? "animate-spin" : ""}`} />
+              Re-extract alerted only ({alertedCount})
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={reExtractMutation.isPending || unhealthy.length === 0}
+              onClick={() => handleReExtract("unhealthy")}
+              title="Re-extract every package currently marked unhealthy"
+            >
+              Re-extract all unhealthy ({unhealthy.length})
+            </Button>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto p-4">
           {isLoading ? (
             <div className="space-y-2">
@@ -1326,6 +1407,7 @@ export default function MediaRepository() {
   const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
   const [autoReExtract, setAutoReExtract] = useState(false);
   const [healthOpen, setHealthOpen] = useState(false);
+  const [pendingReExtractScope, setPendingReExtractScope] = useState<"alerted" | "unhealthy" | null>(null);
   const deepLinkHandled = useRef(false);
   const utils = trpc.useUtils();
 
@@ -1348,14 +1430,29 @@ export default function MediaRepository() {
     const params = new URLSearchParams(window.location.search);
     const assetIdParam = params.get("assetId");
     const reExtract = params.get("reExtract") === "1";
-    if (!assetIdParam) return;
-    const id = Number.parseInt(assetIdParam, 10);
-    if (!Number.isFinite(id) || id <= 0) return;
-    openAsset(id, reExtract);
-    params.delete("assetId");
-    params.delete("reExtract");
-    const qs = params.toString();
-    setLocation(`${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    const openHealth = params.get("scormHealth") === "1";
+    const reExtractAlerted = params.get("reExtractAlerted") === "1";
+
+    if (openHealth || reExtractAlerted) {
+      setHealthOpen(true);
+      if (reExtractAlerted) setPendingReExtractScope("alerted");
+      params.delete("scormHealth");
+      params.delete("reExtractAlerted");
+    }
+
+    if (assetIdParam) {
+      const id = Number.parseInt(assetIdParam, 10);
+      if (Number.isFinite(id) && id > 0) {
+        openAsset(id, reExtract);
+        params.delete("assetId");
+        params.delete("reExtract");
+      }
+    }
+
+    if (openHealth || reExtractAlerted || assetIdParam) {
+      const qs = params.toString();
+      setLocation(`${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    }
   }, [setLocation]);
 
   // Debounce search input — fire query 300ms after user stops typing
@@ -1936,6 +2033,8 @@ export default function MediaRepository() {
         open={healthOpen}
         onClose={() => setHealthOpen(false)}
         onOpenAsset={openAsset}
+        pendingReExtractScope={pendingReExtractScope}
+        onPendingReExtractHandled={() => setPendingReExtractScope(null)}
       />
 
       {/* Asset detail dialog */}

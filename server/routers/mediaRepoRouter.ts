@@ -1370,4 +1370,35 @@ export const mediaRepoRouter = router({
     return runScormHealthAlertPass();
   }),
 
+  /** Snapshot metadata for SCORM health settings (last alert, alerted IDs). */
+  getScormHealthMeta: protectedProcedure.query(async ({ ctx }) => {
+    await assertPlatformAdmin(ctx);
+    const { getScormHealthMeta } = await import("../lib/scormHealthAlerts");
+    return getScormHealthMeta();
+  }),
+
+  /**
+   * Re-extract SCORM packages flagged by health alerts only (not all SCORM assets).
+   * - unhealthy: every package currently marked unhealthy
+   * - alerted: packages from the last alert email that are still unhealthy
+   */
+  reExtractUnhealthyScorm: protectedProcedure
+    .input(
+      z.object({
+        scope: z.enum(["unhealthy", "alerted"]).default("alerted"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const { queueScormReExtractionForAssets, resolveScormReExtractAssetIds } = await import(
+        "../lib/scormHealthAlerts"
+      );
+      const assetIds = await resolveScormReExtractAssetIds(input.scope);
+      if (assetIds.length === 0) {
+        return { ok: true, queued: 0, skipped: 0, scope: input.scope };
+      }
+      const result = await queueScormReExtractionForAssets(assetIds);
+      return { ok: true, scope: input.scope, ...result };
+    }),
+
 });

@@ -46,8 +46,15 @@ describe("scormHealth", () => {
 
   it("newlyUnhealthyAssetIds only returns ids not in previous snapshot", () => {
     const prev = parseScormHealthSnapshot(
-      JSON.stringify({ unhealthyAssetIds: [1, 2], lastAlertAt: null }),
+      JSON.stringify({ unhealthyAssetIds: [1, 2], lastAlertedAssetIds: [2], lastAlertAt: null }),
     );
     expect(newlyUnhealthyAssetIds(prev, [1, 2, 3])).toEqual([3]);
+  });
+
+  it("parseScormHealthSnapshot reads lastAlertedAssetIds", () => {
+    const snap = parseScormHealthSnapshot(
+      JSON.stringify({ unhealthyAssetIds: [1], lastAlertedAssetIds: [1, 5], lastAlertAt: "2026-01-01" }),
+    );
+    expect(snap.lastAlertedAssetIds).toEqual([1, 5]);
   });
 });
