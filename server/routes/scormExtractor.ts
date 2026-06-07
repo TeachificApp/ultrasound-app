@@ -32,7 +32,7 @@ import { findScormLaunchFile, SCORM_PACKAGE_MEDIA_TYPES } from "../lib/scormPack
 
 const SCORM_EXTRACT_DIR = path.join(os.tmpdir(), "scorm-extract-job");
 // If a job has been "processing" for more than 10 minutes, consider it stalled and retry
-const STALL_THRESHOLD_MS = 10 * 60 * 1000;
+const STALL_THRESHOLD_MS = 30 * 60 * 1000; // 30 min — large ZIPs (200MB+) can take 15-25 min to download + extract + upload to R2
 
 // ─── Download helper ──────────────────────────────────────────────────────────
 
