@@ -4710,3 +4710,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add "Education Library" link to RegistryReviewHub footer note; remove Thinkific mention from footer
 - [x] Add "Browse Education Library" button to CMEHub hero banner
 - [x] Add "Education Library" link to CMEHub footer; remove Thinkific mention from footer
+
+## SCORM ZIP Streaming Fix (Jun 2026)
+- [x] Implement scormZipStream.ts — on-demand ZIP streaming via HTTP Range requests (no extraction needed)
+- [x] Add r2_zip_stream plan type to ScormServePlan in scormPackage.ts
+- [x] Wire r2_zip_stream as primary SCORM serve strategy in mediaServe.ts
+- [x] Mark all stuck pending/processing/failed ZIP versions as skipped (13 assets) — serve via zip-stream
+- [x] 8 new tests for r2_zip_stream plan resolution (all passing)
+- [x] Install yauzl for random-access ZIP reading

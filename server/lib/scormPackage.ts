@@ -138,6 +138,7 @@ export type MediaVersionZipRef = {
 
 export type ScormServePlan =
   | { kind: "r2_extracted"; prefix: string; launchFile: string; versionId?: number }
+  | { kind: "r2_zip_stream"; zipUrl: string; versionId?: number }
   | { kind: "direct_html"; url: string; launchFile: string; versionId?: number }
   | { kind: "client_zip"; zipUrl: string; versionId?: number }
   | { kind: "waiting"; status: "pending" | "processing" }
@@ -207,6 +208,16 @@ export function resolveScormServePlans(versions: MediaVersionZipRef[]): ScormSer
         launchFile: v.scormLaunchFile || launchFileFromUrl(v.s3Url),
         versionId: v.id,
       });
+    }
+  }
+
+  // r2_zip_stream: serve directly from the ZIP on R2 (no extraction needed).
+  // Added for versions whose extraction is pending/failed/stuck — the ZIP itself
+  // is already on R2 and can be served on-demand via HTTP Range requests.
+  // This plan is added for ALL ZIP versions so it always acts as a fallback.
+  for (const v of sorted) {
+    if (isZipStorageRef(v) && v.s3Url) {
+      push({ kind: "r2_zip_stream", zipUrl: v.s3Url, versionId: v.id });
     }
   }
 

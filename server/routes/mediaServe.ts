@@ -30,6 +30,7 @@ import {
   SCORM_CACHE_DIR,
   tryServeScormFileFromCache,
 } from "../lib/scormZipCache";
+import { serveScormFileFromZip, getScormLaunchFile } from "../lib/scormZipStream";
 import { ENV } from "../_core/env";
 import { buildMediaAuthQuery, verifyMediaViewerToken } from "../lib/mediaEmbedAccess";
 import { createHash } from "crypto";
@@ -578,40 +579,28 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     };
 
     const plans = resolveScormServePlans(allVersions);
-    // Always check waiting/failed plans FIRST — before any ZIP extraction attempt.
-    // client_zip comes after r2_extracted in the plans array, but waiting/failed
-    // may appear after client_zip when status is pending/processing. We must not
-    // attempt synchronous ZIP extraction (which times out on Cloud Run) when
-    // the heartbeat is already working on this asset.
-    const waitingPlan = plans.find((p) => p.kind === "waiting");
-    if (waitingPlan?.kind === "waiting") {
-      res.status(202).send(scormStatusPage(waitingPlan.status, null));
-      return;
-    }
-    const failedPlan = plans.find((p) => p.kind === "failed");
-    if (failedPlan?.kind === "failed") {
-      res.status(503).send(scormStatusPage("failed", failedPlan.error));
-      return;
+
+    // ── Strategy 1: r2_zip_stream — serve directly from ZIP on R2 (no extraction needed) ──
+    // This is the PRIMARY strategy for all ZIP-based SCORM packages.
+    // It uses HTTP Range requests to read individual files from the ZIP without
+    // downloading or extracting the entire archive. Works for any ZIP size.
+    const zipStreamPlan = plans.find((p) => p.kind === "r2_zip_stream");
+    if (zipStreamPlan?.kind === "r2_zip_stream") {
+      const zipUrl = encodeStorageFetchUrl(zipStreamPlan.zipUrl);
+      try {
+        const served = await serveScormFileFromZip(zipUrl, relativePath, res);
+        if (served) return;
+        // If zip stream fails (e.g., 403 on R2), fall through to other strategies
+        console.warn(`[ScormServe] r2_zip_stream failed for ${asset.slug}, falling back to other strategies`);
+      } catch (zipStreamErr: any) {
+        console.error(`[ScormServe] r2_zip_stream error for ${asset.slug}:`, zipStreamErr?.message);
+        // Fall through to other strategies
+      }
     }
 
-    let zipForExtract: string | null = null;
-    const zipPlan = plans.find((p) => p.kind === "client_zip");
-    if (zipPlan?.kind === "client_zip") {
-      zipForExtract = zipPlan.zipUrl;
-    }
-
-    const cachedZip = zipForExtract ? readScormZipCache(asset.slug, zipForExtract) : null;
-    if (
-      cachedZip &&
-      tryServeScormFileFromCache(res, cachedZip.cacheDir, cachedZip.launchFile, relativePath)
-    ) {
-      return;
-    }
-
+    // ── Strategy 2: r2_extracted — serve from already-extracted R2 prefix ──
+    // Used when extraction has already completed successfully.
     for (const plan of plans) {
-      if (plan.kind === "waiting" || plan.kind === "failed") continue; // already handled above
-      if (plan.kind === "missing") continue;
-
       if (plan.kind === "r2_extracted") {
         const r2Probe = await isR2ScormExtractionPlayable(plan.prefix, plan.launchFile);
         if (!r2Probe.playable) {
@@ -629,50 +618,29 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
         continue;
       }
 
-      if (plan.kind === "client_zip") {
-        break;
-      }
+      // Stop at client_zip — we don't do synchronous extraction anymore
+      if (plan.kind === "client_zip" || plan.kind === "r2_zip_stream") continue;
     }
 
-    if (!zipForExtract) {
-      res.status(503).send(
-        scormStatusPage(
-          "failed",
-          "No playable SCORM file found. Re-upload the package or use Re-extract in the media library.",
-        ),
-      );
+    // ── Strategy 3: waiting/failed status pages ──
+    // Only show these if zip_stream also failed (e.g., ZIP not yet uploaded to R2)
+    const waitingPlan = plans.find((p) => p.kind === "waiting");
+    if (waitingPlan?.kind === "waiting") {
+      res.status(202).send(scormStatusPage(waitingPlan.status, null));
+      return;
+    }
+    const failedPlan = plans.find((p) => p.kind === "failed");
+    if (failedPlan?.kind === "failed") {
+      res.status(503).send(scormStatusPage("failed", failedPlan.error));
       return;
     }
 
-    // Never download a large ZIP synchronously for asset sub-requests (JS/CSS/images).
-    if (relativePath !== "" && !cachedZip) {
-      warmScormZipCacheInBackground(asset.slug, zipForExtract);
-      res.status(202).send(scormStatusPage("processing", null));
-      return;
-    }
-
-    const extracted = await extractScormZip(asset.slug, encodeStorageFetchUrl(zipForExtract));
-    if (!extracted) {
-      try {
-        await dbScorm
-          .update(mediaVersions)
-          .set({
-            scormExtractionStatus: "pending" as any,
-            scormExtractionError: null,
-          })
-          .where(eq(mediaVersions.id, version.id));
-      } catch { /* non-critical */ }
-      res.status(202).send(scormStatusPage("pending", null));
-      return;
-    }
-
-    const { launchFile, cacheDir } = extracted;
-
-    if (tryServeScormFileFromCache(res, cacheDir, launchFile, relativePath)) {
-      return;
-    }
-
-    res.status(404).send("File not found");
+    res.status(503).send(
+      scormStatusPage(
+        "failed",
+        "No playable SCORM file found. Re-upload the package or contact support.",
+      ),
+    );
     } catch (err: any) {
       console.error(`[ScormServe] Unhandled error for slug=${req.params.slug}:`, err?.message ?? err);
       if (!res.headersSent) {
