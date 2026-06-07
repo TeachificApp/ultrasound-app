@@ -864,6 +864,8 @@ export const cmeCoursesCache = mysqlTable("cmeCoursesCache", {
   // JSON array of Thinkific collection IDs this product belongs to
   collectionIds: text("collectionIds"),
   syncedAt: timestamp("syncedAt").defaultNow().notNull(),
+  /** ID of the matching native LMS course, if one exists */
+  nativeLmsCourseId: int("nativeLmsCourseId"),
 });
 export type CmeCourseCache = typeof cmeCoursesCache.$inferSelect;
 export type InsertCmeCourseCache = typeof cmeCoursesCache.$inferInsert;

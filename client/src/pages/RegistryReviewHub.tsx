@@ -8,7 +8,12 @@ import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
-import { ExternalLink, Star, Clock, Info, GraduationCap, Award } from "lucide-react";
+import { ExternalLink, Star, Clock, Info, GraduationCap, Award, BookOpen } from "lucide-react";
+import { Link } from "wouter";
+import { LEARN_APP_URL } from "@/hooks/useSubdomain";
+
+/** Education Library URL on the learn subdomain */
+const EDUCATION_LIBRARY_URL = `${LEARN_APP_URL}/education-library`;
 
 const BRAND = "#189aa1";
 const BRAND_LIGHT = "#f0fbfc";
@@ -27,6 +32,7 @@ interface RegistryCourse {
   isBundle?: boolean;
   isFree?: boolean;
   thinkificCourseId?: number | null;
+  nativeLmsCourseId?: number | null;
 }
 
 function buildCheckoutUrl(enrollUrl: string, email?: string | null): string {
@@ -45,6 +51,7 @@ function mapLiveCourse(c: {
   enrollUrl: string;
   courseUrl: string;
   hasCertificate: boolean;
+  nativeLmsCourseId?: number | null;
 }): RegistryCourse {
   const isFree = parseFloat(c.price) === 0;
   const isBundle =
@@ -79,6 +86,7 @@ function mapLiveCourse(c: {
     isBundle,
     isFree,
     thinkificCourseId: c.thinkificCourseId,
+    nativeLmsCourseId: c.nativeLmsCourseId ?? null,
   };
 }
 
@@ -124,10 +132,20 @@ export default function RegistryReviewHub() {
             <p className="text-[#4ad9e0] font-semibold text-base mb-3">
               All About Ultrasound™ — Registry Review Courses
             </p>
-            <p className="text-white/70 text-sm leading-relaxed max-w-lg">
-              Prepare for your registry exams with comprehensive review courses and test & learn quizzes from All About Ultrasound™. Click "Learn More" to view course details or "Enroll" to register directly on Thinkific.
+            <p className="text-white/70 text-sm leading-relaxed max-w-lg mb-5">
+              Prepare for your registry exams with comprehensive review courses and test &amp; learn quizzes from All About Ultrasound™.
             </p>
-
+            {/* Education Library CTA */}
+            <a
+              href={EDUCATION_LIBRARY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-white/15 border border-white/30 text-white hover:bg-white/25 transition-all"
+            >
+              <BookOpen className="w-4 h-4 text-[#4ad9e0]" />
+              Browse Education Library
+              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+            </a>
           </div>
         </div>
       </div>
@@ -203,24 +221,41 @@ export default function RegistryReviewHub() {
                     >
                       Learn More <Info className="w-3.5 h-3.5" />
                     </a>
-                    <a
-                      href={buildCheckoutUrl(featured.enrollUrl, user?.email)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
-                      style={{
-                        background:
-                          featured.thinkificCourseId && enrolledSet.has(featured.thinkificCourseId)
-                            ? "#059669"
-                            : BRAND,
-                      }}
-                    >
-                      {featured.thinkificCourseId && enrolledSet.has(featured.thinkificCourseId) ? (
-                        "Continue Learning"
-                      ) : (
-                        <>Enroll Now <ExternalLink className="w-3.5 h-3.5" /></>
-                      )}
-                    </a>
+                    {featured.nativeLmsCourseId ? (
+                      <Link
+                        href={`/learn/course/${featured.nativeLmsCourseId}`}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
+                        style={{
+                          background:
+                            featured.thinkificCourseId && enrolledSet.has(featured.thinkificCourseId)
+                              ? "#059669"
+                              : BRAND,
+                        }}
+                      >
+                        {featured.thinkificCourseId && enrolledSet.has(featured.thinkificCourseId)
+                          ? "Continue Learning"
+                          : "Start Course"}
+                      </Link>
+                    ) : (
+                      <a
+                        href={buildCheckoutUrl(featured.enrollUrl, user?.email)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
+                        style={{
+                          background:
+                            featured.thinkificCourseId && enrolledSet.has(featured.thinkificCourseId)
+                              ? "#059669"
+                              : BRAND,
+                        }}
+                      >
+                        {featured.thinkificCourseId && enrolledSet.has(featured.thinkificCourseId) ? (
+                          "Continue Learning"
+                        ) : (
+                          <>Enroll Now <ExternalLink className="w-3.5 h-3.5" /></>
+                        )}
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -256,7 +291,13 @@ export default function RegistryReviewHub() {
                         </span>
                       </div>
                     )}
-
+                    {course.nativeLmsCourseId && (
+                      <div className="absolute top-2 left-2">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#189aa1] text-white">
+                          Available
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="p-4 flex flex-col flex-1">
                     <h3
@@ -291,25 +332,43 @@ export default function RegistryReviewHub() {
                         >
                           Learn More <Info className="w-3 h-3" />
                         </a>
-                        <a
-                          href={buildCheckoutUrl(course.enrollUrl, user?.email)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold py-1.5 px-2 rounded-lg text-white transition-all hover:opacity-90"
-                          style={{
-                            background:
-                              course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId)
-                                ? "#059669"
-                                : BRAND,
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId) ? (
-                            "Continue Learning"
-                          ) : (
-                            <>Enroll <ExternalLink className="w-3 h-3" /></>
-                          )}
-                        </a>
+                        {course.nativeLmsCourseId ? (
+                          <Link
+                            href={`/learn/course/${course.nativeLmsCourseId}`}
+                            className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold py-1.5 px-2 rounded-lg text-white transition-all hover:opacity-90"
+                            style={{
+                              background:
+                                course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId)
+                                  ? "#059669"
+                                  : BRAND,
+                            }}
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                          >
+                            {course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId)
+                              ? "Continue Learning"
+                              : "Start Course"}
+                          </Link>
+                        ) : (
+                          <a
+                            href={buildCheckoutUrl(course.enrollUrl, user?.email)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold py-1.5 px-2 rounded-lg text-white transition-all hover:opacity-90"
+                            style={{
+                              background:
+                                course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId)
+                                  ? "#059669"
+                                  : BRAND,
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId) ? (
+                              "Continue Learning"
+                            ) : (
+                              <>Enroll <ExternalLink className="w-3 h-3" /></>
+                            )}
+                          </a>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -333,16 +392,17 @@ export default function RegistryReviewHub() {
           style={{ background: BRAND_LIGHT, borderColor: BRAND_BORDER }}
         >
           <Clock className="w-4 h-4 text-[#189aa1] flex-shrink-0 mt-0.5 sm:mt-0" />
-          <p className="text-xs text-gray-600 leading-relaxed">
-            All courses are from <strong>All About Ultrasound™</strong>. "Learn More" opens the course details page; "Enroll" takes you directly to the Thinkific checkout page.
+          <p className="text-xs text-gray-600 leading-relaxed flex-1">
+            All courses are from <strong>All About Ultrasound™</strong>. Courses with an "Available" badge can be started directly in the app. "Learn More" opens the course details page.
           </p>
           <a
-            href="https://member.allaboutultrasound.com/collections/registry-review"
+            href={EDUCATION_LIBRARY_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-[#189aa1] hover:underline"
           >
-            View all on site <ExternalLink className="w-3 h-3" />
+            <BookOpen className="w-3.5 h-3.5" />
+            Education Library <ExternalLink className="w-3 h-3" />
           </a>
         </div>
       </div>

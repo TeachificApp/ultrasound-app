@@ -4701,3 +4701,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Replace all frontend Thinkific premium checkout URLs with /premium (Stripe page)
 - [x] Keep Thinkific free membership sync and daily member import unchanged
 - [x] Update UpgradeSuccess page to work with Stripe flow
+
+## Registry Review Hub & CME Hub — Education Library Links (Jun 2026)
+- [x] Add nativeLmsCourseId to RegistryCourse interface and mapLiveCourse function
+- [x] Wire nativeLmsCourseId from cmeRouter into RegistryReviewHub card buttons (Start Course / Continue Learning via /learn/course/:id when available, external Enroll fallback otherwise)
+- [x] Add "Available" badge on course card thumbnails when nativeLmsCourseId is set
+- [x] Add "Browse Education Library" button to RegistryReviewHub hero section (links to learn.allaboutultrasound.com/education-library)
+- [x] Add "Education Library" link to RegistryReviewHub footer note; remove Thinkific mention from footer
+- [x] Add "Browse Education Library" button to CMEHub hero banner
+- [x] Add "Education Library" link to CMEHub footer; remove Thinkific mention from footer

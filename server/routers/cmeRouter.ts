@@ -35,6 +35,8 @@ export interface CatalogCourse {
   courseUrl: string;
   /** Checkout/enroll URL on Thinkific */
   enrollUrl: string;
+  /** Native LMS course ID if this course has been imported natively */
+  nativeLmsCourseId: number | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -98,6 +100,7 @@ function mapToCatalogCourse(c: typeof cmeCoursesCache.$inferSelect): CatalogCour
     hasCertificate: c.hasCertificate,
     courseUrl: buildCourseUrl(c.slug),
     enrollUrl: buildEnrollUrl(c.slug),
+    nativeLmsCourseId: c.nativeLmsCourseId ?? null,
   };
 }
 

@@ -8,8 +8,11 @@ import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
-import { ExternalLink, GraduationCap, Award, Clock, Search, BookOpen } from "lucide-react";
+import { ExternalLink, GraduationCap, Award, Search, BookOpen } from "lucide-react";
 import { parseCreditHoursFromName } from "@/lib/cmeUtils";
+import { LEARN_APP_URL } from "@/hooks/useSubdomain";
+
+const EDUCATION_LIBRARY_URL = `${LEARN_APP_URL}/education-library`;
 
 const BRAND = "#189aa1";
 const BRAND_LIGHT = "#f0fbfc";
@@ -67,9 +70,19 @@ export default function CMEHub() {
             >
               CME Hub
             </h1>
-            <p className="text-sm text-[#4ad9e0]/90">
+            <p className="text-sm text-[#4ad9e0]/90 mb-3">
               Accredited continuing medical education from All About Ultrasound™ — SDMS CME, AMA PRA Category 1, and more.
             </p>
+            <a
+              href={EDUCATION_LIBRARY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/15 border border-white/25 text-white hover:bg-white/25 transition-all"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-[#4ad9e0]" />
+              Browse Education Library
+              <ExternalLink className="w-3 h-3 opacity-70" />
+            </a>
           </div>
         </div>
 
@@ -199,9 +212,18 @@ export default function CMEHub() {
         )}
 
         {/* Footer note */}
-        <p className="text-center text-xs text-gray-400 mt-8">
-          All courses are hosted on Thinkific. Clicking Enroll or Continue will open the All About Ultrasound™ learning platform.
-        </p>
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-gray-400">
+          <p>All courses are from All About Ultrasound™.</p>
+          <a
+            href={EDUCATION_LIBRARY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 font-semibold text-[#189aa1] hover:underline"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            Education Library <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
       </div>
     </Layout>
   );
