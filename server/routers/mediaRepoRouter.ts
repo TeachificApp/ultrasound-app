@@ -1075,12 +1075,16 @@ export const mediaRepoRouter = router({
       if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "No access to this media asset" });
       const versions = await db
         .select({
+          id: mediaVersions.id,
           s3Url: mediaVersions.s3Url,
           fileName: mediaVersions.fileName,
           mimeType: mediaVersions.mimeType,
           s3Key: mediaVersions.s3Key,
           versionNumber: mediaVersions.versionNumber,
           scormExtractedPrefix: mediaVersions.scormExtractedPrefix,
+          scormLaunchFile: mediaVersions.scormLaunchFile,
+          scormExtractionStatus: mediaVersions.scormExtractionStatus,
+          scormExtractionError: mediaVersions.scormExtractionError,
         })
         .from(mediaVersions)
         .where(eq(mediaVersions.assetId, asset.id))
@@ -1098,6 +1102,10 @@ export const mediaRepoRouter = router({
           embedUrl: `/api/media/${asset.slug}/scorm${authQuery}`,
           title: asset.title,
         };
+      }
+
+      if (!strategy.zipS3Url) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "No playable SCORM ZIP found for this asset" });
       }
 
       return {

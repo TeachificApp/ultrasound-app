@@ -8,6 +8,7 @@ import {
   pickScormPlaybackMode,
   isDirectHtmlScormVersion,
   resolveZipDownloadUrl,
+  resolveScormServePlans,
 } from "./scormPackage";
 
 describe("scormPackage", () => {
@@ -92,6 +93,40 @@ describe("pickScormPlaybackMode", () => {
     ).toBe("server");
   });
 });
+describe("resolveScormServePlans", () => {
+  it("falls back to older HTML when latest is ZIP without extraction", () => {
+    const plans = resolveScormServePlans([
+      {
+        versionNumber: 2,
+        s3Url: "https://cdn/quiz.zip",
+        fileName: "quiz.zip",
+        scormExtractedPrefix: null,
+      },
+      {
+        versionNumber: 1,
+        s3Url: "https://cdn/folder/index.html",
+        fileName: "index.html",
+      },
+    ]);
+    expect(plans.some((p) => p.kind === "client_zip")).toBe(true);
+    expect(plans.some((p) => p.kind === "direct_html")).toBe(true);
+    expect(plans.find((p) => p.kind === "direct_html")?.kind).toBe("direct_html");
+  });
+
+  it("prefers R2 extracted prefix when present", () => {
+    const plans = resolveScormServePlans([
+      {
+        versionNumber: 2,
+        s3Url: "https://cdn/quiz.zip",
+        scormExtractedPrefix: "scorm-extracted/foo-abc",
+        scormLaunchFile: "index.html",
+        scormExtractionStatus: "done",
+      },
+    ]);
+    expect(plans[0].kind).toBe("r2_extracted");
+  });
+});
+
 describe("isDirectHtmlScormVersion", () => {
   it("detects CDN index.html packages", () => {
     expect(

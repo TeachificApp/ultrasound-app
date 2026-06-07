@@ -424,10 +424,35 @@ export async function scormHealthCheckHandler(req: Request, res: Response): Prom
               console.log(`[ScormHealthCheck] Healed version ${v.versionId} (${v.slug}): '${v.launchFile}' → '${correctedLaunchFile}'`);
               healed.push(v.versionId);
             } else {
-              // No index.html found — re-queue for full re-extraction
-              await db.update(mediaVersions).set({ scormExtractionStatus: "pending" as any, scormExtractedPrefix: null, scormLaunchFile: null }).where(eq(mediaVersions.id, v.versionId));
-              console.warn(`[ScormHealthCheck] Re-queued version ${v.versionId} (${v.slug}): launch file missing and no index.html found in R2`);
-              broken.push(v.versionId);
+              // R2 prefix is stale — queue re-extraction but keep prefix until a new one is written.
+              // Also try to mark an HTML fallback version if one exists on CDN.
+              const htmlRows = await db
+                .select({ id: mediaVersions.id, s3Url: mediaVersions.s3Url })
+                .from(mediaVersions)
+                .innerJoin(mediaAssets, eq(mediaAssets.id, mediaVersions.assetId))
+                .where(eq(mediaAssets.slug, v.slug));
+              const htmlFallback = htmlRows.find((row) => {
+                const u = (row.s3Url ?? "").toLowerCase().split("?")[0];
+                return u.endsWith(".html") || u.endsWith(".htm");
+              });
+              if (htmlFallback?.s3Url) {
+                const launchFile = htmlFallback.s3Url.substring(htmlFallback.s3Url.lastIndexOf("/") + 1);
+                await db.update(mediaVersions).set({
+                  scormExtractionStatus: "done",
+                  scormExtractedPrefix: `__direct_html__:${htmlFallback.s3Url}`,
+                  scormLaunchFile: launchFile,
+                  scormExtractionError: null,
+                }).where(eq(mediaVersions.id, v.versionId));
+                console.warn(`[ScormHealthCheck] HTML fallback for ${v.slug} (version ${v.versionId})`);
+                healed.push(v.versionId);
+              } else {
+                await db.update(mediaVersions).set({
+                  scormExtractionStatus: "pending" as any,
+                  scormExtractionError: "Launch file missing from R2; queued re-extraction",
+                }).where(eq(mediaVersions.id, v.versionId));
+                console.warn(`[ScormHealthCheck] Re-queued version ${v.versionId} (${v.slug}): launch file missing from R2`);
+                broken.push(v.versionId);
+              }
             }
           }
           // Other errors (network, auth) — skip this version silently
