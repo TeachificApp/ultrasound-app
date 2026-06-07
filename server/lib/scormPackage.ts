@@ -254,7 +254,16 @@ export function pickScormPlaybackMode(
     allVersions.length > 0
       ? allVersions
       : [current];
-  const plan = resolveScormServePlan(versions);
+  const plans = resolveScormServePlans(versions);
+
+  // r2_zip_stream is the primary strategy — always use server mode when available.
+  // This means the browser gets a plain iframe to /api/media/:slug/scorm and the
+  // server streams individual files on-demand from the ZIP using Range requests.
+  if (plans.some((p) => p.kind === "r2_zip_stream")) {
+    return { mode: "server" };
+  }
+
+  const plan = plans[0] ?? { kind: "missing" };
   if (plan.kind === "client_zip") {
     return { mode: "clientZip", zipS3Url: plan.zipUrl };
   }

@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { resolveScormServePlans } from "./lib/scormPackage";
+import { resolveScormServePlans, pickScormPlaybackMode } from "./lib/scormPackage";
 import type { MediaVersionZipRef } from "./lib/scormPackage";
 
 // ─── resolveScormServePlans: r2_zip_stream plan ───────────────────────────────
@@ -154,6 +154,43 @@ describe("resolveScormServePlans — r2_zip_stream", () => {
     const plans = resolveScormServePlans(versions);
     const zipStreamPlan = plans.find((p) => p.kind === "r2_zip_stream");
     expect(zipStreamPlan).toBeUndefined();
+  });
+});
+
+// ─── pickScormPlaybackMode: r2_zip_stream → server mode ─────────────────────
+
+describe("pickScormPlaybackMode — r2_zip_stream returns server mode", () => {
+  it("returns server mode for a skipped ZIP version (uses zip-stream)", () => {
+    const current: MediaVersionZipRef = {
+      id: 20,
+      s3Url: "https://r2.example.com/scorm/course.zip",
+      fileName: "course.zip",
+      mimeType: "application/zip",
+      versionNumber: 1,
+      scormExtractionStatus: "skipped",
+      scormExtractedPrefix: null,
+      scormLaunchFile: null,
+      scormExtractionError: null,
+    };
+    const result = pickScormPlaybackMode(current, [current]);
+    // Must be server mode — browser should get an iframe, not try to download the ZIP
+    expect(result.mode).toBe("server");
+  });
+
+  it("returns server mode for a failed ZIP version (uses zip-stream as fallback)", () => {
+    const current: MediaVersionZipRef = {
+      id: 21,
+      s3Url: "https://r2.example.com/scorm/large.zip",
+      fileName: "large.zip",
+      mimeType: "application/zip",
+      versionNumber: 1,
+      scormExtractionStatus: "failed",
+      scormExtractedPrefix: null,
+      scormLaunchFile: null,
+      scormExtractionError: "Timeout",
+    };
+    const result = pickScormPlaybackMode(current, [current]);
+    expect(result.mode).toBe("server");
   });
 });
 

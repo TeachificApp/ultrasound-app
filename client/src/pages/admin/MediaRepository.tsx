@@ -1251,12 +1251,16 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                             variant="outline"
                             className={`text-xs ${
                               extractStatus === "done" ? "border-green-500 text-green-600 dark:text-green-400" :
+                              extractStatus === "skipped" ? "border-teal-500 text-teal-600 dark:text-teal-400" :
                               extractStatus === "pending" ? "border-yellow-500 text-yellow-600 dark:text-yellow-400" :
                               extractStatus === "failed" ? "border-red-500 text-red-600 dark:text-red-400" :
                               "border-muted-foreground text-muted-foreground"
                             }`}
                           >
-                            {extractStatus === "done" ? "extracted" : extractStatus === "pending" ? "pending" : extractStatus === "failed" ? "failed" : extractStatus}
+                            {extractStatus === "done" ? "extracted" :
+                             extractStatus === "skipped" ? "streaming" :
+                             extractStatus === "pending" ? "pending" :
+                             extractStatus === "failed" ? "failed" : extractStatus}
                           </Badge>
                         )}
                         <span className="text-xs text-muted-foreground truncate">{v.fileName}</span>
@@ -1264,7 +1268,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {formatBytes(v.fileSize)} · {new Date(v.createdAt).toLocaleString()}
                         {v.notes && <span className="ml-2 italic">"{v.notes}"</span>}
-                        {isScorm && (v as any).scormExtractionError && (
+                        {isScorm && (v as any).scormExtractionError && (v as any).scormExtractionStatus !== "skipped" && (
                           <span className="ml-2 text-red-500 dark:text-red-400 truncate max-w-[200px] inline-block align-bottom" title={(v as any).scormExtractionError}>
                             {(v as any).scormExtractionError}
                           </span>
