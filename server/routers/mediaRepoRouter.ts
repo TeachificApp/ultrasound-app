@@ -36,6 +36,7 @@ import {
   lmsEnrollments,
 } from "../../drizzle/schema";
 import { initialScormExtractionStatus, needsScormExtraction, queueScormExtractionIfNeeded, pickScormPlaybackMode } from "../lib/scormPackage";
+import { extractAndUploadScormVersion } from "../routes/scormExtractor";
 import { buildMediaAuthQuery, signMediaViewerToken } from "../lib/mediaEmbedAccess";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1280,18 +1281,22 @@ export const mediaRepoRouter = router({
       if (!needsScormExtraction({ mediaType: asset.mediaType, mimeType: version.mimeType, fileName: version.fileName, s3Url: version.s3Url })) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "This asset is not a SCORM/LMS/ZIP package" });
       }
-      // Reset to pending — heartbeat cron will pick this up within 60 seconds
+      // Mark as processing immediately and run extraction in background (priority — bypasses queue)
       await db.update(mediaVersions)
         .set({
-          scormExtractionStatus: "pending" as any,
+          scormExtractionStatus: "processing" as any,
           scormExtractionError: null,
-          scormExtractionStartedAt: null,
+          scormExtractionStartedAt: new Date(),
           scormExtractedPrefix: null,
           scormLaunchFile: null,
         })
         .where(eq(mediaVersions.id, version.id));
-      console.log(`[ReExtractScorm] Queued asset ${input.assetId} (version ${version.id}) for heartbeat extraction`);
-      return { ok: true, versionId: version.id, status: "pending" };
+      console.log(`[ReExtractScorm] Priority extraction started for asset ${input.assetId} (version ${version.id})`);
+      // Fire-and-forget background extraction (bypasses the heartbeat queue)
+      extractAndUploadScormVersion(version.id, version.s3Url!, asset.slug).catch((err: any) => {
+        console.error(`[ReExtractScorm] Background extraction failed for version ${version.id}:`, err.message);
+      });
+      return { ok: true, versionId: version.id, status: "processing" };
     }),
 
   /**

@@ -165,7 +165,7 @@ function collectFiles(dir: string, base: string = dir): string[] {
  * Uses streaming extraction (pipe to disk) and streaming upload (readStream to R2)
  * to stay within Cloud Run's 512MB RAM limit even for 500MB+ packages.
  */
-async function extractAndUploadScormVersion(
+export async function extractAndUploadScormVersion(
   versionId: number,
   s3Url: string,
   slug: string
