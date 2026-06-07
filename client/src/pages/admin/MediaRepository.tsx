@@ -1237,17 +1237,38 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                 </div>
               </div>
               <div className="space-y-2">
-                {versions.map((v, i) => (
+                {versions.map((v, i) => {
+                  const isScorm = ["scorm", "zip", "lms"].includes(asset.mediaType);
+                  const extractStatus = (v as any).scormExtractionStatus as string | null;
+                  return (
                   <div key={v.id} className={`flex items-center gap-3 p-3 rounded-lg border ${i === 0 ? "border-primary/40 bg-primary/5" : "border-border"}`}>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm">v{v.versionNumber}</span>
                         {i === 0 && <Badge className="text-xs">Current</Badge>}
+                        {isScorm && extractStatus && (
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              extractStatus === "done" ? "border-green-500 text-green-600 dark:text-green-400" :
+                              extractStatus === "pending" ? "border-yellow-500 text-yellow-600 dark:text-yellow-400" :
+                              extractStatus === "failed" ? "border-red-500 text-red-600 dark:text-red-400" :
+                              "border-muted-foreground text-muted-foreground"
+                            }`}
+                          >
+                            {extractStatus === "done" ? "extracted" : extractStatus === "pending" ? "pending" : extractStatus === "failed" ? "failed" : extractStatus}
+                          </Badge>
+                        )}
                         <span className="text-xs text-muted-foreground truncate">{v.fileName}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {formatBytes(v.fileSize)} · {new Date(v.createdAt).toLocaleString()}
                         {v.notes && <span className="ml-2 italic">"{v.notes}"</span>}
+                        {isScorm && (v as any).scormExtractionError && (
+                          <span className="ml-2 text-red-500 dark:text-red-400 truncate max-w-[200px] inline-block align-bottom" title={(v as any).scormExtractionError}>
+                            {(v as any).scormExtractionError}
+                          </span>
+                        )}
                       </div>
                     </div>
                     {i > 0 && (
@@ -1260,13 +1281,26 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                         <RotateCcw className="w-3 h-3 mr-1" />Restore
                       </Button>
                     )}
+                    {isScorm && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => reExtractMutation.mutate({ assetId: asset.id, versionId: v.id })}
+                        disabled={reExtractMutation.isPending}
+                        title={`Re-extract v${v.versionNumber} to R2 for CDN delivery`}
+                      >
+                        <RefreshCw className={`w-3 h-3 mr-1 ${reExtractMutation.isPending ? "animate-spin" : ""}`} />
+                        Re-extract
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" asChild>
                       <a href={v.s3Url} target="_blank" rel="noopener noreferrer">
                         <Eye className="w-3 h-3" />
                       </a>
                     </Button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </TabsContent>
 

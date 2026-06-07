@@ -1254,15 +1254,25 @@ export const mediaRepoRouter = router({
    * Works for both failed extractions and re-uploads.
    */
   reExtractScorm: protectedProcedure
-    .input(z.object({ assetId: z.number().int() }))
+    .input(z.object({ assetId: z.number().int(), versionId: z.number().int().optional() }))
     .mutation(async ({ ctx, input }) => {
       await assertPlatformAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const [version] = await db.select().from(mediaVersions)
-        .where(eq(mediaVersions.assetId, input.assetId))
-        .orderBy(desc(mediaVersions.versionNumber))
-        .limit(1);
+      // If a specific versionId is provided, use that version; otherwise use the latest
+      let version;
+      if (input.versionId) {
+        const [v] = await db.select().from(mediaVersions)
+          .where(and(eq(mediaVersions.id, input.versionId), eq(mediaVersions.assetId, input.assetId)))
+          .limit(1);
+        version = v;
+      } else {
+        const [v] = await db.select().from(mediaVersions)
+          .where(eq(mediaVersions.assetId, input.assetId))
+          .orderBy(desc(mediaVersions.versionNumber))
+          .limit(1);
+        version = v;
+      }
       if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found for asset" });
       const [asset] = await db.select().from(mediaAssets)
         .where(eq(mediaAssets.id, input.assetId)).limit(1);
