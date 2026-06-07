@@ -23,6 +23,13 @@ import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import { findScormLaunchFile, needsScormExtraction, pickScormPlaybackMode, encodeStorageFetchUrl, isScormPackageMediaType, resolveScormServePlans } from "../lib/scormPackage";
+import { isR2ScormExtractionPlayable } from "../lib/scormR2Probe";
+import {
+  getScormZipCachePaths,
+  readScormZipCache,
+  SCORM_CACHE_DIR,
+  tryServeScormFileFromCache,
+} from "../lib/scormZipCache";
 import { ENV } from "../_core/env";
 import { buildMediaAuthQuery, verifyMediaViewerToken } from "../lib/mediaEmbedAccess";
 import { createHash } from "crypto";
@@ -237,8 +244,6 @@ function publicMediaUrl(req: Request, relativePath: string): string {
 // Extracted SCORM packages are cached in /tmp/scorm-cache/<slug>/ so we only
 // download and unzip once per server process lifetime.
 
-const SCORM_CACHE_DIR = path.join(os.tmpdir(), "scorm-cache");
-
 /**
  * Download a remote URL to a local file (streaming — no memory buffering).
  */
@@ -289,14 +294,17 @@ function downloadToFile(url: string, destPath: string): Promise<void> {
  * Uses streaming download to disk + disk-based extraction to avoid OOM on large ZIPs.
  * Returns null if extraction fails.
  */
+function warmScormZipCacheInBackground(slug: string, zipUrl: string): void {
+  void extractScormZip(slug, encodeStorageFetchUrl(zipUrl)).catch((err) => {
+    console.error(`[ScormServe] Background ZIP cache warm failed for ${slug}:`, err);
+  });
+}
+
 async function extractScormZip(
   slug: string,
   zipUrl: string
 ): Promise<{ launchFile: string; cacheDir: string } | null> {
-  // Use a hash of the URL as part of the cache key so re-uploads always get fresh extraction
-  const urlHash = createHash("md5").update(zipUrl).digest("hex").slice(0, 8);
-  const cacheDir = path.join(SCORM_CACHE_DIR, `${slug}-${urlHash}`);
-  const launchMarker = path.join(cacheDir, ".launch");
+  const { cacheDir, launchMarker, zipPath } = getScormZipCachePaths(slug, zipUrl);
 
   // Already extracted — return cached launch file
   if (fs.existsSync(launchMarker)) {
@@ -304,7 +312,6 @@ async function extractScormZip(
     return { launchFile, cacheDir };
   }
 
-  const zipPath = path.join(SCORM_CACHE_DIR, `${slug}-${urlHash}.zip`);
   try {
     fs.mkdirSync(cacheDir, { recursive: true });
     fs.mkdirSync(SCORM_CACHE_DIR, { recursive: true });
@@ -572,6 +579,18 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
 
     const plans = resolveScormServePlans(allVersions);
     let zipForExtract: string | null = null;
+    const zipPlan = plans.find((p) => p.kind === "client_zip");
+    if (zipPlan?.kind === "client_zip") {
+      zipForExtract = zipPlan.zipUrl;
+    }
+
+    const cachedZip = zipForExtract ? readScormZipCache(asset.slug, zipForExtract) : null;
+    if (
+      cachedZip &&
+      tryServeScormFileFromCache(res, cachedZip.cacheDir, cachedZip.launchFile, relativePath)
+    ) {
+      return;
+    }
 
     for (const plan of plans) {
       if (plan.kind === "waiting") {
@@ -585,6 +604,13 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       if (plan.kind === "missing") continue;
 
       if (plan.kind === "r2_extracted") {
+        const r2Probe = await isR2ScormExtractionPlayable(plan.prefix, plan.launchFile);
+        if (!r2Probe.playable) {
+          console.warn(
+            `[ScormServe] Skipping incomplete R2 prefix for ${asset.slug}: ${r2Probe.reason ?? "not playable"} (${r2Probe.objectCount} objects)`,
+          );
+          continue;
+        }
         if (await tryServeR2(plan.prefix, plan.launchFile, plan.versionId)) return;
         continue;
       }
@@ -595,7 +621,6 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       }
 
       if (plan.kind === "client_zip") {
-        zipForExtract = plan.zipUrl;
         break;
       }
     }
@@ -607,6 +632,13 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
           "No playable SCORM file found. Re-upload the package or use Re-extract in the media library.",
         ),
       );
+      return;
+    }
+
+    // Never download a large ZIP synchronously for asset sub-requests (JS/CSS/images).
+    if (relativePath !== "" && !cachedZip) {
+      warmScormZipCacheInBackground(asset.slug, zipForExtract);
+      res.status(202).send(scormStatusPage("processing", null));
       return;
     }
 
@@ -627,80 +659,11 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
 
     const { launchFile, cacheDir } = extracted;
 
-    // The launch file may be nested inside a sub-folder (e.g. 'CourseName/index.html').
-    // Relative asset paths in the HTML resolve relative to /scorm/ (the iframe src),
-    // so 'data/foo.js' resolves to /scorm/data/foo.js — but the actual file lives at
-    // cacheDir/CourseName/data/foo.js.  We try the direct path first, then fall back
-    // to looking inside the launch file's parent directory.
-    const launchDir = path.dirname(launchFile); // e.g. 'CourseName'
-    let targetFile: string;
-    let fullPath: string;
-    if (relativePath === "") {
-      // Root request → serve the launch file
-      targetFile = launchFile;
-      fullPath = path.join(cacheDir, launchFile);
-    } else {
-      // Try direct path first (works when ZIP extracts flat or path already includes folder)
-      const directPath = path.join(cacheDir, relativePath);
-      // Then try relative to the launch file's directory
-      const launchRelPath = path.join(cacheDir, launchDir, relativePath);
-      // Also try with 'data/' prefix relative to launchDir (iSpring quirk: player.js requests
-      // 'images/foo.png' but file lives at 'data/images/foo.png' relative to launch dir)
-      const launchDataRelPath = path.join(cacheDir, launchDir, "data", relativePath);
-      const fileName = path.basename(relativePath);
-
-      if (fs.existsSync(directPath)) {
-        targetFile = relativePath;
-        fullPath = directPath;
-      } else if (launchDir !== "." && fs.existsSync(launchRelPath)) {
-        targetFile = path.join(launchDir, relativePath);
-        fullPath = launchRelPath;
-      } else if (launchDir !== "." && fs.existsSync(launchDataRelPath)) {
-        // iSpring fallback: file lives under data/ subdirectory
-        targetFile = path.join(launchDir, "data", relativePath);
-        fullPath = launchDataRelPath;
-      } else {
-        // Last resort: recursive search for the filename within the launch directory
-        const searchRoot = launchDir !== "." ? path.join(cacheDir, launchDir) : cacheDir;
-        let found: string | null = null;
-        const search = (dir: string, depth: number): void => {
-          if (found || depth > 5) return;
-          try {
-            for (const entry of fs.readdirSync(dir)) {
-              const full = path.join(dir, entry);
-              if (fs.statSync(full).isDirectory()) {
-                search(full, depth + 1);
-              } else if (entry === fileName) {
-                found = full;
-                return;
-              }
-            }
-          } catch {}
-        };
-        search(searchRoot, 0);
-        if (found && (found as string).startsWith(cacheDir)) {
-          targetFile = path.relative(cacheDir, found);
-          fullPath = found;
-        } else {
-          targetFile = relativePath;
-          fullPath = directPath; // will 404 below
-        }
-      }
-    }
-
-    // Security: prevent path traversal
-    if (!fullPath.startsWith(cacheDir + path.sep) && fullPath !== path.join(cacheDir, launchFile)) {
-      res.status(403).send("Forbidden");
+    if (tryServeScormFileFromCache(res, cacheDir, launchFile, relativePath)) {
       return;
     }
 
-    if (!fs.existsSync(fullPath)) {
-      res.status(404).send("File not found");
-      return;
-    }
-
-    res.setHeader("Cache-Control", "public, max-age=3600");
-    res.sendFile(fullPath);
+    res.status(404).send("File not found");
     } catch (err: any) {
       console.error(`[ScormServe] Unhandled error for slug=${req.params.slug}:`, err?.message ?? err);
       if (!res.headersSent) {
