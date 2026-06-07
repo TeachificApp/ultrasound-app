@@ -6,7 +6,12 @@ import { getDb } from "../db";
 import { sendEmail } from "../_core/email";
 import { ENV } from "../_core/env";
 import { mediaAssets, mediaVersions, platformSettings, users } from "../../drizzle/schema";
-import { needsScormExtraction, SCORM_PACKAGE_MEDIA_TYPES } from "./scormPackage";
+import {
+  needsScormExtraction,
+  resolveScormServePlans,
+  SCORM_PACKAGE_MEDIA_TYPES,
+} from "./scormPackage";
+import { isR2ScormExtractionPlayable } from "./scormR2Probe";
 import {
   buildScormAdminUrls,
   classifyScormHealth,
@@ -95,11 +100,25 @@ export async function listScormHealthRows(): Promise<ScormHealthRow[]> {
       .where(eq(mediaVersions.assetId, asset.id))
       .orderBy(desc(mediaVersions.versionNumber));
 
-    const { health, detail } = classifyScormHealth({
+    let { health, detail } = classifyScormHealth({
       mediaType: asset.mediaType,
       mimeType: asset.mimeType,
       versions,
     });
+
+    if (health === "healthy") {
+      const primary = resolveScormServePlans(versions)[0];
+      if (primary?.kind === "r2_extracted") {
+        const probe = await isR2ScormExtractionPlayable(primary.prefix, primary.launchFile);
+        if (!probe.playable) {
+          health = "unhealthy";
+          detail = probe.reason
+            ? `${probe.reason} — embed will fail until re-extracted`
+            : "R2 extraction incomplete — re-extract recommended";
+        }
+      }
+    }
+
     const latest = versions[0];
     const urls = buildScormAdminUrls(asset.id, baseUrl);
 
