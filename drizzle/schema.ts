@@ -4011,6 +4011,10 @@ export const platformSettings = mysqlTable("platform_settings", {
   // ── Legal / Checkout URLs ──
   termsUrl: varchar("terms_url", { length: 500 }),
   privacyUrl: varchar("privacy_url", { length: 500 }),
+  /** JSON snapshot for SCORM health email dedup: { unhealthyAssetIds, lastAlertAt } */
+  scormHealthSnapshot: text("scorm_health_snapshot"),
+  /** Optional override for SCORM health alert emails (else owner / SCORM_HEALTH_ALERT_EMAIL env) */
+  scormHealthAlertEmail: varchar("scorm_health_alert_email", { length: 320 }),
   // ── Future platform-wide toggles go here ──
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

@@ -22,7 +22,7 @@
 import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
-import { findScormLaunchFile, needsScormExtraction, shouldShowScormWaitingPage, pickScormPlaybackMode, encodeStorageFetchUrl, resolveZipDownloadUrl, isDirectHtmlScormVersion, isScormPackageMediaType } from "../lib/scormPackage";
+import { findScormLaunchFile, needsScormExtraction, pickScormPlaybackMode, encodeStorageFetchUrl, isScormPackageMediaType, resolveScormServePlans } from "../lib/scormPackage";
 import { ENV } from "../_core/env";
 import { buildMediaAuthQuery, verifyMediaViewerToken } from "../lib/mediaEmbedAccess";
 import { createHash } from "crypto";
@@ -136,10 +136,11 @@ async function resolveMedia(slug: string, auth?: MediaAuthQuery) {
   const db = await getDb();
   if (!db) return null;
 
+  const normalizedSlug = decodeURIComponent(slug).trim();
   const [asset] = await db
     .select()
     .from(mediaAssets)
-    .where(and(eq(mediaAssets.slug, slug), isNull(mediaAssets.deletedAt)))
+    .where(and(eq(mediaAssets.slug, normalizedSlug), isNull(mediaAssets.deletedAt)))
     .limit(1);
   if (!asset) return null;
 
@@ -203,6 +204,33 @@ function setCorsHeaders(res: Response) {
   // Allow embedding in iframes from any origin
   res.setHeader("X-Frame-Options", "ALLOWALL");
   res.setHeader("Content-Security-Policy", "frame-ancestors *");
+}
+
+/** Public hostname for SCORM redirects (avoids Railway/Cloud Run internal hosts). */
+function resolvePublicHost(req: Request): string {
+  const appHostname = req.headers["x-app-hostname"];
+  const fwdHost = req.headers["x-forwarded-host"];
+  const extractHostnameFromUrl = (url: string): string => {
+    try { return new URL(url).hostname; } catch { return ""; }
+  };
+  const originHostname = extractHostnameFromUrl((req.headers.origin as string) || "");
+  const refererHostname = extractHostnameFromUrl((req.headers.referer as string) || "");
+  return (
+    (typeof appHostname === "string" && appHostname.trim()) ||
+    (Array.isArray(appHostname) && appHostname[0]) ||
+    (typeof fwdHost === "string" && !fwdHost.includes(".run.app") && !fwdHost.includes(".railway.app") && fwdHost.trim()) ||
+    (Array.isArray(fwdHost) && !fwdHost[0].includes(".run.app") && !fwdHost[0].includes(".railway.app") && fwdHost[0]) ||
+    originHostname ||
+    refererHostname ||
+    ENV.canonicalRootDomain ||
+    (req.headers.host as string) ||
+    req.hostname
+  );
+}
+
+function publicMediaUrl(req: Request, relativePath: string): string {
+  const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+  return `${proto}://${resolvePublicHost(req)}${relativePath}`;
 }
 
 // ─── SCORM ZIP extraction helpers ────────────────────────────────────────────
@@ -449,58 +477,54 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     const { asset, version } = result;
 
     const dbScorm = await getDb();
-    const allVersions =
-      dbScorm
-        ? await dbScorm
-            .select({
-              s3Url: mediaVersions.s3Url,
-              fileName: mediaVersions.fileName,
-              mimeType: mediaVersions.mimeType,
-              s3Key: mediaVersions.s3Key,
-              versionNumber: mediaVersions.versionNumber,
-              scormExtractedPrefix: mediaVersions.scormExtractedPrefix,
-            })
-            .from(mediaVersions)
-            .where(eq(mediaVersions.assetId, asset.id))
-            .orderBy(desc(mediaVersions.versionNumber))
-        : [];
-
-    // Determine which file to serve:
-    // - /scorm/  or  /scorm  → serve the launch file
-    // - /scorm/path/to/asset → serve that asset relative to the cache root
-    const prefix = slugPath.replace(":slug", req.params.slug);
-    // Decode URI components since Express does NOT decode req.path for wildcard routes
-    const rawRelative = req.path.replace(prefix, "").replace(/^\//, "");
-    const relativePath = decodeURIComponent(rawRelative);
-
-    // ─── Strategy 1a: Pre-extracted HTML (old-style iHeartEcho content) ───────────────
-    // The scormExtractedPrefix starts with '__direct_html__:' — the content is already
-    // hosted on CloudFront and we just need to redirect to the HTML URL directly.
-    if (version.scormExtractedPrefix?.startsWith("__direct_html__:")) {
-      const directUrl = version.scormExtractedPrefix.replace("__direct_html__:", "");
-      if (relativePath === "" || relativePath === (version.scormLaunchFile || "index.html")) {
-        // Root request or launch file — redirect to the CDN URL
-        res.redirect(302, encodeStorageFetchUrl(directUrl));
-      } else {
-        // Asset request — derive the base URL and redirect to the asset
-        const lastSlash = directUrl.lastIndexOf("/");
-        const baseUrl = directUrl.substring(0, lastSlash + 1); // e.g. .../FolderName/
-        res.redirect(302, encodeStorageFetchUrl(`${baseUrl}${relativePath}`));
-      }
+    if (!dbScorm) {
+      res.status(503).send(errorPage("Service temporarily unavailable. Please try again."));
       return;
     }
 
-    // ─── Strategy 1b: Serve from pre-extracted R2 files via authenticated proxy ───
-    // We proxy through the app server (not redirect) because the R2 bucket is private.
-    if (version.scormExtractedPrefix) {
-      const extractedPrefix = version.scormExtractedPrefix;
-      const targetFile = relativePath === "" ? (version.scormLaunchFile || "index.html") : relativePath;
+    const allVersions = await dbScorm
+      .select({
+        id: mediaVersions.id,
+        s3Url: mediaVersions.s3Url,
+        fileName: mediaVersions.fileName,
+        mimeType: mediaVersions.mimeType,
+        s3Key: mediaVersions.s3Key,
+        versionNumber: mediaVersions.versionNumber,
+        scormExtractedPrefix: mediaVersions.scormExtractedPrefix,
+        scormLaunchFile: mediaVersions.scormLaunchFile,
+        scormExtractionStatus: mediaVersions.scormExtractionStatus,
+        scormExtractionError: mediaVersions.scormExtractionError,
+      })
+      .from(mediaVersions)
+      .where(eq(mediaVersions.assetId, asset.id))
+      .orderBy(desc(mediaVersions.versionNumber));
+
+    const routePrefix = slugPath.replace(":slug", req.params.slug);
+    const rawRelative = req.path.replace(routePrefix, "").replace(/^\//, "");
+    const relativePath = decodeURIComponent(rawRelative);
+
+    const serveDirectHtml = (directUrl: string, launchFile: string): boolean => {
+      if (relativePath === "" || relativePath === launchFile) {
+        res.redirect(302, encodeStorageFetchUrl(directUrl));
+        return true;
+      }
+      const lastSlash = directUrl.lastIndexOf("/");
+      const baseUrl = lastSlash >= 0 ? directUrl.substring(0, lastSlash + 1) : directUrl;
+      res.redirect(302, encodeStorageFetchUrl(`${baseUrl}${relativePath}`));
+      return true;
+    };
+
+    const tryServeR2 = async (
+      extractedPrefix: string,
+      launchFile: string,
+      versionId?: number,
+    ): Promise<boolean> => {
+      const targetFile = relativePath === "" ? launchFile : relativePath;
       const r2Key = `${extractedPrefix}/${targetFile}`;
       try {
         const served = await proxyR2File(r2Key, res);
-        if (served) return;
+        if (served) return true;
 
-        // Key not found — if this is the launch file (root request), try to auto-heal
         if (relativePath === "") {
           console.warn(`[ScormServe] Launch file missing from R2: ${r2Key}. Attempting auto-heal scan.`);
           try {
@@ -508,97 +532,94 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
             const r2Client = new S3Client({
               region: "auto",
               endpoint: `https://${process.env.CF_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-              credentials: { accessKeyId: process.env.CF_R2_ACCESS_KEY_ID!, secretAccessKey: process.env.CF_R2_SECRET_ACCESS_KEY! },
+              credentials: {
+                accessKeyId: process.env.CF_R2_ACCESS_KEY_ID!,
+                secretAccessKey: process.env.CF_R2_SECRET_ACCESS_KEY!,
+              },
             });
-            const listCmd = new ListObjectsV2Command({ Bucket: process.env.CF_R2_BUCKET_NAME!, Prefix: `${extractedPrefix}/`, MaxKeys: 500 });
+            const listCmd = new ListObjectsV2Command({
+              Bucket: process.env.CF_R2_BUCKET_NAME!,
+              Prefix: `${extractedPrefix}/`,
+              MaxKeys: 500,
+            });
             const listResult = await r2Client.send(listCmd);
-            const keys = (listResult.Contents || []).map(o => o.Key || "");
-            const indexKey = keys.find(k => k.toLowerCase().endsWith("/index.html") || k.toLowerCase() === `${extractedPrefix}/index.html`);
-            if (indexKey) {
+            const keys = (listResult.Contents || []).map((o) => o.Key || "");
+            const indexKey = keys.find(
+              (k) =>
+                k.toLowerCase().endsWith("/index.html") ||
+                k.toLowerCase() === `${extractedPrefix}/index.html`,
+            );
+            if (indexKey && versionId) {
               const correctedLaunchFile = indexKey.replace(`${extractedPrefix}/`, "");
-              console.warn(`[ScormServe] Auto-healed launch file: '${version.scormLaunchFile}' → '${correctedLaunchFile}'`);
-              // Update DB with corrected launch file
-              const dbHeal = await getDb();
-              if (dbHeal) {
-                await dbHeal.update(mediaVersions).set({ scormLaunchFile: correctedLaunchFile }).where(eq(mediaVersions.id, version.id));
-              }
-              // Serve the corrected file
-              const healServed = await proxyR2File(`${extractedPrefix}/${correctedLaunchFile}`, res);
-              if (healServed) return;
+              console.warn(`[ScormServe] Auto-healed launch file → '${correctedLaunchFile}'`);
+              await dbScorm
+                .update(mediaVersions)
+                .set({ scormLaunchFile: correctedLaunchFile })
+                .where(eq(mediaVersions.id, versionId));
+              return await proxyR2File(`${extractedPrefix}/${correctedLaunchFile}`, res);
             }
           } catch (healErr) {
             console.error(`[ScormServe] Auto-heal scan failed:`, healErr);
           }
-          // Auto-heal failed — re-queue for extraction
-          console.warn(`[ScormServe] Auto-heal failed for ${extractedPrefix}. Re-queuing extraction.`);
-          try {
-            const dbRequeue = await getDb();
-            if (dbRequeue) {
-              await dbRequeue.update(mediaVersions).set({ scormExtractionStatus: "pending" as any, scormExtractedPrefix: null, scormLaunchFile: null }).where(eq(mediaVersions.id, version.id));
-            }
-          } catch {}
-          res.status(202).send(scormStatusPage("pending", null));
-          return;
+        } else {
+          console.warn(`[ScormServe] R2 key not found: ${r2Key}, trying next fallback`);
         }
-
-        // Non-launch file not found — fall through to Strategy 2
-        console.warn(`[ScormServe] R2 key not found: ${r2Key}, falling back to on-the-fly extraction`);
       } catch (err) {
         console.error(`[ScormServe] R2 proxy error for ${r2Key}:`, err);
-        // Fall through to Strategy 2
       }
-    }
+      return false;
+    };
 
-    // ─── Strategy 2: Check extraction status before attempting on-the-fly extraction ───
-    // If the heartbeat job has set a status, respect it instead of attempting on-the-fly extraction.
-    const extractionStatus = (version as any).scormExtractionStatus as string | null | undefined;
-    const extractionError = (version as any).scormExtractionError as string | null | undefined;
+    const plans = resolveScormServePlans(allVersions);
+    let zipForExtract: string | null = null;
 
-    if (shouldShowScormWaitingPage(extractionStatus, version as any)) {
-      res.status(202).send(scormStatusPage(extractionStatus as "pending" | "processing", null));
-      return;
-    }
-
-    if (extractionStatus === "failed") {
-      // Extraction failed — show error with the actual error message
-      res.status(503).send(scormStatusPage("failed", extractionError));
-      return;
-    }
-
-    // Legacy: current version points at extracted HTML on CDN (not a ZIP file)
-    if (isDirectHtmlScormVersion(version)) {
-      const launch = version.scormLaunchFile || "index.html";
-      const htmlUrl = version.s3Url!;
-      if (relativePath === "" || relativePath === launch) {
-        res.redirect(302, encodeStorageFetchUrl(htmlUrl));
+    for (const plan of plans) {
+      if (plan.kind === "waiting") {
+        res.status(202).send(scormStatusPage(plan.status, null));
         return;
       }
-      const base = htmlUrl.includes("/")
-        ? htmlUrl.replace(/[^/]+$/, relativePath)
-        : relativePath;
-      res.redirect(302, encodeStorageFetchUrl(base));
-      return;
+      if (plan.kind === "failed") {
+        res.status(503).send(scormStatusPage("failed", plan.error));
+        return;
+      }
+      if (plan.kind === "missing") continue;
+
+      if (plan.kind === "r2_extracted") {
+        if (await tryServeR2(plan.prefix, plan.launchFile, plan.versionId)) return;
+        continue;
+      }
+
+      if (plan.kind === "direct_html") {
+        if (serveDirectHtml(plan.url, plan.launchFile)) return;
+        continue;
+      }
+
+      if (plan.kind === "client_zip") {
+        zipForExtract = plan.zipUrl;
+        break;
+      }
     }
 
-    const zipDownloadUrl = resolveZipDownloadUrl(version, allVersions);
-    if (!zipDownloadUrl) {
+    if (!zipForExtract) {
       res.status(503).send(
-        scormStatusPage("failed", "No ZIP file found for this package. Re-upload the SCORM ZIP or use Re-extract in the media library.")
+        scormStatusPage(
+          "failed",
+          "No playable SCORM file found. Re-upload the package or use Re-extract in the media library.",
+        ),
       );
       return;
     }
 
-    // extractionStatus is 'done' or null (legacy) — attempt on-the-fly extraction as fallback
-    const extracted = await extractScormZip(asset.slug, encodeStorageFetchUrl(zipDownloadUrl));
+    const extracted = await extractScormZip(asset.slug, encodeStorageFetchUrl(zipForExtract));
     if (!extracted) {
-      // On-the-fly extraction also failed — queue for heartbeat retry and show waiting page
       try {
-        const db2 = await getDb();
-        if (db2) {
-          await db2.update(mediaVersions)
-            .set({ scormExtractionStatus: "pending" as any, scormExtractionError: null, scormExtractedPrefix: null, scormLaunchFile: null })
-            .where(eq(mediaVersions.id, version.id));
-        }
+        await dbScorm
+          .update(mediaVersions)
+          .set({
+            scormExtractionStatus: "pending" as any,
+            scormExtractionError: null,
+          })
+          .where(eq(mediaVersions.id, version.id));
       } catch { /* non-critical */ }
       res.status(202).send(scormStatusPage("pending", null));
       return;
@@ -979,9 +1000,6 @@ router.get(slugPath, async (req: Request, res: Response) => {
     isScormPackageMediaType(mediaType) ||
     needsScormExtraction({ mediaType, mimeType, fileName: version.fileName ?? "", s3Url: fileUrl })
   ) {
-    const extractionStatus = (version as any).scormExtractionStatus as string | null | undefined;
-    const extractionError = (version as any).scormExtractionError as string | null | undefined;
-
     // Strategy A: Already extracted — serve an HTML redirect page so iframes follow it correctly.
     // Using res.redirect(302) causes iframes to render the "Found. Redirecting to..." text.
     // Instead, we send a minimal HTML page with window.location.replace() so the iframe
@@ -998,61 +1016,11 @@ router.get(slugPath, async (req: Request, res: Response) => {
       return;
     }
 
-    if (version.scormExtractedPrefix) {
-      // Build the R2 public CDN URL for the launch file
-      const r2PublicUrl = process.env.CF_R2_PUBLIC_URL?.replace(/\/+$/, "");
-      const launchFile = (version as any).scormLaunchFile || "index.html";
-      if (r2PublicUrl) {
-        const cdnUrl = `${r2PublicUrl}/${version.scormExtractedPrefix}/${launchFile}`;
-        sendHtmlRedirect(encodeStorageFetchUrl(cdnUrl));
-        return;
-      }
-      // R2 public URL not configured — fall through to /scorm proxy using canonical host
-    }
-
-    // Strategy B: Extraction pending/processing — show waiting page inline
-    if (shouldShowScormWaitingPage(extractionStatus, version as any)) {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.status(202).send(scormStatusPage(extractionStatus as "pending" | "processing", null));
-      return;
-    }
-
-    if (extractionStatus === "failed") {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.status(503).send(scormStatusPage("failed", extractionError));
-      return;
-    }
-
-    // Strategy C: Legacy direct HTML (s3Url points to an HTML file, not a ZIP)
-    if (isDirectHtmlScormVersion(version)) {
-      sendHtmlRedirect(encodeStorageFetchUrl(version.s3Url!));
-      return;
-    }
-
-    // Strategy D: Fall back to /scorm route using the correct public hostname.
-    // Use the same header priority as context.ts to avoid Railway/Cloud Run
-    // internal hostnames (x-forwarded-host can be the internal hostname on Railway).
+    // Always route SCORM through the authenticated /scorm proxy (never redirect to
+    // a public R2 CDN URL — the bucket is private and CDN paths can go stale).
     const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
     const scormRelPath = req.path.replace(/\/embed\/?$/, "/scorm") + q;
-    const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-    function extractHostnameFromUrl(url: string): string {
-      try { return new URL(url).hostname; } catch { return ""; }
-    }
-    const appHostname = req.headers["x-app-hostname"];
-    const fwdHost = req.headers["x-forwarded-host"];
-    const originHostname = extractHostnameFromUrl((req.headers["origin"] as string) || "");
-    const refererHostname = extractHostnameFromUrl((req.headers["referer"] as string) || "");
-    const resolvedHost =
-      (typeof appHostname === "string" && appHostname.trim()) ||
-      (Array.isArray(appHostname) && appHostname[0]) ||
-      (typeof fwdHost === "string" && !fwdHost.includes(".run.app") && !fwdHost.includes(".railway.app") && fwdHost.trim()) ||
-      (Array.isArray(fwdHost) && !fwdHost[0].includes(".run.app") && !fwdHost[0].includes(".railway.app") && fwdHost[0]) ||
-      originHostname ||
-      refererHostname ||
-      ENV.canonicalRootDomain ||
-      req.headers.host ||
-      req.hostname;
-    sendHtmlRedirect(`${proto}://${resolvedHost}${scormRelPath}`);
+    sendHtmlRedirect(publicMediaUrl(req, scormRelPath));
     return;
   }
 

@@ -118,7 +118,106 @@ export type MediaVersionZipRef = {
   s3Key?: string | null;
   versionNumber?: number;
   scormExtractedPrefix?: string | null;
+  scormLaunchFile?: string | null;
+  scormExtractionStatus?: string | null;
+  scormExtractionError?: string | null;
+  id?: number;
 };
+
+export type ScormServePlan =
+  | { kind: "r2_extracted"; prefix: string; launchFile: string; versionId?: number }
+  | { kind: "direct_html"; url: string; launchFile: string; versionId?: number }
+  | { kind: "client_zip"; zipUrl: string; versionId?: number }
+  | { kind: "waiting"; status: "pending" | "processing" }
+  | { kind: "failed"; error: string }
+  | { kind: "missing" };
+
+function launchFileFromUrl(url: string): string {
+  const pathPart = url.split("?")[0];
+  const last = pathPart.lastIndexOf("/");
+  return last >= 0 ? pathPart.slice(last + 1) : "index.html";
+}
+
+/**
+ * Ordered fallback plans for serving SCORM (newest versions first within each tier).
+ * Callers should try each plan until one succeeds — never wipe DB state on a single miss.
+ */
+export function resolveScormServePlans(versions: MediaVersionZipRef[]): ScormServePlan[] {
+  if (!versions.length) return [{ kind: "missing" }];
+
+  const sorted = [...versions].sort((a, b) => (b.versionNumber ?? 0) - (a.versionNumber ?? 0));
+  const latest = sorted[0];
+  const plans: ScormServePlan[] = [];
+  const seen = new Set<string>();
+
+  const push = (plan: ScormServePlan) => {
+    const key =
+      plan.kind === "r2_extracted"
+        ? `r2:${plan.prefix}:${plan.launchFile}`
+        : plan.kind === "direct_html"
+          ? `html:${plan.url}`
+          : plan.kind === "client_zip"
+            ? `zip:${plan.zipUrl}`
+            : plan.kind;
+    if (seen.has(key)) return;
+    seen.add(key);
+    plans.push(plan);
+  };
+
+  for (const v of sorted) {
+    const prefix = v.scormExtractedPrefix;
+    if (prefix && !prefix.startsWith("__direct_html__:")) {
+      const st = v.scormExtractionStatus;
+      if (st === "done" || st == null || st === "skipped") {
+        push({
+          kind: "r2_extracted",
+          prefix,
+          launchFile: v.scormLaunchFile || "index.html",
+          versionId: v.id,
+        });
+      }
+    }
+  }
+
+  for (const v of sorted) {
+    if (v.scormExtractedPrefix?.startsWith("__direct_html__:")) {
+      const url = v.scormExtractedPrefix.replace("__direct_html__:", "");
+      push({
+        kind: "direct_html",
+        url,
+        launchFile: v.scormLaunchFile || launchFileFromUrl(url),
+        versionId: v.id,
+      });
+    } else if (isDirectHtmlScormVersion(v) && v.s3Url) {
+      push({
+        kind: "direct_html",
+        url: v.s3Url,
+        launchFile: v.scormLaunchFile || launchFileFromUrl(v.s3Url),
+        versionId: v.id,
+      });
+    }
+  }
+
+  for (const v of sorted) {
+    if (isZipStorageRef(v) && v.s3Url) {
+      push({ kind: "client_zip", zipUrl: v.s3Url, versionId: v.id });
+    }
+  }
+
+  if (shouldShowScormWaitingPage(latest.scormExtractionStatus, latest)) {
+    push({ kind: "waiting", status: latest.scormExtractionStatus as "pending" | "processing" });
+  } else if (latest.scormExtractionStatus === "failed") {
+    push({ kind: "failed", error: latest.scormExtractionError || "Extraction failed" });
+  }
+
+  if (plans.length === 0) plans.push({ kind: "missing" });
+  return plans;
+}
+
+/** Primary plan (first fallback). */
+export function resolveScormServePlan(versions: MediaVersionZipRef[]): ScormServePlan {
+  return resolveScormServePlans(versions)[0] ?? { kind: "missing" };
+}
 
 /**
  * Choose client-side ZIP extraction vs server /scorm/ serving.
@@ -128,31 +227,23 @@ export function pickScormPlaybackMode(
   current: MediaVersionZipRef,
   allVersions: MediaVersionZipRef[] = []
 ): { mode: ScormPlaybackMode; zipS3Url?: string } {
-  if (current.scormExtractedPrefix) {
+  const versions =
+    allVersions.length > 0
+      ? allVersions
+      : [current];
+  const plan = resolveScormServePlan(versions);
+  if (plan.kind === "client_zip") {
+    return { mode: "clientZip", zipS3Url: plan.zipUrl };
+  }
+  if (plan.kind === "r2_extracted" || plan.kind === "direct_html") {
     return { mode: "server" };
   }
-
   if (isZipStorageRef(current) && current.s3Url) {
     return { mode: "clientZip", zipS3Url: current.s3Url };
   }
-
-  const sorted = [...allVersions].sort(
-    (a, b) => (b.versionNumber ?? 0) - (a.versionNumber ?? 0)
-  );
-  for (const v of sorted) {
-    if (isZipStorageRef(v) && v.s3Url) {
-      return { mode: "clientZip", zipS3Url: v.s3Url };
-    }
-  }
-
   if (current.s3Url && !isZipStorageRef(current)) {
     return { mode: "server" };
   }
-
-  if (current.s3Url) {
-    return { mode: "clientZip", zipS3Url: current.s3Url };
-  }
-
   return { mode: "server" };
 }
 

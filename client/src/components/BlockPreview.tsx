@@ -15,6 +15,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
+import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
@@ -96,7 +97,7 @@ export interface Block {
   data: Record<string, any>;
 }
 
-export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; coursePrice?: number; courseTitle?: string }) {
+export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number }) {
   const { user } = useAuth();
   const d = block.data ?? {};
   // Pre-compute pass-through URL for url_embed blocks (hooks must be at top level, not inside switch)
@@ -1061,7 +1062,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const slug = d.mediaAssetSlug ?? "";
       const title = d.mediaAssetTitle ?? "Interactive Content";
       const height = d.height ?? 600;
-      const embedUrl = slug ? `/api/media/${slug}/embed` : "";
+      const embedUrl = slug ? `/api/media/${slug}/scorm` : "";
       const scormAlign = d.align ?? "center";
       const scormJustify = scormAlign === "left" ? "flex-start" : scormAlign === "right" ? "flex-end" : "center";
       const scormMaxWidth = d.maxWidth ?? "100%";
@@ -1070,12 +1071,11 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           <div style={{ width: scormMaxWidth, maxWidth: "100%" }}>
             {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
             {embedUrl ? (
-              <iframe
+              <MediaEmbedIframe
                 src={embedUrl}
-                style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+                courseId={courseId}
                 title={title}
-                allow="autoplay; fullscreen"
-                allowFullScreen
+                style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
               />
             ) : (
               <div
