@@ -1356,4 +1356,18 @@ export const mediaRepoRouter = router({
       return version;
     }),
 
+  /** SCORM health dashboard rows (admin). */
+  listScormHealth: protectedProcedure.query(async ({ ctx }) => {
+    await assertPlatformAdmin(ctx);
+    const { listScormHealthRows } = await import("../lib/scormHealthAlerts");
+    return listScormHealthRows();
+  }),
+
+  /** Run health scan + email pass immediately (admin). */
+  runScormHealthScanNow: protectedProcedure.mutation(async ({ ctx }) => {
+    await assertPlatformAdmin(ctx);
+    const { runScormHealthAlertPass } = await import("../lib/scormHealthAlerts");
+    return runScormHealthAlertPass();
+  }),
+
 });

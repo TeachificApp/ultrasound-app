@@ -462,7 +462,15 @@ export async function scormHealthCheckHandler(req: Request, res: Response): Prom
       }
     }
 
-    res.json({ ok: true, checked: doneVersions.length, healed, requeued: broken });
+    let alertSummary: Awaited<ReturnType<typeof import("../lib/scormHealthAlerts").runScormHealthAlertPass>> | undefined;
+    try {
+      const { runScormHealthAlertPass } = await import("../lib/scormHealthAlerts");
+      alertSummary = await runScormHealthAlertPass();
+    } catch (alertErr: any) {
+      console.error(`[ScormHealthCheck] Alert pass failed:`, alertErr?.message ?? alertErr);
+    }
+
+    res.json({ ok: true, checked: doneVersions.length, healed, requeued: broken, alerts: alertSummary });
   } catch (err: any) {
     console.error(`[ScormHealthCheck] Error:`, err.message);
     res.status(500).json({ error: err.message });

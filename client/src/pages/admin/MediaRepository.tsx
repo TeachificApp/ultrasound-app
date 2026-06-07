@@ -11,6 +11,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +76,7 @@ import {
   ChevronUp,
   ChevronDown,
   Pencil,
+  Activity,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -719,15 +721,135 @@ function AnalyticsPanel({ assetId }: { assetId: number }) {
   );
 }
 
+// ─── SCORM Health Panel ─────────────────────────────────────────────────────
+
+function healthStatusBadge(health: "healthy" | "preparing" | "unhealthy") {
+  if (health === "healthy") return <Badge className="bg-emerald-600 hover:bg-emerald-600">Healthy</Badge>;
+  if (health === "preparing") return <Badge variant="secondary">Preparing</Badge>;
+  return <Badge variant="destructive">Unhealthy</Badge>;
+}
+
+function ScormHealthDialog({
+  open,
+  onClose,
+  onOpenAsset,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onOpenAsset: (assetId: number, reExtract?: boolean) => void;
+}) {
+  const { data, isLoading, refetch } = trpc.mediaRepo.listScormHealth.useQuery(undefined, { enabled: open });
+  const scanMutation = trpc.mediaRepo.runScormHealthScanNow.useMutation({
+    onSuccess: (result) => {
+      refetch();
+      const msg = result.emailed
+        ? `Scan complete — ${result.unhealthy} unhealthy, alert email sent`
+        : `Scan complete — ${result.unhealthy} unhealthy`;
+      toast.success(msg);
+      if (result.emailError) toast.warning(result.emailError);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const rows = data ?? [];
+  const unhealthy = rows.filter((r) => r.health === "unhealthy");
+  const preparing = rows.filter((r) => r.health === "preparing");
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-5 pb-3 border-b border-border shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            <Activity className="w-5 h-5 text-primary" />
+            SCORM Health
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {rows.length} package{rows.length === 1 ? "" : "s"} tracked · {unhealthy.length} unhealthy · {preparing.length} preparing
+          </p>
+        </DialogHeader>
+        <div className="flex-1 overflow-y-auto p-4">
+          {isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-12 rounded-lg bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-12">No SCORM/ZIP/LMS assets found.</p>
+          ) : (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold">Asset</th>
+                    <th className="text-left px-3 py-2 font-semibold hidden sm:table-cell">Status</th>
+                    <th className="text-left px-3 py-2 font-semibold">Detail</th>
+                    <th className="text-right px-3 py-2 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.map((row) => (
+                    <tr key={row.assetId} className="hover:bg-muted/30">
+                      <td className="px-3 py-2 align-top">
+                        <button
+                          type="button"
+                          className="text-left font-medium hover:text-primary"
+                          onClick={() => { onOpenAsset(row.assetId); onClose(); }}
+                        >
+                          {row.title}
+                        </button>
+                        <p className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">{row.slug}</p>
+                      </td>
+                      <td className="px-3 py-2 align-top hidden sm:table-cell">{healthStatusBadge(row.health)}</td>
+                      <td className="px-3 py-2 align-top text-xs text-muted-foreground max-w-[240px]">{row.healthDetail}</td>
+                      <td className="px-3 py-2 align-top text-right whitespace-nowrap">
+                        {row.health === "unhealthy" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mr-1"
+                            onClick={() => { onOpenAsset(row.assetId, true); onClose(); }}
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            Re-extract
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" onClick={() => { onOpenAsset(row.assetId); onClose(); }}>
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <DialogFooter className="px-5 py-3 border-t border-border shrink-0">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button
+            onClick={() => scanMutation.mutate()}
+            disabled={scanMutation.isPending}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${scanMutation.isPending ? "animate-spin" : ""}`} />
+            {scanMutation.isPending ? "Scanning…" : "Run scan now"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Asset Detail Dialog ──────────────────────────────────────────────────────
 
 interface AssetDetailDialogProps {
   assetId: number | null;
   onClose: () => void;
   onRefresh: () => void;
+  autoReExtract?: boolean;
 }
 
-function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogProps) {
+function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: AssetDetailDialogProps) {
   const [reuploadOpen, setReuploadOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteExpiry, setInviteExpiry] = useState("30");
@@ -802,6 +924,19 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
     onSuccess: () => toast.success("Re-extraction started — runs in the background, may take a minute."),
     onError: (e) => toast.error(`Re-extraction failed: ${e.message}`),
   });
+  const autoReExtractDone = useRef(false);
+
+  useEffect(() => {
+    if (!assetId) autoReExtractDone.current = false;
+  }, [assetId]);
+
+  useEffect(() => {
+    if (!autoReExtract || !data || autoReExtractDone.current) return;
+    const scormTypes = ["scorm", "zip", "lms", "html"];
+    if (!scormTypes.includes(data.asset.mediaType)) return;
+    autoReExtractDone.current = true;
+    reExtractMutation.mutate({ assetId: data.asset.id });
+  }, [autoReExtract, data, assetId]);
 
   if (!data) return null;
   const { asset, versions, grants } = data;
@@ -1180,6 +1315,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function MediaRepository() {
+  const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -1188,7 +1324,39 @@ export default function MediaRepository() {
   const [page, setPage] = useState(1);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
+  const [autoReExtract, setAutoReExtract] = useState(false);
+  const [healthOpen, setHealthOpen] = useState(false);
+  const deepLinkHandled = useRef(false);
   const utils = trpc.useUtils();
+
+  const { data: healthRows } = trpc.mediaRepo.listScormHealth.useQuery(undefined, { staleTime: 60_000 });
+  const unhealthyCount = healthRows?.filter((r) => r.health === "unhealthy").length ?? 0;
+
+  function openAsset(assetId: number, reExtract = false) {
+    setSelectedAssetId(assetId);
+    setAutoReExtract(reExtract);
+  }
+
+  function closeAsset() {
+    setSelectedAssetId(null);
+    setAutoReExtract(false);
+  }
+
+  useEffect(() => {
+    if (deepLinkHandled.current) return;
+    deepLinkHandled.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const assetIdParam = params.get("assetId");
+    const reExtract = params.get("reExtract") === "1";
+    if (!assetIdParam) return;
+    const id = Number.parseInt(assetIdParam, 10);
+    if (!Number.isFinite(id) || id <= 0) return;
+    openAsset(id, reExtract);
+    params.delete("assetId");
+    params.delete("reExtract");
+    const qs = params.toString();
+    setLocation(`${window.location.pathname}${qs ? `?${qs}` : ""}`);
+  }, [setLocation]);
 
   // Debounce search input — fire query 300ms after user stops typing
   useEffect(() => {
@@ -1498,6 +1666,21 @@ export default function MediaRepository() {
               </button>
             </div>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setHealthOpen(true)}
+              title="SCORM package health status"
+              className="relative"
+            >
+              <Activity className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">SCORM Health</span>
+              {unhealthyCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                  {unhealthyCount > 99 ? "99+" : unhealthyCount}
+                </span>
+              )}
+            </Button>
+            <Button
               variant={showTrash ? "destructive" : "outline"}
               size="sm"
               onClick={() => setShowTrash(v => !v)}
@@ -1749,11 +1932,18 @@ export default function MediaRepository() {
         />
       )}
 
+      <ScormHealthDialog
+        open={healthOpen}
+        onClose={() => setHealthOpen(false)}
+        onOpenAsset={openAsset}
+      />
+
       {/* Asset detail dialog */}
       <AssetDetailDialog
         assetId={selectedAssetId}
-        onClose={() => setSelectedAssetId(null)}
+        onClose={closeAsset}
         onRefresh={handleRefresh}
+        autoReExtract={autoReExtract}
       />
     </div>
   );
