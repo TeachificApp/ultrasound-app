@@ -31,8 +31,8 @@ import type { Request, Response } from "express";
 import { findScormLaunchFile, SCORM_PACKAGE_MEDIA_TYPES } from "../lib/scormPackage";
 
 const SCORM_EXTRACT_DIR = path.join(os.tmpdir(), "scorm-extract-job");
-// If a job has been "processing" for more than 10 minutes, consider it stalled and retry
-const STALL_THRESHOLD_MS = 30 * 60 * 1000; // 30 min — large ZIPs (200MB+) can take 15-25 min to download + extract + upload to R2
+// If a job has been "processing" for more than 60 minutes, consider it stalled and retry
+const STALL_THRESHOLD_MS = 60 * 60 * 1000; // 60 min — large ZIPs (200MB+) with 500+ files can take 30-50 min to download + extract + upload to R2
 
 // ─── Download helper ──────────────────────────────────────────────────────────
 
@@ -243,8 +243,8 @@ export async function extractAndUploadScormVersion(
     const allFiles = collectFiles(workDir);
     console.log(`[ScormExtractor] Uploading ${allFiles.length} files to R2 under ${prefix}/`);
 
-    // Upload in batches of 5 to avoid overwhelming R2 while keeping throughput
-    const BATCH_SIZE = 5;
+    // Upload in batches of 20 to maximize R2 throughput (each upload is ~1-2s on Cloud Run)
+    const BATCH_SIZE = 20;
     let uploaded = 0;
     for (let i = 0; i < allFiles.length; i += BATCH_SIZE) {
       const batch = allFiles.slice(i, i + BATCH_SIZE);
