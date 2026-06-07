@@ -578,6 +578,22 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     };
 
     const plans = resolveScormServePlans(allVersions);
+    // Always check waiting/failed plans FIRST — before any ZIP extraction attempt.
+    // client_zip comes after r2_extracted in the plans array, but waiting/failed
+    // may appear after client_zip when status is pending/processing. We must not
+    // attempt synchronous ZIP extraction (which times out on Cloud Run) when
+    // the heartbeat is already working on this asset.
+    const waitingPlan = plans.find((p) => p.kind === "waiting");
+    if (waitingPlan?.kind === "waiting") {
+      res.status(202).send(scormStatusPage(waitingPlan.status, null));
+      return;
+    }
+    const failedPlan = plans.find((p) => p.kind === "failed");
+    if (failedPlan?.kind === "failed") {
+      res.status(503).send(scormStatusPage("failed", failedPlan.error));
+      return;
+    }
+
     let zipForExtract: string | null = null;
     const zipPlan = plans.find((p) => p.kind === "client_zip");
     if (zipPlan?.kind === "client_zip") {
@@ -593,14 +609,7 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     }
 
     for (const plan of plans) {
-      if (plan.kind === "waiting") {
-        res.status(202).send(scormStatusPage(plan.status, null));
-        return;
-      }
-      if (plan.kind === "failed") {
-        res.status(503).send(scormStatusPage("failed", plan.error));
-        return;
-      }
+      if (plan.kind === "waiting" || plan.kind === "failed") continue; // already handled above
       if (plan.kind === "missing") continue;
 
       if (plan.kind === "r2_extracted") {
