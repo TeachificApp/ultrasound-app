@@ -571,10 +571,15 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
 
     console.log(`[ScormExtractor][Heartbeat] Processing version ${job.versionId}, slug=${job.slug}`);
 
-    // Run extraction (this is the slow part — up to ~120s for large packages)
-    await extractAndUploadScormVersion(job.versionId, job.s3Url, job.slug);
+    // ── Respond immediately so Cloud Run doesn't kill us on the 180s timeout ──
+    // Large ZIPs (200MB+) take 3-10 minutes to download + extract + upload to R2.
+    // We fire extraction in the background and return 202 Accepted right away.
+    res.status(202).json({ ok: true, accepted: { versionId: job.versionId, slug: job.slug } });
 
-    res.json({ ok: true, processed: { versionId: job.versionId, slug: job.slug } });
+    // Run extraction in background (detached from HTTP request lifecycle)
+    extractAndUploadScormVersion(job.versionId, job.s3Url, job.slug).catch((err) => {
+      console.error(`[ScormExtractor][Heartbeat] Background extraction failed for version ${job.versionId}:`, err.message);
+    });
   } catch (err: any) {
     console.error(`[ScormExtractor][Heartbeat] Error:`, err.message);
     res.status(500).json({
