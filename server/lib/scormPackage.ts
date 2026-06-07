@@ -53,6 +53,19 @@ export function initialScormExtractionStatus(params: {
 export const SCORM_PENDING_WAIT_MS = 3 * 60 * 1000;
 export const SCORM_PROCESSING_STALL_MS = 10 * 60 * 1000;
 
+/** Packages larger than this must use the heartbeat R2 extractor — never sync extract on HTTP requests. */
+export const SCORM_BACKGROUND_EXTRACT_BYTES = 50 * 1024 * 1024;
+
+export function shouldUseBackgroundScormExtraction(params: {
+  fileSize?: number | null;
+  scormExtractionStatus?: string | null;
+}): boolean {
+  const size = params.fileSize ?? 0;
+  if (size > SCORM_BACKGROUND_EXTRACT_BYTES) return true;
+  const status = params.scormExtractionStatus ?? "pending";
+  return status === "pending" || status === "processing" || status === "failed";
+}
+
 export function shouldShowScormWaitingPage(
   status: string | null | undefined,
   version: { scormExtractionStartedAt?: Date | null; createdAt?: Date | null }

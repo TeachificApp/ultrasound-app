@@ -9,6 +9,8 @@ import {
   isDirectHtmlScormVersion,
   resolveZipDownloadUrl,
   resolveScormServePlans,
+  shouldUseBackgroundScormExtraction,
+  SCORM_BACKGROUND_EXTRACT_BYTES,
 } from "./scormPackage";
 
 describe("scormPackage", () => {
@@ -65,6 +67,26 @@ describe("scormPackage", () => {
     ).toBe(true);
   });
 });
+describe("shouldUseBackgroundScormExtraction", () => {
+  it("requires background extract for large packages", () => {
+    expect(
+      shouldUseBackgroundScormExtraction({
+        fileSize: SCORM_BACKGROUND_EXTRACT_BYTES + 1,
+        scormExtractionStatus: "done",
+      }),
+    ).toBe(true);
+  });
+
+  it("allows small packages when extraction is done", () => {
+    expect(
+      shouldUseBackgroundScormExtraction({
+        fileSize: 1024,
+        scormExtractionStatus: "done",
+      }),
+    ).toBe(false);
+  });
+});
+
 describe("isZipStorageRef", () => {
   it("detects zip by url and filename", () => {
     expect(isZipStorageRef({ s3Url: "https://cdn/x/file.zip" })).toBe(true);

@@ -22,7 +22,16 @@
 import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
-import { findScormLaunchFile, needsScormExtraction, pickScormPlaybackMode, encodeStorageFetchUrl, isScormPackageMediaType, resolveScormServePlans } from "../lib/scormPackage";
+import {
+  findScormLaunchFile,
+  needsScormExtraction,
+  pickScormPlaybackMode,
+  encodeStorageFetchUrl,
+  isScormPackageMediaType,
+  resolveScormServePlans,
+  shouldUseBackgroundScormExtraction,
+  SCORM_BACKGROUND_EXTRACT_BYTES,
+} from "../lib/scormPackage";
 import { isR2ScormExtractionPlayable } from "../lib/scormR2Probe";
 import {
   getScormZipCachePaths,
@@ -592,6 +601,8 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       return;
     }
 
+    let skippedIncompleteR2 = false;
+
     for (const plan of plans) {
       if (plan.kind === "waiting") {
         res.status(202).send(scormStatusPage(plan.status, null));
@@ -606,6 +617,7 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       if (plan.kind === "r2_extracted") {
         const r2Probe = await isR2ScormExtractionPlayable(plan.prefix, plan.launchFile);
         if (!r2Probe.playable) {
+          skippedIncompleteR2 = true;
           console.warn(
             `[ScormServe] Skipping incomplete R2 prefix for ${asset.slug}: ${r2Probe.reason ?? "not playable"} (${r2Probe.objectCount} objects)`,
           );
@@ -625,6 +637,21 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       }
     }
 
+    const queueForHeartbeat = async (errorHint?: string | null) => {
+      try {
+        await dbScorm
+          .update(mediaVersions)
+          .set({
+            scormExtractionStatus: "pending" as any,
+            scormExtractionError: errorHint ?? null,
+            scormExtractionStartedAt: null,
+          })
+          .where(eq(mediaVersions.id, version.id));
+      } catch {
+        /* non-critical */
+      }
+    };
+
     if (!zipForExtract) {
       res.status(503).send(
         scormStatusPage(
@@ -635,24 +662,44 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       return;
     }
 
-    // Never download a large ZIP synchronously for asset sub-requests (JS/CSS/images).
-    if (relativePath !== "" && !cachedZip) {
-      warmScormZipCacheInBackground(asset.slug, zipForExtract);
-      res.status(202).send(scormStatusPage("processing", null));
+    const fileSize = version.fileSize ?? 0;
+    const extractionStatus = (version.scormExtractionStatus as string | null) ?? "pending";
+    const needsBackground =
+      shouldUseBackgroundScormExtraction({ fileSize, scormExtractionStatus: extractionStatus }) ||
+      skippedIncompleteR2 ||
+      relativePath !== "";
+
+    if (needsBackground) {
+      if (extractionStatus !== "processing") {
+        const hint = skippedIncompleteR2
+          ? "Incomplete R2 extraction; queued for background re-extract"
+          : null;
+        await queueForHeartbeat(hint);
+      }
+      if (relativePath !== "" && !cachedZip) {
+        warmScormZipCacheInBackground(asset.slug, zipForExtract);
+      }
+      const waitStatus =
+        extractionStatus === "failed" ? "failed" : ("processing" as const);
+      res
+        .status(202)
+        .send(
+          scormStatusPage(
+            waitStatus,
+            waitStatus === "failed"
+              ? version.scormExtractionError
+              : fileSize > SCORM_BACKGROUND_EXTRACT_BYTES
+                ? "Large SCORM package is being extracted to storage. This page refreshes automatically."
+                : null,
+          ),
+        );
       return;
     }
 
+    // Small packages only: emergency on-the-fly extract (under 50 MB, no R2 yet).
     const extracted = await extractScormZip(asset.slug, encodeStorageFetchUrl(zipForExtract));
     if (!extracted) {
-      try {
-        await dbScorm
-          .update(mediaVersions)
-          .set({
-            scormExtractionStatus: "pending" as any,
-            scormExtractionError: null,
-          })
-          .where(eq(mediaVersions.id, version.id));
-      } catch { /* non-critical */ }
+      await queueForHeartbeat(null);
       res.status(202).send(scormStatusPage("pending", null));
       return;
     }
@@ -663,7 +710,8 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       return;
     }
 
-    res.status(404).send("File not found");
+    await queueForHeartbeat("Launch file missing after extract; queued for re-extract");
+    res.status(202).send(scormStatusPage("pending", null));
     } catch (err: any) {
       console.error(`[ScormServe] Unhandled error for slug=${req.params.slug}:`, err?.message ?? err);
       if (!res.headersSent) {
@@ -934,6 +982,8 @@ router.get(slugPath, async (req: Request, res: Response) => {
     fileName: result.version?.fileName ?? null,
     fileSize: result.version?.fileSize ?? null,
     versionNumber: result.version?.versionNumber ?? null,
+    scormExtractionStatus: result.version?.scormExtractionStatus ?? null,
+    scormExtractionError: result.version?.scormExtractionError ?? null,
   });
 });
 } // end for slugPath (info)
