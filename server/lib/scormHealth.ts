@@ -119,21 +119,26 @@ export function classifyScormHealth(params: {
 
 export type ScormHealthSnapshot = {
   unhealthyAssetIds: number[];
+  /** Asset IDs included in the most recent alert email (for bulk re-extract). */
+  lastAlertedAssetIds: number[];
   lastAlertAt: string | null;
 };
 
 export function parseScormHealthSnapshot(raw: string | null | undefined): ScormHealthSnapshot {
-  if (!raw?.trim()) return { unhealthyAssetIds: [], lastAlertAt: null };
+  if (!raw?.trim()) return { unhealthyAssetIds: [], lastAlertedAssetIds: [], lastAlertAt: null };
   try {
     const parsed = JSON.parse(raw) as Partial<ScormHealthSnapshot>;
     return {
       unhealthyAssetIds: Array.isArray(parsed.unhealthyAssetIds)
         ? parsed.unhealthyAssetIds.filter((n) => typeof n === "number")
         : [],
+      lastAlertedAssetIds: Array.isArray(parsed.lastAlertedAssetIds)
+        ? parsed.lastAlertedAssetIds.filter((n) => typeof n === "number")
+        : [],
       lastAlertAt: typeof parsed.lastAlertAt === "string" ? parsed.lastAlertAt : null,
     };
   } catch {
-    return { unhealthyAssetIds: [], lastAlertAt: null };
+    return { unhealthyAssetIds: [], lastAlertedAssetIds: [], lastAlertAt: null };
   }
 }
 

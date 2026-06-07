@@ -6,7 +6,7 @@ import { getDb } from "../db";
 import { sendEmail } from "../_core/email";
 import { ENV } from "../_core/env";
 import { mediaAssets, mediaVersions, platformSettings, users } from "../../drizzle/schema";
-import { SCORM_PACKAGE_MEDIA_TYPES } from "./scormPackage";
+import { needsScormExtraction, SCORM_PACKAGE_MEDIA_TYPES } from "./scormPackage";
 import {
   buildScormAdminUrls,
   classifyScormHealth,
@@ -143,6 +143,106 @@ export async function saveScormHealthSnapshot(snapshot: ScormHealthSnapshot): Pr
     .where(eq(platformSettings.id, 1));
 }
 
+/** Queue heartbeat re-extraction for specific SCORM assets (latest version each). */
+export async function queueScormReExtractionForAssets(
+  assetIds: number[],
+): Promise<{ queued: number; skipped: number }> {
+  const db = await getDb();
+  if (!db || assetIds.length === 0) return { queued: 0, skipped: 0 };
+
+  let queued = 0;
+  let skipped = 0;
+
+  for (const assetId of assetIds) {
+    const [version] = await db
+      .select()
+      .from(mediaVersions)
+      .where(eq(mediaVersions.assetId, assetId))
+      .orderBy(desc(mediaVersions.versionNumber))
+      .limit(1);
+    const [asset] = await db
+      .select()
+      .from(mediaAssets)
+      .where(and(eq(mediaAssets.id, assetId), isNull(mediaAssets.deletedAt)))
+      .limit(1);
+
+    if (!version || !asset) {
+      skipped++;
+      continue;
+    }
+
+    if (
+      !needsScormExtraction({
+        mediaType: asset.mediaType,
+        mimeType: version.mimeType,
+        fileName: version.fileName,
+        s3Url: version.s3Url,
+      })
+    ) {
+      skipped++;
+      continue;
+    }
+
+    await db
+      .update(mediaVersions)
+      .set({
+        scormExtractionStatus: "pending" as any,
+        scormExtractionError: null,
+        scormExtractionStartedAt: null,
+        scormExtractedPrefix: null,
+        scormLaunchFile: null,
+      })
+      .where(eq(mediaVersions.id, version.id));
+    queued++;
+  }
+
+  if (queued > 0) {
+    console.log(`[ScormHealth] Queued re-extraction for ${queued} asset(s)`);
+  }
+
+  return { queued, skipped };
+}
+
+export type ScormReExtractScope = "unhealthy" | "alerted";
+
+/** Resolve asset IDs to re-extract for bulk health actions. */
+export async function resolveScormReExtractAssetIds(
+  scope: ScormReExtractScope,
+): Promise<number[]> {
+  const rows = await listScormHealthRows();
+  const unhealthyIds = new Set(
+    rows.filter((r) => r.health === "unhealthy").map((r) => r.assetId),
+  );
+
+  if (scope === "unhealthy") {
+    return [...unhealthyIds];
+  }
+
+  const snapshot = await loadScormHealthSnapshot();
+  return snapshot.lastAlertedAssetIds.filter((id) => unhealthyIds.has(id));
+}
+
+export async function getScormHealthMeta(): Promise<{
+  lastAlertAt: string | null;
+  lastAlertedAssetIds: number[];
+  lastAlertedStillUnhealthy: number;
+}> {
+  const snapshot = await loadScormHealthSnapshot();
+  const rows = await listScormHealthRows();
+  const unhealthyIds = new Set(
+    rows.filter((r) => r.health === "unhealthy").map((r) => r.assetId),
+  );
+  const lastAlertedStillUnhealthy = snapshot.lastAlertedAssetIds.filter((id) =>
+    unhealthyIds.has(id),
+  ).length;
+
+  return {
+    lastAlertAt: snapshot.lastAlertAt,
+    lastAlertedAssetIds: snapshot.lastAlertedAssetIds,
+    lastAlertedStillUnhealthy,
+  };
+}
+
 function buildAlertEmailHtml(items: ScormHealthRow[]): string {
   const rows = items
     .map(
@@ -183,8 +283,13 @@ function buildAlertEmailHtml(items: ScormHealthRow[]): string {
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <p style="color:#9ca3af;font-size:12px;margin-top:24px;">
-        You can also open the full SCORM Health panel from Media Repository → SCORM Health.
+      <p style="margin-top:20px;">
+        <a href="${appBaseUrl()}/admin/media-repository?scormHealth=1&amp;reExtractAlerted=1" style="display:inline-block;background:#1f2937;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">
+          Re-extract all alerted packages
+        </a>
+      </p>
+      <p style="color:#9ca3af;font-size:12px;margin-top:16px;">
+        Or open Media Repository → SCORM Health for the full panel and per-file actions.
       </p>
     </div>`;
 }
@@ -245,6 +350,9 @@ export async function runScormHealthAlertPass(): Promise<{
 
   await saveScormHealthSnapshot({
     unhealthyAssetIds: currentIds,
+    lastAlertedAssetIds: emailed
+      ? toEmail.map((r) => r.assetId)
+      : previous.lastAlertedAssetIds,
     lastAlertAt: emailed ? new Date().toISOString() : previous.lastAlertAt,
   });
 
