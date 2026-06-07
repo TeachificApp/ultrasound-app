@@ -24,6 +24,17 @@ describe("scormPackage", () => {
     expect(needsScormExtraction({ mediaType: "other", fileName: "course.zip" })).toBe(true);
   });
 
+  it("needsScormExtraction detects iSpring .quiz archives", () => {
+    expect(
+      needsScormExtraction({
+        mediaType: "other",
+        fileName: "UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO.quiz",
+        s3Url:
+          "https://cdn.example.com/media-repo/quiz/v1-UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO.quiz",
+      }),
+    ).toBe(true);
+  });
+
   it("initialScormExtractionStatus returns skipped for non-packages", () => {
     expect(initialScormExtractionStatus({ mediaType: "image" })).toBe("skipped");
     expect(initialScormExtractionStatus({ mediaType: "lms" })).toBe("pending");
@@ -59,6 +70,17 @@ describe("isZipStorageRef", () => {
     expect(isZipStorageRef({ s3Url: "https://cdn/x/file.zip" })).toBe(true);
     expect(isZipStorageRef({ s3Url: "https://cdn/x/index.html" })).toBe(false);
     expect(isZipStorageRef({ fileName: "quiz.zip" })).toBe(true);
+  });
+
+  it("detects iSpring .quiz files as zip archives", () => {
+    expect(
+      isZipStorageRef({
+        s3Url:
+          "https://pub.example.r2.dev/media-repo/unlimited-registry-review-quiz-pediatric-echo-8384d011/v1-UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO.quiz",
+        fileName: "UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO.quiz",
+        mimeType: "application/octet-stream",
+      }),
+    ).toBe(true);
   });
 });
 
@@ -111,6 +133,21 @@ describe("resolveScormServePlans", () => {
     expect(plans.some((p) => p.kind === "client_zip")).toBe(true);
     expect(plans.some((p) => p.kind === "direct_html")).toBe(true);
     expect(plans.find((p) => p.kind === "direct_html")?.kind).toBe("direct_html");
+  });
+
+  it("includes client_zip plan for iSpring .quiz packages", () => {
+    const plans = resolveScormServePlans([
+      {
+        versionNumber: 1,
+        s3Url:
+          "https://cdn.example.com/v1-UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO.quiz",
+        fileName: "UNLIMITED REGISTRY REVIEW QUIZ - PEDIATRIC ECHO.quiz",
+        mimeType: "application/octet-stream",
+        scormExtractionStatus: "failed",
+        scormExtractionError: "test",
+      },
+    ]);
+    expect(plans.some((p) => p.kind === "client_zip")).toBe(true);
   });
 
   it("prefers R2 extracted prefix when present", () => {

@@ -7,6 +7,18 @@
 export const SCORM_PACKAGE_MEDIA_TYPES = ["scorm", "zip", "lms"] as const;
 export type ScormPackageMediaType = (typeof SCORM_PACKAGE_MEDIA_TYPES)[number];
 
+/**
+ * File extensions that are ZIP archives containing SCORM (iSpring uses .quiz).
+ * These must be treated like .zip for extraction and /scorm serving.
+ */
+export const SCORM_ARCHIVE_EXTENSIONS = [".zip", ".quiz"] as const;
+
+/** True when a URL or filename uses a SCORM archive extension (.zip, .quiz, …). */
+export function hasScormArchiveExtension(ref: string): boolean {
+  const lower = ref.toLowerCase().split("?")[0];
+  return SCORM_ARCHIVE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
 export function isScormPackageMediaType(mediaType: string): mediaType is ScormPackageMediaType {
   return (SCORM_PACKAGE_MEDIA_TYPES as readonly string[]).includes(mediaType);
 }
@@ -21,10 +33,10 @@ export function needsScormExtraction(params: {
   if (isScormPackageMediaType(params.mediaType)) return true;
   const mime = (params.mimeType ?? "").toLowerCase();
   if (mime.includes("zip") || mime.includes("scorm")) return true;
-  const name = (params.fileName ?? "").toLowerCase();
-  if (name.endsWith(".zip")) return true;
-  const url = (params.s3Url ?? "").toLowerCase().split("?")[0];
-  if (url.endsWith(".zip")) return true;
+  const name = params.fileName ?? "";
+  if (hasScormArchiveExtension(name)) return true;
+  const url = params.s3Url ?? "";
+  if (hasScormArchiveExtension(url)) return true;
   return false;
 }
 
@@ -88,8 +100,8 @@ export function isZipStorageRef(params: {
   const url = (params.s3Url ?? "").toLowerCase().split("?")[0];
   const name = (params.fileName ?? params.s3Key ?? "").toLowerCase();
   const mime = (params.mimeType ?? "").toLowerCase();
-  if (url.endsWith(".zip")) return true;
-  if (name.endsWith(".zip")) return true;
+  if (hasScormArchiveExtension(url)) return true;
+  if (hasScormArchiveExtension(name)) return true;
   if (mime.includes("zip") && !mime.includes("html")) return true;
   return false;
 }
