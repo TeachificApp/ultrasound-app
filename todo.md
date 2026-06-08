@@ -4751,3 +4751,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Admin User Detail — Content Tab Fixes (Jun 2026)
 - [x] Courses tab: filter to only show non-quiz, non-download enrollments (was showing all enrollments including quizzes)
 - [x] Quizzes tab: upgrade to full image card with thumbnail, progress badge, attempt stats, View Quiz + Remove buttons (was showing minimal text-only card)
+
+## Stripe Price Creation & Admin Features (Jun 2026)
+- [x] Create Stripe product/price for From Sonographer to CEO eBook ($97 one-time) → plan 30008
+- [x] Create Stripe product/price for Ultrasound Physics SPI Review Quiz ($39.97/month) → plan 30009
+- [x] Create Stripe product/price for From Sonographer to CEO course ($97 one-time) → plan 30010
+- [x] Create Stripe product/price for Fetal Echocardiography Registry Review Quiz ($49.97/month) → plan 30011
+- [x] Create Stripe product/price for Abdomen Ultrasound Registry Review Quiz ($39.97/month) → plan 30012
+- [x] Create Stripe product/price for OB-GYN Ultrasound Registry Review Quiz ($39.97/month) → plan 30013
+- [x] Create Stripe product/price for Vascular Ultrasound Registry Review Quiz ($39.97/month) → plan 30014
+- [x] Create Stripe product/price for LIVE Adult Echo 12-Week Course ($1997 one-time) → plan 30015
+- [x] Create Stripe product/price for ACS Mastery Course ($1497 one-time) → plan 30016
+- [x] Admin Reset Password: add sendPasswordReset procedure to adminUserRouter (24-hour token, branded email)
+- [x] Admin Reset Password: add KeyRound button to ProfileTab in AdminUserDetailPage

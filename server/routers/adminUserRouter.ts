@@ -55,6 +55,7 @@ import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { or, like, gte, lte } from "drizzle-orm";
+import crypto from "crypto";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -2372,5 +2373,58 @@ export const adminUserRouter = router({
       }
 
       return { success: true };
+    }),
+
+  /**
+   * Send a password reset email to a student from the admin panel.
+   * Generates a 1-hour reset token and emails the student a link to set/reset their password.
+   */
+  sendPasswordReset: protectedProcedure
+    .input(z.object({ userId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [user] = await db
+        .select({ id: users.id, email: users.email, name: users.name })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+
+      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+
+      // Generate a secure reset token (valid for 24 hours for admin-initiated resets)
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      await db
+        .update(users)
+        .set({ passwordResetToken: resetToken, passwordResetExpiry: resetExpiry })
+        .where(eq(users.id, user.id));
+
+      // Determine the base URL from the request origin header
+      const origin = (ctx.req.headers.origin as string) || "https://app.allaboutultrasound.com";
+      const resetUrl = `${origin}/auth/reset-password?token=${resetToken}`;
+
+      const firstName = (user.name ?? "").split(" ")[0] || "there";
+
+      await sendEmail({
+        to: user.email,
+        subject: "Reset your password — All About Ultrasound",
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+            <h2 style="color:#189aa1">Password Reset</h2>
+            <p>Hi ${firstName},</p>
+            <p>An administrator has sent you a password reset link. Click the button below to set your password. This link expires in 24 hours.</p>
+            <p style="margin:24px 0">
+              <a href="${resetUrl}" style="background:#189aa1;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold">Set Password</a>
+            </p>
+            <p style="color:#888;font-size:12px">If you did not expect this email, you can safely ignore it.</p>
+          </div>
+        `,
+      });
+
+      return { success: true, email: user.email };
     }),
 });

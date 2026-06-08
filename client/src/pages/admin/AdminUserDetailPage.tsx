@@ -18,7 +18,7 @@ import {
   RefreshCw, Loader2, ChevronRight, ChevronLeft, ShoppingCart,
   UserCog, PlusCircle, Trash2, Shield, ShieldOff, BadgeCheck,
   ClipboardCheck, RotateCcw, DollarSign, Edit3, GitMerge, Mail, X,
-  Users2, Building2, Star, Layers,
+  Users2, Building2, Star, Layers, KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -222,6 +222,10 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: () => { toast.success("Profile updated."); refetch(); setEditOpen(false); },
     onError: (e) => toast.error(e.message),
   });
+  const sendPasswordReset = trpc.adminUser.sendPasswordReset.useMutation({
+    onSuccess: (res) => toast.success(`Password reset email sent to ${res.email}`),
+    onError: (e) => toast.error(e.message),
+  });
 
   const [grantOpen, setGrantOpen] = useState(false);
   const [grantBrand, setGrantBrand] = useState<"aaus" | "iheartecho">("aaus");
@@ -275,9 +279,23 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
                 <p className="text-sm text-gray-500">{user.email}</p>
                 <p className="text-xs text-gray-400 mt-0.5">Member since {formatDate(user.createdAt)}</p>
               </div>
-              <Button size="sm" variant="outline" onClick={handleEditOpen} className="flex-shrink-0 gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50">
-                <Edit3 className="w-3.5 h-3.5" /> Edit Profile
-              </Button>
+              <div className="flex gap-2 flex-shrink-0">
+                <Button size="sm" variant="outline" onClick={handleEditOpen} className="gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50">
+                  <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => sendPasswordReset.mutate({ userId })}
+                  disabled={sendPasswordReset.isPending}
+                  className="gap-1.5 text-orange-700 border-orange-200 hover:bg-orange-50"
+                >
+                  {sendPasswordReset.isPending
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <KeyRound className="w-3.5 h-3.5" />}
+                  Reset Password
+                </Button>
+              </div>
             </div>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <StatusBadge status={user.role} />
