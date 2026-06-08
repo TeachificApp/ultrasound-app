@@ -121,6 +121,7 @@ export default function MembershipsAdmin() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [creatingNew, setCreatingNew] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [newStripePriceId, setNewStripePriceId] = useState("");
 
   const { data: plans, refetch } = trpc.membership.listAll.useQuery();
   const createMutation = trpc.membership.create.useMutation({
@@ -128,6 +129,7 @@ export default function MembershipsAdmin() {
       await refetch();
       setCreatingNew(false);
       setNewTitle("");
+      setNewStripePriceId("");
       setEditingId(data.id);
       toast.success("Membership created");
     },
@@ -170,7 +172,7 @@ export default function MembershipsAdmin() {
       </div>
 
       {/* New membership dialog */}
-      <Dialog open={creatingNew} onOpenChange={setCreatingNew}>
+      <Dialog open={creatingNew} onOpenChange={(open) => { setCreatingNew(open); if (!open) { setNewTitle(""); setNewStripePriceId(""); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Create Membership</DialogTitle>
@@ -183,13 +185,23 @@ export default function MembershipsAdmin() {
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="e.g. All Access Membership"
                 className="mt-1"
-                onKeyDown={(e) => e.key === "Enter" && newTitle.trim() && createMutation.mutate({ title: newTitle.trim() })}
+                onKeyDown={(e) => e.key === "Enter" && newTitle.trim() && createMutation.mutate({ title: newTitle.trim(), stripePriceId: newStripePriceId.trim() || null })}
               />
+            </div>
+            <div>
+              <Label>Stripe Price ID <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Input
+                value={newStripePriceId}
+                onChange={(e) => setNewStripePriceId(e.target.value)}
+                placeholder="price_1Abc..."
+                className="mt-1 font-mono text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">Find in Stripe Dashboard → Products → Prices. Required for auto-matching subscriptions.</p>
             </div>
             <Button
               className="w-full bg-teal-600 hover:bg-teal-700 text-white"
               disabled={!newTitle.trim() || createMutation.isPending}
-              onClick={() => createMutation.mutate({ title: newTitle.trim() })}
+              onClick={() => createMutation.mutate({ title: newTitle.trim(), stripePriceId: newStripePriceId.trim() || null })}
             >
               {createMutation.isPending ? "Creating…" : "Create"}
             </Button>

@@ -192,6 +192,9 @@ const createMembership = adminProcedure
       compareAtPrice: z.number().optional(),
       trialDays: z.number().min(0).optional(),
       accentColor: z.string().optional(),
+      stripePriceId: z.string().optional().nullable(),
+      stripeProductId: z.string().optional().nullable(),
+      status: z.enum(["draft", "published"]).optional(),
     })
   )
   .mutation(async ({ input }) => {
@@ -213,7 +216,9 @@ const createMembership = adminProcedure
       compareAtPrice: input.compareAtPrice ?? null,
       trialDays: input.trialDays ?? 0,
       accentColor: input.accentColor ?? "#189aa1",
-      status: "draft",
+      status: input.status ?? "draft",
+      stripePriceId: input.stripePriceId ?? null,
+      stripeProductId: input.stripeProductId ?? null,
     });
     return { id: (result as any).insertId as number };
   });
