@@ -999,7 +999,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const [addSubOpen, setAddSubOpen] = useState(false);
   const [addSubStripeId, setAddSubStripeId] = useState("");
   const [addSubEmail, setAddSubEmail] = useState("");
-  const [addSubPlanId, setAddSubPlanId] = useState<string>("");
+  const [addSubPlanId, setAddSubPlanId] = useState<string>("auto");
 
   const grantMembership = trpc.adminUser.grantBrandMembership.useMutation({
     onSuccess: () => { toast.success("App access granted."); refetch(); setGrantOpen(false); },
@@ -1032,7 +1032,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
       setAddSubOpen(false);
       setAddSubStripeId("");
       setAddSubEmail("");
-      setAddSubPlanId("");
+      setAddSubPlanId("auto");
     },
     onError: (e) => toast.error(`Sync failed: ${e.message}`),
   });
@@ -1271,7 +1271,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                   <SelectValue placeholder="Auto-detect from Stripe price ID" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Auto-detect from Stripe price ID</SelectItem>
+                  <SelectItem value="auto">Auto-detect from Stripe price ID</SelectItem>
                   {(allPlansData ?? []).map((p: any) => (
                     <SelectItem key={p.id} value={String(p.id)}>{p.title}</SelectItem>
                   ))}
@@ -1290,7 +1290,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                 stripeSubscriptionId: addSubStripeId,
                 email: addSubEmail || undefined,
                 userId,
-                planId: addSubPlanId ? parseInt(addSubPlanId, 10) : undefined,
+                planId: addSubPlanId && addSubPlanId !== "auto" ? parseInt(addSubPlanId, 10) : undefined,
               })}
               disabled={!addSubStripeId || addSubscription.isPending}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
