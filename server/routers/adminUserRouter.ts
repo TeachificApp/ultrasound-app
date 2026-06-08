@@ -52,7 +52,8 @@ import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
-import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
+import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail } from "../_core/email";
+import { getBrandDisplayConfig } from "../../shared/brands";
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { or, like, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
@@ -638,6 +639,7 @@ export const adminUserRouter = router({
       brand: z.enum(["aaus", "iheartecho"]),
       tier: z.enum(["free", "premium"]).default("premium"),
       expiresAt: z.string().optional(), // ISO date string
+      sendNotification: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -652,11 +654,15 @@ export const adminUserRouter = router({
         .where(and(eq(brandMemberships.userId, input.userId), eq(brandMemberships.brand, input.brand)))
         .limit(1);
 
+      let membershipId: number;
+      let created: boolean;
+
       if (existing) {
         await db.update(brandMemberships)
           .set({ tier: input.tier, status: "active", source: "admin", grantedAt: new Date(), ...(expiresAt ? { expiresAt } : {}) })
           .where(eq(brandMemberships.id, existing.id));
-        return { membershipId: existing.id, created: false };
+        membershipId = existing.id;
+        created = false;
       } else {
         const [result] = await db.insert(brandMemberships).values({
           userId: input.userId,
@@ -668,8 +674,35 @@ export const adminUserRouter = router({
           stripeCustomerId: null,
           ...(expiresAt ? { expiresAt } : {}),
         }).$returningId();
-        return { membershipId: result.id, created: true };
+        membershipId = result.id;
+        created = true;
       }
+
+      // Send optional email notification
+      if (input.sendNotification) {
+        try {
+          const [user] = await db
+            .select({ email: users.email, name: users.name })
+            .from(users)
+            .where(eq(users.id, input.userId))
+            .limit(1);
+          if (user) {
+            const bc = getBrandDisplayConfig(input.brand);
+            const firstName = (user.name ?? "").split(" ")[0] || "there";
+            const { subject, htmlBody } = buildAccessGrantedEmail({
+              firstName,
+              brandMode: input.brand,
+              tier: input.tier,
+              loginUrl: bc.appUrl,
+            });
+            await sendEmail({ to: { name: user.name ?? user.email, email: user.email }, subject, htmlBody, brandMode: input.brand });
+          }
+        } catch (emailErr) {
+          console.error("[grantBrandMembership] Failed to send notification email:", emailErr);
+        }
+      }
+
+      return { membershipId, created };
     }),
 
   /** Revoke / downgrade brand membership */
@@ -677,11 +710,20 @@ export const adminUserRouter = router({
     .input(z.object({
       membershipId: z.number().int(),
       downgradeToFree: z.boolean().default(false), // true = downgrade to free, false = cancel
+      sendNotification: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Fetch membership + user info before update (for notification)
+      const [membership] = await db
+        .select({ userId: brandMemberships.userId, brand: brandMemberships.brand })
+        .from(brandMemberships)
+        .where(eq(brandMemberships.id, input.membershipId))
+        .limit(1);
+
       if (input.downgradeToFree) {
         await db.update(brandMemberships)
           .set({ tier: "free", status: "active", source: "admin" })
@@ -691,6 +733,30 @@ export const adminUserRouter = router({
           .set({ status: "cancelled", source: "admin" })
           .where(eq(brandMemberships.id, input.membershipId));
       }
+
+      // Send optional email notification (only when fully revoking, not downgrading to free)
+      if (input.sendNotification && !input.downgradeToFree && membership) {
+        try {
+          const [user] = await db
+            .select({ email: users.email, name: users.name })
+            .from(users)
+            .where(eq(users.id, membership.userId))
+            .limit(1);
+          if (user) {
+            const bc = getBrandDisplayConfig(membership.brand as "aaus" | "iheartecho");
+            const firstName = (user.name ?? "").split(" ")[0] || "there";
+            const { subject, htmlBody } = buildAccessRevokedEmail({
+              firstName,
+              brandMode: membership.brand as "aaus" | "iheartecho",
+              loginUrl: bc.appUrl,
+            });
+            await sendEmail({ to: { name: user.name ?? user.email, email: user.email }, subject, htmlBody, brandMode: membership.brand as "aaus" | "iheartecho" });
+          }
+        } catch (emailErr) {
+          console.error("[revokeBrandMembership] Failed to send notification email:", emailErr);
+        }
+      }
+
       return { success: true };
     }),
 
@@ -2228,14 +2294,51 @@ export const adminUserRouter = router({
 
   /** Revoke (delete) a native membership subscription record */
   revokeNativeMembership: protectedProcedure
-    .input(z.object({ membershipSubscriptionId: z.number().int() }))
+    .input(z.object({
+      membershipSubscriptionId: z.number().int(),
+      sendNotification: z.boolean().default(true),
+    }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Fetch subscription + user info before update (for notification)
+      const [sub] = await db
+        .select({
+          userId: membershipSubscriptions.userId,
+          planId: membershipSubscriptions.planId,
+        })
+        .from(membershipSubscriptions)
+        .where(eq(membershipSubscriptions.id, input.membershipSubscriptionId))
+        .limit(1);
+
       await db.update(membershipSubscriptions)
         .set({ status: "cancelled" })
         .where(eq(membershipSubscriptions.id, input.membershipSubscriptionId));
+
+      // Send optional email notification
+      if (input.sendNotification && sub) {
+        try {
+          const [user] = await db
+            .select({ email: users.email, name: users.name })
+            .from(users)
+            .where(eq(users.id, sub.userId))
+            .limit(1);
+          if (user) {
+            const firstName = (user.name ?? "").split(" ")[0] || "there";
+            const { subject, htmlBody } = buildAccessRevokedEmail({
+              firstName,
+              brandMode: "aaus",
+              loginUrl: "https://app.allaboutultrasound.com",
+            });
+            await sendEmail({ to: { name: user.name ?? user.email, email: user.email }, subject, htmlBody, brandMode: "aaus" });
+          }
+        } catch (emailErr) {
+          console.error("[revokeNativeMembership] Failed to send notification email:", emailErr);
+        }
+      }
+
       return { success: true };
     }),
 

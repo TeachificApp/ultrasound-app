@@ -1090,3 +1090,66 @@ export function buildFreePreviewConfirmationEmail(opts: {
   `, opts.brandMode);
   return { subject, htmlBody, previewText };
 }
+
+export function buildAccessGrantedEmail(opts: {
+  firstName: string;
+  brandMode?: BrandMode;
+  tier?: string;
+  loginUrl: string;
+}): { subject: string; htmlBody: string; previewText: string } {
+  const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
+  const tier = opts.tier === "premium" ? "Premium" : "Free";
+  const subject = `Your ${bc.displayName} ${tier} access has been granted`;
+  const previewText = `You now have ${tier} access to ${bc.displayName}. Sign in to get started.`;
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
+      Access Granted, ${opts.firstName}!
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      Your <strong>${tier}</strong> access to <strong>${bc.displayName}</strong> has been activated by an administrator.
+      You can now sign in and start using your account.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${opts.loginUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
+        Sign In Now
+      </a>
+    </div>
+    <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
+      If you have any questions, please contact <a href="mailto:${bc.supportEmail}" style="color:${brandColor};">${bc.supportEmail}</a>.
+    </p>
+  `, opts.brandMode);
+  return { subject, htmlBody, previewText };
+}
+
+export function buildAccessRevokedEmail(opts: {
+  firstName: string;
+  brandMode?: BrandMode;
+  loginUrl: string;
+}): { subject: string; htmlBody: string; previewText: string } {
+  const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
+  const subject = `Your ${bc.displayName} access has been removed`;
+  const previewText = `Your access to ${bc.displayName} has been removed by an administrator.`;
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
+      Access Removed, ${opts.firstName}
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      Your access to <strong>${bc.displayName}</strong> has been removed by an administrator.
+      If you believe this was done in error, please contact our support team.
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+      If you would like to regain access, you can visit our website to learn more about available plans.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${bc.websiteUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
+        Visit ${bc.displayName}
+      </a>
+    </div>
+    <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
+      Questions? Contact us at <a href="mailto:${bc.supportEmail}" style="color:${brandColor};">${bc.supportEmail}</a>.
+    </p>
+  `, opts.brandMode);
+  return { subject, htmlBody, previewText };
+}

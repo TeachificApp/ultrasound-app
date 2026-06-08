@@ -33,6 +33,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import Layout from "@/components/Layout";
 import { SdmsCmeUserTab } from "@/components/admin/SdmsCmeUserTab";
 
@@ -239,6 +240,8 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [grantBrand, setGrantBrand] = useState<"aaus" | "iheartecho">("aaus");
   const [grantTier, setGrantTier] = useState<"free" | "premium">("premium");
   const [grantExpiry, setGrantExpiry] = useState("");
+  const [grantNotify, setGrantNotify] = useState(true);
+  const [revokeNotify, setRevokeNotify] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
 
   const user = data.user;
@@ -460,10 +463,14 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
             <div className="space-y-1.5"><Label>Brand</Label><Select value={grantBrand} onValueChange={(v) => setGrantBrand(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="aaus">All About Ultrasound™</SelectItem><SelectItem value="iheartecho">iHeartEcho™</SelectItem></SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Tier</Label><Select value={grantTier} onValueChange={(v) => setGrantTier(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="premium">Premium</SelectItem><SelectItem value="free">Free</SelectItem></SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Expiry Date (optional)</Label><Input type="date" value={grantExpiry} onChange={e => setGrantExpiry(e.target.value)} /></div>
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox id="grant-notify" checked={grantNotify} onCheckedChange={(v) => setGrantNotify(!!v)} />
+              <Label htmlFor="grant-notify" className="text-sm font-normal cursor-pointer">Send email notification to student</Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGrantOpen(false)}>Cancel</Button>
-            <Button onClick={() => { grantMembership.mutate({ userId, brand: grantBrand, tier: grantTier, expiresAt: grantExpiry || undefined }); setGrantOpen(false); }} disabled={grantMembership.isPending} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
+            <Button onClick={() => { grantMembership.mutate({ userId, brand: grantBrand, tier: grantTier, expiresAt: grantExpiry || undefined, sendNotification: grantNotify }); setGrantOpen(false); }} disabled={grantMembership.isPending} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
               {grantMembership.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Grant Access
             </Button>
           </DialogFooter>
@@ -490,6 +497,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
   const [cancelNativeConfirm, setCancelNativeConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
   const [revokeNativeConfirm, setRevokeNativeConfirm] = useState<number | null>(null);
+  const [revokeNativeNotify, setRevokeNativeNotify] = useState(true);
 
   const { data: allCourses } = trpc.adminUser.listAllCourses.useQuery();
 
@@ -880,7 +888,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       </AlertDialog>
 
       {/* Revoke native membership confirm */}
-      <AlertDialog open={revokeNativeConfirm !== null} onOpenChange={open => !open && setRevokeNativeConfirm(null)}>
+      <AlertDialog open={revokeNativeConfirm !== null} onOpenChange={open => { if (!open) setRevokeNativeConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke Membership?</AlertDialogTitle>
@@ -888,10 +896,14 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               This will immediately remove the user's membership access. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="flex items-center gap-2 px-1 pb-2">
+            <Checkbox id="revoke-native-notify" checked={revokeNativeNotify} onCheckedChange={(v) => setRevokeNativeNotify(!!v)} />
+            <Label htmlFor="revoke-native-notify" className="text-sm font-normal cursor-pointer">Send email notification to student</Label>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => revokeNativeConfirm !== null && revokeNativeMembership.mutate({ membershipSubscriptionId: revokeNativeConfirm })}
+              onClick={() => revokeNativeConfirm !== null && revokeNativeMembership.mutate({ membershipSubscriptionId: revokeNativeConfirm, sendNotification: revokeNativeNotify })}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Revoke
@@ -1131,6 +1143,9 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const [addSubStripeId, setAddSubStripeId] = useState("");
   const [addSubEmail, setAddSubEmail] = useState("");
   const [addSubPlanId, setAddSubPlanId] = useState<string>("auto");
+  const [grantSubNotify, setGrantSubNotify] = useState(true);
+  const [revokeSubNotify, setRevokeSubNotify] = useState(true);
+  const [revokeNativeSubNotify, setRevokeNativeSubNotify] = useState(true);
 
   const grantMembership = trpc.adminUser.grantBrandMembership.useMutation({
     onSuccess: () => { toast.success("App access granted."); refetch(); setGrantOpen(false); },
@@ -1470,11 +1485,15 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
               <Label>Expiry Date (optional)</Label>
               <Input type="date" value={grantExpiry} onChange={e => setGrantExpiry(e.target.value)} />
             </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox id="grant-sub-notify" checked={grantSubNotify} onCheckedChange={(v) => setGrantSubNotify(!!v)} />
+              <Label htmlFor="grant-sub-notify" className="text-sm font-normal cursor-pointer">Send email notification to student</Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGrantOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => grantMembership.mutate({ userId, brand: grantBrand, tier: grantTier, expiresAt: grantExpiry || undefined })}
+              onClick={() => grantMembership.mutate({ userId, brand: grantBrand, tier: grantTier, expiresAt: grantExpiry || undefined, sendNotification: grantSubNotify })}
               disabled={grantMembership.isPending}
               className="bg-[#189aa1] hover:bg-[#157f85] text-white"
             >
@@ -1507,7 +1526,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
       </AlertDialog>
 
       {/* Revoke app confirm */}
-      <AlertDialog open={revokeConfirm !== null} onOpenChange={open => !open && setRevokeConfirm(null)}>
+      <AlertDialog open={revokeConfirm !== null} onOpenChange={open => { if (!open) setRevokeConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke App Access?</AlertDialogTitle>
@@ -1515,10 +1534,14 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
               This will immediately remove the user's access to this app.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="flex items-center gap-2 px-1 pb-2">
+            <Checkbox id="revoke-sub-notify" checked={revokeSubNotify} onCheckedChange={(v) => setRevokeSubNotify(!!v)} />
+            <Label htmlFor="revoke-sub-notify" className="text-sm font-normal cursor-pointer">Send email notification to student</Label>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => revokeConfirm !== null && revokeMembership.mutate({ membershipId: revokeConfirm })}
+              onClick={() => revokeConfirm !== null && revokeMembership.mutate({ membershipId: revokeConfirm, sendNotification: revokeSubNotify })}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Revoke
@@ -1549,7 +1572,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
       </AlertDialog>
 
       {/* Revoke native subscription confirm */}
-      <AlertDialog open={revokeNativeSubConfirm !== null} onOpenChange={open => !open && setRevokeNativeSubConfirm(null)}>
+      <AlertDialog open={revokeNativeSubConfirm !== null} onOpenChange={open => { if (!open) setRevokeNativeSubConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke Learn Membership?</AlertDialogTitle>
@@ -1557,10 +1580,14 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
               This will immediately remove the user's membership access. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="flex items-center gap-2 px-1 pb-2">
+            <Checkbox id="revoke-native-sub-notify" checked={revokeNativeSubNotify} onCheckedChange={(v) => setRevokeNativeSubNotify(!!v)} />
+            <Label htmlFor="revoke-native-sub-notify" className="text-sm font-normal cursor-pointer">Send email notification to student</Label>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => revokeNativeSubConfirm !== null && revokeNativeSub.mutate({ membershipSubscriptionId: revokeNativeSubConfirm })}
+              onClick={() => revokeNativeSubConfirm !== null && revokeNativeSub.mutate({ membershipSubscriptionId: revokeNativeSubConfirm, sendNotification: revokeNativeSubNotify })}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Revoke
