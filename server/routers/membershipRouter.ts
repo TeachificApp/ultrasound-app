@@ -909,7 +909,7 @@ const reconcileStripeMembership = adminProcedure
     } else if (input.stripeSubscriptionId) {
       const sub = await stripe.subscriptions.retrieve(input.stripeSubscriptionId);
       stripeSubData = sub as unknown as Record<string, unknown>;
-      const sessions = await stripe.checkout.sessions.list({ subscription: input.stripeSubscriptionId, limit: 1 });
+      const sessions = await stripe.checkout.sessions.list({ subscription: input.stripeSubscriptionId, limit: 1, expand: ["data.line_items"] } as any);
       if (sessions.data[0]) {
         session = sessions.data[0] as unknown as Record<string, unknown>;
       } else {
@@ -947,24 +947,57 @@ const reconcileStripeMembership = adminProcedure
       throw new TRPCError({ code: "NOT_FOUND", message: "Could not load Stripe checkout session" });
     }
 
-    // Admin userId override: inject into session metadata so resolveMembershipUserId uses it
-    if (input.userId) {
-      const meta = (session.metadata as Record<string, string>) ?? {};
-      meta.user_id = String(input.userId);
-      session.metadata = meta;
+    // Admin overrides: always create a fresh metadata copy to avoid frozen/sealed object issues
+    if (input.userId || input.planId) {
+      const existingMeta = (session.metadata as Record<string, string>) ?? {};
+      const newMeta: Record<string, string> = { ...existingMeta };
+      if (input.userId) newMeta.user_id = String(input.userId);
+      if (input.planId) newMeta.plan_id = String(input.planId);
+      session = { ...session, metadata: newMeta };
     }
 
-    // Admin planId override: inject into session metadata so resolveMembershipPlanId uses it
+    // Log what we're working with for debugging
+    const debugPriceId = (session as any).line_items?.data?.[0]?.price?.id ?? (session as any).metadata?.stripe_price_id ?? null;
+    const debugPlanId = input.planId ?? ((session as any).metadata?.plan_id ? parseInt((session as any).metadata.plan_id, 10) : null);
+    console.log(`[ReconcileMembership] sub=${input.stripeSubscriptionId ?? input.stripeCheckoutSessionId} priceId=${debugPriceId} planIdOverride=${debugPlanId} userId=${input.userId ?? 'auto'} email=${input.email ?? 'auto'}`);
+
+    const { reconcileMembershipFromStripeSession, resolveMembershipUserId, fulfillMembershipPurchase } = await import("../lib/membershipFulfillment");
+
+    // Fast path: if planId is explicitly provided, bypass plan resolution entirely
     if (input.planId) {
       const meta = (session.metadata as Record<string, string>) ?? {};
-      meta.plan_id = String(input.planId);
-      session.metadata = meta;
+      const customerEmail = (session.customer_email as string) ?? meta.customer_email ?? input.email ?? null;
+      const customerName = meta.customer_name ?? null;
+      const resolved = await resolveMembershipUserId(db as any, {
+        metaUserId: input.userId ?? (meta.user_id ? parseInt(meta.user_id, 10) : null),
+        customerEmail,
+        customerName,
+      });
+      if (!resolved) {
+        throw new TRPCError({ code: "NOT_FOUND", message: `Could not resolve user for email: ${customerEmail ?? 'unknown'}` });
+      }
+      const fastResult = await fulfillMembershipPurchase(db as any, input.planId, resolved, {
+        sessionId: session.id as string,
+        stripeSubscriptionId: (session.subscription as string) ?? input.stripeSubscriptionId ?? null,
+        stripeCustomerId: (session.customer as string) ?? null,
+        amountTotalCents: (session.amount_total as number) ?? 0,
+        customerEmail,
+        customerName,
+        currentPeriodEnd: (session.current_period_end as number) ?? null,
+        cancelAtPeriodEnd: (session.cancel_at_period_end as boolean) ?? false,
+      });
+      if (!fastResult.success) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: fastResult.error ?? "Fulfillment failed" });
+      }
+      return fastResult;
     }
 
-    const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
     const result = await reconcileMembershipFromStripeSession(db as any, session);
     if (!result.success) {
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Reconciliation failed" });
+      const errDetail = result.error === "Could not resolve membership plan"
+        ? `Could not resolve membership plan (priceId=${debugPriceId ?? 'none'}, planIdOverride=${debugPlanId ?? 'none'}). Select a plan manually from the dropdown.`
+        : result.error ?? "Reconciliation failed";
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: errDetail });
     }
     return result;
   });

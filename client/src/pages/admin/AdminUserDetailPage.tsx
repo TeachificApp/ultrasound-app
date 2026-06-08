@@ -1036,7 +1036,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
     },
     onError: (e) => toast.error(`Sync failed: ${e.message}`),
   });
-  const { data: allPlansData } = trpc.membership.listAll.useQuery(undefined, { staleTime: 60_000 });
+  const { data: allPlansData, isLoading: plansLoading } = trpc.membership.listAll.useQuery(undefined, { staleTime: 60_000 });
 
   const memberships = data.memberships ?? [];
   const nativeMemberships = data.nativeMemberships ?? [];
@@ -1282,6 +1282,11 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
             <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700">
               <strong>Note:</strong> This runs full membership fulfillment — granting all courses, downloads, bundles, and app access linked to the plan. Idempotent: safe to run multiple times.
             </div>
+            {addSubscription.error && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700">
+                <strong>Error:</strong> {addSubscription.error.message}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddSubOpen(false)}>Cancel</Button>
@@ -1292,7 +1297,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                 userId,
                 planId: addSubPlanId && addSubPlanId !== "auto" ? parseInt(addSubPlanId, 10) : undefined,
               })}
-              disabled={!addSubStripeId || addSubscription.isPending}
+              disabled={!addSubStripeId || addSubscription.isPending || plansLoading}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {addSubscription.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
