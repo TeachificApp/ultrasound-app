@@ -4729,3 +4729,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix searchUsersForMerge to include isPending accounts
 - [x] Add Subscription from Stripe button in admin Subscriptions tab
 - [x] Write tests for cancel/reactivate logic and webhook idempotency (11 tests passing)
+
+## Stripe Membership Architecture (Jun 2026)
+- [x] Fulfillment path: currentPeriodEnd + cancelAtPeriodEnd synced from Stripe into membershipSubscriptions on every reconcile
+- [x] bulkReconcileStripeSubscriptions tRPC procedure: pages all Stripe subscriptions, runs full fulfillment for each
+- [x] Admin UI: Reconcile All Stripe Subscriptions tab in MembershipsAdmin with progress log
+- [x] Admin UI: Add Subscription from Stripe button in AdminUserDetailPage with plan override dropdown
+- [x] Student dashboard (MyMemberships): billing details, cancel/reactivate buttons, granted access items
+- [x] cancelMembershipSubscription + reactivateMembershipSubscription student-accessible tRPC procedures
+- [x] Webhook hardening: stripeEventId idempotency, test event short-circuit, subscription lifecycle events
+- [x] 11 tests passing for cancel/reactivate logic and webhook idempotency
+- [x] Plan auto-sync engine (planAutoSync.ts): syncPlanForCourse, syncPlanForDigitalProduct, bulkSyncAllPlans
+- [x] Auto-hooks in lmsRouter: after each stripePriceId write-back, syncPlanForCourse fires in background
+- [x] Admin UI: "Sync Plans from Courses" button in MembershipsAdmin header
+- [x] planAutoSync.ts: auto-adds course as access item when new plan is created for a course
+- [x] 7 membership plans seeded for all courses with Stripe price IDs (plans 30001-30007)
+- [x] Backfill course access items for all 7 seeded plans (6 created, 1 already existed)
+- [x] islaolim@icloud.com: subscription synced, enrollment created, transaction recorded
+- [ ] Courses missing Stripe price IDs: Ultrasound Physics SPI Review Quiz, From Sonographer to CEO, Fetal Echo Quiz, Abdomen Quiz (Ergonomics CME intentionally free)

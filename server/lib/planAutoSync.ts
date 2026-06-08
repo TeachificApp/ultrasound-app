@@ -10,8 +10,8 @@
  *  2. If a plan already exists for the price ID → update its title/slug if needed.
  *  3. If no plan exists → create one with status "published" and the correct
  *     billing interval derived from the Stripe price metadata.
- *  4. The plan's access items are NOT auto-populated here — admins add those
- *     manually via the plan editor. This function only ensures the plan exists.
+ *  4. For course plans: the course itself is auto-added as an access item when
+ *     the plan is first created. Admins can add more items via the plan editor.
  *
  * Usage:
  *   import { syncPlanForCourse } from "./planAutoSync";
@@ -21,7 +21,7 @@
 import { eq } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
-import { membershipPlans, lmsCourses, digitalProducts } from "../../drizzle/schema";
+import { membershipPlans, membershipPlanAccess, lmsCourses, digitalProducts } from "../../drizzle/schema";
 
 function slugify(title: string): string {
   return title
@@ -114,6 +114,7 @@ export async function ensurePlanForStripePrice(
 /**
  * Sync a membership plan for a specific LMS course.
  * No-op if the course has no stripe_price_id.
+ * Auto-adds the course as an access item when a new plan is created.
  */
 export async function syncPlanForCourse(
   db: MySql2Database<typeof schema>,
@@ -140,11 +141,28 @@ export async function syncPlanForCourse(
     };
   }
 
-  return ensurePlanForStripePrice(db, {
+  const result = await ensurePlanForStripePrice(db, {
     stripePriceId: course.stripePriceId,
     title: course.title ?? `Course ${courseId}`,
-    billingInterval: "monthly", // default; admin can update
+    billingInterval: "monthly",
   });
+
+  // Auto-add the course as an access item when a new plan is created
+  if (result.action === "created" && result.planId) {
+    try {
+      await db.insert(membershipPlanAccess).values({
+        planId: result.planId,
+        itemType: "course",
+        itemId: course.id,
+        label: course.title ?? undefined,
+        sortOrder: 0,
+      });
+    } catch {
+      // ignore duplicate key errors
+    }
+  }
+
+  return result;
 }
 
 /**
