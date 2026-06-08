@@ -16,23 +16,37 @@ export async function ensureTodaySet(
   db: NonNullable<Awaited<ReturnType<typeof import("../db").getDb>>>,
   date: string,
   brand: QuickfireBrand = "aaus",
+  /** If provided, only backfill these specific categories (used when some categories already have queued challenges) */
+  categoriesToFill?: string[],
 ) {
   const existing = await db
     .select()
     .from(quickfireDailySets)
     .where(and(eq(quickfireDailySets.setDate, date), eq(quickfireDailySets.brand, brand)))
     .limit(1);
-  if (existing.length > 0) return existing[0];
+  // If a full daily set already exists AND we're not doing a partial fill, skip
+  if (existing.length > 0 && !categoriesToFill) return existing[0];
 
-  const { categories, catKey, defaultMap, questionPoolLabels } = getBrandCategoryConfig(brand);
+  const { categories: allCategories, catKey, defaultMap, questionPoolLabels } = getBrandCategoryConfig(brand);
+  // Only process the requested categories (or all if not specified)
+  const categories = categoriesToFill
+    ? allCategories.filter(c => categoriesToFill.includes(c))
+    : allCategories;
   const questionMap: Record<string, number | null> = { ...defaultMap };
 
-  const liveChallenges = await db
+  // Mark categories already covered by today's live OR archived challenges
+  const todaysChallenges = await db
     .select()
     .from(quickfireChallenges)
-    .where(and(eq(quickfireChallenges.status, "live" as never), eq(quickfireChallenges.brand, brand)));
+    .where(
+      and(
+        inArray(quickfireChallenges.status, ["live", "archived"] as never[]),
+        eq(quickfireChallenges.brand, brand),
+        eq(quickfireChallenges.publishDate, date),
+      )
+    );
 
-  for (const liveC of liveChallenges) {
+  for (const liveC of todaysChallenges) {
     if (!liveC.category) continue;
     const key = catKey[liveC.category];
     if (!key) continue;
@@ -243,7 +257,11 @@ export async function ensureTodaySet(
   }
 
   const questionIds = JSON.stringify(questionMap);
-  await db.insert(quickfireDailySets).values({ setDate: date, brand, questionIds });
+  // Use upsert so partial backfills (categoriesToFill) can update an existing daily set record
+  await db
+    .insert(quickfireDailySets)
+    .values({ setDate: date, brand, questionIds })
+    .onDuplicateKeyUpdate({ set: { questionIds } });
   return { setDate: date, questionIds };
 }
 

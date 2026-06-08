@@ -147,6 +147,9 @@ export async function runChallengeCron() {
       }
 
       const toPublish: typeof quickfireChallenges.$inferSelect[] = [];
+      const coveredCategories = new Set<string>();
+
+      // Step A: pick one queued/scheduled challenge per category
       for (const category of categories) {
         const [next] = await db
           .select()
@@ -166,15 +169,19 @@ export async function runChallengeCron() {
           )
           .orderBy(asc(quickfireChallenges.queuePosition), asc(quickfireChallenges.createdAt))
           .limit(1);
-        if (next) toPublish.push(next);
+        if (next) {
+          // Guard: never publish a challenge with no questions
+          const qIds: number[] = JSON.parse(next.questionIds || "[]");
+          if (qIds.length === 0) {
+            console.warn(`[ChallengeCron][${brand}] Skipping #${next.id} "${next.title}" — no questions attached.`);
+            continue;
+          }
+          toPublish.push(next);
+          coveredCategories.add(category);
+        }
       }
 
-      if (toPublish.length === 0) {
-        console.log(`[ChallengeCron][${brand}] No queued challenges — running backfill for ${todayStr}.`);
-        await ensureTodaySet(db, todayStr, brand);
-        continue;
-      }
-
+      // Step B: publish queued challenges
       for (const challenge of toPublish) {
         await db
           .update(quickfireChallenges)
@@ -183,8 +190,29 @@ export async function runChallengeCron() {
         console.log(`[ChallengeCron][${brand}] Published #${challenge.id}: "${challenge.title}" (${challenge.category})`);
       }
 
+      // Step C: backfill any categories that had no queued challenge
+      const missingCategories = categories.filter(cat => !coveredCategories.has(cat));
+      if (missingCategories.length > 0) {
+        console.log(`[ChallengeCron][${brand}] Backfilling ${missingCategories.length} missing categor${missingCategories.length === 1 ? 'y' : 'ies'} from question bank: ${missingCategories.join(", ")}`);
+        await ensureTodaySet(db, todayStr, brand, missingCategories);
+      }
+
+      if (toPublish.length === 0 && missingCategories.length === 0) {
+        // All categories already covered — nothing to do
+        continue;
+      }
+
       await syncIheUnsubscribes();
-      await sendChallengeNotifications(db, toPublish, todayStr, brand);
+
+      // Collect all live challenges for today (queued + backfilled) for the notification email
+      const allTodayLive = await db
+        .select()
+        .from(quickfireChallenges)
+        .where(and(eq(quickfireChallenges.status, "live"), eq(quickfireChallenges.publishDate, todayStr), eq(quickfireChallenges.brand, brand)));
+      const notifyList = allTodayLive.length > 0 ? allTodayLive : toPublish;
+      if (notifyList.length > 0) {
+        await sendChallengeNotifications(db, notifyList, todayStr, brand);
+      }
     }
 
   } catch (err) {
