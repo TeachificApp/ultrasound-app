@@ -2427,4 +2427,37 @@ export const adminUserRouter = router({
 
       return { success: true, email: user.email };
     }),
+
+  /**
+   * Directly set a student's password from the admin panel.
+   * Hashes the provided password and updates the user record immediately.
+   */
+  setPassword: protectedProcedure
+    .input(z.object({
+      userId: z.number(),
+      newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [user] = await db
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      const bcrypt = await import("bcryptjs");
+      const passwordHash = await bcrypt.hash(input.newPassword, 12);
+      await db
+        .update(users)
+        .set({
+          passwordHash,
+          // Clear any pending reset tokens so the new password takes effect immediately
+          passwordResetToken: null,
+          passwordResetExpiry: null,
+        })
+        .where(eq(users.id, user.id));
+      return { success: true, email: user.email };
+    }),
 });

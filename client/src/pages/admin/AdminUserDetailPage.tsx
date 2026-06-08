@@ -18,7 +18,7 @@ import {
   RefreshCw, Loader2, ChevronRight, ChevronLeft, ShoppingCart,
   UserCog, PlusCircle, Trash2, Shield, ShieldOff, BadgeCheck,
   ClipboardCheck, RotateCcw, DollarSign, Edit3, GitMerge, Mail, X,
-  Users2, Building2, Star, Layers, KeyRound,
+  Users2, Building2, Star, Layers, KeyRound, Eye, EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -226,6 +226,14 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: (res) => toast.success(`Password reset email sent to ${res.email}`),
     onError: (e) => toast.error(e.message),
   });
+  const setPasswordMutation = trpc.adminUser.setPassword.useMutation({
+    onSuccess: (res) => { toast.success(`Password updated for ${res.email}`); setSetPwOpen(false); setNewPassword(""); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [setPwOpen, setSetPwOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPw, setShowNewPw] = useState(false);
 
   const [grantOpen, setGrantOpen] = useState(false);
   const [grantBrand, setGrantBrand] = useState<"aaus" | "iheartecho">("aaus");
@@ -289,11 +297,22 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
                   onClick={() => sendPasswordReset.mutate({ userId })}
                   disabled={sendPasswordReset.isPending}
                   className="gap-1.5 text-orange-700 border-orange-200 hover:bg-orange-50"
+                  title="Send password reset email to student"
                 >
                   {sendPasswordReset.isPending
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <KeyRound className="w-3.5 h-3.5" />}
-                  Reset Password
+                    : <Mail className="w-3.5 h-3.5" />}
+                  Send Reset Link
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSetPwOpen(true)}
+                  className="gap-1.5 text-violet-700 border-violet-200 hover:bg-violet-50"
+                  title="Directly set a new password for this student"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  Set Password
                 </Button>
               </div>
             </div>
@@ -344,6 +363,54 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
           </div>
         ) : <p className="text-sm text-gray-500">No brand memberships yet.</p>}
       </div>
+
+      {/* Set Password Dialog */}
+      <Dialog open={setPwOpen} onOpenChange={(o) => { setSetPwOpen(o); if (!o) { setNewPassword(""); setShowNewPw(false); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set Password</DialogTitle>
+            <DialogDescription>Directly set a new password for this member. They will be able to log in immediately with the new password.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="admin-new-pw">New Password</Label>
+              <div className="relative mt-1">
+                <Input
+                  id="admin-new-pw"
+                  type={showNewPw ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Min. 8 characters"
+                  className="pr-10"
+                  onKeyDown={(e) => { if (e.key === "Enter" && newPassword.length >= 8) setPasswordMutation.mutate({ userId, newPassword }); }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPw(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {newPassword.length > 0 && newPassword.length < 8 && (
+                <p className="text-xs text-red-500 mt-1">Password must be at least 8 characters</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSetPwOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => setPasswordMutation.mutate({ userId, newPassword })}
+              disabled={newPassword.length < 8 || setPasswordMutation.isPending}
+              className="bg-violet-600 hover:bg-violet-700 text-white"
+            >
+              {setPasswordMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Set Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Profile Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
