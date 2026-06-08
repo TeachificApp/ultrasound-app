@@ -12,7 +12,7 @@
  */
 import { useState, useEffect } from "react";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
-import { useParams, useLocation, useSearch } from "wouter";
+import { useParams, useLocation, useSearch, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
