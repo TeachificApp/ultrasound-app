@@ -21,6 +21,8 @@ import {
   bundleEnrollments,
   bundleItems,
   bundles,
+  webinarRegistrations,
+  funnelPages,
 } from "../../drizzle/schema";
 import { getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
 import { generateAutoLoginToken } from "../routes/autoLogin";
@@ -35,6 +37,10 @@ export type MembershipFulfillmentContext = {
   discountCodeId?: number | null;
   customerEmail?: string | null;
   customerName?: string | null;
+  /** Unix timestamp (seconds) for when the current billing period ends */
+  currentPeriodEnd?: number | null;
+  /** Whether the subscription is set to cancel at period end */
+  cancelAtPeriodEnd?: boolean;
   /** Skip welcome email (e.g. when resending separately) */
   skipEmail?: boolean;
 };
@@ -275,6 +281,57 @@ async function grantBundle(
   return { title: bundle.title, slug: bundle.slug };
 }
 
+async function grantFunnelPageProduct(
+  db: MySql2Database<typeof schema>,
+  userId: number,
+  productType: string,
+  productId: number,
+  sessionId: string | null,
+  notes: string[],
+): Promise<void> {
+  switch (productType) {
+    case "course":
+    case "quiz":
+      await enrollCourseOrQuiz(db, userId, productId, notes);
+      break;
+    case "download":
+      await grantDownload(db, userId, productId, sessionId, notes);
+      break;
+    case "bundle":
+      await grantBundle(db, userId, productId, sessionId, notes);
+      break;
+    case "physical":
+      notes.push(`Physical product #${productId} requires manual fulfillment`);
+      break;
+    default:
+      notes.push(`Funnel product type "${productType}" #${productId} — skipped`);
+  }
+}
+
+async function grantFunnelProducts(
+  db: MySql2Database<typeof schema>,
+  userId: number,
+  funnelId: number,
+  sessionId: string | null,
+  notes: string[],
+): Promise<void> {
+  const pages = await db
+    .select({
+      productType: funnelPages.productType,
+      productId: funnelPages.productId,
+    })
+    .from(funnelPages)
+    .where(and(
+      eq(funnelPages.funnelId, funnelId),
+      eq(funnelPages.isActive, true),
+      sql`${funnelPages.productId} IS NOT NULL`,
+    ));
+  for (const page of pages) {
+    if (!page.productId || !page.productType) continue;
+    await grantFunnelPageProduct(db, userId, page.productType, page.productId, sessionId, notes);
+  }
+}
+
 export async function fulfillMembershipPlanAccess(
   db: MySql2Database<typeof schema>,
   userId: number,
@@ -330,10 +387,85 @@ export async function fulfillMembershipPlanAccess(
           }
           break;
         }
-        default:
-          if (item.itemId && (item.itemType === "product" || item.itemType === "webinar" || item.itemType === "community")) {
-            notes.push(`Skipped unsupported access type ${item.itemType} #${item.itemId}`);
+        case "all_bundles": {
+          const allBundles = await db.select({ id: bundles.id }).from(bundles);
+          for (const b of allBundles) {
+            await grantBundle(db, userId, b.id, ctx.sessionId ?? null, notes);
           }
+          break;
+        }
+        case "webinar": {
+          if (item.itemId) {
+            // Register user for webinar (idempotent)
+            const [existing] = await db
+              .select({ id: webinarRegistrations.id })
+              .from(webinarRegistrations)
+              .where(and(eq(webinarRegistrations.userId, userId), eq(webinarRegistrations.webinarId, item.itemId)))
+              .limit(1);
+            if (!existing) {
+              await db.insert(webinarRegistrations).values({
+                userId,
+                webinarId: item.itemId,
+              });
+              notes.push(`Webinar registration: #${item.itemId}`);
+            }
+          }
+          break;
+        }
+        case "all_webinars": {
+          // Grant access to all webinars by enrolling in all courses of type 'quiz' (webinar replays)
+          // Webinars themselves are registered on-demand; this ensures replay access
+          const webinarCourses = await db
+            .select({ id: lmsCourses.id })
+            .from(lmsCourses)
+            .where(and(eq(lmsCourses.status, "public")));
+          for (const c of webinarCourses) {
+            await enrollCourseOrQuiz(db, userId, c.id, notes);
+          }
+          break;
+        }
+        case "funnel": {
+          if (item.itemId) {
+            // Grant all products linked to checkout/upsell pages in this funnel
+            await grantFunnelProducts(db, userId, item.itemId, ctx.sessionId ?? null, notes);
+          }
+          break;
+        }
+        case "all_funnel_products": {
+          // Grant all products from all funnel checkout/upsell pages
+          const allFunnelPages = await db
+            .select({
+              productType: funnelPages.productType,
+              productId: funnelPages.productId,
+            })
+            .from(funnelPages)
+            .where(and(
+              eq(funnelPages.isActive, true),
+              sql`${funnelPages.productId} IS NOT NULL`,
+            ));
+          for (const page of allFunnelPages) {
+            if (!page.productId || !page.productType) continue;
+            await grantFunnelPageProduct(db, userId, page.productType, page.productId, ctx.sessionId ?? null, notes);
+          }
+          break;
+        }
+        case "cohort": {
+          // Cohort enrollment is handled by the course enrollment (cohort courses are lmsCourses)
+          if (item.itemId) await enrollCourseOrQuiz(db, userId, item.itemId, notes);
+          break;
+        }
+        case "physical_product":
+        case "product":
+          // Physical products require manual fulfillment — log for owner notification
+          notes.push(`Physical product #${item.itemId ?? "unknown"} requires manual fulfillment`);
+          break;
+        case "community":
+          // Community access is handled by brand membership tier — no separate action needed
+          notes.push(`Community access included via brand membership`);
+          break;
+        default:
+          // Future-proof: log any unrecognized item type but don't crash
+          notes.push(`Unknown access type "${item.itemType}" #${item.itemId ?? "?"} — skipped (add handler when ready)`);
           break;
       }
     } catch (err) {
@@ -457,14 +589,19 @@ export async function fulfillMembershipPurchase(
     if (byUserPlan) existingSub = byUserPlan;
   }
 
+  const periodEnd = ctx.currentPeriodEnd ?? null;
+  const cancelAtEnd = ctx.cancelAtPeriodEnd ?? false;
+
   if (existingSub) {
     await db
       .update(membershipSubscriptions)
       .set({
-        status: "active",
+        status: cancelAtEnd ? "active" : "active",
         userId,
         stripeSubscriptionId: stripeSubscriptionId ?? undefined,
         stripeCustomerId: stripeCustomerId ?? undefined,
+        currentPeriodEnd: periodEnd ?? undefined,
+        cancelAtPeriodEnd: cancelAtEnd,
         updatedAt: new Date(),
       })
       .where(eq(membershipSubscriptions.id, existingSub.id));
@@ -476,7 +613,8 @@ export async function fulfillMembershipPurchase(
       status: "active",
       stripeSubscriptionId,
       stripeCustomerId,
-      currentPeriodEnd: null,
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd: cancelAtEnd,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -558,6 +696,8 @@ export async function reconcileMembershipFromStripeSession(
     const lineItems = session.line_items as { data?: Array<{ price?: { id?: string } }> } | undefined;
     stripePriceId = lineItems?.data?.[0]?.price?.id ?? null;
   } catch { /* optional */ }
+  // Also check metadata.stripe_price_id (set by bulk reconcile for subscriptions without checkout sessions)
+  if (!stripePriceId && meta.stripe_price_id) stripePriceId = meta.stripe_price_id;
 
   const planId = await resolveMembershipPlanId(db, {
     planId: meta.plan_id ? parseInt(meta.plan_id, 10) : null,
@@ -598,6 +738,8 @@ export async function reconcileMembershipFromStripeSession(
     discountCodeId: meta.discount_code_id ? parseInt(meta.discount_code_id, 10) : null,
     customerEmail,
     customerName,
+    currentPeriodEnd: (session.current_period_end as number) ?? null,
+    cancelAtPeriodEnd: (session.cancel_at_period_end as boolean) ?? false,
   });
 
   if (result.success) {

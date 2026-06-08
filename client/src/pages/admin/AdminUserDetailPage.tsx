@@ -996,6 +996,9 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const [cancelNativeSubConfirm, setCancelNativeSubConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
   const [revokeNativeSubConfirm, setRevokeNativeSubConfirm] = useState<number | null>(null);
   const [cancelLmsOrderConfirm, setCancelLmsOrderConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
+  const [addSubOpen, setAddSubOpen] = useState(false);
+  const [addSubStripeId, setAddSubStripeId] = useState("");
+  const [addSubEmail, setAddSubEmail] = useState("");
 
   const grantMembership = trpc.adminUser.grantBrandMembership.useMutation({
     onSuccess: () => { toast.success("App access granted."); refetch(); setGrantOpen(false); },
@@ -1020,6 +1023,16 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const cancelLmsOrderSub = trpc.adminUser.cancelLmsOrderSubscription.useMutation({
     onSuccess: () => { toast.success("Course subscription cancelled at period end."); refetch(); setCancelLmsOrderConfirm(null); },
     onError: (e) => toast.error(e.message),
+  });
+  const addSubscription = trpc.membership.reconcileStripeMembership.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Subscription synced. Notes: ${res.notes?.join(", ") || "done"}.`);
+      refetch();
+      setAddSubOpen(false);
+      setAddSubStripeId("");
+      setAddSubEmail("");
+    },
+    onError: (e) => toast.error(`Sync failed: ${e.message}`),
   });
 
   const memberships = data.memberships ?? [];
@@ -1161,7 +1174,18 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
 
       {/* ── Learn Subscriptions Section ── */}
       <div>
-        <SectionHeader title={`Learn Subscriptions (${nativeMemberships.length})`} />
+        <SectionHeader
+          title={`Learn Subscriptions (${nativeMemberships.length})`}
+          action={
+            <Button
+              size="sm"
+              onClick={() => { setAddSubEmail(data.user?.email ?? ""); setAddSubOpen(true); }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Add Subscription from Stripe
+            </Button>
+          }
+        />
         <p className="text-xs text-gray-400 mb-3">Ongoing LMS membership subscriptions from the Learn platform</p>
         {nativeMemberships.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">No active learn subscriptions.</p>
@@ -1206,6 +1230,54 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
           </div>
         )}
       </div>
+
+      {/* Add Subscription from Stripe dialog */}
+      <Dialog open={addSubOpen} onOpenChange={(open) => { if (!open) { setAddSubOpen(false); setAddSubStripeId(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Subscription from Stripe</DialogTitle>
+            <DialogDescription>
+              Fetch a Stripe subscription and grant all plan access items to this user.
+              The subscription must be linked to a membership plan via its Stripe price ID.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Stripe Subscription ID</Label>
+              <Input
+                placeholder="sub_1Tg4osBj9HgnkZLKAf9B84xu"
+                value={addSubStripeId}
+                onChange={e => setAddSubStripeId(e.target.value.trim())}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-gray-400">Find this in Stripe Dashboard → Customers → Subscriptions</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>User Email (for matching)</Label>
+              <Input
+                placeholder="user@example.com"
+                value={addSubEmail}
+                onChange={e => setAddSubEmail(e.target.value.trim())}
+              />
+              <p className="text-xs text-gray-400">Pre-filled from user profile. Used if Stripe metadata doesn&apos;t include email.</p>
+            </div>
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700">
+              <strong>Note:</strong> This runs full membership fulfillment — granting all courses, downloads, bundles, and app access linked to the plan. Idempotent: safe to run multiple times.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddSubOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => addSubscription.mutate({ stripeSubscriptionId: addSubStripeId, email: addSubEmail || undefined, userId })}
+              disabled={!addSubStripeId || addSubscription.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {addSubscription.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Sync &amp; Grant Access
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Grant dialog */}
       <Dialog open={grantOpen} onOpenChange={setGrantOpen}>

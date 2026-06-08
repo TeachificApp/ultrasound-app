@@ -2120,12 +2120,12 @@ export const adminUserRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const q = `%${input.query.trim()}%`;
       const rows = await db
-        .select({ id: users.id, name: users.name, email: users.email, avatarUrl: users.avatarUrl, createdAt: users.createdAt })
+        .select({ id: users.id, name: users.name, email: users.email, avatarUrl: users.avatarUrl, createdAt: users.createdAt, isPending: users.isPending })
         .from(users)
         .where(and(
           sql`(LOWER(${users.email}) LIKE LOWER(${q}) OR LOWER(${users.name}) LIKE LOWER(${q}))`,
           sql`${users.id} != ${input.excludeUserId}`,
-          eq(users.isPending, false),
+          // Include isPending accounts so same-email duplicates (race-condition accounts) are findable
         ))
         .limit(10);
       return rows;

@@ -12,10 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
+import { useState } from "react";
 import {
   Plus, Edit2, Trash2, Eye, EyeOff, Tag, Users, Package, LayoutTemplate,
   ChevronRight, GripVertical, X, Copy, RefreshCw, DollarSign, Percent,
-  BookOpen, Download, Globe, Lock, Settings, FileText, Award, Search
+  BookOpen, Download, Globe, Lock, Settings, FileText, Award, Search,
+  Loader2, CheckCircle2, AlertTriangle, RotateCcw
 } from "lucide-react";
 import MembershipPageBuilder from "@/components/MembershipPageBuilder";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
@@ -380,6 +382,9 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
           <TabsTrigger value="checkout-page" className="text-xs data-[state=active]:bg-white">
             <DollarSign className="w-3.5 h-3.5 mr-1" /> Checkout Page
           </TabsTrigger>
+          <TabsTrigger value="reconcile" className="text-xs data-[state=active]:bg-white">
+            <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reconcile Stripe
+          </TabsTrigger>
         </TabsList>
 
         <div className="flex-1 overflow-y-auto">
@@ -455,8 +460,184 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
               </div>
             </div>
           </TabsContent>
+
+          <TabsContent value="reconcile" className="m-0 p-6">
+            <StripeReconcileTab planId={planId} stripePriceId={plan.stripePriceId} />
+          </TabsContent>
         </div>
       </Tabs>
+    </div>
+  );
+}
+
+// ─── Stripe Reconcile Tab ───────────────────────────────────────────────────────────────────
+
+function StripeReconcileTab({ planId, stripePriceId }: { planId: number; stripePriceId: string | null }) {
+  const [results, setResults] = useState<Array<{
+    subscriptionId: string;
+    customerEmail: string | null;
+    priceId: string | null;
+    status: "fulfilled" | "skipped" | "error" | "dry_run";
+    notes: string[];
+    error?: string;
+    userId?: number | null;
+  }> | null>(null);
+  const [summary, setSummary] = useState<{ processed: number; fulfilled: number; errors: number; skipped: number } | null>(null);
+  const [dryRun, setDryRun] = useState(false);
+  const [limitVal, setLimitVal] = useState("200");
+
+  const reconcileMutation = trpc.membership.bulkReconcileStripeSubscriptions.useMutation({
+    onSuccess: (data) => {
+      setResults(data.results);
+      setSummary({ processed: data.processed, fulfilled: data.fulfilled, errors: data.errors, skipped: data.skipped });
+      if (data.errors > 0) {
+        toast.error(`Reconcile complete with ${data.errors} error(s). Check results below.`);
+      } else {
+        toast.success(`Reconcile complete: ${data.fulfilled} fulfilled, ${data.skipped} skipped.`);
+      }
+    },
+    onError: (e) => toast.error(`Reconcile failed: ${e.message}`),
+  });
+
+  const STATUS_COLORS: Record<string, string> = {
+    fulfilled: "bg-green-100 text-green-700 border-green-200",
+    error: "bg-red-100 text-red-600 border-red-200",
+    skipped: "bg-gray-100 text-gray-500 border-gray-200",
+    dry_run: "bg-blue-100 text-blue-700 border-blue-200",
+  };
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div>
+        <h3 className="text-base font-semibold text-gray-900">Reconcile Stripe Subscriptions</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Syncs all active Stripe subscriptions for this plan to the database — creating subscription records,
+          granting all plan access items (courses, downloads, bundles, app access), and updating billing details.
+          This is idempotent: safe to run multiple times.
+        </p>
+      </div>
+
+      {!stripePriceId && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-sm text-amber-700">
+            This plan has no Stripe Price ID configured. Set it in the Settings tab first so subscriptions can be matched.
+          </p>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Stripe Price ID (pre-filled from plan)</Label>
+            <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm font-mono text-gray-600">
+              {stripePriceId ?? <span className="text-gray-400 italic">Not configured</span>}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Max subscriptions to process</Label>
+            <Input
+              type="number"
+              min={1}
+              max={500}
+              value={limitVal}
+              onChange={e => setLimitVal(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="dryRun"
+            checked={dryRun}
+            onChange={e => setDryRun(e.target.checked)}
+            className="rounded"
+          />
+          <label htmlFor="dryRun" className="text-sm text-gray-600">
+            Dry run (preview only — no DB writes)
+          </label>
+        </div>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => reconcileMutation.mutate({
+              priceId: stripePriceId ?? undefined,
+              limit: Math.min(500, Math.max(1, parseInt(limitVal) || 200)),
+              dryRun,
+            })}
+            disabled={reconcileMutation.isPending || !stripePriceId}
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+          >
+            {reconcileMutation.isPending
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reconciling...</>
+              : <><RotateCcw className="w-4 h-4 mr-2" /> {dryRun ? "Preview (Dry Run)" : "Reconcile All Subscriptions"}</>}
+          </Button>
+          {results && (
+            <Button variant="outline" onClick={() => { setResults(null); setSummary(null); }}>
+              Clear Results
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {summary && (
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { label: "Processed", value: summary.processed, color: "text-gray-700", bg: "bg-gray-50 border-gray-200" },
+            { label: "Fulfilled", value: summary.fulfilled, color: "text-green-700", bg: "bg-green-50 border-green-200" },
+            { label: "Errors", value: summary.errors, color: "text-red-700", bg: "bg-red-50 border-red-200" },
+            { label: "Skipped", value: summary.skipped, color: "text-gray-500", bg: "bg-gray-50 border-gray-200" },
+          ].map(s => (
+            <div key={s.label} className={`rounded-lg border p-3 ${s.bg}`}>
+              <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+              <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {results && results.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Results ({results.length})</span>
+            <span className="text-xs text-gray-400">Showing all processed subscriptions</span>
+          </div>
+          <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-gray-50 border-b">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Subscription ID</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Email</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Status</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">User ID</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Notes / Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((r, i) => (
+                  <tr key={i} className="border-b hover:bg-gray-50">
+                    <td className="px-3 py-2 font-mono text-gray-500">{r.subscriptionId}</td>
+                    <td className="px-3 py-2 text-gray-700">{r.customerEmail ?? <span className="text-gray-400">—</span>}</td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[r.status] ?? ""}`}>
+                        {r.status === "fulfilled" && <CheckCircle2 className="w-3 h-3" />}
+                        {r.status === "error" && <AlertTriangle className="w-3 h-3" />}
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">{r.userId ?? "—"}</td>
+                    <td className="px-3 py-2 text-gray-600 max-w-xs">
+                      {r.error
+                        ? <span className="text-red-600">{r.error}</span>
+                        : r.notes.join(", ") || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

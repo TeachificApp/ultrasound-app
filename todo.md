@@ -4718,3 +4718,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Mark all stuck pending/processing/failed ZIP versions as skipped (13 assets) — serve via zip-stream
 - [x] 8 new tests for r2_zip_stream plan resolution (all passing)
 - [x] Install yauzl for random-access ZIP reading
+
+## Stripe Membership Architecture (Jun 2026)
+- [x] Fix fulfillment: sync currentPeriodEnd + cancelAtPeriodEnd from Stripe into membershipSubscriptions on every reconcile
+- [x] Build bulk reconciliation backend: tRPC procedure pages all Stripe subscriptions, matches by price ID, runs full fulfillment for each
+- [x] Admin UI: Reconcile All Stripe Subscriptions panel with progress log, per-sub results, cancel button per subscription
+- [x] Student dashboard: membership subscription card with plan name, status, renewal date, price, Cancel button; show granted enrollments and downloads under My Membership
+- [x] Add stripeEventId idempotency column to webhookEvents table and deduplicate in webhook handler
+- [x] Harden webhook: membership subscription lifecycle handler wired to customer.subscription.updated/deleted
+- [x] Fix searchUsersForMerge to include isPending accounts
+- [x] Add Subscription from Stripe button in admin Subscriptions tab
+- [x] Write tests for cancel/reactivate logic and webhook idempotency (11 tests passing)

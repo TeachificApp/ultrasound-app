@@ -11,6 +11,7 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, desc, asc, isNull, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { notifyOwner } from "../_core/notification";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -505,6 +506,69 @@ const manualEnroll = adminProcedure
     return { success: true, notes };
   });
 
+// ─── Student-Accessible Subscription Management ─────────────────────────────
+
+const cancelMembershipSubscription = protectedProcedure
+  .input(z.object({ subscriptionId: z.number().int().positive() }))
+  .mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+    // Verify ownership
+    const [sub] = await db
+      .select()
+      .from(membershipSubscriptions)
+      .where(and(eq(membershipSubscriptions.id, input.subscriptionId), eq(membershipSubscriptions.userId, ctx.user.id)))
+      .limit(1);
+
+    if (!sub) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
+
+    if (sub.stripeSubscriptionId) {
+      // Cancel at period end via Stripe so student keeps access until billing period ends
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      await stripe.subscriptions.update(sub.stripeSubscriptionId, { cancel_at_period_end: true });
+      // Update local record
+      await db.update(membershipSubscriptions)
+        .set({ cancelAtPeriodEnd: true })
+        .where(eq(membershipSubscriptions.id, sub.id));
+      return { success: true, message: "Your subscription will be cancelled at the end of the current billing period. You will retain access until then." };
+    } else {
+      // No Stripe sub — cancel immediately in DB
+      await db.update(membershipSubscriptions)
+        .set({ status: "cancelled" })
+        .where(eq(membershipSubscriptions.id, sub.id));
+      return { success: true, message: "Your subscription has been cancelled." };
+    }
+  });
+
+const reactivateMembershipSubscription = protectedProcedure
+  .input(z.object({ subscriptionId: z.number().int().positive() }))
+  .mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+    const [sub] = await db
+      .select()
+      .from(membershipSubscriptions)
+      .where(and(eq(membershipSubscriptions.id, input.subscriptionId), eq(membershipSubscriptions.userId, ctx.user.id)))
+      .limit(1);
+
+    if (!sub) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
+    if (!sub.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "This subscription cannot be reactivated here." });
+
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+    await stripe.subscriptions.update(sub.stripeSubscriptionId, { cancel_at_period_end: false });
+    await db.update(membershipSubscriptions)
+      .set({ cancelAtPeriodEnd: false })
+      .where(eq(membershipSubscriptions.id, sub.id));
+
+    return { success: true, message: "Your subscription has been reactivated." };
+  });
+
+// ─── Admin Enrollment Management ─────────────────────────────────────────────
+
 const cancelEnrollment = adminProcedure
   .input(z.object({ subscriptionId: z.number() }))
   .mutation(async ({ input }) => {
@@ -816,6 +880,8 @@ const reconcileStripeMembership = adminProcedure
     stripeCheckoutSessionId: z.string().optional(),
     stripeSubscriptionId: z.string().optional(),
     email: z.string().email().optional(),
+    /** Force-assign to a specific user ID (admin override — bypasses email lookup) */
+    userId: z.number().int().optional(),
   }))
   .mutation(async ({ input }) => {
     if (!input.stripeCheckoutSessionId && !input.stripeSubscriptionId) {
@@ -828,26 +894,49 @@ const reconcileStripeMembership = adminProcedure
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
     let session: Record<string, unknown> | null = null;
+    let stripeSubData: Record<string, unknown> | null = null;
+
     if (input.stripeCheckoutSessionId) {
       const s = await stripe.checkout.sessions.retrieve(input.stripeCheckoutSessionId, { expand: ["line_items"] });
       session = s as unknown as Record<string, unknown>;
+      // Also fetch subscription to get billing period details
+      if (s.subscription) {
+        const sub = await stripe.subscriptions.retrieve(s.subscription as string);
+        stripeSubData = sub as unknown as Record<string, unknown>;
+      }
     } else if (input.stripeSubscriptionId) {
       const sub = await stripe.subscriptions.retrieve(input.stripeSubscriptionId);
+      stripeSubData = sub as unknown as Record<string, unknown>;
       const sessions = await stripe.checkout.sessions.list({ subscription: input.stripeSubscriptionId, limit: 1 });
       if (sessions.data[0]) {
         session = sessions.data[0] as unknown as Record<string, unknown>;
       } else {
+        // Build a synthetic session from the subscription
+        const priceId = sub.items?.data?.[0]?.price?.id ?? null;
+        const meta: Record<string, string> = { ...(sub.metadata ?? {}), type: "membership" };
+        if (priceId) meta.stripe_price_id = priceId;
         session = {
           id: `reconcile_sub_${input.stripeSubscriptionId}`,
-          metadata: sub.metadata ?? {},
+          metadata: meta,
           subscription: sub.id,
           customer: sub.customer,
           customer_email: input.email ?? undefined,
           amount_total: sub.items?.data?.[0]?.price?.unit_amount ?? 0,
           status: "complete",
+          line_items: { data: [{ price: { id: priceId } }] },
         };
-        if (!session.metadata || !(session.metadata as Record<string, string>).type) {
-          (session.metadata as Record<string, string>).type = "membership";
+      }
+    }
+
+    // Always enrich session with live subscription billing data
+    if (session && stripeSubData) {
+      session.current_period_end = (stripeSubData as any).current_period_end ?? null;
+      session.cancel_at_period_end = (stripeSubData as any).cancel_at_period_end ?? false;
+      // Ensure line_items has price ID for plan resolution
+      if (!(session as any).line_items?.data?.[0]?.price?.id) {
+        const priceId = (stripeSubData as any).items?.data?.[0]?.price?.id ?? null;
+        if (priceId) {
+          session.line_items = { data: [{ price: { id: priceId } }] };
         }
       }
     }
@@ -856,12 +945,150 @@ const reconcileStripeMembership = adminProcedure
       throw new TRPCError({ code: "NOT_FOUND", message: "Could not load Stripe checkout session" });
     }
 
+    // Admin userId override: inject into session metadata so resolveMembershipUserId uses it
+    if (input.userId) {
+      const meta = (session.metadata as Record<string, string>) ?? {};
+      meta.user_id = String(input.userId);
+      session.metadata = meta;
+    }
+
     const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
     const result = await reconcileMembershipFromStripeSession(db as any, session);
     if (!result.success) {
       throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Reconciliation failed" });
     }
     return result;
+  });
+
+// ─── Bulk Reconcile All Stripe Subscriptions ────────────────────────────────
+/**
+ * Pages through ALL Stripe subscriptions (active + past_due + trialing),
+ * matches each to a membership plan by price ID, and runs full fulfillment.
+ * Returns a per-subscription result log for the admin UI.
+ */
+const bulkReconcileStripeSubscriptions = adminProcedure
+  .input(z.object({
+    /** Limit to a specific Stripe price ID (optional — leave empty to process all) */
+    priceId: z.string().optional(),
+    /** Max subscriptions to process in one call (default 200, max 500) */
+    limit: z.number().int().min(1).max(500).default(200),
+    /** Dry run: resolve plan/user but skip DB writes */
+    dryRun: z.boolean().default(false),
+  }))
+  .mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+    const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
+
+    // Fetch all known plan price IDs so we can skip non-membership subscriptions
+    const allPlans = await db.select({ id: membershipPlans.id, stripePriceId: membershipPlans.stripePriceId }).from(membershipPlans);
+    const knownPriceIds = new Set(allPlans.map(p => p.stripePriceId).filter(Boolean));
+
+    const results: Array<{
+      subscriptionId: string;
+      customerEmail: string | null;
+      priceId: string | null;
+      status: "fulfilled" | "skipped" | "error" | "dry_run";
+      notes: string[];
+      error?: string;
+      userId?: number | null;
+    }> = [];
+
+    let processed = 0;
+    let startingAfter: string | undefined = undefined;
+
+    while (processed < input.limit) {
+      const batchSize = Math.min(100, input.limit - processed);
+      const listParams: Record<string, unknown> = {
+        limit: batchSize,
+        status: "all",
+        expand: ["data.customer"],
+      };
+      if (startingAfter) listParams.starting_after = startingAfter;
+      if (input.priceId) listParams.price = input.priceId;
+
+      const batch = await stripe.subscriptions.list(listParams as any);
+      if (batch.data.length === 0) break;
+
+      for (const sub of batch.data) {
+        const priceId = sub.items?.data?.[0]?.price?.id ?? null;
+        const customerEmail = typeof sub.customer === "object" && sub.customer !== null
+          ? (sub.customer as any).email ?? null
+          : null;
+
+        // Skip non-membership subscriptions unless a specific priceId was requested
+        if (!input.priceId && priceId && !knownPriceIds.has(priceId)) {
+          results.push({ subscriptionId: sub.id, customerEmail, priceId, status: "skipped", notes: ["Not a membership price ID"] });
+          continue;
+        }
+
+        // Skip cancelled subscriptions (they've already been handled by webhook)
+        if (sub.status === "canceled") {
+          results.push({ subscriptionId: sub.id, customerEmail, priceId, status: "skipped", notes: ["Subscription cancelled"] });
+          continue;
+        }
+
+        if (input.dryRun) {
+          results.push({ subscriptionId: sub.id, customerEmail, priceId, status: "dry_run", notes: [`Would reconcile — status: ${sub.status}`] });
+          continue;
+        }
+
+        try {
+          const meta: Record<string, string> = { ...(sub.metadata ?? {}), type: "membership" };
+          if (priceId) meta.stripe_price_id = priceId;
+          const session: Record<string, unknown> = {
+            id: `bulk_reconcile_${sub.id}`,
+            metadata: meta,
+            subscription: sub.id,
+            customer: typeof sub.customer === "object" ? (sub.customer as any).id : sub.customer,
+            customer_email: customerEmail,
+            amount_total: sub.items?.data?.[0]?.price?.unit_amount ?? 0,
+            status: "complete",
+            line_items: { data: [{ price: { id: priceId } }] },
+            current_period_end: sub.current_period_end ?? null,
+            cancel_at_period_end: sub.cancel_at_period_end ?? false,
+          };
+
+          const result = await reconcileMembershipFromStripeSession(db as any, session);
+          results.push({
+            subscriptionId: sub.id,
+            customerEmail,
+            priceId,
+            status: result.success ? "fulfilled" : "error",
+            notes: result.notes,
+            error: result.error,
+            userId: result.userId,
+          });
+        } catch (err: any) {
+          results.push({
+            subscriptionId: sub.id,
+            customerEmail,
+            priceId,
+            status: "error",
+            notes: [],
+            error: err?.message ?? "Unknown error",
+          });
+        }
+      }
+
+      processed += batch.data.length;
+      if (!batch.has_more) break;
+      startingAfter = batch.data[batch.data.length - 1].id;
+    }
+
+    const fulfilled = results.filter(r => r.status === "fulfilled").length;
+    const errors = results.filter(r => r.status === "error").length;
+    const skipped = results.filter(r => r.status === "skipped").length;
+
+    await notifyOwner({
+      title: `🔄 Bulk Stripe Reconcile Complete`,
+      content: `Processed ${processed} subscriptions. Fulfilled: ${fulfilled}, Errors: ${errors}, Skipped: ${skipped}.`,
+    }).catch(() => {});
+
+    return { processed, fulfilled, errors, skipped, results };
   });
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -901,4 +1128,7 @@ export const membershipRouter = router({
   guestCheckoutRegister: guestMembershipCheckoutRegister,
   getCheckoutSessionStatus: getMembershipCheckoutSessionStatus,
   reconcileStripeMembership,
+  bulkReconcileStripeSubscriptions,
+  cancelMembershipSubscription,
+  reactivateMembershipSubscription,
 });

@@ -1381,6 +1381,50 @@ async function handleDiyCheckoutCompleted(session: Record<string, unknown>) {
 }
 
 /**
+ * Handle membership plan subscription lifecycle (renewal, cancellation, update).
+ * Updates membershipSubscriptions table with current status, currentPeriodEnd, cancelAtPeriodEnd.
+ */
+async function handleMembershipSubscriptionLifecycle(subscription: Record<string, unknown>, eventType: string) {
+  const subscriptionId = subscription.id as string;
+  if (!subscriptionId) return;
+  const db = await getDb();
+  if (!db) return;
+
+  const [sub] = await db
+    .select()
+    .from(membershipSubscriptions)
+    .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId))
+    .limit(1);
+  if (!sub) return; // Not a plan-based membership subscription
+
+  const status = subscription.status as string;
+  const periodEnd = subscription.current_period_end as number | undefined;
+  const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
+  const cancelAtPeriodEnd = (subscription.cancel_at_period_end as boolean) ?? false;
+
+  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
+    await db.update(membershipSubscriptions)
+      .set({ status: "cancelled", cancelAtPeriodEnd: false })
+      .where(eq(membershipSubscriptions.id, sub.id));
+    console.log(`[Stripe] Membership subscription cancelled: sub ${sub.id}, plan ${sub.planId}`);
+  } else if (status === "past_due") {
+    await db.update(membershipSubscriptions)
+      .set({ status: "past_due", ...(currentPeriodEnd ? { currentPeriodEnd } : {}), cancelAtPeriodEnd })
+      .where(eq(membershipSubscriptions.id, sub.id));
+    console.log(`[Stripe] Membership subscription past_due: sub ${sub.id}`);
+  } else if (status === "active" || status === "trialing") {
+    await db.update(membershipSubscriptions)
+      .set({
+        status: status as "active" | "trialing",
+        ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
+        cancelAtPeriodEnd,
+      })
+      .where(eq(membershipSubscriptions.id, sub.id));
+    console.log(`[Stripe] Membership subscription updated: sub ${sub.id}, status=${status}, cancelAtPeriodEnd=${cancelAtPeriodEnd}`);
+  }
+}
+
+/**
  * Handle DIY subscription lifecycle (renewal, cancellation, plan change).
  */
 async function handleDiySubscriptionLifecycle(subscription: Record<string, unknown>, eventType: string) {
@@ -1539,11 +1583,40 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
 
   const eventType = event.type as string;
   const eventId = event.id as string;
+
+  // ── Test event short-circuit (required by Stripe sandbox verification) ───────
+  if (eventId && eventId.startsWith("evt_test_")) {
+    console.log("[Stripe] Test event detected, returning verification response");
+    res.json({ verified: true });
+    return;
+  }
+
   const logDb = await getDb();
+
+  // ── Idempotency check — skip if we've already processed this event ────────────
+  if (logDb && eventId) {
+    try {
+      const [existing] = await logDb
+        .select({ id: webhookEvents.id })
+        .from(webhookEvents)
+        .where(eq(webhookEvents.stripeEventId, eventId))
+        .limit(1);
+      if (existing) {
+        console.log(`[Stripe] Duplicate event ${eventId} (${eventType}) — skipping`);
+        res.json({ received: true, duplicate: true });
+        return;
+      }
+    } catch (err) {
+      console.warn("[Stripe] Idempotency check failed:", err);
+    }
+  }
+
+  // ── Log the event ─────────────────────────────────────────────────────────────
   try {
     if (logDb) {
       await logDb.insert(webhookEvents).values({
         source: "stripe",
+        stripeEventId: eventId ?? null,
         resource: eventType.split(".")[0] ?? "checkout",
         action: eventType.split(".").slice(1).join(".") ?? eventType,
         email: undefined,
@@ -1575,6 +1648,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
     } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
       await handleBrandSubscriptionLifecycle(sessionObj, eventType);
       await handleDiySubscriptionLifecycle(sessionObj, eventType);
+      await handleMembershipSubscriptionLifecycle(sessionObj, eventType);
     } else if (eventType === "invoice.paid") {
       await handleInvoicePaid(sessionObj);
     } else if (eventType === "invoice.payment_failed") {
