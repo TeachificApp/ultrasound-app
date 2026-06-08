@@ -475,6 +475,17 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
   router.get([slugPath, `${slugPath}/*`], async (req: Request, res: Response) => {
     setCorsHeaders(res);
     try {
+    // Redirect /scorm → /scorm/ so relative paths in the SCORM HTML resolve correctly.
+    // Without the trailing slash, a browser at /media/:slug/scorm resolves
+    // relative paths like "data/player.js" as /media/:slug/data/player.js (wrong).
+    // With the trailing slash, they resolve as /media/:slug/scorm/data/player.js (correct).
+    const isLaunchRequest = req.path.endsWith('/scorm') || req.path.endsWith('/scorm/');
+    const hasTrailingSlash = req.path.endsWith('/');
+    if (isLaunchRequest && !hasTrailingSlash && !req.query.noredirect) {
+      const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+      res.redirect(301, req.path + '/' + qs);
+      return;
+    }
     const auth = readMediaAuth(req);
     const result = await resolveMedia(req.params.slug, auth);
 
