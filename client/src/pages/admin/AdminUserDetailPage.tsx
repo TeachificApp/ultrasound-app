@@ -480,6 +480,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+  const [courseSearch, setCourseSearch] = useState("");
   const [enrollPaymentMode, setEnrollPaymentMode] = useState<"free" | "link" | "charge">("free");
   const [enrollStripePI, setEnrollStripePI] = useState("");
   const [enrollCardToken, setEnrollCardToken] = useState("");
@@ -923,7 +924,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       <Dialog open={enrollOpen} onOpenChange={(open) => {
         setEnrollOpen(open);
         if (!open) {
-          setSelectedCourseId(""); setEnrollPaymentMode("free");
+          setSelectedCourseId(""); setCourseSearch(""); setEnrollPaymentMode("free");
           setEnrollStripePI(""); setEnrollCardToken(""); setEnrollAmountCents(""); setEnrollNote("");
         }
       }}>
@@ -933,15 +934,49 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
             <DialogDescription>Manually enroll this user in an LMS course. Choose a payment mode below.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {/* Course selector */}
+            {/* Course selector with search */}
             <div className="space-y-1.5">
               <Label>Course</Label>
+              <Input
+                placeholder="Search courses, quizzes, cohorts..."
+                value={courseSearch}
+                onChange={(e) => setCourseSearch(e.target.value)}
+                className="mb-1"
+              />
               <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
-                <SelectTrigger><SelectValue placeholder="Choose a course..." /></SelectTrigger>
-                <SelectContent>
-                  {(allCourses ?? []).map((c: any) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
-                  ))}
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a course...">
+                    {selectedCourseId
+                      ? (allCourses ?? []).find((c: any) => String(c.id) === selectedCourseId)?.title ?? "Selected"
+                      : "Choose a course..."}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {(() => {
+                    const filtered = (allCourses ?? []).filter((c: any) =>
+                      !courseSearch || c.title.toLowerCase().includes(courseSearch.toLowerCase())
+                    );
+                    if (filtered.length === 0) return <div className="px-3 py-2 text-sm text-gray-400">No courses found</div>;
+                    const typeOrder = ["course", "cohort", "quiz", "download"];
+                    const grouped: Record<string, any[]> = {};
+                    for (const c of filtered) {
+                      const t = c.type ?? "course";
+                      if (!grouped[t]) grouped[t] = [];
+                      grouped[t].push(c);
+                    }
+                    return typeOrder.filter(t => grouped[t]?.length).flatMap(t => [
+                      <div key={`hdr-${t}`} className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">
+                        {t === "cohort" ? "Live Cohorts" : t === "quiz" ? "Quizzes" : t === "download" ? "Downloads" : "Courses"}
+                      </div>,
+                      ...grouped[t].map((c: any) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          <span className={c.status === "draft" ? "text-gray-400" : ""}>
+                            {c.title}{c.status === "draft" ? " (draft)" : ""}
+                          </span>
+                        </SelectItem>
+                      ))
+                    ]);
+                  })()}
                 </SelectContent>
               </Select>
             </div>

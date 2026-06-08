@@ -419,7 +419,7 @@ export const adminUserRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     return db
-      .select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug })
+      .select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, status: lmsCourses.status })
       .from(lmsCourses)
       .orderBy(lmsCourses.title);
   }),
@@ -1824,7 +1824,28 @@ export const adminUserRouter = router({
       if (fields.displayName !== undefined) updateData.displayName = fields.displayName || null;
       if (fields.firstName !== undefined) updateData.firstName = fields.firstName || null;
       if (fields.lastName !== undefined) updateData.lastName = fields.lastName || null;
-      if (fields.email !== undefined) updateData.email = fields.email;
+      if (fields.email !== undefined) {
+        const newEmail = fields.email.trim().toLowerCase();
+        updateData.email = newEmail;
+        // Safety: if a pending/ghost user already exists with the new email (e.g. created by Thinkific sync),
+        // delete it before updating so we don't end up with a duplicate account.
+        const [conflicting] = await db
+          .select({ id: users.id, isPending: users.isPending })
+          .from(users)
+          .where(and(sql`LOWER(${users.email}) = ${newEmail}`, sql`${users.id} != ${userId}`))
+          .limit(1);
+        if (conflicting) {
+          if (conflicting.isPending) {
+            // Safe to delete — it's a synthetic pending account with no real login
+            await db.delete(users).where(eq(users.id, conflicting.id));
+          } else {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: `Email ${newEmail} is already in use by another active account (#${conflicting.id}). Use Merge Accounts to consolidate them first.`,
+            });
+          }
+        }
+      }
       if (fields.bio !== undefined) updateData.bio = fields.bio || null;
       if (fields.specialty !== undefined) updateData.specialty = fields.specialty || null;
       if (fields.credentials !== undefined) updateData.credentials = fields.credentials || null;
