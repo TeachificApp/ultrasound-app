@@ -120,100 +120,31 @@ async function handleCheckoutSessionCompleted(session: Record<string, unknown>) 
 
 async function handleMembershipCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata as Record<string, string>) ?? {};
-  if (meta.type !== "membership") return; // Not a membership purchase
-
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
-  const planId = meta.plan_id ? parseInt(meta.plan_id) : null;
-  if (!userId || !planId) return;
+  if (meta.type !== "membership") return;
 
   const db = await getDb();
   if (!db) return;
 
-  // Check idempotency
-  const [existing] = await db
-    .select()
-    .from(membershipSubscriptions)
-    .where(and(eq(membershipSubscriptions.userId, userId), eq(membershipSubscriptions.planId, planId)))
-    .limit(1);
-
-  const sessionId = session.id as string;
-  const stripeSubscriptionId = session.subscription as string | undefined;
-  const amountTotal = (session.amount_total as number) ?? 0;
-
-  if (existing) {
-    // Update existing subscription (e.g. reactivation)
-    await db.update(membershipSubscriptions)
-      .set({ status: "active", stripeSubscriptionId: stripeSubscriptionId ?? existing.stripeSubscriptionId, updatedAt: new Date() })
-      .where(eq(membershipSubscriptions.id, existing.id));
-    console.log(`[Stripe] Membership reactivated: userId=${userId}, planId=${planId}`);
-    return;
-  }
-
-  // Get plan info for notification
-  const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.id, planId)).limit(1);
-
-  // Create new subscription record
-  await db.insert(membershipSubscriptions).values({
-    userId,
-    planId,
-    status: "active",
-    stripeSubscriptionId: stripeSubscriptionId ?? null,
-    stripeCheckoutSessionId: sessionId,
-    currentPeriodStart: Date.now(),
-    currentPeriodEnd: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  // Increment discount code usage if one was applied
-  if (meta.discount_code_id) {
-    const dcId = parseInt(meta.discount_code_id);
-    await db.update(membershipDiscountCodes)
-      .set({ usedCount: sql`used_count + 1` })
-      .where(eq(membershipDiscountCodes.id, dcId));
-  }
-
-  // Grant app-tier access based on plan access items
   try {
-    const accessItems = await db.select().from(membershipPlanAccess).where(eq(membershipPlanAccess.planId, planId));
-    for (const item of accessItems) {
-      const brand = item.itemType.startsWith("ultrasoundassist") ? "all_about_ultrasound" : item.itemType.startsWith("echoassist") ? "iheartecho" : null;
-      if (!brand) continue;
-      const tier = item.itemType.endsWith("_premium") ? "premium" : "free";
-      const [existingBM] = await db.select().from(brandMemberships)
-        .where(and(eq(brandMemberships.userId, userId), eq(brandMemberships.brand, brand as any)))
-        .limit(1);
-      if (existingBM) {
-        // Only upgrade tier, never downgrade
-        const shouldUpgrade = tier === "premium" && existingBM.tier !== "premium";
-        if (shouldUpgrade || existingBM.status !== "active") {
-          await db.update(brandMemberships)
-            .set({ tier: tier as any, status: "active", source: "membership", grantedAt: new Date() })
-            .where(eq(brandMemberships.id, existingBM.id));
-        }
-      } else {
-        await db.insert(brandMemberships).values({
-          userId,
-          brand: brand as any,
-          tier: tier as any,
-          status: "active",
-          source: "membership",
-          stripeSubscriptionId: stripeSubscriptionId ?? null,
-          stripeCustomerId: null,
-        });
-      }
-      console.log(`[Stripe] Membership granted ${brand} ${tier} access to user ${userId} via plan ${planId}`);
+    const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
+    const result = await reconcileMembershipFromStripeSession(db as any, session);
+    if (!result.success) {
+      console.warn(`[Stripe] Membership checkout not fulfilled: ${result.error ?? "unknown"} session=${session.id}`);
+      const customerEmail =
+        (session.customer_email as string) ??
+        (session.customer_details as Record<string, string>)?.email ??
+        meta.customer_email;
+      await notifyOwner({
+        title: "⚠️ Membership Purchase — Fulfillment Failed",
+        content: `Session ${session.id}. Email: ${customerEmail ?? "unknown"}. Error: ${result.error ?? "unknown"}. Notes: ${result.notes.join("; ") || "none"}.`,
+      });
+      return;
     }
+    console.log(`[Stripe] Membership fulfilled: userId=${result.userId}, planId=${result.planId}, notes=${result.notes.join(", ")}`);
   } catch (err) {
-    console.error(`[Stripe] Failed to grant app-tier access for membership planId=${planId} userId=${userId}:`, err);
+    console.error(`[Stripe] Membership fulfillment error for session ${session.id}:`, err);
+    throw err;
   }
-
-  await notifyOwner({
-    title: "🎫 New Membership Purchase",
-    content: `User ID ${userId} (${meta.customer_email ?? "unknown"}) purchased membership "${plan?.title ?? `Plan #${planId}`}". Amount: $${(amountTotal / 100).toFixed(2)}.`,
-  });
-
-  console.log(`[Stripe] Membership fulfilled: userId=${userId}, planId=${planId}`);
 }
 
 async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
@@ -346,6 +277,8 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
             firstName,
             resetUrl: setPasswordUrl,
             brandMode: "aaus",
+            purpose: "welcome",
+            expiresInLabel: "7 days",
           });
           const subject = `Your purchase is ready — access your download`;
           const accessNote = accessTokenForEmail
@@ -940,6 +873,8 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
             firstName,
             resetUrl: setPasswordUrl,
             brandMode: brandMode as any,
+            purpose: "welcome",
+            expiresInLabel: "7 days",
           });
           // Override subject for new accounts
           const subject = `Your account is ready — access your ${meta.product_name || "purchase"}`;

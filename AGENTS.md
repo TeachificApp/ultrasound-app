@@ -53,6 +53,14 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 7. **SDMS CME tables**: Run `scripts/sdms-cme-migration.sql` against MySQL before using SDMS CME features. Admin configures per-activity SDMS settings under LMS course/cohort Settings or Webinar Settings. Learner CME module appears in the course player when enabled. API credentials are AES-encrypted at rest using `JWT_SECRET`; never exposed to the client.
 6. **No ESLint script**: Formatting is via Prettier only (`pnpm format` / `pnpm exec prettier --check .`). There is no `pnpm lint` target in `package.json`.
 
+### Stripe membership subscriptions
+
+- Webhook handler delegates to `server/lib/membershipFulfillment.ts` for `checkout.session.completed` with `metadata.type=membership`.
+- Fulfillment grants `membership_subscriptions`, enrolls courses/quizzes, downloads, bundles, and brand tiers per `membership_plan_access`.
+- Checkout complete fallback: `membership.getCheckoutSessionStatus` (used when `?type=membership` on `/checkout/complete`).
+- Admin manual reconcile (production): `membership.reconcileStripeMembership` with `stripeSubscriptionId` or `stripeCheckoutSessionId` + customer email.
+- Guest checkout before embedded membership pay: `membership.guestCheckoutRegister` then `/checkout/:planSlug?type=membership`.
+
 ### Key file locations
 
 - Server entry: `server/_core/index.ts`

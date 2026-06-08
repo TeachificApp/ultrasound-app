@@ -57,6 +57,10 @@ export default function MembershipPage() {
     }
   );
 
+  const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [showGuestForm, setShowGuestForm] = useState(false);
+
   const checkoutMutation = trpc.membership.createCheckout.useMutation({
     onSuccess: (data) => {
       toast.success("Redirecting to checkout…");
@@ -64,6 +68,36 @@ export default function MembershipPage() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const guestRegisterMutation = trpc.membership.guestCheckoutRegister.useMutation({
+    onSuccess: (data) => {
+      toast.success("Account ready — opening secure checkout…");
+      window.location.href = data.checkoutPath;
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const startCheckout = () => {
+    if (!plan) return;
+    if (user) {
+      checkoutMutation.mutate({
+        planId: plan.id,
+        discountCodeId: appliedCodeId ?? undefined,
+        origin: window.location.origin,
+      });
+      return;
+    }
+    if (showGuestForm && guestName.trim() && guestEmail.trim()) {
+      guestRegisterMutation.mutate({
+        planSlug: slug ?? "",
+        name: guestName.trim(),
+        email: guestEmail.trim(),
+        origin: window.location.origin,
+      });
+      return;
+    }
+    setShowGuestForm(true);
+  };
 
   if (isLoading) {
     return (
@@ -171,30 +205,39 @@ export default function MembershipPage() {
             {codeError && <p className="text-xs text-red-500 mt-1">{codeError}</p>}
             {appliedCode && <p className="text-xs text-green-600 mt-1">✓ Code "{appliedCode}" applied</p>}
 
+            {!user && showGuestForm && (
+              <div className="mt-6 space-y-3 text-left">
+                <Input
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Full name"
+                />
+                <Input
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder="Email address"
+                />
+              </div>
+            )}
             <Button
               className="w-full mt-6 text-white font-semibold py-3 text-base rounded-xl"
               style={{ backgroundColor: accentColor }}
-              disabled={checkoutMutation.isPending}
-              onClick={() => {
-                if (!user) {
-                  window.location.href = `/login?return=/memberships/${slug}`;
-                  return;
-                }
-                checkoutMutation.mutate({
-                  planId: plan!.id,
-                  discountCodeId: appliedCodeId ?? undefined,
-                  origin: window.location.origin,
-                });
-              }}
+              disabled={checkoutMutation.isPending || guestRegisterMutation.isPending}
+              onClick={startCheckout}
             >
-              {checkoutMutation.isPending ? (
+              {(checkoutMutation.isPending || guestRegisterMutation.isPending) ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>
               ) : (
                 (plan?.trialDays ?? 0) > 0 ? `Start ${plan!.trialDays}-Day Free Trial` : "Get Access Now"
               )}
             </Button>
             {!user && (
-              <p className="text-xs text-gray-400 mt-2">You'll be asked to sign in before checkout.</p>
+              <p className="text-xs text-gray-400 mt-2">
+                {showGuestForm
+                  ? "Enter your name and email to continue — no separate sign-up required."
+                  : <>Already have an account? <a href={`/login?return=/memberships/${slug}`} className="text-teal-600 underline">Sign in</a></>}
+              </p>
             )}
           </div>
 
@@ -222,17 +265,7 @@ export default function MembershipPage() {
             className="shadow-xl text-white font-semibold px-6 py-3 rounded-xl"
             style={{ backgroundColor: accentColor }}
             disabled={checkoutMutation.isPending}
-            onClick={() => {
-              if (!user) {
-                window.location.href = `/login?return=/memberships/${slug}`;
-                return;
-              }
-                checkoutMutation.mutate({
-                  planId: plan!.id,
-                  discountCodeId: appliedCodeId ?? undefined,
-                  origin: window.location.origin,
-                });
-              }}
+            onClick={startCheckout}
             >
               {checkoutMutation.isPending ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>

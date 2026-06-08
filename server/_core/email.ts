@@ -271,25 +271,43 @@ export function buildPasswordResetEmail(opts: {
   firstName: string;
   resetUrl: string;
   brandMode?: BrandMode;
+  /** "reset" (default) or "welcome" for new accounts created on purchase */
+  purpose?: "reset" | "welcome";
+  /** Human-readable expiry, e.g. "1 hour" or "7 days" — must match token TTL in DB */
+  expiresInLabel?: string;
 }): { subject: string; htmlBody: string; previewText: string } {
   const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
-  const subject = `Reset your ${bc.displayName} password`;
-  const previewText = "Click to reset your password \u2014 link expires in 1 hour";
+  const isWelcome = opts.purpose === "welcome";
+  const expiresIn = opts.expiresInLabel ?? (isWelcome ? "7 days" : "1 hour");
+  const subject = isWelcome
+    ? `Set your ${bc.displayName} password`
+    : `Reset your ${bc.displayName} password`;
+  const previewText = isWelcome
+    ? `Set your password — link expires in ${expiresIn}`
+    : `Click to reset your password \u2014 link expires in ${expiresIn}`;
+  const headline = isWelcome ? "Welcome — Set Your Password" : "Password Reset Request";
+  const intro = isWelcome
+    ? `Hi ${opts.firstName}, your ${bc.displayName} account has been created. Click the button below to set your password and access your purchase.`
+    : `Hi ${opts.firstName}, we received a request to reset your ${bc.displayName} password.  Click the button below to choose a new password.`;
+  const buttonLabel = isWelcome ? "Set Password" : "Reset Password";
+  const footer = isWelcome
+    ? `This link expires in ${expiresIn}. If you did not make this purchase, please contact support.`
+    : `This link expires in ${expiresIn}. If you did not request a password reset, you can safely ignore this email — your password will not change.`;
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
-      Password Reset Request
+      ${headline}
     </h2>
     <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">
-      Hi ${opts.firstName}, we received a request to reset your ${bc.displayName} password.  Click the button below to choose a new password.
+      ${intro}
     </p>
     <div style="text-align:center;margin:28px 0;">
       <a href="${opts.resetUrl}"
         style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
-        Reset Password
+        ${buttonLabel}
       </a>
     </div>
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
-      This link expires in 1 hour. If you did not request a password reset, you can safely ignore this email — your password will not change.
+      ${footer}
     </p>
     <p style="margin:12px 0 0;font-size:13px;color:#94a3b8;">
       Or copy and paste this URL into your browser:<br/>

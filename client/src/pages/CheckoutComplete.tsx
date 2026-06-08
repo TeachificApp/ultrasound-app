@@ -5,42 +5,66 @@
  * Route: /checkout/complete
  * Query params:
  *   ?session_id=<cs_...>   — Stripe session ID (injected by Stripe)
- *   ?slug=<courseSlug>     — course slug (injected by our return_url template)
+ *   ?slug=<courseSlug>     — course slug (optional, LMS checkout)
+ *   ?type=membership       — membership checkout
  */
 import { useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, XCircle, Clock, ArrowRight, BookOpen } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, ArrowRight, BookOpen, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
 export default function CheckoutComplete() {
   const [, navigate] = useLocation();
 
-  const sessionId = useMemo(() => {
+  const { sessionId, courseSlug, checkoutType } = useMemo(() => {
     const url = new URL(window.location.href);
-    return url.searchParams.get("session_id") ?? "";
+    return {
+      sessionId: url.searchParams.get("session_id") ?? "",
+      courseSlug: url.searchParams.get("slug") ?? "",
+      checkoutType: url.searchParams.get("type") ?? "course",
+    };
   }, []);
 
-  const courseSlug = useMemo(() => {
-    const url = new URL(window.location.href);
-    return url.searchParams.get("slug") ?? "";
-  }, []);
+  const isMembership = checkoutType === "membership";
 
-  const { data, isLoading, isError } = trpc.lmsLearner.getCheckoutSessionStatus.useQuery(
+  const lmsQuery = trpc.lmsLearner.getCheckoutSessionStatus.useQuery(
     { sessionId },
-    { enabled: !!sessionId, retry: 3, retryDelay: 1500 }
+    { enabled: !!sessionId && !isMembership, retry: 3, retryDelay: 1500 }
   );
 
-  // Auto-redirect to course player after a short delay on success
+  const membershipQuery = trpc.membership.getCheckoutSessionStatus.useQuery(
+    { sessionId },
+    { enabled: !!sessionId && isMembership, retry: 3, retryDelay: 1500 }
+  );
+
+  const data = isMembership ? membershipQuery.data : lmsQuery.data;
+  const isLoading = isMembership ? membershipQuery.isLoading : lmsQuery.isLoading;
+  const isError = isMembership ? membershipQuery.isError : lmsQuery.isError;
+
+  const membershipPlanSlug = isMembership && data && "planSlug" in data ? data.planSlug : null;
+  const autoLoginUrl = isMembership && data && "autoLoginUrl" in data ? data.autoLoginUrl : null;
+
   useEffect(() => {
-    if (data?.status === "complete" && courseSlug) {
+    if (data?.status !== "complete") return;
+    if (autoLoginUrl) {
+      window.location.href = autoLoginUrl;
+      return;
+    }
+    if (courseSlug) {
       const timer = setTimeout(() => {
         navigate(`/courses/${courseSlug}/player`);
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [data?.status, courseSlug, navigate]);
+    if (isMembership) {
+      const timer = setTimeout(() => {
+        navigate("/my-dashboard");
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [data?.status, courseSlug, navigate, autoLoginUrl, isMembership]);
 
   if (!sessionId) {
     return (
@@ -49,9 +73,9 @@ export default function CheckoutComplete() {
           <XCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Invalid Session</h2>
           <p className="text-gray-500 text-sm mb-6">No checkout session was found. Please try again.</p>
-          <Link href="/library">
+          <Link href={isMembership ? "/my-dashboard" : "/library"}>
             <Button variant="outline" className="border-teal-200 text-teal-700 hover:bg-teal-50">
-              Back to Library
+              {isMembership ? "My Dashboard" : "Back to Library"}
             </Button>
           </Link>
         </div>
@@ -78,20 +102,20 @@ export default function CheckoutComplete() {
           <Clock className="h-12 w-12 text-amber-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Still Processing</h2>
           <p className="text-gray-500 text-sm mb-6">
-            Your payment is being processed. If you completed payment, your enrollment will appear in your library
+            Your payment is being processed. If you completed payment, your {isMembership ? "membership" : "enrollment"} will appear in your account
             within a few minutes. Check your email for a confirmation.
           </p>
           <div className="flex gap-3 justify-center">
-            {courseSlug && (
+            {courseSlug && !isMembership && (
               <Link href={`/courses/${courseSlug}`}>
                 <Button variant="outline" className="border-teal-200 text-teal-700 hover:bg-teal-50">
                   Back to Course
                 </Button>
               </Link>
             )}
-            <Link href="/library">
+            <Link href={isMembership ? "/my-dashboard" : "/library"}>
               <Button className="bg-teal-600 hover:bg-teal-700 text-white">
-                My Library
+                {isMembership ? "My Dashboard" : "My Library"}
               </Button>
             </Link>
           </div>
@@ -100,7 +124,6 @@ export default function CheckoutComplete() {
     );
   }
 
-  // Payment complete
   if (data.status === "complete") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-teal-50 to-slate-50 flex items-center justify-center p-4">
@@ -109,18 +132,35 @@ export default function CheckoutComplete() {
             <CheckCircle2 className="h-16 w-16 text-teal-500 mx-auto" />
             <span className="absolute -top-1 -right-1 h-5 w-5 bg-teal-500 rounded-full animate-ping opacity-60" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">You're enrolled! 🎉</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {isMembership ? "Your membership is active! 🎉" : "You're enrolled! 🎉"}
+          </h2>
           <p className="text-gray-500 text-sm mb-1">
             {data.customerEmail ? (
               <>A confirmation has been sent to <strong>{data.customerEmail}</strong>.</>
             ) : (
-              "Your enrollment is confirmed."
+              isMembership ? "Your membership is confirmed." : "Your enrollment is confirmed."
             )}
           </p>
-          <p className="text-gray-400 text-xs mb-7">Redirecting you to the course in a moment…</p>
+          <p className="text-gray-400 text-xs mb-7">
+            {autoLoginUrl
+              ? "Signing you in now…"
+              : isMembership
+                ? "Redirecting you to your dashboard in a moment…"
+                : "Redirecting you to the course in a moment…"}
+          </p>
 
           <div className="flex flex-col gap-3">
-            {courseSlug && (
+            {autoLoginUrl && (
+              <a href={autoLoginUrl}>
+                <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2">
+                  <Award className="h-4 w-4" />
+                  Go to My Dashboard
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </a>
+            )}
+            {courseSlug && !isMembership && (
               <Link href={`/courses/${courseSlug}/player`}>
                 <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2">
                   <BookOpen className="h-4 w-4" />
@@ -129,9 +169,16 @@ export default function CheckoutComplete() {
                 </Button>
               </Link>
             )}
-            <Link href="/library">
+            {isMembership && membershipPlanSlug && (
+              <Link href={`/memberships/${membershipPlanSlug}`}>
+                <Button variant="outline" className="w-full border-gray-200 text-gray-600 hover:bg-gray-50">
+                  View Membership
+                </Button>
+              </Link>
+            )}
+            <Link href={isMembership ? "/my-dashboard" : "/library"}>
               <Button variant="outline" className="w-full border-gray-200 text-gray-600 hover:bg-gray-50">
-                Go to My Library
+                {isMembership ? "Go to My Dashboard" : "Go to My Library"}
               </Button>
             </Link>
           </div>
@@ -140,7 +187,6 @@ export default function CheckoutComplete() {
     );
   }
 
-  // Payment open (incomplete) or expired
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
@@ -152,16 +198,16 @@ export default function CheckoutComplete() {
             : "Your payment was not completed. Please try again."}
         </p>
         <div className="flex gap-3 justify-center">
-          {courseSlug && (
-            <Link href={`/checkout/${courseSlug}`}>
+          {(courseSlug || membershipPlanSlug) && (
+            <Link href={isMembership && membershipPlanSlug ? `/checkout/${membershipPlanSlug}?type=membership` : `/checkout/${courseSlug}`}>
               <Button className="bg-teal-600 hover:bg-teal-700 text-white">
                 Try Again
               </Button>
             </Link>
           )}
-          <Link href="/library">
+          <Link href={isMembership ? "/my-dashboard" : "/library"}>
             <Button variant="outline" className="border-gray-200 text-gray-600 hover:bg-gray-50">
-              Back to Library
+              {isMembership ? "My Dashboard" : "Back to Library"}
             </Button>
           </Link>
         </div>

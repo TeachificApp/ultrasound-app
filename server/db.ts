@@ -344,8 +344,9 @@ export async function getOrCreateUserByEmail(opts: {
 }): Promise<{ user: { id: number; email: string | null; firstName: string | null; lastName: string | null; name: string | null }; isNew: boolean; resetToken: string | null }> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  // Check if user already exists
-  const existing = await getUserByEmail(opts.email);
+  const normalised = opts.email.trim().toLowerCase();
+  // Check if user already exists (case-insensitive)
+  const existing = await getUserByEmail(normalised);
   if (existing) {
     return { user: existing as any, isNew: false, resetToken: null };
   }
@@ -355,22 +356,30 @@ export async function getOrCreateUserByEmail(opts: {
   const resetExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   const firstName = opts.firstName || (opts.name ? opts.name.split(" ")[0] : "") || "";
   const lastName = opts.lastName || (opts.name ? opts.name.split(" ").slice(1).join(" ") : "") || "";
-  const displayName = [firstName, lastName].filter(Boolean).join(" ") || opts.email.split("@")[0];
-  // Insert new user
-  await db.insert(users).values({
-    email: opts.email,
-    name: displayName,
-    firstName: firstName || null,
-    lastName: lastName || null,
-    displayName,
-    loginMethod: "email",
-    emailVerified: true,
-    isPending: false,
-    passwordResetToken: resetToken,
-    passwordResetExpiry: resetExpiry,
-    lastSignedIn: new Date(),
-  });
-  const [newUser] = await db.select().from(users).where(eq(users.email, opts.email)).limit(1);
+  const displayName = [firstName, lastName].filter(Boolean).join(" ") || normalised.split("@")[0];
+  try {
+    await db.insert(users).values({
+      email: normalised,
+      name: displayName,
+      firstName: firstName || null,
+      lastName: lastName || null,
+      displayName,
+      loginMethod: "email",
+      emailVerified: true,
+      isPending: false,
+      passwordResetToken: resetToken,
+      passwordResetExpiry: resetExpiry,
+      lastSignedIn: new Date(),
+    });
+  } catch (err: any) {
+    if (err?.code === "ER_DUP_ENTRY" || err?.message?.includes("Duplicate entry")) {
+      const race = await getUserByEmail(normalised);
+      if (race) return { user: race as any, isNew: false, resetToken: null };
+    }
+    throw err;
+  }
+  const newUser = await getUserByEmail(normalised);
+  if (!newUser) throw new Error(`Failed to create user for ${normalised}`);
   return { user: newUser as any, isNew: true, resetToken };
 }
 
