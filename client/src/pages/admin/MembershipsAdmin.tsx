@@ -122,6 +122,8 @@ export default function MembershipsAdmin() {
   const [creatingNew, setCreatingNew] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newStripePriceId, setNewStripePriceId] = useState("");
+  const [syncResults, setSyncResults] = useState<null | { total: number; created: number; skipped: number; errors: number; results: Array<{ action: string; message: string; sourceTitle?: string; stripePriceId?: string }> }>(null);
+  const [showSyncResults, setShowSyncResults] = useState(false);
 
   const { data: plans, refetch } = trpc.membership.listAll.useQuery();
   const createMutation = trpc.membership.create.useMutation({
@@ -141,6 +143,15 @@ export default function MembershipsAdmin() {
   });
   const updateMutation = trpc.membership.update.useMutation({
     onSuccess: async () => { await refetch(); },
+  });
+  const bulkSyncMutation = trpc.membership.bulkSyncPlans.useMutation({
+    onSuccess: (data) => {
+      setSyncResults(data);
+      setShowSyncResults(true);
+      refetch();
+      toast.success(`Sync complete: ${data.created} created, ${data.skipped} skipped, ${data.errors} errors`);
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   if (editingId) {
@@ -163,13 +174,52 @@ export default function MembershipsAdmin() {
             Create membership tiers with bundled access to courses, downloads, communities, and more.
           </p>
         </div>
-        <Button
-          className="bg-teal-600 hover:bg-teal-700 text-white"
-          onClick={() => setCreatingNew(true)}
-        >
-          <Plus className="w-4 h-4 mr-1" /> New Membership
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="text-teal-700 border-teal-300 hover:bg-teal-50"
+            onClick={() => bulkSyncMutation.mutate()}
+            disabled={bulkSyncMutation.isPending}
+          >
+            {bulkSyncMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            Sync Plans from Courses
+          </Button>
+          <Button
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+            onClick={() => setCreatingNew(true)}
+          >
+            <Plus className="w-4 h-4 mr-1" /> New Membership
+          </Button>
+        </div>
       </div>
+
+      {/* Sync results panel */}
+      {showSyncResults && syncResults && (
+        <div className="mb-6 border border-teal-200 rounded-lg bg-teal-50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-teal-800 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" /> Plan Sync Results
+            </h3>
+            <button onClick={() => setShowSyncResults(false)} className="text-teal-600 hover:text-teal-800 text-sm">Dismiss</button>
+          </div>
+          <div className="flex gap-4 mb-3 text-sm">
+            <span className="text-gray-600">Total: <strong>{syncResults.total}</strong></span>
+            <span className="text-green-700">Created: <strong>{syncResults.created}</strong></span>
+            <span className="text-gray-500">Skipped: <strong>{syncResults.skipped}</strong></span>
+            {syncResults.errors > 0 && <span className="text-red-600">Errors: <strong>{syncResults.errors}</strong></span>}
+          </div>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {syncResults.results.map((r, i) => (
+              <div key={i} className={`text-xs flex items-start gap-2 py-1 border-b border-teal-100 last:border-0 ${
+                r.action === "created" ? "text-green-700" : r.action === "error" ? "text-red-600" : "text-gray-500"
+              }`}>
+                <span className="font-mono shrink-0">{r.action === "created" ? "✓" : r.action === "error" ? "✗" : "–"}</span>
+                <span><strong>{r.sourceTitle ?? "—"}</strong> — {r.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* New membership dialog */}
       <Dialog open={creatingNew} onOpenChange={(open) => { setCreatingNew(open); if (!open) { setNewTitle(""); setNewStripePriceId(""); } }}>

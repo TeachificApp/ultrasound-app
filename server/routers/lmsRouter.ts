@@ -1043,6 +1043,8 @@ export const lmsLearnerRouter = router({
             await db.update(lmsPricingOptions).set({ stripePriceId }).where(eq(lmsPricingOptions.id, input.pricingOptionId));
           } else {
             await db.update(lmsCourses).set({ stripePriceId }).where(eq(lmsCourses.id, course.id));
+            // Auto-sync membership plan for this course
+            import("../lib/planAutoSync").then(({ syncPlanForCourse }) => syncPlanForCourse(db as any, course.id)).catch(() => {});
           }
         }
         session = await stripe.checkout.sessions.create({
@@ -2507,7 +2509,11 @@ export const lmsLearnerRouter = router({
         } else {
           throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported pricing type: ${pricingType}` });
         }
-        if (stripePriceId) await db.update(lmsCourses).set({ stripePriceId } as any).where(eq(lmsCourses.id, course.id));
+        if (stripePriceId) {
+          await db.update(lmsCourses).set({ stripePriceId } as any).where(eq(lmsCourses.id, course.id));
+          // Auto-sync membership plan for this course
+          import("../lib/planAutoSync").then(({ syncPlanForCourse }) => syncPlanForCourse(db as any, course.id)).catch(() => {});
+        }
       }
 
       const intervalLabels: Record<string, string> = { monthly: "month", quarterly: "3 months", annual: "year" };
@@ -2905,6 +2911,8 @@ export const lmsGroupRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported pricing type for primary: ${pricingType}` });
         }
         await db.update(lmsCourses).set({ stripePriceId } as any).where(eq(lmsCourses.id, course.id));
+        // Auto-sync membership plan for this course
+        import("../lib/planAutoSync").then(({ syncPlanForCourse }) => syncPlanForCourse(db as any, course.id)).catch(() => {});
       }
 
       const paymentLink = await stripe.paymentLinks.create({

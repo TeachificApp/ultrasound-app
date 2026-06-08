@@ -1138,6 +1138,24 @@ const bulkReconcileStripeSubscriptions = adminProcedure
     return { processed, fulfilled, errors, skipped, results };
   });
 
+// ─── Bulk Plan Sync ─────────────────────────────────────────────────────────
+
+const bulkSyncPlans = adminProcedure
+  .mutation(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const { bulkSyncAllPlans } = await import("../lib/planAutoSync");
+    const results = await bulkSyncAllPlans(db as any);
+    const created = results.filter(r => r.action === "created").length;
+    const skipped = results.filter(r => r.action === "skipped").length;
+    const errors = results.filter(r => r.action === "error").length;
+    await notifyOwner({
+      title: `🔄 Bulk Plan Sync Complete`,
+      content: `Synced ${results.length} sources. Created: ${created}, Skipped: ${skipped}, Errors: ${errors}.`,
+    }).catch(() => {});
+    return { total: results.length, created, skipped, errors, results };
+  });
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const membershipRouter = router({
@@ -1178,4 +1196,5 @@ export const membershipRouter = router({
   bulkReconcileStripeSubscriptions,
   cancelMembershipSubscription,
   reactivateMembershipSubscription,
+  bulkSyncPlans,
 });
