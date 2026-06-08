@@ -911,7 +911,7 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
             </CardContent></Card>
           ) : (
             <div className="space-y-4">
-              {recordings.map((rec: any) => <CohortRecordingCard key={rec.id} recording={rec} />)}
+              {recordings.map((rec: any) => <CohortRecordingCard key={rec.id} recording={rec} courseId={courseId} />)}
             </div>
           )}
         </div>
@@ -1128,40 +1128,38 @@ function CohortAssignmentCard({ assignment, overdue, courseId, mySubmission, onO
   );
 }
 
-function CohortRecordingCard({ recording }: { recording: any }) {
+function CohortRecordingCard({ recording, courseId }: { recording: any; courseId: number }) {
+  const durationMins = recording.durationSeconds ? Math.round(recording.durationSeconds / 60) : null;
   return (
-    <Card className="border border-gray-200 bg-white">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-teal-100">
-            <Film className="w-5 h-5 text-teal-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 flex-wrap">
-              <h3 className="font-semibold text-gray-900 text-sm leading-tight">{recording.title}</h3>
-              <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs flex-shrink-0">Recording</Badge>
+    <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
+      <Card className="border border-gray-200 bg-white hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-4">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-teal-100 group-hover:bg-teal-200 transition-colors">
+              <Film className="w-5 h-5 text-teal-600" />
             </div>
-            {recording.description && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{recording.description}</p>}
-            {recording.sessionDate && (
-              <p className="flex items-center gap-1 mt-1.5 text-xs text-gray-500"><Calendar className="w-3 h-3" />Session: {fmtCohortDate(recording.sessionDate)}</p>
-            )}
-            {recording.embedCode && (
-              <div className="mt-3 rounded-lg overflow-hidden border border-gray-200" dangerouslySetInnerHTML={{ __html: recording.embedCode }} />
-            )}
-            {recording.videoUrl && !recording.embedCode && (
-              <video src={recording.videoUrl} controls className="w-full rounded-lg border border-gray-200 max-h-[360px] mt-3" preload="metadata" />
-            )}
-            {!recording.embedCode && recording.externalUrl && (
-              <Button size="sm" variant="outline" className="mt-3 h-7 text-xs gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50" asChild>
-                <a href={recording.externalUrl} target="_blank" rel="noopener noreferrer">
-                  <PlayCircle className="w-3 h-3" /> Watch Recording
-                </a>
-              </Button>
-            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <h3 className="font-semibold text-gray-900 text-sm leading-tight group-hover:text-teal-700 transition-colors">{recording.title}</h3>
+                <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs flex-shrink-0">Recording</Badge>
+              </div>
+              {recording.description && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{recording.description}</p>}
+              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                {recording.sessionDate && (
+                  <p className="flex items-center gap-1 text-xs text-gray-500"><Calendar className="w-3 h-3" />{fmtCohortDate(recording.sessionDate)}</p>
+                )}
+                {durationMins && (
+                  <p className="flex items-center gap-1 text-xs text-gray-500"><Clock className="w-3 h-3" />{durationMins} min</p>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-teal-600 font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+                <PlayCircle className="w-3.5 h-3.5" /> Watch Recording
+              </p>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
