@@ -39,6 +39,7 @@ import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
 import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
 import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes/scormExtractor";
+import { healStuckScormVersions } from "../scheduled/scormHealthCheck";
 import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
 import { registerCurriculumEmbedRoutes } from "../routes/curriculumEmbedRoutes";
 import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
@@ -462,6 +463,10 @@ async function startServer() {
     startSharingMonitor();
     // Backfill all existing users into the "All Contacts" email list (safe to run on every startup)
     backfillAllContacts().catch((err) => console.error("[backfillAllContacts] Error:", err));
+    // Auto-heal any SCORM versions stuck in processing/pending → serve via zip-stream
+    healStuckScormVersions().then(({ healed }) => {
+      if (healed > 0) console.log(`[Startup] Auto-healed ${healed} stuck SCORM version(s) → zip-stream`);
+    }).catch((err) => console.error("[Startup] SCORM heal error:", err));
   });
 }
 

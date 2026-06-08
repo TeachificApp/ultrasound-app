@@ -462,6 +462,31 @@ export async function scormHealthCheckHandler(req: Request, res: Response): Prom
       }
     }
 
+    // ── Auto-heal stuck processing/pending versions → zip-stream ─────────────────────────
+    // Any version stuck in processing/pending for >30 minutes gets auto-healed to
+    // 'skipped' so it serves via on-demand ZIP streaming immediately.
+    const healCutoff = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes
+    const stuckVersions = await db
+      .select({ id: mediaVersions.id, s3Url: mediaVersions.s3Url, mimeType: mediaVersions.mimeType, fileName: mediaVersions.fileName })
+      .from(mediaVersions)
+      .where(
+        and(
+          inArray(mediaVersions.scormExtractionStatus as any, ["processing", "pending"]),
+          lt(mediaVersions.createdAt, healCutoff)
+        )
+      );
+    const { isZipStorageRef } = await import("../lib/scormPackage");
+    const healedVersionIds: number[] = [];
+    for (const sv of stuckVersions) {
+      if (!isZipStorageRef(sv)) continue;
+      await db
+        .update(mediaVersions)
+        .set({ scormExtractionStatus: "skipped", scormExtractionError: "Serving via on-demand ZIP streaming (auto-healed from stuck state)" })
+        .where(eq(mediaVersions.id, sv.id));
+      healedVersionIds.push(sv.id);
+      console.log(`[ScormHealthCheck] Auto-healed stuck version ${sv.id} → skipped (zip-stream)`);
+    }
+
     let alertSummary: Awaited<ReturnType<typeof import("../lib/scormHealthAlerts").runScormHealthAlertPass>> | undefined;
     try {
       const { runScormHealthAlertPass } = await import("../lib/scormHealthAlerts");
@@ -470,7 +495,7 @@ export async function scormHealthCheckHandler(req: Request, res: Response): Prom
       console.error(`[ScormHealthCheck] Alert pass failed:`, alertErr?.message ?? alertErr);
     }
 
-    res.json({ ok: true, checked: doneVersions.length, healed, requeued: broken, alerts: alertSummary });
+    res.json({ ok: true, checked: doneVersions.length, healed, requeued: broken, healedStuck: healedVersionIds, alerts: alertSummary });
   } catch (err: any) {
     console.error(`[ScormHealthCheck] Error:`, err.message);
     res.status(500).json({ error: err.message });
@@ -492,16 +517,26 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
     const now = new Date();
     const stallCutoff = new Date(now.getTime() - STALL_THRESHOLD_MS);
 
-    // Reset any stalled jobs (processing for > 10 min) back to pending
-    await db
+    // Auto-heal stalled jobs: instead of re-queuing, mark as 'skipped' so they
+    // immediately serve via on-demand ZIP streaming (no extraction needed).
+    // This prevents the infinite processing→pending→processing loop for large ZIPs
+    // that will always time out on Cloud Run (200MB+ packages).
+    const stalledResult = await db
       .update(mediaVersions)
-      .set({ scormExtractionStatus: "pending", scormExtractionStartedAt: null })
+      .set({
+        scormExtractionStatus: "skipped",
+        scormExtractionError: "Serving via on-demand ZIP streaming (extraction timed out — auto-healed)",
+      })
       .where(
         and(
           eq(mediaVersions.scormExtractionStatus as any, "processing"),
           lt(mediaVersions.scormExtractionStartedAt as any, stallCutoff)
         )
       );
+    const stalledCount = (stalledResult as any)?.rowsAffected ?? 0;
+    if (stalledCount > 0) {
+      console.log(`[ScormExtractor][Heartbeat] Auto-healed ${stalledCount} stalled version(s) → skipped (zip-stream)`);
+    }
 
     // Find one pending SCORM version to process
     // Join with mediaAssets to confirm it's actually a SCORM/zip type
@@ -535,6 +570,29 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
         .set({ scormExtractionStatus: "failed", scormExtractionError: "No S3 URL available" })
         .where(eq(mediaVersions.id, job.versionId));
       res.json({ ok: true, skipped: "no-url", versionId: job.versionId });
+      return;
+    }
+
+    // ── Check file size: skip extraction for large ZIPs (>50MB) → use zip-stream ──
+    // Cloud Run has 512MB RAM and 180s timeout. A 200MB ZIP with 500+ files takes
+    // 3-10 minutes to download + extract + upload. We skip extraction for large files
+    // and serve them directly via on-demand ZIP streaming instead.
+    const MAX_EXTRACTABLE_BYTES = 50 * 1024 * 1024; // 50MB
+    const { fileSize: jobFileSize } = (await db
+      .select({ fileSize: mediaVersions.fileSize })
+      .from(mediaVersions)
+      .where(eq(mediaVersions.id, job.versionId))
+      .limit(1))[0] ?? {};
+    if (jobFileSize && jobFileSize > MAX_EXTRACTABLE_BYTES) {
+      await db
+        .update(mediaVersions)
+        .set({
+          scormExtractionStatus: "skipped",
+          scormExtractionError: `File too large for extraction (${Math.round(jobFileSize / 1024 / 1024)}MB > 50MB limit) — serving via on-demand ZIP streaming`,
+        })
+        .where(eq(mediaVersions.id, job.versionId));
+      console.log(`[ScormExtractor][Heartbeat] Skipping large ZIP version ${job.versionId} (${Math.round(jobFileSize / 1024 / 1024)}MB) → zip-stream`);
+      res.json({ ok: true, skipped: "too-large", versionId: job.versionId, fileSizeMB: Math.round(jobFileSize / 1024 / 1024) });
       return;
     }
 
