@@ -507,7 +507,14 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       .where(eq(mediaVersions.assetId, asset.id))
       .orderBy(desc(mediaVersions.versionNumber));
 
-    const routePrefix = slugPath.replace(":slug", req.params.slug);
+    // Detect the actual matched prefix from req.path (handles both /api/media/ and /media/ variants)
+    const slugActual = req.params.slug;
+    const candidatePrefixes = [
+      `/api/media/${slugActual}/scorm`,
+      `/media/${slugActual}/scorm`,
+    ];
+    const routePrefix = candidatePrefixes.find((p) => req.path === p || req.path.startsWith(p + "/")) ??
+      slugPath.replace(":slug", slugActual);
     const rawRelative = req.path.replace(routePrefix, "").replace(/^\//, "");
     const relativePath = decodeURIComponent(rawRelative);
 
