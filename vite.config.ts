@@ -207,6 +207,24 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        // Split large vendor libraries into separate chunks to reduce peak memory
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@radix-ui') || id.includes('lucide-react')) return 'ui-vendor';
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || id.includes('wouter')) return 'react-vendor';
+            if (id.includes('@trpc') || id.includes('@tanstack')) return 'trpc-vendor';
+            if (id.includes('stripe') || id.includes('@stripe')) return 'stripe-vendor';
+            if (id.includes('drizzle') || id.includes('mysql2')) return 'db-vendor';
+            if (id.includes('date-fns') || id.includes('dayjs') || id.includes('moment')) return 'date-vendor';
+            if (id.includes('recharts') || id.includes('d3') || id.includes('plotly')) return 'chart-vendor';
+            return 'vendor';
+          }
+        },
+      },
+    },
   },
   server: {
     host: true,

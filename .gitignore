@@ -112,3 +112,20 @@ temp/
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
 .project-config.json
+
+# Dev-only files — not needed in deployment build
+todo.md
+scripts/
+video_*.md
+check-*.mjs
+check_*.mjs
+fix_*.mjs
+fix-*.mjs
+fix-*.ts
+test_*.mjs
+test-*.mjs
+migrate-*.mjs
+send_*.mjs
+check-*.ts
+check_*.ts
+.manus-logs/

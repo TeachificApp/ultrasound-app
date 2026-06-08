@@ -15,10 +15,10 @@
   ],
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663401463434/UrcfdRVE8J6mpMNR48QuFe",
-    "access_key_id": "ASIAZV3A2ECZEJHFW3VY",
-    "secret_access_key": "uS3diSH+6HVcnASg2MurbTKi7QHtULs5ly4hXJoG",
-    "session_token": "IQoJb3JpZ2luX2VjELj//////////wEaCXVzLWVhc3QtMSJIMEYCIQDIlvHXVj2Fga4eVERJkKS5je5rvviyCnw/ZKZJk3aj8QIhAJPO+QZg155dEbjGg5NA2KGfcO/vU5Vpbhm7McEgDvIuKv4DCIH//////////wEQBBoMNjY1Mzg2MDk4ODY2Igy4sw5jOMaiLwrV/ZAq0gPGLYhkjL3dNSOA7ls6blMGg6S8qYDgB4yWyG5HjPwe0BfNWCkYwgLu79+4X1B9+DIWE+3r9w/kwnafh41JJwRm8FFbTVl2DnZ6PLsOBOGdoU/+jcR9zgPNk3sfoLDkvVG651oER0f14FaR9YQ5JZufZvX4exgMD7jq1Y8sXSkUxrw3OVHIn7k8AE55abOlnihLy4uMkx2u7xrGW1RRRdEl0H+w29gNFSi4bkjGix4v8fwkzW5rmCHxduvUOEmY4Z4xI//926236fkS+Sxbrz6laKPiXmKLzL2PXiA9EHcEEiSANa10lf//clp8V+kt7kN3ZhwP+zY8u0LFkR2B0QkYJqhRe4WknKqI0hLb5TpAVdSCCmM/nTY7EjeCH1xNozunsqvq893VTcRTxYA8kELY4Le8Y1wdcDTeQSOIZiyhHNnCN6+5TVX4h2cjU5AawHiFcddr7jf3x+hcsQyAtvxLH6C0IJOqOxt7zA9Bp6aSH/BJudUzUrz1Ytw1sA9E/eqeDlEBSY3dbrKsZ9rFOkIlCPMGMZx9mlQ2GBPQ8S8hWo/A3TvD6mV9Txg+tp2YPQjATHkv1vCQWGVl5Zd6yiakN2VSJW54ho3+8KHRVnaIfZNxMIqXj9EGOpwBHd5vuSpcbXN0d/F2OzvkPvXjdHudVVDyrPWUrbwdt9LEjTTmhRPz/2cBd++UxvGqJjRNDG5CTtxQZ9DGHG3HMbBc7H5uFKsAkj8dgR7hRGelWovXIu4d/UwN/zUBH7ShqvzwiKs6wVutxwxl/utNbfRXcTu+ykzCbN4qNBFOjHvTGvbnt9wLSm7ZKmk9/XJZ9zLjtyzOyVS8zEli",
-    "expiration": "2026-06-06T19:26:02.000Z"
+    "access_key_id": "ASIAZV3A2ECZOAQSKB7S",
+    "secret_access_key": "jKD4SlDOF2sNZ8v6gQuTSeVJysERzD0sRPscyf9b",
+    "session_token": "IQoJb3JpZ2luX2VjEPX//////////wEaCXVzLWVhc3QtMSJIMEYCIQD+uY+Ey6994/TLxwBZ/zHTiodQbqanPa0QaSUJQ83mDAIhAPorepfNlrfdj7gOPTfCA89OvfqCdccnUY+iL/hxMpkgKv4DCL3//////////wEQBBoMNjY1Mzg2MDk4ODY2Igwno/nvPUJofMkDzdoq0gN6h5ah3WAsRIksHkxO0rIqar6Z/ASZNfjE0M2xA8FIi349dtc5QKEfsdZ+mxCyUbXSZ8i0hrWXsRRH3WLL2j+XFy3Hqh4M1iGHobr19LC7bOQ+ZUfa2LDTrpIIb8/v5Arqs3vKZ+aep/o/MSw/t8ORO1j1153vLd8yEiCRqMa3A09ZJS2VeP1WYKCZ8MDbeJQdQZ4chSgHWtsAm/HRjzB+cY4qNNqir/Eou20YM1yBXXNlyKMdRzKCIr1Vi6dXAZ/7si3vsPJVvbXozqG9fBZcI0wZ6y9lNoGfsuqHn0zCKTfgKLCXoRvidvJC8iKsXHXrp/WTEnCcsMiRrL8FpHU5rxsy6izEe+VrgrNI8w5xRNpZAdihATSMSyaYq+TSfWSJo8YCdoB5hBuIts16W6WT2YycWIpL5UYTgHdB7VNpWb6bqzt+0+PtPWkYM/yIS4FYifQqN92H8s8qWc4De5ugzNaxpzmlGTzehTDDRk1DqCpfEHFo4Nf6Ydqy0W3k1JcZMeDybeUghAK+2okUuCyArv7/iklFclvaEDqo3MIcKOmywi3nfAH2ri7F3nUX38QOm2zuVak6doVH6QRbOLQsQqu6sshGG+TVn3P45rX0EdfKMMHBnNEGOpwB1tcFbmAtJ24t8TMRc/mrQ36NGbBjwhJUULc5hHIf30OgAqMpsJUxUOjs4NX5WSiyiDkr4i4DUNCilguNHSml7vFBk4m5+94a0kOk65i+ufG3uirsGgkfb5xXGDOGIYyR1ZbLbOjk6t8jiJ4k4gcg6ik7+HF4IcHM4UjAEGF5pAcu7MxybP7/OmbaCa929krS/dE6j9EnsgW4gX0O",
+    "expiration": "2026-06-09T08:06:25.000Z"
   },
   "name": "ultrasound-assist",
   "path": "/home/ubuntu/ultrasound-assist",
