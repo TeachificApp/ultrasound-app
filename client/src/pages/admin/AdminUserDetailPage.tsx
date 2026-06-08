@@ -537,6 +537,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const physOrders = data.physicalOrders ?? [];
   const bundleEnrollments = data.bundleEnrollments ?? [];
   const nativeMemberships = data.nativeMemberships ?? [];
+  const brandMemberships = data.memberships ?? [];
   const communityMemberships = data.communityMemberships ?? [];
   const webinarRegistrations = data.webinarRegistrations ?? [];
 
@@ -550,7 +551,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
     { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
     { key: "products",     label: "Products",     icon: Package,        count: physOrders.length },
     { key: "bundles",      label: "Bundles",      icon: Layers,         count: bundleEnrollments.length },
-    { key: "memberships",  label: "Memberships",  icon: Star,           count: nativeMemberships.length },
+    { key: "memberships",  label: "Memberships",  icon: Star,           count: brandMemberships.length },
     { key: "communities",  label: "Communities",  icon: Users2,         count: communityMemberships.length },
   ];
 
@@ -814,42 +815,21 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       {/* Memberships */}
       {contentTab === "memberships" && (
         <div className="space-y-3">
-          <SectionHeader title={`Learn Memberships (${nativeMemberships.length})`} />
-          {nativeMemberships.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No memberships found.</p>
+          <SectionHeader title={`Brand Memberships (${brandMemberships.length})`} />
+          {brandMemberships.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No brand memberships found.</p>
           ) : (
-            nativeMemberships.map((m: any) => (
+            brandMemberships.map((m: any) => (
               <div key={m.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                 <div className="flex items-start justify-between gap-2 flex-wrap">
                   <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">{m.planTitle ?? "Membership"}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Since {formatDate(m.createdAt)}{m.currentPeriodEnd ? ` · Renews ${formatDate(new Date(m.currentPeriodEnd * 1000))}` : ""}
+                    <BrandBadge brand={m.brand} />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {m.tier === "premium" ? "★ Premium" : "Free"}{m.expiresAt ? ` · Expires ${formatDate(m.expiresAt)}` : " · No expiry"}
                     </p>
-                    {m.price > 0 && <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(m.price, m.currency)} / {m.billingInterval}</p>}
-                    {m.stripeSubscriptionId && (
-                      <p className="text-xs text-gray-400 mt-0.5 font-mono">{m.stripeSubscriptionId}</p>
-                    )}
+                    <p className="text-xs text-gray-400 mt-0.5">Granted {formatDate(m.createdAt ?? m.grantedAt)}</p>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <StatusBadge status={m.status ?? "active"} />
-                    {m.status === "active" && (
-                      <button
-                        onClick={() => setCancelNativeConfirm({ id: m.id, stripeSubId: m.stripeSubscriptionId ?? null })}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                      >
-                        <XCircle className="w-3 h-3" /> Cancel
-                      </button>
-                    )}
-                    {m.status !== "cancelled" && (
-                      <button
-                        onClick={() => setRevokeNativeConfirm(m.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                      >
-                        <ShieldOff className="w-3 h-3" /> Revoke
-                      </button>
-                    )}
-                  </div>
+                  <StatusBadge status={m.status ?? "active"} />
                 </div>
               </div>
             ))
@@ -1256,7 +1236,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                             onClick={() => setCancelConfirm({ membershipId: m.id, stripeSubId: m.stripeSubscriptionId })}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                           >
-                            <XCircle className="w-3 h-3" /> Cancel Sub
+                            <XCircle className="w-3 h-3" /> Cancel
                           </button>
                         )}
                         {m.status !== "cancelled" && (
@@ -1315,7 +1295,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                         onClick={() => setCancelLmsOrderConfirm({ id: o.id, stripeSubId: o.stripeSubscriptionId })}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
                       >
-                        <XCircle className="w-3 h-3" /> Cancel Sub
+                        <XCircle className="w-3 h-3" /> Cancel
                       </button>
                     )}
                   </div>
