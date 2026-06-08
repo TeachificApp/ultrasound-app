@@ -9,11 +9,24 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 import { ExternalLink, Star, Clock, Info, GraduationCap, Award, BookOpen } from "lucide-react";
-import { Link } from "wouter";
-import { LEARN_APP_URL } from "@/hooks/useSubdomain";
+import { LEARN_APP_URL, IHEARTECHO_APP_URL, isIHeartEchoDomain } from "@/hooks/useSubdomain";
+
+/** Base URL for the learn/course player — depends on which app domain we're on */
+const COURSE_BASE_URL = isIHeartEchoDomain() ? IHEARTECHO_APP_URL : LEARN_APP_URL;
 
 /** Education Library URL on the learn subdomain */
 const EDUCATION_LIBRARY_URL = `${LEARN_APP_URL}/education-library`;
+
+/** Build the absolute course player URL for the correct app domain */
+function buildCoursePlayerUrl(nativeLmsCourseId: number): string {
+  return `${COURSE_BASE_URL}/learn/course/${nativeLmsCourseId}`;
+}
+
+/** Build the course landing page URL on the learn domain (for Learn More) */
+function buildCourseLandingUrl(slug: string | undefined, fallbackUrl: string): string {
+  if (slug) return `${LEARN_APP_URL}/courses/${slug}`;
+  return fallbackUrl;
+}
 
 const BRAND = "#189aa1";
 const BRAND_LIGHT = "#f0fbfc";
@@ -45,6 +58,7 @@ function mapLiveCourse(c: {
   thinkificProductId: number;
   thinkificCourseId?: number | null;
   name: string;
+  slug?: string | null;
   description: string | null;
   price: string;
   cardImageUrl: string | null;
@@ -81,7 +95,11 @@ function mapLiveCourse(c: {
     price: isFree ? "Free" : `$${priceNum.toFixed(2)}`,
     category,
     enrollUrl: c.enrollUrl,
-    courseUrl: c.courseUrl,
+    // courseUrl: points to learn.allaboutultrasound.com/courses/:slug (native LMS landing page)
+    // Falls back to the Thinkific member portal URL if no native slug available
+    courseUrl: c.slug
+      ? buildCourseLandingUrl(c.slug, c.courseUrl)
+      : c.courseUrl,
     isFeatured: isBundle,
     isBundle,
     isFree,
@@ -222,8 +240,8 @@ export default function RegistryReviewHub() {
                       Learn More <Info className="w-3.5 h-3.5" />
                     </a>
                     {featured.nativeLmsCourseId ? (
-                      <Link
-                        href={`/learn/course/${featured.nativeLmsCourseId}`}
+                      <a
+                        href={buildCoursePlayerUrl(featured.nativeLmsCourseId)}
                         className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
                         style={{
                           background:
@@ -235,7 +253,7 @@ export default function RegistryReviewHub() {
                         {featured.thinkificCourseId && enrolledSet.has(featured.thinkificCourseId)
                           ? "Continue Learning"
                           : "Start Course"}
-                      </Link>
+                      </a>
                     ) : (
                       <a
                         href={buildCheckoutUrl(featured.enrollUrl, user?.email)}
@@ -333,8 +351,8 @@ export default function RegistryReviewHub() {
                           Learn More <Info className="w-3 h-3" />
                         </a>
                         {course.nativeLmsCourseId ? (
-                          <Link
-                            href={`/learn/course/${course.nativeLmsCourseId}`}
+                          <a
+                            href={buildCoursePlayerUrl(course.nativeLmsCourseId)}
                             className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold py-1.5 px-2 rounded-lg text-white transition-all hover:opacity-90"
                             style={{
                               background:
@@ -347,7 +365,7 @@ export default function RegistryReviewHub() {
                             {course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId)
                               ? "Continue Learning"
                               : "Start Course"}
-                          </Link>
+                          </a>
                         ) : (
                           <a
                             href={buildCheckoutUrl(course.enrollUrl, user?.email)}
