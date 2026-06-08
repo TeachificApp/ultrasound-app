@@ -882,6 +882,8 @@ const reconcileStripeMembership = adminProcedure
     email: z.string().email().optional(),
     /** Force-assign to a specific user ID (admin override — bypasses email lookup) */
     userId: z.number().int().optional(),
+    /** Force-assign to a specific plan ID (admin override — bypasses price ID lookup) */
+    planId: z.number().int().optional(),
   }))
   .mutation(async ({ input }) => {
     if (!input.stripeCheckoutSessionId && !input.stripeSubscriptionId) {
@@ -949,6 +951,13 @@ const reconcileStripeMembership = adminProcedure
     if (input.userId) {
       const meta = (session.metadata as Record<string, string>) ?? {};
       meta.user_id = String(input.userId);
+      session.metadata = meta;
+    }
+
+    // Admin planId override: inject into session metadata so resolveMembershipPlanId uses it
+    if (input.planId) {
+      const meta = (session.metadata as Record<string, string>) ?? {};
+      meta.plan_id = String(input.planId);
       session.metadata = meta;
     }
 

@@ -999,6 +999,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const [addSubOpen, setAddSubOpen] = useState(false);
   const [addSubStripeId, setAddSubStripeId] = useState("");
   const [addSubEmail, setAddSubEmail] = useState("");
+  const [addSubPlanId, setAddSubPlanId] = useState<string>("");
 
   const grantMembership = trpc.adminUser.grantBrandMembership.useMutation({
     onSuccess: () => { toast.success("App access granted."); refetch(); setGrantOpen(false); },
@@ -1031,9 +1032,11 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
       setAddSubOpen(false);
       setAddSubStripeId("");
       setAddSubEmail("");
+      setAddSubPlanId("");
     },
     onError: (e) => toast.error(`Sync failed: ${e.message}`),
   });
+  const { data: allPlansData } = trpc.membership.listAll.useQuery(undefined, { staleTime: 60_000 });
 
   const memberships = data.memberships ?? [];
   const nativeMemberships = data.nativeMemberships ?? [];
@@ -1261,6 +1264,21 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
               />
               <p className="text-xs text-gray-400">Pre-filled from user profile. Used if Stripe metadata doesn&apos;t include email.</p>
             </div>
+            <div className="space-y-1.5">
+              <Label>Membership Plan <span className="text-gray-400 font-normal">(optional — override if auto-detect fails)</span></Label>
+              <Select value={addSubPlanId} onValueChange={setAddSubPlanId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Auto-detect from Stripe price ID" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Auto-detect from Stripe price ID</SelectItem>
+                  {(allPlansData ?? []).map((p: any) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-400">Use this if you see &quot;Could not resolve membership plan&quot; — manually select the correct plan.</p>
+            </div>
             <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700">
               <strong>Note:</strong> This runs full membership fulfillment — granting all courses, downloads, bundles, and app access linked to the plan. Idempotent: safe to run multiple times.
             </div>
@@ -1268,7 +1286,12 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddSubOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => addSubscription.mutate({ stripeSubscriptionId: addSubStripeId, email: addSubEmail || undefined, userId })}
+              onClick={() => addSubscription.mutate({
+                stripeSubscriptionId: addSubStripeId,
+                email: addSubEmail || undefined,
+                userId,
+                planId: addSubPlanId ? parseInt(addSubPlanId, 10) : undefined,
+              })}
               disabled={!addSubStripeId || addSubscription.isPending}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
