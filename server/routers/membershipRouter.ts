@@ -461,6 +461,8 @@ const manualEnroll = adminProcedure
       userId: z.number(),
       status: z.enum(["active", "trialing"]).optional(),
       currentPeriodEnd: z.number().optional().nullable(),
+      stripeSubscriptionId: z.string().optional(),
+      stripeCustomerId: z.string().optional(),
     })
   )
   .mutation(async ({ input }) => {
@@ -478,7 +480,11 @@ const manualEnroll = adminProcedure
     if (existing) {
       await db
         .update(membershipSubscriptions)
-        .set({ status: input.status ?? "active" })
+        .set({
+          status: input.status ?? "active",
+          stripeSubscriptionId: input.stripeSubscriptionId ?? undefined,
+          stripeCustomerId: input.stripeCustomerId ?? undefined,
+        })
         .where(eq(membershipSubscriptions.id, existing.id));
     } else {
       await db.insert(membershipSubscriptions).values({
@@ -486,9 +492,17 @@ const manualEnroll = adminProcedure
         userId: input.userId,
         status: input.status ?? "active",
         currentPeriodEnd: input.currentPeriodEnd ?? null,
+        stripeSubscriptionId: input.stripeSubscriptionId ?? null,
+        stripeCustomerId: input.stripeCustomerId ?? null,
       });
     }
-    return { success: true };
+    const { fulfillMembershipPlanAccess } = await import("../lib/membershipFulfillment");
+    const notes = await fulfillMembershipPlanAccess(db as any, input.userId, input.planId, {
+      sessionId: null,
+      stripeSubscriptionId: input.stripeSubscriptionId ?? null,
+      stripeCustomerId: input.stripeCustomerId ?? null,
+    });
+    return { success: true, notes };
   });
 
 const cancelEnrollment = adminProcedure
@@ -669,7 +683,14 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
       allow_promotion_codes: discounts.length === 0,
       ...(discounts.length > 0 ? { discounts } : {}),
       client_reference_id: ctx.user.id.toString(),
-      metadata: { type: "membership", plan_id: plan.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", customer_name: ctx.user.name ?? "" },
+      metadata: {
+        type: "membership",
+        plan_id: plan.id.toString(),
+        user_id: ctx.user.id.toString(),
+        customer_email: ctx.user.email ?? "",
+        customer_name: ctx.user.name ?? "",
+        ...(input.discountCodeId ? { discount_code_id: input.discountCodeId.toString() } : {}),
+      },
       ...(isRecurring ? { subscription_data: { description: plan.title, metadata: { user_id: ctx.user.id.toString(), plan_id: plan.id.toString(), type: "membership" } } } : {}),
       return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=membership`,
     });
@@ -698,6 +719,149 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
       minSeats: null,
       discountPercent: null,
     };
+  });
+
+const guestMembershipCheckoutRegister = publicProcedure
+  .input(z.object({
+    planSlug: z.string(),
+    name: z.string().min(1).max(200),
+    email: z.string().email(),
+    origin: z.string(),
+  }))
+  .mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+    const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
+    if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+
+    const { getOrCreateUserByEmail } = await import("../db");
+    const { user } = await getOrCreateUserByEmail({
+      email: input.email.trim().toLowerCase(),
+      name: input.name.trim(),
+    });
+
+    const { sdk } = await import("../_core/sdk");
+    const { COOKIE_NAME, ONE_YEAR_MS } = await import("@shared/const");
+    const { getSessionCookieOptions } = await import("../_core/cookies");
+    const openId = `email:${input.email.trim().toLowerCase()}`;
+    await db.update(users).set({ openId }).where(and(eq(users.id, user.id), isNull(users.openId)));
+    const sessionToken = await sdk.createSessionToken(openId, { name: input.name, expiresInMs: ONE_YEAR_MS });
+    const cookieOptions = getSessionCookieOptions(ctx.req);
+    ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+    return {
+      userId: user.id,
+      checkoutPath: `/checkout/${input.planSlug}?type=membership`,
+    };
+  });
+
+const getMembershipCheckoutSessionStatus = publicProcedure
+  .input(z.object({ sessionId: z.string() }))
+  .query(async ({ ctx, input }) => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+    const session = await stripe.checkout.sessions.retrieve(input.sessionId, {
+      expand: ["line_items"],
+    });
+
+    if (session.status === "complete") {
+      const db = await getDb();
+      if (db) {
+        try {
+          const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
+          await reconcileMembershipFromStripeSession(db as any, session as unknown as Record<string, unknown>);
+        } catch (err) {
+          console.error("[MembershipCheckoutStatus] Fallback fulfillment error:", err);
+        }
+      }
+    }
+
+    const meta = (session.metadata ?? {}) as Record<string, string>;
+    let planSlug: string | null = null;
+    if (meta.plan_id) {
+      const db = await getDb();
+      if (db) {
+        const [plan] = await db
+          .select({ slug: membershipPlans.slug })
+          .from(membershipPlans)
+          .where(eq(membershipPlans.id, parseInt(meta.plan_id, 10)))
+          .limit(1);
+        planSlug = plan?.slug ?? null;
+      }
+    }
+
+    let autoLoginUrl: string | null = null;
+    if (ctx.user && session.status === "complete") {
+      try {
+        const { generateAutoLoginToken } = await import("../routes/autoLogin");
+        const baseUrl = "https://app.allaboutultrasound.com";
+        const next = planSlug ? `https://learn.allaboutultrasound.com/my-dashboard` : `${baseUrl}/my-dashboard`;
+        const token = await generateAutoLoginToken(ctx.user.id, next);
+        autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
+      } catch { /* non-fatal */ }
+    }
+
+    return {
+      status: session.status,
+      paymentStatus: session.payment_status,
+      customerEmail: session.customer_details?.email ?? null,
+      planSlug,
+      autoLoginUrl,
+    };
+  });
+
+const reconcileStripeMembership = adminProcedure
+  .input(z.object({
+    stripeCheckoutSessionId: z.string().optional(),
+    stripeSubscriptionId: z.string().optional(),
+    email: z.string().email().optional(),
+  }))
+  .mutation(async ({ input }) => {
+    if (!input.stripeCheckoutSessionId && !input.stripeSubscriptionId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Provide stripeCheckoutSessionId or stripeSubscriptionId" });
+    }
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+    let session: Record<string, unknown> | null = null;
+    if (input.stripeCheckoutSessionId) {
+      const s = await stripe.checkout.sessions.retrieve(input.stripeCheckoutSessionId, { expand: ["line_items"] });
+      session = s as unknown as Record<string, unknown>;
+    } else if (input.stripeSubscriptionId) {
+      const sub = await stripe.subscriptions.retrieve(input.stripeSubscriptionId);
+      const sessions = await stripe.checkout.sessions.list({ subscription: input.stripeSubscriptionId, limit: 1 });
+      if (sessions.data[0]) {
+        session = sessions.data[0] as unknown as Record<string, unknown>;
+      } else {
+        session = {
+          id: `reconcile_sub_${input.stripeSubscriptionId}`,
+          metadata: sub.metadata ?? {},
+          subscription: sub.id,
+          customer: sub.customer,
+          customer_email: input.email ?? undefined,
+          amount_total: sub.items?.data?.[0]?.price?.unit_amount ?? 0,
+          status: "complete",
+        };
+        if (!session.metadata || !(session.metadata as Record<string, string>).type) {
+          (session.metadata as Record<string, string>).type = "membership";
+        }
+      }
+    }
+
+    if (!session) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Could not load Stripe checkout session" });
+    }
+
+    const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
+    const result = await reconcileMembershipFromStripeSession(db as any, session);
+    if (!result.success) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Reconciliation failed" });
+    }
+    return result;
   });
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -734,4 +898,7 @@ export const membershipRouter = router({
   saveCheckoutPageConfig: saveMembershipCheckoutPageConfig,
   getPublicCheckoutPageConfig: getPublicMembershipCheckoutPageConfig,
   createEmbeddedCheckoutSession: createMembershipEmbeddedCheckoutSession,
+  guestCheckoutRegister: guestMembershipCheckoutRegister,
+  getCheckoutSessionStatus: getMembershipCheckoutSessionStatus,
+  reconcileStripeMembership,
 });
