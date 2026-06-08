@@ -2147,15 +2147,69 @@ export const adminUserRouter = router({
         "user_email_aliases",
       ];
 
+      // ── Deduplicate lms_enrollments before re-pointing ──────────────────────────
+      // For each course the source is enrolled in, check if target is already enrolled.
+      // If so, delete the source's duplicate row; otherwise re-point it.
+      try {
+        const [sourceEnrollments] = await db.execute(sql.raw(
+          `SELECT id, course_id FROM lms_enrollments WHERE user_id = ${input.sourceUserId}`
+        )) as any;
+        const [targetEnrollments] = await db.execute(sql.raw(
+          `SELECT id, course_id FROM lms_enrollments WHERE user_id = ${input.targetUserId}`
+        )) as any;
+        const targetCourseIds = new Set((targetEnrollments as any[]).map((r: any) => r.course_id));
+        for (const row of sourceEnrollments as any[]) {
+          if (targetCourseIds.has(row.course_id)) {
+            // Target already enrolled in this course — delete the source duplicate
+            await db.execute(sql.raw(`DELETE FROM lms_enrollments WHERE id = ${row.id}`));
+            console.log(`[mergeUsers] Deleted duplicate lms_enrollment id=${row.id} course_id=${row.course_id}`);
+          } else {
+            // Safe to re-point
+            await db.execute(sql.raw(
+              `UPDATE lms_enrollments SET user_id = ${input.targetUserId} WHERE id = ${row.id}`
+            ));
+          }
+        }
+      } catch (_e) {
+        console.warn('[mergeUsers] lms_enrollments dedup error:', (_e as Error).message?.slice(0, 120));
+      }
+
+      // ── Deduplicate lms_cohort_group_enrollments ──────────────────────────────
+      try {
+        const [sourceCGE] = await db.execute(sql.raw(
+          `SELECT id, cohort_group_id FROM lms_cohort_group_enrollments WHERE user_id = ${input.sourceUserId}`
+        )) as any;
+        const [targetCGE] = await db.execute(sql.raw(
+          `SELECT cohort_group_id FROM lms_cohort_group_enrollments WHERE user_id = ${input.targetUserId}`
+        )) as any;
+        const targetCohortIds = new Set((targetCGE as any[]).map((r: any) => r.cohort_group_id));
+        for (const row of sourceCGE as any[]) {
+          if (targetCohortIds.has(row.cohort_group_id)) {
+            await db.execute(sql.raw(`DELETE FROM lms_cohort_group_enrollments WHERE id = ${row.id}`));
+            console.log(`[mergeUsers] Deleted duplicate lms_cohort_group_enrollment id=${row.id}`);
+          } else {
+            await db.execute(sql.raw(
+              `UPDATE lms_cohort_group_enrollments SET user_id = ${input.targetUserId} WHERE id = ${row.id}`
+            ));
+          }
+        }
+      } catch (_e) {
+        console.warn('[mergeUsers] lms_cohort_group_enrollments dedup error:', (_e as Error).message?.slice(0, 120));
+      }
+
       // Re-point each table — skip rows that would create a duplicate (e.g. unique userId)
-      for (const table of tablesToUpdate) {
+      // lms_enrollments and lms_cohort_group_enrollments are handled above with dedup logic
+      const tablesToUpdateFiltered = tablesToUpdate.filter(
+        t => t !== 'lms_enrollments' && t !== 'lms_cohort_group_enrollments'
+      );
+      for (const table of tablesToUpdateFiltered) {
         try {
           const col = table === 'email_send_log' || table === 'ip_access_logs' ||
             table === 'sharing_abuse_flags' || table === 'user_login_events' ||
             table === 'user_activity_logs' || table === 'physical_product_orders' ||
             table === 'digital_purchases' || table === 'digital_download_events' ||
             table === 'digital_bundle_purchases' || table === 'funnel_purchases' ||
-            table === 'order_bump_conversions' || table === 'lms_enrollments' ||
+            table === 'order_bump_conversions' ||
             table === 'lms_orders' || table === 'lms_certificates' ||
             table === 'lms_lesson_notes' || table === 'lms_lesson_bookmarks' ||
             table === 'lms_video_events' || table === 'lms_quiz_attempts' ||
