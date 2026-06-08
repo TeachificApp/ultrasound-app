@@ -4747,3 +4747,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Backfill course access items for all 7 seeded plans (6 created, 1 already existed)
 - [x] islaolim@icloud.com: subscription synced, enrollment created, transaction recorded
 - [ ] Courses missing Stripe price IDs: Ultrasound Physics SPI Review Quiz, From Sonographer to CEO, Fetal Echo Quiz, Abdomen Quiz (Ergonomics CME intentionally free)
+
+## Admin User Detail — Content Tab Fixes (Jun 2026)
+- [x] Courses tab: filter to only show non-quiz, non-download enrollments (was showing all enrollments including quizzes)
+- [x] Quizzes tab: upgrade to full image card with thumbnail, progress badge, attempt stats, View Quiz + Remove buttons (was showing minimal text-only card)

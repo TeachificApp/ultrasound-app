@@ -492,17 +492,17 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       {contentTab === "courses" && (
         <div className="space-y-3">
           <SectionHeader
-            title={`Enrollments (${enrollments.length})`}
+            title={`Enrollments (${courses.length})`}
             action={
               <Button size="sm" onClick={() => setEnrollOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
                 <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Enroll
               </Button>
             }
           />
-          {enrollments.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No enrollments yet.</p>
+          {courses.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No course enrollments yet.</p>
           ) : (
-            enrollments.map((e: any) => (
+            courses.map((e: any) => (
               <div key={e.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex gap-4 items-start">
                 {e.thumbnailUrl ? (
                   <img src={e.thumbnailUrl} alt={e.courseTitle} className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-gray-100" />
@@ -549,23 +549,54 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       {/* Quizzes */}
       {contentTab === "quizzes" && (
         <div className="space-y-3">
-          <SectionHeader title={`Quizzes (${quizzes.length})`} />
+          <SectionHeader
+            title={`Quizzes (${quizzes.length})`}
+            action={
+              <Button size="sm" onClick={() => setEnrollOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
+                <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Enroll
+              </Button>
+            }
+          />
           {quizzes.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">No quiz enrollments.</p>
           ) : (
             quizzes.map((e: any) => (
-              <div key={e.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">{e.courseTitle}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">Enrolled {formatDate(e.enrolledAt)}</p>
+              <div key={e.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex gap-4 items-start">
+                {e.thumbnailUrl ? (
+                  <img src={e.thumbnailUrl} alt={e.courseTitle} className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-gray-100" />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg flex-shrink-0 flex items-center justify-center bg-amber-50">
+                    <ClipboardCheck className="w-6 h-6 text-amber-500" />
                   </div>
-                  <button
-                    onClick={() => setUnenrollConfirm(e.enrollmentId)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                  >
-                    <Trash2 className="w-3 h-3" /> Remove
-                  </button>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <h4 className="font-semibold text-gray-800 text-sm">{e.courseTitle}</h4>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0 ${
+                      e.completedAt ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200"
+                    }`}>
+                      {e.completedAt ? "Completed" : `${e.progressPct ?? 0}% complete`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">Enrolled {formatDate(e.enrolledAt)}</p>
+                  {e.quizAttempts > 0 && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {e.quizAttempts} attempt{e.quizAttempts !== 1 ? "s" : ""}
+                      {e.avgQuizScore != null && ` · Avg score: ${e.avgQuizScore}%`}
+                    </p>
+                  )}
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    <a href={`/courses/${e.courseSlug}/overview`} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                      <ExternalLink className="w-3 h-3" /> View Quiz
+                    </a>
+                    <button
+                      onClick={() => setUnenrollConfirm(e.enrollmentId)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                    >
+                      <Trash2 className="w-3 h-3" /> Remove
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
