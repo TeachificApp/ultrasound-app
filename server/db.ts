@@ -103,6 +103,28 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
+  // ── Alias email detection ─────────────────────────────────────────────────
+  // If the incoming email matches an alias on an existing account, redirect
+  // the upsert to that account instead of creating a new stub.
+  if (user.email) {
+    const normalised = user.email.trim().toLowerCase();
+    const { userEmailAliases } = await import("../../drizzle/schema");
+    const aliasMatch = await db
+      .select({ userId: userEmailAliases.userId })
+      .from(userEmailAliases)
+      .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`)
+      .limit(1);
+    if (aliasMatch[0]) {
+      // Update lastSignedIn on the real account; do NOT create a new row
+      await db
+        .update(users)
+        .set({ lastSignedIn: user.lastSignedIn ?? new Date(), isPending: false })
+        .where(eq(users.id, aliasMatch[0].userId));
+      console.log(`[upsertUser] Alias email ${normalised} matched userId=${aliasMatch[0].userId} — skipped new-account creation`);
+      return;
+    }
+  }
+
   // ── Pending user activation ───────────────────────────────────────────────
   // If a pending stub exists for this email (created by the Thinkific webhook
   // or bulk import), activate it with the real OAuth identity instead of
