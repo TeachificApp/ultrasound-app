@@ -108,7 +108,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   // the upsert to that account instead of creating a new stub.
   if (user.email) {
     const normalised = user.email.trim().toLowerCase();
-    const { userEmailAliases } = await import("../../drizzle/schema");
     const aliasMatch = await db
       .select({ userId: userEmailAliases.userId })
       .from(userEmailAliases)
