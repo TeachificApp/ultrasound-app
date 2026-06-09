@@ -969,7 +969,11 @@ export const lmsCohortAdminRouter = router({
       const counts = await db
         .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId, count: sql<number>`count(*)` })
         .from(lmsCohortGroupEnrollments)
-        .where(eq(lmsCohortGroupEnrollments.courseId, input.courseId))
+        .innerJoin(users, eq(users.id, lmsCohortGroupEnrollments.userId))
+        .where(and(
+          eq(lmsCohortGroupEnrollments.courseId, input.courseId),
+          eq(users.isPending, false),  // exclude merged/placeholder accounts from count
+        ))
         .groupBy(lmsCohortGroupEnrollments.cohortGroupId);
       const countMap = Object.fromEntries(counts.map(c => [c.cohortGroupId, c.count]));
       return groups.map(g => ({ ...g, studentCount: countMap[g.id] ?? 0 }));
@@ -1069,7 +1073,10 @@ export const lmsCohortAdminRouter = router({
         })
         .from(lmsCohortGroupEnrollments)
         .innerJoin(users, eq(users.id, lmsCohortGroupEnrollments.userId))
-        .where(eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId))
+        .where(and(
+          eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId),
+          eq(users.isPending, false),  // exclude merged/placeholder accounts
+        ))
         .orderBy(asc(users.name));
       if (input.search) {
         const q = input.search.toLowerCase();
@@ -1089,7 +1096,11 @@ export const lmsCohortAdminRouter = router({
         .select({ userId: lmsEnrollments.userId, userName: users.name, userEmail: users.email, userAvatar: users.avatarUrl, enrollmentId: lmsEnrollments.id })
         .from(lmsEnrollments)
         .innerJoin(users, eq(users.id, lmsEnrollments.userId))
-        .where(and(eq(lmsEnrollments.courseId, input.courseId), eq(lmsEnrollments.status, "active")));
+        .where(and(
+          eq(lmsEnrollments.courseId, input.courseId),
+          eq(lmsEnrollments.status, "active"),
+          eq(users.isPending, false),  // exclude merged/placeholder accounts
+        ));
       const assigned = await db
         .select({ userId: lmsCohortGroupEnrollments.userId })
         .from(lmsCohortGroupEnrollments)

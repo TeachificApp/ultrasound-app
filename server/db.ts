@@ -2019,8 +2019,13 @@ export async function listUsersWithRoles(
 
   // Build WHERE conditions
   const conditions: any[] = [];
-  if (userType === 'pending') conditions.push(eq(users.isPending, true));
-  if (userType === 'active') conditions.push(eq(users.isPending, false));
+  if (userType === 'pending') {
+    conditions.push(eq(users.isPending, true));
+  } else {
+    // Always exclude merged/pending placeholder accounts from all non-pending views
+    conditions.push(eq(users.isPending, false));
+  }
+  if (userType === 'active') conditions.push(sql`${users.lastSignedIn} >= DATE_SUB(NOW(), INTERVAL 30 DAY)`);
   if (roleFilteredIds !== null) {
     conditions.push(or(...roleFilteredIds.map(id => eq(users.id, id))));
   }
