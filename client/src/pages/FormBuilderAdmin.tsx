@@ -927,8 +927,8 @@ function ItemEditorDialog({ open, onClose, item, existingOptions, sectionId, tem
       label: label.trim(),
       helpText: helpText.trim() || undefined,
       itemType,
-      isRequired,
-      scoreWeight,
+      isRequired: itemType === "hidden" ? false : isRequired,
+      scoreWeight: itemType === "hidden" ? 0 : scoreWeight,
       scaleMin: itemType === "scale" ? scaleMin : undefined,
       scaleMax: itemType === "scale" ? scaleMax : undefined,
       scaleMinLabel: itemType === "scale" ? scaleMinLabel || undefined : undefined,
@@ -939,8 +939,6 @@ function ItemEditorDialog({ open, onClose, item, existingOptions, sectionId, tem
       validationRegex: ["text", "email"].includes(itemType) ? validationRegex || undefined : undefined,
       options: hasOptions ? options : undefined,
       extraConfig: itemType === "hidden" ? JSON.stringify({ hiddenValue }) : undefined,
-      isRequired: itemType === "hidden" ? false : isRequired,
-      scoreWeight: itemType === "hidden" ? 0 : scoreWeight,
     };
 
     if (isEdit && item) {
