@@ -25,7 +25,7 @@ import { getDb, ensureUserRole, markThinkificEnrolled } from "../db";
 import { sendEmail, buildWelcomeEmail, buildVerificationEmail, buildPasswordResetEmail } from "../_core/email";
 import { type BrandMode, detectBrandMode } from "@shared/brands";
 import { enrollInFreeMembership } from "../thinkific";
-import { users } from "../../drizzle/schema";
+import { users, userEmailAliases } from "../../drizzle/schema";
 import { eq, or } from "drizzle-orm";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -385,16 +385,35 @@ export const emailAuthRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const email = input.email.toLowerCase().trim();
+
+      // Look up user by primary email OR by alias email
       const result = await db
         .select()
         .from(users)
         .where(eq(users.email, email))
         .limit(1);
+      let user = result[0] as typeof result[0] | undefined;
+
+      // If not found by primary email, check alias emails
+      if (!user) {
+        const aliasRows = await db
+          .select({ userId: userEmailAliases.userId })
+          .from(userEmailAliases)
+          .where(eq(userEmailAliases.email, email))
+          .limit(1);
+        if (aliasRows[0]) {
+          const aliasUserResult = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, aliasRows[0].userId))
+            .limit(1);
+          user = aliasUserResult[0];
+        }
+      }
 
       // Always return success to avoid email enumeration
       // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)
       // — this allows OAuth users to set a password for the first time via the reset flow
-      const user = result[0];
       if (user) {
         const resetToken = generateToken();
         const resetExpiry = tokenExpiry(1); // 1 hour
@@ -404,7 +423,25 @@ export const emailAuthRouter = router({
           .where(eq(users.id, user.id));
         const firstName = (user.name ?? "").split(" ")[0] ?? "there";
         const bm = detectBrandMode(ctx.req.hostname || "");
+
+        // Send to the address they typed (primary or alias)
         await sendPasswordResetEmail(email, resetToken, firstName, bm, input.origin);
+
+        // Also send to all other alias emails so they receive it regardless of which address they used
+        const allAliases = await db
+          .select({ email: userEmailAliases.email })
+          .from(userEmailAliases)
+          .where(eq(userEmailAliases.userId, user.id));
+        for (const alias of allAliases) {
+          if (alias.email && alias.email.toLowerCase() !== email) {
+            sendPasswordResetEmail(alias.email, resetToken, firstName, bm, input.origin).catch(() => {});
+          }
+        }
+
+        // Also send to primary email if they typed an alias
+        if (user.email && user.email.toLowerCase() !== email) {
+          sendPasswordResetEmail(user.email, resetToken, firstName, bm, input.origin).catch(() => {});
+        }
       }
 
       return { success: true };
