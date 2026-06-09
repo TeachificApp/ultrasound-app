@@ -972,7 +972,7 @@ export const lmsCohortAdminRouter = router({
         .innerJoin(users, eq(users.id, lmsCohortGroupEnrollments.userId))
         .where(and(
           eq(lmsCohortGroupEnrollments.courseId, input.courseId),
-          eq(users.isPending, false),  // exclude merged/placeholder accounts from count
+          sql`${users.name} NOT LIKE '[Merged into #%'`,  // exclude merged placeholder accounts from count
         ))
         .groupBy(lmsCohortGroupEnrollments.cohortGroupId);
       const countMap = Object.fromEntries(counts.map(c => [c.cohortGroupId, c.count]));
@@ -1075,7 +1075,7 @@ export const lmsCohortAdminRouter = router({
         .innerJoin(users, eq(users.id, lmsCohortGroupEnrollments.userId))
         .where(and(
           eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId),
-          eq(users.isPending, false),  // exclude merged/placeholder accounts
+          sql`${users.name} NOT LIKE '[Merged into #%'`,  // exclude merged placeholder accounts
         ))
         .orderBy(asc(users.name));
       if (input.search) {
@@ -1099,7 +1099,7 @@ export const lmsCohortAdminRouter = router({
         .where(and(
           eq(lmsEnrollments.courseId, input.courseId),
           eq(lmsEnrollments.status, "active"),
-          eq(users.isPending, false),  // exclude merged/placeholder accounts
+          sql`${users.name} NOT LIKE '[Merged into #%'`,  // exclude merged placeholder accounts
         ));
       const assigned = await db
         .select({ userId: lmsCohortGroupEnrollments.userId })

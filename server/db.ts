@@ -2019,13 +2019,11 @@ export async function listUsersWithRoles(
 
   // Build WHERE conditions
   const conditions: any[] = [];
-  if (userType === 'pending') {
-    conditions.push(eq(users.isPending, true));
-  } else {
-    // Always exclude merged/pending placeholder accounts from all non-pending views
-    conditions.push(eq(users.isPending, false));
-  }
-  if (userType === 'active') conditions.push(sql`${users.lastSignedIn} >= DATE_SUB(NOW(), INTERVAL 30 DAY)`);
+  // Always exclude merged placeholder accounts (name starts with "[Merged into #")
+  // but keep real pending (pre-registered) accounts visible
+  conditions.push(sql`${users.name} NOT LIKE '[Merged into #%'`);
+  if (userType === 'pending') conditions.push(eq(users.isPending, true));
+  if (userType === 'active') conditions.push(eq(users.isPending, false));
   if (roleFilteredIds !== null) {
     conditions.push(or(...roleFilteredIds.map(id => eq(users.id, id))));
   }

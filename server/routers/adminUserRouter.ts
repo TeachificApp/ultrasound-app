@@ -1652,13 +1652,13 @@ export const adminUserRouter = router({
           (SELECT COUNT(*) FROM lms_enrollments e WHERE e.user_id = u.id) as enrollment_count,
           (SELECT COUNT(*) FROM lms_enrollments e WHERE e.user_id = u.id AND e.completed_at IS NOT NULL) as completion_count
         FROM users u
-        WHERE u.isPending = 0 AND ${statusFilter} AND ${searchFilter}
+        WHERE u.name NOT LIKE '[Merged into #%' AND ${statusFilter} AND ${searchFilter}
         ORDER BY u.createdAt DESC
         LIMIT ${input.pageSize} OFFSET ${offset}
       `) as any;
 
       const [countRow] = await db.execute(sql`
-        SELECT COUNT(*) as total FROM users u WHERE u.isPending = 0 AND ${statusFilter} AND ${searchFilter}
+        SELECT COUNT(*) as total FROM users u WHERE u.name NOT LIKE '[Merged into #%' AND ${statusFilter} AND ${searchFilter}
       `) as any;
       const total = Number(toArr2(countRow)[0]?.total ?? 0);
 
