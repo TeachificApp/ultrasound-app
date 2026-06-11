@@ -18,7 +18,7 @@ import {
   RefreshCw, Loader2, ChevronRight, ChevronLeft, ShoppingCart,
   UserCog, PlusCircle, Trash2, Shield, ShieldOff, BadgeCheck,
   ClipboardCheck, RotateCcw, DollarSign, Edit3, GitMerge, Mail, X,
-  Users2, Building2, Star, Layers, KeyRound, Eye, EyeOff,
+  Users2, Building2, Star, Layers, KeyRound, Eye, EyeOff, Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -498,6 +498,8 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [cancelNativeConfirm, setCancelNativeConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
   const [revokeNativeConfirm, setRevokeNativeConfirm] = useState<number | null>(null);
   const [revokeNativeNotify, setRevokeNativeNotify] = useState(true);
+  const [expiryEditId, setExpiryEditId] = useState<number | null>(null);
+  const [expiryEditValue, setExpiryEditValue] = useState("");
 
   const { data: allCourses } = trpc.adminUser.listAllCourses.useQuery();
 
@@ -535,6 +537,10 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   });
   const revokeNativeMembership = trpc.adminUser.revokeNativeMembership.useMutation({
     onSuccess: () => { toast.success("Membership revoked."); refetch(); setRevokeNativeConfirm(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateExpiry = trpc.adminUser.updateEnrollmentExpiry.useMutation({
+    onSuccess: () => { toast.success("Access expiry updated."); refetch(); setExpiryEditId(null); setExpiryEditValue(""); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -616,17 +622,67 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">Enrolled {formatDate(e.enrolledAt)}</p>
+                  {e.accessExpiresAt && (() => {
+                    const exp = new Date(e.accessExpiresAt);
+                    const daysLeft = Math.ceil((exp.getTime() - Date.now()) / 86400000);
+                    return (
+                      <p className={`text-xs mt-0.5 flex items-center gap-1 font-medium ${
+                        daysLeft <= 0 ? "text-red-500" : daysLeft <= 30 ? "text-amber-600" : "text-gray-400"
+                      }`}>
+                        <Clock className="w-3 h-3" />
+                        {daysLeft <= 0 ? `Expired ${formatDate(exp)}` : daysLeft <= 30 ? `Expires ${formatDate(exp)} (${daysLeft}d left)` : `Access until ${formatDate(exp)}`}
+                      </p>
+                    );
+                  })()}
                   {(e.videosCompleted > 0 || e.quizAttempts > 0) && (
                     <p className="text-xs text-gray-400 mt-0.5">
                       {e.videosCompleted} videos completed · {e.quizAttempts} quiz attempts
                       {e.avgQuizScore != null && ` · Avg score: ${e.avgQuizScore}%`}
                     </p>
                   )}
+                  {expiryEditId === e.enrollmentId ? (
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <Input
+                        type="date"
+                        value={expiryEditValue}
+                        onChange={ev => setExpiryEditValue(ev.target.value)}
+                        className="h-7 text-xs w-36"
+                      />
+                      <button
+                        onClick={() => updateExpiry.mutate({ enrollmentId: e.enrollmentId, accessExpiresAt: expiryEditValue || null })}
+                        disabled={updateExpiry.isPending}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50"
+                      >
+                        {updateExpiry.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Save
+                      </button>
+                      <button
+                        onClick={() => { setExpiryEditId(null); setExpiryEditValue(""); }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      >
+                        <X className="w-3 h-3" /> Cancel
+                      </button>
+                      {e.accessExpiresAt && (
+                        <button
+                          onClick={() => updateExpiry.mutate({ enrollmentId: e.enrollmentId, accessExpiresAt: null })}
+                          disabled={updateExpiry.isPending}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        >
+                          <XCircle className="w-3 h-3" /> Remove Expiry
+                        </button>
+                      )}
+                    </div>
+                  ) : (
                   <div className="flex gap-2 mt-2 flex-wrap">
                     <a href={`/courses/${e.courseSlug}/overview`} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
                       <ExternalLink className="w-3 h-3" /> View Course
                     </a>
+                    <button
+                      onClick={() => { setExpiryEditId(e.enrollmentId); setExpiryEditValue(e.accessExpiresAt ? new Date(e.accessExpiresAt).toISOString().slice(0,10) : ""); }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                    >
+                      <Calendar className="w-3 h-3" /> Edit Expiry
+                    </button>
                     <button
                       onClick={() => setUnenrollConfirm(e.enrollmentId)}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
@@ -634,6 +690,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       <Trash2 className="w-3 h-3" /> Unenroll
                     </button>
                   </div>
+                  )}
                 </div>
               </div>
             ))
@@ -674,17 +731,67 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">Enrolled {formatDate(e.enrolledAt)}</p>
+                  {e.accessExpiresAt && (() => {
+                    const exp = new Date(e.accessExpiresAt);
+                    const daysLeft = Math.ceil((exp.getTime() - Date.now()) / 86400000);
+                    return (
+                      <p className={`text-xs mt-0.5 flex items-center gap-1 font-medium ${
+                        daysLeft <= 0 ? "text-red-500" : daysLeft <= 30 ? "text-amber-600" : "text-gray-400"
+                      }`}>
+                        <Clock className="w-3 h-3" />
+                        {daysLeft <= 0 ? `Expired ${formatDate(exp)}` : daysLeft <= 30 ? `Expires ${formatDate(exp)} (${daysLeft}d left)` : `Access until ${formatDate(exp)}`}
+                      </p>
+                    );
+                  })()}
                   {e.quizAttempts > 0 && (
                     <p className="text-xs text-gray-400 mt-0.5">
                       {e.quizAttempts} attempt{e.quizAttempts !== 1 ? "s" : ""}
                       {e.avgQuizScore != null && ` · Avg score: ${e.avgQuizScore}%`}
                     </p>
                   )}
+                  {expiryEditId === e.enrollmentId ? (
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <Input
+                        type="date"
+                        value={expiryEditValue}
+                        onChange={ev => setExpiryEditValue(ev.target.value)}
+                        className="h-7 text-xs w-36"
+                      />
+                      <button
+                        onClick={() => updateExpiry.mutate({ enrollmentId: e.enrollmentId, accessExpiresAt: expiryEditValue || null })}
+                        disabled={updateExpiry.isPending}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50"
+                      >
+                        {updateExpiry.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Save
+                      </button>
+                      <button
+                        onClick={() => { setExpiryEditId(null); setExpiryEditValue(""); }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      >
+                        <X className="w-3 h-3" /> Cancel
+                      </button>
+                      {e.accessExpiresAt && (
+                        <button
+                          onClick={() => updateExpiry.mutate({ enrollmentId: e.enrollmentId, accessExpiresAt: null })}
+                          disabled={updateExpiry.isPending}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        >
+                          <XCircle className="w-3 h-3" /> Remove Expiry
+                        </button>
+                      )}
+                    </div>
+                  ) : (
                   <div className="flex gap-2 mt-2 flex-wrap">
                     <a href={`/courses/${e.courseSlug}/overview`} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
                       <ExternalLink className="w-3 h-3" /> View Quiz
                     </a>
+                    <button
+                      onClick={() => { setExpiryEditId(e.enrollmentId); setExpiryEditValue(e.accessExpiresAt ? new Date(e.accessExpiresAt).toISOString().slice(0,10) : ""); }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                    >
+                      <Calendar className="w-3 h-3" /> Edit Expiry
+                    </button>
                     <button
                       onClick={() => setUnenrollConfirm(e.enrollmentId)}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
@@ -692,6 +799,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       <Trash2 className="w-3 h-3" /> Remove
                     </button>
                   </div>
+                  )}
                 </div>
               </div>
             ))

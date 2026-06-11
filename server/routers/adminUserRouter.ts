@@ -100,11 +100,14 @@ export const adminUserRouter = router({
           e.enrolled_at AS enrolledAt,
           e.completed_at AS completedAt,
           e.progress_pct AS progressPct,
+          e.access_expires_at AS accessExpiresAt,
           c.id AS courseId,
           c.title AS courseTitle,
           c.slug AS courseSlug,
           c.thumbnail_url AS thumbnailUrl,
           c.type AS courseType,
+          (c.type = 'quiz') AS isQuiz,
+          (c.type = 'download') AS isDownload,
           (SELECT COUNT(*) FROM lms_video_events WHERE user_id = ${input.userId} AND course_id = c.id AND event_type = 'complete') AS videosCompleted,
           (SELECT COUNT(*) FROM lms_quiz_attempts WHERE user_id = ${input.userId} AND course_id = c.id) AS quizAttempts,
           (SELECT ROUND(AVG(score),1) FROM lms_quiz_attempts WHERE user_id = ${input.userId} AND course_id = c.id) AS avgQuizScore
@@ -2637,5 +2640,28 @@ export const adminUserRouter = router({
         })
         .where(eq(users.id, user.id));
       return { success: true, email: user.email };
+    }),
+
+  updateEnrollmentExpiry: protectedProcedure
+    .input(z.object({
+      enrollmentId: z.number(),
+      accessExpiresAt: z.string().nullable(), // ISO date string or null (null = remove expiry)
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [enrollment] = await db
+        .select({ id: lmsEnrollments.id, userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(eq(lmsEnrollments.id, input.enrollmentId))
+        .limit(1);
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+      const newExpiry = input.accessExpiresAt ? new Date(input.accessExpiresAt) : null;
+      await db
+        .update(lmsEnrollments)
+        .set({ accessExpiresAt: newExpiry })
+        .where(eq(lmsEnrollments.id, input.enrollmentId));
+      return { success: true, accessExpiresAt: newExpiry };
     }),
 });
