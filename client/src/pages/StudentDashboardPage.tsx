@@ -853,6 +853,7 @@ function MyContentTab() {
                   badgeColor={c.completedAt ? "emerald" : "teal"}
                   progressPct={c.progressPct}
                   completed={!!c.completedAt}
+                  expiresAt={(c as any).accessExpiresAt ?? null}
                   actions={[
                     { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${c.courseSlug}/player` },
                     { label: "Overview", icon: FileText, href: `/courses/${c.courseSlug}/overview`, secondary: true },
@@ -882,6 +883,7 @@ function MyContentTab() {
                   badgeColor={q.completedAt ? "emerald" : "blue"}
                   progressPct={q.progressPct}
                   completed={!!q.completedAt}
+                  expiresAt={(q as any).accessExpiresAt ?? null}
                   actions={[
                     { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
                   ]}
