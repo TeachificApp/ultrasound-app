@@ -3027,6 +3027,10 @@ export const lmsEnrollments = mysqlTable("lms_enrollments", {
   orderId: int("order_id"),
   // Enrollment type: 'full' = paid/full access, 'free_preview' = free preview only (limited to preview lessons)
   enrollmentType: mysqlEnum("enrollment_type", ["full", "free_preview"]).default("full").notNull(),
+  /** When set, enrollment is inactive after this time (Thinkific expiry, membership period end) */
+  accessExpiresAt: timestamp("access_expires_at"),
+  source: varchar("source", { length: 32 }).default("manual").notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsEnrollment = typeof lmsEnrollments.$inferSelect;

@@ -59,6 +59,9 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 - Fulfillment grants `membership_subscriptions`, enrolls courses/quizzes, downloads, bundles, and brand tiers per `membership_plan_access`.
 - Checkout complete fallback: `membership.getCheckoutSessionStatus` (used when `?type=membership` on `/checkout/complete`).
 - Admin manual reconcile (production): `membership.reconcileStripeMembership` with `stripeSubscriptionId` or `stripeCheckoutSessionId` + customer email.
+- Duplicate Stripe subs: webhook auto-cancels extras; admin can run `membership.cancelDuplicateStripeSubscriptions` with `keepSubscriptionId` + `stripeCustomerId`.
+- Enrollments respect `access_expires_at` (Thinkific import + membership renewals). Run Thinkific resync enrollments to revoke expired imports.
+- Checkout blocks repurchase when active membership/enrollment exists; embedded checkout uses `useEffect` to avoid double Stripe sessions.
 - Guest checkout before embedded membership pay: `membership.guestCheckoutRegister` then `/checkout/:planSlug?type=membership`.
 
 ### Key file locations

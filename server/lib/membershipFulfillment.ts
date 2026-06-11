@@ -26,6 +26,7 @@ import { getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { buildPasswordResetEmail, sendEmail } from "../_core/email";
 import { notifyOwner } from "../_core/notification";
+import { isEnrollmentAccessActive } from "./enrollmentAccess";
 
 export type MembershipFulfillmentContext = {
   sessionId?: string | null;
@@ -35,8 +36,14 @@ export type MembershipFulfillmentContext = {
   discountCodeId?: number | null;
   customerEmail?: string | null;
   customerName?: string | null;
+  accessExpiresAt?: Date | null;
+  stripePriceId?: string | null;
   /** Skip welcome email (e.g. when resending separately) */
   skipEmail?: boolean;
+  /** Force welcome email even when enrollment already exists */
+  forceWelcomeEmail?: boolean;
+  /** Renew course enrollments (repurchase after expiry) */
+  forceRenew?: boolean;
 };
 
 export type MembershipFulfillmentResult = {
@@ -148,12 +155,20 @@ async function grantBrandAccess(
   notes.push(`Brand: ${brandKey} ${tier}`);
 }
 
+type EnrollOpts = {
+  accessExpiresAt?: Date | null;
+  stripeSubscriptionId?: string | null;
+  source?: string;
+  forceRenew?: boolean;
+};
+
 async function enrollCourseOrQuiz(
   db: MySql2Database<typeof schema>,
   userId: number,
   courseId: number,
   notes: string[],
-): Promise<{ courseTitle: string; courseSlug: string; isQuiz: boolean } | null> {
+  opts?: EnrollOpts,
+): Promise<{ courseTitle: string; courseSlug: string; isQuiz: boolean; renewed: boolean } | null> {
   const [course] = await db
     .select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, courseType: lmsCourses.type })
     .from(lmsCourses)
@@ -162,10 +177,16 @@ async function enrollCourseOrQuiz(
   if (!course) return null;
 
   const [existing] = await db
-    .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
+    .select({
+      id: lmsEnrollments.id,
+      enrollmentType: lmsEnrollments.enrollmentType,
+      accessExpiresAt: lmsEnrollments.accessExpiresAt,
+    })
     .from(lmsEnrollments)
     .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId)))
     .limit(1);
+
+  let renewed = false;
   if (!existing) {
     await db.insert(lmsEnrollments).values({
       userId,
@@ -173,18 +194,39 @@ async function enrollCourseOrQuiz(
       orderId: null,
       affiliateCode: null,
       enrollmentType: "full",
+      enrolledAt: new Date(),
+      accessExpiresAt: opts?.accessExpiresAt ?? null,
+      source: opts?.source ?? "stripe",
+      stripeSubscriptionId: opts?.stripeSubscriptionId ?? null,
     });
     notes.push(`Enrolled: ${course.title}`);
-  } else if (existing.enrollmentType === "free_preview") {
-    await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existing.id));
-    notes.push(`Upgraded preview: ${course.title}`);
+    renewed = true;
   } else {
-    notes.push(`Already enrolled: ${course.title}`);
+    const wasExpired = !isEnrollmentAccessActive(existing);
+    const shouldRenew =
+      wasExpired ||
+      existing.enrollmentType === "free_preview" ||
+      !!opts?.forceRenew;
+
+    if (shouldRenew) {
+      await db.update(lmsEnrollments).set({
+        enrollmentType: "full",
+        enrolledAt: new Date(),
+        accessExpiresAt: opts?.accessExpiresAt ?? null,
+        source: opts?.source ?? "stripe",
+        stripeSubscriptionId: opts?.stripeSubscriptionId ?? undefined,
+      }).where(eq(lmsEnrollments.id, existing.id));
+      notes.push(wasExpired ? `Renewed expired enrollment: ${course.title}` : `Renewed: ${course.title}`);
+      renewed = true;
+    } else {
+      notes.push(`Already enrolled: ${course.title}`);
+    }
   }
   return {
     courseTitle: course.title,
     courseSlug: course.slug,
     isQuiz: course.courseType === "quiz",
+    renewed,
   };
 }
 
@@ -224,6 +266,7 @@ async function grantBundle(
   bundleId: number,
   sessionId: string | null,
   notes: string[],
+  enrollOpts?: EnrollOpts,
 ): Promise<{ title: string; slug: string } | null> {
   const [bundle] = await db
     .select({ id: bundles.id, title: bundles.title, slug: bundles.slug })
@@ -260,7 +303,7 @@ async function grantBundle(
     if (item.itemType === "download" && item.itemId) {
       await grantDownload(db, userId, item.itemId, sessionId, notes);
     } else if ((item.itemType === "course" || item.itemType === "quiz") && item.itemId) {
-      await enrollCourseOrQuiz(db, userId, item.itemId, notes);
+      await enrollCourseOrQuiz(db, userId, item.itemId, notes, enrollOpts);
     }
   }
 
@@ -279,8 +322,14 @@ export async function fulfillMembershipPlanAccess(
   db: MySql2Database<typeof schema>,
   userId: number,
   planId: number,
-  ctx: Pick<MembershipFulfillmentContext, "sessionId" | "stripeSubscriptionId" | "stripeCustomerId">,
+  ctx: Pick<MembershipFulfillmentContext, "sessionId" | "stripeSubscriptionId" | "stripeCustomerId" | "accessExpiresAt" | "forceRenew">,
 ): Promise<string[]> {
+  const enrollOpts: EnrollOpts = {
+    accessExpiresAt: ctx.accessExpiresAt ?? null,
+    stripeSubscriptionId: ctx.stripeSubscriptionId ?? null,
+    source: "stripe",
+    forceRenew: ctx.forceRenew,
+  };
   const notes: string[] = [];
   const accessItems = await db
     .select()
@@ -305,13 +354,13 @@ export async function fulfillMembershipPlanAccess(
       switch (item.itemType) {
         case "course":
         case "quiz":
-          if (item.itemId) await enrollCourseOrQuiz(db, userId, item.itemId, notes);
+          if (item.itemId) await enrollCourseOrQuiz(db, userId, item.itemId, notes, enrollOpts);
           break;
         case "download":
           if (item.itemId) await grantDownload(db, userId, item.itemId, ctx.sessionId ?? null, notes);
           break;
         case "bundle":
-          if (item.itemId) await grantBundle(db, userId, item.itemId, ctx.sessionId ?? null, notes);
+          if (item.itemId) await grantBundle(db, userId, item.itemId, ctx.sessionId ?? null, notes, enrollOpts);
           break;
         case "all_courses": {
           const courses = await db
@@ -319,7 +368,7 @@ export async function fulfillMembershipPlanAccess(
             .from(lmsCourses)
             .where(eq(lmsCourses.status, "public"));
           for (const c of courses) {
-            await enrollCourseOrQuiz(db, userId, c.id, notes);
+            await enrollCourseOrQuiz(db, userId, c.id, notes, enrollOpts);
           }
           break;
         }
@@ -439,7 +488,12 @@ export async function fulfillMembershipPurchase(
   }
 
   // Idempotency: prefer stripe subscription id
-  let existingSub = null as { id: number; userId: number; planId: number } | null;
+  let existingSub = null as {
+    id: number;
+    userId: number;
+    planId: number;
+    stripeSubscriptionId: string | null;
+  } | null;
   if (stripeSubscriptionId) {
     const [bySub] = await db
       .select()
@@ -457,6 +511,9 @@ export async function fulfillMembershipPurchase(
     if (byUserPlan) existingSub = byUserPlan;
   }
 
+  const previousStripeSubId = existingSub?.stripeSubscriptionId ?? null;
+  const periodEndMs = ctx.accessExpiresAt?.getTime() ?? null;
+
   if (existingSub) {
     await db
       .update(membershipSubscriptions)
@@ -465,6 +522,7 @@ export async function fulfillMembershipPurchase(
         userId,
         stripeSubscriptionId: stripeSubscriptionId ?? undefined,
         stripeCustomerId: stripeCustomerId ?? undefined,
+        ...(periodEndMs ? { currentPeriodEnd: periodEndMs } : {}),
         updatedAt: new Date(),
       })
       .where(eq(membershipSubscriptions.id, existingSub.id));
@@ -476,7 +534,7 @@ export async function fulfillMembershipPurchase(
       status: "active",
       stripeSubscriptionId,
       stripeCustomerId,
-      currentPeriodEnd: null,
+      currentPeriodEnd: periodEndMs,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -490,10 +548,16 @@ export async function fulfillMembershipPurchase(
       .where(eq(membershipDiscountCodes.id, ctx.discountCodeId));
   }
 
+  const isNewStripeSubscription =
+    !!stripeSubscriptionId &&
+    stripeSubscriptionId !== previousStripeSubId;
+
   const accessNotes = await fulfillMembershipPlanAccess(db, userId, planId, {
     sessionId,
     stripeSubscriptionId,
     stripeCustomerId,
+    accessExpiresAt: ctx.accessExpiresAt ?? null,
+    forceRenew: ctx.forceRenew ?? isNewStripeSubscription,
   });
   notes.push(...accessNotes);
 
@@ -519,7 +583,12 @@ export async function fulfillMembershipPurchase(
   }
 
   const email = ctx.customerEmail?.trim();
-  if (!ctx.skipEmail && email) {
+  const shouldSendEmail =
+    !ctx.skipEmail &&
+    !!email &&
+    (ctx.forceWelcomeEmail || resolved.isNew || !existingSub || isNewStripeSubscription);
+
+  if (shouldSendEmail && email) {
     try {
       await sendMembershipWelcomeEmail({
         userId,
@@ -590,15 +659,50 @@ export async function reconcileMembershipFromStripeSession(
     };
   }
 
+  let accessExpiresAt: Date | null = null;
+  const stripeSubscriptionId = (session.subscription as string) ?? null;
+  const stripeCustomerId = (session.customer as string) ?? null;
+
+  if (stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" as any });
+      const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+      if (sub.current_period_end) {
+        accessExpiresAt = new Date(sub.current_period_end * 1000);
+      }
+      if (!stripePriceId && sub.items?.data?.[0]?.price?.id) {
+        stripePriceId = sub.items.data[0].price.id;
+      }
+    } catch (err) {
+      console.warn(`[MembershipFulfillment] Could not load Stripe subscription ${stripeSubscriptionId}:`, err);
+    }
+  }
+
   const result = await fulfillMembershipPurchase(db, planId, resolved, {
     sessionId: session.id as string,
-    stripeSubscriptionId: (session.subscription as string) ?? null,
-    stripeCustomerId: (session.customer as string) ?? null,
+    stripeSubscriptionId,
+    stripeCustomerId,
     amountTotalCents: (session.amount_total as number) ?? 0,
     discountCodeId: meta.discount_code_id ? parseInt(meta.discount_code_id, 10) : null,
     customerEmail,
     customerName,
+    accessExpiresAt,
+    stripePriceId,
+    forceWelcomeEmail: true,
+    forceRenew: true,
   });
+
+  if (result.success && stripeCustomerId && stripeSubscriptionId) {
+    const cancelled = await cancelDuplicateStripeSubscriptions({
+      stripeCustomerId,
+      keepSubscriptionId: stripeSubscriptionId,
+      stripePriceId,
+    });
+    if (cancelled.length > 0) {
+      result.notes.push(`Cancelled duplicate Stripe subs: ${cancelled.join(", ")}`);
+    }
+  }
 
   if (result.success) {
     await notifyOwner({
@@ -608,4 +712,40 @@ export async function reconcileMembershipFromStripeSession(
   }
 
   return result;
+}
+
+/** Cancel extra active Stripe subscriptions for the same price (double-checkout protection) */
+export async function cancelDuplicateStripeSubscriptions(opts: {
+  stripeCustomerId: string;
+  keepSubscriptionId: string;
+  stripePriceId?: string | null;
+}): Promise<string[]> {
+  if (!process.env.STRIPE_SECRET_KEY) return [];
+  const Stripe = (await import("stripe")).default;
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" as any });
+  const cancelled: string[] = [];
+  try {
+    const subs = await stripe.subscriptions.list({
+      customer: opts.stripeCustomerId,
+      status: "active",
+      limit: 20,
+    });
+    for (const sub of subs.data) {
+      if (sub.id === opts.keepSubscriptionId) continue;
+      const priceId = sub.items?.data?.[0]?.price?.id;
+      if (opts.stripePriceId && priceId !== opts.stripePriceId) continue;
+      await stripe.subscriptions.cancel(sub.id);
+      cancelled.push(sub.id);
+      console.log(`[MembershipFulfillment] Cancelled duplicate subscription ${sub.id} (kept ${opts.keepSubscriptionId})`);
+    }
+    if (cancelled.length > 0) {
+      await notifyOwner({
+        title: "⚠️ Duplicate Stripe Subscription Cancelled",
+        content: `Kept ${opts.keepSubscriptionId}. Cancelled: ${cancelled.join(", ")}. Customer: ${opts.stripeCustomerId}.`,
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.error("[MembershipFulfillment] cancelDuplicateStripeSubscriptions failed:", err);
+  }
+  return cancelled;
 }
