@@ -22,6 +22,45 @@ function slugify(title: string) {
     .replace(/(^-|-$)/g, "");
 }
 
+async function assertCanPurchaseMembership(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  userId: number,
+  plan: { id: number; stripePriceId: string | null; title: string },
+  email: string | null | undefined,
+) {
+  const { userHasActivePlanAccess } = await import("../lib/enrollmentAccess");
+  const access = await userHasActivePlanAccess(db as any, userId, plan.id);
+  if (access.hasAccess) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "You already have active access to this membership. Check your dashboard or contact support if you need help.",
+    });
+  }
+
+  if (!plan.stripePriceId || !email || !process.env.STRIPE_SECRET_KEY) return;
+
+  const Stripe = (await import("stripe")).default;
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" as any });
+  const customers = await stripe.customers.list({ email: email.trim().toLowerCase(), limit: 1 });
+  const customerId = customers.data[0]?.id;
+  if (!customerId) return;
+
+  const subs = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "active",
+    limit: 10,
+  });
+  const duplicate = subs.data.find((s) =>
+    s.items.data.some((item) => item.price.id === plan.stripePriceId),
+  );
+  if (duplicate) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "You already have an active Stripe subscription for this plan. Contact support if you were charged twice.",
+    });
+  }
+}
+
 // ─── Public Procedures ────────────────────────────────────────────────────────
 
 const listPublicMemberships = publicProcedure
@@ -605,6 +644,8 @@ const createMembershipCheckout = protectedProcedure
       .where(eq(membershipPlans.id, input.planId));
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found" });
 
+    await assertCanPurchaseMembership(db, ctx.user.id, plan, ctx.user.email);
+
     // Dynamic import to avoid issues if Stripe not configured
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" as any });
@@ -714,6 +755,9 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+
+    await assertCanPurchaseMembership(db, ctx.user.id, plan, ctx.user.email);
+
     const isFree = !plan.price || Number(plan.price) === 0;
     if (isFree) {
       return { clientSecret: null, free: true, courseTitle: plan.title, courseSubtitle: null, courseDescription: plan.description ?? null, courseThumbnail: plan.coverImage ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: plan.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: plan.currency ?? "usd", minSeats: null, discountPercent: null };
@@ -878,6 +922,18 @@ const getMembershipCheckoutSessionStatus = publicProcedure
       planSlug,
       autoLoginUrl,
     };
+  });
+
+const cancelDuplicateStripeSubscriptionsAdmin = adminProcedure
+  .input(z.object({
+    stripeCustomerId: z.string(),
+    keepSubscriptionId: z.string(),
+    stripePriceId: z.string().optional(),
+  }))
+  .mutation(async ({ input }) => {
+    const { cancelDuplicateStripeSubscriptions } = await import("../lib/membershipFulfillment");
+    const cancelled = await cancelDuplicateStripeSubscriptions(input);
+    return { cancelled };
   });
 
 const reconcileStripeMembership = adminProcedure
@@ -1193,6 +1249,7 @@ export const membershipRouter = router({
   guestCheckoutRegister: guestMembershipCheckoutRegister,
   getCheckoutSessionStatus: getMembershipCheckoutSessionStatus,
   reconcileStripeMembership,
+  cancelDuplicateStripeSubscriptions: cancelDuplicateStripeSubscriptionsAdmin,
   bulkReconcileStripeSubscriptions,
   cancelMembershipSubscription,
   reactivateMembershipSubscription,

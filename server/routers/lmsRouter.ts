@@ -609,9 +609,9 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      // Check enrollment first — must happen before isAdminPreview check
-      const [enrollment] = await db.select().from(lmsEnrollments)
-        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+      // Check enrollment first — must happen before isAdminPreview check (expiry-aware)
+      const { getActiveEnrollment } = await import("../lib/enrollmentAccess");
+      const enrollment = await getActiveEnrollment(db as any, ctx.user.id, course.id);
 
       // Admin preview mode: only active when admin is NOT enrolled AND explicitly requested preview.
       // If the admin IS enrolled, treat them as a regular enrolled user so progress is tracked.
@@ -728,9 +728,8 @@ export const lmsLearnerRouter = router({
       }
       const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
       if (pm !== "preview" && !isAdmin) {
-        // Check enrollment
-        const [enrollment] = await db.select().from(lmsEnrollments)
-          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, resolvedCourseId))).limit(1);
+        const { getActiveEnrollment: getActiveEnrollmentLesson } = await import("../lib/enrollmentAccess");
+        const enrollment = await getActiveEnrollmentLesson(db as any, ctx.user.id, resolvedCourseId);
         if (pm === "preview_hide_after_purchase" && enrollment && enrollment.enrollmentType !== "free_preview") {
           // Purchased (full access) — hide this lesson (it was a pre-purchase teaser)
           throw new TRPCError({ code: "FORBIDDEN", message: "This preview lesson is no longer available after purchase" });
@@ -1610,9 +1609,9 @@ export const lmsLearnerRouter = router({
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Check enrollment first — must happen before isAdminPreview check
-      const [enrollment] = await db.select().from(lmsEnrollments)
-        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+      // Check enrollment first — must happen before isAdminPreview check (expiry-aware)
+      const { getActiveEnrollment: getActiveEnrollment2 } = await import("../lib/enrollmentAccess");
+      const enrollment = await getActiveEnrollment2(db as any, ctx.user.id, course.id);
 
       // Admin preview mode: only active when admin is NOT enrolled AND explicitly requested preview.
       // If the admin IS enrolled, treat them as a regular enrolled user so progress is tracked.

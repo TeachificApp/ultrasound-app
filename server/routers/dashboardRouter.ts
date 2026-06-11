@@ -108,6 +108,8 @@ export const dashboardRouter = router({
         enrolledAt: lmsEnrollments.enrolledAt,
         completedAt: lmsEnrollments.completedAt,
         progressPct: lmsEnrollments.progressPct,
+        accessExpiresAt: lmsEnrollments.accessExpiresAt,
+        enrollmentSource: lmsEnrollments.source,
         courseTitle: lmsCourses.title,
         courseSlug: lmsCourses.slug,
         courseType: lmsCourses.type,
@@ -230,9 +232,13 @@ export const dashboardRouter = router({
 
     // Separate courses from quiz-type LMS items
     // "cohort" courses are live/scheduled cohort courses — include them alongside regular courses
-    const courses = enrollments.filter(e => e.courseType === "course" || e.courseType === "cohort");
-    const quizzes = enrollments.filter(e => e.courseType === "quiz");
-    const downloads = enrollments.filter(e => e.courseType === "download");
+    const { isEnrollmentAccessActive } = await import("../lib/enrollmentAccess");
+    const activeEnrollments = enrollments.filter((e) =>
+      isEnrollmentAccessActive({ enrollmentType: "full", accessExpiresAt: e.accessExpiresAt }),
+    );
+    const courses = activeEnrollments.filter(e => e.courseType === "course" || e.courseType === "cohort");
+    const quizzes = activeEnrollments.filter(e => e.courseType === "quiz");
+    const downloads = activeEnrollments.filter(e => e.courseType === "download");
 
     return {
       courses,

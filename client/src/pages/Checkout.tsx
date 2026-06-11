@@ -17,7 +17,7 @@
  * All interactive elements (buttons, checkboxes, badges, links) use the course's
  * primaryColor / accentColor / gradient from the database.
  */
-import { useState, useMemo, CSSProperties } from "react";
+import { useState, useMemo, useEffect, useRef, CSSProperties } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
@@ -422,10 +422,11 @@ export default function Checkout() {
     error: createCourseSession.error ?? createDownloadSession.error ?? createPhysicalSession.error ?? createWebinarSession.error ?? createMembershipSession.error,
   };
 
-  // Trigger session creation once on mount
-  const [sessionRequested, setSessionRequested] = useState(false);
-  if (!sessionRequested && slug) {
-    setSessionRequested(true);
+  // Trigger session creation once on mount (useEffect — avoids React Strict Mode double Stripe sessions)
+  const sessionStarted = useRef(false);
+  useEffect(() => {
+    if (!slug || sessionStarted.current) return;
+    sessionStarted.current = true;
     if (entityType === "download") {
       createDownloadSession.mutate({ productSlug: slug, origin: window.location.origin });
     } else if (entityType === "physical") {
@@ -443,7 +444,7 @@ export default function Checkout() {
         origin: window.location.origin,
       });
     }
-  }
+  }, [slug, entityType, searchParams.pricingOptionId, searchParams.teamTierId, seatCount]);
 
   // ── Derived theme values ──────────────────────────────────────────────────
   const primary = sessionMeta?.primaryColor ?? "#179ca3";

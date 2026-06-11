@@ -1231,10 +1231,8 @@ export type InsertScanCoachOverride = typeof scanCoachOverrides.$inferInsert;
 // ─── Webhook Events Log ────────────────────────────────────────────────────────
 export const webhookEvents = mysqlTable("webhookEvents", {
   id: int("id").autoincrement().primaryKey(),
-  /** Source system — e.g. "thinkific" or "stripe" */
+  /** Source system — e.g. "thinkific" */
   source: varchar("source", { length: 64 }).notNull().default("thinkific"),
-  /** Stripe event ID (evt_...) — used for idempotency deduplication */
-  stripeEventId: varchar("stripeEventId", { length: 128 }).unique(),
   /** Thinkific resource type — e.g. "order", "subscription" */
   resource: varchar("resource", { length: 64 }).notNull(),
   /** Thinkific action — e.g. "created", "cancelled" */
@@ -3029,6 +3027,10 @@ export const lmsEnrollments = mysqlTable("lms_enrollments", {
   orderId: int("order_id"),
   // Enrollment type: 'full' = paid/full access, 'free_preview' = free preview only (limited to preview lessons)
   enrollmentType: mysqlEnum("enrollment_type", ["full", "free_preview"]).default("full").notNull(),
+  /** When set, enrollment is inactive after this time (Thinkific expiry, membership period end) */
+  accessExpiresAt: timestamp("access_expires_at"),
+  source: varchar("source", { length: 32 }).default("manual").notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsEnrollment = typeof lmsEnrollments.$inferSelect;
@@ -4745,14 +4747,7 @@ export type NewMembershipPlan = typeof membershipPlans.$inferInsert;
 export const membershipPlanAccess = mysqlTable("membership_plan_access", {
   id: int("id").autoincrement().primaryKey(),
   planId: int("plan_id").notNull(),
-  itemType: mysqlEnum("item_type", [
-    // Individual items
-    "course", "quiz", "bundle", "download", "product", "webinar", "cohort", "physical_product", "funnel",
-    // Bulk grants
-    "all_courses", "all_downloads", "all_bundles", "all_webinars", "all_funnel_products",
-    // Brand/platform tiers
-    "community", "ultrasoundassist_free", "ultrasoundassist_premium", "echoassist_free", "echoassist_premium"
-  ]).notNull(),
+  itemType: mysqlEnum("item_type", ["course", "quiz", "bundle", "community", "webinar", "download", "product", "all_courses", "all_downloads", "ultrasoundassist_free", "ultrasoundassist_premium", "echoassist_free", "echoassist_premium"]).notNull(),
   itemId: int("item_id"),
   /** Human-readable label override */
   label: varchar("label", { length: 255 }),

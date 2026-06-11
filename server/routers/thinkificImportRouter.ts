@@ -926,12 +926,15 @@ export const thinkificImportRouter = router({
               const rawPct = parseFloat(e.percentage_completed || "0");
               const progressPct = Math.round(rawPct * 100);
 
+              const accessExpiresAt = e.expiry_date ? new Date(e.expiry_date) : null;
               await db.insert(lmsEnrollments).values({
                 userId,
                 courseId: lmsCourseId,
                 enrolledAt: e.created_at ? new Date(e.created_at) : new Date(),
                 completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null,
-                progressPct: Math.min(progressPct, 100), // cap at 100
+                progressPct: Math.min(progressPct, 100),
+                accessExpiresAt,
+                source: "thinkific",
               });
               enrolledCount++;
             }
@@ -1308,6 +1311,7 @@ export const thinkificImportRouter = router({
           const activeEnrollments = allEnrollments.filter((e) => !e.expired && e.activated_at !== null);
           log.push(`Found ${activeEnrollments.length} active Thinkific enrollments`);
 
+          const emailToUserId = new Map<string, number>();
           const BATCH = 50;
           for (let i = 0; i < activeEnrollments.length; i += BATCH) {
             const batch = activeEnrollments.slice(i, i + BATCH);
@@ -1316,11 +1320,9 @@ export const thinkificImportRouter = router({
             const matchedUsers = await db.select({ id: users.id, email: users.email })
               .from(users)
               .where(inArray(users.email, emails));
-            const emailToUserId = new Map(
-              matchedUsers.map((u: { id: number; email: string | null }) => [
-                (u.email ?? "").toLowerCase(), u.id,
-              ])
-            );
+            for (const u of matchedUsers) {
+              emailToUserId.set((u.email ?? "").toLowerCase(), u.id);
+            }
 
             for (const e of batch) {
               const email = e.user_email.toLowerCase();
@@ -1350,9 +1352,10 @@ export const thinkificImportRouter = router({
                 .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.lmsCourseId)))
                 .limit(1);
 
+              const accessExpiresAt = e.expiry_date ? new Date(e.expiry_date) : null;
               if (existing) {
                 await db.update(lmsEnrollments)
-                  .set({ progressPct, completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null })
+                  .set({ progressPct, completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null, accessExpiresAt, source: "thinkific" })
                   .where(eq(lmsEnrollments.id, existing.id));
               } else {
                 await db.insert(lmsEnrollments).values({
@@ -1360,11 +1363,40 @@ export const thinkificImportRouter = router({
                   enrolledAt: e.created_at ? new Date(e.created_at) : new Date(),
                   completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null,
                   progressPct,
+                  accessExpiresAt,
+                  source: "thinkific",
                 });
               }
               enrollmentsUpdated++;
             }
           }
+
+          // Revoke access for enrollments that expired on Thinkific
+          const expiredOnThinkific = allEnrollments.filter((e) => e.expired);
+          let revokedCount = 0;
+          for (const e of expiredOnThinkific) {
+            const email = e.user_email.toLowerCase();
+            let userId = emailToUserId.get(email);
+            if (!userId) {
+              const [u] = await db.select({ id: users.id }).from(users)
+                .where(sql`LOWER(${users.email}) = ${email}`).limit(1);
+              if (!u) continue;
+              userId = u.id;
+              emailToUserId.set(email, userId);
+            }
+            const [local] = await db.select({ id: lmsEnrollments.id })
+              .from(lmsEnrollments)
+              .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.lmsCourseId)))
+              .limit(1);
+            if (!local) continue;
+            const expiry = e.expiry_date ? new Date(e.expiry_date) : new Date(0);
+            await db.update(lmsEnrollments)
+              .set({ accessExpiresAt: expiry, source: "thinkific" })
+              .where(eq(lmsEnrollments.id, local.id));
+            revokedCount++;
+          }
+          if (revokedCount > 0) log.push(`Revoked ${revokedCount} expired Thinkific enrollments`);
+
           log.push(`Synced ${enrollmentsUpdated} enrollments`);
         }
 
