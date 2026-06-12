@@ -149,84 +149,85 @@ async function handleMembershipCheckoutCompleted(session: Record<string, unknown
 
 async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata as Record<string, string>) ?? {};
-  const orderId = meta.order_id ? parseInt(meta.order_id) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
-  const courseId = meta.course_id ? parseInt(meta.course_id) : null;
-  const seats = meta.seats ? parseInt(meta.seats) : 1;
-  const affiliateCode = meta.affiliate_code ?? null;
-  const sessionId = session.id as string;
-
-  if (!orderId || !userId || !courseId) return; // Not an LMS order
+  if (meta.type === "membership") return;
 
   const db = await getDb();
   if (!db) return;
 
-  // Mark order as paid (also store subscription ID if this was a subscription checkout)
-  const subscriptionIdForOrder = session.subscription as string | undefined;
-  await db.update(lmsOrders).set({
-    status: "paid",
-    stripeSessionId: sessionId,
-    ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
-  }).where(eq(lmsOrders.id, orderId));
+  const { isLmsHostedCheckoutMetadata, reconcileLmsCheckoutFromStripeSession, resolveLmsCourseIdFromSession } =
+    await import("../lib/lmsCheckoutFulfillment");
 
-  // Enroll user (and extra seats if group purchase)
-  const [existingEnrollment] = await db.select().from(lmsEnrollments)
-    .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
-  if (!existingEnrollment) {
-    await db.insert(lmsEnrollments).values({ userId, courseId, orderId, affiliateCode });
+  let shouldProcess = isLmsHostedCheckoutMetadata(meta);
+  if (!shouldProcess) {
+    const courseId = await resolveLmsCourseIdFromSession(db as any, session, meta);
+    shouldProcess = !!courseId;
   }
+  if (!shouldProcess) return;
 
-  // Track affiliate conversion
-  if (affiliateCode) {
-    const [affiliate] = await db.select().from(lmsAffiliates).where(eq(lmsAffiliates.code, affiliateCode)).limit(1);
-    if (affiliate) {
-      const amountTotal = (session.amount_total as number) ?? 0;
-      const commission = Math.round(amountTotal * (affiliate.commissionPct / 100));
-      const [enrollment] = await db.select().from(lmsEnrollments)
-        .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
-      if (enrollment) {
-        await db.insert(lmsAffiliateConversions).values({
-          affiliateId: affiliate.id, enrollmentId: enrollment.id, orderId,
-          saleAmount: amountTotal, commissionAmount: commission,
-        });
-        await db.update(lmsAffiliates).set({ totalEarned: affiliate.totalEarned + commission }).where(eq(lmsAffiliates.id, affiliate.id));
+  try {
+    const result = await reconcileLmsCheckoutFromStripeSession(db as any, session);
+    if (!result.success) {
+      console.warn(`[Stripe] LMS checkout not fulfilled: ${result.error} session=${session.id}`);
+      const customerEmail =
+        (session.customer_email as string) ??
+        (session.customer_details as Record<string, string>)?.email ??
+        meta.customer_email;
+      await notifyOwner({
+        title: "⚠️ LMS Purchase — Fulfillment Failed",
+        content: `Session ${session.id}. Email: ${customerEmail ?? "unknown"}. Error: ${result.error ?? "unknown"}. Notes: ${result.notes.join("; ") || "none"}.`,
+      });
+      return;
+    }
+
+    const userId = result.userId!;
+    const courseId = result.courseId!;
+    const orderId = result.orderId;
+    const sessionId = session.id as string;
+    const affiliateCode = meta.affiliate_code ?? null;
+
+    if (affiliateCode && orderId) {
+      const [affiliate] = await db.select().from(lmsAffiliates).where(eq(lmsAffiliates.code, affiliateCode)).limit(1);
+      if (affiliate) {
+        const amountTotal = (session.amount_total as number) ?? 0;
+        const commission = Math.round(amountTotal * (affiliate.commissionPct / 100));
+        const [enrollment] = await db.select().from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
+        if (enrollment) {
+          await db.insert(lmsAffiliateConversions).values({
+            affiliateId: affiliate.id, enrollmentId: enrollment.id, orderId,
+            saleAmount: amountTotal, commissionAmount: commission,
+          });
+          await db.update(lmsAffiliates).set({ totalEarned: affiliate.totalEarned + commission }).where(eq(lmsAffiliates.id, affiliate.id));
+        }
       }
     }
-  }
 
-  await notifyOwner({
-    title: "🎓 New LMS Course Purchase",
-    content: `User ID ${userId} purchased course ID ${courseId} (${seats} seat${seats > 1 ? 's' : ''}). Order #${orderId}. Amount: $${((session.amount_total as number ?? 0) / 100).toFixed(2)}.`,
-  });
-  // Log purchase + enrollment to unified activity log (fire-and-forget)
-  try {
-    const [courseRow] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
-    await db.insert(userActivityLogs).values({
-      userId,
-      eventType: 'purchase',
-      description: `Purchased course: ${courseRow?.title ?? `Course #${courseId}`}`,
-      courseId,
-      contentTitle: courseRow?.title ?? null,
-      metadata: { orderId, seats, amountCents: session.amount_total, sessionId },
-    });
-    if (!existingEnrollment) {
+    try {
+      const [courseRow] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
       await db.insert(userActivityLogs).values({
         userId,
-        eventType: 'course_enroll',
-        description: `Enrolled in course: ${courseRow?.title ?? `Course #${courseId}`}`,
+        eventType: "purchase",
+        description: `Purchased course: ${courseRow?.title ?? `Course #${courseId}`}`,
         courseId,
         contentTitle: courseRow?.title ?? null,
-        metadata: { orderId, enrollmentType: 'paid' },
+        metadata: { orderId, amountCents: session.amount_total, sessionId },
+      });
+    } catch (_e) { /* non-blocking */ }
+
+    if (orderId) {
+      await fulfillOrderBumpPurchase(db, meta, {
+        userId,
+        sessionId,
+        triggerOrderType: "course",
+        triggerOrderId: orderId,
       });
     }
-  } catch (_e) { /* non-blocking */ }
-  await fulfillOrderBumpPurchase(db, meta, {
-    userId,
-    sessionId,
-    triggerOrderType: "course",
-    triggerOrderId: orderId,
-  });
-  console.log(`[Stripe] LMS order ${orderId} fulfilled for user ${userId}, course ${courseId}`);
+
+    console.log(`[Stripe] LMS checkout fulfilled: user ${userId}, course ${courseId}, ${result.notes.join(", ")}`);
+  } catch (err) {
+    console.error(`[Stripe] LMS checkout fulfillment error for session ${session.id}:`, err);
+    throw err;
+  }
 }
 
 async function handleDigitalDownloadCheckoutCompleted(session: Record<string, unknown>) {
@@ -1290,6 +1291,17 @@ async function handleInvoicePaid(invoice: Record<string, unknown>) {
       .where(eq(diySubscriptions.stripeSubscriptionId, subscriptionId));
     console.log(`[Stripe] invoice.paid — DIY subscription renewed: id ${diySub.id}`);
   }
+  // Extend LMS enrollment expiry for subscription-based course access
+  if (expiresAt) {
+    const lmsEnrollmentRows = await db.select().from(lmsEnrollments)
+      .where(eq(lmsEnrollments.stripeSubscriptionId, subscriptionId));
+    for (const enr of lmsEnrollmentRows) {
+      await db.update(lmsEnrollments)
+        .set({ accessExpiresAt: expiresAt })
+        .where(eq(lmsEnrollments.id, enr.id));
+      console.log(`[Stripe] invoice.paid — LMS enrollment ${enr.id} expiry extended to ${expiresAt.toISOString()}`);
+    }
+  }
 }
 
 // DIY plan config (mirrors diyRouter.ts DIY_PLANS)
@@ -1378,6 +1390,42 @@ async function handleDiyCheckoutCompleted(session: Record<string, unknown>) {
     content: `Plan: ${plan}\nOrg: ${orgName}\nOwner: ${customerEmail}\nUser ID: ${userId}\nStripe Sub: ${subscriptionId ?? "N/A"}`,
   });
   console.log(`[Stripe] DIY checkout completed: org ${orgId}, plan ${plan}, user ${userId}`);
+}
+
+/**
+ * Handle LMS subscription lifecycle — extend or revoke enrollment expiry based on subscription status.
+ */
+async function handleLmsSubscriptionLifecycle(subscription: Record<string, unknown>, eventType: string) {
+  const subscriptionId = subscription.id as string;
+  if (!subscriptionId) return;
+  const db = await getDb();
+  if (!db) return;
+
+  const enrollments = await db.select().from(lmsEnrollments)
+    .where(eq(lmsEnrollments.stripeSubscriptionId, subscriptionId));
+  if (!enrollments.length) return;
+
+  const status = subscription.status as string;
+  const periodEnd = subscription.current_period_end as number | undefined;
+  const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
+
+  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
+    // Expire enrollment immediately
+    for (const enr of enrollments) {
+      await db.update(lmsEnrollments)
+        .set({ accessExpiresAt: new Date() })
+        .where(eq(lmsEnrollments.id, enr.id));
+      console.log(`[Stripe] LMS enrollment ${enr.id} expired (subscription ${subscriptionId} ${eventType})`);
+    }
+  } else if ((status === "active" || status === "trialing") && currentPeriodEnd) {
+    // Extend enrollment expiry to new period end
+    for (const enr of enrollments) {
+      await db.update(lmsEnrollments)
+        .set({ accessExpiresAt: currentPeriodEnd })
+        .where(eq(lmsEnrollments.id, enr.id));
+      console.log(`[Stripe] LMS enrollment ${enr.id} expiry updated to ${currentPeriodEnd.toISOString()}`);
+    }
+  }
 }
 
 /**
@@ -1649,6 +1697,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       await handleBrandSubscriptionLifecycle(sessionObj, eventType);
       await handleDiySubscriptionLifecycle(sessionObj, eventType);
       await handleMembershipSubscriptionLifecycle(sessionObj, eventType);
+      await handleLmsSubscriptionLifecycle(sessionObj, eventType);
     } else if (eventType === "invoice.paid") {
       await handleInvoicePaid(sessionObj);
     } else if (eventType === "invoice.payment_failed") {
