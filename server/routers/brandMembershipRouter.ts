@@ -40,6 +40,9 @@ export const BRAND_PRODUCTS: Record<Brand, {
     annualPrice: 9997,   // $99.97/year — HIDDEN
     lifetimePrice: 9997, // $99.97 one-time Founding Member
     currency: "usd",
+    // Canonical Stripe Price IDs — created 2026-06-12 via create-stripe-products.mjs
+    monthlyPriceId: "price_1Tha9fPvVOPkJOle5Hskjfal",
+    lifetimePriceId: "price_1Tha9gPvVOPkJOlepC1scyNs",
     showAnnual: false,
   },
   iheartecho: {
@@ -48,6 +51,9 @@ export const BRAND_PRODUCTS: Record<Brand, {
     annualPrice: 9997,   // $99.97/year — HIDDEN
     lifetimePrice: 9997, // $99.97 one-time Founding Member
     currency: "usd",
+    // Canonical Stripe Price IDs — created 2026-06-12 via create-stripe-products.mjs
+    monthlyPriceId: "price_1Tha9hPvVOPkJOleqUp8JE4K",
+    lifetimePriceId: "price_1Tha9iPvVOPkJOleTyF7o1JU",
     showAnnual: false,
   },
 };
@@ -62,6 +68,9 @@ export const DUAL_MEMBERSHIP_PRODUCT = {
   monthlyPrice: 1299,   // $12.99/month
   lifetimePrice: 14700, // $147.00 one-time Founding Member
   currency: "usd",
+  // Canonical Stripe Price IDs — created 2026-06-12 via create-stripe-products.mjs
+  monthlyPriceId: "price_1Tha9iPvVOPkJOleWkCoGHpm",
+  lifetimePriceId: "price_1Tha9jPvVOPkJOleqHBfaSom",
 } as const;
 
 /** Admin check helper */
@@ -150,22 +159,26 @@ export const brandMembershipRouter = router({
 
       if (isLifetime) {
         // One-time payment for lifetime access
+        // Use canonical price ID if available, otherwise fall back to price_data
+        const lifetimeLineItem = productConfig.lifetimePriceId
+          ? { price: productConfig.lifetimePriceId, quantity: 1 }
+          : {
+              price_data: {
+                currency: productConfig.currency,
+                product_data: {
+                  name: `${productConfig.name} — Founding Member Lifetime Access`,
+                  description: "One-time payment. Lock in lifetime access before future pricing increases.",
+                  metadata: { brand },
+                },
+                unit_amount: productConfig.lifetimePrice,
+              },
+              quantity: 1,
+            };
         const session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
           ...promoOpts,
-          line_items: [{
-            price_data: {
-              currency: productConfig.currency,
-              product_data: {
-                name: `${productConfig.name} — Founding Member Lifetime Access`,
-                description: "One-time payment. Lock in lifetime access before future pricing increases.",
-                metadata: { brand },
-              },
-              unit_amount: productConfig.lifetimePrice,
-            },
-            quantity: 1,
-          }],
+          line_items: [lifetimeLineItem],
           success_url: `${input.origin}/upgrade-success?brand=${brand}&lifetime=1&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${input.origin}/premium`,
           client_reference_id: ctx.user.id.toString(),
@@ -186,23 +199,30 @@ export const brandMembershipRouter = router({
         ? { interval: "year" as const, interval_count: 1 }
         : { interval: "month" as const, interval_count: 1 };
 
+      // Use canonical price ID if available, otherwise fall back to price_data
+      const recurringLineItem = (input.interval === "monthly" && productConfig.monthlyPriceId)
+        ? { price: productConfig.monthlyPriceId, quantity: 1 }
+        : (input.interval === "annual" && productConfig.annualPriceId)
+          ? { price: productConfig.annualPriceId, quantity: 1 }
+          : {
+              price_data: {
+                currency: productConfig.currency,
+                product_data: {
+                  name: productConfig.name,
+                  description: "Monthly subscription — cancel anytime",
+                  metadata: { brand },
+                },
+                unit_amount: priceAmount,
+                recurring: intervalConfig,
+              },
+              quantity: 1,
+            };
+
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer_email: ctx.user.email ?? undefined,
         ...promoOpts,
-        line_items: [{
-          price_data: {
-            currency: productConfig.currency,
-            product_data: {
-              name: productConfig.name,
-              description: "Monthly subscription — cancel anytime",
-              metadata: { brand },
-            },
-            unit_amount: priceAmount,
-            recurring: intervalConfig,
-          },
-          quantity: 1,
-        }],
+        line_items: [recurringLineItem],
         subscription_data: {
           description: `${productConfig.name} — ${input.interval === "annual" ? "Annual" : "Monthly"} Subscription`,
           metadata: { user_id: ctx.user.id.toString(), brand, type: "brand_membership_upgrade" },
@@ -234,23 +254,27 @@ export const brandMembershipRouter = router({
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
+      // Use canonical price ID if available
+      const dualMonthlyLineItem = DUAL_MEMBERSHIP_PRODUCT.monthlyPriceId
+        ? { price: DUAL_MEMBERSHIP_PRODUCT.monthlyPriceId, quantity: 1 }
+        : {
+            price_data: {
+              currency: DUAL_MEMBERSHIP_PRODUCT.currency,
+              product_data: {
+                name: DUAL_MEMBERSHIP_PRODUCT.name,
+                description: DUAL_MEMBERSHIP_PRODUCT.description,
+                metadata: { type: "dual_membership" },
+              },
+              unit_amount: DUAL_MEMBERSHIP_PRODUCT.monthlyPrice,
+              recurring: { interval: "month", interval_count: 1 },
+            },
+            quantity: 1,
+          };
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer_email: ctx.user.email ?? undefined,
         allow_promotion_codes: true,
-        line_items: [{
-          price_data: {
-            currency: DUAL_MEMBERSHIP_PRODUCT.currency,
-            product_data: {
-              name: DUAL_MEMBERSHIP_PRODUCT.name,
-              description: DUAL_MEMBERSHIP_PRODUCT.description,
-              metadata: { type: "dual_membership" },
-            },
-            unit_amount: DUAL_MEMBERSHIP_PRODUCT.monthlyPrice,
-            recurring: { interval: "month", interval_count: 1 },
-          },
-          quantity: 1,
-        }],
+        line_items: [dualMonthlyLineItem],
         subscription_data: {
           description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Monthly Subscription`,
           metadata: { user_id: ctx.user.id.toString(), type: "dual_membership" },
@@ -280,22 +304,26 @@ export const brandMembershipRouter = router({
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
+      // Use canonical price ID if available
+      const dualLifetimeLineItem = DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId
+        ? { price: DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId, quantity: 1 }
+        : {
+            price_data: {
+              currency: DUAL_MEMBERSHIP_PRODUCT.currency,
+              product_data: {
+                name: `${DUAL_MEMBERSHIP_PRODUCT.name} — Founding Member Lifetime Access`,
+                description: "One-time payment. Lifetime access to both UltrasoundAssist™ + EchoAssist™. Lock in before future pricing increases.",
+                metadata: { type: "dual_membership_lifetime" },
+              },
+              unit_amount: DUAL_MEMBERSHIP_PRODUCT.lifetimePrice,
+            },
+            quantity: 1,
+          };
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,
         allow_promotion_codes: true,
-        line_items: [{
-          price_data: {
-            currency: DUAL_MEMBERSHIP_PRODUCT.currency,
-            product_data: {
-              name: `${DUAL_MEMBERSHIP_PRODUCT.name} — Founding Member Lifetime Access`,
-              description: "One-time payment. Lifetime access to both UltrasoundAssist™ + EchoAssist™. Lock in before future pricing increases.",
-              metadata: { type: "dual_membership_lifetime" },
-            },
-            unit_amount: DUAL_MEMBERSHIP_PRODUCT.lifetimePrice,
-          },
-          quantity: 1,
-        }],
+        line_items: [dualLifetimeLineItem],
         success_url: `${input.origin}/upgrade-success?dual=1&lifetime=1&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${input.origin}/premium`,
         client_reference_id: ctx.user.id.toString(),
@@ -411,13 +439,27 @@ export const brandMembershipRouter = router({
       // Collect all configured price IDs from BRAND_PRODUCTS + DUAL_MEMBERSHIP_PRODUCT.
       // Any subscription or payment whose price matches one of these is a brand membership.
       const brandPriceIds = new Set<string>();
+      const lifetimePriceIds = new Set<string>(); // one-time prices (no recurring)
+      const dualPriceIds = new Set<string>();     // dual membership prices
+
       for (const cfg of Object.values(BRAND_PRODUCTS)) {
         if (cfg.monthlyPriceId) brandPriceIds.add(cfg.monthlyPriceId);
         if (cfg.annualPriceId) brandPriceIds.add(cfg.annualPriceId);
-        if (cfg.lifetimePriceId) brandPriceIds.add(cfg.lifetimePriceId);
+        if (cfg.lifetimePriceId) {
+          brandPriceIds.add(cfg.lifetimePriceId);
+          lifetimePriceIds.add(cfg.lifetimePriceId);
+        }
       }
-      // Dual membership price IDs are stored in metadata on the session, not in a
-      // static config object, so we identify them by metadata.type in the loop below.
+      // Include DUAL_MEMBERSHIP_PRODUCT canonical price IDs
+      if (DUAL_MEMBERSHIP_PRODUCT.monthlyPriceId) {
+        brandPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.monthlyPriceId);
+        dualPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.monthlyPriceId);
+      }
+      if (DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId) {
+        brandPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId);
+        dualPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId);
+        lifetimePriceIds.add(DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId);
+      }
 
       type ReconcileResult = {
         stripeId: string;
@@ -460,8 +502,11 @@ export const brandMembershipRouter = router({
               : null;
 
             // Determine if this is a brand membership subscription
+            // Match by metadata type OR by canonical price ID
+            const isDualByPrice = priceId ? dualPriceIds.has(priceId) : false;
             const isBrandSub = metaType === "brand_membership_upgrade" ||
               metaType === "dual_membership" ||
+              isDualByPrice ||
               (priceId && brandPriceIds.has(priceId));
 
             if (!isBrandSub && !input.priceId) {
@@ -485,11 +530,15 @@ export const brandMembershipRouter = router({
               const { handleBrandMembershipCheckoutCompleted, handleDualMembershipCheckoutCompleted } =
                 await import("../webhooks/stripe") as any;
 
+              // Determine effective type — prefer metadata, fall back to price ID match
+              const effectiveType = metaType ??
+                (isDualByPrice ? "dual_membership" : (metaBrand ? "brand_membership_upgrade" : "dual_membership"));
+
               const syntheticSession: Record<string, unknown> = {
                 id: `bulk_reconcile_${sub.id}`,
                 metadata: {
                   ...((sub.metadata as Record<string, string>) ?? {}),
-                  type: metaType ?? (metaBrand ? "brand_membership_upgrade" : "dual_membership"),
+                  type: effectiveType,
                   brand: metaBrand ?? undefined,
                 },
                 subscription: sub.id,
@@ -528,7 +577,8 @@ export const brandMembershipRouter = router({
           const batchSize = Math.min(100, remainingLimit - piProcessed);
           const listParams: Record<string, unknown> = {
             limit: batchSize,
-            expand: ["data.customer"],
+            // Expand both customer (for email) and line_items (for canonical price ID matching)
+            expand: ["data.customer", "data.line_items"],
           };
           if (startingAfter) listParams.starting_after = startingAfter;
 
@@ -542,8 +592,14 @@ export const brandMembershipRouter = router({
             const customerEmail = session.customer_email ??
               (typeof session.customer === "object" ? (session.customer as any)?.email : null) ?? null;
 
-            const isLifetimeBrand = metaType === "brand_membership_upgrade" && meta.interval === "lifetime";
-            const isLifetimeDual = metaType === "dual_membership_lifetime";
+            // Resolve price ID from session line items if available
+            const sessionPriceId = (session as any).line_items?.data?.[0]?.price?.id ?? null;
+
+            // Match by metadata type OR by canonical lifetime price ID
+            const isLifetimeBrand = (metaType === "brand_membership_upgrade" && meta.interval === "lifetime") ||
+              (sessionPriceId && lifetimePriceIds.has(sessionPriceId) && !dualPriceIds.has(sessionPriceId));
+            const isLifetimeDual = metaType === "dual_membership_lifetime" ||
+              (sessionPriceId && dualPriceIds.has(sessionPriceId) && lifetimePriceIds.has(sessionPriceId));
 
             if (!isLifetimeBrand && !isLifetimeDual) {
               // Not a lifetime brand membership session — skip
