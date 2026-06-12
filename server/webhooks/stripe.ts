@@ -521,7 +521,7 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
  * Handle brand membership upgrade checkout completion.
  * Triggered when a user completes a Stripe checkout for brand premium.
  */
-async function handleBrandMembershipCheckoutCompleted(session: Record<string, unknown>) {
+export async function handleBrandMembershipCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.type !== "brand_membership_upgrade") return; // Not a brand membership checkout
 
@@ -670,7 +670,7 @@ async function handleBrandMembershipCheckoutCompleted(session: Record<string, un
  * Grants premium access to BOTH aaus and iheartecho brands.
  * Also syncs the user to Thinkific.
  */
-async function handleDualMembershipCheckoutCompleted(session: Record<string, unknown>) {
+export async function handleDualMembershipCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata ?? {}) as Record<string, string>;
   // Handle both recurring dual membership and one-time lifetime dual membership
   const isDual = meta.type === "dual_membership" || meta.type === "dual_membership_lifetime";

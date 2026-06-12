@@ -380,6 +380,236 @@ export const brandMembershipRouter = router({
     }),
 
   /**
+   * Admin: bulk-reconcile brand memberships from Stripe.
+   *
+   * Pages through all Stripe subscriptions (for recurring brand/dual plans)
+   * and payment intents (for lifetime one-time purchases) that match known
+   * brand price IDs, then calls the same fulfillment logic used by the
+   * webhook to fill any gaps caused by missed or failed webhook deliveries.
+   *
+   * Accepts an optional dryRun flag to preview what would be reconciled
+   * without making any DB writes.
+   */
+  bulkReconcileBrandMemberships: protectedProcedure
+    .input(z.object({
+      /** Limit to a specific Stripe price ID (optional — leave empty to process all brand price IDs) */
+      priceId: z.string().optional(),
+      /** Max Stripe objects to process in one call (default 200, max 500) */
+      limit: z.number().int().min(1).max(500).default(200),
+      /** Dry run: resolve user/brand but skip DB writes */
+      dryRun: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      // ── Known brand price IDs ────────────────────────────────────────────────
+      // Collect all configured price IDs from BRAND_PRODUCTS + DUAL_MEMBERSHIP_PRODUCT.
+      // Any subscription or payment whose price matches one of these is a brand membership.
+      const brandPriceIds = new Set<string>();
+      for (const cfg of Object.values(BRAND_PRODUCTS)) {
+        if (cfg.monthlyPriceId) brandPriceIds.add(cfg.monthlyPriceId);
+        if (cfg.annualPriceId) brandPriceIds.add(cfg.annualPriceId);
+        if (cfg.lifetimePriceId) brandPriceIds.add(cfg.lifetimePriceId);
+      }
+      // Dual membership price IDs are stored in metadata on the session, not in a
+      // static config object, so we identify them by metadata.type in the loop below.
+
+      type ReconcileResult = {
+        stripeId: string;
+        type: "subscription" | "payment_intent";
+        customerEmail: string | null;
+        priceId: string | null;
+        brand: string | null;
+        metaType: string | null;
+        status: "fulfilled" | "skipped" | "error" | "dry_run";
+        notes: string[];
+        error?: string;
+        userId?: number | null;
+      };
+
+      const results: ReconcileResult[] = [];
+      let processed = 0;
+
+      // ── 1. Reconcile subscriptions (monthly/annual recurring brand plans) ────
+      {
+        let startingAfter: string | undefined = undefined;
+        while (processed < input.limit) {
+          const batchSize = Math.min(100, input.limit - processed);
+          const listParams: Record<string, unknown> = {
+            limit: batchSize,
+            status: "all",
+            expand: ["data.customer"],
+          };
+          if (startingAfter) listParams.starting_after = startingAfter;
+          if (input.priceId) listParams.price = input.priceId;
+
+          const batch = await stripe.subscriptions.list(listParams as any);
+          if (batch.data.length === 0) break;
+
+          for (const sub of batch.data) {
+            const priceId = sub.items?.data?.[0]?.price?.id ?? null;
+            const metaType = (sub.metadata as Record<string, string>)?.type ?? null;
+            const metaBrand = (sub.metadata as Record<string, string>)?.brand ?? null;
+            const customerEmail = typeof sub.customer === "object" && sub.customer !== null
+              ? (sub.customer as any).email ?? null
+              : null;
+
+            // Determine if this is a brand membership subscription
+            const isBrandSub = metaType === "brand_membership_upgrade" ||
+              metaType === "dual_membership" ||
+              (priceId && brandPriceIds.has(priceId));
+
+            if (!isBrandSub && !input.priceId) {
+              results.push({ stripeId: sub.id, type: "subscription", customerEmail, priceId, brand: metaBrand, metaType, status: "skipped", notes: ["Not a brand membership subscription"] });
+              continue;
+            }
+
+            if (sub.status === "canceled") {
+              results.push({ stripeId: sub.id, type: "subscription", customerEmail, priceId, brand: metaBrand, metaType, status: "skipped", notes: ["Subscription cancelled — skipped"] });
+              continue;
+            }
+
+            if (input.dryRun) {
+              results.push({ stripeId: sub.id, type: "subscription", customerEmail, priceId, brand: metaBrand, metaType, status: "dry_run", notes: [`Would reconcile — Stripe status: ${sub.status}`] });
+              processed++;
+              continue;
+            }
+
+            try {
+              // Build a synthetic session and dispatch through the same webhook handlers
+              const { handleBrandMembershipCheckoutCompleted, handleDualMembershipCheckoutCompleted } =
+                await import("../webhooks/stripe") as any;
+
+              const syntheticSession: Record<string, unknown> = {
+                id: `bulk_reconcile_${sub.id}`,
+                metadata: {
+                  ...((sub.metadata as Record<string, string>) ?? {}),
+                  type: metaType ?? (metaBrand ? "brand_membership_upgrade" : "dual_membership"),
+                  brand: metaBrand ?? undefined,
+                },
+                subscription: sub.id,
+                customer: typeof sub.customer === "object" ? (sub.customer as any).id : sub.customer,
+                customer_email: customerEmail,
+                status: "complete",
+              };
+
+              if (metaType === "dual_membership") {
+                await handleDualMembershipCheckoutCompleted(syntheticSession);
+              } else {
+                await handleBrandMembershipCheckoutCompleted(syntheticSession);
+              }
+
+              results.push({ stripeId: sub.id, type: "subscription", customerEmail, priceId, brand: metaBrand, metaType, status: "fulfilled", notes: ["Reconciled via webhook handler"] });
+            } catch (err: any) {
+              results.push({ stripeId: sub.id, type: "subscription", customerEmail, priceId, brand: metaBrand, metaType, status: "error", notes: [], error: err?.message ?? "Unknown error" });
+            }
+            processed++;
+          }
+
+          if (!batch.has_more) break;
+          startingAfter = batch.data[batch.data.length - 1].id;
+        }
+      }
+
+      // ── 2. Reconcile one-time payments (lifetime brand/dual memberships) ─────
+      // Search payment intents with metadata.type = brand_membership_upgrade or dual_membership_lifetime
+      // Stripe doesn't support filtering payment intents by metadata, so we use checkout sessions instead.
+      if (processed < input.limit) {
+        const remainingLimit = input.limit - processed;
+        let startingAfter: string | undefined = undefined;
+        let piProcessed = 0;
+
+        while (piProcessed < remainingLimit) {
+          const batchSize = Math.min(100, remainingLimit - piProcessed);
+          const listParams: Record<string, unknown> = {
+            limit: batchSize,
+            expand: ["data.customer"],
+          };
+          if (startingAfter) listParams.starting_after = startingAfter;
+
+          const batch = await stripe.checkout.sessions.list(listParams as any);
+          if (batch.data.length === 0) break;
+
+          for (const session of batch.data) {
+            const meta = (session.metadata ?? {}) as Record<string, string>;
+            const metaType = meta.type ?? null;
+            const metaBrand = meta.brand ?? null;
+            const customerEmail = session.customer_email ??
+              (typeof session.customer === "object" ? (session.customer as any)?.email : null) ?? null;
+
+            const isLifetimeBrand = metaType === "brand_membership_upgrade" && meta.interval === "lifetime";
+            const isLifetimeDual = metaType === "dual_membership_lifetime";
+
+            if (!isLifetimeBrand && !isLifetimeDual) {
+              // Not a lifetime brand membership session — skip
+              continue;
+            }
+
+            if (session.payment_status !== "paid") {
+              results.push({ stripeId: session.id, type: "payment_intent", customerEmail, priceId: null, brand: metaBrand, metaType, status: "skipped", notes: [`Payment status: ${session.payment_status}`] });
+              piProcessed++;
+              continue;
+            }
+
+            if (input.dryRun) {
+              results.push({ stripeId: session.id, type: "payment_intent", customerEmail, priceId: null, brand: metaBrand, metaType, status: "dry_run", notes: [`Would reconcile lifetime ${metaType}`] });
+              piProcessed++;
+              processed++;
+              continue;
+            }
+
+            try {
+              const { handleBrandMembershipCheckoutCompleted, handleDualMembershipCheckoutCompleted } =
+                await import("../webhooks/stripe") as any;
+
+              const syntheticSession: Record<string, unknown> = {
+                id: session.id,
+                metadata: meta,
+                subscription: null,
+                customer: typeof session.customer === "object" ? (session.customer as any)?.id : session.customer,
+                customer_email: customerEmail,
+                status: "complete",
+                payment_status: "paid",
+              };
+
+              if (isLifetimeDual) {
+                await handleDualMembershipCheckoutCompleted(syntheticSession);
+              } else {
+                await handleBrandMembershipCheckoutCompleted(syntheticSession);
+              }
+
+              results.push({ stripeId: session.id, type: "payment_intent", customerEmail, priceId: null, brand: metaBrand, metaType, status: "fulfilled", notes: ["Reconciled lifetime via webhook handler"] });
+            } catch (err: any) {
+              results.push({ stripeId: session.id, type: "payment_intent", customerEmail, priceId: null, brand: metaBrand, metaType, status: "error", notes: [], error: err?.message ?? "Unknown error" });
+            }
+            piProcessed++;
+            processed++;
+          }
+
+          if (!batch.has_more) break;
+          startingAfter = batch.data[batch.data.length - 1].id;
+        }
+      }
+
+      const fulfilled = results.filter(r => r.status === "fulfilled").length;
+      const errors = results.filter(r => r.status === "error").length;
+      const skipped = results.filter(r => r.status === "skipped").length;
+      const dryRunCount = results.filter(r => r.status === "dry_run").length;
+
+      await (await import("../_core/notification")).notifyOwner({
+        title: `\ud83d\udd04 Bulk Brand Membership Reconcile Complete`,
+        content: `Processed ${processed} Stripe objects. Fulfilled: ${fulfilled}, Errors: ${errors}, Skipped: ${skipped}${input.dryRun ? `, Dry-run: ${dryRunCount}` : ""}.`,
+      }).catch(() => {});
+
+      return { processed, fulfilled, errors, skipped, dryRun: input.dryRun, results };
+    }),
+
+  /**
    * Admin: list all premium members for a specific brand.
    */
   adminList: protectedProcedure
