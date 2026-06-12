@@ -120,10 +120,22 @@ async function handleCheckoutSessionCompleted(session: Record<string, unknown>) 
 
 async function handleMembershipCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata as Record<string, string>) ?? {};
-  if (meta.type !== "membership") return;
-
   const db = await getDb();
   if (!db) return;
+
+  let isMembership = meta.type === "membership";
+  if (!isMembership) {
+    try {
+      const { extractStripePriceId } = await import("../lib/lmsCheckoutFulfillment");
+      const { resolveMembershipPlanId } = await import("../lib/membershipFulfillment");
+      const priceId = extractStripePriceId(session);
+      if (priceId) {
+        const planId = await resolveMembershipPlanId(db as any, { stripePriceId: priceId });
+        if (planId) isMembership = true;
+      }
+    } catch { /* ignore */ }
+  }
+  if (!isMembership) return;
 
   try {
     const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
@@ -149,84 +161,85 @@ async function handleMembershipCheckoutCompleted(session: Record<string, unknown
 
 async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata as Record<string, string>) ?? {};
-  const orderId = meta.order_id ? parseInt(meta.order_id) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
-  const courseId = meta.course_id ? parseInt(meta.course_id) : null;
-  const seats = meta.seats ? parseInt(meta.seats) : 1;
-  const affiliateCode = meta.affiliate_code ?? null;
-  const sessionId = session.id as string;
-
-  if (!orderId || !userId || !courseId) return; // Not an LMS order
+  if (meta.type === "membership") return;
 
   const db = await getDb();
   if (!db) return;
 
-  // Mark order as paid (also store subscription ID if this was a subscription checkout)
-  const subscriptionIdForOrder = session.subscription as string | undefined;
-  await db.update(lmsOrders).set({
-    status: "paid",
-    stripeSessionId: sessionId,
-    ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
-  }).where(eq(lmsOrders.id, orderId));
+  const { isLmsHostedCheckoutMetadata, reconcileLmsCheckoutFromStripeSession, resolveLmsCourseIdFromSession } =
+    await import("../lib/lmsCheckoutFulfillment");
 
-  // Enroll user (and extra seats if group purchase)
-  const [existingEnrollment] = await db.select().from(lmsEnrollments)
-    .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
-  if (!existingEnrollment) {
-    await db.insert(lmsEnrollments).values({ userId, courseId, orderId, affiliateCode });
+  let shouldProcess = isLmsHostedCheckoutMetadata(meta);
+  if (!shouldProcess) {
+    const courseId = await resolveLmsCourseIdFromSession(db as any, session, meta);
+    shouldProcess = !!courseId;
   }
+  if (!shouldProcess) return;
 
-  // Track affiliate conversion
-  if (affiliateCode) {
-    const [affiliate] = await db.select().from(lmsAffiliates).where(eq(lmsAffiliates.code, affiliateCode)).limit(1);
-    if (affiliate) {
-      const amountTotal = (session.amount_total as number) ?? 0;
-      const commission = Math.round(amountTotal * (affiliate.commissionPct / 100));
-      const [enrollment] = await db.select().from(lmsEnrollments)
-        .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
-      if (enrollment) {
-        await db.insert(lmsAffiliateConversions).values({
-          affiliateId: affiliate.id, enrollmentId: enrollment.id, orderId,
-          saleAmount: amountTotal, commissionAmount: commission,
-        });
-        await db.update(lmsAffiliates).set({ totalEarned: affiliate.totalEarned + commission }).where(eq(lmsAffiliates.id, affiliate.id));
+  try {
+    const result = await reconcileLmsCheckoutFromStripeSession(db as any, session);
+    if (!result.success) {
+      console.warn(`[Stripe] LMS checkout not fulfilled: ${result.error} session=${session.id}`);
+      const customerEmail =
+        (session.customer_email as string) ??
+        (session.customer_details as Record<string, string>)?.email ??
+        meta.customer_email;
+      await notifyOwner({
+        title: "⚠️ LMS Purchase — Fulfillment Failed",
+        content: `Session ${session.id}. Email: ${customerEmail ?? "unknown"}. Error: ${result.error ?? "unknown"}. Notes: ${result.notes.join("; ") || "none"}.`,
+      });
+      return;
+    }
+
+    const userId = result.userId!;
+    const courseId = result.courseId!;
+    const orderId = result.orderId;
+    const sessionId = session.id as string;
+    const affiliateCode = meta.affiliate_code ?? null;
+
+    if (affiliateCode && orderId) {
+      const [affiliate] = await db.select().from(lmsAffiliates).where(eq(lmsAffiliates.code, affiliateCode)).limit(1);
+      if (affiliate) {
+        const amountTotal = (session.amount_total as number) ?? 0;
+        const commission = Math.round(amountTotal * (affiliate.commissionPct / 100));
+        const [enrollment] = await db.select().from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
+        if (enrollment) {
+          await db.insert(lmsAffiliateConversions).values({
+            affiliateId: affiliate.id, enrollmentId: enrollment.id, orderId,
+            saleAmount: amountTotal, commissionAmount: commission,
+          });
+          await db.update(lmsAffiliates).set({ totalEarned: affiliate.totalEarned + commission }).where(eq(lmsAffiliates.id, affiliate.id));
+        }
       }
     }
-  }
 
-  await notifyOwner({
-    title: "🎓 New LMS Course Purchase",
-    content: `User ID ${userId} purchased course ID ${courseId} (${seats} seat${seats > 1 ? 's' : ''}). Order #${orderId}. Amount: $${((session.amount_total as number ?? 0) / 100).toFixed(2)}.`,
-  });
-  // Log purchase + enrollment to unified activity log (fire-and-forget)
-  try {
-    const [courseRow] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
-    await db.insert(userActivityLogs).values({
-      userId,
-      eventType: 'purchase',
-      description: `Purchased course: ${courseRow?.title ?? `Course #${courseId}`}`,
-      courseId,
-      contentTitle: courseRow?.title ?? null,
-      metadata: { orderId, seats, amountCents: session.amount_total, sessionId },
-    });
-    if (!existingEnrollment) {
+    try {
+      const [courseRow] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
       await db.insert(userActivityLogs).values({
         userId,
-        eventType: 'course_enroll',
-        description: `Enrolled in course: ${courseRow?.title ?? `Course #${courseId}`}`,
+        eventType: "purchase",
+        description: `Purchased course: ${courseRow?.title ?? `Course #${courseId}`}`,
         courseId,
         contentTitle: courseRow?.title ?? null,
-        metadata: { orderId, enrollmentType: 'paid' },
+        metadata: { orderId, amountCents: session.amount_total, sessionId },
+      });
+    } catch (_e) { /* non-blocking */ }
+
+    if (orderId) {
+      await fulfillOrderBumpPurchase(db, meta, {
+        userId,
+        sessionId,
+        triggerOrderType: "course",
+        triggerOrderId: orderId,
       });
     }
-  } catch (_e) { /* non-blocking */ }
-  await fulfillOrderBumpPurchase(db, meta, {
-    userId,
-    sessionId,
-    triggerOrderType: "course",
-    triggerOrderId: orderId,
-  });
-  console.log(`[Stripe] LMS order ${orderId} fulfilled for user ${userId}, course ${courseId}`);
+
+    console.log(`[Stripe] LMS checkout fulfilled: user ${userId}, course ${courseId}, ${result.notes.join(", ")}`);
+  } catch (err) {
+    console.error(`[Stripe] LMS checkout fulfillment error for session ${session.id}:`, err);
+    throw err;
+  }
 }
 
 async function handleDigitalDownloadCheckoutCompleted(session: Record<string, unknown>) {

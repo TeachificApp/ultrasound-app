@@ -2370,7 +2370,7 @@ export const lmsLearnerRouter = router({
           return_url: returnUrl,
           customer_email: ctx.user?.email ?? undefined,
           allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: String(requestedSeats) },
+          metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: String(requestedSeats), ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
         });
         return {
           clientSecret: session.client_secret!,
@@ -2448,7 +2448,7 @@ export const lmsLearnerRouter = router({
           return_url: returnUrl,
           customer_email: ctx.user?.email ?? undefined,
           allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1" },
+          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
         });
         return {
           clientSecret: session.client_secret!,
@@ -2524,7 +2524,7 @@ export const lmsLearnerRouter = router({
         return_url: returnUrl,
         customer_email: ctx.user?.email ?? undefined,
         allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1" },
+          metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
       });
       return {
         clientSecret: session.client_secret!,
@@ -2561,63 +2561,37 @@ export const lmsLearnerRouter = router({
     .query(async ({ ctx, input }) => {
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
-      const session = await stripe.checkout.sessions.retrieve(input.sessionId);
+      const session = await stripe.checkout.sessions.retrieve(input.sessionId, {
+        expand: ["line_items"],
+      });
 
-      // Fallback enrollment: if the session is complete but the webhook missed it,
-      // enroll the logged-in user now so they don't get stuck on the success page.
-      if (session.status === "complete" && ctx.user) {
-        try {
-          const meta = (session.metadata ?? {}) as Record<string, string>;
-          const courseId = meta.course_id ? parseInt(meta.course_id) : null;
-          const metaUserId = meta.user_id ? parseInt(meta.user_id) : null;
-          // Only apply fallback if the session belongs to this user
-          if (courseId && (metaUserId === ctx.user.id || !metaUserId)) {
-            const db = await getDb();
-            if (db) {
-              const [existingEnrollment] = await db.select({ id: lmsEnrollments.id })
-                .from(lmsEnrollments)
-                .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, courseId)))
-                .limit(1);
-              if (!existingEnrollment) {
-                // Not yet enrolled — create order + enrollment as fallback
-                const amountTotal = session.amount_total ?? 0;
-                let fallbackOrderId: number | null = null;
-                // Check for existing pending order
-                const [existingOrder] = await db.select({ id: lmsOrders.id })
-                  .from(lmsOrders)
-                  .where(and(eq(lmsOrders.userId, ctx.user.id), eq(lmsOrders.courseId, courseId)))
-                  .limit(1);
-                if (existingOrder) {
-                  fallbackOrderId = existingOrder.id;
-                  await db.update(lmsOrders).set({ status: "paid", stripeSessionId: session.id }).where(eq(lmsOrders.id, existingOrder.id));
-                } else {
-                  const [newOrder] = await db.insert(lmsOrders).values({
-                    userId: ctx.user.id,
-                    courseId,
-                    amount: amountTotal,
-                    currency: session.currency ?? "usd",
-                    stripeSessionId: session.id,
-                    status: "paid",
-                    seats: 1,
-                  }).$returningId();
-                  fallbackOrderId = newOrder?.id ?? null;
-                }
-                await db.insert(lmsEnrollments).values({
-                  userId: ctx.user.id,
-                  courseId,
-                  orderId: fallbackOrderId,
-                  affiliateCode: null,
-                });
-                console.log(`[CheckoutStatus] Fallback enrollment: user ${ctx.user.id} enrolled in course ${courseId} via session ${session.id}`);
-                await notifyOwner({
-                  title: "🎓 Fallback Enrollment Triggered",
-                  content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in course ${courseId} via checkout session status fallback. Session: ${session.id}. Amount: $${(amountTotal / 100).toFixed(2)}.`,
-                });
-              }
+      // Fallback fulfillment: webhook may have missed guest checkouts (no user_id in metadata).
+      if (session.status === "complete") {
+        const db = await getDb();
+        if (db) {
+          try {
+            const { reconcileLmsCheckoutFromStripeSession } = await import("../lib/lmsCheckoutFulfillment");
+            const result = await reconcileLmsCheckoutFromStripeSession(db as any, session as unknown as Record<string, unknown>);
+            if (result.success) {
+              console.log(`[CheckoutStatus] LMS fallback fulfilled: user ${result.userId}, course ${result.courseId}`);
             }
+          } catch (err) {
+            console.error("[CheckoutStatus] Fallback fulfillment error:", err);
           }
-        } catch (err) {
-          console.error("[CheckoutStatus] Fallback enrollment error:", err);
+        }
+      }
+
+      const meta = (session.metadata ?? {}) as Record<string, string>;
+      let courseSlug: string | null = meta.course_slug ?? null;
+      if (!courseSlug && meta.course_id) {
+        const db = await getDb();
+        if (db) {
+          const [course] = await db
+            .select({ slug: lmsCourses.slug })
+            .from(lmsCourses)
+            .where(eq(lmsCourses.id, parseInt(meta.course_id, 10)))
+            .limit(1);
+          courseSlug = course?.slug ?? null;
         }
       }
 
@@ -2625,7 +2599,7 @@ export const lmsLearnerRouter = router({
         status: session.status, // 'open' | 'complete' | 'expired'
         paymentStatus: session.payment_status, // 'paid' | 'unpaid' | 'no_payment_required'
         customerEmail: session.customer_details?.email ?? null,
-        courseSlug: (session.metadata as any)?.course_slug ?? null,
+        courseSlug,
       };
     }),
 });

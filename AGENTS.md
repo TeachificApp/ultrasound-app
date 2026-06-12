@@ -64,6 +64,14 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 - Checkout blocks repurchase when active membership/enrollment exists; embedded checkout uses `useEffect` to avoid double Stripe sessions.
 - Guest checkout before embedded membership pay: `membership.guestCheckoutRegister` then `/checkout/:planSlug?type=membership`.
 
+### Stripe LMS course checkout (learn.allaboutultrasound.com)
+
+- Webhook handler delegates guest + logged-in LMS purchases to `server/lib/lmsCheckoutFulfillment.ts` on `checkout.session.completed` when metadata has `course_id` / `hosted_checkout_*` or Stripe price matches `lms_courses` / `lms_pricing_options`.
+- Guest buyers: no `user_id` / `order_id` in metadata — fulfillment resolves email from `customer_details`, creates account, order, enrollment, and sends enrollment email.
+- Checkout complete fallback: `lms.getCheckoutSessionStatus` calls `reconcileLmsCheckoutFromStripeSession` for any completed session (not only logged-in users).
+- Admin manual reconcile (production): `lmsEnrollmentAdmin.reconcileStripeLmsCheckout` with `stripeSubscriptionId` or `stripeCheckoutSessionId` + customer email when needed.
+- Membership handler also matches checkout by Stripe price ID — if a price is on both `membership_plans` and LMS, verify product routing in Stripe metadata.
+
 ### Key file locations
 
 - Server entry: `server/_core/index.ts`

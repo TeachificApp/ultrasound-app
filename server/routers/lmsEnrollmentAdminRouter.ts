@@ -3210,4 +3210,58 @@ CRITICAL REQUIREMENTS:
       const { url } = await storagePut(key, buffer, input.mimeType);
       return { url, key };
     }),
+
+  /** Manually fulfill an LMS Stripe checkout when the webhook missed enrollment */
+  reconcileStripeLmsCheckout: protectedProcedure
+    .input(z.object({
+      stripeCheckoutSessionId: z.string().optional(),
+      stripeSubscriptionId: z.string().optional(),
+      email: z.string().email().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!input.stripeCheckoutSessionId && !input.stripeSubscriptionId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Provide stripeCheckoutSessionId or stripeSubscriptionId" });
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      let session: Record<string, unknown> | null = null;
+      if (input.stripeCheckoutSessionId) {
+        const s = await stripe.checkout.sessions.retrieve(input.stripeCheckoutSessionId, { expand: ["line_items"] });
+        session = s as unknown as Record<string, unknown>;
+      } else if (input.stripeSubscriptionId) {
+        const sub = await stripe.subscriptions.retrieve(input.stripeSubscriptionId);
+        const sessions = await stripe.checkout.sessions.list({ subscription: input.stripeSubscriptionId, limit: 1 });
+        if (sessions.data[0]) {
+          const s = await stripe.checkout.sessions.retrieve(sessions.data[0].id, { expand: ["line_items"] });
+          session = s as unknown as Record<string, unknown>;
+        } else {
+          session = {
+            id: `reconcile_sub_${input.stripeSubscriptionId}`,
+            metadata: sub.metadata ?? {},
+            subscription: sub.id,
+            customer: sub.customer,
+            customer_email: input.email ?? undefined,
+            amount_total: sub.items?.data?.[0]?.price?.unit_amount ?? 0,
+            status: "complete",
+          };
+        }
+      }
+
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Could not load Stripe checkout session" });
+      }
+
+      const { reconcileLmsCheckoutFromStripeSession } = await import("../lib/lmsCheckoutFulfillment");
+      const result = await reconcileLmsCheckoutFromStripeSession(db as any, session);
+      if (!result.success) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Reconciliation failed" });
+      }
+      return result;
+    }),
 });
