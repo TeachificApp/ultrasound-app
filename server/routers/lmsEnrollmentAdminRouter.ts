@@ -3211,12 +3211,51 @@ CRITICAL REQUIREMENTS:
       return { url, key };
     }),
 
+  /**
+   * Link a manually created enrollment to a paid Stripe subscription.
+   * Sets lms_orders.stripe_subscription_id + lms_enrollments.stripe_subscription_id / access_expires_at.
+   */
+  linkStripeSubscription: protectedProcedure
+    .input(z.object({
+      stripeSubscriptionId: z.string().min(1),
+      userId: z.number().int().positive().optional(),
+      courseId: z.number().int().positive().optional(),
+      enrollmentId: z.number().int().positive().optional(),
+      stripePaymentIntentId: z.string().optional(),
+      stripeCheckoutSessionId: z.string().optional(),
+      amountCents: z.number().int().nonnegative().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!input.enrollmentId && !(input.userId && input.courseId)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Provide enrollmentId or both userId and courseId",
+        });
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const { linkLmsEnrollmentToStripeSubscription } = await import("../lib/lmsCheckoutFulfillment");
+      const result = await linkLmsEnrollmentToStripeSubscription(db as any, input);
+      if (!result.success) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: result.error ?? "Link failed" });
+      }
+      return result;
+    }),
+
   /** Manually fulfill an LMS Stripe checkout when the webhook missed enrollment */
   reconcileStripeLmsCheckout: protectedProcedure
     .input(z.object({
       stripeCheckoutSessionId: z.string().optional(),
       stripeSubscriptionId: z.string().optional(),
       email: z.string().email().optional(),
+      userId: z.number().int().positive().optional(),
+      courseId: z.number().int().positive().optional(),
+      enrollmentId: z.number().int().positive().optional(),
+      /** After manual enroll: only link Stripe ids, do not create user or resend email */
+      linkOnly: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -3248,7 +3287,11 @@ CRITICAL REQUIREMENTS:
             customer: sub.customer,
             customer_email: input.email ?? undefined,
             amount_total: sub.items?.data?.[0]?.price?.unit_amount ?? 0,
+            currency: sub.currency ?? "usd",
             status: "complete",
+            line_items: {
+              data: sub.items?.data?.map((item) => ({ price: { id: item.price.id } })) ?? [],
+            },
           };
         }
       }
@@ -3258,7 +3301,12 @@ CRITICAL REQUIREMENTS:
       }
 
       const { reconcileLmsCheckoutFromStripeSession } = await import("../lib/lmsCheckoutFulfillment");
-      const result = await reconcileLmsCheckoutFromStripeSession(db as any, session);
+      const result = await reconcileLmsCheckoutFromStripeSession(db as any, session, {
+        userId: input.userId,
+        courseId: input.courseId,
+        enrollmentId: input.enrollmentId,
+        linkOnly: input.linkOnly,
+      });
       if (!result.success) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Reconciliation failed" });
       }

@@ -7,6 +7,8 @@ describe("lmsCheckoutFulfillment helpers", () => {
   it("exports LMS fulfillment functions", async () => {
     const mod = await import("./lib/lmsCheckoutFulfillment");
     expect(typeof mod.reconcileLmsCheckoutFromStripeSession).toBe("function");
+    expect(typeof mod.linkLmsEnrollmentToStripeSubscription).toBe("function");
+    expect(typeof mod.fetchStripeSubscriptionDetails).toBe("function");
     expect(typeof mod.resolveLmsCourseIdFromSession).toBe("function");
     expect(typeof mod.isLmsHostedCheckoutMetadata).toBe("function");
     expect(typeof mod.extractStripePriceId).toBe("function");

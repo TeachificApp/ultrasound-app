@@ -70,6 +70,8 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 - Guest buyers: no `user_id` / `order_id` in metadata — fulfillment resolves email from `customer_details`, creates account, order, enrollment, and sends enrollment email.
 - Checkout complete fallback: `lms.getCheckoutSessionStatus` calls `reconcileLmsCheckoutFromStripeSession` for any completed session (not only logged-in users).
 - Admin manual reconcile (production): `lmsEnrollmentAdmin.reconcileStripeLmsCheckout` with `stripeSubscriptionId` or `stripeCheckoutSessionId` + customer email when needed.
+- **Manual enroll then link Stripe**: after `lmsEnrollmentAdmin.addEnrollment`, call `lmsEnrollmentAdmin.linkStripeSubscription` with `userId` + `courseId` (or `enrollmentId`) and `stripeSubscriptionId`. Sets `lms_orders.stripe_subscription_id` and `lms_enrollments.stripe_subscription_id` / `access_expires_at` / `source='stripe'`. CLI: `node scripts/link-lms-stripe-subscription.mjs --user-id … --course-id … --subscription sub_…`.
+- `invoice.paid` and `customer.subscription.updated` extend `lms_enrollments.access_expires_at` when `stripe_subscription_id` is set.
 - Membership handler also matches checkout by Stripe price ID — if a price is on both `membership_plans` and LMS, verify product routing in Stripe metadata.
 
 ### Key file locations
