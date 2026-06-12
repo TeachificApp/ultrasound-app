@@ -1,14 +1,14 @@
 /**
  * UpgradeSuccess.tsx
  *
- * Landing page for users returning from checkout.
+ * Landing page for users returning from Stripe checkout.
  * Handles two scenarios:
  *  1. Logged-in user  → auto-sync premium status via checkAndSync
- *  2. Logged-out user → prompt to enter email to verify purchase,
- *                       then direct to sign-in or register
- *
- * Redirect here after checkout:
- *   https://your-domain.com/upgrade-success
+ *  2. Logged-out user → prompt to enter email to verify purchase.
+ *                       The webhook now auto-creates accounts, so the most
+ *                       likely outcome is "account exists + premium active →
+ *                       sign in". If the webhook hasn't fired yet, the user
+ *                       sees a "check your email / try again" message.
  */
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -60,15 +60,13 @@ export default function UpgradeSuccess() {
 
   const syncByEmail = trpc.premium.syncByEmail.useMutation({
     onSuccess: (data) => {
-      setEmailSubmitted(true);
       setEmailError(null);
-      if (data.isPremium) {
-        // Premium was found and synced — prompt to sign in
-      } else if (data.premiumOnThinkific && !data.userExists) {
-        // Purchase confirmed but no account yet — prompt to register
-      } else if (!data.premiumOnThinkific) {
+      if (data.isPremium || data.userExists) {
+        // Account exists (possibly auto-created by webhook) — show result card
+        setEmailSubmitted(true);
+      } else {
+        // Webhook hasn't fired yet or payment still processing
         setEmailError(data.message);
-        setEmailSubmitted(false);
       }
     },
     onError: () => {
@@ -187,7 +185,7 @@ export default function UpgradeSuccess() {
                       <h2 className="font-bold text-gray-800 text-lg">Verify Your Purchase</h2>
                     </div>
                     <p className="text-gray-500 text-sm mb-6">
-                      Enter the email address you used to purchase to confirm your order and activate premium access.
+                      Enter the email address you used at checkout to confirm your order and activate premium access.
                     </p>
                     <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
                       <Input
@@ -199,10 +197,14 @@ export default function UpgradeSuccess() {
                         className="text-center"
                       />
                       {emailError && (
-                        <p className="text-red-500 text-xs flex items-center gap-1 justify-center">
-                          <AlertCircle className="w-3 h-3" />
-                          {emailError}
-                        </p>
+                        <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-left">
+                          <p className="font-medium mb-1">Payment Processing</p>
+                          <p className="text-xs leading-relaxed">{emailError}</p>
+                          <p className="text-xs mt-1 text-amber-600">
+                            Check your inbox for a welcome email, then{" "}
+                            <a href="/login" className="underline font-medium">sign in here</a>.
+                          </p>
+                        </div>
                       )}
                       <Button
                         type="submit"
@@ -226,15 +228,15 @@ export default function UpgradeSuccess() {
                     </div>
                   </>
                 ) : syncResult?.isPremium ? (
-                  /* Purchase verified + account exists → prompt to sign in */
+                  /* ── Premium confirmed — account exists, sign in ── */
                   <div className="flex flex-col items-center gap-4">
                     <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center">
                       <Check className="w-7 h-7 text-emerald-500" />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-800 text-base mb-1">Purchase Confirmed!</p>
+                      <p className="font-bold text-gray-800 text-base mb-1">Premium Access Confirmed!</p>
                       <p className="text-gray-500 text-sm max-w-xs mx-auto">
-                        Your premium access has been activated. Sign in to start using all premium features.
+                        Your premium membership is active. Sign in to start using all premium features.
                       </p>
                     </div>
                     <a href="/login" className="w-full">
@@ -244,30 +246,37 @@ export default function UpgradeSuccess() {
                       </Button>
                     </a>
                   </div>
-                ) : syncResult?.premiumOnThinkific && !syncResult.userExists ? (
-                  /* Purchase verified but no All About Ultrasound™ account yet → prompt to register */
+                ) : syncResult?.userExists && !syncResult.isPremium ? (
+                  /* ── Account exists but premium not yet active (webhook delay) ── */
                   <div className="flex flex-col items-center gap-4">
-                    <div className="w-14 h-14 rounded-full bg-[#f0fbfc] flex items-center justify-center">
-                      <Crown className="w-7 h-7 text-[#189aa1]" />
+                    <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
+                      <Loader2 className="w-7 h-7 text-amber-500 animate-spin" />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-800 text-base mb-1">Purchase Confirmed!</p>
+                      <p className="font-bold text-gray-800 text-base mb-1">Almost There!</p>
                       <p className="text-gray-500 text-sm max-w-xs mx-auto">
-                        Your purchase was verified. Create your free All About Ultrasound™ account using{" "}
-                        <strong>{email}</strong> and premium will be activated automatically.
+                        Your account was found but premium access is still being activated. This usually takes a few
+                        seconds. Check your inbox for a welcome email, then sign in.
                       </p>
                     </div>
-                    <a href="/login" target="_blank" rel="noopener noreferrer" className="w-full">
-                      <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold w-full">
-                        <ArrowRight className="w-4 h-4 mr-2" />
-                        Create Free Account
+                    <div className="flex flex-col gap-2 w-full">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setEmailSubmitted(false);
+                          syncByEmail.reset();
+                        }}
+                        className="w-full"
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Try Again
                       </Button>
-                    </a>
-                    <a href="/login" className="w-full">
-                      <Button variant="outline" size="sm" className="w-full">
-                        Already have an account? Sign In
-                      </Button>
-                    </a>
+                      <a href="/login" className="w-full">
+                        <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold w-full">
+                          Sign In Anyway
+                        </Button>
+                      </a>
+                    </div>
                   </div>
                 ) : null}
               </div>

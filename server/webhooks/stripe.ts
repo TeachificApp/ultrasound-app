@@ -525,20 +525,65 @@ async function handleBrandMembershipCheckoutCompleted(session: Record<string, un
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.type !== "brand_membership_upgrade") return; // Not a brand membership checkout
 
-  const userId = parseInt(meta.user_id, 10);
+  let userId = meta.user_id ? parseInt(meta.user_id, 10) : NaN;
   const brand = meta.brand as "aaus" | "iheartecho";
   const subscriptionId = session.subscription as string | undefined;
   const customerId = session.customer as string | undefined;
+  const customerEmail =
+    (session.customer_email as string) ??
+    (session.customer_details as Record<string, string>)?.email ??
+    meta.customer_email ?? null;
+  const customerName = meta.customer_name ?? null;
 
-  if (!userId || !brand) {
-    console.warn("[Stripe] Brand membership checkout missing userId or brand in metadata");
+  if (!brand) {
+    console.warn("[Stripe] Brand membership checkout missing brand in metadata");
+    await notifyOwner({
+      title: "\u26a0\ufe0f Brand Membership \u2014 Missing Brand",
+      content: `Session ${session.id}: brand missing from metadata. Email: ${customerEmail ?? "unknown"}. Please verify manually.`,
+    });
     return;
   }
 
   const db = await getDb();
   if (!db) return;
 
-  // Check if membership already exists
+  // \u2500\u2500 Guest / no-account recovery \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // If user_id was not embedded (guest checkout), resolve or create the account
+  // from the Stripe customer email \u2014 same pattern as LMS and membership plan flows.
+  let isNewUser = false;
+  let resetToken: string | null = null;
+  if ((!userId || isNaN(userId)) && customerEmail) {
+    try {
+      const nameParts = (customerName || "").trim().split(" ");
+      const created = await getOrCreateUserByEmail({
+        email: customerEmail,
+        firstName: nameParts[0] || undefined,
+        lastName: nameParts.slice(1).join(" ") || undefined,
+        name: customerName || undefined,
+      });
+      userId = created.user.id;
+      isNewUser = created.isNew;
+      resetToken = created.resetToken;
+      console.log(
+        `[Stripe] Brand membership: ${
+          isNewUser ? "auto-created account" : "resolved account"
+        } for ${customerEmail} (userId=${userId})`
+      );
+    } catch (err) {
+      console.error(`[Stripe] Brand membership: failed to resolve/create account for ${customerEmail}:`, err);
+    }
+  }
+
+  if (!userId || isNaN(userId)) {
+    console.warn(`[Stripe] Brand membership checkout: no userId and could not resolve from email. Session: ${session.id}`);
+    await notifyOwner({
+      title: `\u26a0\ufe0f ${brand === "iheartecho" ? "EchoAssist" : "UltrasoundAssist"} Membership \u2014 No User ID`,
+      content: `Session ${session.id}: could not resolve user. Email: ${customerEmail ?? "unknown"}. Please grant access manually.`,
+    });
+    return;
+  }
+
+  // \u2500\u2500 Grant brand membership \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   const [existing] = await db
     .select()
     .from(brandMemberships)
@@ -546,7 +591,6 @@ async function handleBrandMembershipCheckoutCompleted(session: Record<string, un
     .limit(1);
 
   if (existing) {
-    // Update existing membership to premium
     await db.update(brandMemberships)
       .set({
         tier: "premium",
@@ -558,7 +602,6 @@ async function handleBrandMembershipCheckoutCompleted(session: Record<string, un
       })
       .where(eq(brandMemberships.id, existing.id));
   } else {
-    // Create new premium membership
     await db.insert(brandMemberships).values({
       userId,
       brand,
@@ -570,9 +613,53 @@ async function handleBrandMembershipCheckoutCompleted(session: Record<string, un
     });
   }
 
+  // \u2500\u2500 Welcome / set-password email for new accounts \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  if (isNewUser && resetToken && customerEmail) {
+    try {
+      const baseUrl = "https://app.allaboutultrasound.com";
+      const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+      const firstName = (customerName || customerEmail).split(" ")[0] || "there";
+      let accessTokenForEmail: string | null = null;
+      try {
+        accessTokenForEmail = await getOrCreateAccessToken(userId);
+      } catch { /* non-fatal */ }
+      const accessUrl = accessTokenForEmail
+        ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}`
+        : setPasswordUrl;
+      const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
+      const emailContent = buildPasswordResetEmail({
+        firstName,
+        resetUrl: setPasswordUrl,
+        brandMode: brand === "iheartecho" ? "iheartecho" : "aaus",
+        purpose: "welcome",
+        expiresInLabel: "7 days",
+      });
+      const brandLabel = brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
+      const accessNote = accessTokenForEmail
+        ? `<div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
+            <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Access your membership now</p>
+            <p style="margin:0;font-size:13px;color:#475569;">Click below to access your ${brandLabel} premium membership \u2014 no password needed:</p>
+            <p style="margin:8px 0 0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
+          </div>`
+        : "";
+      const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
+      await _sendEmail({
+        to: { name: customerName || firstName, email: customerEmail },
+        subject: `Your ${brandLabel} Premium Membership is ready`,
+        htmlBody: enhancedBody,
+        previewText: `Access your ${brandLabel} premium membership on All About Ultrasound`,
+      });
+      console.log(`[Stripe] Brand membership: welcome email sent to new user ${customerEmail} (userId=${userId})`);
+    } catch (emailErr) {
+      console.error(`[Stripe] Brand membership: failed to send welcome email to ${customerEmail}:`, emailErr);
+    }
+  }
+
   await notifyOwner({
-    title: `\u2B50 New ${brand === "iheartecho" ? "EchoAssist" : "UltrasoundAssist"} Premium Subscription`,
-    content: `User ID ${userId} (${meta.customer_email}) upgraded to ${brand} premium via Stripe. Subscription: ${subscriptionId ?? "N/A"}.`,
+    title: `\u2b50 New ${brand === "iheartecho" ? "EchoAssist" : "UltrasoundAssist"} Premium Subscription`,
+    content: `User ID ${userId} (${customerEmail ?? meta.customer_email}) upgraded to ${brand} premium via Stripe.${
+      isNewUser ? " [NEW ACCOUNT AUTO-CREATED]" : ""
+    } Subscription: ${subscriptionId ?? "N/A"}.`,
   });
 
   console.log(`[Stripe] Brand membership upgrade recorded: user ${userId}, brand ${brand}, subscription ${subscriptionId}`);
@@ -585,20 +672,59 @@ async function handleBrandMembershipCheckoutCompleted(session: Record<string, un
  */
 async function handleDualMembershipCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata ?? {}) as Record<string, string>;
-  if (meta.type !== "dual_membership") return;
+  // Handle both recurring dual membership and one-time lifetime dual membership
+  const isDual = meta.type === "dual_membership" || meta.type === "dual_membership_lifetime";
+  if (!isDual) return;
 
-  const userId = parseInt(meta.user_id, 10);
+  const isLifetime = meta.type === "dual_membership_lifetime";
+  let userId = meta.user_id ? parseInt(meta.user_id, 10) : NaN;
   const subscriptionId = session.subscription as string | undefined;
   const customerId = session.customer as string | undefined;
-
-  if (!userId) {
-    console.warn("[Stripe] Dual membership checkout missing userId in metadata");
-    return;
-  }
+  const customerEmail =
+    (session.customer_email as string) ??
+    (session.customer_details as Record<string, string>)?.email ??
+    meta.customer_email ?? null;
+  const customerName = meta.customer_name ?? null;
 
   const db = await getDb();
   if (!db) return;
 
+  // ── Guest / no-account recovery ─────────────────────────────────────────────
+  let isNewUser = false;
+  let resetToken: string | null = null;
+  if ((!userId || isNaN(userId)) && customerEmail) {
+    try {
+      const nameParts = (customerName || "").trim().split(" ");
+      const created = await getOrCreateUserByEmail({
+        email: customerEmail,
+        firstName: nameParts[0] || undefined,
+        lastName: nameParts.slice(1).join(" ") || undefined,
+        name: customerName || undefined,
+      });
+      userId = created.user.id;
+      isNewUser = created.isNew;
+      resetToken = created.resetToken;
+      console.log(
+        `[Stripe] Dual membership: ${
+          isNewUser ? "auto-created account" : "resolved account"
+        } for ${customerEmail} (userId=${userId})`
+      );
+    } catch (err) {
+      console.error(`[Stripe] Dual membership: failed to resolve/create account for ${customerEmail}:`, err);
+    }
+  }
+
+  if (!userId || isNaN(userId)) {
+    console.warn(`[Stripe] Dual membership checkout: no userId and could not resolve from email. Session: ${session.id}`);
+    await notifyOwner({
+      title: "\u26a0\ufe0f Dual Membership \u2014 No User ID",
+      content: `Session ${session.id}: could not resolve user. Email: ${customerEmail ?? "unknown"}. Please grant access manually.`,
+    });
+    return;
+  }
+
+  // ── Grant both brand memberships ─────────────────────────────────────────────
+  const source = isLifetime ? "stripe_dual_lifetime" : "stripe_dual";
   const brands: ("aaus" | "iheartecho")[] = ["aaus", "iheartecho"];
   for (const brand of brands) {
     const [existing] = await db
@@ -612,7 +738,7 @@ async function handleDualMembershipCheckoutCompleted(session: Record<string, unk
         .set({
           tier: "premium",
           status: "active",
-          source: "stripe_dual",
+          source,
           stripeSubscriptionId: subscriptionId ?? null,
           stripeCustomerId: customerId ?? null,
           grantedAt: new Date(),
@@ -624,35 +750,81 @@ async function handleDualMembershipCheckoutCompleted(session: Record<string, unk
         brand,
         tier: "premium",
         status: "active",
-        source: "stripe_dual",
+        source,
         stripeSubscriptionId: subscriptionId ?? null,
         stripeCustomerId: customerId ?? null,
       });
     }
   }
 
-  // Sync user to Thinkific
-  try {
-    const user = await getUserByEmail(meta.customer_email);
-    if (user) {
+  // ── Sync to Thinkific (existing or newly created user) ───────────────────────
+  if (customerEmail) {
+    try {
       const { findOrCreateThinkificUser } = await import("../thinkific");
       await findOrCreateThinkificUser(
-        meta.customer_email,
-        meta.customer_name?.split(" ")[0] ?? "Member",
-        meta.customer_name?.split(" ").slice(1).join(" ") ?? ""
+        customerEmail,
+        customerName?.split(" ")[0] ?? "Member",
+        customerName?.split(" ").slice(1).join(" ") ?? ""
       );
-      console.log(`[Stripe] Dual membership: Thinkific user ensured for ${meta.customer_email}`);
+      console.log(`[Stripe] Dual membership: Thinkific user ensured for ${customerEmail}`);
+    } catch (err) {
+      console.error("[Stripe] Dual membership Thinkific sync failed:", err);
     }
-  } catch (err) {
-    console.error("[Stripe] Dual membership Thinkific sync failed:", err);
   }
 
+  // ── Welcome / set-password email for new accounts ────────────────────────────
+  if (isNewUser && resetToken && customerEmail) {
+    try {
+      const baseUrl = "https://app.allaboutultrasound.com";
+      const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+      const firstName = (customerName || customerEmail).split(" ")[0] || "there";
+      let accessTokenForEmail: string | null = null;
+      try {
+        accessTokenForEmail = await getOrCreateAccessToken(userId);
+      } catch { /* non-fatal */ }
+      const accessUrl = accessTokenForEmail
+        ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}`
+        : setPasswordUrl;
+      const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
+      const emailContent = buildPasswordResetEmail({
+        firstName,
+        resetUrl: setPasswordUrl,
+        brandMode: "aaus",
+        purpose: "welcome",
+        expiresInLabel: "7 days",
+      });
+      const planLabel = isLifetime ? "All Access Dual Lifetime Membership" : "All Access Dual Membership";
+      const accessNote = accessTokenForEmail
+        ? `<div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
+            <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Access your membership now</p>
+            <p style="margin:0;font-size:13px;color:#475569;">Click below to access your ${planLabel} \u2014 no password needed:</p>
+            <p style="margin:8px 0 0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
+          </div>`
+        : "";
+      const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
+      await _sendEmail({
+        to: { name: customerName || firstName, email: customerEmail },
+        subject: `Your ${planLabel} is ready`,
+        htmlBody: enhancedBody,
+        previewText: `Access your ${planLabel} on All About Ultrasound`,
+      });
+      console.log(`[Stripe] Dual membership: welcome email sent to new user ${customerEmail} (userId=${userId})`);
+    } catch (emailErr) {
+      console.error(`[Stripe] Dual membership: failed to send welcome email to ${customerEmail}:`, emailErr);
+    }
+  }
+
+  const planDescription = isLifetime
+    ? "All Access Dual Lifetime Membership ($147 one-time)"
+    : "All Access Dual Membership ($12.99/mo)";
   await notifyOwner({
-    title: "⭐⭐ New Dual Membership Subscription",
-    content: `User ID ${userId} (${meta.customer_email}) subscribed to the All Access Dual Membership ($12.99/mo). Both AAUS + iHeartEcho premium granted. Subscription: ${subscriptionId ?? "N/A"}.`,
+    title: `\u2b50\u2b50 New Dual Membership${isLifetime ? " (Lifetime)" : ""} Subscription`,
+    content: `User ID ${userId} (${customerEmail}) \u2014 ${planDescription}. Both AAUS + iHeartEcho premium granted.${
+      isNewUser ? " [NEW ACCOUNT AUTO-CREATED]" : ""
+    } Subscription: ${subscriptionId ?? "N/A"}.`,
   });
 
-  console.log(`[Stripe] Dual membership recorded: user ${userId}, both brands, subscription ${subscriptionId}`);
+  console.log(`[Stripe] Dual membership recorded: user ${userId}, both brands, lifetime=${isLifetime}, subscription ${subscriptionId}`);
 }
 
 /**

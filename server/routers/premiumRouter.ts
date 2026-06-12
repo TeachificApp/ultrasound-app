@@ -154,11 +154,16 @@ export const premiumRouter = router({
       const email = input.email.toLowerCase().trim();
       const user = await getUserByEmail(email);
       if (!user) {
+        // The webhook may have already auto-created this account — return a
+        // "payment processing" message so the user knows to wait and retry,
+        // rather than telling them to create an account that may already exist.
         return {
           userExists: false,
           isPremium: false,
           premiumOnThinkific: false,
-          message: "No account found for this email. Create your account first, then your premium access will be activated.",
+          isAccountAutoCreated: false,
+          message:
+            "Your payment was received. Your account and premium access are being set up — please check your email for a welcome message, or try again in a moment.",
         };
       }
       // Check if already premium in DB
@@ -167,6 +172,7 @@ export const premiumRouter = router({
           userExists: true,
           isPremium: true,
           premiumOnThinkific: true,
+          isAccountAutoCreated: false,
           message: "Premium access is already active on your account.",
         };
       }
@@ -181,9 +187,10 @@ export const premiumRouter = router({
         userExists: true,
         isPremium: hasPremium,
         premiumOnThinkific: hasPremium, // Keep field name for backward compat
+        isAccountAutoCreated: false,
         message: hasPremium
-          ? "Premium access granted! Sign in to access all premium features."
-          : "No active premium membership found. Your Stripe payment may still be processing — try again in a moment.",
+          ? "Premium access confirmed! Sign in to access all premium features."
+          : "No active premium membership found yet. Your Stripe payment may still be processing — please try again in a moment.",
       };
     }),
 
