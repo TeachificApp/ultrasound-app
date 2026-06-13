@@ -2954,6 +2954,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   onLandingPageChange={v => set("heroLandingPageSlug", v)}
                   funnelPageValue={d.heroFunnelPageValue ?? null}
                   onFunnelPageChange={v => set("heroFunnelPageValue", v)}
+                  freeEnrollProductType={d.heroFreeEnrollProductType ?? "course"}
+                  freeEnrollProductId={d.heroFreeEnrollProductId ?? null}
+                  onFreeEnrollProductChange={(type, id) => setMany({ heroFreeEnrollProductType: type, heroFreeEnrollProductId: id })}
                 />
               </div>
             )}
@@ -3016,6 +3019,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     onLandingPageChange={v => setBtnMulti(idx, { landingPageSlug: v })}
                     funnelPageValue={(btn as any).funnelPageValue ?? null}
                     onFunnelPageChange={v => setBtnMulti(idx, { funnelPageValue: v })}
+                    freeEnrollProductType={(btn as any).freeEnrollProductType ?? "course"}
+                    freeEnrollProductId={(btn as any).freeEnrollProductId ?? null}
+                    onFreeEnrollProductChange={(type, id) => setBtnMulti(idx, { freeEnrollProductType: type, freeEnrollProductId: id })}
                   />
                   {(btn.behavior ?? "url") === "send_email" && (
                     <HeroSendEmailSettings btn={btn} idx={idx} setBtn={setBtn} setBtnMulti={setBtnMulti} />
@@ -3119,6 +3125,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 onLandingPageChange={v => set("linkLandingPageSlug", v)}
                 funnelPageValue={d.linkFunnelPageValue ?? null}
                 onFunnelPageChange={v => set("linkFunnelPageValue", v)}
+                freeEnrollProductType={d.linkFreeEnrollProductType ?? "course"}
+                freeEnrollProductId={d.linkFreeEnrollProductId ?? null}
+                onFreeEnrollProductChange={(type, id) => setMany({ linkFreeEnrollProductType: type, linkFreeEnrollProductId: id })}
               />
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={d.openInNewTab ?? true} onChange={e => set("openInNewTab", e.target.checked)} className="rounded" />
@@ -3771,6 +3780,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     onLandingPageChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaLandingPageSlug: v } : p))}
                     funnelPageValue={(product as any).ctaFunnelPageValue ?? null}
                     onFunnelPageChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaFunnelPageValue: v } : p))}
+                    freeEnrollProductType={(product as any).freeEnrollProductType ?? "course"}
+                    freeEnrollProductId={(product as any).freeEnrollProductId ?? null}
+                    onFreeEnrollProductChange={(type, id) => set("products", products.map((p, j) => j === i ? { ...p, freeEnrollProductType: type, freeEnrollProductId: id } : p))}
                   />
                   <DebouncedInput value={product.fulfillment ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, fulfillment: v } : p))} className="h-7 text-xs" placeholder="Fulfillment note" />
                   <DebouncedInput value={product.imageUrl ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, imageUrl: v } : p))} className="h-7 text-xs" placeholder="Image URL" />
