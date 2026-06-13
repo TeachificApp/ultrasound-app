@@ -1105,26 +1105,35 @@ function CTAActionPicker({
 
   // Free enrollment product picker — separate queries per product type
   const freeEnrollType = (freeEnrollProductType ?? "course") as string;
+  // Courses, quizzes, cohorts live in lmsCourses table
   const { data: feCourses } = trpc.lmsAdmin.listCourses.useQuery(
-    { status: "published", type: "all", pageSize: 200 },
-    { enabled: behavior === "free_enrollment" && (freeEnrollType === "course" || freeEnrollType === "quiz" || freeEnrollType === "cohort" || freeEnrollType === "webinar") }
+    { status: "all", type: "all", pageSize: 200 },
+    { enabled: behavior === "free_enrollment" && (freeEnrollType === "course" || freeEnrollType === "quiz" || freeEnrollType === "cohort") }
   );
-  const { data: feDownloads } = trpc.lmsAdmin.listDownloads.useQuery(
-    { status: "published", pageSize: 200 },
+  // Webinars are a separate table
+  const { data: feWebinars } = trpc.webinarAdmin.list.useQuery(
+    { pageSize: 200 },
+    { enabled: behavior === "free_enrollment" && freeEnrollType === "webinar" }
+  );
+  // Downloads (digitalProducts)
+  const { data: feDownloads } = trpc.downloadsAdmin.list.useQuery(
+    undefined,
     { enabled: behavior === "free_enrollment" && freeEnrollType === "download" }
   );
-  const { data: feBundles } = trpc.lmsAdmin.listBundles.useQuery(
-    { status: "published", pageSize: 200 },
+  // Bundles (digitalBundles)
+  const { data: feBundles } = trpc.downloadsAdmin.listBundles.useQuery(
+    undefined,
     { enabled: behavior === "free_enrollment" && freeEnrollType === "bundle" }
   );
   const freeEnrollItems: Array<{ id: number; label: string }> = React.useMemo(() => {
-    if (freeEnrollType === "course" || freeEnrollType === "quiz" || freeEnrollType === "cohort" || freeEnrollType === "webinar") {
-      return ((feCourses as any)?.courses ?? []).filter((c: any) => !freeEnrollType || c.type === freeEnrollType).map((c: any) => ({ id: c.id, label: `${c.title} (${c.type})` }));
+    if (freeEnrollType === "course" || freeEnrollType === "quiz" || freeEnrollType === "cohort") {
+      return ((feCourses as any)?.courses ?? []).filter((c: any) => c.type === freeEnrollType).map((c: any) => ({ id: c.id, label: `${c.title} (${c.type})` }));
     }
-    if (freeEnrollType === "download") return ((feDownloads as any)?.downloads ?? (feDownloads as any) ?? []).map((d: any) => ({ id: d.id, label: d.title ?? d.name ?? `Download #${d.id}` }));
-    if (freeEnrollType === "bundle") return ((feBundles as any)?.bundles ?? (feBundles as any) ?? []).map((b: any) => ({ id: b.id, label: b.title ?? b.name ?? `Bundle #${b.id}` }));
+    if (freeEnrollType === "webinar") return ((feWebinars as any)?.webinars ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Webinar #${w.id}` }));
+    if (freeEnrollType === "download") return ((feDownloads as any) ?? []).map((d: any) => ({ id: d.id, label: d.title ?? d.name ?? `Download #${d.id}` }));
+    if (freeEnrollType === "bundle") return ((feBundles as any) ?? []).map((b: any) => ({ id: b.id, label: b.title ?? b.name ?? `Bundle #${b.id}` }));
     return [];
-  }, [freeEnrollType, feCourses, feDownloads, feBundles]);
+  }, [freeEnrollType, feCourses, feWebinars, feDownloads, feBundles]);
   // Pricing option picker state
   const [poCourseId, setPoCoursId] = React.useState<number | null>(pricingOptionCourseIdValue ?? null);
   const { data: poCoursesData } = trpc.lmsAdmin.listCourses.useQuery(
