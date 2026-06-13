@@ -101,6 +101,7 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+// Build: 2026-06-13T17:00:00Z — freeEnrollProductType fix
 // Register service worker for PWA installability
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
