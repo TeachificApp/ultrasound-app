@@ -68,6 +68,8 @@ import type { BlockType, Block } from "@/components/BlockPreview";
 export type { BlockType, Block } from "@/components/BlockPreview";
 export { BlockPreview };
 import UserParamTagsHelper from "@/components/UserParamTagsHelper";
+import { useAutoSave } from "@/hooks/useAutoSave";
+import { AutoSaveIndicator } from "@/components/AutoSaveIndicator";
 
 export function uid() { return Math.random().toString(36).slice(2, 10); }
 
@@ -6039,6 +6041,8 @@ export default function LandingPageBuilder() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  // Track whether blocks have been loaded from the server (to avoid marking dirty on initial load)
+  const blocksLoadedRef = useRef(false);
   // Right panel resizable width
   const [rightPanelWidth, setRightPanelWidth] = useState(288);
   const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -6163,6 +6167,8 @@ export default function LandingPageBuilder() {
         { id: uid(), type: "pricing_cta", data: { headline: "Ready to Get Started?", subtext: "Join thousands of sonographers improving their skills.", ctaText: lpData.ctaText || "Enroll Now", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#ffffff", showPrice: true } },
       ]);
     }
+    // Mark as loaded so subsequent setBlocks calls can trigger dirty
+    blocksLoadedRef.current = true;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lpData]);
 
@@ -6192,9 +6198,26 @@ export default function LandingPageBuilder() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    try { await saveBlocks.mutateAsync({ courseId: numericCourseId, blocks }); }
-    finally { setIsSaving(false); }
+    try {
+      await saveBlocks.mutateAsync({ courseId: numericCourseId, blocks });
+      autoSave.markClean();
+    } finally { setIsSaving(false); }
   };
+
+  const autoSave = useAutoSave({
+    onSave: async () => {
+      await saveBlocks.mutateAsync({ courseId: numericCourseId, blocks });
+    },
+    intervalMs: 60_000,
+  });
+
+  // Mark dirty whenever blocks change after initial load
+  useEffect(() => {
+    if (blocksLoadedRef.current) {
+      autoSave.markDirty();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
 
   // ─── Cross-list DnD helpers ───────────────────────────────────────────────
   // Column drop zone IDs use the format: "col:BLOCK_ID:left" or "col:BLOCK_ID:right"
@@ -6541,6 +6564,7 @@ export default function LandingPageBuilder() {
               <Eye size={14} /> Preview
             </a>
           )}
+          <AutoSaveIndicator status={autoSave.status} />
           <Button onClick={handleSave} disabled={isSaving} className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-1.5 h-8">
             <Save size={14} /> {isSaving ? "Saving…" : "Save Page"}
           </Button>

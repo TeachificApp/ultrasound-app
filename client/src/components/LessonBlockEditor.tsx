@@ -5,7 +5,7 @@
  * Reuses the same Block system (BLOCK_CATALOG, BlockPreview, BlockSettings, SortableBlock)
  * as the LandingPageBuilder.
  */
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, UniqueIdentifier,
 } from "@dnd-kit/core";
@@ -17,6 +17,8 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useAutoSave } from "@/hooks/useAutoSave";
+import { AutoSaveIndicator } from "@/components/AutoSaveIndicator";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -84,6 +86,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const embedded = embeddedProp || !!onBlocksChange;
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const blocksInitializedRef = useRef(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CATALOG_CATEGORIES[0]);
   const [pickerTab, setPickerTab] = useState<PickerTab>("catalog");
@@ -454,6 +457,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
     if (onBlocksChange) {
       onBlocksChange(blocks);
       toast.success("Content saved!");
+      autoSave.markClean();
       if (andClose && onSavedAndClose) onSavedAndClose();
       else if (onSaved) onSaved();
       return;
@@ -465,6 +469,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
         contentBlocks: JSON.stringify(blocks),
       });
       toast.success("Lesson content saved!");
+      autoSave.markClean();
       if (andClose && onSavedAndClose) {
         onSavedAndClose();
       } else {
@@ -477,6 +482,27 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
     }
   };
   handleSaveRef.current = handleSave;
+
+  const autoSave = useAutoSave({
+    onSave: async () => {
+      if (onBlocksChange) {
+        onBlocksChange(blocks);
+      } else if (lessonId) {
+        await updateLesson.mutateAsync({ id: lessonId, contentBlocks: JSON.stringify(blocks) });
+      }
+    },
+    intervalMs: 60_000,
+  });
+
+  // Mark dirty after initial render (blocks come from props, not a server load)
+  useEffect(() => {
+    if (!blocksInitializedRef.current) {
+      blocksInitializedRef.current = true;
+      return;
+    }
+    autoSave.markDirty();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
 
   // Also search column_layout children so clicking a child block opens its settings
   const selectedBlock = blocks.find(b => b.id === selectedBlockId) ??
@@ -666,6 +692,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
               {previewMode ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
               {previewMode ? "Edit" : "Preview Blocks"}
             </Button>
+            <AutoSaveIndicator status={autoSave.status} />
             <Button
               size="sm"
               variant="outline"

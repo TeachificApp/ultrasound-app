@@ -25,6 +25,8 @@ import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useAutoSave } from "@/hooks/useAutoSave";
+import { AutoSaveIndicator } from "@/components/AutoSaveIndicator";
 import { type Block, type BlockType, BlockPreview } from "@/components/BlockPreview";
 import { uid, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock } from "./LandingPageBuilder";
 import {
@@ -46,6 +48,7 @@ export default function FunnelPageEditor() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [loadedPageId, setLoadedPageId] = useState<number | null>(null);
+  const blocksLoadedRef = useRef(false);
   const [activeCat, setActiveCat] = useState<string>("Layout");
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [pickerTab, setPickerTab] = useState<"catalog" | "from_pages" | "templates" | "import_url">("catalog");
@@ -154,6 +157,7 @@ export default function FunnelPageEditor() {
       } catch { /* fall through to defaults */ }
     }
     setBlocks(getDefaultBlocks(pageData.page.pageType, pageData.page.title));
+    blocksLoadedRef.current = true;
   }, [pageData, numericPageId, loadedPageId]);
 
   const utils = trpc.useUtils();
@@ -171,14 +175,27 @@ export default function FunnelPageEditor() {
         id: numericPageId,
         blocks: JSON.stringify(blocks),
       });
+      autoSave.markClean();
       // Invalidate the cache so the NEXT mount of this page loads fresh data from DB.
-      // Do NOT reset loadedPageId here — that would cause the useEffect to immediately
-      // re-run with stale cached pageData and overwrite blocks with the pre-save state.
       utils.funnel.getPageById.invalidate({ id: numericPageId });
     } finally {
       setIsSaving(false);
     }
   };
+
+  const autoSave = useAutoSave({
+    onSave: async () => {
+      await updatePage.mutateAsync({ id: numericPageId, blocks: JSON.stringify(blocks) });
+      utils.funnel.getPageById.invalidate({ id: numericPageId });
+    },
+    intervalMs: 60_000,
+  });
+
+  // Mark dirty whenever blocks change after initial load
+  useEffect(() => {
+    if (blocksLoadedRef.current) autoSave.markDirty();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     if (pointerMoveHandlerRef.current) {
@@ -619,6 +636,7 @@ export default function FunnelPageEditor() {
           >
             <Bookmark size={14} /> Save as Template
           </button>
+          <AutoSaveIndicator status={autoSave.status} />
           <Button
             onClick={handleSave}
             disabled={isSaving}
