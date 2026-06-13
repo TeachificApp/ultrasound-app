@@ -935,11 +935,12 @@ function MembershipItemsTab({
 
   // ── Data fetches for all 6 product types ──────────────────────────────────
   const { data: allCourses } = trpc.lmsAdmin.listCourses.useQuery({ pageSize: 500 });
-  const { data: downloads } = trpc.downloads.admin.list.useQuery({ pageSize: 500 });
-  const { data: quizzes } = trpc.sonoQuiz.listQuizzes.useQuery({ status: "all" });
+  const { data: downloads } = trpc.downloadsAdmin.list.useQuery();
+  const { data: quizzes } = trpc.sonoQuiz.adminListAll.useQuery({ status: "all" });
   const { data: webinarsData } = trpc.webinarAdmin.list.useQuery({ pageSize: 500 });
   const { data: communities } = trpc.community.admin.listCommunities.useQuery();
   const { data: products } = trpc.productsAdmin.list.useQuery();
+  const { data: bundlesData } = trpc.bundlesAdmin.list.useQuery({ pageSize: 200 });
 
   // ── Unified item list for the current type ────────────────────────────────
   const itemsForType = useMemo(() => {
@@ -947,22 +948,24 @@ function MembershipItemsTab({
     const filter = (title: string) => !q || title.toLowerCase().includes(q);
     switch (addType) {
       case "course": return (allCourses?.courses ?? []).filter((c: any) => filter(c.title ?? "")).map((c: any) => ({ id: c.id, title: c.title ?? `Course #${c.id}` }));
-      case "download": return (downloads?.downloads ?? []).filter((d: any) => filter(d.title ?? "")).map((d: any) => ({ id: d.id, title: d.title ?? `Download #${d.id}` }));
+      case "download": return (downloads ?? []).filter((d: any) => filter(d.title ?? "")).map((d: any) => ({ id: d.id, title: d.title ?? `Download #${d.id}` }));
       case "quiz": return (quizzes ?? []).filter((q2: any) => filter(q2.title ?? "")).map((q2: any) => ({ id: q2.id, title: q2.title ?? `Quiz #${q2.id}` }));
       case "webinar": return (webinarsData?.webinars ?? []).filter((w: any) => filter(w.title ?? "")).map((w: any) => ({ id: w.id, title: w.title ?? `Webinar #${w.id}` }));
-      case "community": return (communities ?? []).filter((c: any) => filter(c.name ?? "")).map((c: any) => ({ id: c.id, title: c.name ?? `Community #${c.id}` }));
+      case "community": return (communities ?? []).filter((c: any) => filter(c.title ?? c.name ?? "")).map((c: any) => ({ id: c.id, title: c.title ?? c.name ?? `Community #${c.id}` }));
       case "product": return (products ?? []).filter((p: any) => filter(p.name ?? p.title ?? "")).map((p: any) => ({ id: p.id, title: p.name ?? p.title ?? `Product #${p.id}` }));
+      case "bundle": return (bundlesData?.bundles ?? []).filter((b: any) => filter(b.title ?? "")).map((b: any) => ({ id: b.id, title: b.title ?? `Bundle #${b.id}` }));
       default: return [];
     }
-  }, [addType, search, allCourses, downloads, quizzes, webinarsData, communities, products]);
+  }, [addType, search, allCourses, downloads, quizzes, webinarsData, communities, products, bundlesData]);
 
   // ── Build lookup maps for resolving saved item names ──────────────────────
   const courseMap = useMemo(() => { const m: Record<number, string> = {}; for (const c of allCourses?.courses ?? []) m[(c as any).id] = (c as any).title; return m; }, [allCourses]);
-  const downloadMap = useMemo(() => { const m: Record<number, string> = {}; for (const d of downloads?.downloads ?? []) m[(d as any).id] = (d as any).title; return m; }, [downloads]);
+  const downloadMap = useMemo(() => { const m: Record<number, string> = {}; for (const d of downloads ?? []) m[(d as any).id] = (d as any).title; return m; }, [downloads]);
   const quizMap = useMemo(() => { const m: Record<number, string> = {}; for (const q2 of quizzes ?? []) m[(q2 as any).id] = (q2 as any).title; return m; }, [quizzes]);
   const webinarMap = useMemo(() => { const m: Record<number, string> = {}; for (const w of webinarsData?.webinars ?? []) m[(w as any).id] = (w as any).title; return m; }, [webinarsData]);
-  const communityMap = useMemo(() => { const m: Record<number, string> = {}; for (const c of communities ?? []) m[(c as any).id] = (c as any).name; return m; }, [communities]);
+  const communityMap = useMemo(() => { const m: Record<number, string> = {}; for (const c of communities ?? []) m[(c as any).id] = (c as any).title ?? (c as any).name; return m; }, [communities]);
   const productMap = useMemo(() => { const m: Record<number, string> = {}; for (const p of products ?? []) m[(p as any).id] = (p as any).name ?? (p as any).title; return m; }, [products]);
+  const bundleMap = useMemo(() => { const m: Record<number, string> = {}; for (const b of bundlesData?.bundles ?? []) m[(b as any).id] = (b as any).title; return m; }, [bundlesData]);
 
   function resolveItemName(item: AccessItem): string {
     if (item.label) return item.label;
@@ -975,6 +978,7 @@ function MembershipItemsTab({
       case "webinar": return webinarMap[id] ?? `Webinar #${id}`;
       case "community": return communityMap[id] ?? `Community #${id}`;
       case "product": return productMap[id] ?? `Product #${id}`;
+      case "bundle": return bundleMap[id] ?? `Bundle #${id}`;
       default: return `${ITEM_TYPE_LABELS[item.itemType]} #${id}`;
     }
   }

@@ -104,6 +104,23 @@ export const sonoQuizRouter = router({
       return quizzes;
     }),
 
+  /** List ALL quizzes across all admins — used by Memberships/Bundles included-item pickers */
+  adminListAll: protectedProcedure
+    .input(z.object({ status: z.enum(["draft", "published", "archived", "all"]).default("all") }).optional())
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx.user.id);
+      const db = (await getDb())!;
+      const conditions: any[] = [];
+      if (input?.status && input.status !== "all") {
+        conditions.push(eq(sonoQuizzes.status, input.status));
+      }
+      return db
+        .select({ id: sonoQuizzes.id, title: sonoQuizzes.title, status: sonoQuizzes.status, category: sonoQuizzes.category })
+        .from(sonoQuizzes)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(sonoQuizzes.updatedAt));
+    }),
+
   getQuiz: protectedProcedure
     .input(z.object({ quizId: z.number() }))
     .query(async ({ ctx, input }) => {
