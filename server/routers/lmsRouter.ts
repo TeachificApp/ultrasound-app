@@ -45,6 +45,8 @@ import {
   lmsLessonProgress,
   lmsGroups,
   lmsGroupSeats,
+  lmsGroupCourses,
+  lmsGroupManagers,
   lmsInstructors,
   lmsCourseInstructors,
   lmsAffiliates,
@@ -1454,6 +1456,64 @@ export const lmsLearnerRouter = router({
       }).$returningId();
       await db.update(lmsGroupSeats).set({ acceptedAt: new Date(), enrollmentId: result.id }).where(eq(lmsGroupSeats.id, seat.id));
       return { enrollmentId: result.id };
+    }),
+
+  // ── Free Group Enrollment ────────────────────────────────────────────────
+
+  /**
+   * Create a free group for a course — no Stripe payment required.
+   * The calling user becomes the group manager and can assign seats to members.
+   * Members accept their invite via the normal acceptGroupInvite flow and get
+   * a free enrollment tracked under this group.
+   */
+  createFreeGroup: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      seats: z.number().int().min(1).max(500),
+      groupName: z.string().min(1).max(255),
+      orgName: z.string().max(255).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Verify the course exists and is a free/public course
+      const [course] = await db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, isFree: lmsCourses.isFree })
+        .from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+
+      // Create the group
+      const [groupResult] = await db.insert(lmsGroups).values({
+        name: input.groupName,
+        orgName: input.orgName ?? null,
+        courseId: input.courseId,
+        seats: input.seats,
+        teamAdminId: ctx.user.id,
+        adminEmail: ctx.user.email ?? null,
+        source: "free_enrollment",
+      }).$returningId();
+      const groupId = groupResult.id;
+
+      // Create the per-course seat allocation
+      await db.insert(lmsGroupCourses).values({
+        groupId,
+        courseId: input.courseId,
+        seats: input.seats,
+      });
+
+      // Register the creator as an active manager (with a seat so they also get access)
+      await db.insert(lmsGroupManagers).values({
+        groupId,
+        userId: ctx.user.id,
+        email: ctx.user.email ?? "",
+        managerName: ctx.user.name ?? undefined,
+        status: "active",
+        hasSeat: true,
+        acceptedAt: new Date(),
+        addedByUserId: ctx.user.id,
+      });
+
+      return { groupId, courseTitle: course.title, courseSlug: course.slug };
     }),
 
   // ── Certificates ──────────────────────────────────────────────────────────

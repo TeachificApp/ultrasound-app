@@ -1009,7 +1009,7 @@ type CTAAction =
   | "url" | "send_email" | "next_funnel_step" | "direct_checkout"
   | "free_preview" | "group_purchase" | "order_bump_lp"
   | "scroll_to_section" | "open_popup" | "download_file" | "pricing_option"
-  | "landing_page" | "funnel_page" | "free_enrollment";
+  | "landing_page" | "funnel_page" | "free_enrollment" | "group_free_enrollment";
 
 const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   url: "Link to URL",
@@ -1018,6 +1018,7 @@ const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   send_email: "Send Email",
   next_funnel_step: "Next Funnel Step",
   free_enrollment: "Free Enrollment",
+  group_free_enrollment: "Group Free Enrollment (No Payment)",
   direct_checkout: "Direct Checkout (Stripe)",
   free_preview: "Direct to Checkout (Free Preview)",
   group_purchase: "Direct to Checkout (Group Purchase)",
@@ -1099,9 +1100,20 @@ function CTAActionPicker({
   freeEnrollProductType?: string;
   freeEnrollProductId?: number | null;
   onFreeEnrollProductChange?: (type: string, id: number | null) => void;
+  /** group_free_enrollment action: course id + default seat count */
+  groupFreeEnrollCourseId?: number | null;
+  groupFreeEnrollDefaultSeats?: number;
+  onGroupFreeEnrollChange?: (courseId: number | null, defaultSeats: number) => void;
 }) {
   const behavior = (behaviorValue ?? "url") as CTAAction;
   const isCheckoutBehavior = behavior === "direct_checkout" || behavior === "free_preview" || behavior === "group_purchase";
+
+  // Group free enrollment: courses query (only courses supported for group analytics)
+  const { data: gfeCourses } = trpc.lmsAdmin.listCourses.useQuery(
+    { status: "all", type: "all", pageSize: 200 },
+    { enabled: behavior === "group_free_enrollment" }
+  );
+  const gfeCourseItems = ((gfeCourses as any)?.courses ?? []).filter((c: any) => c.type === "course" || c.type === "quiz" || c.type === "cohort") as Array<{ id: number; title: string; type: string }>;
 
   // Free enrollment product picker — separate queries per product type
   const freeEnrollType = (freeEnrollProductType ?? "course") as string;
@@ -1252,6 +1264,36 @@ function CTAActionPicker({
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+      {behavior === "group_free_enrollment" && (
+        <div className="space-y-2 bg-purple-50 border border-purple-200 rounded p-2">
+          <p className="text-[10px] text-purple-700 font-medium">Creates a free group for a course — no Stripe payment. The buyer specifies a group name and seat count, then manages members from their Team Dashboard. Completion and activity are tracked per member.</p>
+          <div>
+            <label className="text-xs text-gray-500 block mb-0.5">Course</label>
+            <select
+              value={groupFreeEnrollCourseId ?? ""}
+              onChange={e => onGroupFreeEnrollChange?.(e.target.value ? Number(e.target.value) : null, groupFreeEnrollDefaultSeats ?? 5)}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            >
+              <option value="">-- Select course --</option>
+              {gfeCourseItems.map(c => (
+                <option key={c.id} value={c.id}>{c.title} ({c.type})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-0.5">Default Seat Count (shown pre-filled in dialog)</label>
+            <input
+              type="number" min={1} max={500}
+              value={groupFreeEnrollDefaultSeats ?? 5}
+              onChange={e => onGroupFreeEnrollChange?.(groupFreeEnrollCourseId ?? null, Number(e.target.value))}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            />
+          </div>
+          {groupFreeEnrollCourseId && (
+            <p className="text-[10px] text-purple-600 mt-0.5">✓ Will prompt buyer for group name + seat count, then create a free group for course #{groupFreeEnrollCourseId}. Buyer is redirected to /my-team to manage seats.</p>
           )}
         </div>
       )}
@@ -2536,6 +2578,9 @@ function SortablePricingCard({
         freeEnrollProductType={card.freeEnrollProductType ?? "course"}
         freeEnrollProductId={card.freeEnrollProductId ?? null}
         onFreeEnrollProductChange={(type, id) => { onSet("freeEnrollProductType", type); onSet("freeEnrollProductId", id); }}
+        groupFreeEnrollCourseId={(card as any).groupFreeEnrollCourseId ?? null}
+        groupFreeEnrollDefaultSeats={(card as any).groupFreeEnrollDefaultSeats ?? 5}
+        onGroupFreeEnrollChange={(cid, seats) => { onSet("groupFreeEnrollCourseId", cid); onSet("groupFreeEnrollDefaultSeats", seats); }}
       />
       <DebouncedInput value={card.badge ?? ""} onChange={v => onSet("badge", v)} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
       <div>
@@ -2969,6 +3014,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   freeEnrollProductType={d.heroFreeEnrollProductType ?? "course"}
                   freeEnrollProductId={d.heroFreeEnrollProductId ?? null}
                   onFreeEnrollProductChange={(type, id) => setMany({ heroFreeEnrollProductType: type, heroFreeEnrollProductId: id })}
+                  groupFreeEnrollCourseId={(d as any).heroGroupFreeEnrollCourseId ?? null}
+                  groupFreeEnrollDefaultSeats={(d as any).heroGroupFreeEnrollDefaultSeats ?? 5}
+                  onGroupFreeEnrollChange={(cid, seats) => setMany({ heroGroupFreeEnrollCourseId: cid, heroGroupFreeEnrollDefaultSeats: seats })}
                 />
               </div>
             )}
@@ -3034,6 +3082,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     freeEnrollProductType={(btn as any).freeEnrollProductType ?? "course"}
                     freeEnrollProductId={(btn as any).freeEnrollProductId ?? null}
                     onFreeEnrollProductChange={(type, id) => setBtnMulti(idx, { freeEnrollProductType: type, freeEnrollProductId: id })}
+                    groupFreeEnrollCourseId={(btn as any).groupFreeEnrollCourseId ?? null}
+                    groupFreeEnrollDefaultSeats={(btn as any).groupFreeEnrollDefaultSeats ?? 5}
+                    onGroupFreeEnrollChange={(cid, seats) => setBtnMulti(idx, { groupFreeEnrollCourseId: cid, groupFreeEnrollDefaultSeats: seats })}
                   />
                   {(btn.behavior ?? "url") === "send_email" && (
                     <HeroSendEmailSettings btn={btn} idx={idx} setBtn={setBtn} setBtnMulti={setBtnMulti} />

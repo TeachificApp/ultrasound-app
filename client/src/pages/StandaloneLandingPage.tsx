@@ -116,6 +116,28 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
     },
     onError: (e) => toast.error(`Checkout failed: ${e.message}`),
   });
+  // Group free enrollment dialog state
+  const [gfeDialogOpen, setGfeDialogOpen] = useState(false);
+  const [gfeCourseId, setGfeCourseId] = useState<number | null>(null);
+  const [gfeDefaultSeats, setGfeDefaultSeats] = useState(5);
+  const [gfeGroupName, setGfeGroupName] = useState("");
+  const [gfeSeats, setGfeSeats] = useState(5);
+  const createFreeGroup = trpc.lmsLearner.createFreeGroup.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Group "${gfeGroupName}" created with ${gfeSeats} seats!`);
+      setGfeDialogOpen(false);
+      window.location.href = "/my-team";
+    },
+    onError: (e) => toast.error(`Failed to create group: ${e.message}`),
+  });
+  const openGroupFreeEnrollDialog = (courseId: number, defaultSeats: number) => {
+    setGfeCourseId(courseId);
+    setGfeDefaultSeats(defaultSeats);
+    setGfeSeats(defaultSeats);
+    setGfeGroupName("");
+    setGfeDialogOpen(true);
+  };
+
   const handleFreeEnroll = async (productType: string, productId: number) => {
     try {
       if (productType === "course" || productType === "quiz" || productType === "cohort") {
@@ -173,6 +195,10 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
       const heroClickHandlerSL = d.heroClickable && d.heroBehavior && d.heroBehavior !== "next_funnel_step"
         ? () => {
             const beh = d.heroBehavior as string;
+            if (beh === "group_free_enrollment" && (d as any).heroGroupFreeEnrollCourseId) {
+              openGroupFreeEnrollDialog(Number((d as any).heroGroupFreeEnrollCourseId), (d as any).heroGroupFreeEnrollDefaultSeats ?? 5);
+              return;
+            }
             if (beh === "url" && d.heroLink) window.open(d.heroLink, "_blank");
             else if (beh === "send_email" && d.heroEmail) window.location.href = `mailto:${d.heroEmail}`;
             else if (beh === "scroll_to_section" && d.heroScrollAnchor) {
@@ -186,6 +212,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
           }
         : undefined;
       return (
+        <>
         <div className="relative px-8 py-16 md:py-24 overflow-hidden" style={{ ...bgStyle, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerSL ? "pointer" : undefined }} onClick={heroClickHandlerSL}>
           {d.bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
@@ -199,7 +226,14 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
                 <div className={`flex flex-wrap gap-3 ${align === "center" ? "justify-center" : align === "right" ? "justify-end" : ""}`}>
                   {d.buttons.map((btn: any, i: number) => (
                     <div key={i} className="flex flex-col items-center gap-1">
-                      {btn.behavior === "free_enrollment" && btn.freeEnrollProductId ? (
+                      {btn.behavior === "group_free_enrollment" && btn.groupFreeEnrollCourseId ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openGroupFreeEnrollDialog(Number(btn.groupFreeEnrollCourseId), btn.groupFreeEnrollDefaultSeats ?? 5); }}
+                          className={`inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                          style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color || "#fff", border: `2px solid ${btn.color || "#fff"}` } : { backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>
+                          {btn.text}
+                        </button>
+                      ) : btn.behavior === "free_enrollment" && btn.freeEnrollProductId ? (
                         <button
                           onClick={() => handleFreeEnroll(btn.freeEnrollProductType ?? "course", Number(btn.freeEnrollProductId))}
                           className={`inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
@@ -235,6 +269,56 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
             )}
           </div>
         </div>
+        {/* Group Free Enrollment Dialog */}
+        {gfeDialogOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setGfeDialogOpen(false)}>
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-900">Create Free Group Access</h2>
+                <button onClick={() => setGfeDialogOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Enter your group details. You'll be able to assign seats and track member progress from your Team Dashboard.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Group / Organization Name</label>
+                  <input
+                    type="text"
+                    value={gfeGroupName}
+                    onChange={e => setGfeGroupName(e.target.value)}
+                    placeholder="e.g. Cardiology Department, St. Mary's Hospital"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Number of Seats</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={gfeSeats}
+                    onChange={e => setGfeSeats(Math.max(1, Number(e.target.value)))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Each seat allows one team member to access the course.</p>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={() => setGfeDialogOpen(false)}
+                  className="flex-1 border border-gray-300 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50"
+                >Cancel</button>
+                <button
+                  disabled={!gfeGroupName.trim() || gfeSeats < 1 || createFreeGroup.isPending || !gfeCourseId}
+                  onClick={() => createFreeGroup.mutate({ courseId: gfeCourseId!, seats: gfeSeats, groupName: gfeGroupName.trim() })}
+                  className="flex-1 bg-teal-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {createFreeGroup.isPending ? "Creating..." : "Create Group"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        </>
       );
     }
     case "text":

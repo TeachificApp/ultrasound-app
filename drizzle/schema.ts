@@ -3067,6 +3067,8 @@ export const lmsGroups = mysqlTable("lms_groups", {
   notes: text("notes"),
   // Stripe order that created this group (set after webhook fulfillment)
   orderId: int("order_id"),
+  /** How this group was created — used for admin filtering */
+  source: mysqlEnum("source", ["stripe_checkout", "free_enrollment", "admin_created"]).default("admin_created"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
