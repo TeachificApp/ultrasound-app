@@ -1781,11 +1781,26 @@ export const lmsLearnerRouter = router({
             ? and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published"), eq(lmsCohortAssignments.cohortGroupId, groupId))
             : and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published")))
           .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.dueDate)),
-        db.select().from(lmsCohortRecordings)
-          .where(groupId
-            ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published"), eq(lmsCohortRecordings.cohortGroupId, groupId))
-            : and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published")))
-          .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt)),
+        (async () => {
+          const recs = await db.select().from(lmsCohortRecordings)
+            .where(groupId
+              ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published"), eq(lmsCohortRecordings.cohortGroupId, groupId))
+              : and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published")))
+            .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt));
+          // Enrich recordings that have a sessionId with the linked session's title and date
+          const sessionIds = recs.map(r => r.sessionId).filter((id): id is number => id != null);
+          const linkedSessions = sessionIds.length > 0
+            ? await db.select({ id: lmsCohortSessions.id, title: lmsCohortSessions.title, sessionDate: lmsCohortSessions.sessionDate })
+                .from(lmsCohortSessions)
+                .where(inArray(lmsCohortSessions.id, sessionIds))
+            : [];
+          const sessionMap = new Map(linkedSessions.map(s => [s.id, s]));
+          return recs.map(r => ({
+            ...r,
+            linkedSessionTitle: r.sessionId ? (sessionMap.get(r.sessionId)?.title ?? null) : null,
+            linkedSessionDate: r.sessionId ? (sessionMap.get(r.sessionId)?.sessionDate ?? null) : null,
+          }));
+        })(),
         db.select().from(lmsCohortResources)
           .where(resourceWhere)
           .orderBy(asc(lmsCohortResources.position), asc(lmsCohortResources.createdAt)),

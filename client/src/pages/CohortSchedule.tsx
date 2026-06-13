@@ -1165,16 +1165,25 @@ function RecordingThumbnail({ recording, className }: { recording: any; classNam
   const vimeoThumb = useVimeoThumbnail(vimeoId);
   const isDirectVideo = autoRaw?.startsWith("__video__") ?? false;
   const directVideoUrl = isDirectVideo ? autoRaw!.replace("__video__", "") : null;
+  const [imgError, setImgError] = React.useState(false);
 
-  const thumbSrc = recording.thumbnailUrl ||
+  const thumbSrc = !imgError && (
+    recording.thumbnailUrl ||
     (isVimeo ? vimeoThumb : null) ||
-    (!isVimeo && !isDirectVideo ? autoRaw : null);
+    (!isVimeo && !isDirectVideo ? autoRaw : null)
+  );
 
   if (thumbSrc) {
-    return <img src={thumbSrc} alt={recording.title} className={className ?? "w-full h-full object-cover"} />;
+    return (
+      <img
+        src={thumbSrc}
+        alt={recording.title}
+        className={className ?? "w-full h-full object-cover"}
+        onError={() => setImgError(true)}
+      />
+    );
   }
   if (isDirectVideo && directVideoUrl) {
-    // Use a hidden video element to extract a frame as poster
     return (
       <video
         src={directVideoUrl}
@@ -1186,7 +1195,12 @@ function RecordingThumbnail({ recording, className }: { recording: any; classNam
       />
     );
   }
-  return <Film className="w-10 h-10 text-teal-300" />;
+  // Fallback: gradient placeholder with film icon
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-50 to-teal-100">
+      <Film className="w-10 h-10 text-teal-300" />
+    </div>
+  );
 }
 
 function getVideoEmbedUrl(url: string): { type: "iframe" | "video"; src: string } {
@@ -1205,14 +1219,13 @@ function getVideoEmbedUrl(url: string): { type: "iframe" | "video"; src: string 
 
 /** Grid card — thumbnail + title + progress, links to player page */
 function RecordingGridCard({ recording, courseId }: { recording: any; courseId: number }) {
-  const hasThumbnail = !!recording.thumbnailUrl;
   const durationMins = recording.durationSeconds ? Math.round(recording.durationSeconds / 60) : null;
   return (
     <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
       <Card className="border border-gray-200 bg-white hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group overflow-hidden">
-        {/* Thumbnail — auto-derived from videoUrl if no explicit thumbnail */}
+        {/* Thumbnail — absolute-positioned to fill aspect-video container correctly */}
         <div className="w-full aspect-video bg-gradient-to-br from-teal-50 to-teal-100 relative overflow-hidden">
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="absolute inset-0">
             <RecordingThumbnail recording={recording} className="w-full h-full object-cover" />
           </div>
           {/* Play overlay */}
@@ -1232,10 +1245,18 @@ function RecordingGridCard({ recording, courseId }: { recording: any; courseId: 
           <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 group-hover:text-teal-700 transition-colors">
             {recording.title}
           </h3>
-          {recording.sessionDate && (
-            <p className="text-gray-400 text-xs mt-1 flex items-center gap-1">
+          {/* Linked session name — shown when recording is tied to a specific session */}
+          {recording.linkedSessionTitle && (
+            <p className="text-teal-600 text-xs mt-1 font-medium flex items-center gap-1 truncate">
+              <BookOpen className="w-3 h-3 flex-shrink-0" />
+              {recording.linkedSessionTitle}
+            </p>
+          )}
+          {/* Session date — prefer linked session date, fall back to recording's own sessionDate */}
+          {(recording.linkedSessionDate || recording.sessionDate) && (
+            <p className="text-gray-400 text-xs mt-0.5 flex items-center gap-1">
               <Calendar className="w-3 h-3" />
-              {fmtDate(recording.sessionDate)}
+              {fmtDate(recording.linkedSessionDate ?? recording.sessionDate)}
             </p>
           )}
         </CardContent>
@@ -1250,21 +1271,31 @@ function RecordingListRow({ recording, courseId }: { recording: any; courseId: n
   return (
     <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
       <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-teal-300 hover:bg-teal-50/30 transition-all cursor-pointer group">
-        <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0 group-hover:bg-teal-200 transition-colors overflow-hidden">
-          {(recording.thumbnailUrl || recording.videoUrl) ? (
+        {/* Thumbnail — 16:9 aspect box, absolute-positioned fill */}
+        <div className="w-16 aspect-video rounded-lg bg-teal-100 flex-shrink-0 overflow-hidden relative">
+          <div className="absolute inset-0">
             <RecordingThumbnail recording={recording} className="w-full h-full object-cover" />
-          ) : (
-            <PlayCircle className="w-5 h-5 text-teal-600" />
-          )}
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-colors">
+            <PlayCircle className="w-4 h-4 text-white drop-shadow opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-gray-900 text-sm truncate group-hover:text-teal-700 transition-colors">{recording.title}</p>
-          {recording.sessionDate && (
-            <p className="text-gray-400 text-xs flex items-center gap-1 mt-0.5">
-              <Calendar className="w-3 h-3" />
-              {fmtDate(recording.sessionDate)}
-            </p>
-          )}
+          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+            {recording.linkedSessionTitle && (
+              <span className="text-teal-600 text-xs font-medium flex items-center gap-0.5 truncate max-w-[180px]">
+                <BookOpen className="w-3 h-3 flex-shrink-0" />
+                {recording.linkedSessionTitle}
+              </span>
+            )}
+            {(recording.linkedSessionDate || recording.sessionDate) && (
+              <span className="text-gray-400 text-xs flex items-center gap-0.5">
+                <Calendar className="w-3 h-3" />
+                {fmtDate(recording.linkedSessionDate ?? recording.sessionDate)}
+              </span>
+            )}
+          </div>
         </div>
         {durationMins && (
           <span className="text-xs text-gray-400 flex-shrink-0">{fmtDuration(durationMins)}</span>
