@@ -1000,7 +1000,7 @@ function MembershipItemsTab({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Item Type</Label>
-              <Select value={addType} onValueChange={v => { setAddType(v); setAddItemId(""); setAddItemTitle(""); setCourseSearch(""); setDownloadSearch(""); }}>
+              <Select value={addType} onValueChange={v => { setAddType(v); setAddItemId(""); setAddItemTitle(""); setSearch(""); }}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
