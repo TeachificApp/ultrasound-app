@@ -1092,7 +1092,7 @@ function CTAActionPicker({
   /** funnel_page action: encoded as "funnelSlug/pageSlug" */
   funnelPageValue?: string | null;
   onFunnelPageChange?: (value: string | null) => void;
-  /** free_enrollment action: product type + product id */
+  /** free_enrollment action: product type + product id (fix: Jun 13 2026) */
   freeEnrollProductType?: string;
   freeEnrollProductId?: number | null;
   onFreeEnrollProductChange?: (type: string, id: number | null) => void;
