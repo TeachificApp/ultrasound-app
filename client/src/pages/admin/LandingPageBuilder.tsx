@@ -85,7 +85,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       gradientDir: "to bottom right", imageUrl: "", videoUrl: "", textColor: "#ffffff",
       headlineColor: "", headline2Color: "",
       align: "left", inlineMediaUrl: "", inlineMediaType: "image", inlineMediaPlacement: "right",
-      hideButtons: true,
+      hideButtons: false,
       buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#179ca3", link: "", style: "filled", behavior: "url" }],
     },
   },
@@ -3062,12 +3062,12 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 mb-1"><input type="checkbox" checked={d.hideButtons ?? false} onChange={e => set("hideButtons", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Hide buttons on page</label></div>
-          {!d.hideButtons && <div>
+          <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">CTA Buttons</label>
               <button onClick={addBtn} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"><Plus size={12} /> Add</button>
             </div>
+            <div className="flex items-center gap-2 mb-2"><input type="checkbox" checked={d.hideButtons ?? false} onChange={e => set("hideButtons", e.target.checked)} className="rounded" /><label className="text-xs text-gray-500">Hide all buttons on page (buttons still editable here)</label></div>
             <div className="space-y-3">
               {buttons.map((btn, idx) => (
                 <div key={idx} className="border border-gray-200 rounded-lg p-2 space-y-2">
@@ -3158,7 +3158,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 </div>
               ))}
             </div>
-          </div>}
+          </div>
         </div>
       );
     }
