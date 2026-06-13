@@ -150,24 +150,28 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const heroMaxHeight = d.maxHeight ? `${d.maxHeight}px` : undefined;
       return (
         <div
-          className="relative px-8 py-16 overflow-hidden"
+          className="relative px-4 sm:px-8 py-10 sm:py-16 overflow-hidden w-full box-border"
           style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), cursor: heroClickHandler ? "pointer" : undefined, minHeight: `${heroMinHeight}px`, ...(heroMaxHeight ? { maxHeight: heroMaxHeight, overflow: "hidden" } : {}) }}
           onClick={heroClickHandler}
         >
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
-          <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-8" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
-            <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-3xl"}>
-              <h1 className="text-4xl font-bold mb-4 leading-tight">
+          <div className={`relative max-w-5xl mx-auto w-full ${
+            hasInlineMedia && isHorizontal
+              ? "flex flex-col sm:flex-row items-center gap-6 sm:gap-8"
+              : ""
+          } ${hasInlineMedia && placement === "left" ? "sm:flex-row-reverse" : ""}`}>
+            <div className={hasInlineMedia && isHorizontal ? "w-full sm:flex-1 min-w-0" : "max-w-3xl w-full"}>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 leading-tight break-words">
                 <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
                 {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
               </h1>
-              {d.subheadline && <p className="text-xl opacity-90 mb-8" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+              {d.subheadline && <p className="text-base sm:text-lg md:text-xl opacity-90 mb-6 sm:mb-8 break-words" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
               {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {heroButtons.map((btn, i) => (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                    <button className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
                     </button>
@@ -175,7 +179,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                     {btn.showStrikethrough && btn.strikethroughPrice && (
                       <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
                     )}
-                  {btn.showOptOut && btn.optOutText && (
+                    {btn.showOptOut && btn.optOutText && (
                       <span className="text-xs text-white/60 underline cursor-pointer hover:text-white/80">{btn.optOutText}</span>
                     )}
                   </div>
@@ -183,7 +187,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>}
             </div>
             {hasInlineMedia && (
-              <div className={isHorizontal ? "flex-1 max-w-xs" : "mt-8 max-w-sm mx-auto"}>
+              <div className={isHorizontal ? "w-full sm:flex-1 sm:max-w-xs mt-6 sm:mt-0" : "mt-6 max-w-sm mx-auto w-full"}>
                 {d.inlineMediaType === "video" ? (
                   <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
                 ) : (
@@ -197,7 +201,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     }
     case "text":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
           <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
         </div>
@@ -211,7 +215,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyle} />
         : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>;
       return (
-        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustify, backgroundColor: d.bgColor || undefined }}>
+        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustify, backgroundColor: d.bgColor || undefined }}>
           <ImageLinkWrapper d={d}>{imgEl}</ImageLinkWrapper>
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlign as any }}>{d.caption}</p>}
         </div>
@@ -227,7 +231,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       // Build the trimmed embed URL using platform-aware logic
       const trimmedEmbedUrl = d.embedUrl ? applyVideoTrim(d.embedUrl, trimStart, trimEnd) : "";
       return (
-        <div className="px-8 py-6">
+        <div className="px-4 sm:px-8 py-4 sm:py-6">
           {d.embedUrl ? (
             isDirectVideo ? (
               <div className="mx-auto overflow-hidden shadow" style={containerStyle}>
@@ -287,7 +291,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const embedJustify = embedAlign === "left" ? "flex-start" : embedAlign === "right" ? "flex-end" : "center";
       const embedMaxWidth = d.maxWidth ?? "100%";
       return (
-        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: embedJustify }}>
+        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ display: "flex", flexDirection: "column", alignItems: embedJustify }}>
           <div style={{ width: embedMaxWidth, maxWidth: "100%" }}>
             {d.embedCode ? (
               <iframe
@@ -304,8 +308,8 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     }
     case "gallery":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${Math.floor(100 / (d.columns ?? 3))}%), 1fr))` }}>
             {(d.images ?? []).map((img: any, i: number) => (
               <div key={i} className="rounded-lg overflow-hidden shadow">
                 {img.url ? <img src={img.url} alt={img.caption ?? ""} className="w-full h-40 object-cover" /> : <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400"><Image size={24} /></div>}
@@ -320,7 +324,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         typeof item === "string" ? item : (item?.text ?? "")
       );
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl">
             {bulletItems.map((item: string, i: number) => (
@@ -338,7 +342,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         typeof item === "string" ? item : (item?.text ?? "")
       );
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
           {!d.subHeading && d.headline && <div className="mb-6" />}
@@ -360,7 +364,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           typeof item === "string" ? { text: item, crossed: false } : { text: item.text ?? "", crossed: item.crossed ?? false }
       );
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
           {!d.subHeading && d.headline && <div className="mb-6" />}
@@ -381,9 +385,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     }
     case "icon_grid":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
+          <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${Math.floor(100 / (d.columns ?? 3))}%), 1fr))` }}>
             {(d.items ?? []).map((item: any, i: number) => (
               <div key={i} className="text-center p-4">
                 <div className="text-4xl mb-3">{item.icon}</div>
@@ -396,7 +400,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       );
     case "testimonial":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}>
           <div className="max-w-2xl mx-auto text-center">
             <div className="text-4xl mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>"</div>
             <p className="text-xl text-gray-700 italic mb-6">{d.quote}</p>
@@ -414,7 +418,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       );
     case "reviews":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {(d.reviews ?? []).map((r: any, i: number) => (
@@ -431,7 +435,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       );
     case "logos":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
           {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex flex-wrap items-center justify-center gap-8">
             {(d.logos ?? []).map((logo: any, i: number) => (
@@ -445,7 +449,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       return <InstructorBlockPreview d={d} />;
     case "faq":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="max-w-3xl space-y-3">
             {(d.items ?? []).map((item: any, i: number) => (
@@ -497,7 +501,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     }
     case "flip_cards":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {(d.cards ?? []).map((card: any, i: number) => (
@@ -534,7 +538,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </a>
       );
       return (
-        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {priceAbove && priceBlock}
@@ -547,7 +551,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     }
     case "cta_standalone":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -564,7 +568,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       );
     case "lead_capture":
       return (
-        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="opacity-90 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <div className="flex max-w-md mx-auto gap-2">
@@ -575,7 +579,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       );
     case "cta_optin":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -750,7 +754,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const cr = d.cornerRadius ?? 12;
       const hAlign = d.headlineAlign ?? "left";
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className={`text-2xl font-bold mb-6 ${hAlign === "center" ? "text-center" : hAlign === "right" ? "text-right" : "text-left"}`} style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="overflow-hidden max-w-3xl" style={{ border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`, borderRadius: `${cr}px` }}>
             {["Section 1", "Section 2", "Section 3"].map((s, i) => (
@@ -778,7 +782,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const titleColor = d.cardTitleColor ?? "#111827";
       const priceColor = d.priceColor ?? "#179ca3";
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex justify-center gap-6 max-w-3xl mx-auto">
             {pCards.map((card: any, i: number) => {
@@ -823,7 +827,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         }
       };
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
           <div className="flex gap-8">
             <div style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
@@ -835,7 +839,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     case "divided_columns": {
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
           <div className="grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
@@ -848,9 +852,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     case "three_column": {
       const divStyle = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: d.dividerStyle ?? "solid", borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
-          <div className="grid grid-cols-3 gap-6 items-stretch">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-stretch">
             <div className="prose prose-sm pr-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-sm px-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
             <div className="prose prose-sm pl-4" dangerouslySetInnerHTML={{ __html: d.col3Html ?? "" }} />
@@ -880,7 +884,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const links: Array<{ text: string; url: string }> = d.links ?? [];
       const socialLinks = d.socialLinks ?? {};
       return (
-        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }}>
+        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }}>
           {d.logoUrl && (
             <div className="flex justify-center mb-4">
               <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" />
@@ -915,10 +919,10 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         description: "Comprehensive training resource for sonographers and clinicians.",
       }));
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
           {d.headline && <h2 className="text-2xl font-bold text-center mb-2" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-sm mb-6 opacity-70" style={{ color: d.textColor ?? "#111827" }}>{d.subtext}</p>}
-          <div className={layout === "grid" ? `grid grid-cols-${Math.min(maxItems, 3)} gap-4` : "space-y-3"}>
+          <div className={layout === "grid" ? `grid grid-cols-1 sm:grid-cols-${Math.min(maxItems, 3)} gap-4` : "space-y-3"}>
             {mockCards.map((card, i) => (
               <div key={i} className="rounded-xl border border-gray-200 overflow-hidden" style={{ backgroundColor: d.cardBgColor ?? "#ffffff" }}>
                 <div className="h-24 flex items-center justify-center" style={{ backgroundColor: d.accentColor ?? "#179ca3", opacity: 0.15 + i * 0.05 }}>
@@ -1015,7 +1019,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         const isVideo = ["mp4", "webm", "mov", "ogg"].includes(ext);
         const isAudio = ["mp3", "wav", "ogg", "m4a"].includes(ext);
         return (
-          <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
             {d.label && <h3 className="text-lg font-semibold text-gray-800 mb-2">{d.label}</h3>}
             {d.description && <p className="text-sm text-gray-500 mb-3">{d.description}</p>}
             {isPdf && <iframe src={fileUrl} className="w-full rounded-lg border border-gray-200" style={{ height: `${d.inlineHeight ?? 600}px` }} title={fileName} />}
@@ -1036,7 +1040,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       }
       // Card mode (default)
       return (
-        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           <div className="max-w-xl mx-auto flex items-center gap-4 p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
             {d.showIcon !== false && (
               <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${d.buttonColor ?? "#179ca3"}20` }}>
@@ -1067,7 +1071,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const scormJustify = scormAlign === "left" ? "flex-start" : scormAlign === "right" ? "flex-end" : "center";
       const scormMaxWidth = d.maxWidth ?? "100%";
       return (
-        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff", display: "flex", flexDirection: "column", alignItems: scormJustify }}>
+        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff", display: "flex", flexDirection: "column", alignItems: scormJustify }}>
           <div style={{ width: scormMaxWidth, maxWidth: "100%" }}>
             {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
             {embedUrl ? (
@@ -1100,7 +1104,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const urlJustify = urlAlign === "left" ? "flex-start" : urlAlign === "right" ? "flex-end" : "center";
       const urlMaxWidth = d.maxWidth ?? "100%";
       return (
-        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff", display: "flex", flexDirection: "column", alignItems: urlJustify }}>
+        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff", display: "flex", flexDirection: "column", alignItems: urlJustify }}>
           <div style={{ width: urlMaxWidth, maxWidth: "100%" }}>
             {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
             {url ? (
@@ -1174,7 +1178,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const rows: Array<{ feature: string; values: Array<string | boolean | null> }> = d.rows ?? [];
       const accentCol = d.accentColor ?? "#179ca3";
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {!d.subtext && d.headline && <div className="mb-8" />}
@@ -1227,7 +1231,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         return attrs;
       };
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {!d.subtext && d.headline && <div className="mb-8" />}
@@ -1299,7 +1303,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         { title: "Session 3: Advanced Topics", date: "Mon, Jun 16 · 10:00 AM" },
       ];
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="space-y-3 max-w-2xl mx-auto">
             {sampleSessions.map((s, i) => (
@@ -1323,7 +1327,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const ctaText = d.ctaText ?? "Become an Affiliate";
       const benefits = d.benefits ?? ["Earn up to 30% commission", "Real-time earnings dashboard", "Unique tracking links per course", "Monthly payouts via Stripe, PayPal, or ACH"];
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fdf9" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fdf9" }}>
           <div className="max-w-2xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold mb-4" style={{ backgroundColor: `${accentColor}20`, color: accentColor }}>
               <span>💰</span> Affiliate Program
@@ -1407,14 +1411,14 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </div>
       );
       if (wr_layout === "card") return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
           <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8" style={{ border: `1px solid ${d.borderColor ?? "#e2e8f0"}` }}>
             {formContent}
           </div>
         </div>
       );
       if (wr_layout === "split") return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
           <div className="max-w-4xl mx-auto grid grid-cols-2 gap-8 items-center">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4" style={{ backgroundColor: `${wr_accentColor}20`, color: wr_accentColor }}>LIVE WEBINAR</div>
@@ -1426,7 +1430,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </div>
       );
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
           <div className="max-w-lg mx-auto">{formContent}</div>
         </div>
       );
@@ -1457,7 +1461,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         ? <img src={d.avatarUrl} alt={d.name ?? "Host"} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4" style={{ borderColor: `${whb_accentColor}40` }} />
         : <div className="w-24 h-24 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${whb_accentColor}20` }}><Users size={32} style={{ color: whb_accentColor }} /></div>;
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
           {d.headline && <h2 className="text-2xl font-bold text-center mb-8" style={{ color: d.headlineColor ?? "#111827" }}>{d.headline}</h2>}
           {whb_layout === "centered" ? (
             <div className="max-w-2xl mx-auto text-center">
@@ -1488,7 +1492,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       };
       const embedUrl = getEmbedUrl(videoUrl, d.videoSource ?? "youtube");
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#0e1e2e" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#0e1e2e" }}>
           <div className="max-w-4xl mx-auto">
             <h2 className="text-3xl font-bold mb-3" style={{ color: d.textColor ?? "#fff" }}>{d.headline ?? "Watch the Replay"}</h2>
             {d.subheadline && <p className="mb-6 opacity-80" style={{ color: d.textColor ?? "#fff" }}>{d.subheadline}</p>}
@@ -1528,7 +1532,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const wa_accentColor = d.accentColor ?? "#189aa1";
       const agendaItems: Array<{ time: string; title: string; description: string; speaker: string }> = d.items ?? [];
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-3xl mx-auto">
             {d.headline && <h2 className="text-3xl font-bold mb-2" style={{ color: d.headlineColor ?? "#111827" }}>{d.headline}</h2>}
             {d.subheadline && <p className="text-gray-500 mb-8">{d.subheadline}</p>}
@@ -1576,7 +1580,7 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
 
   if (layout === "centered") {
     return (
-      <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+      <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
         <div className="max-w-2xl mx-auto text-center">
           {avatarUrl
             ? <img src={avatarUrl} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100" />
@@ -1591,7 +1595,7 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
   }
 
   return (
-    <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+    <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
       <div className="max-w-3xl mx-auto flex gap-6 items-start">
         {avatarUrl
           ? <img src={avatarUrl} alt={name} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4 border-teal-100" />
@@ -1881,7 +1885,7 @@ function LiveSessionBlockPreview({ d }: { d: Record<string, any> }) {
 
   return (
     <div
-      className="px-8 py-8"
+      className="px-4 sm:px-8 py-6 sm:py-8"
       style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}
     >
       <div
@@ -2314,7 +2318,7 @@ export function FormEmbedBlockPreview({ d }: { d: Record<string, any> }) {
 
   if (displayMode === "inline") {
     return (
-      <div className="px-8 py-10" style={{ backgroundColor: bgColor }}>
+      <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: bgColor }}>
         {d.headline && <h2 className="text-2xl font-bold mb-2 text-center" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
         {d.subtext && <p className="text-center text-gray-500 mb-6 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
         <div className="max-w-xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
@@ -2328,7 +2332,7 @@ export function FormEmbedBlockPreview({ d }: { d: Record<string, any> }) {
   const triggerLabel = displayMode === "popup_click" ? (d.triggerButtonText ?? "Open Form") : null;
 
   return (
-    <div className="px-8 py-10" style={{ backgroundColor: bgColor }}>
+    <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: bgColor }}>
       {d.headline && <h2 className="text-2xl font-bold mb-2 text-center" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
       {d.subtext && <p className="text-center text-gray-500 mb-6 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
 
@@ -2542,7 +2546,7 @@ function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
   // Inline display
   if (displayMode === "inline") {
     return (
-      <div className="px-8 py-6" style={{ backgroundColor: bgColor }}>
+      <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: bgColor }}>
         <div className="max-w-2xl mx-auto rounded-2xl p-6 shadow-sm" style={{ border: `1.5px solid ${accentColor}33`, backgroundColor: "#fff" }}>
           <CardContent />
         </div>
@@ -2660,7 +2664,7 @@ function FileUploadBlockPreview({ d }: { d: Record<string, any> }) {
   const borderColor = d.borderColor ?? "#e2e8f0";
 
   return (
-    <div className="px-8 py-10" style={{ backgroundColor: bgColor }}>
+    <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: bgColor }}>
       <div className="max-w-xl mx-auto">
         {label && (
           <h3 className="text-lg font-semibold mb-2" style={{ color: "#111827" }}>{label}</h3>

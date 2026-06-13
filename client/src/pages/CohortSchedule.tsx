@@ -230,13 +230,15 @@ function CohortCalendar({ sessions, courseTitle }: { sessions: any[]; courseTitl
 
       {/* Month View */}
       {view === "month" && (
-        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white overflow-x-auto">
+          <div className="min-w-[560px]">
           <div className="grid grid-cols-7 border-b border-gray-200">
             {DAYS.map(d => (
               <div key={d} className="text-center text-xs font-semibold text-teal-700 py-2 bg-teal-50/60">{d}</div>
             ))}
           </div>
           <MonthGrid cursor={cursor} today={today} sessionsOnDay={sessionsOnDay} onDayClick={d => { setCursor(d); setView("day"); }} />
+          </div>
         </div>
       )}
 
@@ -320,7 +322,8 @@ function WeekView({ cursor, today, sessionsOnDay, now }: { cursor: Date; today: 
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d; });
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white overflow-x-auto">
+      <div className="min-w-[560px]">
       <div className="grid grid-cols-7 border-b border-gray-200">
         {days.map((d, i) => {
           const isToday = sameDay(d, today);
@@ -344,6 +347,7 @@ function WeekView({ cursor, today, sessionsOnDay, now }: { cursor: Date; today: 
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

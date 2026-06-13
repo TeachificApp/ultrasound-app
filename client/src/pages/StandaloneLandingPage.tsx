@@ -213,15 +213,19 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
         : undefined;
       return (
         <>
-        <div className="relative px-8 py-16 md:py-24 overflow-hidden" style={{ ...bgStyle, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerSL ? "pointer" : undefined }} onClick={heroClickHandlerSL}>
+        <div className="relative px-4 sm:px-8 py-10 sm:py-16 md:py-24 overflow-hidden w-full box-border" style={{ ...bgStyle, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerSL ? "pointer" : undefined }} onClick={heroClickHandlerSL}>
           {d.bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
-          <div className={`relative max-w-5xl mx-auto ${hasInlineMediaSL && isHorizontalSL ? "flex items-center gap-10" : ""} ${hasInlineMediaSL && placementSL === "left" ? "flex-row-reverse" : ""}`}>
-            <div className={`${hasInlineMediaSL && isHorizontalSL ? "flex-1" : "max-w-3xl"} ${align === "center" ? "text-center mx-auto" : align === "right" ? "text-right ml-auto" : ""}`}>
-              <h1 className="text-3xl md:text-5xl font-bold leading-tight mb-4" style={{ color: d.headlineColor || d.textColor || "#ffffff" }} dangerouslySetInnerHTML={{ __html: d.headline ?? "" }} />
-              {d.headline2 && <h2 className="text-xl md:text-2xl font-semibold mb-4" style={{ color: d.headline2Color || d.textColor || "#ffffff" }} dangerouslySetInnerHTML={{ __html: d.headline2 }} />}
-              {d.subheadline && <p className="text-lg md:text-xl opacity-90 mb-6" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+          <div className={`relative max-w-5xl mx-auto w-full ${
+            hasInlineMediaSL && isHorizontalSL
+              ? "flex flex-col sm:flex-row items-center gap-6 sm:gap-10"
+              : ""
+          } ${hasInlineMediaSL && placementSL === "left" ? "sm:flex-row-reverse" : ""}`}>
+            <div className={`${hasInlineMediaSL && isHorizontalSL ? "w-full sm:flex-1 min-w-0" : "max-w-3xl w-full"} ${align === "center" ? "text-center mx-auto" : align === "right" ? "text-right ml-auto" : ""}`}>
+              <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold leading-tight mb-3 sm:mb-4 break-words" style={{ color: d.headlineColor || d.textColor || "#ffffff" }} dangerouslySetInnerHTML={{ __html: d.headline ?? "" }} />
+              {d.headline2 && <h2 className="text-lg sm:text-xl md:text-2xl font-semibold mb-3 sm:mb-4 break-words" style={{ color: d.headline2Color || d.textColor || "#ffffff" }} dangerouslySetInnerHTML={{ __html: d.headline2 }} />}
+              {d.subheadline && <p className="text-base sm:text-lg md:text-xl opacity-90 mb-5 sm:mb-6 break-words" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
               {!d.hideButtons && d.buttons?.length > 0 && (
                 <div className={`flex flex-wrap gap-3 ${align === "center" ? "justify-center" : align === "right" ? "justify-end" : ""}`}>
                   {d.buttons.map((btn: any, i: number) => (
@@ -229,20 +233,20 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
                       {btn.behavior === "group_free_enrollment" && btn.groupFreeEnrollCourseId ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); openGroupFreeEnrollDialog(Number(btn.groupFreeEnrollCourseId), btn.groupFreeEnrollDefaultSeats ?? 5); }}
-                          className={`inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                          className={`inline-block px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg transition-transform hover:scale-105 w-full sm:w-auto ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                           style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color || "#fff", border: `2px solid ${btn.color || "#fff"}` } : { backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>
                           {btn.text}
                         </button>
                       ) : btn.behavior === "free_enrollment" && btn.freeEnrollProductId ? (
                         <button
                           onClick={() => handleFreeEnroll(btn.freeEnrollProductType ?? "course", Number(btn.freeEnrollProductId))}
-                          className={`inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                          className={`inline-block px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg transition-transform hover:scale-105 w-full sm:w-auto ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                           style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color || "#fff", border: `2px solid ${btn.color || "#fff"}` } : { backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>
                           {btn.text}
                         </button>
                       ) : (
                       <a href={btn.link || "#"}
-                        className={`inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                        className={`inline-block px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg transition-transform hover:scale-105 w-full sm:w-auto ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                         style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color || "#fff", border: `2px solid ${btn.color || "#fff"}` } : { backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>
                         {btn.text}
                       </a>
@@ -259,7 +263,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
               )}
             </div>
             {hasInlineMediaSL && (
-              <div className={isHorizontalSL ? "flex-1 max-w-lg" : "mt-8 max-w-lg mx-auto"}>
+              <div className={isHorizontalSL ? "w-full sm:flex-1 sm:max-w-lg mt-6 sm:mt-0" : "mt-6 max-w-lg mx-auto w-full"}>
                 {d.inlineMediaType === "video" ? (
                   <div className="aspect-video rounded-xl overflow-hidden shadow-2xl"><iframe src={d.inlineMediaUrl} className="w-full h-full" allowFullScreen /></div>
                 ) : (
@@ -323,7 +327,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
     }
     case "text":
       return (
-        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor || "#ffffff", color: d.textColor || "#1a1a1a", textAlign: d.align || "left" }}>
+        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor || "#ffffff", color: d.textColor || "#1a1a1a", textAlign: d.align || "left" }}>
           <div className="max-w-3xl mx-auto prose prose-lg" dangerouslySetInnerHTML={{ __html: d.html || "" }} />
         </div>
       );
@@ -334,7 +338,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
       const imgStyleSL: React.CSSProperties = { maxWidth: mwSL === "auto" ? "100%" : mwSL, width: mwSL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
       const imgElSL = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow-md" : ""} style={imgStyleSL} /> : null;
       return imgElSL ? (
-        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifySL }}>
+        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifySL }}>
           <ImageLinkWrapper d={d}>{imgElSL}</ImageLinkWrapper>
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignSL as any }}>{d.caption}</p>}
         </div>
@@ -344,7 +348,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
       if (!d.embedUrl) return null;
       const isDirectVidSL = /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);
       return (
-        <div className="px-8 py-6">
+        <div className="px-4 sm:px-8 py-4 sm:py-6">
           <div className="max-w-4xl mx-auto rounded-xl overflow-hidden shadow-lg">
             {isDirectVidSL ? (
               <video
@@ -387,7 +391,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
       );
     case "bullets":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor || "#f8fffe" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor || "#f8fffe" }}>
           <div className="max-w-3xl mx-auto">
             {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
             <ul className="space-y-3">{(d.items || []).map((item: string, i: number) => (<li key={i} className="flex items-start gap-3"><CheckCircle size={20} style={{ color: d.iconColor || "#179ca3" }} className="flex-shrink-0 mt-0.5" /><span className="text-gray-700">{item}</span></li>))}</ul>
@@ -403,7 +407,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
     default:
       // For blocks we haven't explicitly handled, render a placeholder
       return (
-        <div className="px-8 py-6">
+        <div className="px-4 sm:px-8 py-4 sm:py-6">
           <div className="max-w-4xl mx-auto text-center text-gray-400 text-sm">
             Block type: {block.type}
           </div>

@@ -286,19 +286,23 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
           }
         : undefined;
       return (
-        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandler ? "pointer" : undefined }} onClick={heroClickHandler}>
+        <div className="relative px-4 sm:px-8 py-10 sm:py-16 overflow-hidden w-full box-border" style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandler ? "pointer" : undefined }} onClick={heroClickHandler}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
-          <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-10" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
-            <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-3xl mx-auto"}>
-              <h1 className="text-4xl font-bold mb-4 leading-tight animate-fade-slide-up" dangerouslySetInnerHTML={{ __html: `<span style="${d.headlineColor ? `color:${d.headlineColor}` : ''}">${d.headline ?? ''}</span>${d.headline2 ? `<br/><span style="${d.headline2Color ? `color:${d.headline2Color}` : ''}">${d.headline2}</span>` : ''}` }} />
-              {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+          <div className={`relative max-w-5xl mx-auto w-full ${
+            hasInlineMedia && isHorizontal
+              ? "flex flex-col sm:flex-row items-center gap-6 sm:gap-10"
+              : ""
+          } ${hasInlineMedia && placement === "left" ? "sm:flex-row-reverse" : ""}`}>
+            <div className={hasInlineMedia && isHorizontal ? "w-full sm:flex-1 min-w-0" : "max-w-3xl mx-auto w-full"}>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 leading-tight break-words animate-fade-slide-up" dangerouslySetInnerHTML={{ __html: `<span style="${d.headlineColor ? `color:${d.headlineColor}` : ''}">${d.headline ?? ''}</span>${d.headline2 ? `<br/><span style="${d.headline2Color ? `color:${d.headline2Color}` : ''}">${d.headline2}</span>` : ''}` }} />
+              {d.subheadline && <p className="text-base sm:text-lg md:text-xl opacity-90 mb-6 sm:mb-8 break-words animate-fade-slide-up-delay-1" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
               {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn, i) => (
                   <div key={i} className="flex flex-col items-center gap-1">
                     <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined, onCheckoutPage, (btn as any).freeEnrollProductType, (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null, onFreeEnroll)}
-                      className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
+                      className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto transition-opacity hover:opacity-90 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
                     </button>
@@ -313,7 +317,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               </div>}
             </div>
             {hasInlineMedia && (
-              <div className={`animate-fade-slide-up-delay-1 ${isHorizontal ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}`}>
+              <div className={`animate-fade-slide-up-delay-1 ${isHorizontal ? "w-full sm:flex-1 sm:max-w-md mt-6 sm:mt-0" : "mt-6 max-w-lg mx-auto w-full"}`}>
                 {d.inlineMediaType === "video" ? (
                   <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
                 ) : (
@@ -327,7 +331,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     }
     case "text":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
         </div>
@@ -353,7 +357,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         return undefined;
       })();
       return (
-        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyCL }}>
+        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyCL }}>
           {imgElCL && <ImageLinkWrapper d={d} onAction={imgOnAction}>{imgElCL}</ImageLinkWrapper>}
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignCL as any }}>{d.caption}</p>}
         </div>
@@ -367,7 +371,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const clTrimmedUrl = resolvedVidUrl ? applyVideoTrim(resolvedVidUrl, clTrimStart, clTrimEnd) : "";
       const clContainerStyle: React.CSSProperties = { paddingBottom: d.height ? undefined : (clIsDirectVid ? undefined : "56.25%"), height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
-        <div className="px-8 py-6">
+        <div className="px-4 sm:px-8 py-4 sm:py-6">
           <div className="mx-auto" style={{ maxWidth: d.maxWidth ?? "100%" }}>
             {resolvedVidUrl && (
               clIsDirectVid ? (
@@ -401,7 +405,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     }
     case "embed":
       return (
-        <div className="px-8 py-6">
+        <div className="px-4 sm:px-8 py-4 sm:py-6">
           {d.embedCode ? (
             <iframe
               srcDoc={injectUserParamsIntoHtml(d.embedCode, user)}
@@ -415,7 +419,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       );
     case "gallery":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
             {(d.images ?? []).map((img: any, i: number) => (
               <div key={i} className="rounded-lg overflow-hidden shadow">
@@ -431,7 +435,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         typeof item === "string" ? item : (item?.text ?? "")
       );
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl">
             {bulletItems.map((item: string, i: number) => (
@@ -449,7 +453,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         typeof item === "string" ? item : (item?.text ?? "")
       );
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
           {!d.subHeading && d.headline && <div className="mb-6" />}
@@ -469,7 +473,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         (item: any) => typeof item === "string" ? { text: item, crossed: false } : { text: item?.text ?? "", crossed: item?.crossed ?? false }
       );
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
           {!d.subHeading && d.headline && <div className="mb-6" />}
@@ -490,7 +494,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     }
     case "icon_grid":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
             {(d.items ?? []).map((item: any, i: number) => (
@@ -505,7 +509,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       );
     case "testimonial":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}>
           <div className="max-w-2xl mx-auto text-center">
             <div className="text-4xl mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>"</div>
             <p className="text-xl text-gray-700 italic mb-6">{d.quote}</p>
@@ -523,7 +527,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       );
     case "reviews":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {(d.reviews ?? []).map((r: any, i: number) => (
@@ -538,7 +542,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       );
     case "logos":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
           {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex flex-wrap items-center justify-center gap-8">
             {(d.logos ?? []).map((logo: any, i: number) => (
@@ -554,7 +558,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       return <RelatedProductsBlock data={d} currentSlug={slug} currentType="course" />;
     case "faq":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="max-w-3xl space-y-3">
             {(d.items ?? []).map((item: any, i: number) => (
@@ -611,7 +615,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     }
     case "flip_cards":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {(d.cards ?? []).map((card: any, i: number) => (
@@ -657,7 +661,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       );
     case "cta_standalone":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={enrolling}
@@ -689,7 +693,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const iconStyle = d.iconStyle ?? "lock";
       const hAlign = d.headlineAlign ?? "left";
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className={`text-2xl font-bold mb-6 ${hAlign === "center" ? "text-center" : hAlign === "right" ? "text-right" : "text-left"}`} style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="overflow-hidden max-w-3xl" style={{ border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`, borderRadius: `${cr}px` }}>
             <Accordion type="multiple" defaultValue={["section-0"]}>
@@ -778,7 +782,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         return { ...opt, ...Object.fromEntries(Object.entries(override).filter(([, v]) => v !== undefined && v !== "")) };
       });
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className={`grid gap-4 max-w-4xl mx-auto ${mergedOptions.length === 1 ? "max-w-sm" : mergedOptions.length === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-3"}`}>
             {mergedOptions.map((opt: any, i: number) => {
@@ -845,7 +849,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const accentColor = d.accentColor ?? "#179ca3";
       if (visibleSessions.length === 0) return null;
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827", textAlign: "center" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="space-y-3 max-w-2xl mx-auto">
             {visibleSessions.map((s: any, i: number) => {
@@ -874,7 +878,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       return <div style={{ padding: `${d.spacing ?? 32}px 32px` }}><hr style={{ borderTop: `${d.thickness ?? 1}px ${d.style ?? "solid"} ${d.color ?? "#e5e7eb"}`, borderRadius: d.borderRadius ? `${d.borderRadius}px` : undefined }} /></div>;
     case "two_column":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           <div className="flex gap-8">
             <div className="prose" style={{ flex: d.leftRatio ?? 50 }} dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
@@ -885,7 +889,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     case "divided_columns": {
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           <div className="max-w-5xl mx-auto grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
@@ -898,7 +902,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     case "three_column": {
       const divStyle3 = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: (d.dividerStyle ?? "solid") as any, borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
             <div className="prose prose-lg pr-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
@@ -962,7 +966,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         return attrs;
       };
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}
+        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
@@ -1741,7 +1745,7 @@ function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
 
   if (layout === "centered") {
     return (
-      <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+      <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
         <div className="max-w-2xl mx-auto text-center">
           {avatarUrl
             ? <img src={avatarUrl} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100 shadow-md" />
@@ -1760,7 +1764,7 @@ function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
   }
 
   return (
-    <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+    <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
       <div className="max-w-3xl mx-auto flex flex-col md:flex-row gap-6 items-start">
         <div className="flex-shrink-0">
           {avatarUrl
