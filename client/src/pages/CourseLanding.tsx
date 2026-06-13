@@ -75,6 +75,12 @@ export function handleCtaBtnClick(
   } else if (action === "direct_checkout" || action === "group_purchase") {
     if (onCheckoutPage) onCheckoutPage(undefined);
     else onEnroll?.();
+  } else if (action === "free_enrollment") {
+    // free_enrollment: the data-product-type and data-product-id attributes carry the target
+    // The actual mutation is handled by onFreeEnroll callback passed from the page
+    const productType = target.dataset.productType;
+    const productId = target.dataset.productId ? Number(target.dataset.productId) : undefined;
+    (onEnroll as any)?.(productType, productId);
   } else if (action === "pricing_option") {
     const rawId = target.dataset.pricingOption;
     const poId = rawId ? Number(rawId) : undefined;
@@ -200,6 +206,9 @@ function resolveBtnAction(
   pricingOptionId?: number,
   onFreePreview?: () => void,
   onCheckoutPage?: (pricingOptionId?: number) => void,
+  freeEnrollProductType?: string,
+  freeEnrollProductId?: number | null,
+  onFreeEnroll?: (productType: string, productId: number) => void,
 ): () => void {
   const b = behavior ?? (link ? "url" : "");
   if (b === "url" && link) return () => window.open(link, "_blank", "noopener,noreferrer");
@@ -218,16 +227,21 @@ function resolveBtnAction(
   if (b === "direct_checkout" || b === "group_purchase") {
     if (onCheckoutPage) return () => onCheckoutPage(undefined);
   }
+  // free_enrollment → direct free access grant for any product type
+  if (b === "free_enrollment" && onFreeEnroll && freeEnrollProductId) {
+    return () => onFreeEnroll(freeEnrollProductType ?? "course", freeEnrollProductId);
+  }
   // next_funnel_step, or default → onEnroll (free courses, already enrolled, etc.)
   return onEnroll;
 }
 
-function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage }: {
+function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage, onFreeEnroll }: {
   block: Block; course: any; onEnroll: () => void; onEnrollWithOption?: (pricingOptionId: number | undefined) => void; enrolling: boolean; ctaText: string; price: string;
   selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
   slug?: string; enrollment?: any; user?: UserParamSource | null;
   onFreePreviewClick?: (lessonId: number) => void;
   onCheckoutPage?: (pricingOptionId?: number) => void;
+  onFreeEnroll?: (productType: string, productId: number) => void;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -262,6 +276,12 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               else onEnroll();
             } else if (beh === "direct_checkout") {
               onEnroll();
+            } else if (beh === "free_enrollment") {
+              if (onFreeEnroll && d.heroFreeEnrollProductId) {
+                onFreeEnroll(d.heroFreeEnrollProductType ?? "course", Number(d.heroFreeEnrollProductId));
+              } else {
+                onEnroll();
+              }
             }
           }
         : undefined;
@@ -277,7 +297,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn, i) => (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined, onCheckoutPage)}
+                    <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined, onCheckoutPage, (btn as any).freeEnrollProductType, (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null, onFreeEnroll)}
                       className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
@@ -325,6 +345,11 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         if (beh === "free_preview") return onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : onEnroll;
         if (beh === "pricing_option") return onEnrollWithOption ? () => onEnrollWithOption(d.linkPricingOptionId ? Number(d.linkPricingOptionId) : undefined) : onEnroll;
         if (beh === "direct_checkout" || beh === "group_purchase") return onEnroll;
+        if (beh === "free_enrollment") {
+          return onFreeEnroll && d.linkFreeEnrollProductId
+            ? () => onFreeEnroll(d.linkFreeEnrollProductType ?? "course", Number(d.linkFreeEnrollProductId))
+            : onEnroll;
+        }
         return undefined;
       })();
       return (
@@ -614,7 +639,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               </p>
             </div>
           )}
-          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage)} disabled={enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {enrolling ? "Processing…" : (d.ctaText ?? ctaText)}
           </button>
           {/* Price below button */}
@@ -635,7 +660,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage)} disabled={enrolling}
+          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={enrolling}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {d.ctaText ?? ctaText}
           </button>
@@ -776,6 +801,9 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                 opt.ctaPricingOptionId ? Number(opt.ctaPricingOptionId) : opt.id,
                 undefined,
                 onCheckoutPage,
+                (opt as any).freeEnrollProductType,
+                (opt as any).freeEnrollProductId ? Number((opt as any).freeEnrollProductId) : null,
+                onFreeEnroll,
               );
               const isExternalAction = cardBehavior && ["url", "send_email", "download_file", "open_popup", "scroll_to_section"].includes(cardBehavior);
               const handleCardClick = () => { if (isExternalAction) { cardCtaAction(); } else { onSelectPricingOption?.(opt.id); } };
@@ -1045,6 +1073,53 @@ export default function CourseLanding() {
     onError: (e) => toast.error(`Checkout failed: ${e.message}`),
   });
 
+  // Product catalog for free enrollment cross-product lookup (lazy-loaded, only used when free_enrollment CTA fires)
+  const { data: freeEnrollCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
+
+  // Mutations for cross-product free enrollment
+  const bundleEnroll = trpc.bundlesLearner.enroll.useMutation({
+    onSuccess: () => toast.success("Enrolled! You now have access."),
+    onError: (e) => toast.error(`Enrollment failed: ${e.message}`),
+  });
+  const webinarRegister = trpc.webinarLearner.register.useMutation({
+    onSuccess: () => toast.success("Registered! You now have access."),
+    onError: (e) => toast.error(`Registration failed: ${e.message}`),
+  });
+  const downloadsCheckout = trpc.downloadsLearner.createCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.free || data.alreadyPurchased) toast.success("Access granted!");
+      else if (data.checkoutUrl) window.open(data.checkoutUrl, "_blank");
+    },
+    onError: (e) => toast.error(`Checkout failed: ${e.message}`),
+  });
+
+  // handleFreeEnroll: dispatches free enrollment for any product type selected in the CTA builder
+  const handleFreeEnroll = async (productType: string, productId: number) => {
+    if (!user) {
+      // Guest: fall back to the standard guest checkout modal
+      openGuestCheckoutModal(undefined);
+      return;
+    }
+    try {
+      if (productType === "course" || productType === "quiz" || productType === "cohort") {
+        // Find the course slug by ID from the product catalog
+        const targetCourse = (freeEnrollCatalog as any[])?.find((p: any) => (p.type === productType) && p.id === productId);
+        const targetSlug = targetCourse?.slug ?? slug;
+        await enrollFree.mutateAsync({ courseSlug: targetSlug! });
+      } else if (productType === "bundle") {
+        await bundleEnroll.mutateAsync({ bundleId: productId });
+      } else if (productType === "webinar") {
+        await webinarRegister.mutateAsync({ webinarId: productId });
+      } else if (productType === "download") {
+        await downloadsCheckout.mutateAsync({ productId });
+      } else {
+        toast.error(`Free enrollment not supported for product type: ${productType}`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Enrollment failed.");
+    }
+  };
+
   const handleFreePreviewClick = (lessonId: number) => {
     // If user is logged in, grant access directly via lmsLearner.createFreePreviewEnrollment
     if (user) {
@@ -1279,10 +1354,10 @@ export default function CourseLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
                 <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} />
+                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} />
                 </div>
               ) : (
-                <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} />
+                <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} />
               )}
             </div>
           );

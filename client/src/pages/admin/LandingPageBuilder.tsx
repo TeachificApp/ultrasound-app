@@ -1009,7 +1009,7 @@ type CTAAction =
   | "url" | "send_email" | "next_funnel_step" | "direct_checkout"
   | "free_preview" | "group_purchase" | "order_bump_lp"
   | "scroll_to_section" | "open_popup" | "download_file" | "pricing_option"
-  | "landing_page" | "funnel_page";
+  | "landing_page" | "funnel_page" | "free_enrollment";
 
 const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   url: "Link to URL",
@@ -1017,6 +1017,7 @@ const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   funnel_page: "Funnel Page",
   send_email: "Send Email",
   next_funnel_step: "Next Funnel Step",
+  free_enrollment: "Free Enrollment",
   direct_checkout: "Direct Checkout (Stripe)",
   free_preview: "Direct to Checkout (Free Preview)",
   group_purchase: "Direct to Checkout (Group Purchase)",
@@ -1091,9 +1092,36 @@ function CTAActionPicker({
   /** funnel_page action: encoded as "funnelSlug/pageSlug" */
   funnelPageValue?: string | null;
   onFunnelPageChange?: (value: string | null) => void;
+  /** free_enrollment action: product type + product id */
+  freeEnrollProductType?: string;
+  freeEnrollProductId?: number | null;
+  onFreeEnrollProductChange?: (type: string, id: number | null) => void;
 }) {
   const behavior = (behaviorValue ?? "url") as CTAAction;
   const isCheckoutBehavior = behavior === "direct_checkout" || behavior === "free_preview" || behavior === "group_purchase";
+
+  // Free enrollment product picker — separate queries per product type
+  const freeEnrollType = (freeEnrollProductType ?? "course") as string;
+  const { data: feCourses } = trpc.lmsAdmin.listCourses.useQuery(
+    { status: "published", type: "all", pageSize: 200 },
+    { enabled: behavior === "free_enrollment" && (freeEnrollType === "course" || freeEnrollType === "quiz" || freeEnrollType === "cohort" || freeEnrollType === "webinar") }
+  );
+  const { data: feDownloads } = trpc.lmsAdmin.listDownloads.useQuery(
+    { status: "published", pageSize: 200 },
+    { enabled: behavior === "free_enrollment" && freeEnrollType === "download" }
+  );
+  const { data: feBundles } = trpc.lmsAdmin.listBundles.useQuery(
+    { status: "published", pageSize: 200 },
+    { enabled: behavior === "free_enrollment" && freeEnrollType === "bundle" }
+  );
+  const freeEnrollItems: Array<{ id: number; label: string }> = React.useMemo(() => {
+    if (freeEnrollType === "course" || freeEnrollType === "quiz" || freeEnrollType === "cohort" || freeEnrollType === "webinar") {
+      return ((feCourses as any)?.courses ?? []).filter((c: any) => !freeEnrollType || c.type === freeEnrollType).map((c: any) => ({ id: c.id, label: `${c.title} (${c.type})` }));
+    }
+    if (freeEnrollType === "download") return ((feDownloads as any)?.downloads ?? (feDownloads as any) ?? []).map((d: any) => ({ id: d.id, label: d.title ?? d.name ?? `Download #${d.id}` }));
+    if (freeEnrollType === "bundle") return ((feBundles as any)?.bundles ?? (feBundles as any) ?? []).map((b: any) => ({ id: b.id, label: b.title ?? b.name ?? `Bundle #${b.id}` }));
+    return [];
+  }, [freeEnrollType, feCourses, feDownloads, feBundles]);
   // Pricing option picker state
   const [poCourseId, setPoCoursId] = React.useState<number | null>(pricingOptionCourseIdValue ?? null);
   const { data: poCoursesData } = trpc.lmsAdmin.listCourses.useQuery(
@@ -1212,6 +1240,45 @@ function CTAActionPicker({
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+      {behavior === "free_enrollment" && (
+        <div className="space-y-2 bg-green-50 border border-green-200 rounded p-2">
+          <p className="text-[10px] text-green-700 font-medium">Enrolls the user directly — no Stripe, no payment. Use for free courses, quizzes, downloads, bundles, or webinars.</p>
+          <div>
+            <label className="text-xs text-gray-500 block mb-0.5">Product Type</label>
+            <select
+              value={freeEnrollType}
+              onChange={e => onFreeEnrollProductChange?.(e.target.value, null)}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            >
+              <option value="course">Course</option>
+              <option value="quiz">Quiz</option>
+              <option value="cohort">Cohort</option>
+              <option value="webinar">Webinar</option>
+              <option value="download">Download</option>
+              <option value="bundle">Bundle</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-0.5">Product</label>
+            <select
+              value={freeEnrollProductId ?? ""}
+              onChange={e => onFreeEnrollProductChange?.(freeEnrollType, e.target.value ? Number(e.target.value) : null)}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            >
+              <option value="">-- Select product --</option>
+              {freeEnrollItems.map(item => (
+                <option key={item.id} value={item.id}>{item.label}</option>
+              ))}
+            </select>
+            {freeEnrollItems.length === 0 && freeEnrollProductId == null && (
+              <p className="text-[10px] text-gray-400 mt-0.5">No published {freeEnrollType}s found.</p>
+            )}
+          </div>
+          {freeEnrollProductId && (
+            <p className="text-[10px] text-green-600 mt-0.5">✓ Will enroll user in {freeEnrollType} #{freeEnrollProductId} immediately on click.</p>
           )}
         </div>
       )}
@@ -2454,6 +2521,9 @@ function SortablePricingCard({
         onLandingPageChange={v => onSet("ctaLandingPageSlug", v)}
         funnelPageValue={card.ctaFunnelPageValue ?? null}
         onFunnelPageChange={v => onSet("ctaFunnelPageValue", v)}
+        freeEnrollProductType={card.freeEnrollProductType ?? "course"}
+        freeEnrollProductId={card.freeEnrollProductId ?? null}
+        onFreeEnrollProductChange={(type, id) => { onSet("freeEnrollProductType", type); onSet("freeEnrollProductId", id); }}
       />
       <DebouncedInput value={card.badge ?? ""} onChange={v => onSet("badge", v)} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
       <div>
@@ -3510,6 +3580,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             onLandingPageChange={v => set("ctaLandingPageSlug", v)}
             funnelPageValue={d.ctaFunnelPageValue ?? null}
             onFunnelPageChange={v => set("ctaFunnelPageValue", v)}
+            freeEnrollProductType={d.freeEnrollProductType ?? "course"}
+            freeEnrollProductId={d.freeEnrollProductId ?? null}
+            onFreeEnrollProductChange={(type, id) => setMany({ freeEnrollProductType: type, freeEnrollProductId: id })}
           />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
@@ -3596,6 +3669,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             onLandingPageChange={v => set("ctaLandingPageSlug", v)}
             funnelPageValue={d.ctaFunnelPageValue ?? null}
             onFunnelPageChange={v => set("ctaFunnelPageValue", v)}
+            freeEnrollProductType={d.freeEnrollProductType ?? "course"}
+            freeEnrollProductId={d.freeEnrollProductId ?? null}
+            onFreeEnrollProductChange={(type, id) => setMany({ freeEnrollProductType: type, freeEnrollProductId: id })}
           /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Style</label><div className="flex gap-1">{(["filled","outline"] as const).map(s=><button key={s} onClick={()=>set("btnStyle",s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.btnStyle??"filled")===s?"bg-teal-600 text-white border-teal-600":"border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2"><div className="flex items-center gap-2"><input type="checkbox" id="cta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" /><label htmlFor="cta-lc" className="text-xs text-teal-700 font-medium">Collect lead before action</label></div>{(d.leadCapture??false)&&(<div className="space-y-1 pl-1"><p className="text-[10px] text-gray-400">A name/email modal will appear before the button action executes.</p><BSTextField data={d} onSet={set} label="Modal Title" field="leadModalTitle" placeholder="e.g. Get Instant Access" /><BSTextField data={d} onSet={set} label="Modal Subtext" field="leadModalSubtext" placeholder="Optional" /><BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="leadTags" placeholder="e.g. webinar, free-guide" /></div>)}</div><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
     case "lead_capture":
       return <LeadCaptureSettings d={d} set={set} />;
@@ -3809,12 +3885,15 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             onLandingPageChange={v => set("ctaLandingPageSlug", v)}
             funnelPageValue={d.ctaFunnelPageValue ?? null}
             onFunnelPageChange={v => set("ctaFunnelPageValue", v)}
+            freeEnrollProductType={d.freeEnrollProductType ?? "course"}
+            freeEnrollProductId={d.freeEnrollProductId ?? null}
+            onFreeEnrollProductChange={(type, id) => setMany({ freeEnrollProductType: type, freeEnrollProductId: id })}
           />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
-          <BSColorField data={d} onSet={set} label="Border Color" field="borderColor" />
+          <BSColorField data={d} onSet={set} label="Border Color" field="borderColor"/>
           <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div>
           <OptOutSettings d={d} set={set} />
         </div>
@@ -3865,6 +3944,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             onLandingPageChange={v => set("ctaLandingPageSlug", v)}
             funnelPageValue={d.ctaFunnelPageValue ?? null}
             onFunnelPageChange={v => set("ctaFunnelPageValue", v)}
+            freeEnrollProductType={d.freeEnrollProductType ?? "course"}
+            freeEnrollProductId={d.freeEnrollProductId ?? null}
+            onFreeEnrollProductChange={(type, id) => setMany({ freeEnrollProductType: type, freeEnrollProductId: id })}
           />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
@@ -4952,6 +5034,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       onLandingPageChange={v => setTier(ti, { ctaLandingPageSlug: v })}
                       funnelPageValue={(tier as any).ctaFunnelPageValue ?? null}
                       onFunnelPageChange={v => setTier(ti, { ctaFunnelPageValue: v })}
+                      freeEnrollProductType={(tier as any).freeEnrollProductType ?? "course"}
+                      freeEnrollProductId={(tier as any).freeEnrollProductId ?? null}
+                      onFreeEnrollProductChange={(type, id) => setTier(ti, { freeEnrollProductType: type, freeEnrollProductId: id })}
                     />
                   </div>
                 </div>

@@ -96,6 +96,45 @@ import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { ImageLinkWrapper } from "@/components/BlockPreview";
 
 function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block: Block; funnelId: number; pageId: number; funnelSlug: string }) {
+  const { data: freeEnrollCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
+  const enrollFree = trpc.lmsLearner.enrollFree.useMutation({
+    onSuccess: () => toast.success("Enrolled! You now have access."),
+    onError: (e) => toast.error(`Enrollment failed: ${e.message}`),
+  });
+  const bundleEnroll = trpc.bundlesLearner.enroll.useMutation({
+    onSuccess: () => toast.success("Enrolled! You now have access."),
+    onError: (e) => toast.error(`Enrollment failed: ${e.message}`),
+  });
+  const webinarRegister = trpc.webinarLearner.register.useMutation({
+    onSuccess: () => toast.success("Registered! You now have access."),
+    onError: (e) => toast.error(`Registration failed: ${e.message}`),
+  });
+  const downloadsCheckout = trpc.downloadsLearner.createCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.free || data.alreadyPurchased) toast.success("Access granted!");
+      else if (data.checkoutUrl) window.open(data.checkoutUrl, "_blank");
+    },
+    onError: (e) => toast.error(`Checkout failed: ${e.message}`),
+  });
+  const handleFreeEnroll = async (productType: string, productId: number) => {
+    try {
+      if (productType === "course" || productType === "quiz" || productType === "cohort") {
+        const target = (freeEnrollCatalog as any[])?.find((p: any) => p.type === productType && p.id === productId);
+        if (target?.slug) await enrollFree.mutateAsync({ courseSlug: target.slug });
+        else toast.error("Course not found.");
+      } else if (productType === "bundle") {
+        await bundleEnroll.mutateAsync({ bundleId: productId });
+      } else if (productType === "webinar") {
+        await webinarRegister.mutateAsync({ webinarId: productId });
+      } else if (productType === "download") {
+        await downloadsCheckout.mutateAsync({ productId });
+      } else {
+        toast.error(`Free enrollment not supported for product type: ${productType}`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Enrollment failed.");
+    }
+  };
   const d = block.data;
   // This is a simplified version — for a full implementation, we'd share the RenderBlock component
   // For now, we'll use the same rendering approach as PublicFunnelPage
@@ -141,6 +180,9 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
               el?.scrollIntoView({ behavior: "smooth" });
             } else if (beh === "download_file" && d.heroDownloadUrl) window.open(d.heroDownloadUrl, "_blank");
             else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
+            else if (beh === "free_enrollment" && d.heroFreeEnrollProductId) {
+              handleFreeEnroll(d.heroFreeEnrollProductType ?? "course", Number(d.heroFreeEnrollProductId));
+            }
           }
         : undefined;
       return (
@@ -157,11 +199,20 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
                 <div className={`flex flex-wrap gap-3 ${align === "center" ? "justify-center" : align === "right" ? "justify-end" : ""}`}>
                   {d.buttons.map((btn: any, i: number) => (
                     <div key={i} className="flex flex-col items-center gap-1">
+                      {btn.behavior === "free_enrollment" && btn.freeEnrollProductId ? (
+                        <button
+                          onClick={() => handleFreeEnroll(btn.freeEnrollProductType ?? "course", Number(btn.freeEnrollProductId))}
+                          className={`inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                          style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color || "#fff", border: `2px solid ${btn.color || "#fff"}` } : { backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>
+                          {btn.text}
+                        </button>
+                      ) : (
                       <a href={btn.link || "#"}
                         className={`inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                         style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color || "#fff", border: `2px solid ${btn.color || "#fff"}` } : { backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>
                         {btn.text}
                       </a>
+                      )}
                       {btn.showStrikethrough && btn.strikethroughPrice && (
                         <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
                       )}

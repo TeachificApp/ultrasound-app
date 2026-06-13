@@ -50,8 +50,8 @@ export function ImageLinkWrapper({ d, children, onAction }: { d: Record<string, 
       <span style={style} onClick={e => { e.stopPropagation(); const w = 800, h = 600; const left = window.screenX + (window.outerWidth - w) / 2; const top = window.screenY + (window.outerHeight - h) / 2; window.open(d.linkPopupUrl, "_blank", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`); }}>{children}</span>
     );
   }
-  // Checkout/free_preview/pricing_option behaviors — delegate to onAction if provided
-  if (onAction && (behavior === "direct_checkout" || behavior === "free_preview" || behavior === "pricing_option" || behavior === "group_purchase")) {
+  // Checkout/free_preview/pricing_option/free_enrollment behaviors — delegate to onAction if provided
+  if (onAction && (behavior === "direct_checkout" || behavior === "free_preview" || behavior === "pricing_option" || behavior === "group_purchase" || behavior === "free_enrollment")) {
     return (
       <span style={style} onClick={e => { e.stopPropagation(); onAction(); }}>{children}</span>
     );
