@@ -5,6 +5,7 @@
  * Route: /courses/:slug
  */
 import { useState, useEffect, useRef } from "react";
+import { useSeoHead, buildCourseJsonLd } from "@/hooks/useSeoHead";
 import { EnrolledAccessBanner } from "@/components/EnrolledAccessBanner";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -1395,11 +1396,21 @@ export default function CourseLanding() {
     ? { backgroundImage: `url(${lp.heroImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
     : { backgroundColor: heroColor };
 
-  // Set page title
-  useEffect(() => {
-    if (course?.title) document.title = `${course.title} | Education Library | All About Ultrasound™`;
-    return () => { document.title = "UltrasoundAssist™ | All About Ultrasound™"; };
-  }, [course?.title]);
+  // Full SEO — title, OG, Twitter Card, JSON-LD, canonical
+  const _canonicalOrigin = typeof window !== "undefined" ? window.location.origin : "https://learn.allaboutultrasound.com";
+  useSeoHead({
+    title: lp?.seoTitle ?? course?.metaTitle ?? course?.title,
+    description: lp?.seoDescription ?? course?.metaDescription ?? course?.subtitle ?? undefined,
+    image: lp?.seoImage ?? course?.coverImageUrl ?? course?.thumbnailUrl ?? undefined,
+    canonical: course?.slug ? `${_canonicalOrigin}/courses/${course.slug}` : undefined,
+    type: "article",
+    jsonLd: course ? buildCourseJsonLd({
+      name: course.title,
+      description: course.metaDescription ?? course.subtitle ?? undefined,
+      image: course.coverImageUrl ?? course.thumbnailUrl ?? undefined,
+      url: `${_canonicalOrigin}/courses/${course.slug}`,
+    }) : null,
+  });
 
   return (
     <>

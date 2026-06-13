@@ -23,6 +23,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import { useState, useEffect, useRef } from "react";
+import { useSeoHead } from "@/hooks/useSeoHead";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { CountdownV2Block, ImageLinkWrapper } from "@/components/BlockPreview";
 
@@ -702,11 +703,15 @@ export default function DownloadLanding() {
     onError: (e) => toast.error(e.message),
   });
 
-  // Set page title for SEO
-  useEffect(() => {
-    if (product?.title) document.title = `${product.title} | Education Library | All About Ultrasound™`;
-    return () => { document.title = "All About Ultrasound™"; };
-  }, [product?.title]);
+  // Full SEO — title, OG, Twitter Card, JSON-LD, canonical
+  const _dlOrigin = typeof window !== "undefined" ? window.location.origin : "https://learn.allaboutultrasound.com";
+  useSeoHead({
+    title: product?.seoTitle ?? product?.metaTitle ?? product?.title,
+    description: product?.seoDescription ?? product?.metaDescription ?? product?.subtitle ?? undefined,
+    image: product?.seoImage ?? product?.thumbnailUrl ?? undefined,
+    canonical: product?.slug ? `${_dlOrigin}/downloads/${product.slug}` : undefined,
+    type: "article",
+  });
 
   // Auto-trigger checkout when ?checkout=1 is in the URL (used by BSLinkField product links)
   // MUST be before early returns to comply with React Rules of Hooks

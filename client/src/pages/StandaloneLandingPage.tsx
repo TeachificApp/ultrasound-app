@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { Suspense, lazy } from "react";
+import { useSeoHead } from "@/hooks/useSeoHead";
 
 // Re-use the same block renderer from PublicFunnelPage
 const PublicFunnelPage = lazy(() => import("./PublicFunnelPage"));
@@ -46,6 +47,16 @@ export default function StandaloneLandingPage() {
   } catch {
     blocks = [];
   }
+
+  // SEO head tags for standalone funnel pages
+  const _canonicalOrigin = typeof window !== "undefined" ? window.location.origin : "https://learn.allaboutultrasound.com";
+  useSeoHead({
+    title: page.seoTitle ?? funnel?.name ?? page.title ?? undefined,
+    description: page.seoDescription ?? undefined,
+    image: page.seoImage ?? undefined,
+    canonical: `${_canonicalOrigin}/p/${slug}`,
+    type: "website",
+  });
 
   // We render the page using the same block rendering approach as PublicFunnelPage
   // but without the funnel navigation (no next/prev page links)

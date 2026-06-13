@@ -3,6 +3,7 @@
  * Main community hub — shows community list and redirects to the first/default community feed.
  */
 import { useState, useEffect, useRef } from "react";
+import { useSeoHead } from "@/hooks/useSeoHead";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -21,10 +22,12 @@ export default function CommunityHub() {
   const { data: trending } = trpc.community.public.trendingHashtags.useQuery();
   const { data: leaderboard } = trpc.community.public.leaderboard.useQuery({ limit: 5 });
 
-  useEffect(() => {
-    document.title = "Community | All About Ultrasound™";
-    return () => { document.title = "All About Ultrasound™"; };
-  }, []);
+  useSeoHead({
+    title: "Community | All About Ultrasound™",
+    description: "Join the All About Ultrasound community. Connect with sonographers, share cases, and grow your skills together.",
+    canonical: typeof window !== "undefined" ? `${window.location.origin}/community` : undefined,
+    type: "website",
+  });
 
   if (isLoading) {
     return (

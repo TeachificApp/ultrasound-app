@@ -6154,9 +6154,10 @@ export default function LandingPageBuilder() {
     // Initialize SEO fields once per page load
     if (!seoInitialized.current) {
       seoInitialized.current = true;
-      setSeoTitle(lpData.seoTitle ?? "");
-      setSeoDescription(lpData.seoDescription ?? "");
-      setSeoImage(lpData.seoImage ?? "");
+      // Use per-page override if set; otherwise fall back to course settings-page SEO defaults
+      setSeoTitle(lpData.seoTitle ?? lpData.defaultSeoTitle ?? "");
+      setSeoDescription(lpData.seoDescription ?? lpData.defaultSeoDescription ?? "");
+      setSeoImage(lpData.seoImage ?? lpData.defaultSeoImage ?? "");
     }
     if (lpData.blocks && lpData.blocks.length > 0) {
       setBlocks(lpData.blocks as Block[]);
@@ -6750,12 +6751,12 @@ export default function LandingPageBuilder() {
                 </p>
               </div>
               <div className="pl-4 pr-3 py-3 space-y-3 flex-1">
-                <p className="text-[10px] text-gray-400">Override what iMessage, WhatsApp, and social media show when this page link is shared.</p>
+                <p className="text-[10px] text-gray-400">Override what iMessage, WhatsApp, and social media show when this page link is shared. Fields auto-populate from your course SEO settings.</p>
                 <div>
                   <label className="text-[10px] font-medium text-gray-600 block mb-1">Display Name (og:title)</label>
                   <input
                     className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    placeholder={courseInfo?.title ?? "Page title"}
+                    placeholder={lpData?.defaultSeoTitle || courseInfo?.title || "Page title"}
                     value={seoTitle}
                     onChange={e => setSeoTitle(e.target.value)}
                   />
@@ -6765,7 +6766,7 @@ export default function LandingPageBuilder() {
                   <textarea
                     className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
                     rows={3}
-                    placeholder="Short description shown in link previews…"
+                    placeholder={lpData?.defaultSeoDescription || "Short description shown in link previews…"}
                     value={seoDescription}
                     onChange={e => setSeoDescription(e.target.value)}
                   />
@@ -6774,7 +6775,7 @@ export default function LandingPageBuilder() {
                   <label className="text-[10px] font-medium text-gray-600 block mb-1">Preview Image URL (og:image)</label>
                   <input
                     className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    placeholder="https://…"
+                    placeholder={lpData?.defaultSeoImage || "https://…"}
                     value={seoImage}
                     onChange={e => setSeoImage(e.target.value)}
                   />
@@ -6782,13 +6783,27 @@ export default function LandingPageBuilder() {
                     <img src={seoImage} alt="Preview" className="mt-1.5 w-full rounded-lg border border-gray-200 object-cover" style={{ maxHeight: 80 }} />
                   )}
                 </div>
+                {/* Reset to course defaults link */}
+                {(lpData?.defaultSeoTitle || lpData?.defaultSeoDescription || lpData?.defaultSeoImage) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSeoTitle(lpData?.defaultSeoTitle ?? "");
+                      setSeoDescription(lpData?.defaultSeoDescription ?? "");
+                      setSeoImage(lpData?.defaultSeoImage ?? "");
+                    }}
+                    className="text-[10px] text-teal-600 hover:text-teal-700 underline"
+                  >
+                    ↺ Reset to course SEO defaults
+                  </button>
+                )}
                 {/* Mini link preview card */}
-                {(seoTitle || seoDescription) && (
+                {(seoTitle || seoDescription || lpData?.defaultSeoTitle) && (
                   <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                    {seoImage && <img src={seoImage} alt="" className="w-full object-cover" style={{ maxHeight: 60 }} />}
+                    {(seoImage || lpData?.defaultSeoImage) && <img src={seoImage || lpData?.defaultSeoImage} alt="" className="w-full object-cover" style={{ maxHeight: 60 }} />}
                     <div className="px-2 py-1.5">
-                      <p className="text-[10px] font-semibold text-gray-800 truncate">{seoTitle || courseInfo?.title}</p>
-                      {seoDescription && <p className="text-[9px] text-gray-500 line-clamp-2">{seoDescription}</p>}
+                      <p className="text-[10px] font-semibold text-gray-800 truncate">{seoTitle || lpData?.defaultSeoTitle || courseInfo?.title}</p>
+                      {(seoDescription || lpData?.defaultSeoDescription) && <p className="text-[9px] text-gray-500 line-clamp-2">{seoDescription || lpData?.defaultSeoDescription}</p>}
                       <p className="text-[9px] text-teal-600 mt-0.5 truncate">{typeof window !== 'undefined' ? window.location.hostname : 'learn.allaboutultrasound.com'}</p>
                     </div>
                   </div>

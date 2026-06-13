@@ -23,6 +23,7 @@ import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResourc
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
 import { registerFunnelOgMetaRoutes } from "../routes/funnelOgMeta";
+import { registerSitemapRoute } from "../routes/sitemap";
 import { registerAutoLoginRoute } from "../routes/autoLogin";
 import { registerGoogleOAuthRoutes } from "../routes/googleOAuth";
 import { appRouter } from "../routers";
@@ -237,6 +238,8 @@ async function startServer() {
   registerUploadSocialImageRoute(app);
   // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
   registerSsoAutoRoute(app);
+  // Sitemap.xml and robots.txt — must be before SPA catch-all
+  registerSitemapRoute(app);
   // Funnel page OG meta injection — must be before SPA catch-all so crawlers get correct meta tags
   registerFunnelOgMetaRoutes(app);
   // Auto-login route — one-time token redemption for post-purchase automatic sign-in

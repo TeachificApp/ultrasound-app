@@ -4,6 +4,7 @@
   Fonts: Merriweather headings, Open Sans body
 */
 import { useEffect, useState, useRef } from "react";
+import { useSeoHead } from "@/hooks/useSeoHead";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
@@ -146,9 +147,12 @@ const modules: Module[] = [
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
   const isPremium = user?.isPremium === true || user?.role === "admin";
-  useEffect(() => {
-    document.title = "UltrasoundAssist™ | All About Ultrasound™";
-  }, []);
+  useSeoHead({
+    title: "UltrasoundAssist™ | All About Ultrasound™",
+    description: "The clinical intelligence platform for sonographers. Access accredited ultrasound courses, quizzes, and community resources.",
+    canonical: typeof window !== "undefined" ? window.location.origin : undefined,
+    type: "website",
+  });
   const pinnedLast = modules.filter(m => m.pinLast);
   const sortedModules = [...modules.filter(m => !m.pinLast), ...pinnedLast];
 

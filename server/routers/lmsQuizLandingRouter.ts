@@ -403,6 +403,8 @@ Rules:
         coverImageUrl: lmsCourses.coverImageUrl,
         subtitle: lmsCourses.subtitle,
         price: lmsCourses.price,
+        metaTitle: lmsCourses.metaTitle,
+        metaDescription: lmsCourses.metaDescription,
       }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
       const parsedBlocks = lp?.blocks ? (() => { try { return JSON.parse(lp.blocks); } catch(e) { console.error('[getLandingPageBlocks] JSON parse error:', e); return null; } })() : null;
 
@@ -415,9 +417,14 @@ Rules:
         courseTitle: course?.title ?? "",
         courseSlug: course?.slug ?? "",
         coursePrice: course?.price ?? 0,
+        // Per-page SEO overrides (null = no override set)
         seoTitle: lp?.seoTitle ?? null,
         seoDescription: lp?.seoDescription ?? null,
         seoImage: lp?.seoImage ?? null,
+        // Course settings-page SEO defaults (auto-populate when no override)
+        defaultSeoTitle: course?.metaTitle ?? course?.title ?? "",
+        defaultSeoDescription: course?.metaDescription ?? course?.subtitle ?? "",
+        defaultSeoImage: course?.coverImageUrl ?? "",
       };
     }),
   saveLandingPageBlocks: protectedProcedure

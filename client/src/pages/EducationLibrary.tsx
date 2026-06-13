@@ -3,6 +3,7 @@
  * Public-facing course catalog for All About Ultrasound™ & iHeartEcho™
  */
 import { useState, useMemo, useEffect } from "react";
+import { useSeoHead } from "@/hooks/useSeoHead";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -208,11 +209,12 @@ export default function EducationLibrary() {
   // Fetch published bundles
   const { data: bundlesData } = trpc.bundles.list.useQuery({ page: 1, limit: 50 });
 
-  // Set page title for SEO
-  useEffect(() => {
-    document.title = "Education Library | All About Ultrasound™";
-    return () => { document.title = "All About Ultrasound™"; };
-  }, []);
+  useSeoHead({
+    title: "Education Library | All About Ultrasound™",
+    description: "Browse the full All About Ultrasound™ course library. Accredited ultrasound education for sonographers at every level.",
+    canonical: typeof window !== "undefined" ? `${window.location.origin}/education-library` : undefined,
+    type: "website",
+  });
 
   // Build fast lookup sets
   const enrolledCourseIds = useMemo(() => new Set((myCoursesData ?? []).map((e: any) => e.courseId)), [myCoursesData]);
