@@ -931,41 +931,56 @@ function MembershipItemsTab({
   const [addItemId, setAddItemId] = useState("");
   const [addItemTitle, setAddItemTitle] = useState("");
   const [addLabel, setAddLabel] = useState("");
-  const [courseSearch, setCourseSearch] = useState("");
-  const [downloadSearch, setDownloadSearch] = useState("");
+  const [search, setSearch] = useState("");
 
+  // ── Data fetches for all 6 product types ──────────────────────────────────
   const { data: allCourses } = trpc.lmsAdmin.listCourses.useQuery({ pageSize: 500 });
   const { data: downloads } = trpc.downloads.admin.list.useQuery({ pageSize: 500 });
+  const { data: quizzes } = trpc.sonoQuiz.listQuizzes.useQuery({ status: "all" });
+  const { data: webinarsData } = trpc.webinarAdmin.list.useQuery({ pageSize: 500 });
+  const { data: communities } = trpc.community.admin.listCommunities.useQuery();
+  const { data: products } = trpc.productsAdmin.list.useQuery();
 
-  const filteredCourses = (allCourses?.courses ?? []).filter((c: any) =>
-    !courseSearch || c.title?.toLowerCase().includes(courseSearch.toLowerCase())
-  );
-  const filteredDownloads = (downloads?.downloads ?? []).filter((d: any) =>
-    !downloadSearch || d.title?.toLowerCase().includes(downloadSearch.toLowerCase())
-  );
+  // ── Unified item list for the current type ────────────────────────────────
+  const itemsForType = useMemo(() => {
+    const q = search.toLowerCase();
+    const filter = (title: string) => !q || title.toLowerCase().includes(q);
+    switch (addType) {
+      case "course": return (allCourses?.courses ?? []).filter((c: any) => filter(c.title ?? "")).map((c: any) => ({ id: c.id, title: c.title ?? `Course #${c.id}` }));
+      case "download": return (downloads?.downloads ?? []).filter((d: any) => filter(d.title ?? "")).map((d: any) => ({ id: d.id, title: d.title ?? `Download #${d.id}` }));
+      case "quiz": return (quizzes ?? []).filter((q2: any) => filter(q2.title ?? "")).map((q2: any) => ({ id: q2.id, title: q2.title ?? `Quiz #${q2.id}` }));
+      case "webinar": return (webinarsData?.webinars ?? []).filter((w: any) => filter(w.title ?? "")).map((w: any) => ({ id: w.id, title: w.title ?? `Webinar #${w.id}` }));
+      case "community": return (communities ?? []).filter((c: any) => filter(c.name ?? "")).map((c: any) => ({ id: c.id, title: c.name ?? `Community #${c.id}` }));
+      case "product": return (products ?? []).filter((p: any) => filter(p.name ?? p.title ?? "")).map((p: any) => ({ id: p.id, title: p.name ?? p.title ?? `Product #${p.id}` }));
+      default: return [];
+    }
+  }, [addType, search, allCourses, downloads, quizzes, webinarsData, communities, products]);
 
-  // Build lookup maps for resolving item names
-  const courseMap = useMemo(() => {
-    const m: Record<number, string> = {};
-    for (const c of allCourses?.courses ?? []) m[c.id] = c.title;
-    return m;
-  }, [allCourses]);
-  const downloadMap = useMemo(() => {
-    const m: Record<number, string> = {};
-    for (const d of downloads?.downloads ?? []) m[d.id] = d.title;
-    return m;
-  }, [downloads]);
+  // ── Build lookup maps for resolving saved item names ──────────────────────
+  const courseMap = useMemo(() => { const m: Record<number, string> = {}; for (const c of allCourses?.courses ?? []) m[(c as any).id] = (c as any).title; return m; }, [allCourses]);
+  const downloadMap = useMemo(() => { const m: Record<number, string> = {}; for (const d of downloads?.downloads ?? []) m[(d as any).id] = (d as any).title; return m; }, [downloads]);
+  const quizMap = useMemo(() => { const m: Record<number, string> = {}; for (const q2 of quizzes ?? []) m[(q2 as any).id] = (q2 as any).title; return m; }, [quizzes]);
+  const webinarMap = useMemo(() => { const m: Record<number, string> = {}; for (const w of webinarsData?.webinars ?? []) m[(w as any).id] = (w as any).title; return m; }, [webinarsData]);
+  const communityMap = useMemo(() => { const m: Record<number, string> = {}; for (const c of communities ?? []) m[(c as any).id] = (c as any).name; return m; }, [communities]);
+  const productMap = useMemo(() => { const m: Record<number, string> = {}; for (const p of products ?? []) m[(p as any).id] = (p as any).name ?? (p as any).title; return m; }, [products]);
 
   function resolveItemName(item: AccessItem): string {
     if (item.label) return item.label;
     if (!item.itemId) return ITEM_TYPE_LABELS[item.itemType];
-    if (item.itemType === "course") return courseMap[item.itemId] ?? `Course #${item.itemId}`;
-    if (item.itemType === "download") return downloadMap[item.itemId] ?? `Download #${item.itemId}`;
-    return `${ITEM_TYPE_LABELS[item.itemType]} #${item.itemId}`;
+    const id = item.itemId;
+    switch (item.itemType) {
+      case "course": return courseMap[id] ?? `Course #${id}`;
+      case "download": return downloadMap[id] ?? `Download #${id}`;
+      case "quiz": return quizMap[id] ?? `Quiz #${id}`;
+      case "webinar": return webinarMap[id] ?? `Webinar #${id}`;
+      case "community": return communityMap[id] ?? `Community #${id}`;
+      case "product": return productMap[id] ?? `Product #${id}`;
+      default: return `${ITEM_TYPE_LABELS[item.itemType]} #${id}`;
+    }
   }
 
   const addMutation = trpc.membership.addItem.useMutation({
-    onSuccess: () => { onRefetch(); setAddItemId(""); setAddItemTitle(""); setAddLabel(""); setCourseSearch(""); setDownloadSearch(""); toast.success("Item added"); },
+    onSuccess: () => { onRefetch(); setAddItemId(""); setAddItemTitle(""); setAddLabel(""); setSearch(""); toast.success("Item added"); },
     onError: (e) => toast.error(e.message),
   });
   const removeMutation = trpc.membership.removeItem.useMutation({
@@ -998,84 +1013,60 @@ function MembershipItemsTab({
             </div>
             {needsItemId && (
               <div>
-                <Label>
-                  {addType === "course" ? "Course" : addType === "download" ? "Download" : "Item ID"}
-                </Label>
-                {addType === "course" ? (
-                  <div className="mt-1 space-y-1">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
-                      <Input
-                        value={courseSearch}
-                        onChange={e => { setCourseSearch(e.target.value); setAddItemId(""); setAddItemTitle(""); }}
-                        placeholder="Search courses..."
-                        className="pl-8 text-sm"
-                      />
+                <Label className="capitalize">{ITEM_TYPE_LABELS[addType] ?? "Item"}</Label>
+                <div className="mt-1 space-y-1">
+                  {/* Selected badge */}
+                  {addItemId ? (
+                    <div className="flex items-center gap-1 bg-teal-50 border border-teal-200 rounded px-2 py-1">
+                      <span className="text-xs text-teal-700 flex-1 truncate">{addItemTitle}</span>
+                      <button onClick={() => { setAddItemId(""); setAddItemTitle(""); setSearch(""); }} className="text-teal-400 hover:text-teal-600"><X className="w-3 h-3" /></button>
                     </div>
-                    {addItemId && (
-                      <div className="flex items-center gap-1 bg-teal-50 border border-teal-200 rounded px-2 py-1">
-                        <span className="text-xs text-teal-700 flex-1 truncate">{addItemTitle}</span>
-                        <button onClick={() => { setAddItemId(""); setAddItemTitle(""); setCourseSearch(""); }} className="text-teal-400 hover:text-teal-600"><X className="w-3 h-3" /></button>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
+                        <Input
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                          placeholder={`Search ${ITEM_TYPE_LABELS[addType]?.toLowerCase() ?? "items"}…`}
+                          className="pl-8 text-sm"
+                        />
                       </div>
-                    )}
-                    {!addItemId && courseSearch && (
-                      <div className="border rounded-md max-h-40 overflow-y-auto bg-white shadow-sm">
-                        {filteredCourses.length === 0 ? (
-                          <p className="text-xs text-gray-400 p-2 text-center">No courses found</p>
-                        ) : filteredCourses.slice(0, 20).map((c: any) => (
-                          <button
-                            key={c.id}
-                            className="w-full text-left px-3 py-1.5 text-sm hover:bg-teal-50 border-b last:border-0 truncate"
-                            onClick={() => { setAddItemId(String(c.id)); setAddItemTitle(c.title); setCourseSearch(""); }}
-                          >
-                            {c.title}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : addType === "download" ? (
-                  <div className="mt-1 space-y-1">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
-                      <Input
-                        value={downloadSearch}
-                        onChange={e => { setDownloadSearch(e.target.value); setAddItemId(""); setAddItemTitle(""); }}
-                        placeholder="Search downloads..."
-                        className="pl-8 text-sm"
-                      />
-                    </div>
-                    {addItemId && (
-                      <div className="flex items-center gap-1 bg-teal-50 border border-teal-200 rounded px-2 py-1">
-                        <span className="text-xs text-teal-700 flex-1 truncate">{addItemTitle}</span>
-                        <button onClick={() => { setAddItemId(""); setAddItemTitle(""); setDownloadSearch(""); }} className="text-teal-400 hover:text-teal-600"><X className="w-3 h-3" /></button>
-                      </div>
-                    )}
-                    {!addItemId && downloadSearch && (
-                      <div className="border rounded-md max-h-40 overflow-y-auto bg-white shadow-sm">
-                        {filteredDownloads.length === 0 ? (
-                          <p className="text-xs text-gray-400 p-2 text-center">No downloads found</p>
-                        ) : filteredDownloads.slice(0, 20).map((d: any) => (
-                          <button
-                            key={d.id}
-                            className="w-full text-left px-3 py-1.5 text-sm hover:bg-teal-50 border-b last:border-0 truncate"
-                            onClick={() => { setAddItemId(String(d.id)); setAddItemTitle(d.title); setDownloadSearch(""); }}
-                          >
-                            {d.title}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <Input
-                    type="number"
-                    value={addItemId}
-                    onChange={(e) => setAddItemId(e.target.value)}
-                    placeholder="Item ID"
-                    className="mt-1"
-                  />
-                )}
+                      {search && (
+                        <div className="border rounded-md max-h-48 overflow-y-auto bg-white shadow-sm">
+                          {itemsForType.length === 0 ? (
+                            <p className="text-xs text-gray-400 p-2 text-center">No results found</p>
+                          ) : itemsForType.slice(0, 30).map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className="w-full text-left px-3 py-1.5 text-sm hover:bg-teal-50 border-b last:border-0 truncate"
+                              onClick={() => { setAddItemId(String(item.id)); setAddItemTitle(item.title); setSearch(""); }}
+                            >
+                              <span className="font-medium">{item.title}</span>
+                              <span className="ml-2 text-xs text-gray-400">#{item.id}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {!search && itemsForType.length > 0 && (
+                        <div className="border rounded-md max-h-48 overflow-y-auto bg-white shadow-sm">
+                          {itemsForType.slice(0, 30).map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className="w-full text-left px-3 py-1.5 text-sm hover:bg-teal-50 border-b last:border-0 truncate"
+                              onClick={() => { setAddItemId(String(item.id)); setAddItemTitle(item.title); }}
+                            >
+                              <span className="font-medium">{item.title}</span>
+                              <span className="ml-2 text-xs text-gray-400">#{item.id}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
