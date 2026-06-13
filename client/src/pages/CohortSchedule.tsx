@@ -1118,6 +1118,73 @@ function AssignmentCard({ assignment, overdue, courseId, mySubmission, onOpen }:
 
 // ─── Recording Card Components ──────────────────────────────────────────────────
 
+/**
+ * Derive a thumbnail URL from a video URL when no explicit thumbnail is stored.
+ * Supports YouTube, Vimeo, and direct video files (via poster attribute).
+ * Returns null for unsupported platforms (Loom, Wistia, etc.).
+ */
+function getAutoThumbnail(videoUrl: string | null | undefined): string | null {
+  if (!videoUrl) return null;
+  // YouTube — use maxresdefault, fall back to hqdefault
+  const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([-\w]+)/);
+  if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+  // Vimeo — thumbnail requires API call; return a placeholder signal so we can lazy-fetch
+  const vimeoMatch = videoUrl.match(/vimeo\.com\/(?:video\/)?(\.?\d+)/);
+  if (vimeoMatch) return `__vimeo__${vimeoMatch[1]}`;
+  // Direct video file — we'll use the video element's poster via a data URL trick
+  if (/\.(mp4|webm|ogg|mov)([?#]|$)/i.test(videoUrl)) return `__video__${videoUrl}`;
+  return null;
+}
+
+/** Resolves Vimeo thumbnail via oEmbed (client-side, no auth needed) */
+function useVimeoThumbnail(videoId: string | null): string | null {
+  const [thumb, setThumb] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!videoId) return;
+    fetch(`https://vimeo.com/api/oembed.json?url=https://vimeo.com/${videoId}&width=640`)
+      .then(r => r.json())
+      .then(d => { if (d.thumbnail_url) setThumb(d.thumbnail_url); })
+      .catch(() => {});
+  }, [videoId]);
+  return thumb;
+}
+
+/**
+ * Resolves the best thumbnail for a recording:
+ * 1. Explicit thumbnailUrl (admin-uploaded)
+ * 2. Auto-derived from videoUrl (YouTube / Vimeo / direct video)
+ */
+function RecordingThumbnail({ recording, className }: { recording: any; className?: string }) {
+  const autoRaw = getAutoThumbnail(recording.videoUrl);
+  const isVimeo = autoRaw?.startsWith("__vimeo__") ?? false;
+  const vimeoId = isVimeo ? autoRaw!.replace("__vimeo__", "") : null;
+  const vimeoThumb = useVimeoThumbnail(vimeoId);
+  const isDirectVideo = autoRaw?.startsWith("__video__") ?? false;
+  const directVideoUrl = isDirectVideo ? autoRaw!.replace("__video__", "") : null;
+
+  const thumbSrc = recording.thumbnailUrl ||
+    (isVimeo ? vimeoThumb : null) ||
+    (!isVimeo && !isDirectVideo ? autoRaw : null);
+
+  if (thumbSrc) {
+    return <img src={thumbSrc} alt={recording.title} className={className ?? "w-full h-full object-cover"} />;
+  }
+  if (isDirectVideo && directVideoUrl) {
+    // Use a hidden video element to extract a frame as poster
+    return (
+      <video
+        src={directVideoUrl}
+        className={className ?? "w-full h-full object-cover"}
+        preload="metadata"
+        muted
+        playsInline
+        onLoadedMetadata={(e) => { (e.target as HTMLVideoElement).currentTime = 2; }}
+      />
+    );
+  }
+  return <Film className="w-10 h-10 text-teal-300" />;
+}
+
 function getVideoEmbedUrl(url: string): { type: "iframe" | "video"; src: string } {
   if (!url) return { type: "video", src: url };
   // YouTube
@@ -1139,15 +1206,11 @@ function RecordingGridCard({ recording, courseId }: { recording: any; courseId: 
   return (
     <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
       <Card className="border border-gray-200 bg-white hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group overflow-hidden">
-        {/* Thumbnail */}
+        {/* Thumbnail — auto-derived from videoUrl if no explicit thumbnail */}
         <div className="w-full aspect-video bg-gradient-to-br from-teal-50 to-teal-100 relative overflow-hidden">
-          {hasThumbnail ? (
-            <img src={recording.thumbnailUrl} alt={recording.title} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Film className="w-10 h-10 text-teal-300" />
-            </div>
-          )}
+          <div className="w-full h-full flex items-center justify-center">
+            <RecordingThumbnail recording={recording} className="w-full h-full object-cover" />
+          </div>
           {/* Play overlay */}
           <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors">
             <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1183,8 +1246,12 @@ function RecordingListRow({ recording, courseId }: { recording: any; courseId: n
   return (
     <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
       <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-teal-300 hover:bg-teal-50/30 transition-all cursor-pointer group">
-        <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0 group-hover:bg-teal-200 transition-colors">
-          <PlayCircle className="w-5 h-5 text-teal-600" />
+        <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0 group-hover:bg-teal-200 transition-colors overflow-hidden">
+          {(recording.thumbnailUrl || recording.videoUrl) ? (
+            <RecordingThumbnail recording={recording} className="w-full h-full object-cover" />
+          ) : (
+            <PlayCircle className="w-5 h-5 text-teal-600" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-gray-900 text-sm truncate group-hover:text-teal-700 transition-colors">{recording.title}</p>
