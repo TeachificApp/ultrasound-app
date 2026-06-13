@@ -123,14 +123,27 @@ function GroupDashboard({ group }: { group: any }) {
       .filter((e: any) => e.completedAt || e.progress >= 100).length;
   }, [analytics]);
 
-  // Synthetic weekly activity data (last 7 days based on seat assignments)
+  // Real daily activity from analytics (last 30 days, condensed to last 14 for chart readability)
   const activityData = useMemo(() => {
-    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    return days.map((day, i) => ({
-      day,
-      activity: Math.max(0, activeSeats - Math.floor(Math.random() * 3) + (i % 3)),
+    if (!analytics?.dailyActivity?.length) return [];
+    // Show last 14 days for the dashboard chart, all 30 for the full Activity tab
+    return analytics.dailyActivity.slice(-14).map((d: any) => ({
+      day: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      date: d.date,
+      activeUsers: d.activeUsers,
+      lessonsCompleted: d.lessonsCompleted,
     }));
-  }, [activeSeats]);
+  }, [analytics]);
+
+  const fullActivityData = useMemo(() => {
+    if (!analytics?.dailyActivity?.length) return [];
+    return analytics.dailyActivity.map((d: any) => ({
+      day: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      date: d.date,
+      activeUsers: d.activeUsers,
+      lessonsCompleted: d.lessonsCompleted,
+    }));
+  }, [analytics]);
 
   const navItems: { id: NavSection; label: string; icon: React.ElementType }[] = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -221,20 +234,26 @@ function GroupDashboard({ group }: { group: any }) {
               {/* Activity line chart */}
               <div className="col-span-3 bg-white rounded-xl p-4 ring-1 ring-gray-100 shadow-sm">
                 <p className="text-sm font-semibold text-gray-700 mb-3">User Activity</p>
-                <ResponsiveContainer width="100%" height={140}>
-                  <AreaChart data={activityData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#189aa1" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#189aa1" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} />
-                    <Area type="monotone" dataKey="activity" stroke="#189aa1" strokeWidth={2} fill="url(#actGrad)" dot={{ r: 3, fill: "#189aa1" }} activeDot={{ r: 5 }} />
-                  </AreaChart>
+<ResponsiveContainer width="100%" height={140}>
+                  {activityData.length > 0 ? (
+                    <AreaChart data={activityData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#189aa1" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#189aa1" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="day" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={3} />
+                      <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }}
+                        formatter={(val: any, name: string) => [val, name === 'activeUsers' ? 'Active Users' : 'Lessons Completed']} />
+                      <Area type="monotone" dataKey="activeUsers" stroke="#189aa1" strokeWidth={2} fill="url(#actGrad)" dot={{ r: 3, fill: "#189aa1" }} activeDot={{ r: 5 }} />
+                      <Area type="monotone" dataKey="lessonsCompleted" stroke="#4ad9e0" strokeWidth={1.5} fill="none" dot={false} strokeDasharray="4 2" />
+                    </AreaChart>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400 text-xs">No activity data yet</div>
+                  )}
                 </ResponsiveContainer>
               </div>
 
@@ -341,22 +360,34 @@ function GroupDashboard({ group }: { group: any }) {
               </div>
             ) : (
               <>
-                <div className="bg-white rounded-xl p-5 ring-1 ring-gray-100 shadow-sm">
-                  <p className="text-sm font-semibold text-gray-700 mb-4">Weekly Engagement</p>
+<div className="bg-white rounded-xl p-5 ring-1 ring-gray-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm font-semibold text-gray-700">30-Day Engagement</p>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#189aa1] inline-block rounded" /> Active Users</span>
+                      <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#4ad9e0] inline-block rounded border-dashed border-t border-[#4ad9e0]" /> Lessons Completed</span>
+                    </div>
+                  </div>
                   <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={activityData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="actGrad2" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#189aa1" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#189aa1" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }} />
-                      <Area type="monotone" dataKey="activity" stroke="#189aa1" strokeWidth={2.5} fill="url(#actGrad2)" dot={{ r: 4, fill: "#189aa1" }} activeDot={{ r: 6 }} />
-                    </AreaChart>
+                    {fullActivityData.length > 0 ? (
+                      <AreaChart data={fullActivityData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="actGrad2" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#189aa1" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#189aa1" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={4} />
+                        <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                        <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+                          formatter={(val: any, name: string) => [val, name === 'activeUsers' ? 'Active Users' : 'Lessons Completed']} />
+                        <Area type="monotone" dataKey="activeUsers" stroke="#189aa1" strokeWidth={2.5} fill="url(#actGrad2)" dot={{ r: 3, fill: "#189aa1" }} activeDot={{ r: 6 }} />
+                        <Area type="monotone" dataKey="lessonsCompleted" stroke="#4ad9e0" strokeWidth={1.5} fill="none" dot={false} strokeDasharray="4 2" />
+                      </AreaChart>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400 text-sm">No activity data yet — members haven't started their courses.</div>
+                    )}
                   </ResponsiveContainer>
                 </div>
 
@@ -428,8 +459,9 @@ function GroupDashboard({ group }: { group: any }) {
             <div className="bg-white rounded-xl p-6 ring-1 ring-gray-100 shadow-sm flex flex-col items-center">
               <p className="text-sm font-semibold text-gray-700 mb-4 self-start">Overall Completion</p>
               <CompletionDonut pct={completionPct} />
-              <p className="text-xs text-gray-400 mt-3">
-                {completedCount} completed · {inProgressCount} in progress · {activeSeats - completedCount - inProgressCount > 0 ? activeSeats - completedCount - inProgressCount : 0} not started
+<p className="text-xs text-gray-400 mt-3">
+                {completedCount} completed · {inProgressCount} in progress
+                {analytics?.memberProgress?.length ? ` · ${Math.max(0, analytics.memberProgress.length - completedCount - inProgressCount)} not started` : ""}
               </p>
             </div>
           </div>

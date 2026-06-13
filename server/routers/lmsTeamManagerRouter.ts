@@ -29,6 +29,7 @@ import {
   lmsLessonProgress,
   lmsCourses,
   users,
+  userActivityLogs,
 } from "../../drizzle/schema";
 import { sendEmail, emailWrapper } from "../_core/email";
 
@@ -475,6 +476,81 @@ export const lmsTeamManagerRouter = router({
 
       const totalAllocatedSeats = courses.reduce((sum, c) => sum + (c.seats || 0), 0) || group.seats;
 
+      // ── Real daily activity: count distinct active members who had lesson completions
+      //    or enrollment updates in the last 30 days, grouped by calendar day.
+      let dailyActivity: { date: string; activeUsers: number; lessonsCompleted: number }[] = [];
+      if (acceptedEmails.length > 0) {
+        const memberUsers2 = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(sql`LOWER(${users.email}) IN (${sql.join(acceptedEmails.map((e) => sql`${e}`), sql`, `)})`);
+        const memberUserIds = memberUsers2.map((u) => u.id);
+        if (memberUserIds.length > 0) {
+          // Lesson completions per day (last 30 days)
+          const lessonRows = await db
+            .select({
+              day: sql<string>`DATE(${lmsLessonProgress.completedAt})`,
+              userId: sql<number>`${lmsEnrollments.userId}`,
+              cnt: sql<number>`COUNT(*)`,
+            })
+            .from(lmsLessonProgress)
+            .innerJoin(lmsEnrollments, eq(lmsLessonProgress.enrollmentId, lmsEnrollments.id))
+            .where(
+              and(
+                sql`${lmsEnrollments.userId} IN (${sql.join(memberUserIds.map((id) => sql`${id}`), sql`, `)})`,
+                sql`${lmsLessonProgress.completedAt} >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+                sql`${lmsLessonProgress.completedAt} IS NOT NULL`
+              )
+            )
+            .groupBy(sql`DATE(${lmsLessonProgress.completedAt})`, lmsEnrollments.userId);
+
+          // Also pull login/page_view events from userActivityLogs for the same members
+          const activityRows = await db
+            .select({
+              day: sql<string>`DATE(${userActivityLogs.createdAt})`,
+              userId: userActivityLogs.userId,
+              cnt: sql<number>`COUNT(*)`,
+            })
+            .from(userActivityLogs)
+            .where(
+              and(
+                sql`${userActivityLogs.userId} IN (${sql.join(memberUserIds.map((id) => sql`${id}`), sql`, `)})`,
+                sql`${userActivityLogs.createdAt} >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+                sql`${userActivityLogs.eventType} IN ('login','page_view','video_play','lesson_complete','course_complete')`
+              )
+            )
+            .groupBy(sql`DATE(${userActivityLogs.createdAt})`, userActivityLogs.userId);
+
+          // Build a map: day -> { activeUsers: Set<userId>, lessonsCompleted: number }
+          const dayMap = new Map<string, { users: Set<number>; lessons: number }>();
+          for (const r of lessonRows) {
+            const d = r.day as string;
+            if (!dayMap.has(d)) dayMap.set(d, { users: new Set(), lessons: 0 });
+            dayMap.get(d)!.users.add(Number(r.userId));
+            dayMap.get(d)!.lessons += Number(r.cnt);
+          }
+          for (const r of activityRows) {
+            const d = r.day as string;
+            if (!dayMap.has(d)) dayMap.set(d, { users: new Set(), lessons: 0 });
+            dayMap.get(d)!.users.add(Number(r.userId));
+          }
+
+          // Produce last 30 days sorted ascending
+          const today = new Date();
+          for (let i = 29; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const key = d.toISOString().slice(0, 10);
+            const entry = dayMap.get(key);
+            dailyActivity.push({
+              date: key,
+              activeUsers: entry ? entry.users.size : 0,
+              lessonsCompleted: entry ? entry.lessons : 0,
+            });
+          }
+        }
+      }
+
       return {
         group: {
           id: group.id,
@@ -491,6 +567,7 @@ export const lmsTeamManagerRouter = router({
         courses,
         memberProgress,
         seatList: seats,
+        dailyActivity,
       };
     }),
 });
