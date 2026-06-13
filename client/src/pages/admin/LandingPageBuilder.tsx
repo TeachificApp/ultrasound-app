@@ -1059,6 +1059,9 @@ function CTAActionPicker({
   onLandingPageChange,
   funnelPageValue,
   onFunnelPageChange,
+  freeEnrollProductType,
+  freeEnrollProductId,
+  onFreeEnrollProductChange,
 }: {
   label?: string;
   behaviorValue: string;
