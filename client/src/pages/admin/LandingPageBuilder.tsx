@@ -34,6 +34,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -5937,6 +5938,94 @@ function TemplateLibrary({ blocks, onInsert, onClose, initialTab }: {
   );
 }
 
+// ─── Quick-Nav Dropdown ──────────────────────────────────────────────────────
+
+function LandingPageQuickNav({ currentCourseId, navigate }: { currentCourseId: number; navigate: (path: string) => void }) {
+  const { data, isLoading } = trpc.lmsAdmin.listAllLandingPages.useQuery(undefined, {
+    staleTime: 60_000,
+  });
+
+  const sections = [
+    { label: "Courses", items: data?.courses ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
+    { label: "Quizzes", items: data?.quizzes ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
+    { label: "Cohorts", items: data?.cohorts ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
+    { label: "Webinars", items: data?.webinars ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
+    { label: "Downloads", items: data?.downloads ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
+    { label: "Bundles", items: data?.bundles ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
+    { label: "Products", items: data?.products ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
+    { label: "Communities", items: data?.communities ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
+  ].filter(s => s.items.length > 0);
+
+  const funnels = data?.funnels ?? [];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors bg-white">
+          <Layers size={14} /> Jump to Page <ChevronDown size={12} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64 max-h-[70vh] overflow-y-auto">
+        {isLoading && <div className="px-3 py-2 text-xs text-gray-400">Loading pages…</div>}
+        {sections.map((section, si) => (
+          <React.Fragment key={section.label}>
+            {si > 0 && <DropdownMenuSeparator />}
+            <DropdownMenuLabel className="text-xs text-gray-500 uppercase tracking-wide px-2 py-1">{section.label}</DropdownMenuLabel>
+            {section.items.map((item: { id: number; title: string }) => (
+              <DropdownMenuItem
+                key={item.id}
+                disabled={item.id === currentCourseId}
+                onClick={() => navigate(section.route(item.id))}
+                className={item.id === currentCourseId ? "font-semibold text-teal-700 bg-teal-50" : ""}
+              >
+                <span className="truncate">{item.title}</span>
+                {item.id === currentCourseId && <span className="ml-auto text-[10px] text-teal-500">current</span>}
+              </DropdownMenuItem>
+            ))}
+          </React.Fragment>
+        ))}
+        {funnels.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-gray-500 uppercase tracking-wide px-2 py-1">Funnel Pages</DropdownMenuLabel>
+            {funnels.map((funnel: { id: number; title: string; pages: Array<{ id: number; title: string }> }) => (
+              funnel.pages.length === 0 ? null : funnel.pages.length === 1 ? (
+                <DropdownMenuItem
+                  key={funnel.id}
+                  onClick={() => navigate(`/admin/funnels/${funnel.id}/pages/${funnel.pages[0].id}/edit`)}
+                >
+                  <span className="truncate">{funnel.title} — {funnel.pages[0].title}</span>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuSub key={funnel.id}>
+                  <DropdownMenuSubTrigger className="text-sm">
+                    <span className="truncate">{funnel.title}</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent className="w-56">
+                      {funnel.pages.map((page: { id: number; title: string }) => (
+                        <DropdownMenuItem
+                          key={page.id}
+                          onClick={() => navigate(`/admin/funnels/${funnel.id}/pages/${page.id}/edit`)}
+                        >
+                          <span className="truncate">{page.title}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+              )
+            ))}
+          </>
+        )}
+        {!isLoading && sections.length === 0 && funnels.length === 0 && (
+          <div className="px-3 py-2 text-xs text-gray-400">No other landing pages found</div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // ─── Main Builder ─────────────────────────────────────────────────────────────
 
 export default function LandingPageBuilder() {
@@ -6433,6 +6522,8 @@ export default function LandingPageBuilder() {
           <button onClick={() => navigate(`/admin/lms?editCourse=${courseId}`)} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 font-medium transition-colors">
             <ArrowLeft size={16} /> Back to Course
           </button>
+          <div className="w-px h-5 bg-gray-200" />
+          <LandingPageQuickNav currentCourseId={numericCourseId} navigate={navigate} />
           <div className="w-px h-5 bg-gray-200" />
           <span className="text-sm font-semibold text-gray-800 truncate max-w-xs">{courseInfo?.title ?? "Landing Page Builder"}</span>
           <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Page Editor</span>

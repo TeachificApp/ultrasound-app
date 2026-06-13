@@ -73,6 +73,11 @@ import {
   lmsCohortSubmissions,
   mediaUploadFolders,
   mediaUploadResponses,
+  webinars,
+  bundles,
+  communities,
+  funnels,
+  funnelPages,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1265,4 +1270,63 @@ export const lmsCourseBuilderRouter = router({
       await db.delete(lmsCheckoutTemplates).where(eq(lmsCheckoutTemplates.id, input.id));
       return { success: true };
     }),
+
+  /**
+   * Quick-nav: return all content types that have landing pages so the
+   * LandingPageBuilder header can offer a jump-to dropdown.
+   */
+  listAllLandingPages: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+    const [courses, webinarRows, downloadRows, bundleRows, productRows, communityRows, funnelRows, funnelPageRows] =
+      await Promise.all([
+        db.select({ id: lmsCourses.id, title: lmsCourses.title, type: lmsCourses.type })
+          .from(lmsCourses)
+          .where(sql`${lmsCourses.status} != 'archived'`)
+          .orderBy(asc(lmsCourses.type), asc(lmsCourses.title)),
+        db.select({ id: webinars.id, title: webinars.title })
+          .from(webinars)
+          .where(sql`${webinars.status} != 'ended'`)
+          .orderBy(asc(webinars.title)),
+        db.select({ id: digitalProducts.id, title: digitalProducts.title })
+          .from(digitalProducts)
+          .orderBy(asc(digitalProducts.title)),
+        db.select({ id: bundles.id, title: bundles.title })
+          .from(bundles)
+          .orderBy(asc(bundles.title)),
+        db.select({ id: physicalProducts.id, title: physicalProducts.title })
+          .from(physicalProducts)
+          .orderBy(asc(physicalProducts.title)),
+        db.select({ id: communities.id, title: communities.title })
+          .from(communities)
+          .orderBy(asc(communities.title)),
+        db.select({ id: funnels.id, name: funnels.name })
+          .from(funnels)
+          .orderBy(asc(funnels.sortOrder), asc(funnels.name)),
+        db.select({ id: funnelPages.id, funnelId: funnelPages.funnelId, title: funnelPages.title })
+          .from(funnelPages)
+          .orderBy(asc(funnelPages.sortOrder)),
+      ]);
+
+    // Attach pages to their funnel
+    const pagesByFunnelId = new Map<number, Array<{ id: number; title: string }>>();
+    for (const page of funnelPageRows) {
+      if (!pagesByFunnelId.has(page.funnelId)) pagesByFunnelId.set(page.funnelId, []);
+      pagesByFunnelId.get(page.funnelId)!.push({ id: page.id, title: page.title });
+    }
+
+    return {
+      courses: courses.filter(c => c.type === "course"),
+      quizzes: courses.filter(c => c.type === "quiz"),
+      cohorts: courses.filter(c => c.type === "cohort"),
+      downloads: downloadRows,
+      webinars: webinarRows,
+      bundles: bundleRows,
+      products: productRows,
+      communities: communityRows,
+      funnels: funnelRows.map(f => ({ id: f.id, title: f.name, pages: pagesByFunnelId.get(f.id) ?? [] })),
+    };
+  }),
 });
