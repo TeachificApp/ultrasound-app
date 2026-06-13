@@ -23,6 +23,7 @@ import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
+import { fireCommunityWorkflowRules } from "../lib/communityAutoJoin";
 
 // Stripe webhook secret — optional but strongly recommended in production
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
@@ -1863,6 +1864,14 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       await handlePhysicalProductCheckoutCompleted(sessionObj);
       await handleMembershipCheckoutCompleted(sessionObj);
       await handleDiyCheckoutCompleted(sessionObj);
+      // Fire community workflow rules for any purchase (fire-and-forget)
+      try {
+        const meta = (sessionObj.metadata as Record<string, string>) ?? {};
+        const purchaseUserId = meta.user_id ? parseInt(meta.user_id) : null;
+        if (purchaseUserId) {
+          fireCommunityWorkflowRules(purchaseUserId, { type: "any_purchase" }).catch(() => {});
+        }
+      } catch (_) {}
     } else if (eventType === "payment_intent.succeeded") {
       await handleFunnelPaymentIntentSucceeded(sessionObj);
     } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {

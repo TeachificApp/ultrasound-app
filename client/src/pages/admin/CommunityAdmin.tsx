@@ -28,7 +28,7 @@ import {
   Hash, Award, Shield, Upload, UserPlus,
   UserMinus, MessageSquare, CheckSquare, X, ExternalLink,
   GripVertical, Link2, Image, UserCircle, ChevronUp, ChevronDown,
-  AlertCircle, Lock, PenSquare, LayoutTemplate
+  AlertCircle, Lock, PenSquare, LayoutTemplate, Zap, ToggleLeft, ToggleRight
 } from "lucide-react";
 import CommunityPageEditor from "@/components/CommunityPageEditor";
 import { Link } from "wouter";
@@ -665,6 +665,127 @@ function SortOrderTab({ communities, onRefresh }: { communities: any[]; onRefres
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Workflow Rules Tab ───────────────────────────────────────────────────────
+const TRIGGER_LABELS: Record<string, string> = {
+  any_signup: "Any new account signup",
+  any_purchase: "Any purchase (Stripe checkout)",
+  course_enrollment: "Course enrollment",
+  webinar_registration: "Webinar registration",
+  download_purchase: "Download purchase",
+  bundle_purchase: "Bundle purchase",
+  brand_membership: "Brand membership activation",
+};
+
+function WorkflowRulesTab({ communityId }: { communityId: number }) {
+  const utils = trpc.useUtils();
+  const { data: rules, isLoading } = trpc.community.admin.listWorkflowRules.useQuery({ communityId });
+  const createMutation = trpc.community.admin.createWorkflowRule.useMutation({
+    onSuccess: () => { utils.community.admin.listWorkflowRules.invalidate(); toast.success("Rule created"); setShowForm(false); resetForm(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateMutation = trpc.community.admin.updateWorkflowRule.useMutation({
+    onSuccess: () => { utils.community.admin.listWorkflowRules.invalidate(); toast.success("Rule updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteMutation = trpc.community.admin.deleteWorkflowRule.useMutation({
+    onSuccess: () => { utils.community.admin.listWorkflowRules.invalidate(); toast.success("Rule deleted"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState("");
+  const [triggerType, setTriggerType] = useState("any_signup");
+  const [entityId, setEntityId] = useState("");
+
+  function resetForm() { setName(""); setTriggerType("any_signup"); setEntityId(""); }
+
+  const needsEntity = ["course_enrollment", "webinar_registration", "download_purchase", "bundle_purchase"].includes(triggerType);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-gray-900">Workflow Rules</h3>
+          <p className="text-sm text-gray-500 mt-0.5">Automatically add users to this community when a trigger event occurs.</p>
+        </div>
+        <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5">
+          <Plus className="w-4 h-4" />Add Rule
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />)}</div>
+      ) : !rules?.length ? (
+        <div className="text-center py-10 text-gray-400 border-2 border-dashed rounded-xl">
+          <Zap className="w-8 h-8 mx-auto mb-2 opacity-40" />
+          <p className="text-sm">No workflow rules yet. Add one to auto-enroll users.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {rules.map((rule: any) => (
+            <div key={rule.id} className="flex items-center gap-3 p-3 bg-white border rounded-xl shadow-sm">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${rule.isActive ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-400"}`}>
+                <Zap className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm text-gray-900 truncate">{rule.name}</div>
+                <div className="text-xs text-gray-500">{TRIGGER_LABELS[rule.triggerType] ?? rule.triggerType}{rule.entityId ? ` (ID: ${rule.entityId})` : ""}</div>
+              </div>
+              <button
+                onClick={() => updateMutation.mutate({ id: rule.id, isActive: !rule.isActive })}
+                className="text-gray-400 hover:text-teal-600 transition-colors"
+                title={rule.isActive ? "Disable rule" : "Enable rule"}
+              >
+                {rule.isActive ? <ToggleRight className="w-5 h-5 text-teal-500" /> : <ToggleLeft className="w-5 h-5" />}
+              </button>
+              <button
+                onClick={() => { if (confirm("Delete this rule?")) deleteMutation.mutate({ id: rule.id }); }}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
+          <h4 className="font-medium text-sm text-gray-900">New Workflow Rule</h4>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Rule Name</label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Auto-join on course purchase" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Trigger Event</label>
+            <Select value={triggerType} onValueChange={setTriggerType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(TRIGGER_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {needsEntity && (
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Entity ID (optional — leave blank to match any)</label>
+              <Input value={entityId} onChange={e => setEntityId(e.target.value)} placeholder="e.g. 42" type="number" />
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" onClick={() => createMutation.mutate({ communityId, name, triggerType: triggerType as any, entityId: entityId ? parseInt(entityId) : undefined })} disabled={!name || createMutation.isPending}>
+              {createMutation.isPending ? "Saving..." : "Create Rule"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function CommunityAdmin() {
   const { user } = useAuth();
   const isAdmin = (user as any)?.role === "admin";
@@ -791,6 +912,7 @@ export default function CommunityAdmin() {
           <TabsTrigger value="badges"><Award className="w-4 h-4 mr-2" />Badges</TabsTrigger>
           <TabsTrigger value="page-editor"><LayoutTemplate className="w-4 h-4 mr-2" />Page Editor</TabsTrigger>
           <TabsTrigger value="landing-editor"><LayoutTemplate className="w-4 h-4 mr-2" />Landing Page</TabsTrigger>
+          <TabsTrigger value="workflow-rules"><Zap className="w-4 h-4 mr-2" />Workflow Rules</TabsTrigger>
         </TabsList>
 
         {/* Communities tab */}
@@ -1098,6 +1220,13 @@ export default function CommunityAdmin() {
             </div>
           ) : (
             <div className="text-center py-12 text-gray-400">Select a community above to edit its landing page.</div>
+          )}
+        </TabsContent>
+        <TabsContent value="workflow-rules">
+          {activeCommunityId ? (
+            <WorkflowRulesTab communityId={activeCommunityId} />
+          ) : (
+            <div className="text-center py-12 text-gray-400">Select a community above to manage its workflow rules.</div>
           )}
         </TabsContent>
       </Tabs>

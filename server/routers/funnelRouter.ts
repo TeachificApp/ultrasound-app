@@ -7,7 +7,7 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getOrCreateUserByEmail } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users } from "../../drizzle/schema";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users, webinarRegistrations, bundleEnrollments } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql, inArray, or, like, isNotNull } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 import { computeFunnelCheckoutTotalCents } from "../lib/checkoutPricing";
@@ -2358,6 +2358,94 @@ export const funnelAdminRouter = router({
 
       const csvContent = [headers.map(escape).join(","), ...rows].join("\n");
       return { csvContent, total: leads.length };
+    }),
+
+  /**
+   * getEnrollmentCount — public procedure used by the EnrollmentCounter block.
+   * Returns the count for the requested entity type. No auth required so it
+   * works on public landing pages and standalone funnel pages.
+   */
+  getEnrollmentCount: publicProcedure
+    .input(z.object({
+      countType: z.enum([
+        "site_users",
+        "course", "all_courses",
+        "brand_membership",
+        "download", "all_downloads",
+        "webinar", "all_webinars",
+        "bundle", "all_bundles",
+      ]),
+      entityId: z.number().optional(),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { count: 0 };
+      const { countType, entityId } = input;
+      let n = 0;
+      switch (countType) {
+        case "site_users": {
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(users);
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        case "course": {
+          if (!entityId) { n = 0; break; }
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(lmsEnrollments)
+            .where(eq(lmsEnrollments.courseId, entityId));
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        case "all_courses": {
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(lmsEnrollments);
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        case "brand_membership": {
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(brandMemberships)
+            .where(eq(brandMemberships.status, "active"));
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        case "download": {
+          if (!entityId) { n = 0; break; }
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(digitalPurchases)
+            .where(eq(digitalPurchases.productId, entityId));
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        case "all_downloads": {
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(digitalPurchases);
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        case "webinar": {
+          if (!entityId) { n = 0; break; }
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(webinarRegistrations)
+            .where(eq(webinarRegistrations.webinarId, entityId));
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        case "all_webinars": {
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(webinarRegistrations);
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        case "bundle": {
+          if (!entityId) { n = 0; break; }
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(bundleEnrollments)
+            .where(eq(bundleEnrollments.bundleId, entityId));
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        case "all_bundles": {
+          const [r] = await db.select({ c: sql<number>`COUNT(*)` }).from(bundleEnrollments);
+          n = Number(r?.c ?? 0);
+          break;
+        }
+        default:
+          n = 0;
+      }
+      return { count: n };
     }),
 
   /** Get all funnels with their pages (including blocks) for the block picker "Copy from Other Pages" tab */

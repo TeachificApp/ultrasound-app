@@ -42,6 +42,7 @@ import {
   communityCourseLinkages,
   communityInvites,
   thinkificCommunitySyncState,
+  communityWorkflowRules,
 } from "../../drizzle/schema";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1649,6 +1650,52 @@ const communityAdminRouter = router({
       ],
     });
     return { summary: response.choices[0]?.message?.content ?? "Unable to generate summary." };
+  }),
+
+  // ─── Community Workflow Rules ─────────────────────────────────────────────────
+  /** List all workflow rules for a community */
+  listWorkflowRules: protectedProcedure.input(z.object({ communityId: z.number() })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    return db.select().from(communityWorkflowRules).where(eq(communityWorkflowRules.communityId, input.communityId)).orderBy(asc(communityWorkflowRules.id));
+  }),
+  /** Create a workflow rule */
+  createWorkflowRule: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    name: z.string().min(1).max(200),
+    triggerType: z.enum(["any_signup", "any_purchase", "course_enrollment", "webinar_registration", "download_purchase", "bundle_purchase", "brand_membership"]),
+    entityId: z.number().optional(),
+    isActive: z.boolean().default(true),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [result] = await db.insert(communityWorkflowRules).values(input).$returningId();
+    return { id: result.id };
+  }),
+  /** Update a workflow rule */
+  updateWorkflowRule: protectedProcedure.input(z.object({
+    id: z.number(),
+    name: z.string().min(1).max(200).optional(),
+    triggerType: z.enum(["any_signup", "any_purchase", "course_enrollment", "webinar_registration", "download_purchase", "bundle_purchase", "brand_membership"]).optional(),
+    entityId: z.number().nullable().optional(),
+    isActive: z.boolean().optional(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const { id, ...rest } = input;
+    await db.update(communityWorkflowRules).set(rest).where(eq(communityWorkflowRules.id, id));
+    return { success: true };
+  }),
+  /** Delete a workflow rule */
+  deleteWorkflowRule: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.delete(communityWorkflowRules).where(eq(communityWorkflowRules.id, input.id));
+    return { success: true };
   }),
 });
 

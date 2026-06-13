@@ -6356,3 +6356,29 @@ export const lmsCohortRecordingProgress = mysqlTable("lms_cohort_recording_progr
 });
 export type LmsCohortRecordingProgress = typeof lmsCohortRecordingProgress.$inferSelect;
 export type InsertLmsCohortRecordingProgress = typeof lmsCohortRecordingProgress.$inferInsert;
+
+// ─── Community Workflow Rules ─────────────────────────────────────────────────
+/**
+ * Admin-configurable rules that automatically add users to a community when
+ * a trigger event occurs (e.g. course purchase, webinar registration, signup).
+ */
+export const communityWorkflowRules = mysqlTable("community_workflow_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  communityId: int("community_id").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  triggerType: mysqlEnum("trigger_type", [
+    "any_signup",
+    "any_purchase",
+    "course_enrollment",
+    "webinar_registration",
+    "download_purchase",
+    "bundle_purchase",
+    "brand_membership",
+  ]).notNull(),
+  entityId: int("entity_id"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type CommunityWorkflowRule = typeof communityWorkflowRules.$inferSelect;
+export type InsertCommunityWorkflowRule = typeof communityWorkflowRules.$inferInsert;

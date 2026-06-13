@@ -89,7 +89,8 @@ export type BlockType =
   | "webinar_replay"
   | "webinar_agenda"
   | "conditional_text"
-  | "sdms_cme_module";
+  | "sdms_cme_module"
+  | "enrollment_counter";
 
 export interface Block {
   id: string;
@@ -1558,9 +1559,97 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       );
     }
 
+    case "enrollment_counter":
+      return <EnrollmentCounterBlockPreview d={d} />;
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
+}
+
+// ─── Enrollment Counter Block ─────────────────────────────────────────────────
+function useCountUp(target: number, duration = 1800) {
+  const [display, setDisplay] = React.useState(0);
+  const rafRef = React.useRef<number | null>(null);
+  const startRef = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    if (target === 0) { setDisplay(0); return; }
+    startRef.current = null;
+    const step = (ts: number) => {
+      if (!startRef.current) startRef.current = ts;
+      const elapsed = ts - startRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(eased * target));
+      if (progress < 1) rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [target, duration]);
+  return display;
+}
+
+function EnrollmentCounterBlockPreview({ d }: { d: Record<string, any> }) {
+  const countType = d.countType ?? "site_users";
+  const entityId = d.entityId ? Number(d.entityId) : undefined;
+  const { data, isLoading } = trpc.funnel.getEnrollmentCount.useQuery(
+    { countType, entityId },
+    { staleTime: 60_000 }
+  );
+  const rawCount = data?.count ?? 0;
+  const offset = Number(d.countOffset ?? 0);
+  const multiplier = Number(d.countMultiplier ?? 1) || 1;
+  const finalCount = Math.max(0, Math.round(rawCount * multiplier + offset));
+  const displayCount = useCountUp(finalCount);
+
+  const accentColor = d.accentColor ?? "#179ca3";
+  const bgColor = d.bgColor ?? "#f0fafa";
+  const textColor = d.textColor ?? "#0e4a50";
+  const label = d.label ?? "Students Enrolled";
+  const subtext = d.subtext ?? "";
+  const showIcon = d.showIcon !== false;
+  const numberSize = d.numberSize ?? "5xl";
+  const align = d.align ?? "center";
+
+  const sizeMap: Record<string, string> = {
+    "3xl": "text-3xl",
+    "4xl": "text-4xl",
+    "5xl": "text-5xl",
+    "6xl": "text-6xl",
+    "7xl": "text-7xl",
+    "8xl": "text-8xl",
+  };
+  const numClass = sizeMap[numberSize] ?? "text-5xl";
+
+  const formatted = new Intl.NumberFormat("en-US").format(displayCount);
+
+  return (
+    <div
+      className="px-8 py-10"
+      style={{ backgroundColor: bgColor }}
+    >
+      <div className={`flex flex-col items-${align === "left" ? "start" : align === "right" ? "end" : "center"} gap-2`}>
+        {showIcon && (
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mb-1" style={{ backgroundColor: `${accentColor}20` }}>
+            <Users className="w-6 h-6" style={{ color: accentColor }} />
+          </div>
+        )}
+        {isLoading ? (
+          <div className={`${numClass} font-extrabold tabular-nums`} style={{ color: accentColor }}>—</div>
+        ) : (
+          <div className={`${numClass} font-extrabold tabular-nums leading-none`} style={{ color: accentColor }}>
+            {d.prefix ?? ""}{formatted}{d.suffix ?? "+"}
+          </div>
+        )}
+        {label && (
+          <p className="text-lg font-semibold mt-1" style={{ color: textColor }}>{label}</p>
+        )}
+        {subtext && (
+          <p className="text-sm opacity-70 max-w-xs text-center" style={{ color: textColor }}>{subtext}</p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function InstructorBlockPreview({ d }: { d: Record<string, any> }) {

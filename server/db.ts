@@ -213,7 +213,19 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   else if (user.openId === ENV.ownerOpenId) { values.role = "admin"; updateSet.role = "admin"; }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
+  // Check if this is a genuinely new user (no existing row for this openId)
+  const existingRow = await db.select({ id: users.id }).from(users).where(eq(users.openId, user.openId)).limit(1);
+  const isNewOAuthUser = existingRow.length === 0;
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  // Fire community workflow rules for brand-new signups (fire-and-forget)
+  if (isNewOAuthUser) {
+    const newRow = await db.select({ id: users.id }).from(users).where(eq(users.openId, user.openId)).limit(1);
+    if (newRow[0]) {
+      import("./lib/communityAutoJoin").then(({ fireCommunityWorkflowRules }) => {
+        fireCommunityWorkflowRules(newRow[0].id, { type: "any_signup" }).catch(() => {});
+      }).catch(() => {});
+    }
+  }
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -400,10 +412,13 @@ export async function getOrCreateUserByEmail(opts: {
     throw err;
   }
   const newUser = await getUserByEmail(normalised);
-  if (!newUser) throw new Error(`Failed to create user for ${normalised}`);
+    if (!newUser) throw new Error(`Failed to create user for ${normalised}`);
+  // Fire community workflow rules for brand-new email-based signups (fire-and-forget)
+  import("./lib/communityAutoJoin").then(({ fireCommunityWorkflowRules }) => {
+    fireCommunityWorkflowRules(newUser!.id, { type: "any_signup" }).catch(() => {});
+  }).catch(() => {});
   return { user: newUser as any, isNew: true, resetToken };
 }
-
 export async function setPasswordResetToken(
   userId: number,
   token: string,

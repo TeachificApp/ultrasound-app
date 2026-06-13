@@ -383,6 +383,28 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       bgColor: "#ffffff", headerBg: "#f0fafa", headerTextColor: "#0e4a50", borderColor: "#d1fae5",
       fontSize: 14, textAlign: "left",
     } },
+  {
+    type: "enrollment_counter",
+    label: "Enrollment Counter",
+    icon: <Users size={14} />,
+    category: "Marketing",
+    defaultData: {
+      countType: "site_users",
+      entityId: null,
+      label: "Students Enrolled",
+      subtext: "Join our growing community of learners.",
+      prefix: "",
+      suffix: "+",
+      countOffset: 0,
+      countMultiplier: 1,
+      numberSize: "5xl",
+      align: "center",
+      showIcon: true,
+      accentColor: "#179ca3",
+      bgColor: "#f0fafa",
+      textColor: "#0e4a50",
+    },
+  },
 ];
 
 export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart", "Webinar"];
@@ -5510,6 +5532,111 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       );
     }
 
+    case "enrollment_counter": {
+      const COUNT_TYPE_OPTIONS = [
+        { value: "site_users", label: "All Site Users" },
+        { value: "all_courses", label: "All Course Enrollments (platform-wide)" },
+        { value: "course", label: "Specific Course Enrollments" },
+        { value: "brand_membership", label: "Active Brand Memberships" },
+        { value: "all_downloads", label: "All Download Purchases (platform-wide)" },
+        { value: "download", label: "Specific Download Purchases" },
+        { value: "all_webinars", label: "All Webinar Registrations (platform-wide)" },
+        { value: "webinar", label: "Specific Webinar Registrations" },
+        { value: "all_bundles", label: "All Bundle Enrollments (platform-wide)" },
+        { value: "bundle", label: "Specific Bundle Enrollments" },
+      ];
+      const needsEntity = ["course", "download", "webinar", "bundle"].includes(d.countType ?? "");
+      // Entity pickers
+      const { data: ecCourses } = trpc.lmsAdmin.listCourses.useQuery(
+        { status: "all", type: "all", pageSize: 200 },
+        { enabled: d.countType === "course" }
+      );
+      const { data: ecDownloads } = trpc.downloadsAdmin.list.useQuery(
+        undefined,
+        { enabled: d.countType === "download" }
+      );
+      const { data: ecBundles } = trpc.downloadsAdmin.listBundles.useQuery(
+        undefined,
+        { enabled: d.countType === "bundle" }
+      );
+      const { data: ecWebinars } = trpc.webinarAdmin.list.useQuery(
+        { pageSize: 200 },
+        { enabled: d.countType === "webinar" }
+      );
+      const entityOptions: Array<{ id: number; label: string }> = React.useMemo(() => {
+        if (d.countType === "course") return ((ecCourses as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: `${c.title} (${c.type})` }));
+        if (d.countType === "download") return ((ecDownloads as any) ?? []).map((x: any) => ({ id: x.id, label: x.title ?? x.name ?? `#${x.id}` }));
+        if (d.countType === "bundle") return ((ecBundles as any) ?? []).map((x: any) => ({ id: x.id, label: x.title ?? x.name ?? `#${x.id}` }));
+        if (d.countType === "webinar") return ((ecWebinars as any)?.webinars ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `#${w.id}` }));
+        return [];
+      }, [d.countType, ecCourses, ecDownloads, ecBundles, ecWebinars]);
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">What to Count</label>
+            <select value={d.countType ?? "site_users"} onChange={e => { set("countType", e.target.value); set("entityId", null); }} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              {COUNT_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          {needsEntity && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Select {d.countType === "course" ? "Course" : d.countType === "download" ? "Download" : d.countType === "bundle" ? "Bundle" : "Webinar"}</label>
+              <select value={d.entityId ?? ""} onChange={e => set("entityId", e.target.value ? Number(e.target.value) : null)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+                <option value="">— Select —</option>
+                {entityOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="border-t border-gray-100 pt-2">
+            <p className="text-[10px] text-gray-400 mb-2 font-medium uppercase tracking-wide">Display Options</p>
+            <BSTextField data={d} onSet={set} label="Label" field="label" placeholder="Students Enrolled" />
+            <BSTextField data={d} onSet={set} label="Subtext (optional)" field="subtext" placeholder="Join our growing community" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <BSTextField data={d} onSet={set} label="Prefix" field="prefix" placeholder="" />
+            <BSTextField data={d} onSet={set} label="Suffix" field="suffix" placeholder="+" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Add Offset</label>
+              <input type="number" value={d.countOffset ?? 0} onChange={e => set("countOffset", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+              <p className="text-[10px] text-gray-400 mt-0.5">Added to real count</p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Multiplier</label>
+              <input type="number" step="0.1" value={d.countMultiplier ?? 1} onChange={e => set("countMultiplier", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" min={0.1} />
+              <p className="text-[10px] text-gray-400 mt-0.5">Scales real count</p>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Number Size</label>
+            <select value={d.numberSize ?? "5xl"} onChange={e => set("numberSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="3xl">Small</option>
+              <option value="4xl">Medium</option>
+              <option value="5xl">Large (default)</option>
+              <option value="6xl">X-Large</option>
+              <option value="7xl">2X-Large</option>
+              <option value="8xl">3X-Large</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Alignment</label>
+            <select value={d.align ?? "center"} onChange={e => set("align", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="ec-icon" checked={d.showIcon !== false} onChange={e => set("showIcon", e.target.checked)} className="w-3.5 h-3.5" />
+            <label htmlFor="ec-icon" className="text-xs text-gray-600">Show icon</label>
+          </div>
+          <BSColorField data={d} onSet={set} label="Number Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+        </div>
+      );
+    }
      default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
   } })();
