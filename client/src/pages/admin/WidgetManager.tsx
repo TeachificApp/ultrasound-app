@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Link } from "wouter";
 import {
   Plus, Copy, Trash2, Edit2, Eye, RefreshCw, Code2, ArrowLeft,
@@ -357,7 +357,6 @@ function WidgetForm({
 
 export default function WidgetManager() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const utils = trpc.useUtils();
   const [mode, setMode] = useState<"list" | "create" | "edit">("list");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -372,23 +371,23 @@ export default function WidgetManager() {
   );
 
   const createMutation = trpc.widgetAdmin.create.useMutation({
-    onSuccess: () => { utils.widgetAdmin.list.invalidate(); setMode("list"); toast({ title: "Widget created!" }); },
-    onError: e => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { utils.widgetAdmin.list.invalidate(); setMode("list"); toast.success("Widget created!"); },
+    onError: e => toast.error(e.message),
   });
 
   const updateMutation = trpc.widgetAdmin.update.useMutation({
-    onSuccess: () => { utils.widgetAdmin.list.invalidate(); setMode("list"); setEditingId(null); toast({ title: "Widget updated!" }); },
-    onError: e => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { utils.widgetAdmin.list.invalidate(); setMode("list"); setEditingId(null); toast.success("Widget updated!"); },
+    onError: e => toast.error(e.message),
   });
 
   const deleteMutation = trpc.widgetAdmin.delete.useMutation({
-    onSuccess: () => { utils.widgetAdmin.list.invalidate(); toast({ title: "Widget deleted" }); },
-    onError: e => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { utils.widgetAdmin.list.invalidate(); toast.success("Widget deleted"); },
+    onError: e => toast.error(e.message),
   });
 
   const regenMutation = trpc.widgetAdmin.regenerateToken.useMutation({
-    onSuccess: () => { utils.widgetAdmin.list.invalidate(); toast({ title: "Token regenerated — update your embed code!" }); },
-    onError: e => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { utils.widgetAdmin.list.invalidate(); toast.success("Token regenerated — update your embed code!"); },
+    onError: e => toast.error(e.message),
   });
 
   function handleSubmit(data: WidgetFormData) {
