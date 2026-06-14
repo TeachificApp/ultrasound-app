@@ -91,6 +91,7 @@ import {
   Briefcase,
   ArrowLeft,
   Home,
+  Code2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1205,6 +1206,7 @@ export default function PlatformAdmin() {
     { id: "media-repository", href: getAdminUrl("/admin/media-repository"), icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
     { id: "lms", href: getAdminUrl("/admin/lms"), icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
     { id: "funnels", href: getAdminUrl("/admin/funnels"), icon: LayoutTemplate, label: "Funnel Management", description: "Build funnels, manage contacts/leads, and track Lead \u2192 User \u2192 Purchaser conversions", color: "#be185d" },
+    { id: "widgets", href: getAdminUrl("/admin/widgets"), icon: Code2, label: "Embed Widgets", description: "Create embeddable course/quiz card widgets for any external website", color: "#7c3aed" },
     { id: "members", href: getAdminUrl("/admin/members"), icon: Users, label: "Members", description: "Registered users, enrollments, sales, memberships, and activity logs", color: "#0d9488" },
     { id: "career-network", href: getAdminUrl("/admin/career-network"), icon: Briefcase, label: "Career Network", description: "Manage job postings, RSS feed sources, candidate profiles, and employer subscriptions", color: "#0369a1" },
   ];

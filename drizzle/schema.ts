@@ -6383,3 +6383,26 @@ export const communityWorkflowRules = mysqlTable("community_workflow_rules", {
 });
 export type CommunityWorkflowRule = typeof communityWorkflowRules.$inferSelect;
 export type InsertCommunityWorkflowRule = typeof communityWorkflowRules.$inferInsert;
+
+// ── Embeddable Widgets ──────────────────────────────────────────────────────
+export const embedWidgets = mysqlTable("embed_widgets", {
+  id: int("id").autoincrement().primaryKey(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  title: varchar("title", { length: 255 }),
+  subtitle: varchar("subtitle", { length: 500 }),
+  layout: mysqlEnum("layout", ["grid", "carousel", "list"]).default("grid").notNull(),
+  theme: mysqlEnum("theme", ["light", "dark", "brand"]).default("light").notNull(),
+  cardStyle: mysqlEnum("card_style", ["standard", "compact", "minimal"]).default("standard").notNull(),
+  showPrice: boolean("show_price").default(true).notNull(),
+  showEnrollButton: boolean("show_enroll_button").default(true).notNull(),
+  buttonText: varchar("button_text", { length: 100 }).default("Enroll Now"),
+  buttonUrl: varchar("button_url", { length: 500 }),
+  maxCards: int("max_cards").default(6).notNull(),
+  items: longtext("items").notNull().default("[]"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type EmbedWidget = typeof embedWidgets.$inferSelect;
+export type InsertEmbedWidget = typeof embedWidgets.$inferInsert;

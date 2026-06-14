@@ -55,6 +55,7 @@ import { communityRouter } from "./routers/communityRouter";
 import { interestsRouter } from "./routers/interestsRouter";
 import { productAnalyticsRouter } from "./routers/productAnalyticsRouter";
 import { sdmsCmeRouter } from "./routers/sdmsCmeRouter";
+import { widgetAdminRouter, widgetPublicRouter } from "./routers/widgetRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -2030,6 +2031,8 @@ export const appRouter = router({
   // ─── CME Hub (Thinkific Catalog) ──────────────────────────────────────────────
   cmeCatalog: cmeRouter,
   sdmsCme: sdmsCmeRouter,
+  widgetAdmin: widgetAdminRouter,
+  widgetPublic: widgetPublicRouter,
 
   // ─── Email/Password Auth (white-label, no OAuth portal) ──────────────────────
   emailAuth: emailAuthRouter,

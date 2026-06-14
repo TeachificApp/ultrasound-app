@@ -82,6 +82,8 @@ const CommunityExperiencePageBuilder = lazy(() => import("./pages/admin/Communit
 const BundleLandingPageBuilder = lazy(() => import("./pages/admin/BundleLandingPageBuilder"));
 const WebinarLandingPageBuilder = lazy(() => import("./pages/admin/WebinarLandingPageBuilder"));
 const WebinarPlayerPageBuilder = lazy(() => import("./pages/admin/WebinarPlayerPageBuilder"));
+const WidgetManager = lazy(() => import("./pages/admin/WidgetManager"));
+const WidgetRenderer = lazy(() => import("./pages/WidgetRenderer"));
 const MyDownloads = lazy(() => import("./pages/MyDownloads"));
 const BundleLanding = lazy(() => import("./pages/BundleLanding"));
 const ProductLanding = lazy(() => import("./pages/ProductLanding"));
@@ -473,6 +475,8 @@ function Router() {
         <Route path="/admin/bundles/:bundleId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><BundleLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/webinars/:webinarId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/webinars/:webinarId/player-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarPlayerPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/widgets">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><WidgetManager /></Suspense></RoleGuard>}</Route>
+        <Route path="/widget/:token">{() => <Suspense fallback={<div />}><WidgetRenderer /></Suspense>}</Route>
         {/* ── Physical Products ────────────────────────────────────────────────────────────────────────────── */}
         {/* Products listing page */}
         <Route path="/products">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductsListing /></Suspense>}</Route>
