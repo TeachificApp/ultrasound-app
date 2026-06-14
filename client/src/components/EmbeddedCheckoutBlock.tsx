@@ -67,6 +67,12 @@ export interface EmbeddedCheckoutProduct {
   imageUrl?: string;
   type: "course" | "download" | "physical" | "membership" | "bundle" | "other" | "subscription";
   strikethroughPrice?: string; // display-only, e.g. "$197"
+  billingInterval?: "monthly" | "quarterly" | "annual"; // for subscription type
+}
+const EC_INTERVAL_LABEL: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
+function ecIntervalSuffix(p: EmbeddedCheckoutProduct): string {
+  if (p.type !== "subscription") return "";
+  return EC_INTERVAL_LABEL[p.billingInterval ?? "monthly"] ?? "/mo";
 }
 
 export interface EmbeddedCheckoutOrderBump {
@@ -367,7 +373,7 @@ function DetailsStep({
                   {p.strikethroughPrice && (
                     <div className="text-xs text-red-500 line-through font-medium">{p.strikethroughPrice}</div>
                   )}
-                  <span className="font-bold text-sm" style={{ color: accent }}>${Number(p.price).toFixed(2)}</span>
+                  <span className="font-bold text-sm" style={{ color: accent }}>${Number(p.price).toFixed(2)}{ecIntervalSuffix(p)}</span>
                 </div>
                 <input type="radio" className="sr-only" checked={selectedProductIdx === i} onChange={() => setSelectedProductIdx(i)} />
               </label>
@@ -390,7 +396,7 @@ function DetailsStep({
             {selectedProduct.strikethroughPrice && (
               <div className="text-sm text-red-500 line-through font-medium">{selectedProduct.strikethroughPrice}</div>
             )}
-            <span className="font-bold text-lg" style={{ color: accent }}>${Number(selectedProduct.price).toFixed(2)}</span>
+            <span className="font-bold text-lg" style={{ color: accent }}>${Number(selectedProduct.price).toFixed(2)}{ecIntervalSuffix(selectedProduct)}</span>
           </div>
         </div>
       )}
@@ -498,7 +504,7 @@ function DetailsStep({
           {selectedProduct && (
             <div className="flex justify-between text-gray-600 mb-1">
               <span>{selectedProduct.name}</span>
-              <span>${Number(selectedProduct.price).toFixed(2)}</span>
+              <span>${Number(selectedProduct.price).toFixed(2)}{ecIntervalSuffix(selectedProduct)}</span>
             </div>
           )}
           {Array.from(addedBumps).map((idx) => {

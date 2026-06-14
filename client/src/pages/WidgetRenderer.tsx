@@ -14,6 +14,7 @@ interface Card {
   price: number | null;
   isFree: boolean;
   pricingType: string | null;
+  subscriptionInterval: string | null;
   currency: string | null;
   brand: string | null;
   itemType: string;
@@ -76,11 +77,15 @@ const THEMES = {
 
 // ─── Price formatter ──────────────────────────────────────────────────────────
 
+const INTERVAL_LABEL: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
 function formatPrice(card: Card): string {
   if (card.isFree || card.pricingType === "free") return "Free";
   if (!card.price) return "Free";
   const currency = card.currency?.toUpperCase() ?? "USD";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(card.price);
+  const base = new Intl.NumberFormat("en-US", { style: "currency", currency }).format(card.price);
+  if (card.pricingType === "subscription") return base + (INTERVAL_LABEL[card.subscriptionInterval ?? "monthly"] ?? "/mo");
+  if (card.pricingType === "payment_plan") return base + " (plan)";
+  return base;
 }
 
 // ─── Course URL builder ───────────────────────────────────────────────────────

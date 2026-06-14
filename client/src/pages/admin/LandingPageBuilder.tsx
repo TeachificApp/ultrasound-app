@@ -4279,6 +4279,12 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Type</label>
                     <select value={p.type} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 flex-1 text-xs rounded border border-gray-200 px-2"><option value="other">Other / Service</option><option value="course">Course</option><option value="download">Download</option><option value="physical">Physical Product</option><option value="subscription">Subscription</option></select>
                   </div>
+                  {p.type === "subscription" && (
+                    <div className="flex items-center gap-1">
+                      <label className="text-xs text-gray-400 w-24 flex-shrink-0">Billing Cycle</label>
+                      <select value={(p as any).billingInterval ?? "monthly"} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], billingInterval: e.target.value }; set("products", next); }} className="h-7 flex-1 text-xs rounded border border-gray-200 px-2"><option value="monthly">Monthly (/mo)</option><option value="quarterly">Quarterly (/qtr)</option><option value="annual">Annual (/yr)</option></select>
+                    </div>
+                  )}
                 </div>
                 <DebouncedInput value={p.imageUrl} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], imageUrl: v }; set("products", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
                 <div className="flex items-center gap-1">

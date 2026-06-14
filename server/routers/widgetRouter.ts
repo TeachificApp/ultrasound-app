@@ -149,6 +149,7 @@ export const widgetPublicRouter = router({
             price: lmsCourses.price,
             isFree: lmsCourses.isFree,
             pricingType: lmsCourses.pricingType,
+            subscriptionInterval: lmsCourses.subscriptionInterval,
             currency: lmsCourses.currency,
             brand: lmsCourses.brand,
             status: lmsCourses.status,

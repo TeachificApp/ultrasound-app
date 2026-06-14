@@ -84,7 +84,7 @@ export const funnelRouter = router({
 
       const [courses, downloads, bundles, physicals] = await Promise.all([
         allLmsCourseIds.length > 0
-          ? db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, description: lmsCourses.subtitle, imageUrl: lmsCourses.coverImageUrl, courseType: lmsCourses.type }).from(lmsCourses).where(inArray(lmsCourses.id, allLmsCourseIds))
+          ? db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, description: lmsCourses.subtitle, imageUrl: lmsCourses.coverImageUrl, courseType: lmsCourses.type, pricingType: lmsCourses.pricingType, subscriptionInterval: lmsCourses.subscriptionInterval }).from(lmsCourses).where(inArray(lmsCourses.id, allLmsCourseIds))
           : [],
         downloadIds.length > 0
           ? db.select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, price: digitalProducts.price, isFree: digitalProducts.isFree, description: digitalProducts.subtitle, imageUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).where(inArray(digitalProducts.id, downloadIds))
@@ -134,6 +134,7 @@ export const funnelRouter = router({
           id: number; type: string; slug: string; title: string;
           description: string | null; price: number; isFree: boolean;
           imageUrl: string | null; href: string;
+          pricingType?: string | null; subscriptionInterval?: string | null;
         }>;
     }),
 

@@ -43,9 +43,13 @@ interface Props {
   currentType?: "course" | "download";
 }
 
-function formatPrice(price: number, isFree: boolean): string {
+const INTERVAL_LABEL: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
+function formatPrice(price: number, isFree: boolean, pricingType?: string | null, subscriptionInterval?: string | null): string {
   if (isFree || price === 0) return "Free";
-  return `$${Number(price).toFixed(2)}`;
+  const base = `$${Number(price).toFixed(2)}`;
+  if (pricingType === "subscription") return base + (INTERVAL_LABEL[subscriptionInterval ?? "monthly"] ?? "/mo");
+  if (pricingType === "payment_plan") return base + " (plan)";
+  return base;
 }
 
 type ProductItem = {
@@ -58,6 +62,8 @@ type ProductItem = {
   imageUrl: string;
   type: "course" | "download" | "bundle" | "physical";
   href: string;
+  pricingType?: string | null;
+  subscriptionInterval?: string | null;
 };
 
 export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) {
@@ -113,6 +119,8 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
       imageUrl: p.imageUrl ?? "",
       type: p.type as ProductItem["type"],
       href: p.href,
+      pricingType: (p as any).pricingType ?? null,
+      subscriptionInterval: (p as any).subscriptionInterval ?? null,
     }));
   } else {
     const courseItems: ProductItem[] = (coursesData?.courses ?? []).map((c) => ({
@@ -125,6 +133,8 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
       imageUrl: (c as any).coverImageUrl ?? (c as any).thumbnailUrl ?? "",
       type: "course" as const,
       href: `/courses/${c.slug}`,
+      pricingType: (c as any).pricingType ?? null,
+      subscriptionInterval: (c as any).subscriptionInterval ?? null,
     }));
 
     const downloadItems: ProductItem[] = (downloadsData?.products ?? []).map((p) => ({
@@ -301,7 +311,7 @@ function ProductCard({ item, accent, textColor, cardBg, showPrice, showDescripti
         <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 flex-shrink-0">
           {showPrice ? (
             <span className="text-sm font-bold whitespace-nowrap" style={{ color: accent }}>
-              {formatPrice(item.price, item.isFree)}
+              {formatPrice(item.price, item.isFree, item.pricingType, item.subscriptionInterval)}
             </span>
           ) : (
             <span />
@@ -360,7 +370,7 @@ function ProductListRow({ item, accent, textColor, cardBg, showPrice, showDescri
       <div className="flex items-center gap-3 flex-shrink-0">
         {showPrice && (
           <span className="text-sm font-bold whitespace-nowrap" style={{ color: accent }}>
-            {formatPrice(item.price, item.isFree)}
+            {formatPrice(item.price, item.isFree, item.pricingType, item.subscriptionInterval)}
           </span>
         )}
         <Link href={item.href}>
