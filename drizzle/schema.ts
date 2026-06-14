@@ -4607,6 +4607,7 @@ export const webinars = mysqlTable("webinars", {
   postWebinarMessage: text("post_webinar_message"),
   postWebinarDelaySeconds: int("post_webinar_delay_seconds").default(0),
   publishDomain: varchar("publish_domain", { length: 255 }),
+  playerPageBlocks: longtext("player_page_blocks"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

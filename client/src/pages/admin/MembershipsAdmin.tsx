@@ -463,6 +463,13 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
           </TabsContent>
 
           <TabsContent value="sales-page" className="m-0 h-full">
+            <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-1">
+              <a href={`/admin/memberships/${planId}/sales-builder`} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Open Full Editor
+              </a>
+            </div>
             <MembershipPageBuilderTab
               planId={planId}
               blocks={plan.landingPageBlocks}
@@ -472,6 +479,13 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
           </TabsContent>
 
           <TabsContent value="member-page" className="m-0 h-full">
+            <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-1">
+              <a href={`/admin/memberships/${planId}/member-builder`} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Open Full Editor
+              </a>
+            </div>
             <MembershipPageBuilderTab
               planId={planId}
               blocks={plan.memberPageBlocks}

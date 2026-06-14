@@ -1198,9 +1198,16 @@ export default function CommunityAdmin() {
         <TabsContent value="page-editor">
           {activeCommunityId ? (
             <div>
-              <div className="mb-3">
-                <h3 className="font-semibold text-gray-900">Community Page Editor</h3>
-                <p className="text-sm text-gray-500 mt-0.5">Edit the content blocks shown on the community's main page for members.</p>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-gray-900">Community Experience Page Editor</h3>
+                  <p className="text-sm text-gray-500 mt-0.5">Edit the content blocks shown on the community's main page for members.</p>
+                </div>
+                <a href={`/admin/communities/${activeCommunityId}/experience-builder`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Open Full Editor
+                </a>
               </div>
               <CommunityPageEditor communityId={activeCommunityId} pageType="page" />
             </div>
@@ -1212,9 +1219,16 @@ export default function CommunityAdmin() {
         <TabsContent value="landing-editor">
           {activeCommunityId ? (
             <div>
-              <div className="mb-3">
-                <h3 className="font-semibold text-gray-900">Landing Page Editor</h3>
-                <p className="text-sm text-gray-500 mt-0.5">Edit the public-facing landing page blocks shown before users join the community.</p>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-gray-900">Community Sales Landing Page Editor</h3>
+                  <p className="text-sm text-gray-500 mt-0.5">Edit the public-facing landing page blocks shown before users join the community.</p>
+                </div>
+                <a href={`/admin/communities/${activeCommunityId}/sales-builder`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Open Full Editor
+                </a>
               </div>
               <CommunityPageEditor communityId={activeCommunityId} pageType="landing" />
             </div>

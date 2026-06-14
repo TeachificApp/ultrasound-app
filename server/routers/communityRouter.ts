@@ -1061,6 +1061,15 @@ const communityAdminRouter = router({
     }));
     return withCounts;
   }),
+  /** Get a single community by ID (for page builders) */
+  getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [community] = await db.select().from(communities).where(eq(communities.id, input.id)).limit(1);
+    if (!community) throw new TRPCError({ code: "NOT_FOUND" });
+    return community;
+  }),
   /** Delete a community */
   deleteCommunity: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);

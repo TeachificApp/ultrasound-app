@@ -75,6 +75,13 @@ const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
 const DownloadLanding = lazy(() => import("./pages/DownloadLanding"));
 const DownloadFiles = lazy(() => import("./pages/DownloadFiles"));
 const DownloadLandingPageBuilder = lazy(() => import("./pages/admin/DownloadLandingPageBuilder"));
+const MembershipSalesPageBuilder = lazy(() => import("./pages/admin/MembershipSalesPageBuilder"));
+const MembershipMemberPageBuilder = lazy(() => import("./pages/admin/MembershipMemberPageBuilder"));
+const CommunitySalesPageBuilder = lazy(() => import("./pages/admin/CommunitySalesPageBuilder"));
+const CommunityExperiencePageBuilder = lazy(() => import("./pages/admin/CommunityExperiencePageBuilder"));
+const BundleLandingPageBuilder = lazy(() => import("./pages/admin/BundleLandingPageBuilder"));
+const WebinarLandingPageBuilder = lazy(() => import("./pages/admin/WebinarLandingPageBuilder"));
+const WebinarPlayerPageBuilder = lazy(() => import("./pages/admin/WebinarPlayerPageBuilder"));
 const MyDownloads = lazy(() => import("./pages/MyDownloads"));
 const BundleLanding = lazy(() => import("./pages/BundleLanding"));
 const ProductLanding = lazy(() => import("./pages/ProductLanding"));
@@ -459,6 +466,13 @@ function Router() {
         <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/memberships/:planId/sales-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembershipSalesPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/memberships/:planId/member-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembershipMemberPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/communities/:communityId/sales-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunitySalesPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/communities/:communityId/experience-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityExperiencePageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/bundles/:bundleId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><BundleLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/webinars/:webinarId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/webinars/:webinarId/player-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarPlayerPageBuilder /></RoleGuard>}</Route>
         {/* ── Physical Products ────────────────────────────────────────────────────────────────────────────── */}
         {/* Products listing page */}
         <Route path="/products">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductsListing /></Suspense>}</Route>

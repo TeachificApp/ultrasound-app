@@ -193,6 +193,7 @@ export const webinarAdminRouter = router({
       postWebinarMessage: z.string().optional(), postWebinarDelaySeconds: z.number().optional(),
       sortOrder: z.number().optional(), iconImage: z.string().optional(), linkedAccessItems: z.string().optional(),
       publishDomain: z.string().optional(),
+      playerPageBlocks: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
