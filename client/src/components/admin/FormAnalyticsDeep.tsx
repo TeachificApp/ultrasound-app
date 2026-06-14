@@ -1,7 +1,7 @@
 /**
  * Deep field analytics, cross-tabulation, drop-off funnel, and shareable reports for a single form.
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,8 +37,10 @@ import {
   Copy,
   Download,
   ExternalLink,
+  FileDown,
   Grid3X3,
   Layers,
+  Loader2,
   Mail,
   RefreshCw,
   Send,
@@ -49,6 +51,7 @@ import {
   PieChart as PieIcon,
 } from "lucide-react";
 import { buildReportPublicUrl } from "@shared/formAnalyticsUtils";
+import { exportAnalyticsPdf } from "@/lib/exportAnalyticsPdf";
 
 const BRAND = "#0e7490";
 const COLORS = [
@@ -636,6 +639,28 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
   const [compareFormIds, setCompareFormIds] = useState<number[]>([]);
   const [compareFieldLabel, setCompareFieldLabel] = useState("");
   const [crossTabMode, setCrossTabMode] = useState<"single" | "multi">("single");
+  const [activeTab, setActiveTab] = useState("fields");
+  const [isPdfExporting, setIsPdfExporting] = useState(false);
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!pdfContainerRef.current) return;
+    setIsPdfExporting(true);
+    try {
+      // Find the active tab content
+      const activeContent = pdfContainerRef.current.querySelector<HTMLElement>(
+        `[data-tab-content="${activeTab}"]`
+      );
+      const target = activeContent ?? pdfContainerRef.current;
+      await exportAnalyticsPdf(
+        target,
+        `${template.name} — Analytics (${activeTab})`,
+        `${template.name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-analytics-${activeTab}`
+      );
+    } finally {
+      setIsPdfExporting(false);
+    }
+  }, [activeTab, template.name]);
 
   const { data: formsList } = trpc.generalForm.listForms.useQuery({ page: 1, pageSize: 200 });
   const { data, isLoading, refetch } = trpc.generalForm.getDeepFieldAnalytics.useQuery({
@@ -686,7 +711,7 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
   const items = data?.items ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfContainerRef}>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[200px]">
           <Label className="text-xs text-gray-500">Results filter</Label>
@@ -705,12 +730,25 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
         <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1">
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportPdf}
+          disabled={isPdfExporting}
+          className="gap-1 border-teal-300 text-teal-700 hover:bg-teal-50"
+        >
+          {isPdfExporting ? (
+            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exporting…</>
+          ) : (
+            <><FileDown className="w-3.5 h-3.5" /> Save as PDF</>
+          )}
+        </Button>
         <p className="text-sm text-gray-500 ml-auto">
           {data?.totalSubmissions ?? 0} submissions · {template.name}
         </p>
       </div>
 
-      <Tabs defaultValue="fields">
+      <Tabs defaultValue="fields" onValueChange={setActiveTab}>
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="fields" className="gap-1"><BarChart2 className="w-3.5 h-3.5" /> Field analytics</TabsTrigger>
           <TabsTrigger value="crosstab" className="gap-1"><Grid3X3 className="w-3.5 h-3.5" /> Cross-tab</TabsTrigger>
@@ -720,7 +758,7 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
         </TabsList>
 
         {/* ── Field analytics tab ── */}
-        <TabsContent value="fields" className="space-y-4 mt-4">
+        <TabsContent value="fields" className="space-y-4 mt-4" data-tab-content="fields">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <Card className="lg:col-span-1">
               <CardHeader className="pb-2">
@@ -820,7 +858,7 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
         </TabsContent>
 
         {/* ── Cross-tab tab ── */}
-        <TabsContent value="crosstab" className="space-y-4 mt-4">
+        <TabsContent value="crosstab" className="space-y-4 mt-4" data-tab-content="crosstab">
           <div className="flex gap-2 mb-2">
             <button
               type="button"
@@ -903,13 +941,13 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
         </TabsContent>
 
         {/* ── Drop-off tab ── */}
-        <TabsContent value="dropoff" className="mt-4 space-y-6">
+        <TabsContent value="dropoff" className="mt-4 space-y-6" data-tab-content="dropoff">
           <DropOffPanel formId={formId} items={items} />
           <DropOffEmailPanel formId={formId} />
         </TabsContent>
 
         {/* ── Multi-form compare tab ── */}
-        <TabsContent value="multiform" className="space-y-4 mt-4">
+        <TabsContent value="multiform" className="space-y-4 mt-4" data-tab-content="multiform">
           <p className="text-sm text-gray-600">
             Compare the same field label across multiple forms (matched by exact label text).
           </p>
@@ -982,7 +1020,7 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
         </TabsContent>
 
         {/* ── Reports tab ── */}
-        <TabsContent value="reports" className="mt-4">
+        <TabsContent value="reports" className="mt-4" data-tab-content="reports">
           <FormAnalyticsReportsPanel formId={formId} items={items} savedFilters={data?.savedFilters ?? []} />
         </TabsContent>
       </Tabs>
