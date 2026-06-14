@@ -1312,6 +1312,15 @@ export default function PlatformAdmin() {
     },
     onError: (err) => toast.error(`Member sync failed: ${err.message}`),
   });
+  // ── Thinkific Community Sync ──────────────────────────────────────────────
+  const [communitySyncResult, setCommunitySyncResult] = useState<{ triggeredAt: number } | null>(null);
+  const triggerCommunitySyncMutation = trpc.community.triggerFullSync.useMutation({
+    onSuccess: () => {
+      setCommunitySyncResult({ triggeredAt: Date.now() });
+      toast.success("Community sync started in background — posts, replies, and comments will be imported from Thinkific.");
+    },
+    onError: (err) => toast.error(`Community sync failed: ${err.message}`),
+  });
   // ── Posting Aliases ─────────────────────────────────────────────────────
   const { data: aliasList = [], refetch: refetchAliases } = trpc.admin.listPostingAliases.useQuery();
   const [aliasDialog, setAliasDialog] = useState<{ open: boolean; id?: number; name: string; email: string; avatarUrl: string; bio: string }>({ open: false, name: "", email: "", avatarUrl: "", bio: "" });
@@ -1836,6 +1845,41 @@ export default function PlatformAdmin() {
               >
                 <Award className={`w-4 h-4 ${backfillAccessMutation.isPending ? "animate-spin" : ""}`} />
                 {backfillAccessMutation.isPending ? "Backfilling…" : "Backfill Access"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        {/* Thinkific Community Sync */}
+        <Card className="mb-6 border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Thinkific Community Sync
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 mb-1">
+                  Import all posts, replies, and comments from Thinkific communities into the native community system.
+                  Runs automatically every 6 hours. Use this button to trigger a manual sync immediately.
+                </p>
+                {communitySyncResult ? (
+                  <p className="text-xs text-[#189aa1] font-medium">
+                    Last sync triggered at {new Date(communitySyncResult.triggeredAt).toLocaleString()} — running in background.
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400">Scheduled: every 6 hours automatically. Next run: ~6h from last sync.</p>
+                )}
+              </div>
+              <Button
+                onClick={() => triggerCommunitySyncMutation.mutate()}
+                disabled={triggerCommunitySyncMutation.isPending}
+                className="flex items-center gap-2 flex-shrink-0"
+                style={{ background: "#189aa1" }}
+              >
+                <RefreshCw className={`w-4 h-4 ${triggerCommunitySyncMutation.isPending ? "animate-spin" : ""}`} />
+                {triggerCommunitySyncMutation.isPending ? "Triggering…" : "Sync Now"}
               </Button>
             </div>
           </CardContent>

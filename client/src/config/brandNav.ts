@@ -70,7 +70,7 @@ const AAUS_NAV_GROUPS: NavGroup[] = [
   {
     label: "Community",
     items: [
-      { path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community", label: "Community Hub", icon: MessageCircle, external: true },
+      { path: "https://learn.allaboutultrasound.com/community/all-about-ultrasound", label: "Community Hub", icon: MessageCircle, external: true },
     ],
   },
   {
@@ -203,7 +203,7 @@ const IHE_NAV_GROUPS: NavGroup[] = [
   {
     label: "Community",
     items: [
-      { path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community", label: "iHeartEcho\u2122 Community", icon: MessageCircle, external: true },
+      { path: "https://learn.allaboutultrasound.com/community/all-about-ultrasound", label: "iHeartEcho\u2122 Community", icon: MessageCircle, external: true },
     ],
   },
   {
