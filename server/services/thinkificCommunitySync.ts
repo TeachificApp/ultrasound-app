@@ -132,11 +132,102 @@ interface PostsPage {
   pageInfo: { hasNextPage: boolean; endCursor: string | null };
 }
 
-async function fetchPostsPage(communityId: string, cursor: string | null): Promise<PostsPage> {
+// Shared post fields fragment (inlined since GraphQL fragments require named ops)
+const POST_FIELDS = `
+  id
+  title
+  content
+  type
+  depth
+  createdAt
+  updatedAt
+  replyCount
+  pinnedAt
+  author {
+    id
+    firstName
+    lastName
+    email
+  }
+  replies(first: 50) {
+    nodes {
+      id
+      title
+      content
+      type
+      depth
+      createdAt
+      updatedAt
+      replyCount
+      pinnedAt
+      author {
+        id
+        firstName
+        lastName
+        email
+      }
+      replies(first: 50) {
+        nodes {
+          id
+          title
+          content
+          type
+          depth
+          createdAt
+          updatedAt
+          author {
+            id
+            firstName
+            lastName
+            email
+          }
+          replies(first: 1) {
+            nodes { id }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+`;
+
+/** Fetch a page of posts from a community (all spaces). */
+async function fetchCommunityPostsPage(communityId: string, cursor: string | null): Promise<PostsPage> {
   const data = await gql<any>(
     `
     query GetCommunityPosts($id: ID!, $cursor: String) {
       community(id: $id) {
+        posts(first: 50, after: $cursor) {
+          nodes { ${POST_FIELDS} }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  `,
+    { id: communityId, cursor }
+  );
+  return data?.community?.posts ?? { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
+}
+
+/**
+ * Fetch a page of posts scoped to a specific space (Adult Echo / Fetal Echo Learning Hub).
+ *
+ * Uses a cost-safe query shape: posts(first:50) + replies(first:3) + nested_replies(first:5).
+ * Thinkific's GraphQL cost limit is 1,000 per query; the full POST_FIELDS template exceeds
+ * this even for a single post when queried via space(id). The community(id) endpoint is
+ * more permissive, but space(id) is stricter. We keep r1×r2 ≤ 15 to stay safe.
+ *
+ * Since space posts typically have very few replies (≤3 in practice), this captures all
+ * content. Posts with more replies will have their extra replies fetched in a follow-up
+ * pass via fetchPostRepliesPage.
+ */
+async function fetchSpacePostsPage(spaceId: string, cursor: string | null): Promise<PostsPage> {
+  const data = await gql<any>(
+    `
+    query GetSpacePosts($id: ID!, $cursor: String) {
+      space(id: $id) {
         posts(first: 50, after: $cursor) {
           nodes {
             id
@@ -148,13 +239,8 @@ async function fetchPostsPage(communityId: string, cursor: string | null): Promi
             updatedAt
             replyCount
             pinnedAt
-            author {
-              id
-              firstName
-              lastName
-              email
-            }
-            replies(first: 50) {
+            author { id firstName lastName email }
+            replies(first: 3) {
               nodes {
                 id
                 title
@@ -165,13 +251,8 @@ async function fetchPostsPage(communityId: string, cursor: string | null): Promi
                 updatedAt
                 replyCount
                 pinnedAt
-                author {
-                  id
-                  firstName
-                  lastName
-                  email
-                }
-                replies(first: 50) {
+                author { id firstName lastName email }
+                replies(first: 5) {
                   nodes {
                     id
                     title
@@ -180,16 +261,7 @@ async function fetchPostsPage(communityId: string, cursor: string | null): Promi
                     depth
                     createdAt
                     updatedAt
-                    author {
-                      id
-                      firstName
-                      lastName
-                      email
-                    }
-                    replies(first: 1) {
-                      nodes { id }
-                      pageInfo { hasNextPage endCursor }
-                    }
+                    author { id firstName lastName email }
                   }
                   pageInfo { hasNextPage endCursor }
                 }
@@ -197,17 +269,14 @@ async function fetchPostsPage(communityId: string, cursor: string | null): Promi
               pageInfo { hasNextPage endCursor }
             }
           }
-          pageInfo {
-            hasNextPage
-            endCursor
-          }
+          pageInfo { hasNextPage endCursor }
         }
       }
     }
   `,
-    { id: communityId, cursor }
+    { id: spaceId, cursor }
   );
-  return data?.community?.posts ?? { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
+  return data?.space?.posts ?? { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
 }
 
 // ─── User resolution ──────────────────────────────────────────────────────────
@@ -442,7 +511,10 @@ export async function syncThinkificCommunity(
   let hasMore = true;
   while (hasMore) {
     try {
-      const page = await fetchPostsPage(thinkificCommunityId, cursor);
+      // Use space-scoped fetch when a spaceId is set (Adult Echo / Fetal Echo Learning Hub)
+      const page = thinkificSpaceId
+        ? await fetchSpacePostsPage(thinkificSpaceId, cursor)
+        : await fetchCommunityPostsPage(thinkificCommunityId, cursor);
 
       for (const post of page.nodes) {
         try {
@@ -549,8 +621,8 @@ export async function syncAllThinkificCommunities(): Promise<void> {
         .limit(1);
 
       if (spaceSyncState[0]?.syncEnabled !== false) {
-        // For space-specific sync, we fetch from the parent community
-        // Space-filtered post queries are not yet available in Thinkific GraphQL
+        // Use space-scoped GraphQL query: space(id) > posts
+        // This correctly isolates posts belonging only to this space
         await syncThinkificCommunity(spaceCommunityId, tc.id, space.id);
       }
     }
