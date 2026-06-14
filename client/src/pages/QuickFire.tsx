@@ -1546,7 +1546,7 @@ export default function QuickFire() {
 
             {!activeCategory && !isLoading && !error && questions.length === 0 && (
               <div className="flex flex-col items-center gap-6 py-4 text-center max-w-lg mx-auto">
-                <p className="text-gray-400 text-sm">No legacy challenge active today. Use the category cards above.</p>            {isPremium && (
+                {isPremium && (
                   <Button variant="outline" onClick={() => setActiveTab("archive")}>
                     <Archive className="w-4 h-4 mr-2" /> Browse Archive
                   </Button>
