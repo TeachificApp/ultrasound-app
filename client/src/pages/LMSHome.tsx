@@ -151,11 +151,7 @@ export default function LMSHome() {
                       <span className="text-sm font-bold text-[#189aa1]">
                         {(course.isFree || course.price === 0) ? "Free" : `$${Number(course.price).toFixed(2)}${course.pricingType === "subscription" ? (course.subscriptionInterval === "annual" ? "/yr" : course.subscriptionInterval === "quarterly" ? "/qtr" : "/mo") : course.pricingType === "payment_plan" ? " (plan)" : ""}`}
                       </span>
-                      {course.instructor && (
-                        <span className="text-xs text-gray-400 truncate ml-2">
-                          {course.instructor.name}
-                        </span>
-                      )}
+
                     </div>
                     {course.isFree && (
                       <div className="mt-1.5">

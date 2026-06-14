@@ -78,6 +78,7 @@ import {
   communities,
   funnels,
   funnelPages,
+  curriculumEmbedVisibility,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1329,4 +1330,53 @@ export const lmsCourseBuilderRouter = router({
       funnels: funnelRows.map(f => ({ id: f.id, title: f.name, pages: pagesByFunnelId.get(f.id) ?? [] })),
     };
   }),
+
+  // ── Curriculum Embed Visibility ──────────────────────────────────────────────
+  /** Get all visibility overrides for a course (sections + lessons hidden from embed widget) */
+  getCurriculumEmbedVisibility: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db
+        .select()
+        .from(curriculumEmbedVisibility)
+        .where(eq(curriculumEmbedVisibility.courseId, input.courseId));
+      // Return as a Set-like map: { section_123: true, lesson_456: true }
+      const hiddenMap: Record<string, boolean> = {};
+      for (const row of rows) {
+        if (row.hidden) hiddenMap[`${row.itemType}_${row.itemId}`] = true;
+      }
+      return { hiddenMap, rows };
+    }),
+
+  /** Set visibility for a section or lesson in the embed widget */
+  setCurriculumEmbedVisibility: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      items: z.array(z.object({
+        itemType: z.enum(["section", "lesson"]),
+        itemId: z.number(),
+        hidden: z.boolean(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Upsert each item using INSERT ... ON DUPLICATE KEY UPDATE
+      for (const item of input.items) {
+        await db
+          .insert(curriculumEmbedVisibility)
+          .values({
+            courseId: input.courseId,
+            itemType: item.itemType,
+            itemId: item.itemId,
+            hidden: item.hidden,
+          })
+          .onDuplicateKeyUpdate({ set: { hidden: item.hidden } });
+      }
+      return { success: true, updated: input.items.length };
+    }),
 });

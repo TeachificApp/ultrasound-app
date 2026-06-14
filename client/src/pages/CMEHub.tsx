@@ -214,12 +214,6 @@ export default function CMEHub() {
                       {course.name}
                     </a>
 
-                    {course.instructorNames && (
-                      <p className="text-xs text-gray-400 mb-2">
-                        {course.instructorNames}
-                      </p>
-                    )}
-
                     {/* Native badge */}
                     {hasNative && (
                       <div className="flex items-center gap-1 mb-2">

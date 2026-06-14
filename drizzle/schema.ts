@@ -2972,6 +2972,26 @@ export const lmsLessons = mysqlTable("lms_lessons", {
 });
 export type LmsLesson = typeof lmsLessons.$inferSelect;
 
+// ── Curriculum Embed Visibility Overrides ────────────────────────────────────
+// Controls which sections and lessons are hidden from the public embed widget.
+// This does NOT affect the actual Thinkific course or enrolled student access —
+// it only filters what appears in the embeddable curriculum accordion/CTA card.
+export const curriculumEmbedVisibility = mysqlTable(
+  "curriculum_embed_visibility",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    courseId: int("course_id").notNull(),
+    itemType: mysqlEnum("item_type", ["section", "lesson"]).notNull(),
+    itemId: int("item_id").notNull(), // lmsSections.id or lmsLessons.id
+    hidden: boolean("hidden").default(true).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  },
+  (t) => ({
+    uniqCev: uniqueIndex("uq_cev_course_item").on(t.courseId, t.itemType, t.itemId),
+  })
+);
+export type CurriculumEmbedVisibility = typeof curriculumEmbedVisibility.$inferSelect;
+
 // ── Section Templates ─────────────────────────────────────────────────────────
 // A section template stores a section title + all its lessons (as a JSON snapshot)
 // so admins can reuse common module structures across courses.

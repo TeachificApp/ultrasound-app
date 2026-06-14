@@ -68,20 +68,6 @@ function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { cour
             <p className="text-xs text-gray-500 line-clamp-2 mb-3">{course.subtitle}</p>
           )}
 
-          {/* Instructor */}
-          {course.instructor && (
-            <div className="flex items-center gap-2 mt-auto mb-3">
-              {course.instructor.avatarUrl ? (
-                <img src={course.instructor.avatarUrl} alt={course.instructor.name} className="w-6 h-6 rounded-full object-cover" />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center">
-                  <span className="text-teal-700 text-xs font-bold">{course.instructor.name[0]}</span>
-                </div>
-              )}
-              <span className="text-xs text-gray-600">{course.instructor.name}</span>
-            </div>
-          )}
-
           {/* Footer */}
           <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
             <span className="text-sm font-bold text-teal-700">{price}</span>
