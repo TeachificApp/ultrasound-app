@@ -32,6 +32,7 @@ import {
 } from "recharts";
 import {
   BarChart2,
+  Download,
   Grid3X3,
   RefreshCw,
   TrendingDown,
@@ -119,6 +120,25 @@ type CrossTabResult = {
 
 type ChartMode = "bar" | "stacked" | "pie" | "donut" | "heatmap";
 
+function exportCrossTabCsv(ct: CrossTabResult) {
+  const header = ["", ...ct.colValues].map(v => `"${v.replace(/"/g, '""')}"`).join(",");
+  const rows = ct.rowValues.map(rv => {
+    const cells = ct.colValues.map(cv => {
+      const cell = ct.cells.find(c => c.rowValue === rv && c.colValue === cv);
+      return String(cell?.count ?? 0);
+    });
+    return [`"${rv.replace(/"/g, '""')}"`, ...cells].join(",");
+  });
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `crosstab_${ct.rowLabel.replace(/[^a-z0-9]/gi, "_")}_x_${ct.colLabel.replace(/[^a-z0-9]/gi, "_")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function CrossTabChartPanel({ ct }: { ct: CrossTabResult }) {
   const [mode, setMode] = useState<ChartMode>("bar");
 
@@ -148,7 +168,7 @@ function CrossTabChartPanel({ ct }: { ct: CrossTabResult }) {
             {ct.rowLabel} × {ct.colLabel}
             <span className="ml-2 text-xs text-gray-400 font-normal">{ct.total} paired responses</span>
           </CardTitle>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
             {(["bar", "stacked", "pie", "donut", "heatmap"] as ChartMode[]).map(m => (
               <button
                 key={m}
@@ -161,6 +181,14 @@ function CrossTabChartPanel({ ct }: { ct: CrossTabResult }) {
                 {m === "stacked" ? "Stacked" : m === "heatmap" ? "Heatmap" : m.charAt(0).toUpperCase() + m.slice(1)}
               </button>
             ))}
+            <button
+              type="button"
+              title="Export as CSV"
+              onClick={() => exportCrossTabCsv(ct)}
+              className="ml-1 p-1 rounded border border-gray-200 hover:bg-gray-50 text-gray-500 hover:text-teal-700 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </CardHeader>

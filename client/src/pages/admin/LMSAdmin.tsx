@@ -10284,7 +10284,25 @@ function CurriculumEmbedVisibilityPanel({ courseId, sections }: { courseId: numb
     });
   };
 
-  const [collapsed, setCollapsed] = React.useState(false);
+    const [collapsed, setCollapsed] = React.useState(false);
+
+  // Bulk toggle helpers
+  const allItems = React.useMemo(() => {
+    const items: Array<{ itemType: "section" | "lesson"; itemId: number }> = [];
+    sections.forEach((s: any) => {
+      items.push({ itemType: "section", itemId: s.id });
+      (s.lessons ?? []).forEach((l: any) => items.push({ itemType: "lesson", itemId: l.id }));
+    });
+    return items;
+  }, [sections]);
+
+  const handleBulkToggle = (hidden: boolean) => {
+    if (allItems.length === 0) return;
+    setVisibility.mutate({
+      courseId,
+      items: allItems.map(i => ({ ...i, hidden })),
+    });
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -10301,9 +10319,33 @@ function CurriculumEmbedVisibilityPanel({ courseId, sections }: { courseId: numb
         </div>
         <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${collapsed ? "" : "rotate-180"}`} />
       </button>
-
       {!collapsed && (
         <div className="mt-5 space-y-3">
+          {/* Bulk action bar */}
+          {sections.length > 0 && !isLoading && (
+            <div className="flex items-center gap-2 pb-1">
+              <span className="text-xs text-gray-500 mr-1">Bulk:</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1 border-teal-300 text-teal-700 hover:bg-teal-50"
+                disabled={setVisibility.isPending}
+                onClick={() => handleBulkToggle(false)}
+              >
+                <Eye className="w-3 h-3" /> Show All
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1 border-gray-300 text-gray-600 hover:bg-gray-50"
+                disabled={setVisibility.isPending}
+                onClick={() => handleBulkToggle(true)}
+              >
+                <EyeOff className="w-3 h-3" /> Hide All
+              </Button>
+              {setVisibility.isPending && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
+            </div>
+          )}
           {isLoading ? (
             <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading…

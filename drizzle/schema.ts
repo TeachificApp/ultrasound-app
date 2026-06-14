@@ -4425,6 +4425,7 @@ export const generalFormProgressEvents = mysqlTable("general_form_progress_event
   id: int("id").autoincrement().primaryKey(),
   sessionId: varchar("session_id", { length: 64 }).notNull(),
   templateId: int("template_id").notNull(),
+  userId: int("user_id"),
   fieldId: int("field_id"),
   pageIndex: smallint("page_index").default(0).notNull(),
   eventType: mysqlEnum("event_type", ["session_start", "field_view", "field_answer", "page_advance", "form_submit", "form_abandon"]).notNull(),

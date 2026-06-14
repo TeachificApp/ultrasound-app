@@ -41,6 +41,7 @@ import {
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 import { addToEmailList, addToAllContacts } from "../lib/emailListHelper";
+import { sendEmail } from "../_core/email";
 import {
   ensureLegacySuccessModules,
   fetchSuccessModules,
@@ -2733,6 +2734,7 @@ ${pageText}`;
     .input(z.object({
       sessionId: z.string().max(64),
       templateId: z.number().int().positive(),
+      userId: z.number().int().positive().nullable().optional(),
       fieldId: z.number().int().positive().nullable().optional(),
       pageIndex: z.number().int().min(0).default(0),
       eventType: z.enum(["session_start", "field_view", "field_answer", "page_advance", "form_submit", "form_abandon"]),
@@ -2743,6 +2745,7 @@ ${pageText}`;
       await db.insert(generalFormProgressEvents).values({
         sessionId: input.sessionId,
         templateId: input.templateId,
+        userId: input.userId ?? null,
         fieldId: input.fieldId ?? null,
         pageIndex: input.pageIndex,
         eventType: input.eventType,
@@ -2789,8 +2792,134 @@ ${pageText}`;
         totalSubmits,
         overallCompletionRate: totalSessions > 0 ? Math.round((totalSubmits / totalSessions) * 100) : 0,
         pageFunnel: (pageRows as any[]).map((r: any) => ({ pageIndex: Number(r.page_index), sessions: Number(r.sessions) })),
-        fieldStats,
+                fieldStats,
       };
     }),
 
+  /**
+   * getDropOffAbandonerEmails
+   * Returns a list of users who started the form but never submitted,
+   * with their email addresses (logged-in users only).
+   */
+  getDropOffAbandonerEmails: protectedProcedure
+    .input(z.object({
+      templateId: z.number().int().positive(),
+      /** Only include sessions that answered at least this many fields (default 1) */
+      minFieldAnswers: z.number().int().min(0).default(1),
+    }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Step 1: Find all sessions that started but never submitted
+      const [abandonedRows] = await db.execute(
+        sql`
+          SELECT DISTINCT s.session_id, s.user_id
+          FROM general_form_progress_events s
+          WHERE s.template_id = ${input.templateId}
+            AND s.event_type = 'session_start'
+            AND s.session_id NOT IN (
+              SELECT session_id FROM general_form_progress_events
+              WHERE template_id = ${input.templateId} AND event_type = 'form_submit'
+            )
+        `
+      ) as any;
+      const abandonedSessions = (abandonedRows as any[]) as Array<{ session_id: string; user_id: number | null }>;
+      if (abandonedSessions.length === 0) {
+        return { totalAbandoned: 0, previousSubmitters: [], anonymousAbandonerCount: 0 };
+      }
+
+      // Step 2: Filter by minFieldAnswers
+      let qualifiedSessions = abandonedSessions;
+      if (input.minFieldAnswers > 0 && abandonedSessions.length > 0) {
+        const sessionIdList = abandonedSessions.map(s => `'${s.session_id.replace(/'/g, "''")}'`).join(',');
+        const [answerCountRows] = await db.execute(
+          sql`
+            SELECT session_id, COUNT(*) as answer_count
+            FROM general_form_progress_events
+            WHERE template_id = ${input.templateId}
+              AND event_type = 'field_answer'
+              AND session_id IN (${sql.raw(sessionIdList)})
+            GROUP BY session_id
+            HAVING COUNT(*) >= ${input.minFieldAnswers}
+          `
+        ) as any;
+        const qualifiedSet = new Set((answerCountRows as any[]).map((r: any) => r.session_id as string));
+        qualifiedSessions = abandonedSessions.filter(s => qualifiedSet.has(s.session_id));
+      }
+
+      const totalAbandoned = qualifiedSessions.length;
+
+      // Step 3: Identify logged-in abandoners via the user_id stored in progress events
+      const loggedInUserIds = [...new Set(
+        qualifiedSessions.map(s => s.user_id).filter((id): id is number => id != null && id > 0)
+      )];
+
+      let identifiedUsers: Array<{ userId: number; email: string; name: string }> = [];
+      if (loggedInUserIds.length > 0) {
+        const userIdList = loggedInUserIds.join(',');
+        const [userRows] = await db.execute(
+          sql`
+            SELECT id, email, name
+            FROM users
+            WHERE id IN (${sql.raw(userIdList)})
+              AND email IS NOT NULL AND email != ''
+              AND unsubscribedAt IS NULL
+          `
+        ) as any;
+        identifiedUsers = (userRows as any[]).map((r: any) => ({
+          userId: Number(r.id),
+          email: r.email as string,
+          name: r.name as string,
+        }));
+      }
+
+      const anonymousAbandonerCount = totalAbandoned - loggedInUserIds.length;
+
+      return {
+        totalAbandoned,
+        previousSubmitters: identifiedUsers,
+        anonymousAbandonerCount: Math.max(0, anonymousAbandonerCount),
+      };
+    }),
+
+  /**
+   * sendDropOffFollowUp
+   * Sends a custom follow-up email to a list of user IDs (form abandoners).
+   */
+  sendDropOffFollowUp: protectedProcedure
+    .input(z.object({
+      templateId: z.number().int().positive(),
+      subject: z.string().min(1).max(200),
+      htmlBody: z.string().min(1),
+      recipientUserIds: z.array(z.number().int().positive()).min(1).max(500),
+      brandMode: z.enum(["aaus", "ihe"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Fetch recipient details
+      const recipients = await db
+        .select({ id: users.id, email: users.email, name: users.name })
+        .from(users)
+        .where(inArray(users.id, input.recipientUserIds));
+
+      let sent = 0;
+      let failed = 0;
+      for (const recipient of recipients) {
+        if (!recipient.email) { failed++; continue; }
+        const ok = await sendEmail({
+          to: { email: recipient.email, name: recipient.name ?? "" },
+          subject: input.subject,
+          htmlBody: input.htmlBody,
+          brandMode: (input.brandMode as any) ?? "aaus",
+        });
+        if (ok) sent++; else failed++;
+      }
+
+      return { sent, failed, total: recipients.length };
+    }),
 });

@@ -35,13 +35,17 @@ import {
 import {
   BarChart2,
   Copy,
+  Download,
   ExternalLink,
   Grid3X3,
   Layers,
+  Mail,
   RefreshCw,
+  Send,
   Share2,
   Table2,
   TrendingDown,
+  Users,
   PieChart as PieIcon,
 } from "lucide-react";
 import { buildReportPublicUrl } from "@shared/formAnalyticsUtils";
@@ -130,6 +134,25 @@ type CrossTabResult = {
 
 type ChartMode = "bar" | "stacked" | "pie" | "donut" | "heatmap";
 
+function exportCrossTabCsv(ct: CrossTabResult) {
+  const header = ["", ...ct.colValues].map(v => `"${v.replace(/"/g, '""')}"`).join(",");
+  const rows = ct.rowValues.map(rv => {
+    const cells = ct.colValues.map(cv => {
+      const cell = ct.cells.find(c => c.rowValue === rv && c.colValue === cv);
+      return String(cell?.count ?? 0);
+    });
+    return [`"${rv.replace(/"/g, '""')}"`, ...cells].join(",");
+  });
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `crosstab_${ct.rowLabel.replace(/[^a-z0-9]/gi, "_")}_x_${ct.colLabel.replace(/[^a-z0-9]/gi, "_")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function CrossTabChartPanel({ ct }: { ct: CrossTabResult }) {
   const [mode, setMode] = useState<ChartMode>("bar");
 
@@ -161,7 +184,7 @@ function CrossTabChartPanel({ ct }: { ct: CrossTabResult }) {
             {ct.rowLabel} × {ct.colLabel}
             <span className="ml-2 text-xs text-gray-400 font-normal">{ct.total} paired responses</span>
           </CardTitle>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
             {(["bar", "stacked", "pie", "donut", "heatmap"] as ChartMode[]).map(m => (
               <button
                 key={m}
@@ -174,6 +197,14 @@ function CrossTabChartPanel({ ct }: { ct: CrossTabResult }) {
                 {m === "stacked" ? "Stacked" : m === "heatmap" ? "Heatmap" : m.charAt(0).toUpperCase() + m.slice(1)}
               </button>
             ))}
+            <button
+              type="button"
+              title="Export as CSV"
+              onClick={() => exportCrossTabCsv(ct)}
+              className="ml-1 p-1 rounded border border-gray-200 hover:bg-gray-50 text-gray-500 hover:text-teal-700 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </CardHeader>
@@ -465,6 +496,136 @@ function DropOffPanel({ formId, items }: { formId: number; items: Array<{ id: nu
   );
 }
 
+// ─── Drop-off follow-up email panel ──────────────────────────────────────────
+function DropOffEmailPanel({ formId }: { formId: number }) {
+  const [minAnswers, setMinAnswers] = useState(1);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [brand, setBrand] = useState<"aaus" | "ihe">("aaus");
+  const [showComposer, setShowComposer] = useState(false);
+
+  const { data: abandoners, isLoading } = trpc.generalForm.getDropOffAbandonerEmails.useQuery(
+    { templateId: formId, minFieldAnswers: minAnswers },
+    { enabled: showComposer },
+  );
+
+  const sendMutation = trpc.generalForm.sendDropOffFollowUp.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Sent ${res.sent} email${res.sent !== 1 ? "s" : ""}${res.failed > 0 ? ` (${res.failed} failed)` : ""}`);
+      setShowComposer(false);
+      setSubject("");
+      setBody("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const prevSubmitters = abandoners?.previousSubmitters ?? [];
+
+  const handleSend = () => {
+    if (!subject.trim() || !body.trim()) { toast.error("Subject and body are required"); return; }
+    if (prevSubmitters.length === 0) { toast.error("No identifiable recipients found"); return; }
+    if (!confirm(`Send follow-up email to ${prevSubmitters.length} recipient${prevSubmitters.length !== 1 ? "s" : ""}?`)) return;
+    sendMutation.mutate({
+      templateId: formId,
+      subject,
+      htmlBody: body.replace(/\n/g, "<br />"),
+      recipientUserIds: prevSubmitters.map(r => r.userId),
+      brandMode: brand,
+    });
+  };
+
+  return (
+    <Card className="border border-amber-200 bg-amber-50/30">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-amber-600" />
+            <CardTitle className="text-sm font-semibold text-gray-800">Follow-up Email to Abandoners</CardTitle>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+            onClick={() => setShowComposer(v => !v)}
+          >
+            {showComposer ? "Cancel" : "Compose Follow-up"}
+          </Button>
+        </div>
+      </CardHeader>
+      {showComposer && (
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-gray-600 whitespace-nowrap">Min. fields answered:</label>
+            <input
+              type="number" min={0} max={50} value={minAnswers}
+              onChange={e => setMinAnswers(Number(e.target.value))}
+              className="w-20 h-7 text-xs border border-gray-200 rounded px-2"
+            />
+            <span className="text-xs text-gray-400">(sessions that answered at least this many fields)</span>
+          </div>
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-xs"><RefreshCw className="w-3 h-3 animate-spin" /> Loading abandoners…</div>
+          ) : (
+            <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-1">
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <Users className="w-3.5 h-3.5" />
+                <span><strong>{abandoners?.totalAbandoned ?? 0}</strong> total abandoners ({abandoners?.anonymousAbandonerCount ?? 0} anonymous)</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <Mail className="w-3.5 h-3.5" />
+                <span><strong>{prevSubmitters.length}</strong> identifiable recipients (previous submitters with known email)</span>
+              </div>
+              {prevSubmitters.length > 0 && (
+                <div className="mt-2 max-h-24 overflow-y-auto space-y-0.5">
+                  {prevSubmitters.slice(0, 10).map(r => (
+                    <div key={r.userId} className="text-xs text-gray-500">{r.name} &lt;{r.email}&gt;</div>
+                  ))}
+                  {prevSubmitters.length > 10 && <div className="text-xs text-gray-400">…and {prevSubmitters.length - 10} more</div>}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-gray-600">Send as:</label>
+            <select
+              value={brand} onChange={e => setBrand(e.target.value as "aaus" | "ihe")}
+              className="h-7 text-xs border border-gray-200 rounded px-2"
+            >
+              <option value="aaus">All About Ultrasound</option>
+              <option value="ihe">iHeartEcho</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-700">Subject</label>
+            <input
+              type="text" value={subject} onChange={e => setSubject(e.target.value)}
+              placeholder="We noticed you didn't finish your form…"
+              className="w-full h-8 text-sm border border-gray-200 rounded px-3"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-700">Email body (plain text or HTML)</label>
+            <textarea
+              value={body} onChange={e => setBody(e.target.value)} rows={6}
+              placeholder="Hi there,\n\nWe noticed you started our form but didn't complete it. We'd love to hear from you!\n\n[Include form link here]"
+              className="w-full text-sm border border-gray-200 rounded px-3 py-2 resize-y"
+            />
+          </div>
+          <Button
+            size="sm"
+            className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+            disabled={sendMutation.isPending || prevSubmitters.length === 0 || !subject.trim() || !body.trim()}
+            onClick={handleSend}
+          >
+            <Send className="w-3.5 h-3.5" />
+            {sendMutation.isPending ? "Sending…" : `Send to ${prevSubmitters.length} recipient${prevSubmitters.length !== 1 ? "s" : ""}`}
+          </Button>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function FormAnalyticsDeep({ formId, template }: Props) {
   const [filterId, setFilterId] = useState<string>("");
@@ -742,8 +903,9 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
         </TabsContent>
 
         {/* ── Drop-off tab ── */}
-        <TabsContent value="dropoff" className="mt-4">
+        <TabsContent value="dropoff" className="mt-4 space-y-6">
           <DropOffPanel formId={formId} items={items} />
+          <DropOffEmailPanel formId={formId} />
         </TabsContent>
 
         {/* ── Multi-form compare tab ── */}

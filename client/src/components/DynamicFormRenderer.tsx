@@ -5,6 +5,7 @@
  */
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -445,13 +446,14 @@ export default function DynamicFormRenderer({
   const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString(36));
   const sessionStartedRef = useRef(false);
   const submittedRef = useRef(false);
+  const { user } = useAuth();
   const trackProgressMutation = trpc.generalForm.trackProgress.useMutation();
 
   const trackEvent = useCallback((eventType: "session_start" | "field_answer" | "form_submit" | "form_abandon", fieldId?: number) => {
     if (!templateId || readOnly) return;
-    trackProgressMutation.mutate({ sessionId: sessionIdRef.current, templateId, fieldId: fieldId ?? null, pageIndex: 0, eventType });
+    trackProgressMutation.mutate({ sessionId: sessionIdRef.current, templateId, userId: user?.id ?? null, fieldId: fieldId ?? null, pageIndex: 0, eventType });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId, readOnly]);
+  }, [templateId, readOnly, user?.id]);
 
   // Fire session_start once when template is loaded
   useEffect(() => {
