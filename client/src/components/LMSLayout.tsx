@@ -34,7 +34,7 @@ const IHE_SITE_URL = "https://www.iheartecho.com";
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Education Library", href: "/education-library", icon: <BookOpen className="w-4 h-4" /> },
-  { label: "Community", href: "/community", icon: <Users className="w-4 h-4" /> },
+  { label: "Community", href: "/community/all-about-ultrasound", icon: <Users className="w-4 h-4" /> },
 ];
 
 export default function LMSLayout({ children }: { children: React.ReactNode }) {
