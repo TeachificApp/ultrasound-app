@@ -1309,6 +1309,25 @@ export default function PlatformAdmin() {
     },
     onError: (err) => toast.error(`Member sync failed: ${err.message}`),
   });
+  // ── CME Course Linker ─────────────────────────────────────────────────────
+  const [showCmeLinker, setShowCmeLinker] = useState(false);
+  const [cmeSearch, setCmeSearch] = useState("");
+  const { data: cmeLinkData, refetch: refetchCmeLinks } = trpc.platformAdmin.listCmeCourseLinks.useQuery(
+    undefined,
+    { enabled: showCmeLinker }
+  );
+  const autoLinkMutation = trpc.platformAdmin.autoLinkCmeCoursesBySlug.useMutation({
+    onSuccess: (data) => {
+      refetchCmeLinks();
+      toast.success(`Auto-linked ${data.linked} of ${data.total} unlinked CME courses by slug match.`);
+    },
+    onError: (err) => toast.error(`Auto-link failed: ${err.message}`),
+  });
+  const linkCourseMutation = trpc.platformAdmin.linkCmeCourseToNative.useMutation({
+    onSuccess: () => refetchCmeLinks(),
+    onError: (err) => toast.error(`Link failed: ${err.message}`),
+  });
+
   const syncCoursesMutation = trpc.platformAdmin.syncThinkificCourses.useMutation({
     onSuccess: (data) => {
       setLastSyncResult(data);
@@ -1803,6 +1822,106 @@ export default function PlatformAdmin() {
             </div>
           </CardContent>
         </Card>
+        {/* CME Course Linker */}
+        <Card className="mb-6 border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <GraduationCap className="w-4 h-4" />
+              CME Course Linker
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-sm text-gray-600 mb-3">
+              Link each Thinkific CME course to its native LMS course so the CME Hub routes enrolled users to this platform instead of Thinkific.
+              {cmeLinkData && (
+                <span className="ml-1 text-xs text-gray-400">
+                  ({cmeLinkData.cmeRows.filter(r => r.nativeLmsCourseId).length}/{cmeLinkData.cmeRows.length} linked)
+                </span>
+              )}
+            </p>
+            <div className="flex gap-2 mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCmeLinker(v => !v)}
+                className="gap-2"
+              >
+                <GraduationCap className="w-4 h-4" />
+                {showCmeLinker ? "Hide" : "Show"} Course Links
+              </Button>
+              {showCmeLinker && (
+                <Button
+                  size="sm"
+                  onClick={() => autoLinkMutation.mutate()}
+                  disabled={autoLinkMutation.isPending}
+                  style={{ background: "#189aa1" }}
+                  className="gap-2 text-white"
+                >
+                  <RefreshCw className={`w-4 h-4 ${autoLinkMutation.isPending ? "animate-spin" : ""}`} />
+                  {autoLinkMutation.isPending ? "Auto-linking…" : "Auto-link by Slug"}
+                </Button>
+              )}
+            </div>
+            {showCmeLinker && (
+              <div className="space-y-2">
+                <Input
+                  placeholder="Search CME courses…"
+                  value={cmeSearch}
+                  onChange={e => setCmeSearch(e.target.value)}
+                  className="mb-3 h-8 text-sm"
+                />
+                {!cmeLinkData ? (
+                  <p className="text-xs text-gray-400">Loading…</p>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                    {cmeLinkData.cmeRows
+                      .filter(r => !cmeSearch || r.name.toLowerCase().includes(cmeSearch.toLowerCase()))
+                      .map(cme => {
+                        const linked = cmeLinkData.lmsRows.find(l => l.id === cme.nativeLmsCourseId);
+                        return (
+                          <div key={cme.id} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-800 truncate">{cme.name}</p>
+                              <p className="text-xs text-gray-400 truncate">{cme.slug}</p>
+                            </div>
+                            {linked ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-[#189aa1] font-medium truncate max-w-[140px]">{linked.title}</span>
+                                <button
+                                  onClick={() => linkCourseMutation.mutate({ cmeCourseId: cme.id, nativeLmsCourseId: null })}
+                                  className="text-gray-300 hover:text-red-400 flex-shrink-0"
+                                  title="Unlink"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <Select
+                                value=""
+                                onValueChange={v => linkCourseMutation.mutate({ cmeCourseId: cme.id, nativeLmsCourseId: parseInt(v) })}
+                              >
+                                <SelectTrigger className="h-7 text-xs w-48 flex-shrink-0">
+                                  <SelectValue placeholder="Link to native course…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {cmeLinkData.lmsRows.map(l => (
+                                    <SelectItem key={l.id} value={String(l.id)}>
+                                      <span className="text-xs">{l.title}</span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Role Reference */}
         <Card className="mb-6 border-0 shadow-sm">
           <CardHeader className="pb-3">

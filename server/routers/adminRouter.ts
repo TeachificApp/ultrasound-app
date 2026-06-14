@@ -532,6 +532,95 @@ export const labSeatsRouter = router({
     return cleanupUserRolesDb();
   }),
 
+  /**
+   * List all CME courses from the cache with their native LMS link status.
+   * Also returns all native LMS courses for the manual-link dropdown.
+   */
+  listCmeCourseLinks: protectedProcedure.query(async ({ ctx }) => {
+    const myRoles = await getUserRoles(ctx.user.id);
+    if (ctx.user.role !== "admin" && !myRoles.includes("platform_admin")) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
+    }
+    const { getDb } = await import("../db");
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const { cmeCoursesCache, lmsCourses } = await import("../../drizzle/schema");
+    const [cmeRows, lmsRows] = await Promise.all([
+      db.select({
+        id: cmeCoursesCache.id,
+        name: cmeCoursesCache.name,
+        slug: cmeCoursesCache.slug,
+        nativeLmsCourseId: cmeCoursesCache.nativeLmsCourseId,
+      }).from(cmeCoursesCache),
+      db.select({
+        id: lmsCourses.id,
+        title: lmsCourses.title,
+        slug: lmsCourses.slug,
+      }).from(lmsCourses),
+    ]);
+    return { cmeRows, lmsRows };
+  }),
+
+  /**
+   * Manually link a CME course cache entry to a native LMS course.
+   * Pass nativeLmsCourseId: null to unlink.
+   */
+  linkCmeCourseToNative: protectedProcedure
+    .input(z.object({
+      cmeCourseId: z.number(),
+      nativeLmsCourseId: z.number().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Owner only" });
+      }
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { cmeCoursesCache } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db
+        .update(cmeCoursesCache)
+        .set({ nativeLmsCourseId: input.nativeLmsCourseId })
+        .where(eq(cmeCoursesCache.id, input.cmeCourseId));
+      return { success: true };
+    }),
+
+  /**
+   * Auto-link all unlinked CME courses to native LMS courses by matching slug.
+   * Returns the number of courses linked.
+   */
+  autoLinkCmeCoursesBySlug: protectedProcedure.mutation(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Owner only" });
+    }
+    const { getDb } = await import("../db");
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const { cmeCoursesCache, lmsCourses } = await import("../../drizzle/schema");
+    const { eq, isNull } = await import("drizzle-orm");
+    // Get all unlinked CME courses
+    const unlinked = await db
+      .select({ id: cmeCoursesCache.id, slug: cmeCoursesCache.slug })
+      .from(cmeCoursesCache)
+      .where(isNull(cmeCoursesCache.nativeLmsCourseId));
+    // Get all native LMS courses
+    const native = await db.select({ id: lmsCourses.id, slug: lmsCourses.slug }).from(lmsCourses);
+    const slugMap = new Map(native.map(c => [c.slug, c.id]));
+    let linked = 0;
+    for (const cme of unlinked) {
+      const nativeId = slugMap.get(cme.slug);
+      if (nativeId) {
+        await db
+          .update(cmeCoursesCache)
+          .set({ nativeLmsCourseId: nativeId })
+          .where(eq(cmeCoursesCache.id, cme.id));
+        linked++;
+      }
+    }
+    return { linked, total: unlinked.length };
+  }),
+
   /** Get seat usage for current lab */
   seatUsage: protectedProcedure.query(async ({ ctx }) => {
     const myRoles = await getUserRoles(ctx.user.id);
