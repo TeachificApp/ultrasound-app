@@ -287,7 +287,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
           }
         : undefined;
       return (
-        <div className="relative px-4 sm:px-8 py-10 sm:py-16 overflow-hidden w-full box-border" style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandler ? "pointer" : undefined }} onClick={heroClickHandler}>
+        <div className="relative px-4 sm:px-8 py-10 sm:py-16 overflow-hidden w-full box-border [min-height:0] sm:[min-height:var(--hero-mh)]" style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), "--hero-mh": `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandler ? "pointer" : undefined } as React.CSSProperties} onClick={heroClickHandler}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}

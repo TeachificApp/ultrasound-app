@@ -224,7 +224,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
         : undefined;
       return (
         <>
-        <div className="relative px-4 sm:px-8 py-10 sm:py-16 md:py-24 overflow-hidden w-full box-border" style={{ ...bgStyle, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerSL ? "pointer" : undefined }} onClick={heroClickHandlerSL}>
+        <div className="relative px-4 sm:px-8 py-10 sm:py-16 md:py-24 overflow-hidden w-full box-border [min-height:0] sm:[min-height:var(--hero-mh)]" style={{ ...bgStyle, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", "--hero-mh": `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerSL ? "pointer" : undefined } as React.CSSProperties} onClick={heroClickHandlerSL}>
           {d.bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}

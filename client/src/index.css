@@ -564,3 +564,15 @@ textarea,
 .animate-bounce-in {
   animation: bounceIn 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
+
+/* ── Mobile hero: cap inline font-size on headings so large display text
+   set via the landing page builder doesn't overflow on small screens ── */
+@media (max-width: 639px) {
+  h1 span[style*="font-size"],
+  h2 span[style*="font-size"],
+  h1 [style*="font-size"],
+  h2 [style*="font-size"] {
+    font-size: clamp(1.5rem, 8vw, 2.5rem) !important;
+    line-height: 1.2 !important;
+  }
+}
