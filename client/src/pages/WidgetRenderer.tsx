@@ -43,10 +43,10 @@ const THEMES = {
     cardBorder: "#e2e8f0",
     text: "#0f172a",
     subtext: "#64748b",
-    accent: "#0d9488",
-    accentHover: "#0f766e",
+    accent: "#179ca3",
+    accentHover: "#0e8a91",
     btnText: "#ffffff",
-    priceColor: "#0d9488",
+    priceColor: "#179ca3",
     shadow: "0 1px 3px rgba(0,0,0,0.08)",
   },
   dark: {
@@ -55,10 +55,10 @@ const THEMES = {
     cardBorder: "#334155",
     text: "#f1f5f9",
     subtext: "#94a3b8",
-    accent: "#14b8a6",
-    accentHover: "#0d9488",
+    accent: "#179ca3",
+    accentHover: "#0e8a91",
     btnText: "#ffffff",
-    priceColor: "#2dd4bf",
+    priceColor: "#4ad9e0",
     shadow: "0 1px 3px rgba(0,0,0,0.4)",
   },
   brand: {
@@ -67,11 +67,11 @@ const THEMES = {
     cardBorder: "#99f6e4",
     text: "#134e4a",
     subtext: "#0f766e",
-    accent: "#0d9488",
-    accentHover: "#0f766e",
+    accent: "#179ca3",
+    accentHover: "#0e8a91",
     btnText: "#ffffff",
-    priceColor: "#0d9488",
-    shadow: "0 1px 3px rgba(13,148,136,0.12)",
+    priceColor: "#179ca3",
+    shadow: "0 1px 3px rgba(23,156,163,0.12)",
   },
 };
 
@@ -92,7 +92,7 @@ function formatPrice(card: Card): string {
 
 function courseUrl(card: Card): string {
   const base = "https://learn.allaboutultrasound.com";
-  return card.slug ? `${base}/courses/${card.slug}` : base;
+  return card.slug ? `${base}/courses/${card.slug}` : `${base}/education-library`;
 }
 
 // ─── Card components ──────────────────────────────────────────────────────────

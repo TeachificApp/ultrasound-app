@@ -1294,6 +1294,14 @@ export default function PlatformAdmin() {
   const [lastSyncResult, setLastSyncResult] = useState<{ count: number; syncedAt: Date } | null>(null);
   const [lastRegistrySyncResult, setLastRegistrySyncResult] = useState<{ count: number; syncedAt: Date } | null>(null);
   const [lastMemberSyncResult, setLastMemberSyncResult] = useState<{ total: number; created: number; skipped: number; errors: number; syncedAt: Date } | null>(null);
+  const [lastBackfillResult, setLastBackfillResult] = useState<{ total: number; membershipGranted: number; communityGranted: number; errors: number; completedAt: Date } | null>(null);
+  const backfillAccessMutation = trpc.platformAdmin.backfillThinkificAccess.useMutation({
+    onSuccess: (data) => {
+      setLastBackfillResult(data);
+      toast.success(`Access backfill complete: ${data.membershipGranted} memberships + ${data.communityGranted} community memberships granted across ${data.total} users.`);
+    },
+    onError: (err) => toast.error(`Backfill failed: ${err.message}`),
+  });
   const syncAllMembersMutation = trpc.platformAdmin.syncAllThinkificMembers.useMutation({
     onSuccess: (data) => {
       setLastMemberSyncResult(data);
@@ -1758,6 +1766,43 @@ export default function PlatformAdmin() {
           </CardContent>
         </Card>
 
+        {/* Backfill Free Membership + Community Access */}
+        <Card className="mb-6 border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <Award className="w-4 h-4" />
+              Backfill Free Membership &amp; Community Access
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 mb-1">
+                  Grant the <strong>Free Membership</strong> plan and <strong>All About Ultrasound | iHeartEcho™ Community</strong> membership to all existing platform users who don&apos;t already have them.
+                  Idempotent — safe to run multiple times. No emails are sent. No premium_user role is assigned.
+                </p>
+                {lastBackfillResult ? (
+                  <p className="text-xs text-[#189aa1] font-medium">
+                    Last backfill: {lastBackfillResult.membershipGranted} memberships granted, {lastBackfillResult.communityGranted} community memberships granted across {lastBackfillResult.total} users
+                    {lastBackfillResult.errors > 0 ? `, ${lastBackfillResult.errors} errors` : ""} &mdash;{" "}
+                    {new Date(lastBackfillResult.completedAt).toLocaleString()}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400">No backfill performed this session.</p>
+                )}
+              </div>
+              <Button
+                onClick={() => backfillAccessMutation.mutate()}
+                disabled={backfillAccessMutation.isPending}
+                className="flex items-center gap-2 flex-shrink-0"
+                style={{ background: "#189aa1" }}
+              >
+                <Award className={`w-4 h-4 ${backfillAccessMutation.isPending ? "animate-spin" : ""}`} />
+                {backfillAccessMutation.isPending ? "Backfilling…" : "Backfill Access"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         {/* Role Reference */}
         <Card className="mb-6 border-0 shadow-sm">
           <CardHeader className="pb-3">

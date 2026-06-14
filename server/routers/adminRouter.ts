@@ -387,6 +387,23 @@ export const platformAdminRouter = router({
     const result = await runThinkificMemberSync();
     return { ...result, syncedAt: new Date() };
   }),
+
+  /**
+   * Backfill free membership + community access for ALL existing platform users.
+   * Idempotent — safe to run multiple times. Does NOT send emails or grant premium_user role.
+   * Processes users in batches of 500 to handle 14,000+ members.
+   */
+  backfillThinkificAccess: protectedProcedure.mutation(async ({ ctx }) => {
+    const myRoles = await getUserRoles(ctx.user.id);
+    const isOwner = ctx.user.role === "admin";
+    const isPlatformAdmin = myRoles.includes("platform_admin");
+    if (!isOwner && !isPlatformAdmin) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
+    }
+    const { runThinkificAccessBackfill } = await import("../jobs/thinkificMemberSync");
+    const result = await runThinkificAccessBackfill();
+    return { ...result, completedAt: new Date() };
+  }),
 });
 
 // ─── Lab Seat Management Router ───────────────────────────────────────────────
