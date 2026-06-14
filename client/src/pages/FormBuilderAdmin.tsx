@@ -69,6 +69,7 @@ import { Link } from "wouter";
 import FormPreview from "@/components/FormPreview";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import DIYFormSuccessModulesTab from "@/components/admin/DIYFormSuccessModulesTab";
+import DIYFormAnalyticsDeep from "@/components/admin/DIYFormAnalyticsDeep";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1737,7 +1738,7 @@ function FormResultsTab({ templateId }: { templateId: number }) {
 
 function FormEditor({ templateId }: { templateId: number }) {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "style" | "preview" | "settings" | "results" | "success-modules">("editor");
+  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "style" | "preview" | "settings" | "results" | "success-modules" | "analytics">("editor");
   const [urlImportOpen, setUrlImportOpen] = useState(false);
   const [urlImportValue, setUrlImportValue] = useState("");
   const [editingItem, setEditingItem] = useState<FormItem | null>(null);
@@ -1907,6 +1908,7 @@ function FormEditor({ templateId }: { templateId: number }) {
           { id: "settings" as const, label: "Settings", icon: Save, badge: null },
           { id: "success-modules" as const, label: "Success Modules", icon: CheckCircle2, badge: null },
           { id: "results" as const, label: "Results", icon: BarChart2, badge: null },
+          { id: "analytics" as const, label: "Deep Analytics", icon: BarChart2, badge: null },
         ].map(tab => (
           <button
             key={tab.id}
@@ -2107,6 +2109,11 @@ function FormEditor({ templateId }: { templateId: number }) {
       {/* Results Tab */}
       {activeTab === "results" && (
         <FormResultsTab templateId={templateId} />
+      )}
+
+      {/* Deep Analytics Tab */}
+      {activeTab === "analytics" && (
+        <DIYFormAnalyticsDeep templateId={templateId} />
       )}
 
       {/* Section Dialog */}

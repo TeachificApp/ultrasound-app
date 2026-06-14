@@ -1,15 +1,13 @@
 /**
- * Deep field analytics, cross-tabulation, drop-off funnel, and shareable reports for a single form.
+ * DIYFormAnalyticsDeep — Deep analytics for DIY/Accreditation form templates.
+ * Mirrors FormAnalyticsDeep but uses formBuilder.getDIYDeepFieldAnalytics,
+ * getDIYDropOffAnalytics, and getDIYMultiCrossTab procedures.
  */
 import React, { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -34,17 +32,11 @@ import {
 } from "recharts";
 import {
   BarChart2,
-  Copy,
-  ExternalLink,
   Grid3X3,
-  Layers,
   RefreshCw,
-  Share2,
-  Table2,
   TrendingDown,
   PieChart as PieIcon,
 } from "lucide-react";
-import { buildReportPublicUrl } from "@shared/formAnalyticsUtils";
 
 const BRAND = "#0e7490";
 const COLORS = [
@@ -52,10 +44,7 @@ const COLORS = [
   "#14b8a6", "#10b981", "#84cc16", "#f59e0b", "#ef4444",
 ];
 
-type Props = {
-  formId: number;
-  template: { name: string; status: string; formType: string };
-};
+type Props = { templateId: number };
 
 // ─── Multi-select pill component ─────────────────────────────────────────────
 function MultiFieldSelect({
@@ -133,7 +122,6 @@ type ChartMode = "bar" | "stacked" | "pie" | "donut" | "heatmap";
 function CrossTabChartPanel({ ct }: { ct: CrossTabResult }) {
   const [mode, setMode] = useState<ChartMode>("bar");
 
-  // Build stacked bar data: one entry per rowValue, one key per colValue
   const stackedData = useMemo(() => {
     return ct.rowValues.map(rv => {
       const entry: Record<string, string | number> = { name: rv.length > 20 ? rv.slice(0, 18) + "…" : rv };
@@ -145,7 +133,6 @@ function CrossTabChartPanel({ ct }: { ct: CrossTabResult }) {
     });
   }, [ct]);
 
-  // Pie data: aggregate by colValue across all rows
   const pieData = useMemo(() => {
     return ct.colValues.map(cv => {
       const total = ct.cells.filter(c => c.colValue === cv).reduce((s, c) => s + c.count, 0);
@@ -283,8 +270,8 @@ function CrossTabChartPanel({ ct }: { ct: CrossTabResult }) {
 }
 
 // ─── Drop-off funnel panel ────────────────────────────────────────────────────
-function DropOffPanel({ formId, items }: { formId: number; items: Array<{ id: number; label: string }> }) {
-  const { data, isLoading } = trpc.generalForm.getDropOffAnalytics.useQuery({ templateId: formId });
+function DropOffPanel({ templateId, items }: { templateId: number; items: Array<{ id: number; label: string }> }) {
+  const { data, isLoading } = trpc.formBuilder.getDIYDropOffAnalytics.useQuery({ templateId });
 
   if (isLoading) {
     return (
@@ -327,7 +314,6 @@ function DropOffPanel({ formId, items }: { formId: number; items: Array<{ id: nu
 
   return (
     <div className="space-y-6">
-      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: "Total Sessions", value: data.totalSessions },
@@ -345,7 +331,6 @@ function DropOffPanel({ formId, items }: { formId: number; items: Array<{ id: nu
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Completion pie / donut */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5">
@@ -375,7 +360,6 @@ function DropOffPanel({ formId, items }: { formId: number; items: Array<{ id: nu
           </CardContent>
         </Card>
 
-        {/* Page funnel bar chart */}
         {pageFunnelData.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
@@ -402,7 +386,6 @@ function DropOffPanel({ formId, items }: { formId: number; items: Array<{ id: nu
         )}
       </div>
 
-      {/* Field-level drop-off */}
       {fieldDropOffData.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
@@ -466,47 +449,42 @@ function DropOffPanel({ formId, items }: { formId: number; items: Array<{ id: nu
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function FormAnalyticsDeep({ formId, template }: Props) {
-  const [filterId, setFilterId] = useState<string>("");
+export default function DIYFormAnalyticsDeep({ templateId }: Props) {
   const [rowFieldId, setRowFieldId] = useState<string>("");
   const [colFieldId, setColFieldId] = useState<string>("");
   const [colFieldIds, setColFieldIds] = useState<number[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState<string>("");
-  const [compareFormIds, setCompareFormIds] = useState<number[]>([]);
-  const [compareFieldLabel, setCompareFieldLabel] = useState("");
   const [crossTabMode, setCrossTabMode] = useState<"single" | "multi">("single");
 
-  const { data: formsList } = trpc.generalForm.listForms.useQuery({ page: 1, pageSize: 200 });
-  const { data, isLoading, refetch } = trpc.generalForm.getDeepFieldAnalytics.useQuery({
-    formId,
-    filterId: filterId || undefined,
-    crossTabRowFieldId: rowFieldId ? Number(rowFieldId) : undefined,
-    crossTabColFieldId: colFieldId ? Number(colFieldId) : undefined,
-  });
+  const { data, isLoading, refetch } = trpc.formBuilder.getDIYDeepFieldAnalytics.useQuery({ templateId });
 
-  const { data: multiCrossTabData } = trpc.generalForm.getMultiCrossTab.useQuery(
+  const { data: multiCrossTabData } = trpc.formBuilder.getDIYMultiCrossTab.useQuery(
     {
-      templateId: formId,
+      templateId,
       rowFieldId: Number(rowFieldId),
       colFieldIds,
-      filterId: filterId || undefined,
     },
     { enabled: crossTabMode === "multi" && !!rowFieldId && colFieldIds.length > 0 },
   );
 
-  const { data: compareData } = trpc.generalForm.compareFormsByField.useQuery(
-    { formIds: compareFormIds, fieldLabel: compareFieldLabel },
-    { enabled: compareFormIds.length > 0 && compareFieldLabel.trim().length > 0 },
+  // For single cross-tab, we use the multi endpoint with a single colFieldId
+  const { data: singleCrossTabData } = trpc.formBuilder.getDIYMultiCrossTab.useQuery(
+    {
+      templateId,
+      rowFieldId: Number(rowFieldId),
+      colFieldIds: colFieldId ? [Number(colFieldId)] : [],
+    },
+    { enabled: crossTabMode === "single" && !!rowFieldId && !!colFieldId },
   );
 
   const selectedField = useMemo(
-    () => data?.fieldAnalytics.find(f => String(f.fieldId) === selectedFieldId),
+    () => data?.fieldAnalytics.find((f: any) => String(f.fieldId) === selectedFieldId),
     [data, selectedFieldId],
   );
 
   const chartData = useMemo(
     () =>
-      (selectedField?.distribution ?? []).slice(0, 15).map(d => ({
+      (selectedField?.distribution ?? []).slice(0, 15).map((d: any) => ({
         name: d.label.length > 24 ? `${d.label.slice(0, 22)}…` : d.label,
         count: d.count,
         percent: d.percent,
@@ -522,30 +500,16 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
     );
   }
 
-  const items = data?.items ?? [];
+  const items = (data?.items ?? []) as Array<{ id: number; label: string; itemType: string }>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[200px]">
-          <Label className="text-xs text-gray-500">Results filter</Label>
-          <Select value={filterId || "__none__"} onValueChange={v => setFilterId(v === "__none__" ? "" : v)}>
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="No filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">No filter</SelectItem>
-              {(data?.savedFilters ?? []).map(f => (
-                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1">
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </Button>
         <p className="text-sm text-gray-500 ml-auto">
-          {data?.totalSubmissions ?? 0} submissions · {template.name}
+          {data?.totalSubmissions ?? 0} submissions
         </p>
       </div>
 
@@ -554,8 +518,6 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
           <TabsTrigger value="fields" className="gap-1"><BarChart2 className="w-3.5 h-3.5" /> Field analytics</TabsTrigger>
           <TabsTrigger value="crosstab" className="gap-1"><Grid3X3 className="w-3.5 h-3.5" /> Cross-tab</TabsTrigger>
           <TabsTrigger value="dropoff" className="gap-1"><TrendingDown className="w-3.5 h-3.5" /> Drop-off</TabsTrigger>
-          <TabsTrigger value="multiform" className="gap-1"><Layers className="w-3.5 h-3.5" /> Multi-form</TabsTrigger>
-          <TabsTrigger value="reports" className="gap-1"><Share2 className="w-3.5 h-3.5" /> Reports</TabsTrigger>
         </TabsList>
 
         {/* ── Field analytics tab ── */}
@@ -579,7 +541,7 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
                   >
                     <div className="font-medium truncate">{field.label}</div>
                     {(() => {
-                      const fa = data?.fieldAnalytics.find(f => f.fieldId === field.id);
+                      const fa = data?.fieldAnalytics.find((f: any) => f.fieldId === field.id);
                       return fa ? (
                         <div className="text-xs text-gray-500">
                           {fa.responseCount} responses · {fa.uniqueCount} unique
@@ -641,7 +603,7 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
                           </tr>
                         </thead>
                         <tbody>
-                          {selectedField.distribution.map(row => (
+                          {selectedField.distribution.map((row: any) => (
                             <tr key={row.value} className="border-b border-gray-50">
                               <td className="py-1.5 pr-4">{row.label}</td>
                               <td className="py-1.5 pr-4">{row.count}</td>
@@ -720,11 +682,11 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
             )}
           </div>
 
-          {crossTabMode === "single" && data?.crossTab && (
-            <CrossTabChartPanel ct={data.crossTab} />
+          {crossTabMode === "single" && singleCrossTabData && singleCrossTabData.comparisons.length > 0 && (
+            <CrossTabChartPanel ct={singleCrossTabData.comparisons[0]} />
           )}
 
-          {crossTabMode === "single" && !data?.crossTab && (
+          {crossTabMode === "single" && (!rowFieldId || !colFieldId) && (
             <p className="text-sm text-gray-400">Select row and column fields to generate a cross-tabulation.</p>
           )}
 
@@ -743,322 +705,9 @@ export default function FormAnalyticsDeep({ formId, template }: Props) {
 
         {/* ── Drop-off tab ── */}
         <TabsContent value="dropoff" className="mt-4">
-          <DropOffPanel formId={formId} items={items} />
-        </TabsContent>
-
-        {/* ── Multi-form compare tab ── */}
-        <TabsContent value="multiform" className="space-y-4 mt-4">
-          <p className="text-sm text-gray-600">
-            Compare the same field label across multiple forms (matched by exact label text).
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <div className="flex-1 min-w-[200px]">
-              <Label className="text-xs">Field label to compare</Label>
-              <Input
-                className="mt-1"
-                placeholder="e.g. Years of experience"
-                value={compareFieldLabel}
-                onChange={e => setCompareFieldLabel(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(formsList?.forms ?? [])
-              .filter(f => f.id !== formId)
-              .map(f => {
-                const checked = compareFormIds.includes(f.id);
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() =>
-                      setCompareFormIds(prev =>
-                        checked ? prev.filter(id => id !== f.id) : [...prev, f.id],
-                      )
-                    }
-                    className={`px-3 py-1.5 rounded-full text-xs border ${
-                      checked ? "bg-teal-50 border-teal-300 text-teal-800" : "border-gray-200"
-                    }`}
-                  >
-                    {f.name}
-                  </button>
-                );
-              })}
-            <button
-              type="button"
-              className="px-3 py-1.5 rounded-full text-xs border border-teal-300 bg-teal-50"
-              onClick={() => setCompareFormIds(prev => (prev.includes(formId) ? prev : [...prev, formId]))}
-            >
-              + This form
-            </button>
-          </div>
-          {compareData && compareData.length > 0 && (
-            <div className="grid gap-4 md:grid-cols-2">
-              {compareData.map(row => (
-                <Card key={row.formId}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">{row.formName}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {row.fieldId == null ? (
-                      <p className="text-xs text-amber-600">Field not found in this form</p>
-                    ) : (
-                      <ul className="text-sm space-y-1">
-                        {row.distribution.slice(0, 8).map(d => (
-                          <li key={d.value} className="flex justify-between gap-2">
-                            <span className="truncate">{d.label}</span>
-                            <span className="text-gray-500 shrink-0">{d.count} ({d.percent}%)</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* ── Reports tab ── */}
-        <TabsContent value="reports" className="mt-4">
-          <FormAnalyticsReportsPanel formId={formId} items={items} savedFilters={data?.savedFilters ?? []} />
+          <DropOffPanel templateId={templateId} items={items} />
         </TabsContent>
       </Tabs>
     </div>
   );
-}
-
-// ─── Public reports panel ─────────────────────────────────────────────────────
-function FormAnalyticsReportsPanel({
-  formId,
-  items,
-  savedFilters,
-}: {
-  formId: number;
-  items: Array<{ id: number; label: string; itemType: string }>;
-  savedFilters: Array<{ id: string; name: string }>;
-}) {
-  const utils = trpc.useUtils();
-  const { data: reports, refetch } = trpc.generalForm.listAnalyticsReports.useQuery({ formId });
-  const saveReport = trpc.generalForm.saveAnalyticsReport.useMutation({
-    onSuccess: () => {
-      toast.success("Report saved");
-      refetch();
-      utils.generalForm.listAnalyticsReports.invalidate({ formId });
-    },
-    onError: e => toast.error(e.message),
-  });
-  const deleteReport = trpc.generalForm.deleteAnalyticsReport.useMutation({
-    onSuccess: () => {
-      toast.success("Report deleted");
-      refetch();
-    },
-    onError: e => toast.error(e.message),
-  });
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [headerHtml, setHeaderHtml] = useState("");
-  const [password, setPassword] = useState("");
-  const [filterId, setFilterId] = useState("");
-  const [showTable, setShowTable] = useState(true);
-  const [showCharts, setShowCharts] = useState(true);
-  const [rowFieldId, setRowFieldId] = useState("");
-  const [colFieldId, setColFieldId] = useState("");
-
-  const resetForm = () => {
-    setEditingId(null);
-    setName("");
-    setHeaderHtml("");
-    setPassword("");
-    setFilterId("");
-    setShowTable(true);
-    setShowCharts(true);
-    setRowFieldId("");
-    setColFieldId("");
-  };
-
-  const loadReport = (r: NonNullable<typeof reports>[number]) => {
-    setEditingId(r.id);
-    setName(r.name);
-    setHeaderHtml(r.headerHtml ?? "");
-    setPassword("");
-    setFilterId(r.filterId ?? "");
-    setShowTable(r.showTable);
-    setShowCharts(r.showCharts);
-    setRowFieldId(r.crossTabRowFieldId ? String(r.crossTabRowFieldId) : "");
-    setColFieldId(r.crossTabColFieldId ? String(r.crossTabColFieldId) : "");
-  };
-
-  const copyLink = (token: string, mode: "full" | "table" | "charts" | "embed") => {
-    const url = `${window.location.origin}${buildReportPublicUrl(token, mode)}`;
-    void navigator.clipboard.writeText(url);
-    toast.success("Link copied");
-  };
-
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">{editingId ? "Edit report" : "New public report"}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div>
-            <Label className="text-xs">Report name</Label>
-            <Input className="mt-1" value={name} onChange={e => setName(e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Header HTML (optional)</Label>
-            <Textarea className="mt-1" rows={3} value={headerHtml} onChange={e => setHeaderHtml(e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Password (optional)</Label>
-            <Input
-              type="password"
-              className="mt-1"
-              placeholder={editingId ? "Leave blank to keep existing" : ""}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label className="text-xs">Results filter</Label>
-            <Select value={filterId || "__none__"} onValueChange={v => setFilterId(v === "__none__" ? "" : v)}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">No filter</SelectItem>
-                {savedFilters.map(f => (
-                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-sm">
-              <Switch checked={showTable} onCheckedChange={setShowTable} /> Table view
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Switch checked={showCharts} onCheckedChange={setShowCharts} /> Charts
-            </label>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-xs">Cross-tab row</Label>
-              <Select value={rowFieldId || "__none__"} onValueChange={v => setRowFieldId(v === "__none__" ? "" : v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">None</SelectItem>
-                  {items.map(i => (
-                    <SelectItem key={i.id} value={String(i.id)}>{i.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Cross-tab column</Label>
-              <Select value={colFieldId || "__none__"} onValueChange={v => setColFieldId(v === "__none__" ? "" : v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">None</SelectItem>
-                  {items.map(i => (
-                    <SelectItem key={i.id} value={String(i.id)}>{i.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              disabled={!name.trim() || saveReport.isPending}
-              className="text-white"
-              style={{ background: BRAND }}
-              onClick={() =>
-                saveReport.mutate({
-                  formId,
-                  report: {
-                    id: editingId ?? undefined,
-                    name,
-                    headerHtml: headerHtml || undefined,
-                    password: password || undefined,
-                    filterId: filterId || undefined,
-                    showTable,
-                    showCharts,
-                    crossTabRowFieldId: rowFieldId ? Number(rowFieldId) : undefined,
-                    crossTabColFieldId: colFieldId ? Number(colFieldId) : undefined,
-                  },
-                })
-              }
-            >
-              Save report
-            </Button>
-            {editingId && (
-              <Button variant="outline" onClick={resetForm}>Cancel</Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2"><Table2 className="w-4 h-4" /> Saved reports</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {!reports?.length ? (
-            <p className="text-sm text-gray-400">No public reports yet. Create one to share filtered analytics.</p>
-          ) : (
-            reports.map(r => (
-              <div key={r.id} className="border rounded-lg p-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-sm">{r.name}</p>
-                    <p className="text-xs text-gray-500">Updated {new Date(r.updatedAt).toLocaleString()}</p>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => loadReport(r)}>Edit</Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-red-600"
-                      onClick={() => deleteReport.mutate({ formId, reportId: r.id })}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => copyLink(r.token, "full")}>
-                    <Copy className="w-3 h-3" /> Full
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => copyLink(r.token, "table")}>
-                    <Table2 className="w-3 h-3" /> Table
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => copyLink(r.token, "charts")}>
-                    <BarChart2 className="w-3 h-3" /> Charts
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => copyLink(r.token, "embed")}>
-                    <Code2Icon /> Embed
-                  </Button>
-                  <a
-                    href={buildReportPublicUrl(r.token, "full")}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center h-7 px-2 text-xs border rounded-md hover:bg-gray-50 gap-1"
-                  >
-                    <ExternalLink className="w-3 h-3" /> View
-                  </a>
-                </div>
-                <p className="text-[10px] text-gray-400 break-all font-mono">
-                  {window.location.origin}{buildReportPublicUrl(r.token, "full")}
-                </p>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function Code2Icon() {
-  return <span className="text-[10px] font-bold">&lt;/&gt;</span>;
 }

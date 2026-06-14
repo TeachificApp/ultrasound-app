@@ -36,6 +36,7 @@ import {
   generalFormSuccessRoutingRules,
   generalFormEmbedWidgets,
   generalFormEmbedAnalytics,
+  generalFormProgressEvents,
 } from "../../drizzle/schema";
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
@@ -2700,6 +2701,96 @@ ${pageText}`;
         updatedAt: new Date(),
       }).where(eq(generalFormEmbedWidgets.id, widget.id));
       return { success: true, widgetKey: widget.widgetKey };
+    }),
+
+  // ── Multi-field Cross-Tabulation ───────────────────────────────────────────
+  getMultiCrossTab: protectedProcedure
+    .input(z.object({
+      templateId: z.number().int().positive(),
+      rowFieldId: z.number().int().positive(),
+      colFieldIds: z.array(z.number().int().positive()).min(1).max(10),
+      filterId: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const bundle = await loadFormAnalyticsBundle(db, input.templateId, input.filterId);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      const { computeMultiCrossTab } = await import("../../shared/formAnalyticsUtils");
+      const result = computeMultiCrossTab(
+        bundle.items,
+        bundle.options,
+        bundle.submissions,
+        input.rowFieldId,
+        input.colFieldIds,
+      );
+      return result;
+    }),
+
+  // ── Drop-off / Progress Tracking ──────────────────────────────────────────
+  trackProgress: publicProcedure
+    .input(z.object({
+      sessionId: z.string().max(64),
+      templateId: z.number().int().positive(),
+      fieldId: z.number().int().positive().nullable().optional(),
+      pageIndex: z.number().int().min(0).default(0),
+      eventType: z.enum(["session_start", "field_view", "field_answer", "page_advance", "form_submit", "form_abandon"]),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { ok: false };
+      await db.insert(generalFormProgressEvents).values({
+        sessionId: input.sessionId,
+        templateId: input.templateId,
+        fieldId: input.fieldId ?? null,
+        pageIndex: input.pageIndex,
+        eventType: input.eventType,
+        createdAt: Date.now(),
+      });
+      return { ok: true };
+    }),
+
+  getDropOffAnalytics: protectedProcedure
+    .input(z.object({ templateId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [sessionsRows] = await db.execute(
+        sql`SELECT COUNT(DISTINCT session_id) as total FROM general_form_progress_events WHERE template_id = ${input.templateId} AND event_type = 'session_start'`
+      ) as any;
+      const totalSessions = Number((sessionsRows as any[])[0]?.total ?? 0);
+      const [submitRows] = await db.execute(
+        sql`SELECT COUNT(DISTINCT session_id) as total FROM general_form_progress_events WHERE template_id = ${input.templateId} AND event_type = 'form_submit'`
+      ) as any;
+      const totalSubmits = Number((submitRows as any[])[0]?.total ?? 0);
+      const [pageRows] = await db.execute(
+        sql`SELECT page_index, COUNT(DISTINCT session_id) as sessions FROM general_form_progress_events WHERE template_id = ${input.templateId} AND event_type IN ('session_start','page_advance','form_submit') GROUP BY page_index ORDER BY page_index ASC`
+      ) as any;
+      const [fieldViewRows] = await db.execute(
+        sql`SELECT field_id, COUNT(DISTINCT session_id) as views FROM general_form_progress_events WHERE template_id = ${input.templateId} AND event_type = 'field_view' AND field_id IS NOT NULL GROUP BY field_id`
+      ) as any;
+      const [fieldAnswerRows] = await db.execute(
+        sql`SELECT field_id, COUNT(DISTINCT session_id) as answers FROM general_form_progress_events WHERE template_id = ${input.templateId} AND event_type = 'field_answer' AND field_id IS NOT NULL GROUP BY field_id`
+      ) as any;
+      const viewMap: Record<number, number> = {};
+      for (const r of (fieldViewRows as any[])) viewMap[Number(r.field_id)] = Number(r.views);
+      const answerMap: Record<number, number> = {};
+      for (const r of (fieldAnswerRows as any[])) answerMap[Number(r.field_id)] = Number(r.answers);
+      const fieldStats = Object.keys({ ...viewMap, ...answerMap }).map(id => ({
+        fieldId: Number(id),
+        views: viewMap[Number(id)] ?? 0,
+        answers: answerMap[Number(id)] ?? 0,
+        dropOffRate: viewMap[Number(id)] ? Math.round((1 - (answerMap[Number(id)] ?? 0) / viewMap[Number(id)]) * 100) : 0,
+      }));
+      return {
+        totalSessions,
+        totalSubmits,
+        overallCompletionRate: totalSessions > 0 ? Math.round((totalSubmits / totalSessions) * 100) : 0,
+        pageFunnel: (pageRows as any[]).map((r: any) => ({ pageIndex: Number(r.page_index), sessions: Number(r.sessions) })),
+        fieldStats,
+      };
     }),
 
 });

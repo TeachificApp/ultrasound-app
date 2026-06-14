@@ -3,7 +3,7 @@
  * Renders any Form Builder template from the database.
  * Supports: all 10 field types, branching rules, org visibility rules, quality score computation.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -441,6 +441,39 @@ export default function DynamicFormRenderer({
   const [submitted, setSubmitted] = useState(false);
   const [successOutcome, setSuccessOutcome] = useState<any | null>(null);
 
+  // ── Progress / Drop-off Tracking ──────────────────────────────────────────
+  const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString(36));
+  const sessionStartedRef = useRef(false);
+  const submittedRef = useRef(false);
+  const trackProgressMutation = trpc.generalForm.trackProgress.useMutation();
+
+  const trackEvent = useCallback((eventType: "session_start" | "field_answer" | "form_submit" | "form_abandon", fieldId?: number) => {
+    if (!templateId || readOnly) return;
+    trackProgressMutation.mutate({ sessionId: sessionIdRef.current, templateId, fieldId: fieldId ?? null, pageIndex: 0, eventType });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId, readOnly]);
+
+  // Fire session_start once when template is loaded
+  useEffect(() => {
+    if (templateData && !sessionStartedRef.current && !readOnly) {
+      sessionStartedRef.current = true;
+      trackEvent("session_start");
+    }
+  }, [templateData, readOnly, trackEvent]);
+
+  // Fire form_abandon via sendBeacon on page unload if not submitted
+  useEffect(() => {
+    if (readOnly) return;
+    const handleUnload = () => {
+      if (!submittedRef.current && sessionStartedRef.current) {
+        const payload = JSON.stringify({ json: { sessionId: sessionIdRef.current, templateId, fieldId: null, pageIndex: 0, eventType: "form_abandon" } });
+        navigator.sendBeacon("/api/trpc/generalForm.trackProgress", new Blob([payload], { type: "application/json" }));
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, [templateId, readOnly]);
+
   const { data: rawTemplateData, isLoading } = trpc.formBuilder.getFullTemplate.useQuery(
     { id: templateId },
     { enabled: !!templateId }
@@ -533,6 +566,7 @@ export default function DynamicFormRenderer({
 
   const setResponse = (itemId: number, value: string | string[]) => {
     setResponses(prev => ({ ...prev, [String(itemId)]: value }));
+    if (!readOnly && sessionStartedRef.current) trackEvent("field_answer", itemId);
   };
 
   const validate = (): boolean => {
@@ -554,6 +588,8 @@ export default function DynamicFormRenderer({
   const handleSubmit = async () => {
     if (!validate()) return;
     setSubmitting(true);
+    submittedRef.current = true;
+    trackEvent("form_submit");
     const normalizedScore = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
     submitMutation.mutate({
       templateId,

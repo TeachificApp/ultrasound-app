@@ -6,6 +6,7 @@ import {
   longtext,
   mysqlEnum,
   mysqlTable,
+  smallint,
   text,
   timestamp,
   varchar,
@@ -4418,6 +4419,19 @@ export const generalFormEmbedAnalytics = mysqlTable("generalFormEmbedAnalytics",
 });
 export type GeneralFormEmbedAnalytic = typeof generalFormEmbedAnalytics.$inferSelect;
 export type InsertGeneralFormEmbedAnalytic = typeof generalFormEmbedAnalytics.$inferInsert;
+
+// ─── Form Progress / Drop-off Tracking ───────────────────────────────────────
+export const generalFormProgressEvents = mysqlTable("general_form_progress_events", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("session_id", { length: 64 }).notNull(),
+  templateId: int("template_id").notNull(),
+  fieldId: int("field_id"),
+  pageIndex: smallint("page_index").default(0).notNull(),
+  eventType: mysqlEnum("event_type", ["session_start", "field_view", "field_answer", "page_advance", "form_submit", "form_abandon"]).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type GeneralFormProgressEvent = typeof generalFormProgressEvents.$inferSelect;
+export type InsertGeneralFormProgressEvent = typeof generalFormProgressEvents.$inferInsert;
 
 // ─── Block Templates (shared across all page editors) ─────────────────────────
 export const blockTemplates = mysqlTable("blockTemplates", {

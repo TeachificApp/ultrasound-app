@@ -21,6 +21,7 @@ import {
   filterSubmissions,
   computeFieldAnalytics,
   computeCrossTab,
+  computeMultiCrossTab,
   compareFieldAcrossForms,
   type FormFieldMeta,
   type FormOptionMeta,
@@ -151,17 +152,23 @@ export function buildDeepAnalyticsPayload(
   submissions: ReturnType<typeof parseSubmissions>,
   crossTabRowFieldId?: number,
   crossTabColFieldId?: number,
+  crossTabColFieldIds?: number[],
 ) {
   const fieldAnalytics = computeFieldAnalytics(items, options, submissions);
   const crossTab =
     crossTabRowFieldId && crossTabColFieldId
       ? computeCrossTab(items, options, submissions, crossTabRowFieldId, crossTabColFieldId)
       : null;
+  const multiCrossTab =
+    crossTabRowFieldId && crossTabColFieldIds && crossTabColFieldIds.length > 0
+      ? computeMultiCrossTab(items, options, submissions, crossTabRowFieldId, crossTabColFieldIds)
+      : null;
 
   return {
     totalSubmissions: submissions.length,
     fieldAnalytics,
     crossTab,
+    multiCrossTab,
   };
 }
 

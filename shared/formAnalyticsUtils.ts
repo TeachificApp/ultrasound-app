@@ -76,6 +76,14 @@ export type CrossTabResult = {
   total: number;
 };
 
+// ─── Multi-field Cross-Tabulation (1 row × N columns) ────────────────────────
+
+export type MultiCrossTabResult = {
+  rowFieldId: number;
+  rowLabel: string;
+  comparisons: CrossTabResult[];
+};
+
 export type AnalyticsReportConfig = {
   id: string;
   name: string;
@@ -89,6 +97,8 @@ export type AnalyticsReportConfig = {
   showCharts: boolean;
   crossTabRowFieldId?: number;
   crossTabColFieldId?: number;
+  /** Multi-column cross-tab: compare rowField against multiple colFields */
+  crossTabColFieldIds?: number[];
   createdAt: string;
   updatedAt: string;
 };
@@ -423,6 +433,33 @@ export function computeCrossTab(
       colValue: optionLabelForValue(options, colFieldId, c.colValue),
     })),
     total,
+  };
+}
+
+/**
+ * Compute cross-tabulation for one row field against multiple column fields.
+ * Returns a MultiCrossTabResult containing one CrossTabResult per colFieldId,
+ * allowing the UI to render each comparison as a separate chart (bar, stacked
+ * bar, pie, donut, heatmap).
+ */
+export function computeMultiCrossTab(
+  items: FormFieldMeta[],
+  options: FormOptionMeta[],
+  submissions: ParsedSubmission[],
+  rowFieldId: number,
+  colFieldIds: number[],
+): MultiCrossTabResult | null {
+  const rowItem = items.find(i => i.id === rowFieldId);
+  if (!rowItem) return null;
+  const comparisons: CrossTabResult[] = [];
+  for (const colFieldId of colFieldIds) {
+    const result = computeCrossTab(items, options, submissions, rowFieldId, colFieldId);
+    if (result) comparisons.push(result);
+  }
+  return {
+    rowFieldId,
+    rowLabel: rowItem.label,
+    comparisons,
   };
 }
 

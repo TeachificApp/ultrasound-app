@@ -12,8 +12,8 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb } from "../db";
-import { lmsCourses, lmsSections, lmsLessons } from "../../drizzle/schema";
-import { eq, asc } from "drizzle-orm";
+import { lmsCourses, lmsSections, lmsLessons, curriculumEmbedVisibility } from "../../drizzle/schema";
+import { eq, asc, and } from "drizzle-orm";
 
 function setCors(res: Response) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -78,7 +78,29 @@ async function getCurriculumData(slug: string) {
     })
   );
 
-  const filteredSections = sectionsWithLessons.filter((s) => s.lessons.length > 0);
+  // Apply embed visibility filter — exclude hidden sections and lessons
+  const visibilityRows = await db
+    .select()
+    .from(curriculumEmbedVisibility)
+    .where(and(
+      eq(curriculumEmbedVisibility.courseId, course.id),
+      eq(curriculumEmbedVisibility.hidden, true)
+    ));
+  const hiddenSectionIds = new Set(
+    visibilityRows.filter(r => r.itemType === "section").map(r => r.itemId)
+  );
+  const hiddenLessonIds = new Set(
+    visibilityRows.filter(r => r.itemType === "lesson").map(r => r.itemId)
+  );
+
+  const visibleSections = sectionsWithLessons
+    .filter(s => !hiddenSectionIds.has(s.id))
+    .map(s => ({
+      ...s,
+      lessons: s.lessons.filter(l => !hiddenLessonIds.has(l.id)),
+    }));
+
+  const filteredSections = visibleSections.filter((s) => s.lessons.length > 0);
 
   const totalLessons = filteredSections.reduce((n, s) => n + s.lessons.length, 0);
   const totalMinutes = filteredSections.reduce(

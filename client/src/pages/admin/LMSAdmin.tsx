@@ -10254,13 +10254,133 @@ function CurriculumEmbedTab({ course }: { course: any }) {
             </div>
             <textarea readOnly value={ctaCardIframeEmbed} rows={7} className="w-full text-xs font-mono bg-white border border-gray-200 rounded p-2 resize-none focus:outline-none" />
           </div>
-        </div>
+                </div>
       </div>
 
+      {/* ── Section 3: Embed Visibility Control ── */}
+      <CurriculumEmbedVisibilityPanel courseId={course.id} sections={course.sections ?? []} />
     </div>
   );
 }
 
+// ─── Curriculum Embed Visibility Panel ───────────────────────────────────────
+function CurriculumEmbedVisibilityPanel({ courseId, sections }: { courseId: number; sections: any[] }) {
+  const utils = trpc.useUtils();
+  const { data: visData, isLoading } = trpc.lmsCourseBuilder.getCurriculumEmbedVisibility.useQuery({ courseId });
+  const setVisibility = trpc.lmsCourseBuilder.setCurriculumEmbedVisibility.useMutation({
+    onSuccess: () => {
+      toast.success("Embed visibility updated");
+      utils.lmsCourseBuilder.getCurriculumEmbedVisibility.invalidate({ courseId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const hiddenMap = visData?.hiddenMap ?? {};
+
+  const toggle = (itemType: "section" | "lesson", itemId: number, currentlyHidden: boolean) => {
+    setVisibility.mutate({
+      courseId,
+      items: [{ itemType, itemId, hidden: !currentlyHidden }],
+    });
+  };
+
+  const [collapsed, setCollapsed] = React.useState(false);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between gap-2 text-left"
+        onClick={() => setCollapsed(c => !c)}
+      >
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">Embed Visibility Control</h3>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Choose which modules and lessons appear in the public curriculum embed. Hidden items are excluded from the embed but remain in the course.
+          </p>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${collapsed ? "" : "rotate-180"}`} />
+      </button>
+
+      {!collapsed && (
+        <div className="mt-5 space-y-3">
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+            </div>
+          ) : sections.length === 0 ? (
+            <p className="text-sm text-gray-400">No modules found for this course.</p>
+          ) : (
+            sections.map((section: any) => {
+              const sectionKey = `section_${section.id}`;
+              const sectionHidden = !!hiddenMap[sectionKey];
+              return (
+                <div key={section.id} className="border border-gray-100 rounded-lg overflow-hidden">
+                  {/* Section row */}
+                  <div className={`flex items-center gap-3 px-4 py-2.5 ${sectionHidden ? "bg-gray-50" : "bg-teal-50/40"}`}>
+                    <Switch
+                      checked={!sectionHidden}
+                      onCheckedChange={() => toggle("section", section.id, sectionHidden)}
+                      disabled={setVisibility.isPending}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-sm font-semibold truncate block ${sectionHidden ? "text-gray-400 line-through" : "text-gray-800"}`}>
+                        {section.title}
+                      </span>
+                    </div>
+                    {sectionHidden ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                        <EyeOff className="w-3.5 h-3.5" /> Hidden in embed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-teal-600">
+                        <Eye className="w-3.5 h-3.5" /> Visible in embed
+                      </span>
+                    )}
+                  </div>
+                  {/* Lesson rows */}
+                  {(section.lessons ?? []).map((lesson: any) => {
+                    const lessonKey = `lesson_${lesson.id}`;
+                    const lessonHidden = !!hiddenMap[lessonKey];
+                    return (
+                      <div
+                        key={lesson.id}
+                        className={`flex items-center gap-3 px-4 py-2 border-t border-gray-100 ml-4 ${lessonHidden ? "bg-gray-50/50" : ""}`}
+                      >
+                        <Switch
+                          checked={!lessonHidden}
+                          onCheckedChange={() => toggle("lesson", lesson.id, lessonHidden)}
+                          disabled={setVisibility.isPending || sectionHidden}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <span className={`text-xs truncate block ${lessonHidden || sectionHidden ? "text-gray-400 line-through" : "text-gray-600"}`}>
+                            {lesson.title}
+                          </span>
+                        </div>
+                        {(lessonHidden || sectionHidden) ? (
+                          <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                            <EyeOff className="w-3 h-3" /> hidden
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-teal-600 flex items-center gap-0.5">
+                            <Eye className="w-3 h-3" /> visible
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+          <p className="text-xs text-gray-400 mt-2">
+            Note: Changes take effect immediately in the embed. Refresh the embed preview above to see updates.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 function CohortTab({ courseId }: { courseId: number }) {
   const [activeTab, setActiveTab] = useState<"settings" | "groups" | "sessions" | "assignments" | "recordings" | "resources" | "discussions">("settings");
   // Multi-cohort mode toggle
