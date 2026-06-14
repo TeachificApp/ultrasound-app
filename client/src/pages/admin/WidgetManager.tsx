@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { getAdminUrl } from "@/hooks/useSubdomain";
 import {
   Plus, Copy, Trash2, Edit2, Eye, RefreshCw, Code2, ArrowLeft,
-  LayoutGrid, List, Rows3, Sparkles, CheckCircle2, X
+  LayoutGrid, List, Rows3, Sparkles, CheckCircle2, X, ChevronLeft
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -475,6 +476,12 @@ export default function WidgetManager() {
   // ── List mode ──
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Breadcrumb */}
+      <div className="mb-4">
+        <a href={getAdminUrl("/platform-admin")} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="w-3 h-3" /> Platform Admin
+        </a>
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
