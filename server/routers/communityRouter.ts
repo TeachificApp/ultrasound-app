@@ -43,6 +43,7 @@ import {
   communityInvites,
   thinkificCommunitySyncState,
   communityWorkflowRules,
+  postingAliases,
 } from "../../drizzle/schema";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -157,6 +158,17 @@ async function enrichPosts(db: any, posts: any[], currentUserId?: number) {
   }).from(users).where(inArray(users.id, userIds));
   const authorMap = Object.fromEntries(authors.map((a: any) => [a.id, a]));
 
+  // Load posting aliases for any posts that have aliasId set
+  const aliasIds = [...new Set(posts.filter((p: any) => p.aliasId).map((p: any) => p.aliasId as number))];
+  let aliasMap: Record<number, { id: number; name: string; email: string | null; avatarUrl: string | null; bio: string | null }> = {};
+  if (aliasIds.length) {
+    const aliases = await db.select({
+      id: postingAliases.id, name: postingAliases.name, email: postingAliases.email,
+      avatarUrl: postingAliases.avatarUrl, bio: postingAliases.bio,
+    }).from(postingAliases).where(inArray(postingAliases.id, aliasIds));
+    aliasMap = Object.fromEntries(aliases.map((a: any) => [a.id, a]));
+  }
+
   const postIds = posts.map((p: any) => p.id);
   let bookmarkedIds = new Set<number>();
   let myReactions: Record<number, string> = {};
@@ -173,12 +185,20 @@ async function enrichPosts(db: any, posts: any[], currentUserId?: number) {
     myReactions = Object.fromEntries(rx.map((r: any) => [r.postId, r.emoji]));
   }
 
-  return posts.map((p: any) => ({
-    ...p,
-    author: authorMap[p.userId] ?? null,
-    isBookmarked: bookmarkedIds.has(p.id),
-    myReaction: myReactions[p.id] ?? null,
-  }));
+  return posts.map((p: any) => {
+    const alias = p.aliasId ? aliasMap[p.aliasId] : null;
+    const baseAuthor = authorMap[p.userId] ?? null;
+    // If aliasId is set, override display name and avatar with alias data
+    const author = alias
+      ? { ...baseAuthor, name: alias.name, displayName: alias.name, avatarUrl: alias.avatarUrl ?? baseAuthor?.avatarUrl, isAlias: true, aliasEmail: alias.email }
+      : baseAuthor;
+    return {
+      ...p,
+      author,
+      isBookmarked: bookmarkedIds.has(p.id),
+      myReaction: myReactions[p.id] ?? null,
+    };
+  });
 }
 
 // ─── Public sub-router ────────────────────────────────────────────────────────
@@ -374,8 +394,10 @@ const communityMemberRouter = router({
     postType: z.enum(["text", "image", "video", "poll", "case_study"]).default("text"),
     attachments: z.array(z.object({ url: z.string(), type: z.string() })).optional(),
     poll: z.object({ question: z.string(), options: z.array(z.string().min(1)), endsAt: z.string().optional() }).optional(),
-    /** Post as a specific admin profile (admin only) */
+        /** Post as a specific admin profile (admin only) */
     adminProfileId: z.number().optional(),
+    /** Post as a global posting alias (admin only) */
+    aliasId: z.number().optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -383,12 +405,13 @@ const communityMemberRouter = router({
     if (!member && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     // Validate admin profile belongs to this community
     if (input.adminProfileId && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-
+    if (input.aliasId && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     const [result] = await db.insert(communityPosts).values({
       communityId: input.communityId,
       channelId: input.channelId,
       userId: ctx.user.id,
       adminProfileId: input.adminProfileId ?? null,
+      aliasId: input.aliasId ?? null,
       title: input.title ?? null,
       body: input.body,
       postType: input.postType as any,

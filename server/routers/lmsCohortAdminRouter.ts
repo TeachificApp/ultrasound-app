@@ -78,6 +78,7 @@ import {
   lmsCohortGroupEnrollments,
   lmsCohortMessages,
   lmsCohortStaff,
+  postingAliases,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1422,17 +1423,32 @@ export const lmsCohortAdminRouter = router({
         body: lmsCohortMessages.body,
         mediaUrls: lmsCohortMessages.mediaUrls,
         isAdminPost: lmsCohortMessages.isAdminPost,
+        aliasId: lmsCohortMessages.aliasId,
         isPinned: lmsCohortMessages.isPinned,
         createdAt: lmsCohortMessages.createdAt,
         userName: users.name,
         userEmail: users.email,
+        userAvatarUrl: users.avatarUrl,
       })
         .from(lmsCohortMessages)
         .innerJoin(users, eq(users.id, lmsCohortMessages.userId))
         .where(and(...conditions))
         .orderBy(desc(lmsCohortMessages.isPinned), desc(lmsCohortMessages.createdAt))
         .limit(input.limit);
-      return messages;
+      // Enrich with alias data
+      const aliasIds = [...new Set(messages.filter(m => m.aliasId).map(m => m.aliasId as number))];
+      let aliasMap: Record<number, { name: string; avatarUrl: string | null; email: string | null }> = {};
+      if (aliasIds.length) {
+        const aliases = await db.select({ id: postingAliases.id, name: postingAliases.name, avatarUrl: postingAliases.avatarUrl, email: postingAliases.email })
+          .from(postingAliases).where(inArray(postingAliases.id, aliasIds));
+        aliasMap = Object.fromEntries(aliases.map((a: any) => [a.id, a]));
+      }
+      return messages.map(m => ({
+        ...m,
+        displayName: m.aliasId && aliasMap[m.aliasId] ? aliasMap[m.aliasId].name : m.userName,
+        displayAvatarUrl: m.aliasId && aliasMap[m.aliasId] ? aliasMap[m.aliasId].avatarUrl : m.userAvatarUrl,
+        isAlias: !!m.aliasId,
+      }));
     }),
 
   /** Pin or unpin a cohort message */
@@ -1461,13 +1477,15 @@ export const lmsCohortAdminRouter = router({
       return { success: true };
     }),
 
-  /** Post a message as admin (from Discussions tab) */
+  /** Post a message as admin (from Discussions tab), optionally as a posting alias */
   postAdminCohortMessage: protectedProcedure
     .input(z.object({
       cohortGroupId: z.number(),
       courseId: z.number(),
       body: z.string().optional(),
       mediaUrls: z.array(z.object({ url: z.string(), mimeType: z.string(), fileName: z.string() })).optional(),
+      /** Post as a global posting alias (admin only) */
+      aliasId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -1480,6 +1498,7 @@ export const lmsCohortAdminRouter = router({
         body: input.body ?? null,
         mediaUrls: input.mediaUrls ?? null,
         isAdminPost: true,
+        aliasId: input.aliasId ?? null,
         isPinned: false,
       }).$returningId();
       return { id: result.id };

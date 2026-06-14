@@ -6,7 +6,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
 import { runMirrorSync, getLastSyncResult, isSyncRunning } from "./jobs/mirrorSync";
-import { platformAdminRouter, labSeatsRouter } from "./routers/adminRouter";
+import { platformAdminRouter, labSeatsRouter, adminRouter } from "./routers/adminRouter";
 import { cmeRouter } from "./routers/cmeRouter";
 import { emailAuthRouter } from "./routers/emailAuthRouter";
 import { quickfireRouter } from "./routers/quickfireRouter";
@@ -2023,6 +2023,7 @@ export const appRouter = router({
   }),
 
   // ─── Platform Admin & Seat Management ────────────────────────────────────
+  admin: adminRouter,
   platformAdmin: platformAdminRouter,
   formBuilder: formBuilderRouter,
   generalForm: generalFormRouter,

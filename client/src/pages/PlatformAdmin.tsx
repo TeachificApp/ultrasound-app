@@ -92,6 +92,9 @@ import {
   ArrowLeft,
   Home,
   Code2,
+  UserCircle2,
+  PlusCircle,
+  Pencil,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1309,6 +1312,21 @@ export default function PlatformAdmin() {
     },
     onError: (err) => toast.error(`Member sync failed: ${err.message}`),
   });
+  // ── Posting Aliases ─────────────────────────────────────────────────────
+  const { data: aliasList = [], refetch: refetchAliases } = trpc.admin.listPostingAliases.useQuery();
+  const [aliasDialog, setAliasDialog] = useState<{ open: boolean; id?: number; name: string; email: string; avatarUrl: string; bio: string }>({ open: false, name: "", email: "", avatarUrl: "", bio: "" });
+  const createAlias = trpc.admin.createPostingAlias.useMutation({
+    onSuccess: () => { refetchAliases(); setAliasDialog({ open: false, name: "", email: "", avatarUrl: "", bio: "" }); toast.success("Alias created"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateAlias = trpc.admin.updatePostingAlias.useMutation({
+    onSuccess: () => { refetchAliases(); setAliasDialog({ open: false, name: "", email: "", avatarUrl: "", bio: "" }); toast.success("Alias updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteAlias = trpc.admin.deletePostingAlias.useMutation({
+    onSuccess: () => { refetchAliases(); toast.success("Alias deleted"); },
+    onError: (e) => toast.error(e.message),
+  });
   // ── CME Course Linker ─────────────────────────────────────────────────────
   const [showCmeLinker, setShowCmeLinker] = useState(false);
   const [cmeSearch, setCmeSearch] = useState("");
@@ -1921,6 +1939,111 @@ export default function PlatformAdmin() {
             )}
           </CardContent>
         </Card>
+
+        {/* Posting Aliases */}
+        <Card className="mb-6 border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <UserCircle2 className="w-4 h-4 text-[#189aa1]" />
+              Posting Aliases
+            </CardTitle>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Create named aliases (e.g., "All About Ultrasound Support") that you can post as in community feeds and cohort discussions.
+            </p>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <Button
+              size="sm"
+              onClick={() => setAliasDialog({ open: true, name: "", email: "", avatarUrl: "", bio: "" })}
+              style={{ background: "#189aa1" }}
+              className="text-white gap-2"
+            >
+              <PlusCircle className="w-4 h-4" />
+              New Alias
+            </Button>
+            {aliasList.length === 0 ? (
+              <p className="text-xs text-gray-400">No aliases yet. Create one to post as a support account.</p>
+            ) : (
+              <div className="space-y-2">
+                {aliasList.map(a => (
+                  <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+                    {a.avatarUrl ? (
+                      <img src={a.avatarUrl} alt={a.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-bold text-teal-700">{a.name[0]?.toUpperCase()}</span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{a.name}</p>
+                      <p className="text-xs text-gray-500">{a.email}</p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button
+                        variant="ghost" size="icon"
+                        className="w-7 h-7 text-gray-400 hover:text-teal-600"
+                        onClick={() => setAliasDialog({ open: true, id: a.id, name: a.name, email: a.email, avatarUrl: a.avatarUrl ?? "", bio: a.bio ?? "" })}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon"
+                        className="w-7 h-7 text-gray-400 hover:text-red-500"
+                        onClick={() => { if (confirm(`Delete alias "${a.name}"?`)) deleteAlias.mutate({ id: a.id }); }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Alias create/edit dialog */}
+        <Dialog open={aliasDialog.open} onOpenChange={open => !open && setAliasDialog(d => ({ ...d, open: false }))}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{aliasDialog.id ? "Edit Alias" : "New Posting Alias"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div>
+                <Label className="text-xs">Display Name *</Label>
+                <Input value={aliasDialog.name} onChange={e => setAliasDialog(d => ({ ...d, name: e.target.value }))} placeholder="All About Ultrasound Support" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Email *</Label>
+                <Input value={aliasDialog.email} onChange={e => setAliasDialog(d => ({ ...d, email: e.target.value }))} placeholder="support@allaboutultrasound.com" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Avatar URL (optional)</Label>
+                <Input value={aliasDialog.avatarUrl} onChange={e => setAliasDialog(d => ({ ...d, avatarUrl: e.target.value }))} placeholder="https://..." className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Bio (optional)</Label>
+                <Textarea value={aliasDialog.bio} onChange={e => setAliasDialog(d => ({ ...d, bio: e.target.value }))} placeholder="Official support account for All About Ultrasound" className="mt-1 text-sm" rows={2} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setAliasDialog(d => ({ ...d, open: false }))}>Cancel</Button>
+              <Button
+                style={{ background: "#189aa1" }}
+                className="text-white"
+                disabled={!aliasDialog.name.trim() || !aliasDialog.email.trim() || createAlias.isPending || updateAlias.isPending}
+                onClick={() => {
+                  if (aliasDialog.id) {
+                    updateAlias.mutate({ id: aliasDialog.id, name: aliasDialog.name.trim(), email: aliasDialog.email.trim(), avatarUrl: aliasDialog.avatarUrl.trim() || undefined, bio: aliasDialog.bio.trim() || undefined });
+                  } else {
+                    createAlias.mutate({ name: aliasDialog.name.trim(), email: aliasDialog.email.trim(), avatarUrl: aliasDialog.avatarUrl.trim() || undefined, bio: aliasDialog.bio.trim() || undefined });
+                  }
+                }}
+              >
+                {(createAlias.isPending || updateAlias.isPending) ? "Saving…" : aliasDialog.id ? "Save Changes" : "Create Alias"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Role Reference */}
         <Card className="mb-6 border-0 shadow-sm">

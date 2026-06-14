@@ -26,6 +26,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select";
+import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
 
@@ -309,8 +312,14 @@ function CreatePostBox({ communityId, channelId, onPosted }: { communityId: numb
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [selectedAliasId, setSelectedAliasId] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
+
+  // Load posting aliases for admin users
+  const { data: aliases } = trpc.admin.listPostingAliases.useQuery(undefined, {
+    enabled: user?.role === "admin",
+  });
 
   const uploadImage = trpc.community.member.uploadPostImage.useMutation({
     onSuccess: (data) => setImageUrl(data.url),
@@ -347,7 +356,13 @@ function CreatePostBox({ communityId, channelId, onPosted }: { communityId: numb
     const poll = postType === "poll" && pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2
       ? { question: pollQuestion.trim(), options: pollOptions.filter(o => o.trim()) }
       : undefined;
-    createPost.mutate({ communityId, channelId, title: title.trim() || undefined, body: body.trim(), postType, attachments, poll });
+    createPost.mutate({
+      communityId, channelId,
+      title: title.trim() || undefined,
+      body: body.trim(),
+      postType, attachments, poll,
+      aliasId: selectedAliasId ?? undefined,
+    });
   }
 
   if (!user) return null;
@@ -364,8 +379,33 @@ function CreatePostBox({ communityId, channelId, onPosted }: { communityId: numb
           </div>
         ) : (
           <div>
+            {/* Post as selector for admins */}
+            {user?.role === "admin" && aliases && aliases.length > 0 && (
+              <div className="flex items-center gap-2 mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <span className="text-xs font-medium text-amber-700 whitespace-nowrap">Post as:</span>
+                <Select
+                  value={selectedAliasId === null ? "self" : String(selectedAliasId)}
+                  onValueChange={v => setSelectedAliasId(v === "self" ? null : Number(v))}
+                >
+                  <SelectTrigger className="h-7 text-xs border-amber-300 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">Myself ({user.name})</SelectItem>
+                    {aliases.map(a => (
+                      <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.email})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-start gap-3 mb-3">
-              <AuthorAvatar author={user} size="md" />
+              <AuthorAvatar
+                author={selectedAliasId && aliases?.find(a => a.id === selectedAliasId)
+                  ? { name: aliases.find(a => a.id === selectedAliasId)!.name, avatarUrl: aliases.find(a => a.id === selectedAliasId)!.avatarUrl ?? undefined }
+                  : user}
+                size="md"
+              />
               <div className="flex-1">
                 <Input
                   value={title}

@@ -4858,6 +4858,8 @@ export const communityPosts = mysqlTable("community_posts", {
   userId: int("user_id").notNull(),
   // If posted as an admin profile, this overrides the display name/avatar
   adminProfileId: int("admin_profile_id"),
+  // If posted as a global posting alias, this overrides the display name/avatar
+  aliasId: int("alias_id"),
   title: varchar("title", { length: 255 }),
   body: longtext("body").notNull(),
   attachments: longtext("attachments"),
@@ -5404,6 +5406,8 @@ export const lmsCohortMessages = mysqlTable("lms_cohort_messages", {
   // JSON array of { url, mimeType, fileName } objects
   mediaUrls: json("media_urls").$type<{ url: string; mimeType: string; fileName: string }[]>(),
   isAdminPost: boolean("is_admin_post").default(false).notNull(),
+  // If posted as a global posting alias, this overrides the display name/avatar
+  aliasId: int("alias_id"),
   isPinned: boolean("is_pinned").default(false).notNull(),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -6406,3 +6410,20 @@ export const embedWidgets = mysqlTable("embed_widgets", {
 });
 export type EmbedWidget = typeof embedWidgets.$inferSelect;
 export type InsertEmbedWidget = typeof embedWidgets.$inferInsert;
+
+// ─── Global Posting Aliases ──────────────────────────────────────────────────
+// Allows admins to post community posts and cohort discussion messages as a
+// named alias (e.g., "All About Ultrasound Support") instead of their personal
+// account. Aliases are global — not scoped to a specific community or course.
+export const postingAliases = mysqlTable("posting_aliases", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  avatarUrl: text("avatar_url"),
+  bio: text("bio"),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type PostingAlias = typeof postingAliases.$inferSelect;
+export type InsertPostingAlias = typeof postingAliases.$inferInsert;

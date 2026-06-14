@@ -10338,6 +10338,8 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [discMedia, setDiscMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
   const [discTargetGroupId, setDiscTargetGroupId] = useState<number | null>(null);
   const [discUploadingMedia, setDiscUploadingMedia] = useState(false);
+  const [discAliasId, setDiscAliasId] = useState<number | null>(null);
+  const { data: postingAliases = [] } = trpc.admin.listPostingAliases.useQuery(undefined, { enabled: activeTab === "discussions" });
   const pinMessage = trpc.lmsAdmin.pinCohortMessage.useMutation({ onSuccess: () => refetchAllDiscussions(), onError: (e) => toast.error(e.message) });
   const moderateDelete = trpc.lmsAdmin.moderateDeleteCohortMessage.useMutation({ onSuccess: () => refetchAllDiscussions(), onError: (e) => toast.error(e.message) });
   const postAdminMessage = trpc.lmsAdmin.postAdminCohortMessage.useMutation({
@@ -11918,12 +11920,28 @@ function CohortTab({ courseId }: { courseId: number }) {
           {/* Post new message */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
             <h4 className="text-sm font-semibold text-gray-800">Post as Admin</h4>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <label className="text-xs text-gray-600">Target group:</label>
               <select className="border border-gray-200 rounded-lg px-2 py-1 text-xs" value={discTargetGroupId ?? ""} onChange={e => setDiscTargetGroupId(e.target.value ? Number(e.target.value) : null)}>
                 <option value="">-- select group --</option>
                 {cohortGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
+              {postingAliases.length > 0 && (
+                <>
+                  <label className="text-xs text-gray-600 ml-2">Post as:</label>
+                  <Select value={discAliasId === null ? "self" : String(discAliasId)} onValueChange={v => setDiscAliasId(v === "self" ? null : Number(v))}>
+                    <SelectTrigger className="h-7 text-xs w-56 border-amber-300 bg-amber-50">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="self">Myself (Admin)</SelectItem>
+                      {postingAliases.map(a => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.email})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
             </div>
             <RichTextEditor value={discBody} onChange={setDiscBody} placeholder="Write a message to the cohort..." />
             {discMedia.length > 0 && (
@@ -11941,7 +11959,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                 {discUploadingMedia ? 'Uploading...' : '+ Add Image/Video'}
                 <input type="file" accept="image/*,video/*" className="hidden" disabled={discUploadingMedia} onChange={e => { if (e.target.files?.[0]) handleDiscMediaUpload(e.target.files[0]); e.target.value = ''; }} />
               </label>
-              <button disabled={(!discBody.trim() && discMedia.length === 0) || !discTargetGroupId || postAdminMessage.isPending} onClick={() => { if (!discTargetGroupId) return; postAdminMessage.mutate({ cohortGroupId: discTargetGroupId, courseId, body: discBody.trim() || undefined, mediaUrls: discMedia.length > 0 ? discMedia : undefined }); }} className="ml-auto px-4 py-1.5 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+              <button disabled={(!discBody.trim() && discMedia.length === 0) || !discTargetGroupId || postAdminMessage.isPending} onClick={() => { if (!discTargetGroupId) return; postAdminMessage.mutate({ cohortGroupId: discTargetGroupId, courseId, body: discBody.trim() || undefined, mediaUrls: discMedia.length > 0 ? discMedia : undefined, aliasId: discAliasId ?? undefined }); }} className="ml-auto px-4 py-1.5 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
                 {postAdminMessage.isPending ? 'Posting...' : 'Post'}
               </button>
             </div>
@@ -11961,8 +11979,8 @@ function CohortTab({ courseId }: { courseId: number }) {
                         <span className="text-xs font-bold text-teal-700">{((msg as any).userDisplayName || msg.userName || '?')[0].toUpperCase()}</span>
                       </div>
                     )}
-                    <span className="text-sm font-semibold text-gray-800">{(msg as any).userDisplayName || msg.userName}</span>
-                    {msg.isAdminPost && <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">Admin</span>}
+                    <span className="text-sm font-semibold text-gray-800">{(msg as any).displayName || (msg as any).userDisplayName || msg.userName}</span>
+                    {msg.isAdminPost && <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">{(msg as any).isAlias ? 'Support' : 'Admin'}</span>}
                     {msg.isPinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">📌 Pinned</span>}
                     <span className="text-xs text-gray-400">{new Date(msg.createdAt).toLocaleString()}</span>
                     {cohortGroups.find(g => g.id === msg.cohortGroupId) && <span className="text-xs text-gray-400">· {cohortGroups.find(g => g.id === msg.cohortGroupId)?.name}</span>}

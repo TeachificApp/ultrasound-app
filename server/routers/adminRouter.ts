@@ -621,6 +621,78 @@ export const labSeatsRouter = router({
     return { linked, total: unlinked.length };
   }),
 
+  // ── Posting Aliases ─────────────────────────────────────────────────────────
+  /** List all global posting aliases */
+  listPostingAliases: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const { getDb } = await import("../db");
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const { postingAliases } = await import("../../drizzle/schema");
+    const { desc } = await import("drizzle-orm");
+    return db.select().from(postingAliases).orderBy(desc(postingAliases.createdAt));
+  }),
+  /** Create a global posting alias */
+  createPostingAlias: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(100),
+      email: z.string().email().optional(),
+      avatarUrl: z.string().url().optional(),
+      bio: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { postingAliases } = await import("../../drizzle/schema");
+      const [result] = await db.insert(postingAliases).values({
+        name: input.name,
+        email: input.email ?? null,
+        avatarUrl: input.avatarUrl ?? null,
+        bio: input.bio ?? null,
+        createdByUserId: ctx.user.id,
+      }).$returningId();
+      return { id: result.id };
+    }),
+  /** Update a global posting alias */
+  updatePostingAlias: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().min(1).max(100).optional(),
+      email: z.string().email().nullable().optional(),
+      avatarUrl: z.string().url().nullable().optional(),
+      bio: z.string().max(500).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { postingAliases } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const updates: Record<string, unknown> = {};
+      if (input.name !== undefined) updates.name = input.name;
+      if (input.email !== undefined) updates.email = input.email;
+      if (input.avatarUrl !== undefined) updates.avatarUrl = input.avatarUrl;
+      if (input.bio !== undefined) updates.bio = input.bio;
+      await db.update(postingAliases).set(updates).where(eq(postingAliases.id, input.id));
+      return { success: true };
+    }),
+  /** Delete a global posting alias */
+  deletePostingAlias: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { postingAliases } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.delete(postingAliases).where(eq(postingAliases.id, input.id));
+      return { success: true };
+    }),
+
   /** Get seat usage for current lab */
   seatUsage: protectedProcedure.query(async ({ ctx }) => {
     const myRoles = await getUserRoles(ctx.user.id);
@@ -632,4 +704,78 @@ export const labSeatsRouter = router({
     const seats = await getDiyUsersForLab(lab.id);
     return { used: seats.length, total: (lab as any).seatCount ?? 1 };
   }),
+});
+
+// ─── Global Admin Router (posting aliases, etc.) ─────────────────────────────
+// Mounted as `admin:` in routers.ts — accessible via trpc.admin.*
+export const adminRouter = router({
+  listPostingAliases: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const { getDb } = await import("../db");
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const { postingAliases } = await import("../../drizzle/schema");
+    const { desc } = await import("drizzle-orm");
+    return db.select().from(postingAliases).orderBy(desc(postingAliases.createdAt));
+  }),
+
+  createPostingAlias: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(100),
+      email: z.string().email().optional(),
+      avatarUrl: z.string().url().optional(),
+      bio: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { postingAliases } = await import("../../drizzle/schema");
+      const [result] = await db.insert(postingAliases).values({
+        name: input.name,
+        email: input.email ?? null,
+        avatarUrl: input.avatarUrl ?? null,
+        bio: input.bio ?? null,
+        createdByUserId: ctx.user.id,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  updatePostingAlias: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().min(1).max(100).optional(),
+      email: z.string().email().nullable().optional(),
+      avatarUrl: z.string().url().nullable().optional(),
+      bio: z.string().max(500).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { postingAliases } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const updates: Record<string, unknown> = {};
+      if (input.name !== undefined) updates.name = input.name;
+      if (input.email !== undefined) updates.email = input.email;
+      if (input.avatarUrl !== undefined) updates.avatarUrl = input.avatarUrl;
+      if (input.bio !== undefined) updates.bio = input.bio;
+      await db.update(postingAliases).set(updates).where(eq(postingAliases.id, input.id));
+      return { success: true };
+    }),
+
+  deletePostingAlias: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { postingAliases } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.delete(postingAliases).where(eq(postingAliases.id, input.id));
+      return { success: true };
+    }),
 });
