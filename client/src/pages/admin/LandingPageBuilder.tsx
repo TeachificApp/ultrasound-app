@@ -4389,6 +4389,48 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             <input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" />
             <label className="text-xs text-gray-600">Show locked lessons</label>
           </div>
+          {/* Auto-scroll / max height */}
+          <div className="border-t pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Scroll Behavior</p>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="autoScroll" checked={d.autoScroll ?? false} onChange={e => set("autoScroll", e.target.checked)} className="rounded" />
+              <label htmlFor="autoScroll" className="text-xs text-gray-600">Auto-scroll when content overflows</label>
+            </div>
+            {(d.autoScroll ?? false) && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Max Height (px)</label>
+                <input type="number" min={200} max={1200} step={20} value={d.maxHeight ?? 480}
+                  onChange={e => set("maxHeight", Number(e.target.value))}
+                  className="w-full border border-gray-200 rounded px-2 py-1 text-xs" />
+              </div>
+            )}
+          </div>
+          {/* Course card sidebar */}
+          <div className="border-t pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Course Card Sidebar</p>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="showCourseCard" checked={d.showCourseCard ?? false} onChange={e => set("showCourseCard", e.target.checked)} className="rounded" />
+              <label htmlFor="showCourseCard" className="text-xs text-gray-600">Show course card sidebar</label>
+            </div>
+            {(d.showCourseCard ?? false) && (
+              <div className="space-y-2 pl-1">
+                <BSTextField data={d} onSet={set} label="Card Title" field="cardTitle" placeholder="Course Title" />
+                <BSTextField data={d} onSet={set} label="Card Subtitle" field="cardSubtitle" placeholder="Short description" />
+                <BSTextField data={d} onSet={set} label="Instructor Name" field="cardInstructor" placeholder="Jane Smith" />
+                <BSTextField data={d} onSet={set} label="Price" field="cardPrice" placeholder="$99" />
+                <BSTextField data={d} onSet={set} label="CTA Button Label" field="cardCtaLabel" placeholder="Enroll Now" />
+                <BSTextField data={d} onSet={set} label="CTA Button URL" field="cardCtaUrl" placeholder="https://..." />
+                <BSColorField data={d} onSet={set} label="CTA Button Color" field="cardCtaColor" />
+                <BSColorField data={d} onSet={set} label="Card Background" field="cardBg" />
+                <BSColorField data={d} onSet={set} label="Card Border Color" field="cardBorderColor" />
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Card Cover Image URL</label>
+                  <input type="text" value={d.cardImageUrl ?? ""} onChange={e => set("cardImageUrl", e.target.value)}
+                    placeholder="https://..." className="w-full border border-gray-200 rounded px-2 py-1 text-xs" />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       );
     case "pricing_options_auto": {

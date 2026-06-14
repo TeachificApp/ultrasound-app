@@ -4,7 +4,7 @@
  * Extracted into its own file to break the circular dependency between CoursePlayer and LandingPageBuilder.
  */
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Award, ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
+import { Award, BookOpen, ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import CarouselBlock from "@/components/CarouselBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
@@ -754,20 +754,75 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     case "curriculum_auto": {
       const cr = d.cornerRadius ?? 12;
       const hAlign = d.headlineAlign ?? "left";
+      const showCourseCard = d.showCourseCard ?? false;
+      const autoScroll = d.autoScroll ?? false;
+      const maxHeightPx = d.maxHeight ?? 480;
+      // Course card sidebar data
+      const cardTitle = d.cardTitle ?? "Course Title";
+      const cardSubtitle = d.cardSubtitle ?? "";
+      const cardImage = d.cardImageUrl ?? "";
+      const cardInstructor = d.cardInstructor ?? "";
+      const cardPrice = d.cardPrice ?? "";
+      const cardCtaLabel = d.cardCtaLabel ?? "Enroll Now";
+      const cardCtaUrl = d.cardCtaUrl ?? "#";
+      const cardCtaColor = d.cardCtaColor ?? "#179ca3";
+      const cardBg = d.cardBg ?? "#ffffff";
+      const cardBorderColor = d.cardBorderColor ?? "#e5e7eb";
+      const accordionEl = (
+        <div
+          className="overflow-hidden"
+          style={{
+            border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`,
+            borderRadius: `${cr}px`,
+            ...(autoScroll ? { overflowY: "auto", maxHeight: `${maxHeightPx}px` } : {}),
+          }}
+        >
+          {["Section 1", "Section 2", "Section 3"].map((s, i) => (
+            <div key={i} style={{ borderBottom: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}` }} className="last:border-0">
+              <div className="flex items-center justify-between px-5 py-4 font-semibold" style={{ backgroundColor: d.sectionBgColor ?? "#f9fafb", color: d.sectionTextColor ?? "#1f2937" }}>
+                <span>{s}</span>
+                <span className="text-xs mr-2" style={{ color: d.lessonCountColor ?? "#9ca3af" }}>5 lessons</span>
+                <ChevronDown size={16} style={{ color: d.lessonCountColor ?? "#9ca3af" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+      const courseCardEl = (
+        <div
+          className="rounded-xl overflow-hidden shadow-md flex-shrink-0"
+          style={{ border: `1px solid ${cardBorderColor}`, backgroundColor: cardBg, width: 260, minWidth: 220, maxWidth: 280 }}
+        >
+          {cardImage
+            ? <img src={cardImage} alt={cardTitle} className="w-full object-cover" style={{ height: 160 }} />
+            : <div className="w-full flex items-center justify-center bg-gray-100" style={{ height: 160 }}><BookOpen size={32} className="text-gray-300" /></div>
+          }
+          <div className="p-4">
+            <h3 className="font-bold text-sm leading-snug mb-1" style={{ color: d.sectionTextColor ?? "#111827" }}>{cardTitle}</h3>
+            {cardSubtitle && <p className="text-xs mb-2" style={{ color: d.lessonCountColor ?? "#6b7280" }}>{cardSubtitle}</p>}
+            {cardInstructor && <p className="text-xs mb-3" style={{ color: d.lessonCountColor ?? "#9ca3af" }}>by {cardInstructor}</p>}
+            {cardPrice && <p className="text-lg font-bold mb-3" style={{ color: cardCtaColor }}>{cardPrice}</p>}
+            <a
+              href={cardCtaUrl}
+              className="block w-full text-center py-2 rounded-lg font-semibold text-sm text-white"
+              style={{ backgroundColor: cardCtaColor }}
+            >
+              {cardCtaLabel}
+            </a>
+          </div>
+        </div>
+      );
       return (
         <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className={`text-2xl font-bold mb-6 ${hAlign === "center" ? "text-center" : hAlign === "right" ? "text-right" : "text-left"}`} style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="overflow-hidden max-w-3xl" style={{ border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`, borderRadius: `${cr}px` }}>
-            {["Section 1", "Section 2", "Section 3"].map((s, i) => (
-              <div key={i} style={{ borderBottom: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}` }} className="last:border-0">
-                <div className="flex items-center justify-between px-5 py-4 font-semibold" style={{ backgroundColor: d.sectionBgColor ?? "#f9fafb", color: d.sectionTextColor ?? "#1f2937" }}>
-                  <span>{s}</span>
-                  <span className="text-xs mr-2" style={{ color: d.lessonCountColor ?? "#9ca3af" }}>5 lessons</span>
-                  <ChevronDown size={16} style={{ color: d.lessonCountColor ?? "#9ca3af" }} />
-                </div>
-              </div>
-            ))}
-          </div>
+          {showCourseCard ? (
+            <div className="flex gap-6 items-start">
+              <div className="hidden sm:block" style={{ position: "sticky", top: 16 }}>{courseCardEl}</div>
+              <div className="flex-1 min-w-0">{accordionEl}</div>
+            </div>
+          ) : (
+            <div className="max-w-3xl">{accordionEl}</div>
+          )}
           <p className="text-xs text-gray-400 mt-3">Auto-populated from course curriculum</p>
         </div>
       );
