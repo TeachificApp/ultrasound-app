@@ -920,6 +920,9 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
     window.location.href = getBtnHref(btn);
   };
 
+  const heroTopBorderStyle: React.CSSProperties = d.heroTopBorder
+    ? { borderTop: `${d.heroTopBorderWidth ?? 4}px solid ${d.heroTopBorderColor ?? "#179ca3"}` }
+    : {};
   const heroBottomBorderStyle: React.CSSProperties = d.heroBottomBorder
     ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
     : {};
@@ -946,7 +949,7 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
       }
     : undefined;
   return (
-    <div className="hero-block relative px-4 sm:px-8 py-10 sm:py-20 overflow-hidden" style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandler ? "pointer" : undefined }} onClick={heroClickHandler}>
+    <div className="hero-block relative px-4 sm:px-8 py-10 sm:py-20 overflow-hidden" style={{ ...heroBg, ...heroTopBorderStyle, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandler ? "pointer" : undefined }} onClick={heroClickHandler}>
       {bgType === "video" && d.videoUrl && (
         <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
       )}

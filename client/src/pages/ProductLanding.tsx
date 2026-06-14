@@ -105,6 +105,9 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
       const hasInlineMediaPL = !!d.inlineMediaUrl;
       const placementPL = d.inlineMediaPlacement ?? "right";
       const isHorizontalPL = placementPL === "left" || placementPL === "right";
+      const heroTopBorderStylePL: React.CSSProperties = d.heroTopBorder
+        ? { borderTop: `${d.heroTopBorderWidth ?? 4}px solid ${d.heroTopBorderColor ?? "#179ca3"}` }
+        : {};
       const heroBottomBorderStylePL: React.CSSProperties = d.heroBottomBorder
         ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
         : {};
@@ -121,7 +124,7 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
           }
         : undefined;
       return (
-        <div className="relative px-8 py-20 overflow-hidden" style={{ ...bgStyle, ...heroBottomBorderStylePL, color: d.textColor ?? "#fff", textAlign: hasInlineMediaPL && isHorizontalPL ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerPL ? "pointer" : undefined }} onClick={heroClickHandlerPL}>
+        <div className="hero-block relative px-8 py-20 overflow-hidden" style={{ ...bgStyle, ...heroTopBorderStylePL, ...heroBottomBorderStylePL, color: d.textColor ?? "#fff", textAlign: hasInlineMediaPL && isHorizontalPL ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerPL ? "pointer" : undefined }} onClick={heroClickHandlerPL}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}

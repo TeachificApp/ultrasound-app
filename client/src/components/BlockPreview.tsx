@@ -144,6 +144,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
           })
         : undefined;
+      const heroTopBorderStyle: React.CSSProperties = d.heroTopBorder
+        ? { borderTop: `${d.heroTopBorderWidth ?? 4}px solid ${d.heroTopBorderColor ?? "#179ca3"}` }
+        : {};
       const heroBottomBorderStyle: React.CSSProperties = d.heroBottomBorder
         ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
         : {};
@@ -152,7 +155,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       return (
         <div
           className="relative px-4 sm:px-8 py-10 sm:py-16 overflow-hidden w-full box-border"
-          style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), cursor: heroClickHandler ? "pointer" : undefined, minHeight: `${heroMinHeight}px`, ...(heroMaxHeight ? { maxHeight: heroMaxHeight, overflow: "hidden" } : {}) }}
+          style={{ ...heroBg, ...heroTopBorderStyle, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), cursor: heroClickHandler ? "pointer" : undefined, minHeight: `${heroMinHeight}px`, ...(heroMaxHeight ? { maxHeight: heroMaxHeight, overflow: "hidden" } : {}) }}
           onClick={heroClickHandler}
         >
           {bgType === "video" && d.videoUrl && (

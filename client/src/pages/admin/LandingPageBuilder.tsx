@@ -3081,6 +3081,22 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               </div>
             )}
           </div>
+          {/* Hero Top Border */}
+          <div className="border-t pt-3 mt-1">
+            <div className="flex items-center gap-2 mb-2">
+              <input type="checkbox" id="hero-top-border" checked={d.heroTopBorder ?? false} onChange={e => set("heroTopBorder", e.target.checked)} className="rounded" />
+              <label htmlFor="hero-top-border" className="text-xs text-gray-700 font-medium">Hero top border</label>
+            </div>
+            {d.heroTopBorder && (
+              <div className="pl-1 space-y-2">
+                <BSColorField data={d} onSet={set} label="Border Color" field="heroTopBorderColor" />
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Border Thickness (px)</label>
+                  <input type="number" min={1} max={20} value={d.heroTopBorderWidth ?? 4} onChange={e => set("heroTopBorderWidth", Number(e.target.value))} className="w-full h-7 text-xs rounded border border-gray-200 px-2" />
+                </div>
+              </div>
+            )}
+          </div>
           {/* Hero Bottom Border */}
           <div className="border-t pt-3 mt-1">
             <div className="flex items-center gap-2 mb-2">

@@ -200,6 +200,9 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
       const hasInlineMediaSL = !!d.inlineMediaUrl;
       const placementSL = d.inlineMediaPlacement ?? "right";
       const isHorizontalSL = placementSL === "left" || placementSL === "right";
+      const heroTopBorderStyleSL: React.CSSProperties = d.heroTopBorder
+        ? { borderTop: `${d.heroTopBorderWidth ?? 4}px solid ${d.heroTopBorderColor ?? "#179ca3"}` }
+        : {};
       const heroBottomBorderStyleSL: React.CSSProperties = d.heroBottomBorder
         ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
         : {};
@@ -224,7 +227,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
         : undefined;
       return (
         <>
-        <div className="hero-block relative px-4 sm:px-8 py-10 sm:py-16 md:py-24 overflow-hidden w-full box-border" style={{ ...bgStyle, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerSL ? "pointer" : undefined }} onClick={heroClickHandlerSL}>
+        <div className="hero-block relative px-4 sm:px-8 py-10 sm:py-16 md:py-24 overflow-hidden w-full box-border" style={{ ...bgStyle, ...heroTopBorderStyleSL, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerSL ? "pointer" : undefined }} onClick={heroClickHandlerSL}>
           {d.bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
