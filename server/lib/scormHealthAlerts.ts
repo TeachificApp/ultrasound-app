@@ -50,7 +50,7 @@ export async function resolveScormAlertEmail(): Promise<string | null> {
     if (owner?.email?.trim()) return owner.email.trim();
   }
 
-  const fallback = process.env.SENDGRID_FROM_EMAIL?.trim();
+  const fallback = ENV.platformAdminEmail?.trim();
   return fallback || null;
 }
 

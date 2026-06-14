@@ -452,8 +452,8 @@ export const caseLibraryRouter = router({
           content: `${submitterName} submitted a new case for review: "${input.title}" (${input.modality}, ${input.difficulty}). Visit Case Management to approve or reject it.`,
         }).catch((err) => console.error("[caseLibrary] Failed to send in-app notification:", err));
 
-        // Email notification to the admin inbox (SENDGRID_FROM_EMAIL)
-        const adminEmail = process.env.SENDGRID_FROM_EMAIL;
+        // Email notification to the admin inbox
+        const adminEmail = ENV.platformAdminEmail;
         if (adminEmail) {
           const { subject, htmlBody, previewText } = buildNewCaseSubmissionAdminEmail({
             submitterName,
@@ -710,7 +710,7 @@ export const caseLibraryRouter = router({
         title: "Case Resubmitted for Review",
         content: `${submitterName} resubmitted a case: "${input.title}" (${input.modality}). Visit Case Management to review it.`,
       }).catch((err) => console.error("[caseLibrary] Failed to send resubmission notification:", err));
-      const adminEmail = process.env.SENDGRID_FROM_EMAIL;
+      const adminEmail = ENV.platformAdminEmail;
       if (adminEmail) {
         const { subject, htmlBody, previewText } = buildNewCaseSubmissionAdminEmail({
           submitterName,

@@ -13,6 +13,7 @@ import path from "path";
 import type { Request, Response } from "express";
 import { storagePutLarge } from "../storage";
 import { sendEmail } from "../_core/email";
+import { ENV } from "../_core/env";
 
 const PROJECT_ROOT = path.resolve(process.cwd());
 
@@ -42,7 +43,7 @@ export async function hourlyBackupHandler(req: Request, res: Response) {
     console.log(`[HourlyBackup] Uploaded to R2: ${url}`);
 
     // ── 3. Email the owner ────────────────────────────────────────────────────
-    const ownerEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@allaboutultrasound.com";
+    const ownerEmail = ENV.platformAdminEmail;
     const ownerName = process.env.LMS_FROM_NAME || "All About Ultrasound";
 
     const htmlBody = `

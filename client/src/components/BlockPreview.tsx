@@ -125,7 +125,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       let heroBg: React.CSSProperties = {};
       if (bgType === "color") heroBg = { backgroundColor: d.bgColor ?? "#179ca3" };
       else if (bgType === "gradient") heroBg = { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` };
-      else if (bgType === "image") heroBg = { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
+      else if (bgType === "image") heroBg = { backgroundImage: `url(${d.imageUrl})`, backgroundSize: d.bgImageSize ?? "cover", backgroundPosition: `${d.bgPositionX ?? "center"} ${d.bgPositionY ?? "center"}` };
       else if (bgType === "video") heroBg = { backgroundColor: "#000" };
       const heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; showStrikethrough?: boolean; strikethroughPrice?: string; showOptOut?: boolean; optOutText?: string; optOutUrl?: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Enroll Now", color: d.ctaColor ?? "#fff", textColor: d.ctaTextColor ?? "#179ca3", link: "", style: "filled" }];

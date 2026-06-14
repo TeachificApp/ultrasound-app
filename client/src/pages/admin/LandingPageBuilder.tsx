@@ -2935,6 +2935,41 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 <input ref={bgImageRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "imageUrl", "hero-bg"); e.target.value = ""; }} />
               </div>
               {d.imageUrl && <img src={d.imageUrl} className="w-full h-16 object-cover rounded border" />}
+              <div>
+                <label className="text-[10px] font-medium text-gray-500 block mb-1">Image Size</label>
+                <select value={d.bgImageSize ?? "cover"} onChange={e => set("bgImageSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+                  <option value="cover">Cover (fill, crop)</option>
+                  <option value="contain">Contain (fit, no crop)</option>
+                  <option value="100% 100%">Stretch to fill</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-gray-500 block mb-1">Image Focal Point</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-0.5">Horizontal</label>
+                    <div className="flex rounded border border-gray-200 overflow-hidden">
+                      {(["left", "center", "right"] as const).map(v => (
+                        <button key={v} onClick={() => set("bgPositionX", v)} className={`flex-1 py-1 text-[10px] font-medium capitalize ${(d.bgPositionX ?? "center") === v ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>{v}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-0.5">Vertical</label>
+                    <div className="flex rounded border border-gray-200 overflow-hidden">
+                      {(["top", "center", "bottom"] as const).map(v => (
+                        <button key={v} onClick={() => set("bgPositionY", v)} className={`flex-1 py-1 text-[10px] font-medium capitalize ${(d.bgPositionY ?? "center") === v ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>{v}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-1.5 grid grid-cols-3 gap-1">
+                  {(["top", "center", "bottom"] as const).map(y => (["left", "center", "right"] as const).map(x => (
+                    <button key={`${x}-${y}`} onClick={() => { set("bgPositionX", x); set("bgPositionY", y); }} title={`${x} ${y}`}
+                      className={`h-7 rounded text-[9px] font-medium capitalize border ${(d.bgPositionX ?? "center") === x && (d.bgPositionY ?? "center") === y ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-500 border-gray-200 hover:bg-teal-50"}`}>{x[0]}{y[0]}</button>
+                  )))}
+                </div>
+              </div>
             </div>
           )}
           {bgType === "video" && (
