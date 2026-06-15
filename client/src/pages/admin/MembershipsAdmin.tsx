@@ -17,10 +17,12 @@ import {
   Plus, Edit2, Trash2, Eye, EyeOff, Tag, Users, Package, LayoutTemplate,
   ChevronRight, GripVertical, X, Copy, RefreshCw, DollarSign, Percent,
   BookOpen, Download, Globe, Lock, Settings, FileText, Award, Search,
-  Loader2, CheckCircle2, AlertTriangle, RotateCcw
+  Loader2, CheckCircle2, AlertTriangle, RotateCcw, Workflow
 } from "lucide-react";
 import MembershipPageBuilder from "@/components/MembershipPageBuilder";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
+import AfterPurchaseWorkflowEditor from "@/components/AfterPurchaseWorkflowEditor";
+import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -116,9 +118,8 @@ function formatPrice(price: number, currency = "usd") {
 
 // ─── Membership List ──────────────────────────────────────────────────────────
 
-export default function MembershipsAdmin() {
-  
-  const [editingId, setEditingId] = useState<number | null>(null);
+export default function MembershipsAdmin({ initialEditId }: { initialEditId?: number } = {}) {
+  const [editingId, setEditingId] = useState<number | null>(initialEditId ?? null);
   const [creatingNew, setCreatingNew] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newStripePriceId, setNewStripePriceId] = useState("");
@@ -444,6 +445,9 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
           <TabsTrigger value="checkout-page" className="text-xs data-[state=active]:bg-white">
             <DollarSign className="w-3.5 h-3.5 mr-1" /> Checkout Page
           </TabsTrigger>
+          <TabsTrigger value="after-purchase" className="text-xs data-[state=active]:bg-white">
+            <Workflow className="w-3.5 h-3.5 mr-1" />After Purchase
+          </TabsTrigger>
           <TabsTrigger value="reconcile" className="text-xs data-[state=active]:bg-white">
             <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reconcile Stripe
           </TabsTrigger>
@@ -537,11 +541,52 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
             </div>
           </TabsContent>
 
+          <TabsContent value="after-purchase" className="m-0 p-6">
+            <MembershipAfterPurchaseTab planId={planId} />
+          </TabsContent>
+
           <TabsContent value="reconcile" className="m-0 p-6">
             <StripeReconcileTab planId={planId} stripePriceId={plan.stripePriceId} />
           </TabsContent>
         </div>
       </Tabs>
+    </div>
+  );
+}
+
+// ─── After Purchase Tab ─────────────────────────────────────────────────────────────────────
+function MembershipAfterPurchaseTab({ planId }: { planId: number }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.memberships.getAfterPurchaseWorkflow.useQuery({ planId });
+  const saveMut = trpc.memberships.updateAfterPurchaseWorkflow.useMutation({
+    onSuccess: () => { utils.memberships.getAfterPurchaseWorkflow.invalidate({ planId }); toast.success("After purchase workflow saved"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const { data: hideData } = trpc.memberships.getHidePricingOptions.useQuery({ planId });
+  const hideToggleMut = trpc.memberships.updateHidePricingOptions.useMutation({
+    onSuccess: () => { utils.memberships.getHidePricingOptions.invalidate({ planId }); toast.success("Setting saved"); },
+    onError: (e) => toast.error(e.message),
+  });
+  if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
+  return (
+    <div className="space-y-4">
+      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+        <Workflow className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-teal-800">After Purchase Workflow</p>
+          <p className="text-xs text-teal-600 mt-0.5">Configure what happens immediately after a member completes their purchase. Actions run in order.</p>
+        </div>
+      </div>
+      <HidePricingOptionsToggle
+        value={hideData?.hidePricingOptions ?? false}
+        onChange={(v) => hideToggleMut.mutate({ planId, hidePricingOptions: v })}
+        isSaving={hideToggleMut.isPending}
+      />
+      <AfterPurchaseWorkflowEditor
+        value={data?.afterPurchaseWorkflow ?? null}
+        onChange={(workflow) => saveMut.mutate({ planId, workflow })}
+        isSaving={saveMut.isPending}
+      />
     </div>
   );
 }

@@ -2844,6 +2844,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   welcomeEmailSubject: varchar("welcome_email_subject", { length: 500 }),
   welcomeEmailBody: longtext("welcome_email_body"),
   // Upsell offer shown on the thank-you page
+  // Hide additional pricing options on the landing page (secondary pricing options block hidden)
+  hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
   upsellEnabled: boolean("upsell_enabled").default(false).notNull(),
   upsellCourseId: int("upsell_course_id"),
   upsellProductType: varchar("upsell_product_type", { length: 20 }).$type<"course" | "quiz" | "webinar" | "download" | "membership">(),
@@ -3322,6 +3324,16 @@ export const lmsCollectionCourses = mysqlTable("lms_collection_courses", {
 });
 export type LmsCollectionCourse = typeof lmsCollectionCourses.$inferSelect;
 
+/** Generic multi-type collection items — supports all content types */
+export const lmsCollectionItems = mysqlTable("lms_collection_items", {
+  id: int("id").autoincrement().primaryKey(),
+  collectionId: int("collection_id").notNull(),
+  /** Content type: course, quiz, webinar, download, bundle, membership, physical */
+  itemType: mysqlEnum("item_type", ["course", "quiz", "webinar", "download", "bundle", "membership", "physical"]).notNull(),
+  itemId: int("item_id").notNull(),
+  position: int("position").default(0).notNull(),
+});
+export type LmsCollectionItem = typeof lmsCollectionItems.$inferSelect;
 
 // ─── Digital Downloads (File Repository) ────────────────────────────────────
 export const digitalProducts = mysqlTable("digital_products", {
@@ -3351,6 +3363,8 @@ export const digitalProducts = mysqlTable("digital_products", {
   seoImage: varchar("seo_image", { length: 512 }),
   // After Purchase Workflow — JSON array of workflow action objects
   afterPurchaseWorkflow: longtext("after_purchase_workflow"),
+  // Hide additional pricing options on the landing page
+  hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
   // Show in Education Library — admin toggle to include/exclude from the public library
   showInLibrary: boolean("show_in_library").default(true).notNull(),
   // Stats
@@ -3409,6 +3423,10 @@ export const digitalBundles = mysqlTable("digital_bundles", {
   discountPrice: int("discount_price").default(0).notNull(), // cents
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived"]).default("draft").notNull(),
+  // Hide additional pricing options on the landing page
+  hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
+  // After Purchase Workflow — JSON array of workflow action objects
+  afterPurchaseWorkflow: longtext("after_purchase_workflow"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4134,6 +4152,11 @@ export const physicalProducts = mysqlTable("physical_products", {
   seoImage: varchar("seo_image", { length: 512 }),
   // After Purchase Workflow — JSON array of workflow action objects
   afterPurchaseWorkflow: longtext("after_purchase_workflow"),
+  // Hide additional pricing options on the landing page
+  hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
+  // BookVault print-on-demand integration
+  bookvaultEnabled: boolean("bookvault_enabled").default(false).notNull(),
+  bookvaultIsbn: varchar("bookvault_isbn", { length: 32 }),
   // Checkout page builder config (JSON)
   checkoutPageConfig: longtext("checkout_page_config"),
   // Stats
@@ -4647,6 +4670,10 @@ export const webinars = mysqlTable("webinars", {
   postWebinarDelaySeconds: int("post_webinar_delay_seconds").default(0),
   publishDomain: varchar("publish_domain", { length: 255 }),
   playerPageBlocks: longtext("player_page_blocks"),
+  // Hide additional pricing options on the landing page
+  hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
+  // After Purchase Workflow — JSON array of workflow action objects
+  afterPurchaseWorkflow: longtext("after_purchase_workflow"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4726,6 +4753,8 @@ export const bundles = mysqlTable("bundles", {
   accessType: mysqlEnum("access_type", ["free", "paid"]).default("paid").notNull(),
   pricingOptions: longtext("pricing_options"),
   landingPageBlocks: longtext("landing_page_blocks"),
+  afterPurchaseWorkflow: longtext("after_purchase_workflow"),
+  hidePricingOptions: int("hide_pricing_options").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4780,6 +4809,10 @@ export const membershipPlans = mysqlTable("membership_plans", {
   publishDomain: varchar("publish_domain", { length: 255 }),
   /** JSON: { maxMembers, requireApproval, welcomeEmailSubject, welcomeEmailBody } */
   settings: longtext("settings"),
+  // Hide additional pricing options on the landing page
+  hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
+  // After Purchase Workflow — JSON array of workflow action objects
+  afterPurchaseWorkflow: longtext("after_purchase_workflow"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

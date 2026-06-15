@@ -59,6 +59,10 @@ import {
   lmsLessonBookmarks,
   lmsCollections,
   lmsCollectionCourses,
+  lmsCollectionItems,
+  webinars,
+  bundles,
+  membershipPlans,
   users,
   mediaAssets,
   mediaVersions,
@@ -446,14 +450,60 @@ export const lmsPublicRouter = router({
       const [col] = await db.select().from(lmsCollections)
         .where(and(eq(lmsCollections.id, input.id), eq(lmsCollections.isPublished, true))).limit(1);
       if (!col) throw new TRPCError({ code: "NOT_FOUND" });
-      const cc = await db.select().from(lmsCollectionCourses)
+
+      // Fetch from new lmsCollectionItems table (supports all content types)
+      const newItems = await db.select().from(lmsCollectionItems)
+        .where(eq(lmsCollectionItems.collectionId, col.id)).orderBy(asc(lmsCollectionItems.position));
+
+      // Fetch from legacy lmsCollectionCourses table (backward compat)
+      const legacyCourses = await db.select().from(lmsCollectionCourses)
         .where(eq(lmsCollectionCourses.collectionId, col.id)).orderBy(asc(lmsCollectionCourses.position));
-      const courses = await Promise.all(cc.map(async ({ courseId }) => {
+
+      // Resolve new items
+      const resolvedNewItems = await Promise.all(newItems.map(async (item) => {
+        if (item.itemType === "course" || item.itemType === "quiz") {
+          const [c] = await db.select().from(lmsCourses)
+            .where(and(eq(lmsCourses.id, item.itemId), eq(lmsCourses.status, "public"))).limit(1);
+          return c ? { ...c, _source: "lms_course" as const, _itemType: item.itemType } : null;
+        } else if (item.itemType === "download") {
+          const [p] = await db.select().from(digitalProducts)
+            .where(and(eq(digitalProducts.id, item.itemId), eq(digitalProducts.status, "published"))).limit(1);
+          return p ? { id: p.id, slug: p.slug, title: p.title, subtitle: p.subtitle ?? null, coverImageUrl: p.thumbnailUrl ?? null, price: p.price, isFree: p.isFree, type: "download" as const, _source: "digital_product" as const, _itemType: "download" } : null;
+        } else if (item.itemType === "physical") {
+          const [p] = await db.select().from(physicalProducts)
+            .where(and(eq(physicalProducts.id, item.itemId), eq(physicalProducts.status, "published"))).limit(1);
+          return p ? { id: p.id, slug: p.slug, title: p.title, subtitle: null as null, coverImageUrl: p.imageUrl ?? null, price: p.price, isFree: false, type: "physical" as const, _source: "physical_product" as const, _itemType: "physical" } : null;
+        } else if (item.itemType === "webinar") {
+          const [w] = await db.select().from(webinars)
+            .where(and(eq(webinars.id, item.itemId), eq(webinars.status, "published"))).limit(1);
+          if (!w) return null;
+          const wPricing = (() => { try { const opts = JSON.parse((w as any).pricingOptions ?? "[]"); return Array.isArray(opts) && opts.length > 0 ? Math.min(...opts.map((o: any) => Number(o.price || 0))) : 0; } catch { return 0; } })();
+          return { id: w.id, slug: w.slug, title: w.title, subtitle: null as null, coverImageUrl: (w as any).thumbnailUrl ?? (w as any).coverImage ?? null, price: wPricing, isFree: w.accessType === "free", type: "webinar" as const, _source: "webinar" as const, _itemType: "webinar" };
+        } else if (item.itemType === "bundle") {
+          const [b] = await db.select().from(bundles)
+            .where(and(eq(bundles.id, item.itemId), eq(bundles.status, "published"))).limit(1);
+          if (!b) return null;
+          const bPricing = (() => { try { const opts = JSON.parse((b as any).pricingOptions ?? "[]"); return Array.isArray(opts) && opts.length > 0 ? Math.min(...opts.map((o: any) => Number(o.price || 0))) : 0; } catch { return 0; } })();
+          return { id: b.id, slug: b.slug, title: b.title, subtitle: null as null, coverImageUrl: (b as any).coverImage ?? null, price: bPricing, isFree: bPricing === 0, type: "bundle" as const, _source: "bundle" as const, _itemType: "bundle" };
+        } else if (item.itemType === "membership") {
+          const [m] = await db.select().from(membershipPlans)
+            .where(and(eq(membershipPlans.id, item.itemId), eq(membershipPlans.status, "published"))).limit(1);
+          return m ? { id: m.id, slug: m.slug, title: m.title, subtitle: null as null, coverImageUrl: (m as any).coverImage ?? null, price: m.price ?? 0, isFree: false, type: "membership" as const, _source: "membership" as const, _itemType: "membership" } : null;
+        }
+        return null;
+      }));
+
+      // Resolve legacy course items
+      const resolvedLegacy = await Promise.all(legacyCourses.map(async ({ courseId }) => {
         const [c] = await db.select().from(lmsCourses)
           .where(and(eq(lmsCourses.id, courseId), eq(lmsCourses.status, "public"))).limit(1);
-        return c ? { ...c, _source: "lms_course" as const } : null;
+        return c ? { ...c, _source: "lms_course" as const, _itemType: c.type } : null;
       }));
-      return { ...col, courses: courses.filter(Boolean) };
+
+      // Merge: prefer new items if any exist, otherwise use legacy
+      const allItems = newItems.length > 0 ? resolvedNewItems.filter(Boolean) : resolvedLegacy.filter(Boolean);
+
+      return { ...col, courses: allItems };
     }),
 
   /** Fetch course title + sections + lessons by course ID — used by curriculum_auto block on funnel pages */

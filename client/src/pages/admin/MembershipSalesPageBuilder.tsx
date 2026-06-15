@@ -169,7 +169,7 @@ export default function MembershipSalesPageBuilder() {
   const deleteBlockTpl = trpc.blockTemplates.delete.useMutation({ onSuccess: () => { toast.success("Template deleted"); } });
 
   const selectedBlock = blocks.find(b => b.id === selectedId) ?? null;
-  const backPath = "/admin/members?tab=memberships";
+  const backPath = `/admin/lms?tab=memberships&editMembership=${numericId}`;
   const previewPath = pageInfo?.slug ? `/memberships/${pageInfo.slug}` : null;
 
   return (

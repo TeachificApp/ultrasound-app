@@ -13,7 +13,9 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, GripVertical, BookOpen, Download, ShoppingBag, Radio, HelpCircle, X, Users, DollarSign, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, GripVertical, BookOpen, Download, ShoppingBag, Radio, HelpCircle, X, Users, DollarSign, Eye, Workflow } from "lucide-react";
+import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
+import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 
 const ITEM_TYPE_ICONS: Record<string, typeof BookOpen> = {
   course: BookOpen,
@@ -377,6 +379,9 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
         </Card>
       )}
 
+      {/* After Purchase Workflow */}
+      <BundleAfterPurchaseSection bundleId={bundleId} />
+
       {/* Add Item Dialog */}
       {showAddItem && (
         <AddItemDialog
@@ -389,6 +394,44 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
         />
       )}
     </div>
+  );
+}
+
+// ─── After Purchase Section ───────────────────────────────────────────────────────────────────
+function BundleAfterPurchaseSection({ bundleId }: { bundleId: number }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.bundlesAdmin.getAfterPurchaseWorkflow.useQuery({ bundleId });
+  const saveMut = trpc.bundlesAdmin.updateAfterPurchaseWorkflow.useMutation({
+    onSuccess: () => { utils.bundlesAdmin.getAfterPurchaseWorkflow.invalidate({ bundleId }); toast.success("After purchase workflow saved"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const { data: hideData } = trpc.bundlesAdmin.getHidePricingOptions.useQuery({ bundleId });
+  const hideToggleMut = trpc.bundlesAdmin.updateHidePricingOptions.useMutation({
+    onSuccess: () => { utils.bundlesAdmin.getHidePricingOptions.invalidate({ bundleId }); toast.success("Setting saved"); },
+    onError: (e) => toast.error(e.message),
+  });
+  if (isLoading) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Workflow className="w-4 h-4 text-teal-600" /> After Purchase Workflow
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">Configure what happens immediately after a customer purchases this bundle.</p>
+        <HidePricingOptionsToggle
+          value={hideData?.hidePricingOptions ?? false}
+          onChange={(v) => hideToggleMut.mutate({ bundleId, hidePricingOptions: v })}
+          isSaving={hideToggleMut.isPending}
+        />
+        <AfterPurchaseWorkflowEditor
+          value={data?.afterPurchaseWorkflow ?? null}
+          onChange={(workflow) => saveMut.mutate({ bundleId, workflow })}
+          isSaving={saveMut.isPending}
+        />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -480,8 +523,8 @@ function AddItemDialog({
   );
 }
 
-export default function BundlesAdmin() {
-  const [editingId, setEditingId] = useState<number | null>(null);
+export default function BundlesAdmin({ initialEditId }: { initialEditId?: number } = {}) {
+  const [editingId, setEditingId] = useState<number | null>(initialEditId ?? null);
   if (editingId) {
     return <BundleEditor bundleId={editingId} onBack={() => setEditingId(null)} />;
   }

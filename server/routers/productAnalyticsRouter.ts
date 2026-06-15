@@ -428,14 +428,16 @@ export const productAnalyticsRouter = router({
             fp.product_name AS productName, fp.product_type AS productType,
             fp.amount_paid AS amountPaid, fp.currency, fp.status,
             fp.stripe_payment_intent_id AS stripePaymentIntentId,
-            fp.purchased_at AS purchasedAt
+            fp.purchased_at AS purchasedAt,
+            'one_time' AS orderType
           FROM funnel_purchases fp WHERE fp.user_id = ${input.userId}
           UNION ALL
           SELECT lo.id AS transactionId, 'course' AS sourceTable,
             COALESCE(c.title, 'Course') AS productName, 'course' AS productType,
             lo.amount AS amountPaid, lo.currency, lo.status,
             lo.stripe_payment_intent_id AS stripePaymentIntentId,
-            lo.created_at AS purchasedAt
+            lo.created_at AS purchasedAt,
+            CASE WHEN lo.stripe_subscription_id IS NOT NULL THEN 'subscription' ELSE 'one_time' END AS orderType
           FROM lms_orders lo
           LEFT JOIN lms_courses c ON lo.course_id = c.id
           WHERE lo.user_id = ${input.userId}
@@ -444,7 +446,8 @@ export const productAnalyticsRouter = router({
             COALESCE(prod.title, 'Download') AS productName, 'download' AS productType,
             COALESCE(prod.price, 0) AS amountPaid, 'usd' AS currency, 'paid' AS status,
             dp.stripe_payment_intent_id AS stripePaymentIntentId,
-            dp.purchased_at AS purchasedAt
+            dp.purchased_at AS purchasedAt,
+            'one_time' AS orderType
           FROM digital_purchases dp
           LEFT JOIN digital_products prod ON dp.product_id = prod.id
           WHERE dp.user_id = ${input.userId}
@@ -453,10 +456,21 @@ export const productAnalyticsRouter = router({
             COALESCE(b.title, 'Bundle') AS productName, 'bundle' AS productType,
             COALESCE(b.discount_price, b.original_price, 0) AS amountPaid, 'usd' AS currency, 'paid' AS status,
             NULL AS stripePaymentIntentId,
-            bp.purchased_at AS purchasedAt
+            bp.purchased_at AS purchasedAt,
+            'one_time' AS orderType
           FROM digital_bundle_purchases bp
           LEFT JOIN digital_bundles b ON bp.bundle_id = b.id
           WHERE bp.user_id = ${input.userId}
+          UNION ALL
+          SELECT po.id AS transactionId, 'physical' AS sourceTable,
+            COALESCE(pp.title, 'Physical Product') AS productName, 'physical' AS productType,
+            po.amount_paid AS amountPaid, 'usd' AS currency, po.fulfillment_status AS status,
+            po.stripe_payment_intent_id AS stripePaymentIntentId,
+            po.created_at AS purchasedAt,
+            'one_time' AS orderType
+          FROM physical_product_orders po
+          LEFT JOIN physical_products pp ON po.product_id = pp.id
+          WHERE po.user_id = ${input.userId}
         ) AS user_txns
         ORDER BY purchasedAt DESC
         LIMIT ${input.pageSize} OFFSET ${offset}
@@ -470,33 +484,45 @@ export const productAnalyticsRouter = router({
           (SELECT COUNT(*) FROM funnel_purchases WHERE user_id = ${input.userId}) +
           (SELECT COUNT(*) FROM lms_orders WHERE user_id = ${input.userId}) +
           (SELECT COUNT(*) FROM digital_purchases WHERE user_id = ${input.userId}) +
-          (SELECT COUNT(*) FROM digital_bundle_purchases WHERE user_id = ${input.userId})
+          (SELECT COUNT(*) FROM digital_bundle_purchases WHERE user_id = ${input.userId}) +
+          (SELECT COUNT(*) FROM physical_product_orders WHERE user_id = ${input.userId})
         ) AS total
       `) as any;
       const countRows = Array.isArray(countResult) ? countResult : (countResult as any)[0] ?? [];
       const total = Number(countRows[0]?.total ?? 0);
 
-      // Total spent
+      // Total spent — normalize everything to cents before summing
+      // funnel_purchases.amount_paid is in dollars, lms_orders.amount and physical_product_orders.amount_paid are in cents
       const spentResult = await db.execute(sql`
         SELECT (
-          COALESCE((SELECT SUM(amount_paid) FROM funnel_purchases WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
-          COALESCE((SELECT SUM(amount) FROM lms_orders WHERE user_id = ${input.userId} AND status = 'paid'), 0)
+          COALESCE((SELECT ROUND(SUM(amount_paid) * 100) FROM funnel_purchases WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
+          COALESCE((SELECT SUM(amount) FROM lms_orders WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
+          COALESCE((SELECT SUM(amount_paid) FROM physical_product_orders WHERE user_id = ${input.userId} AND fulfillment_status = 'paid'), 0)
         ) AS totalSpent
       `) as any;
       const spentRows = Array.isArray(spentResult) ? spentResult : (spentResult as any)[0] ?? [];
       const totalSpent = Number(spentRows[0]?.totalSpent ?? 0);
 
+      // Normalize amounts: lms_orders and physical_product_orders store cents; others store dollars
+      // The frontend fmtCurrency divides by 100, so we return everything in cents
+      const normalizeAmount = (r: any): number => {
+        const raw = Number(r.amountPaid ?? 0);
+        const src = r.sourceTable as string;
+        if (src === 'course' || src === 'physical') return raw; // already cents
+        return Math.round(raw * 100); // dollars → cents
+      };
       return {
         transactions: rows.map((r: any) => ({
           transactionId: Number(r.transactionId),
           sourceTable: r.sourceTable,
           productName: r.productName ?? "",
           productType: r.productType ?? "other",
-          amountPaid: Number(r.amountPaid ?? 0),
+          amountPaid: normalizeAmount(r),
           currency: r.currency ?? "usd",
           status: r.status ?? "paid",
           stripePaymentIntentId: r.stripePaymentIntentId ?? null,
           purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
+          orderType: r.orderType ?? 'one_time',
         })),
         total,
         totalSpent,

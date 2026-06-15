@@ -808,7 +808,9 @@ function WorkflowRulesTab({ communityId }: { communityId: number }) {
 export default function CommunityAdmin() {
   const { user } = useAuth();
   const isAdmin = (user as any)?.role === "admin";
-  const [activeCommunityId, setActiveCommunityId] = useState<number | null>(null);
+  const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const urlEditCommunity = urlParams?.get("editCommunity") ?? null;
+  const [activeCommunityId, setActiveCommunityId] = useState<number | null>(urlEditCommunity ? Number(urlEditCommunity) : null);
   const [showCommunityForm, setShowCommunityForm] = useState(false);
   const [editCommunity, setEditCommunity] = useState<any>(null);
   const [showChannelForm, setShowChannelForm] = useState(false);

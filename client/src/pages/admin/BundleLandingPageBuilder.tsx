@@ -166,7 +166,7 @@ export default function BundleLandingPageBuilder() {
   const deleteBlockTpl = trpc.blockTemplates.delete.useMutation({ onSuccess: () => { toast.success("Template deleted"); } });
 
   const selectedBlock = blocks.find(b => b.id === selectedId) ?? null;
-  const backPath = "/admin/downloads?tab=bundles";
+  const backPath = `/admin/lms?tab=bundles&editBundle=${numericId}`;
   const previewPath = pageInfo?.slug ? `/bundles/${pageInfo.slug}` : null;
 
   return (

@@ -906,6 +906,54 @@ Make ALL content specific and compelling based on the product title and descript
       return { success: true };
     }),
 
+  getHidePricingOptions: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [p] = await db.select({ id: physicalProducts.id, hidePricingOptions: physicalProducts.hidePricingOptions })
+        .from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
+      if (!p) throw new TRPCError({ code: "NOT_FOUND" });
+      return { hidePricingOptions: p.hidePricingOptions ?? false };
+    }),
+
+  updateHidePricingOptions: protectedProcedure
+    .input(z.object({ productId: z.number(), hidePricingOptions: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(physicalProducts)
+        .set({ hidePricingOptions: input.hidePricingOptions })
+        .where(eq(physicalProducts.id, input.productId));
+      return { success: true };
+    }),
+
+  getBookvaultSettings: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [p] = await db.select({ id: physicalProducts.id, bookvaultEnabled: physicalProducts.bookvaultEnabled, bookvaultIsbn: physicalProducts.bookvaultIsbn })
+        .from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
+      if (!p) throw new TRPCError({ code: "NOT_FOUND" });
+      return { bookvaultEnabled: p.bookvaultEnabled ?? false, bookvaultIsbn: p.bookvaultIsbn ?? null };
+    }),
+
+  updateBookvaultSettings: protectedProcedure
+    .input(z.object({ productId: z.number(), bookvaultEnabled: z.boolean(), bookvaultIsbn: z.string().max(32).nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(physicalProducts)
+        .set({ bookvaultEnabled: input.bookvaultEnabled, bookvaultIsbn: input.bookvaultIsbn })
+        .where(eq(physicalProducts.id, input.productId));
+      return { success: true };
+    }),
+
   // ─── Checkout Page Config ──────────────────────────────────────────────────
   getCheckoutPageConfig: protectedProcedure
     .input(z.object({ productId: z.number() }))

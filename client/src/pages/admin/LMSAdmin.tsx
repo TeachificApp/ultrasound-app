@@ -67,6 +67,7 @@ import BundlesAdmin from "./BundlesAdmin";
 import MembershipsAdmin from "./MembershipsAdmin";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 import { CohortResourcesAdminSection } from "@/components/cohort/CohortResourcesAdminSection";
+import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -6897,7 +6898,10 @@ export default function LMSAdmin() {
   const urlEditCourse = urlParams?.get("editCourse") ?? null;
   const urlEditDownload = urlParams?.get("editDownload") ?? null;
   const urlEditProduct = urlParams?.get("editProduct") ?? null;
-  const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : urlEditProduct ? "products" : "courses"));
+  const urlEditWebinar = urlParams?.get("editWebinar") ?? null;
+  const urlEditBundle = urlParams?.get("editBundle") ?? null;
+  const urlEditMembership = urlParams?.get("editMembership") ?? null;
+  const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : urlEditProduct ? "products" : urlEditWebinar ? "webinars" : urlEditBundle ? "bundles" : urlEditMembership ? "memberships" : "courses"));
   const [editingCourseId, setEditingCourseId] = useState<number | null>(urlEditCourse ? Number(urlEditCourse) : null);
 
   // Flatten all tabs to find active group color
@@ -6989,9 +6993,9 @@ export default function LMSAdmin() {
               {activeTab === "cohorts"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="cohort" />}
               {activeTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
               {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
-              {activeTab === "webinars"    && <WebinarsAdmin />}
-              {activeTab === "bundles"     && <BundlesAdmin />}
-              {activeTab === "memberships" && <MembershipsAdmin />}
+              {activeTab === "webinars"    && <WebinarsAdmin initialEditId={urlEditWebinar ? Number(urlEditWebinar) : undefined} />}
+              {activeTab === "bundles"     && <BundlesAdmin initialEditId={urlEditBundle ? Number(urlEditBundle) : undefined} />}
+              {activeTab === "memberships" && <MembershipsAdmin initialEditId={urlEditMembership ? Number(urlEditMembership) : undefined} />}
               {activeTab === "communities" && <CommunitiesTab />}
               {activeTab === "orderbumps"  && <OrderBumpsAdmin />}
               {activeTab === "collections" && <CollectionsTab />}
@@ -8041,7 +8045,6 @@ function SortableCollectionRow({ col, onEdit, onDelete }: { col: any; onEdit: (c
 function CollectionsTab() {
   const utils = trpc.useUtils();
   const { data: collections, isLoading } = trpc.lmsAdmin.listCollections.useQuery();
-  const { data: allCourses } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editCollection, setEditCollection] = useState<any>(null);
@@ -8059,12 +8062,13 @@ function CollectionsTab() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const [pendingCourseIds, setPendingCourseIds] = useState<number[]>([]);
+  type CollectionItem = { itemType: string; itemId: number };
+  const [pendingItems, setPendingItems] = useState<CollectionItem[]>([]);
   const createCollection = trpc.lmsAdmin.createCollection.useMutation({
     onSuccess: (newCol) => {
-      if (pendingCourseIds.length > 0) {
-        setCourses.mutate({ collectionId: newCol.id, courseIds: pendingCourseIds }, {
-          onSettled: () => { toast.success("Collection created"); utils.lmsAdmin.listCollections.invalidate(); setCreateOpen(false); setPendingCourseIds([]); },
+      if (pendingItems.length > 0) {
+        setItems.mutate({ collectionId: newCol.id, items: pendingItems as any }, {
+          onSettled: () => { toast.success("Collection created"); utils.lmsAdmin.listCollections.invalidate(); setCreateOpen(false); setPendingItems([]); },
         });
       } else {
         toast.success("Collection created"); utils.lmsAdmin.listCollections.invalidate(); setCreateOpen(false);
@@ -8080,7 +8084,7 @@ function CollectionsTab() {
     onSuccess: () => { toast.success("Collection deleted"); utils.lmsAdmin.listCollections.invalidate(); },
     onError: e => toast.error(e.message),
   });
-  const setCourses = trpc.lmsAdmin.setCollectionCourses.useMutation({
+  const setItems = trpc.lmsEnrollmentAdmin.setCollectionItems.useMutation({
     onSuccess: () => { utils.lmsAdmin.listCollections.invalidate(); },
     onError: e => toast.error(e.message),
   });
@@ -8107,7 +8111,7 @@ function CollectionsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-gray-800">Collections</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Group courses by custom labels — shown as filter tabs on the Education Library. Drag to reorder.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Group any content (courses, webinars, downloads, bundles, memberships, products) — shown as filter tabs on the Education Library. Drag to reorder.</p>
         </div>
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setCreateOpen(true)}>
           <Plus className="w-3.5 h-3.5 mr-1" /> New Collection
@@ -8117,7 +8121,7 @@ function CollectionsTab() {
       {localOrder.length === 0 && (
         <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
           <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
-          <p className="text-sm">No collections yet. Create one to group courses by topic or label.</p>
+          <p className="text-sm">No collections yet. Create one to group content by topic or label.</p>
         </div>
       )}
 
@@ -8140,8 +8144,7 @@ function CollectionsTab() {
       <CollectionFormDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        allCourses={allCourses?.courses ?? []}
-        onSave={(data, courseIds) => { setPendingCourseIds(courseIds); createCollection.mutate({ ...data, isPublished: data.isPublished ?? true } as any); }}
+        onSave={(data, items) => { setPendingItems(items); createCollection.mutate({ ...data, isPublished: data.isPublished ?? true } as any); }}
         saving={createCollection.isPending}
         title="New Collection"
       />
@@ -8151,13 +8154,12 @@ function CollectionsTab() {
         <CollectionFormDialog
           open={!!editCollection}
           onClose={() => setEditCollection(null)}
-          allCourses={allCourses?.courses ?? []}
           initial={editCollection}
-          onSave={(data, courseIds) => {
+          onSave={(data, items) => {
             updateCollection.mutate({ id: editCollection.id, ...data } as any);
-            setCourses.mutate({ collectionId: editCollection.id, courseIds });
+            setItems.mutate({ collectionId: editCollection.id, items: items as any });
           }}
-          saving={updateCollection.isPending || setCourses.isPending}
+          saving={updateCollection.isPending || setItems.isPending}
           title="Edit Collection"
         />
       )}
@@ -8166,14 +8168,23 @@ function CollectionsTab() {
 }
 
 // ─── Collection Form Dialog ────────────────────────────────────────────────────
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  course: "Courses",
+  quiz: "Quizzes",
+  webinar: "Webinars",
+  download: "Downloads",
+  bundle: "Bundles",
+  membership: "Memberships",
+  physical: "Physical Products",
+};
+
 function CollectionFormDialog({
-  open, onClose, allCourses, initial, onSave, saving, title,
+  open, onClose, initial, onSave, saving, title,
 }: {
   open: boolean;
   onClose: () => void;
-  allCourses: any[];
   initial?: any;
-  onSave: (data: any, courseIds: number[]) => void;
+  onSave: (data: any, items: { itemType: string; itemId: number }[]) => void;
   saving: boolean;
   title: string;
 }) {
@@ -8182,10 +8193,37 @@ function CollectionFormDialog({
   const [label, setLabel] = useState(initial?.label ?? "");
   const [color, setColor] = useState(initial?.color ?? "#189aa1");
   const [isPublished, setIsPublished] = useState(initial?.isPublished ?? true);
-  const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>(initial?.courseIds ?? []);
-  const [search, setSearch] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState<string>(initial?.coverImageUrl ?? "");
   const [imageUploading, setImageUploading] = useState(false);
+  const [activeContentTab, setActiveContentTab] = useState("course");
+  const [search, setSearch] = useState("");
+  // selectedItems: array of { itemType, itemId } in order
+  const [selectedItems, setSelectedItems] = useState<{ itemType: string; itemId: number }[]>([]);
+
+  // Load existing items for edit mode
+  const { data: existingItems } = trpc.lmsEnrollmentAdmin.getCollectionItems.useQuery(
+    { collectionId: initial?.id ?? 0 },
+    { enabled: !!initial?.id, onSuccess: (data) => { if (data && selectedItems.length === 0) setSelectedItems(data.map(i => ({ itemType: i.itemType, itemId: i.itemId }))); } }
+  );
+
+  // Fetch all content types
+  const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 500 });
+  const { data: webinarsData } = trpc.webinarAdmin.list.useQuery({ pageSize: 500 });
+  const { data: downloadsData } = trpc.downloadsAdmin.list.useQuery();
+  const { data: bundlesData } = trpc.bundlesAdmin.list.useQuery({});
+  const { data: membershipsData } = trpc.membership.listAll.useQuery();
+  const { data: physicalData } = trpc.productsAdmin.list.useQuery();
+
+  const contentByType: Record<string, { id: number; title: string; type: string }[]> = {
+    course: (coursesData?.courses ?? []).filter((c: any) => c.type !== "quiz").map((c: any) => ({ id: c.id, title: c.title, type: "course" })),
+    quiz: (coursesData?.courses ?? []).filter((c: any) => c.type === "quiz").map((c: any) => ({ id: c.id, title: c.title, type: "quiz" })),
+    webinar: (webinarsData?.webinars ?? []).map((w: any) => ({ id: w.id, title: w.title, type: "webinar" })),
+    download: (downloadsData ?? []).map((d: any) => ({ id: d.id, title: d.title, type: "download" })),
+    bundle: (bundlesData?.bundles ?? bundlesData ?? []).map((b: any) => ({ id: b.id, title: b.title, type: "bundle" })),
+    membership: (membershipsData ?? []).map((m: any) => ({ id: m.id, title: m.title, type: "membership" })),
+    physical: (physicalData ?? []).map((p: any) => ({ id: p.id, title: p.title, type: "physical" })),
+  };
+
   const uploadCollectionImage = trpc.lmsAdmin.uploadCollectionImage.useMutation({
     onSuccess: (data) => { setCoverImageUrl(data.url); setImageUploading(false); },
     onError: (e) => { toast.error(e.message); setImageUploading(false); },
@@ -8204,19 +8242,26 @@ function CollectionFormDialog({
     reader.readAsDataURL(file);
   };
 
-  const filteredCourses = allCourses.filter(c =>
+  const toggleItem = (itemType: string, itemId: number) => {
+    setSelectedItems(prev => {
+      const exists = prev.some(i => i.itemType === itemType && i.itemId === itemId);
+      return exists ? prev.filter(i => !(i.itemType === itemType && i.itemId === itemId)) : [...prev, { itemType, itemId }];
+    });
+  };
+
+  const isSelected = (itemType: string, itemId: number) => selectedItems.some(i => i.itemType === itemType && i.itemId === itemId);
+  const getPosition = (itemType: string, itemId: number) => {
+    const idx = selectedItems.findIndex(i => i.itemType === itemType && i.itemId === itemId);
+    return idx >= 0 ? idx + 1 : null;
+  };
+
+  const filteredItems = (contentByType[activeContentTab] ?? []).filter(c =>
     c.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleCourse = (id: number) => {
-    setSelectedCourseIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
   const handleSave = () => {
     if (!colTitle.trim()) return;
-    onSave({ title: colTitle.trim(), description: description || undefined, label: label || undefined, color, isPublished, coverImageUrl: coverImageUrl || undefined }, selectedCourseIds);
+    onSave({ title: colTitle.trim(), description: description || undefined, label: label || undefined, color, isPublished, coverImageUrl: coverImageUrl || undefined }, selectedItems);
   };
 
   return (
@@ -8272,31 +8317,52 @@ function CollectionFormDialog({
             </div>
           </div>
 
-          {/* Course picker */}
+          {/* Multi-type content picker */}
           <div>
-            <Label className="text-xs font-medium">Courses in this Collection</Label>
-            <p className="text-xs text-gray-400 mb-2">Select which courses appear in this collection. Order matches selection order.</p>
-            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search courses..." className="mb-2 text-sm" />
-            <div className="border border-gray-200 rounded-lg max-h-52 overflow-y-auto divide-y divide-gray-100">
-              {filteredCourses.length === 0 && (
-                <div className="py-6 text-center text-xs text-gray-400">No courses found</div>
+            <Label className="text-xs font-medium">Content in this Collection</Label>
+            <p className="text-xs text-gray-400 mb-2">Select content from any type. Order matches selection order.</p>
+            {/* Content type tabs */}
+            <div className="flex gap-1 flex-wrap mb-2">
+              {Object.keys(CONTENT_TYPE_LABELS).map(type => (
+                <button
+                  key={type}
+                  onClick={() => { setActiveContentTab(type); setSearch(""); }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    activeContentTab === type
+                      ? "bg-teal-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {CONTENT_TYPE_LABELS[type]}
+                  {selectedItems.filter(i => i.itemType === type).length > 0 && (
+                    <span className="ml-1 bg-white/30 text-inherit rounded-full px-1">
+                      {selectedItems.filter(i => i.itemType === type).length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${CONTENT_TYPE_LABELS[activeContentTab] ?? activeContentTab}...`} className="mb-2 text-sm" />
+            <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+              {filteredItems.length === 0 && (
+                <div className="py-6 text-center text-xs text-gray-400">No {CONTENT_TYPE_LABELS[activeContentTab]?.toLowerCase()} found</div>
               )}
-              {filteredCourses.map((c: any) => (
-                <label key={c.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+              {filteredItems.map((c) => (
+                <label key={`${c.type}-${c.id}`} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={selectedCourseIds.includes(c.id)}
-                    onChange={() => toggleCourse(c.id)}
+                    checked={isSelected(c.type, c.id)}
+                    onChange={() => toggleItem(c.type, c.id)}
                     className="accent-teal-600"
                   />
                   <span className="text-sm text-gray-700 flex-1 truncate">{c.title}</span>
-                  {selectedCourseIds.includes(c.id) && (
-                    <span className="text-xs text-teal-600 font-medium">#{selectedCourseIds.indexOf(c.id) + 1}</span>
+                  {isSelected(c.type, c.id) && (
+                    <span className="text-xs text-teal-600 font-medium">#{getPosition(c.type, c.id)}</span>
                   )}
                 </label>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-1">{selectedCourseIds.length} course{selectedCourseIds.length !== 1 ? "s" : ""} selected</p>
+            <p className="text-xs text-gray-400 mt-1">{selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""} selected total</p>
           </div>
         </div>
         <DialogFooter>
@@ -12719,6 +12785,17 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Hide Additional Pricing Options */}
+      <Card>
+        <CardContent className="p-5">
+          <HidePricingOptionsToggle
+            value={(data as any)?.hidePricingOptions ?? false}
+            onChange={(v) => update.mutate({ courseId, hidePricingOptions: v } as any)}
+            isSaving={update.isPending}
+          />
         </CardContent>
       </Card>
 

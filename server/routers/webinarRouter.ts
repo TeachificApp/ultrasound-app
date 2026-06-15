@@ -261,6 +261,50 @@ export const webinarAdminRouter = router({
       }
       return { success: true };
     }),
+
+  getAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ webinarId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [w] = await db.select({ id: webinars.id, afterPurchaseWorkflow: webinars.afterPurchaseWorkflow })
+        .from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
+      if (!w) throw new TRPCError({ code: "NOT_FOUND" });
+      return { afterPurchaseWorkflow: w.afterPurchaseWorkflow ?? null };
+    }),
+
+  updateAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ webinarId: z.number(), workflow: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(webinars).set({ afterPurchaseWorkflow: input.workflow }).where(eq(webinars.id, input.webinarId));
+      return { success: true };
+    }),
+
+  getHidePricingOptions: protectedProcedure
+    .input(z.object({ webinarId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [w] = await db.select({ id: webinars.id, hidePricingOptions: webinars.hidePricingOptions })
+        .from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
+      if (!w) throw new TRPCError({ code: "NOT_FOUND" });
+      return { hidePricingOptions: w.hidePricingOptions ?? false };
+    }),
+
+  updateHidePricingOptions: protectedProcedure
+    .input(z.object({ webinarId: z.number(), hidePricingOptions: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(webinars).set({ hidePricingOptions: input.hidePricingOptions }).where(eq(webinars.id, input.webinarId));
+      return { success: true };
+    }),
 });
 
 // ── Public session tracking (no auth required) ────────────────────────────────

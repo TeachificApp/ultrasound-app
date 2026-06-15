@@ -167,7 +167,7 @@ export default function WebinarPlayerPageBuilder() {
   const deleteBlockTpl = trpc.blockTemplates.delete.useMutation({ onSuccess: () => { toast.success("Template deleted"); } });
 
   const selectedBlock = blocks.find(b => b.id === selectedId) ?? null;
-  const backPath = "/admin/webinars";
+  const backPath = `/admin/lms?tab=webinars&editWebinar=${numericId}`;
   const previewPath = null;
 
   return (

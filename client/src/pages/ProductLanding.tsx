@@ -166,8 +166,8 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
     }
     case "text":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-3xl mx-auto prose prose-gray max-w-none" dangerouslySetInnerHTML={{ __html: d.content ?? "" }} />
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#1a1a1a", textAlign: (d.align ?? "left") as any }}>
+          <div className="max-w-3xl mx-auto prose prose-gray max-w-none" dangerouslySetInnerHTML={{ __html: d.html ?? d.content ?? "" }} />
         </div>
       );
     case "image": {
@@ -239,6 +239,36 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
     case "countdown": {
       const resolvedMode = d.mode ?? (d.targetDate ? "event" : "on_load");
       return <ProductCountdownTimer mode={resolvedMode} durationMinutes={d.durationMinutes} targetDate={d.targetDate} headline={d.headline} textColor={d.textColor ?? "#fff"} bgColor={d.bgColor ?? "#179ca3"} />;
+    }
+    case "cta_standalone": {
+      const isDirectCheckout = d.ctaBehavior === "direct_checkout";
+      return (
+        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: (d.align ?? "center") as any }}>
+          {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          {(d.showStrikethrough && d.strikethroughPrice) && (
+            <p className="text-lg text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>
+          )}
+          {d.displayPrice && <p className="text-3xl font-bold mb-4" style={{ color: d.ctaColor ?? "#179ca3" }}>{d.displayPrice}</p>}
+          {isDirectCheckout ? (
+            <button onClick={onBuy} disabled={buying}
+              className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+              style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+              {buying ? "Processing…" : (d.ctaText ?? "Get Started")}
+            </button>
+          ) : (
+            <a href={d.ctaLink ?? "#"}
+              className={`inline-block px-8 py-3 rounded-lg font-semibold shadow ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+              style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+              {d.ctaText ?? "Get Started"}
+            </a>
+          )}
+          {isDirectCheckout && <p className="text-[10px] text-teal-600 mt-1">→ Stripe Checkout</p>}
+          {(d.showOptOut || d.optOutEnabled) && d.optOutText && (
+            <div className="mt-3"><a href={d.optOutUrl || d.optOutCustomUrl || "#"} className="text-xs text-gray-400 underline hover:text-gray-600">{d.optOutText}</a></div>
+          )}
+        </div>
+      );
     }
     case "divider":
       return <div style={{ height: `${d.height ?? 2}px`, backgroundColor: d.color ?? "#e5e7eb", margin: `${d.marginY ?? 0}px 0` }} />;
@@ -445,7 +475,7 @@ export default function ProductLanding() {
           </div>
         ))}
         {/* Pricing options selector below blocks if multiple options */}
-        {pricingOptions.length > 1 && (
+        {pricingOptions.length > 1 && !product.hidePricingOptions && (
           <div className="max-w-2xl mx-auto px-4 py-8">
             <PricingOptionSelector
               options={pricingOptions}
@@ -478,7 +508,7 @@ export default function ProductLanding() {
                 {product.isFree && <Badge className="bg-teal-500 text-white">Free</Badge>}
               </div>
               {/* Pricing options */}
-              {pricingOptions.length > 1 && (
+              {pricingOptions.length > 1 && !product.hidePricingOptions && (
                 <div className="mt-4 max-w-sm">
                   <PricingOptionSelector
                     options={pricingOptions}

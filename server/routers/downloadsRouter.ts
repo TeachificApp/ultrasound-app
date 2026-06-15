@@ -1462,11 +1462,86 @@ Make ALL content specific and compelling based on the product title and descript
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(digitalProducts)
-        .set({ afterPurchaseWorkflow: input.workflow })
+                .set({ afterPurchaseWorkflow: input.workflow })
         .where(eq(digitalProducts.id, input.productId));
       return { success: true };
     }),
-
+  getHidePricingOptions: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db
+        .select({ id: digitalProducts.id, hidePricingOptions: digitalProducts.hidePricingOptions })
+        .from(digitalProducts)
+        .where(eq(digitalProducts.id, input.productId))
+        .limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      return { hidePricingOptions: product.hidePricingOptions ?? false };
+    }),
+  updateHidePricingOptions: protectedProcedure
+    .input(z.object({ productId: z.number(), hidePricingOptions: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(digitalProducts)
+        .set({ hidePricingOptions: input.hidePricingOptions })
+        .where(eq(digitalProducts.id, input.productId));
+      return { success: true };
+    }),
+  // ─── Bundle After Purchase Workflow + Hide Pricing Options ─────────────────────────────────
+  getBundleAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ bundleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [bundle] = await db
+        .select({ id: digitalBundles.id, afterPurchaseWorkflow: digitalBundles.afterPurchaseWorkflow })
+        .from(digitalBundles)
+        .where(eq(digitalBundles.id, input.bundleId))
+        .limit(1);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      return { afterPurchaseWorkflow: bundle.afterPurchaseWorkflow ?? null };
+    }),
+  updateBundleAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ bundleId: z.number(), workflow: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(digitalBundles)
+        .set({ afterPurchaseWorkflow: input.workflow })
+        .where(eq(digitalBundles.id, input.bundleId));
+      return { success: true };
+    }),
+  getBundleHidePricingOptions: protectedProcedure
+    .input(z.object({ bundleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [bundle] = await db
+        .select({ id: digitalBundles.id, hidePricingOptions: digitalBundles.hidePricingOptions })
+        .from(digitalBundles)
+        .where(eq(digitalBundles.id, input.bundleId))
+        .limit(1);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      return { hidePricingOptions: bundle.hidePricingOptions ?? false };
+    }),
+  updateBundleHidePricingOptions: protectedProcedure
+    .input(z.object({ bundleId: z.number(), hidePricingOptions: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(digitalBundles)
+        .set({ hidePricingOptions: input.hidePricingOptions })
+        .where(eq(digitalBundles.id, input.bundleId));
+      return { success: true };
+    }),
   // ─── Checkout Page Config ──────────────────────────────────────────────────
   getCheckoutPageConfig: protectedProcedure
     .input(z.object({ productId: z.number() }))

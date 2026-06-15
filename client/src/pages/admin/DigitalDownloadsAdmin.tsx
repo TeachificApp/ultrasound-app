@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate, BarChart3, ShoppingCart, Settings2, FolderOpen, Workflow } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
+import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RichTextEditor from "@/components/RichTextEditor";
@@ -903,6 +904,11 @@ function AfterPurchaseWorkflowTab({ productId }: { productId: number }) {
     onSuccess: () => { utils.downloadsAdmin.getAfterPurchaseWorkflow.invalidate({ productId }); toast.success("After purchase workflow saved"); },
     onError: (e) => toast.error(e.message),
   });
+  const { data: hideData } = trpc.downloadsAdmin.getHidePricingOptions.useQuery({ productId });
+  const hideToggleMut = trpc.downloadsAdmin.updateHidePricingOptions.useMutation({
+    onSuccess: () => { utils.downloadsAdmin.getHidePricingOptions.invalidate({ productId }); toast.success("Setting saved"); },
+    onError: (e) => toast.error(e.message),
+  });
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
 
@@ -915,6 +921,11 @@ function AfterPurchaseWorkflowTab({ productId }: { productId: number }) {
           <p className="text-xs text-teal-600 mt-0.5">Configure what happens immediately after a customer completes their purchase. Actions run in order.</p>
         </div>
       </div>
+      <HidePricingOptionsToggle
+        value={hideData?.hidePricingOptions ?? false}
+        onChange={(v) => hideToggleMut.mutate({ productId, hidePricingOptions: v })}
+        isSaving={hideToggleMut.isPending}
+      />
       <AfterPurchaseWorkflowEditor
         value={data?.afterPurchaseWorkflow ?? null}
         onChange={(workflow) => saveMut.mutate({ productId, workflow })}

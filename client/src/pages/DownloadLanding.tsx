@@ -790,6 +790,8 @@ export default function DownloadLanding() {
           </div>
         </div>
         {blocks.map(block => {
+          // Hide pricing options blocks if hidePricingOptions is set
+          if (product?.hidePricingOptions && (block.type === "pricing_options_auto" || block.type === "pricing_cards")) return null;
           const FULL_BLEED_TYPES_DL = ["hero", "pricing_cta", "cta_standalone", "divider", "spacer", "footer", "logo_strip", "urgency_offer", "product_offer_stack", "price_stack", "image_content"];
           const isFullBleedDL = FULL_BLEED_TYPES_DL.includes(block.type);
           const bwDL = block.data?.contentWidth;

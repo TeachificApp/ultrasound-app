@@ -19,10 +19,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   Radio, Plus, Edit2, Trash2, Eye, Users, BarChart2, Settings,
   Video, Calendar, Globe, Link2, RefreshCw, CheckCircle, Clock,
-  PlayCircle, DollarSign, ChevronLeft, Copy, ExternalLink
+  PlayCircle, DollarSign, ChevronLeft, Copy, ExternalLink, Workflow
 } from "lucide-react";
 import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
+import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
+import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function fmtDate(ts: number | null | undefined) {
@@ -349,6 +351,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
           <TabsTrigger value="attendees" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Attendees</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs"><BarChart2 className="w-3.5 h-3.5 mr-1" />Analytics</TabsTrigger>
           <TabsTrigger value="domain" className="text-xs"><Globe className="w-3.5 h-3.5 mr-1" />Domain</TabsTrigger>
+          <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3.5 h-3.5 mr-1" />After Purchase</TabsTrigger>
           <a href={`/admin/webinars/${webinarId}/landing-builder`} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-teal-600 text-teal-700 rounded-md hover:bg-teal-50 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -680,14 +683,56 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* After Purchase Tab */}
+        <TabsContent value="after-purchase" className="pt-2">
+          <WebinarAfterPurchaseTab webinarId={webinarId} />
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
+// ── After Purchase Tab ─────────────────────────────────────────────────────────────────────────────────
+function WebinarAfterPurchaseTab({ webinarId }: { webinarId: number }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.webinarAdmin.getAfterPurchaseWorkflow.useQuery({ webinarId });
+  const saveMut = trpc.webinarAdmin.updateAfterPurchaseWorkflow.useMutation({
+    onSuccess: () => { utils.webinarAdmin.getAfterPurchaseWorkflow.invalidate({ webinarId }); toast.success("After purchase workflow saved"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const { data: hideData } = trpc.webinarAdmin.getHidePricingOptions.useQuery({ webinarId });
+  const hideToggleMut = trpc.webinarAdmin.updateHidePricingOptions.useMutation({
+    onSuccess: () => { utils.webinarAdmin.getHidePricingOptions.invalidate({ webinarId }); toast.success("Setting saved"); },
+    onError: (e) => toast.error(e.message),
+  });
+  if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
+  return (
+    <div className="space-y-4">
+      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+        <Workflow className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-teal-800">After Purchase Workflow</p>
+          <p className="text-xs text-teal-600 mt-0.5">Configure what happens immediately after a customer completes their purchase. Actions run in order.</p>
+        </div>
+      </div>
+      <HidePricingOptionsToggle
+        value={hideData?.hidePricingOptions ?? false}
+        onChange={(v) => hideToggleMut.mutate({ webinarId, hidePricingOptions: v })}
+        isSaving={hideToggleMut.isPending}
+      />
+      <AfterPurchaseWorkflowEditor
+        value={data?.afterPurchaseWorkflow ?? null}
+        onChange={(workflow) => saveMut.mutate({ webinarId, workflow })}
+        isSaving={saveMut.isPending}
+      />
+    </div>
+  );
+}
+
 // ── Main export ────────────────────────────────────────────────────────────────
-export function WebinarsAdmin() {
-  const [editingId, setEditingId] = useState<number | null>(null);
+export function WebinarsAdmin({ initialEditId }: { initialEditId?: number } = {}) {
+  const [editingId, setEditingId] = useState<number | null>(initialEditId ?? null);
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">

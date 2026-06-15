@@ -139,9 +139,10 @@ export default function MembershipPage() {
       {/* If admin configured blocks, render them */}
       {blocks.length > 0 ? (
         <div>
-          {blocks.map((block: any) => (
-            <BlockPreview key={block.id} block={block} />
-          ))}
+          {blocks.map((block: any) => {
+            if (plan?.hidePricingOptions && (block.type === "pricing_options_auto" || block.type === "pricing_cards")) return null;
+            return <BlockPreview key={block.id} block={block} />;
+          })}
         </div>
       ) : (
         /* Default sales page layout */

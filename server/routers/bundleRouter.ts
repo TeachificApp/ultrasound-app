@@ -387,6 +387,25 @@ export const bundleAdminRouter = router({
       return { success: true };
     }),
 
+  getAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ bundleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [row] = await db.select({ afterPurchaseWorkflow: bundles.afterPurchaseWorkflow }).from(bundles).where(eq(bundles.id, input.bundleId)).limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      return { afterPurchaseWorkflow: row.afterPurchaseWorkflow };
+    }),
+  updateAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ bundleId: z.number(), workflow: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(bundles).set({ afterPurchaseWorkflow: input.workflow }).where(eq(bundles.id, input.bundleId));
+      return { success: true };
+    }),
   listAvailableItems: protectedProcedure.query(async ({ ctx }) => {
     await assertAdmin(ctx);
     const db = await getDb();

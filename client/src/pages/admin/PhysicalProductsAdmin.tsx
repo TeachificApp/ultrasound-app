@@ -20,6 +20,7 @@ import {
   DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow,
 } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
+import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import RichTextEditor from "@/components/RichTextEditor";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 
@@ -965,6 +966,11 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
     onSuccess: () => { utils.productsAdmin.getAfterPurchaseWorkflow.invalidate({ productId }); toast.success("After purchase workflow saved"); },
     onError: (e: any) => toast.error(e.message),
   });
+  const { data: hideData } = trpc.productsAdmin.getHidePricingOptions.useQuery({ productId });
+  const hideToggleMut = trpc.productsAdmin.updateHidePricingOptions.useMutation({
+    onSuccess: () => { utils.productsAdmin.getHidePricingOptions.invalidate({ productId }); toast.success("Setting saved"); },
+    onError: (e: any) => toast.error(e.message),
+  });
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
   return (
     <div className="space-y-4">
@@ -975,6 +981,11 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
           <p className="text-xs text-teal-600 mt-0.5">Configure what happens immediately after a customer completes their purchase. Actions run in order.</p>
         </div>
       </div>
+      <HidePricingOptionsToggle
+        value={hideData?.hidePricingOptions ?? false}
+        onChange={(v) => hideToggleMut.mutate({ productId, hidePricingOptions: v })}
+        isSaving={hideToggleMut.isPending}
+      />
       <AfterPurchaseWorkflowEditor
         value={data?.afterPurchaseWorkflow ?? null}
         onChange={(workflow) => saveMut.mutate({ productId, workflow })}

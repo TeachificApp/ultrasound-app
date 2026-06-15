@@ -956,7 +956,13 @@ export default function CheckoutPageEditorPage() {
     ? `/checkout/${entitySlug}${entityType !== "course" ? `?type=${entityType}` : ""}`
     : "#";
 
-  const backUrl = entityType === "course" ? `/admin/lms?editCourse=${entityId}` : `/admin/lms`;
+  const backUrl = entityType === "course" ? `/admin/lms?editCourse=${entityId}`
+    : entityType === "download" ? `/admin/lms?tab=downloads&editDownload=${entityId}`
+    : entityType === "product" ? `/admin/lms?tab=products&editProduct=${entityId}`
+    : entityType === "webinar" ? `/admin/lms?tab=webinars&editWebinar=${entityId}`
+    : entityType === "bundle" ? `/admin/lms?tab=bundles&editBundle=${entityId}`
+    : entityType === "membership" ? `/admin/lms?tab=memberships&editMembership=${entityId}`
+    : `/admin/lms`;
 
   const selectedSection = config && selectedIdx !== null ? config.sections[selectedIdx] : null;
   const primary = "#179ca3";

@@ -52,6 +52,10 @@ import {
   lmsLessonBookmarks,
   lmsCollections,
   lmsCollectionCourses,
+  lmsCollectionItems,
+  webinars,
+  digitalBundles,
+  membershipPlans,
   users,
   mediaAssets,
   mediaVersions,
@@ -3311,5 +3315,46 @@ CRITICAL REQUIREMENTS:
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Reconciliation failed" });
       }
       return result;
+    }),
+
+  /** Get all items (multi-type) in a collection */
+  getCollectionItems: protectedProcedure
+    .input(z.object({ collectionId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const items = await db.select()
+        .from(lmsCollectionItems)
+        .where(eq(lmsCollectionItems.collectionId, input.collectionId))
+        .orderBy(asc(lmsCollectionItems.position));
+      return items;
+    }),
+
+  /** Set all items (multi-type) in a collection (replaces existing) */
+  setCollectionItems: protectedProcedure
+    .input(z.object({
+      collectionId: z.number(),
+      items: z.array(z.object({
+        itemType: z.enum(["course", "quiz", "webinar", "download", "bundle", "membership", "physical"]),
+        itemId: z.number(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCollectionItems).where(eq(lmsCollectionItems.collectionId, input.collectionId));
+      if (input.items.length > 0) {
+        await db.insert(lmsCollectionItems).values(
+          input.items.map((item, i) => ({
+            collectionId: input.collectionId,
+            itemType: item.itemType,
+            itemId: item.itemId,
+            position: i,
+          }))
+        );
+      }
+      return { success: true };
     }),
 });

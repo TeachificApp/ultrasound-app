@@ -1235,6 +1235,43 @@ const bulkSyncPlans = adminProcedure
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
+
+// ─── After Purchase Workflow + Hide Pricing Options ───────────────────────────
+
+const getMembershipAfterPurchaseWorkflow = adminProcedure
+  .input(z.object({ planId: z.number() }))
+  .query(async ({ input }) => {
+    const db = await getDb();
+    const [plan] = await db.select({ id: membershipPlans.id, afterPurchaseWorkflow: membershipPlans.afterPurchaseWorkflow })
+      .from(membershipPlans).where(eq(membershipPlans.id, input.planId)).limit(1);
+    return { afterPurchaseWorkflow: plan.afterPurchaseWorkflow ?? null };
+  });
+
+const updateMembershipAfterPurchaseWorkflow = adminProcedure
+  .input(z.object({ planId: z.number(), workflow: z.string().nullable() }))
+  .mutation(async ({ input }) => {
+    const db = await getDb();
+    await db.update(membershipPlans).set({ afterPurchaseWorkflow: input.workflow }).where(eq(membershipPlans.id, input.planId));
+    return { success: true };
+  });
+
+const getMembershipHidePricingOptions = adminProcedure
+  .input(z.object({ planId: z.number() }))
+  .query(async ({ input }) => {
+    const db = await getDb();
+    const [plan] = await db.select({ id: membershipPlans.id, hidePricingOptions: membershipPlans.hidePricingOptions })
+      .from(membershipPlans).where(eq(membershipPlans.id, input.planId)).limit(1);
+    return { hidePricingOptions: plan.hidePricingOptions ?? false };
+  });
+
+const updateMembershipHidePricingOptions = adminProcedure
+  .input(z.object({ planId: z.number(), hidePricingOptions: z.boolean() }))
+  .mutation(async ({ input }) => {
+    const db = await getDb();
+    await db.update(membershipPlans).set({ hidePricingOptions: input.hidePricingOptions }).where(eq(membershipPlans.id, input.planId));
+    return { success: true };
+  });
+
 export const membershipRouter = router({
   // Public
   listPublic: listPublicMemberships,
@@ -1275,4 +1312,8 @@ export const membershipRouter = router({
   cancelMembershipSubscription,
   reactivateMembershipSubscription,
   bulkSyncPlans,
+  getAfterPurchaseWorkflow: getMembershipAfterPurchaseWorkflow,
+  updateAfterPurchaseWorkflow: updateMembershipAfterPurchaseWorkflow,
+  getHidePricingOptions: getMembershipHidePricingOptions,
+  updateHidePricingOptions: updateMembershipHidePricingOptions,
 });

@@ -481,7 +481,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
 }
 
 // ─── Content Tab ──────────────────────────────────────────────────────────────
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "purchases" | "webinars" | "products" | "bundles" | "memberships" | "communities";
+type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "products" | "bundles" | "memberships" | "communities";
 
 function ContentTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
@@ -559,13 +559,10 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const communityMemberships = data.communityMemberships ?? [];
   const webinarRegistrations = data.webinarRegistrations ?? [];
 
-  const funnelPurchases = data.funnelPurchases ?? [];
-
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: courses.length },
     { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: quizzes.length },
     { key: "downloads",    label: "Downloads",    icon: Download,       count: downloads.length },
-    { key: "purchases",    label: "Purchases",    icon: ShoppingCart,   count: funnelPurchases.length },
     { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
     { key: "products",     label: "Products",     icon: Package,        count: physOrders.length },
     { key: "bundles",      label: "Bundles",      icon: Layers,         count: bundleEnrollments.length },
@@ -842,31 +839,6 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200">
                   <Download className="w-3 h-3" /> Files
                 </a>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Purchases */}
-      {contentTab === "purchases" && (
-        <div className="space-y-3">
-          <SectionHeader title={`Funnel Purchases (${funnelPurchases.length})`} />
-          {funnelPurchases.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No funnel purchases.</p>
-          ) : (
-            funnelPurchases.map((p: any) => (
-              <div key={p.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">{p.productName ?? "Purchase"}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {p.productType} · {formatDate(p.purchasedAt)} · {formatCurrency(p.amountPaid, p.currency)}
-                    </p>
-                    {p.sourceType && <p className="text-xs text-gray-400 mt-0.5">Source: {p.sourceType}</p>}
-                  </div>
-                  <StatusBadge status={p.status ?? "completed"} />
-                </div>
               </div>
             ))
           )}
@@ -1312,7 +1284,8 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
 
   const memberships = data.memberships ?? [];
   const nativeMemberships = data.nativeMemberships ?? [];
-  const lmsCourseOrders = data.lmsCourseOrders ?? [];
+  // Only show subscription-type orders here; one-time purchases appear in Transactions
+  const lmsCourseOrders = (data.lmsCourseOrders ?? []).filter((o: any) => !!o.stripeSubscriptionId);
 
   // Group app memberships by brand
   const byBrand: Record<string, typeof memberships> = {};
@@ -1408,10 +1381,10 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
 
       </div>
 
-      {/* ── LMS Course Orders Section ── */}
+      {/* ── LMS Content Subscriptions Section ── */}
       <div>
-        <SectionHeader title={`Course Orders (${lmsCourseOrders.length})`} />
-        <p className="text-xs text-gray-400 mb-3">LMS course purchases and subscriptions</p>
+        <SectionHeader title={`Content Subscriptions (${lmsCourseOrders.length})`} />
+        <p className="text-xs text-gray-400 mb-3">Active LMS course and quiz subscriptions (one-time purchases appear in Transactions)</p>
         {lmsCourseOrders.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">No course orders found.</p>
         ) : (
@@ -1751,7 +1724,6 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
   const [page, setPage] = useState(1);
   const { data, isLoading } = trpc.productAnalytics.getUserTransactions.useQuery({ userId, page, pageSize: 50 });
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
-  const [activeSection, setActiveSection] = useState<"stripe" | "purchases">("stripe");
 
   const fmtCurrency = (cents: number, currency = "usd") =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
@@ -1761,7 +1733,7 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
   const STATUS_COLORS: Record<string, string> = {
     paid: "bg-green-100 text-green-700", pending: "bg-yellow-100 text-yellow-700",
     refunded: "bg-gray-100 text-gray-600", failed: "bg-red-100 text-red-700",
-    completed: "bg-green-100 text-green-700",
+    completed: "bg-green-100 text-green-700", fulfilled: "bg-green-100 text-green-700",
   };
 
   const refundPayment = trpc.adminUser.refundPayment.useMutation({
@@ -1769,31 +1741,10 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
     onError: (e) => toast.error(e.message),
   });
 
-  const funnelPurchases = userData?.funnelPurchases ?? [];
-
   return (
     <div className="space-y-4">
-      {/* Section toggle */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setActiveSection("stripe")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeSection === "stripe" ? "bg-[#189aa1] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Stripe Transactions ({data?.total ?? 0})
-        </button>
-        <button
-          onClick={() => setActiveSection("purchases")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeSection === "purchases" ? "bg-[#189aa1] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Checkout Purchases ({funnelPurchases.length})
-        </button>
-      </div>
-
-      {activeSection === "stripe" && (<>
+      {/* Unified transactions list */}
+      {(<>
       {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
@@ -1825,19 +1776,25 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Product</th>
                 <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Date</th>
                 <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Amount</th>
-                <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-600">Status</th>
+                <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Status</th>
+                <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
-                <tr><td colSpan={4} className="text-center py-8 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin inline mr-2" />Loading…</td></tr>
+                <tr><td colSpan={5} className="text-center py-8 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin inline mr-2" />Loading…</td></tr>
               ) : (data?.transactions ?? []).length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-8 text-gray-400">No transactions found</td></tr>
+                <tr><td colSpan={5} className="text-center py-8 text-gray-400">No transactions found</td></tr>
               ) : (data?.transactions ?? []).map((t: any, i: number) => (
                 <tr key={`${t.sourceTable}-${t.transactionId}-${i}`} className="hover:bg-gray-50">
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-gray-900 text-sm">{t.productName}</div>
-                    <div className="text-xs text-gray-400 capitalize">{t.productType}</div>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-xs text-gray-400 capitalize">{t.productType}</span>
+                      {t.orderType === "subscription" && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-purple-50 text-purple-600 border border-purple-100">subscription</span>
+                      )}
+                    </div>
                     {t.stripePaymentIntentId && (
                       <div className="text-xs text-gray-300 font-mono mt-0.5 truncate max-w-[200px]">{t.stripePaymentIntentId}</div>
                     )}
@@ -1846,10 +1803,20 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
                   <td className="px-3 py-2.5 text-right font-semibold text-gray-900 text-sm whitespace-nowrap">
                     {fmtCurrency(t.amountPaid, t.currency)}
                   </td>
-                  <td className="px-4 py-2.5 text-right">
+                  <td className="px-3 py-2.5 text-right">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] ?? "bg-gray-100 text-gray-600"}`}>
                       {t.status}
                     </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    {t.stripePaymentIntentId && t.status !== "refunded" && (
+                      <button
+                        onClick={() => setRefundOpen({ piId: t.stripePaymentIntentId })}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                      >
+                        Refund
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -1875,44 +1842,6 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
         )}
       </div>
       </>)}
-
-      {activeSection === "purchases" && (
-        <div className="space-y-3">
-          <SectionHeader title={`Checkout Purchases (${funnelPurchases.length})`} />
-          {funnelPurchases.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No checkout purchases.</p>
-          ) : (
-            funnelPurchases.map((p: any) => (
-              <div key={p.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">{p.productName}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {fmtDate(p.purchasedAt ?? p.createdAt)} · {fmtCurrency(p.amountPaid ?? 0, p.currency ?? "usd")}
-                    </p>
-                    {p.stripePaymentIntentId && (
-                      <p className="text-xs text-gray-400 mt-0.5 font-mono">{p.stripePaymentIntentId}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status] ?? "bg-gray-100 text-gray-600"}`}>
-                      {p.status ?? "completed"}
-                    </span>
-                    {p.stripePaymentIntentId && p.status !== "refunded" && (
-                      <button
-                        onClick={() => setRefundOpen({ piId: p.stripePaymentIntentId, purchaseId: p.id })}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                      >
-                        <DollarSign className="w-3 h-3" /> Refund
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
 
       {/* Refund dialog */}
       {refundOpen && (

@@ -1360,6 +1360,8 @@ export default function CourseLanding() {
         )}
         {EnrollmentCountdownBanner}
         {blocks.map(block => {
+          // Hide pricing options blocks if hidePricingOptions is set
+          if (course?.hidePricingOptions && (block.type === "pricing_options_auto" || block.type === "pricing_cards")) return null;
           // Full-bleed block types must never be wrapped in a contentWidth constraint at the outer level.
           const FULL_BLEED_TYPES_CL = ["hero", "pricing_cta", "cta_standalone", "divider", "spacer", "footer", "logo_strip", "urgency_offer", "product_offer_stack", "price_stack", "image_content"];
           const isFullBleedCL = FULL_BLEED_TYPES_CL.includes(block.type);

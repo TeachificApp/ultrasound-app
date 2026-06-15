@@ -165,7 +165,7 @@ export default function CommunitySalesPageBuilder() {
   const deleteBlockTpl = trpc.blockTemplates.delete.useMutation({ onSuccess: () => { toast.success("Template deleted"); } });
 
   const selectedBlock = blocks.find(b => b.id === selectedId) ?? null;
-  const backPath = "/admin/community";
+  const backPath = `/admin/community?editCommunity=${numericId}`;
   const previewPath = pageInfo?.slug ? `/community/${pageInfo.slug}` : null;
 
   return (
