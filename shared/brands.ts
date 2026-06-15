@@ -36,11 +36,14 @@ export function detectBrandFromHostname(hostname: string): Brand {
 }
 
 /** Detect the brand mode from hostname (for visual branding/messaging) */
-export function detectBrandMode(hostname: string): BrandMode {
+export function detectBrandMode(hostname: string, defaultBrand: Brand = "aaus"): BrandMode {
   const h = hostname.toLowerCase();
   if (h.includes("iheartecho")) return "iheartecho";
   if (h.includes("learn.") || h.includes("members.") || h.includes("member.")) return "combined";
-  return "aaus";
+  // For known AAUS domains, always return "aaus"
+  if (h.includes("allaboutultrasound") || h.includes("aaus")) return "aaus";
+  // For ambiguous domains (dev URLs, generic custom domains), use the configured default
+  return defaultBrand;
 }
 
 /** Brand display config for emails and UI */

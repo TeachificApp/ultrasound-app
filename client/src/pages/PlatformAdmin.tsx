@@ -1122,6 +1122,71 @@ function PublishDomainPanel() {
   );
 }
 
+// ─── Default Brand Settings Panel ──────────────────────────────────────────
+function DefaultBrandPanel() {
+  const { data: settings, isLoading, refetch } = trpc.lmsGroup.getPlatformSettings.useQuery();
+  const [defaultBrand, setDefaultBrand] = useState<"aaus" | "iheartecho">("aaus");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setDefaultBrand((settings.defaultBrand as "aaus" | "iheartecho") ?? "aaus");
+      setDirty(false);
+    }
+  }, [settings]);
+
+  const updateSettings = trpc.lmsGroup.updatePlatformSettings.useMutation({
+    onSuccess: () => { toast.success("Default brand saved."); setDirty(false); refetch(); },
+    onError: (e: { message: string }) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="mb-6 border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+          <Globe className="w-4 h-4 text-teal-600" />
+          Default Brand
+        </CardTitle>
+        <p className="text-xs text-gray-500 mt-1">
+          When a request comes from a domain that doesn't match any known brand (e.g. the Manus dev URL or a generic custom domain),
+          this brand is used as the fallback for data scoping and email templates.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-4">
+        {isLoading ? (
+          <div className="h-16 bg-gray-50 rounded-lg animate-pulse" />
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-gray-700">Fallback Brand</Label>
+              <Select value={defaultBrand} onValueChange={(v) => { setDefaultBrand(v as "aaus" | "iheartecho"); setDirty(true); }}>
+                <SelectTrigger className="text-sm max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="aaus">All About Ultrasound (AAUS)</SelectItem>
+                  <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-400">This only affects requests from ambiguous domains. Explicit brand domains (allaboutultrasound.com, iheartecho.com) always take priority.</p>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                onClick={() => updateSettings.mutate({ defaultBrand })}
+                disabled={!dirty || updateSettings.isPending}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                size="sm"
+              >
+                {updateSettings.isPending ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Tool Card Types ─────────────────────────────────────────────────────────
 
 type ToolCard = {
@@ -2192,8 +2257,14 @@ export default function PlatformAdmin() {
         {/* Domain Management */}
         <DomainManagementPanel />
 
-        {/* Enrollment Email Settings — Publish Domain Settings moved to LMS Admin → Settings → Publish Domains */}
+        {/* Enrollment Email Settings */}
         <EnrollmentEmailSettingsPanel />
+
+        {/* Publish Domain Settings */}
+        <PublishDomainPanel />
+
+        {/* Default Brand Fallback */}
+        <DefaultBrandPanel />
 
         {/* DIY Organizations */}
         <DIYOrgsPanel />

@@ -3089,7 +3089,7 @@ export const lmsGroupRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [settings] = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
-    const raw = settings ?? { id: 1, enrollmentEmailEnabled: true, enrollmentEmailSubject: null, enrollmentEmailIntro: null, customDomains: null };
+    const raw = settings ?? { id: 1, enrollmentEmailEnabled: true, enrollmentEmailSubject: null, enrollmentEmailIntro: null, customDomains: null, defaultBrand: "aaus" as string | null };
     return {
       ...raw,
       customDomainsList: raw.customDomains ? (JSON.parse(raw.customDomains) as string[]) : [],
@@ -3109,6 +3109,7 @@ export const lmsGroupRouter = router({
       formPublishDomain: z.string().max(255).nullable().optional(),
       termsUrl: z.string().max(2048).nullable().optional(),
       privacyUrl: z.string().max(2048).nullable().optional(),
+      defaultBrand: z.enum(["aaus", "iheartecho"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -3118,6 +3119,11 @@ export const lmsGroupRouter = router({
       for (const [k, v] of Object.entries(input)) { if (v !== undefined) updates[k] = v; }
       if (Object.keys(updates).length > 0) {
         await db.update(platformSettings).set(updates).where(eq(platformSettings.id, 1));
+      }
+      // Invalidate brand cache if defaultBrand was updated
+      if (input.defaultBrand !== undefined) {
+        const { invalidateDefaultBrandCache } = await import("../_core/context");
+        invalidateDefaultBrandCache();
       }
       return { success: true };
     }),

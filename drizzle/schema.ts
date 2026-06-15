@@ -4062,6 +4062,10 @@ export const platformSettings = mysqlTable("platform_settings", {
   scormHealthSnapshot: text("scorm_health_snapshot"),
   /** Optional override for SCORM health alert emails (else owner / SCORM_HEALTH_ALERT_EMAIL env) */
   scormHealthAlertEmail: varchar("scorm_health_alert_email", { length: 320 }),
+  // ── Default brand for ambiguous domains ──
+  // When a request hostname doesn't match any known brand domain, use this brand as fallback.
+  // Valid values: 'aaus' | 'iheartecho' (defaults to 'aaus' if not set)
+  defaultBrand: varchar("default_brand", { length: 32 }).default("aaus"),
   // ── Future platform-wide toggles go here ──
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

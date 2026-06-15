@@ -23,11 +23,44 @@ export type TrpcContext = {
   realAdminId: number | null;
 };
 
-/** Detect brand from request hostname */
-function detectBrand(hostname: string): Brand {
+// ─── Default brand cache (5-minute TTL) ──────────────────────────────────────
+// Avoids a DB query on every request while still respecting admin changes.
+let _defaultBrandCache: Brand = "aaus";
+let _defaultBrandCacheAt = 0;
+const DEFAULT_BRAND_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getDefaultBrand(): Promise<Brand> {
+  const now = Date.now();
+  if (now - _defaultBrandCacheAt < DEFAULT_BRAND_TTL_MS) return _defaultBrandCache;
+  try {
+    const { getDb } = await import("../db");
+    const { platformSettings } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const db = await getDb();
+    if (db) {
+      const [row] = await db.select({ defaultBrand: platformSettings.defaultBrand })
+        .from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+      if (row?.defaultBrand === "iheartecho") _defaultBrandCache = "iheartecho";
+      else _defaultBrandCache = "aaus";
+    }
+  } catch {
+    // DB unavailable — keep existing cache value
+  }
+  _defaultBrandCacheAt = now;
+  return _defaultBrandCache;
+}
+
+/** Invalidate the default brand cache (call after updatePlatformSettings) */
+export function invalidateDefaultBrandCache(): void {
+  _defaultBrandCacheAt = 0;
+}
+
+/** Detect brand from request hostname, with DB-stored default as fallback */
+function detectBrand(hostname: string, defaultBrand: Brand): Brand {
   const h = hostname.toLowerCase();
   if (h.includes("iheartecho")) return "iheartecho";
-  return "aaus";
+  if (h.includes("allaboutultrasound") || h.includes("aaus")) return "aaus";
+  return defaultBrand;
 }
 
 export async function createContext(
@@ -105,8 +138,9 @@ export async function createContext(
       || opts.req.headers.host
       || opts.req.hostname
       || "";
-    brand = detectBrand(hostname);
-    brandMode = detectBrandMode(hostname);
+    const defaultBrand = await getDefaultBrand();
+    brand = detectBrand(hostname, defaultBrand);
+    brandMode = detectBrandMode(hostname, defaultBrand);
   }
 
   return {
