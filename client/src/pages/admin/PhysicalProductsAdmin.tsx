@@ -17,7 +17,7 @@ import {
   Plus, Pencil, Trash2, Copy, Upload, ShoppingBag, ArrowLeft,
   ExternalLink, Eye, Image as ImageIcon, Link as LinkIcon,
   Users, UserPlus, Loader2, Package, BarChart2, Settings,
-  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow,
+  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow, Search,
 } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
@@ -53,19 +53,37 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
     onError: (e) => toast.error(e.message),
   });
   const [showCreate, setShowCreate] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
 
+  const allProducts = products ?? [];
+  const filteredProducts = searchQuery.trim()
+    ? allProducts.filter(p => p.title?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : allProducts;
+
   return (
     <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search products..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
+        />
+      </div>
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Physical Products</h3>
+        <h3 className="text-lg font-semibold">Physical Products {searchQuery && <span className="text-sm font-normal text-gray-500">({filteredProducts.length} results)</span>}</h3>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="w-4 h-4 mr-1" /> New Product
         </Button>
       </div>
 
-      {(!products || products.length === 0) ? (
+      {filteredProducts.length === 0 && allProducts.length > 0 ? (
+        <div className="text-center py-8 text-gray-400 text-sm">No products match "{searchQuery}"</div>
+      ) : (!allProducts || allProducts.length === 0) ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
             <ShoppingBag className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
@@ -77,7 +95,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {products.map((p) => (
+          {filteredProducts.map((p) => (
             <Card key={p.id} className="hover:border-teal-500/50 transition-colors">
               <CardContent className="p-4 flex items-center gap-4">
                 {p.thumbnailUrl ? (

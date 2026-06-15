@@ -386,7 +386,8 @@ function AudioPlayerInner({
   );
 
   return (
-    <div className="px-8 py-6">
+    <div className="py-6" style={{ backgroundColor: bgColor }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
       <div
         className="mx-auto max-w-2xl rounded-xl p-4 shadow-sm border border-gray-100"
         style={{ backgroundColor: bgColor }}
@@ -497,6 +498,7 @@ function AudioPlayerInner({
         </div>
 
         {caption && <p className="text-xs text-gray-500 mt-2">{caption}</p>}
+      </div>
       </div>
     </div>
   );

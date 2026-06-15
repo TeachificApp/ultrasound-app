@@ -71,7 +71,7 @@ function ProductCountdownTimer({ mode, durationMinutes, targetDate, headline, te
     ? [["Days", time.days], ["Hours", time.hours], ["Mins", time.mins], ["Secs", time.secs]]
     : [["Hours", time.hours], ["Mins", time.mins], ["Secs", time.secs]];
   return (
-    <div className="px-8 py-10 text-center" style={{ backgroundColor: bgColor }}>
+    <div className="py-10 text-center" style={{ backgroundColor: bgColor }}>
       {headline && <h2 className="text-2xl font-bold mb-6" style={{ color: textColor }} dangerouslySetInnerHTML={{ __html: headline }} />}
       <div className="flex justify-center gap-4">
         {units.map(([label, val]) => (
@@ -84,6 +84,11 @@ function ProductCountdownTimer({ mode, durationMinutes, targetDate, headline, te
     </div>
   );
 }
+
+/** Content container: backgrounds bleed full-width, content constrained to max-w-5xl. */
+const CC = ({ children, className = "", ...rest }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${className}`.trim()} {...rest}>{children}</div>
+);
 
 // ─── Block Renderer ───────────────────────────────────────────────────────────
 function RenderBlock({ block, onBuy, buying, price, slug }: {
@@ -166,8 +171,8 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
     }
     case "text":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#1a1a1a", textAlign: (d.align ?? "left") as any }}>
-          <div className="max-w-3xl mx-auto prose prose-gray max-w-none" dangerouslySetInnerHTML={{ __html: d.html ?? d.content ?? "" }} />
+        <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#1a1a1a" }}>
+          <CC style={{ textAlign: (d.align ?? "left") as any }}><div className="prose prose-gray" dangerouslySetInnerHTML={{ __html: d.html ?? d.content ?? "" }} /></CC>
         </div>
       );
     case "image": {
@@ -177,16 +182,18 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
       const imgStylePL: React.CSSProperties = { maxWidth: mwPL === "auto" ? "100%" : mwPL, width: mwPL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
       const imgElPL = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStylePL} /> : null;
       return imgElPL ? (
-        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#ffffff", display: "flex", flexDirection: "column", alignItems: imgJustifyPL }}>
-          <ImageLinkWrapper d={d}>{imgElPL}</ImageLinkWrapper>
-          {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignPL as any }}>{d.caption}</p>}
+        <div className="py-6" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <CC style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyPL }}>
+            <ImageLinkWrapper d={d}>{imgElPL}</ImageLinkWrapper>
+            {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignPL as any }}>{d.caption}</p>}
+          </CC>
         </div>
       ) : null;
     }
     case "bullets":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
-          <div className="max-w-3xl mx-auto">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          <CC>
             {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <ul className="space-y-3">
               {(d.items ?? []).map((item: string, i: number) => (
@@ -196,36 +203,39 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
                 </li>
               ))}
             </ul>
-          </div>
+          </CC>
         </div>
       );
     case "pricing_cta":
       return (
-        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          {d.showPrice && <div className="text-3xl font-bold text-teal-700 mb-4">{price}</div>}
-          <button onClick={onBuy} disabled={buying}
-            className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
-            style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
-            {buying ? "Processing…" : (d.ctaText ?? "Buy Now")}
-          </button>
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <CC className="text-center">
+            {d.headline && <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+            {d.showPrice && <div className="text-3xl font-bold text-teal-700 mb-4">{price}</div>}
+            <button onClick={onBuy} disabled={buying}
+              className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+              style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+              {buying ? "Processing…" : (d.ctaText ?? "Buy Now")}
+            </button>
+          </CC>
         </div>
       );
     case "two_col":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8 items-center">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <CC><div className="grid md:grid-cols-2 gap-8 items-center">
             <div className="prose prose-gray max-w-none" dangerouslySetInnerHTML={{ __html: d.leftContent ?? "" }} />
             <div className="prose prose-gray max-w-none" dangerouslySetInnerHTML={{ __html: d.rightContent ?? "" }} />
-          </div>
+          </div></CC>
         </div>
       );
     case "testimonials":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+          <CC>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {(d.items ?? []).map((t: any, i: number) => (
               <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
                 <p className="text-gray-700 italic mb-4">"{t.quote}"</p>
@@ -234,6 +244,7 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
               </div>
             ))}
           </div>
+          </CC>
         </div>
       );
     case "countdown": {
@@ -243,7 +254,7 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
     case "cta_standalone": {
       const isDirectCheckout = d.ctaBehavior === "direct_checkout";
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: (d.align ?? "center") as any }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}><CC style={{ textAlign: (d.align ?? "center") as any }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -267,7 +278,7 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
           {(d.showOptOut || d.optOutEnabled) && d.optOutText && (
             <div className="mt-3"><a href={d.optOutUrl || d.optOutCustomUrl || "#"} className="text-xs text-gray-400 underline hover:text-gray-600">{d.optOutText}</a></div>
           )}
-        </div>
+        </CC></div>
       );
     }
     case "divider":
@@ -277,7 +288,7 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
     case "footer": {
       const footerLinks: Array<{ text: string; url: string }> = d.links ?? [];
       return (
-        <footer style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }} className="px-6 py-8">
+        <footer style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }} className="py-8">
           {d.logoUrl && <div className="flex justify-center mb-4"><img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" /></div>}
           {footerLinks.length > 0 && <div className="flex flex-wrap justify-center gap-4 mb-4">{footerLinks.map((l, i) => <a key={i} href={l.url} className="text-sm opacity-80 hover:opacity-100 underline" style={{ color: d.textColor ?? "#ffffff" }}>{l.text}</a>)}</div>}
           <p className="text-xs text-center opacity-60">{d.copyrightText ?? `© ${new Date().getFullYear()} All rights reserved.`}</p>

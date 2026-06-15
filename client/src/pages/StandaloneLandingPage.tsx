@@ -405,8 +405,8 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
       );
     case "bullets":
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor || "#f8fffe" }}>
-          <div className="max-w-3xl mx-auto">
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor || "#f8fffe" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6">
             {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
             <ul className="space-y-3">{(d.items || []).map((item: string, i: number) => (<li key={i} className="flex items-start gap-3"><CheckCircle size={20} style={{ color: d.iconColor || "#179ca3" }} className="flex-shrink-0 mt-0.5" /><span className="text-gray-700">{item}</span></li>))}</ul>
           </div>
@@ -421,8 +421,8 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
     default:
       // For blocks we haven't explicitly handled, render a placeholder
       return (
-        <div className="px-4 sm:px-8 py-4 sm:py-6">
-          <div className="max-w-4xl mx-auto text-center text-gray-400 text-sm">
+        <div className="py-4 sm:py-6">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center text-gray-400 text-sm">
             Block type: {block.type}
           </div>
         </div>

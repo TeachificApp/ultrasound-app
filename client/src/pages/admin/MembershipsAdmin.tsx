@@ -125,6 +125,7 @@ export default function MembershipsAdmin({ initialEditId }: { initialEditId?: nu
   const [newStripePriceId, setNewStripePriceId] = useState("");
   const [syncResults, setSyncResults] = useState<null | { total: number; created: number; skipped: number; errors: number; results: Array<{ action: string; message: string; sourceTitle?: string; stripePriceId?: string }> }>(null);
   const [showSyncResults, setShowSyncResults] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: plans, refetch } = trpc.membership.listAll.useQuery();
   const createMutation = trpc.membership.create.useMutation({
@@ -260,6 +261,19 @@ export default function MembershipsAdmin({ initialEditId }: { initialEditId?: nu
         </DialogContent>
       </Dialog>
 
+      {/* Search */}
+      {plans && plans.length > 0 && (
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search memberships..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
+          />
+        </div>
+      )}
       {/* Plans list */}
       {!plans || plans.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
@@ -267,9 +281,15 @@ export default function MembershipsAdmin({ initialEditId }: { initialEditId?: nu
           <p className="font-medium">No memberships yet</p>
           <p className="text-sm mt-1">Create your first membership tier above.</p>
         </div>
-      ) : (
+      ) : (() => {
+        const filteredPlans = searchQuery.trim()
+          ? plans.filter(p => p.title?.toLowerCase().includes(searchQuery.toLowerCase()))
+          : plans;
+        return filteredPlans.length === 0 ? (
+          <div className="text-center py-8 text-gray-400 text-sm">No memberships match "{searchQuery}"</div>
+        ) : (
         <div className="space-y-3">
-          {plans.map((plan) => (
+          {filteredPlans.map((plan) => (
             <div
               key={plan.id}
               className="bg-white border border-gray-200 rounded-lg p-4 flex items-center gap-4 hover:border-teal-300 transition-colors"
@@ -350,7 +370,8 @@ export default function MembershipsAdmin({ initialEditId }: { initialEditId?: nu
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

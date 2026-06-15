@@ -153,8 +153,8 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
     }
     case "text":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}>
-          <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
+        <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a" }}>
+          <CC style={{ textAlign: d.align ?? "left" }}><div className="prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} /></CC>
         </div>
       );
     case "image": {
@@ -164,10 +164,10 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       const imgStyleDL: React.CSSProperties = { maxWidth: mwDL === "auto" ? "100%" : mwDL, width: mwDL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
       const imgElDL = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyleDL} /> : null;
       return (
-        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyDL }}>
+        <div className="py-6"><CC style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyDL }}>
           {imgElDL && <ImageLinkWrapper d={d}>{imgElDL}</ImageLinkWrapper>}
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignDL as any }}>{d.caption}</p>}
-        </div>
+        </CC></div>
       );
     }
     case "video": {
@@ -180,19 +180,19 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       }
       const resolvedVidUrl = injectUserParams(embedUrl, user);
       return (
-        <div className="px-8 py-6 max-w-4xl mx-auto">
+        <div className="py-6"><CC>
           {resolvedVidUrl && (
             <div className="relative w-full overflow-hidden shadow" style={{ paddingBottom: d.height ? undefined : "56.25%", height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }}>
               <iframe src={resolvedVidUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
             </div>
           )}
-        </div>
+        </CC></div>
       );
     }
     case "bullets":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
-          <div className="max-w-3xl mx-auto">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          <CC>
             {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {(d.items ?? []).map((item: string, i: number) => (
@@ -202,13 +202,13 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                 </div>
               ))}
             </div>
-          </div>
+          </CC>
         </div>
       );
     case "numbered_list":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-2xl mx-auto">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC>
             {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
             {!d.subHeading && d.headline && <div className="mb-6" />}
@@ -220,13 +220,13 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                 </div>
               ))}
             </div>
-          </div>
+          </CC>
         </div>
       );
     case "checklist":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-2xl mx-auto">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC>
             {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
             {!d.subHeading && d.headline && <div className="mb-6" />}
@@ -238,13 +238,13 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                 </div>
               ))}
             </div>
-          </div>
+          </CC>
         </div>
       );
     case "testimonial":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f0fdfa" }}>
-          <div className="max-w-2xl mx-auto text-center">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#f0fdfa" }}>
+          <CC><div className="text-center">
             <blockquote className="text-xl italic text-gray-700 mb-4">"{d.quote}"</blockquote>
             {(d.rating ?? 0) > 0 && (
               <div className="flex items-center justify-center gap-0.5 mb-4">
@@ -258,12 +258,12 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                 {d.role && <p className="text-sm text-gray-500">{d.role}</p>}
               </div>
             </div>
-          </div>
+          </div></CC>
         </div>
       );
     case "pricing_cta":
       return (
-        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC className="text-center">
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {/* Price above button */}
@@ -296,7 +296,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
             </div>
           )}
           <ButtonSubtext d={d} />
-        </div>
+        </CC></div>
       );
     case "funnel_workflow":
       return <FunnelWorkflowBlock data={d} />;
@@ -306,7 +306,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return <InlineOrderBumpBlock data={d} onPrimaryCta={onBuy} />;
     case "cta_standalone":
       return (
-        <div className="px-8 py-8" style={{ textAlign: d.align ?? "center" }}>
+        <div className="py-8"><CC style={{ textAlign: d.align ?? "center" }}>
           <button
             onClick={d.link ? () => { window.location.href = d.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
             disabled={buying}
@@ -316,12 +316,12 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
             {hasPurchased ? "Access Files" : (d.text ?? d.ctaText ?? "Buy Now")}
           </button>
           <ButtonSubtext d={d} />
-        </div>
+        </CC></div>
       );
     case "faq":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-3xl mx-auto">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC>
             {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="space-y-2">
               {(d.items ?? []).map((item: any, i: number) => (
@@ -336,21 +336,21 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                 </details>
               ))}
             </div>
-          </div>
+          </CC>
         </div>
       );
     case "alert": {
       const alertStyles: Record<string, string> = { info: "bg-blue-50 border-blue-300 text-blue-800", success: "bg-green-50 border-green-300 text-green-800", warning: "bg-yellow-50 border-yellow-300 text-yellow-800", error: "bg-red-50 border-red-300 text-red-800" };
       return (
-        <div className={`mx-8 my-4 px-5 py-4 rounded-lg border-l-4 flex items-start gap-3 ${alertStyles[d.type ?? "info"] ?? alertStyles.info}`}>
+        <div className="py-2"><CC><div className={`px-5 py-4 rounded-lg border-l-4 flex items-start gap-3 ${alertStyles[d.type ?? "info"] ?? alertStyles.info}`}>
           <p className="font-medium">{d.title && <strong>{d.title}: </strong>}{d.message}</p>
-        </div>
+        </div></CC></div>
       );
     }
     case "reviews":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-4xl mx-auto">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC>
             {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid md:grid-cols-2 gap-4">
               {(d.reviews ?? []).map((item: any, i: number) => (
@@ -363,13 +363,13 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                 </div>
               ))}
             </div>
-          </div>
+          </CC>
         </div>
       );
     case "icon_grid":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-4xl mx-auto">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC>
             {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
               {(d.items ?? []).map((item: any, i: number) => (
@@ -380,35 +380,35 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                 </div>
               ))}
             </div>
-          </div>
+          </CC>
         </div>
       );
     case "gallery":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="grid gap-4 max-w-4xl mx-auto" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
+        <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC><div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
             {(d.images ?? []).map((img: string, i: number) => (
               <div key={i} className="rounded-lg overflow-hidden shadow">
                 <img src={img} alt="" className="w-full h-40 object-cover" />
               </div>
             ))}
-          </div>
+          </div></CC>
         </div>
       );
     case "two_column":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-4xl mx-auto grid gap-8" style={{ gridTemplateColumns: `${d.leftRatio ?? 50}% 1fr` }}>
+        <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC><div className="grid gap-8" style={{ gridTemplateColumns: `${d.leftRatio ?? 50}% 1fr` }}>
             <div className="prose" dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
             <div className="prose" dangerouslySetInnerHTML={{ __html: d.rightHtml ?? "" }} />
-          </div>
+          </div></CC>
         </div>
       );
     case "divided_columns": {
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-5xl mx-auto grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
+        <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC><div className="grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
             ))}
@@ -418,8 +418,8 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
     }
     case "embed":
       return (
-        <div className="px-8 py-6">
-          <div className="max-w-4xl mx-auto">
+        <div className="py-6">
+          <CC>
             {d.embedCode ? (
               <iframe
                 srcDoc={injectUserParamsIntoHtml(d.embedCode, user)}
@@ -431,18 +431,18 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
               <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}>Embed placeholder</div>
             )}
             {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
-          </div>
+          </CC>
         </div>
       );
     case "three_column": {
       const divStyle3 = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: (d.dividerStyle ?? "solid") as any, borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC><div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
             <div className="prose prose-lg pr-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-lg px-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
             <div className="prose prose-lg pl-4" dangerouslySetInnerHTML={{ __html: d.col3Html ?? "" }} />
-          </div>
+          </div></CC>
         </div>
       );
     }
@@ -468,7 +468,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       const footerLinks: Array<{ text: string; url: string }> = d.links ?? [];
       const socialLinks = d.socialLinks ?? {};
       return (
-        <footer style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }} className="px-6 py-8">
+        <footer style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }} className="py-8">
           {d.logoUrl && <div className="flex justify-center mb-4"><img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" /></div>}
           {footerLinks.length > 0 && <div className="flex flex-wrap justify-center gap-4 mb-4">{footerLinks.map((l, i) => <a key={i} href={l.url} className="text-sm opacity-80 hover:opacity-100 underline" style={{ color: d.textColor ?? "#ffffff" }}>{l.text}</a>)}</div>}
           {d.showSocial && (socialLinks.facebook || socialLinks.instagram || socialLinks.youtube || socialLinks.linkedin) && (
@@ -489,7 +489,8 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return <RelatedProductsBlock data={d} currentSlug={slug} currentType="download" />;
     case "logos":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+          <CC>
           {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex flex-wrap items-center justify-center gap-8">
             {(d.logos ?? []).map((logo: any, i: number) => (
@@ -497,11 +498,12 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                 : <div key={i} className="h-10 w-24 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400">{logo.alt || "Logo"}</div>
             ))}
           </div>
+          </CC>
         </div>
       );
     case "countdown":
       return (
-        <div className="px-8 py-10 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3" }}>
+        <div className="py-10 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.textColor ?? "#fff" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <CountdownTimer mode={d.mode} durationMinutes={d.durationMinutes} targetDate={d.targetDate} textColor={d.textColor ?? "#fff"} />
         </div>
@@ -529,9 +531,10 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return <CountdownV2Block data={d} />;
     case "flip_cards":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          <CC>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {(d.cards ?? []).map((card: any, i: number) => (
               <div key={i} className="rounded-xl overflow-hidden shadow-sm border border-gray-200">
                 <div className="p-5 font-semibold text-white text-center" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{card.front}</div>
@@ -539,22 +542,23 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
               </div>
             ))}
           </div>
+          </CC>
         </div>
       );
     case "lead_capture":
       return (
-        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}>
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}><CC className="text-center">
           {d.headline && <h2 className="text-2xl font-bold mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="opacity-90 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <div className="flex max-w-md mx-auto gap-2">
             <input type="email" placeholder="Your email address" className="flex-1 px-4 py-3 rounded-lg text-gray-900 border-0 focus:ring-2 focus:ring-white/50" />
             <button className="px-6 py-3 bg-white font-semibold rounded-lg" style={{ color: d.bgColor ?? "#179ca3" }}>{d.ctaText ?? "Send Me Access"}</button>
           </div>
-        </div>
+        </CC></div>
       );
     case "urgency_offer":
       return (
-        <div className="px-8 py-8 text-center" style={{ backgroundColor: d.bgColor ?? "#fff7ed" }}>
+        <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#fff7ed" }}><CC className="text-center">
           {d.headline && <h2 className="text-2xl font-bold mb-3" style={{ color: d.headlineColor ?? "#92400e" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="mb-4" style={{ color: d.textColor ?? "#78350f" }} dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {d.ctaText && (
@@ -568,9 +572,10 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       );
     case "price_stack":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+          <CC>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+          <div className="flex flex-col gap-4">
             {(d.items ?? []).map((item: any, i: number) => (
               <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
                 <div>
@@ -590,6 +595,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
               </div>
             )}
           </div>
+          </CC>
         </div>
       );
     case "checkout_form":
@@ -601,7 +607,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       // These blocks are course/LMS-specific; render a generic CTA for download pages
       const _hAlign = d.headlineAlign ?? "left";
       return (
-        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC className="text-center">
           {d.headline && <h2 className={`text-2xl font-bold text-gray-900 mb-3 ${_hAlign === "center" ? "text-center" : _hAlign === "right" ? "text-right" : "text-left"}`} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <button onClick={onBuy} disabled={buying}
@@ -612,7 +618,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
         </div>
       );
     case "carousel":
-      return <div className="px-4 py-4"><CarouselBlock data={d} /></div>;
+      return <div className="py-4"><CC><CarouselBlock data={d} /></CC></div>;
     default:
       return null;
   }
@@ -636,8 +642,8 @@ function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
 
   if (layout === "centered") {
     return (
-      <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-        <div className="max-w-2xl mx-auto text-center">
+      <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+        <CC><div className="text-center">
           {avatarUrl
             ? <img src={avatarUrl} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100 shadow-md" />
             : <div className="w-28 h-28 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4"><Users size={40} className="text-teal-600" /></div>}
@@ -649,14 +655,14 @@ function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
               <Globe size={14} /> {website.replace(/^https?:\/\//, "")}
             </a>
           )}
-        </div>
+        </div></CC>
       </div>
     );
   }
 
   return (
-    <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-      <div className="max-w-3xl mx-auto flex flex-col md:flex-row gap-6 items-start">
+    <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+      <CC><div className="flex flex-col md:flex-row gap-6 items-start">
         <div className="flex-shrink-0">
           {avatarUrl
             ? <img src={avatarUrl} alt={name} className="w-24 h-24 rounded-full object-cover border-4 border-teal-100 shadow-md" />
@@ -672,7 +678,7 @@ function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
             </a>
           )}
         </div>
-      </div>
+      </div></CC>
     </div>
   );
 }

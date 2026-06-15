@@ -186,8 +186,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
     }
     case "text":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}>
-          <div className="max-w-4xl mx-auto prose prose-lg" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="prose prose-lg" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} /></div>
         </div>
       );
     case "image": {
@@ -197,9 +197,11 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       const imgStyleF: React.CSSProperties = { maxWidth: mwF === "auto" ? "100%" : mwF, width: mwF === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
       const imgElF = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow-md" : ""} style={imgStyleF} /> : null;
       return (
-        <div className="px-8 py-8" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyF }}>
+        <div className="py-8" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyF }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 w-full" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyF }}>
           {imgElF && <ImageLinkWrapper d={d}>{imgElF}</ImageLinkWrapper>}
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignF as any }}>{d.caption}</p>}
+          </div>
         </div>
       );
     }
@@ -212,7 +214,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       const trimmedVidUrl = resolvedVidUrl ? applyVideoTrim(resolvedVidUrl, vidTrimStart, vidTrimEnd) : "";
       const vidContainerStyle: React.CSSProperties = { paddingBottom: d.height ? undefined : (isDirectVid ? undefined : "56.25%"), height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
-        <div className="px-8 py-8">
+        <div className="py-8">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="mx-auto" style={{ maxWidth: d.maxWidth ?? "56rem" }}>
             {resolvedVidUrl && (
               isDirectVid ? (
@@ -240,13 +243,14 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
             )}
             {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
           </div>
+          </div>
         </div>
       );
     }
     case "bullets":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
-          <div className="max-w-4xl mx-auto">
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6">
             {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <ul className="space-y-3">
               {(d.items ?? []).map((item: string | { text?: string; crossed?: boolean }, i: number) => {
@@ -265,8 +269,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       );
     case "testimonial":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}>
-          <div className="max-w-3xl mx-auto text-center">
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-3xl mx-auto text-center">
             <div className="text-4xl mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>"</div>
             <blockquote className="text-xl italic text-gray-700 mb-4">{d.quote}</blockquote>
             {(d.rating ?? 0) > 0 && (
@@ -275,13 +279,13 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
               </div>
             )}
             <p className="font-semibold text-gray-900">— {d.author}</p>
-          </div>
+          </div></div>
         </div>
       );
     case "reviews":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-4xl mx-auto">
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6">
             {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {(d.reviews ?? []).map((review: any, i: number) => (
@@ -313,8 +317,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
     }
     case "faq":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-3xl mx-auto">
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-3xl mx-auto">
             {d.headline && <h2 className="text-2xl font-bold mb-8 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="space-y-4">
               {(d.items ?? []).map((item: { q: string; a: string }, i: number) => (
@@ -327,7 +331,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
                 </details>
               ))}
             </div>
-          </div>
+          </div></div>
         </div>
       );
     case "countdown":
@@ -373,8 +377,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
     case "three_column": {
       const divStyle3 = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: (d.dividerStyle ?? "solid") as any, borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
             <div className="prose prose-lg pr-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-lg px-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
             <div className="prose prose-lg pl-4" dangerouslySetInnerHTML={{ __html: d.col3Html ?? "" }} />
@@ -398,8 +402,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
         }
       };
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-8">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row gap-8">
             <div style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
             <div style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderCol("right")}</div>
           </div>
@@ -412,8 +416,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       return <RelatedProductsBlock data={d} />;
     case "alert":
       return (
-        <div className="px-8 py-4">
-          <div className="max-w-4xl mx-auto">
+        <div className="py-4">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6">
             <div className={`flex items-center gap-3 p-4 rounded-lg border ${
               d.alertType === "warning" ? "bg-amber-50 border-amber-200 text-amber-800" :
               d.alertType === "error" ? "bg-red-50 border-red-200 text-red-800" :
@@ -428,8 +432,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       );
     case "icon_grid":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-4xl mx-auto">
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6">
             {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className={`grid gap-6 ${d.columns === 2 ? "grid-cols-1 md:grid-cols-2" : d.columns === 4 ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1 md:grid-cols-3"}`}>
               {(d.items ?? []).map((item: { icon: string; title: string; text: string }, i: number) => (
@@ -445,8 +449,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       );
     case "numbered_list":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-3xl mx-auto">
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-3xl mx-auto">
             {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
             {!d.subHeading && d.headline && <div className="mb-6" />}
@@ -463,13 +467,13 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
                 );
               })}
             </ol>
-          </div>
+          </div></div>
         </div>
       );
     case "checklist":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-3xl mx-auto">
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-3xl mx-auto">
             {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
             {!d.subHeading && d.headline && <div className="mb-6" />}
@@ -486,13 +490,13 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
                 );
               })}
             </ul>
-          </div>
+          </div></div>
         </div>
       );
     case "logos":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
-          <div className="max-w-4xl mx-auto text-center">
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
             {d.headline && <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="flex flex-wrap justify-center items-center gap-8">
               {(d.logos ?? []).map((logo: { url: string; alt: string }, i: number) => (
@@ -530,8 +534,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       );
     case "embed":
       return (
-        <div className="px-8 py-8">
-          <div className="max-w-4xl mx-auto">
+        <div className="py-8">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6">
             {d.embedCode ? (
               <iframe
                 srcDoc={injectUserParamsIntoHtml(d.embedCode, user)}
@@ -548,8 +552,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       );
     case "gallery":
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className={`max-w-5xl mx-auto grid gap-4 ${d.columns === 2 ? "grid-cols-2" : d.columns === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <div className={`max-w-5xl mx-auto px-4 sm:px-6 grid gap-4 ${d.columns === 2 ? "grid-cols-2" : d.columns === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
             {(d.images ?? []).map((img: { url: string; caption: string }, i: number) => (
               <div key={i}>
                 {img.url ? <img src={img.url} alt={img.caption} className="rounded-lg shadow-sm w-full" /> :
@@ -561,8 +565,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       );
     case "flip_cards":
       return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
-          <div className="max-w-4xl mx-auto">
+        <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6">
             {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {(d.cards ?? []).map((card: { front: string; back: string }, i: number) => (
@@ -690,22 +694,23 @@ function FunnelCurriculumBlock({ block }: { block: Block }) {
 
   if (!courseId) {
     return (
-      <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-        <p className="text-sm text-gray-400 text-center">No course selected. Edit this block to choose a course.</p>
+      <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6"><p className="text-sm text-gray-400 text-center">No course selected. Edit this block to choose a course.</p></div>
       </div>
     );
   }
 
   if (isLoading || !curriculum) {
     return (
-      <div className="px-8 py-10 flex justify-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+      <div className="py-10 flex justify-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
         <Loader2 className="animate-spin text-gray-400" size={24} />
       </div>
     );
   }
 
   return (
-    <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+    <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
       {d.headline && (
         <h2 className={`text-2xl font-bold mb-6 ${hAlign === "center" ? "text-center" : hAlign === "right" ? "text-right" : "text-left"}`} style={{ color: d.headlineColor ?? "#111827" }}
           dangerouslySetInnerHTML={{ __html: d.headline }} />
@@ -1075,8 +1080,8 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
   };
 
   return (
-    <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
-      <div className="max-w-3xl mx-auto">
+    <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-3xl mx-auto">
         <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
         {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
 
@@ -1087,7 +1092,7 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
         </a>
         <ButtonSubtext d={d} />
         <OptOutLink d={d} />
-      </div>
+      </div></div>
       {lcOpen && (
         <LeadCaptureModal
           open={true}
@@ -1169,8 +1174,8 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
   };
 
   return (
-    <div className="px-8 py-16" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-      <div className="max-w-2xl mx-auto text-center">
+    <div className="py-16" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-2xl mx-auto text-center">
         <h2 className="text-3xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
         {d.subtext && <p className="text-lg text-gray-600 mb-8" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
         {/* Price display */}
@@ -1205,7 +1210,7 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
         )}
         <ButtonSubtext d={d} />
         <OptOutLink d={d} />
-      </div>
+      </div></div>
       {lcOpen && (
         <LeadCaptureModal
           open={true}
@@ -1333,7 +1338,7 @@ function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Recor
 
   if (submitted && (data.btnBehavior ?? "none") === "none") {
     return (
-      <div className="px-8 py-16 text-center" style={lcWrapStyle}>
+      <div className="py-16 text-center" style={lcWrapStyle}>
         {lcBgType === "image" && data.bgImageUrl && data.bgOverlayColor && (
           <div style={{ position: "absolute", inset: 0, backgroundColor: data.bgOverlayColor, opacity: data.bgOverlayOpacity ?? 0.4, pointerEvents: "none" }} />
         )}
@@ -1347,11 +1352,11 @@ function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Recor
   }
 
   return (
-    <div className="px-8 py-16" style={lcWrapStyle}>
+    <div className="py-16" style={lcWrapStyle}>
       {lcBgType === "image" && data.bgImageUrl && data.bgOverlayColor && (
         <div style={{ position: "absolute", inset: 0, backgroundColor: data.bgOverlayColor, opacity: data.bgOverlayOpacity ?? 0.4, pointerEvents: "none" }} />
       )}
-      <div className="max-w-2xl mx-auto text-center relative">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-2xl mx-auto text-center relative">
         <h2 className="text-2xl font-bold mb-2">{data.headline ?? "Get Access"}</h2>
         {data.subtext && <p className="opacity-80 mb-6">{data.subtext}</p>}
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 items-stretch">
@@ -1385,7 +1390,7 @@ function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Recor
           </Button>
         </form>
         <p className="text-xs opacity-60 mt-3">We respect your privacy. Unsubscribe anytime.</p>
-      </div>
+      </div></div>
     </div>
   );
 }
@@ -1476,7 +1481,7 @@ function CtaOptinBlock({ data, funnelId, pageId, nextPageUrl }: { data: Record<s
   const showSuccess = submitted && (data.btnBehavior ?? "none") === "none" && !data.ctaLink;
   if (showSuccess) {
     return (
-      <div className="px-8 py-16 text-center" style={optinWrapStyle}>
+      <div className="py-16 text-center" style={optinWrapStyle}>
         {optinBgType === "image" && data.bgImageUrl && data.bgOverlayColor && (
           <div style={{ position: "absolute", inset: 0, backgroundColor: data.bgOverlayColor, opacity: data.bgOverlayOpacity ?? 0.4, pointerEvents: "none" }} />
         )}
@@ -1490,11 +1495,11 @@ function CtaOptinBlock({ data, funnelId, pageId, nextPageUrl }: { data: Record<s
   }
 
   return (
-    <div className="px-8 py-12" style={optinWrapStyle}>
+    <div className="py-12" style={optinWrapStyle}>
       {optinBgType === "image" && data.bgImageUrl && data.bgOverlayColor && (
         <div style={{ position: "absolute", inset: 0, backgroundColor: data.bgOverlayColor, opacity: data.bgOverlayOpacity ?? 0.4, pointerEvents: "none" }} />
       )}
-      <div className="max-w-sm mx-auto relative">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-sm mx-auto relative">
         {data.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: data.headline }} />}
         {data.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: data.subtext }} />}
         <form onSubmit={handleSubmit} className="space-y-3 mb-4">
@@ -1527,7 +1532,7 @@ function CtaOptinBlock({ data, funnelId, pageId, nextPageUrl }: { data: Record<s
         </form>
         <ButtonSubtext d={data} />
         <OptOutLink d={data} />
-      </div>
+      </div></div>
     </div>
   );
 }
@@ -1709,8 +1714,8 @@ function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
 
   if (layout === "centered") {
     return (
-      <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-        <div className="max-w-2xl mx-auto text-center">
+      <div className="py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-2xl mx-auto text-center">
           {avatarUrl
             ? <img src={avatarUrl} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100 shadow-md" />
             : <div className="w-28 h-28 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4"><Users size={40} className="text-teal-600" /></div>}
@@ -1723,13 +1728,13 @@ function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
             </a>
           )}
         </div>
-      </div>
+      </div></div>
     );
   }
 
   return (
-    <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-      <div className="max-w-3xl mx-auto flex flex-col md:flex-row gap-6 items-start">
+    <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row gap-6 items-start">
         <div className="flex-shrink-0">
           {avatarUrl
             ? <img src={avatarUrl} alt={name} className="w-24 h-24 rounded-full object-cover border-4 border-teal-100 shadow-md" />

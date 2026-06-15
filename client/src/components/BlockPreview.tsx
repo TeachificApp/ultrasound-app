@@ -98,6 +98,11 @@ export interface Block {
   data: Record<string, any>;
 }
 
+/** Content container: backgrounds bleed full-width, content constrained to max-w-5xl. */
+export const CC = ({ children, className = "", ...rest }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${className}`.trim()} {...rest}>{children}</div>
+);
+
 export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number }) {
   const { user } = useAuth();
   const d = block.data ?? {};
@@ -205,9 +210,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     }
     case "text":
       return (
-        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
+        <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
-          <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
+          <CC style={{ textAlign: d.align ?? "left" }}><div className="prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} /></CC>
         </div>
       );
     case "image": {
@@ -219,9 +224,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyle} />
         : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>;
       return (
-        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustify, backgroundColor: d.bgColor || undefined }}>
+        <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor || undefined }}>
+          <CC style={{ display: "flex", flexDirection: "column", alignItems: imgJustify }}>
           <ImageLinkWrapper d={d}>{imgEl}</ImageLinkWrapper>
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlign as any }}>{d.caption}</p>}
+          </CC>
         </div>
       );
     }
@@ -235,7 +242,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       // Build the trimmed embed URL using platform-aware logic
       const trimmedEmbedUrl = d.embedUrl ? applyVideoTrim(d.embedUrl, trimStart, trimEnd) : "";
       return (
-        <div className="px-4 sm:px-8 py-4 sm:py-6">
+        <div className="py-4 sm:py-6"><CC>
           {d.embedUrl ? (
             isDirectVideo ? (
               <div className="mx-auto overflow-hidden shadow" style={containerStyle}>
@@ -295,7 +302,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const embedJustify = embedAlign === "left" ? "flex-start" : embedAlign === "right" ? "flex-end" : "center";
       const embedMaxWidth = d.maxWidth ?? "100%";
       return (
-        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ display: "flex", flexDirection: "column", alignItems: embedJustify }}>
+        <div className="py-4 sm:py-6"><CC style={{ display: "flex", flexDirection: "column", alignItems: embedJustify }}>
           <div style={{ width: embedMaxWidth, maxWidth: "100%" }}>
             {d.embedCode ? (
               <iframe
@@ -307,12 +314,12 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             ) : <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}><Globe size={32} /></div>}
             {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: embedAlign as any }}>{d.caption}</p>}
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "gallery":
       return (
-        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${Math.floor(100 / (d.columns ?? 3))}%), 1fr))` }}>
             {(d.images ?? []).map((img: any, i: number) => (
               <div key={i} className="rounded-lg overflow-hidden shadow">
@@ -321,16 +328,16 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     case "bullets": {
       const bulletItems: string[] = (d.items ?? []).map((item: string | { text?: string; crossed?: boolean }) =>
         typeof item === "string" ? item : (item?.text ?? "")
       );
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {bulletItems.map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-3">
                 <span className="mt-0.5 flex-shrink-0 text-lg" style={{ color: d.iconColor ?? "#179ca3" }}>✓</span>
@@ -338,7 +345,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "numbered_list": {
@@ -346,11 +353,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         typeof item === "string" ? item : (item?.text ?? "")
       );
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
           {!d.subHeading && d.headline && <div className="mb-6" />}
-          <div className="space-y-4 max-w-2xl">
+          <div className="space-y-4">
             {numItems.map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{i + 1}</span>
@@ -358,7 +365,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "checklist": {
@@ -368,11 +375,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           typeof item === "string" ? { text: item, crossed: false } : { text: item.text ?? "", crossed: item.crossed ?? false }
       );
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
           {!d.subHeading && d.headline && <div className="mb-6" />}
-          <div className="space-y-3 max-w-2xl">
+          <div className="space-y-3">
             {clItems.map((item, i) => (
               <div key={i} className="flex items-start gap-3">
                 {item.crossed ? (
@@ -384,12 +391,12 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "icon_grid":
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${Math.floor(100 / (d.columns ?? 3))}%), 1fr))` }}>
             {(d.items ?? []).map((item: any, i: number) => (
@@ -400,12 +407,12 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     case "testimonial":
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}>
-          <div className="max-w-2xl mx-auto text-center">
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}>
+          <CC><div className="text-center">
             <div className="text-4xl mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>"</div>
             <p className="text-xl text-gray-700 italic mb-6">{d.quote}</p>
             {(d.rating ?? 0) > 0 && (
@@ -417,14 +424,14 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               {d.avatarUrl && <img src={d.avatarUrl} alt={d.author} className="w-10 h-10 rounded-full object-cover" />}
               <span className="font-semibold text-gray-900">{d.author}</span>
             </div>
-          </div>
+          </div></CC>
         </div>
       );
     case "reviews":
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {(d.reviews ?? []).map((r: any, i: number) => (
               <div key={i} className="rounded-xl p-5 shadow-sm" style={{ backgroundColor: d.cardBgColor ?? "#f9fafb" }}>
                 <div className="flex items-center gap-1 mb-2">
@@ -435,11 +442,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     case "logos":
       return (
-        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}><CC>
           {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex flex-wrap items-center justify-center gap-8">
             {(d.logos ?? []).map((logo: any, i: number) => (
@@ -447,15 +454,15 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                 : <div key={i} className="h-10 w-24 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400">{logo.alt || "Logo"}</div>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     case "instructor":
       return <InstructorBlockPreview d={d} />;
     case "faq":
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-8" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="max-w-3xl space-y-3">
+          <div className="space-y-3">
             {(d.items ?? []).map((item: any, i: number) => (
               <details key={i} className="rounded-lg overflow-hidden group" style={{ border: `1px solid ${d.accentColor ?? "#e5e7eb"}`, backgroundColor: d.itemBgColor ?? "transparent" }}>
                 <summary
@@ -470,7 +477,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </details>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     case "countdown": {
       const mode = d.mode ?? "on_load";
@@ -505,9 +512,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     }
     case "flip_cards":
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {(d.cards ?? []).map((card: any, i: number) => (
               <div key={i} className="rounded-xl overflow-hidden shadow-sm border border-gray-200 group cursor-pointer">
                 <div className="p-5 font-semibold text-white text-center" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{card.front}</div>
@@ -515,7 +522,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     case "pricing_cta": {
       const priceAbove = (d.pricePosition ?? "above") === "above";
@@ -542,7 +549,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </a>
       );
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC className="text-center">
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {priceAbove && priceBlock}
@@ -550,12 +557,12 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           {d.ctaBehavior === "direct_checkout" && <p className="text-[10px] text-teal-600 mt-1">→ Stripe Checkout</p>}
           {!priceAbove && priceBlock}
           <ButtonSubtext d={d} />
-        </div>
+        </CC></div>
       );
     }
     case "cta_standalone":
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}><CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -568,22 +575,22 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           {(d.showOptOut || d.optOutEnabled) && d.optOutText && (
             <div className="mt-3"><a href={d.optOutUrl || d.optOutCustomUrl || "#"} className="text-xs text-gray-400 underline hover:text-gray-600">{d.optOutText}</a></div>
           )}
-        </div>
+        </CC></div>
       );
     case "lead_capture":
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}><CC className="text-center">
           {d.headline && <h2 className="text-2xl font-bold mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="opacity-90 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <div className="flex max-w-md mx-auto gap-2">
             <input type="email" placeholder="Your email address" className="flex-1 px-4 py-3 rounded-lg text-gray-900 border-0 focus:ring-2 focus:ring-white/50" />
             <button className="px-6 py-3 bg-white font-semibold rounded-lg" style={{ color: d.bgColor ?? "#179ca3" }}>{d.ctaText ?? "Send Me Access"}</button>
           </div>
-        </div>
+        </CC></div>
       );
     case "cta_optin":
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}><CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -596,7 +603,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           </div>
           <a href="#" className={`inline-block px-8 py-3 rounded-lg font-semibold shadow ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Get Access"}</a>
           <ButtonSubtext d={d} />
-        </div>
+        </CC></div>
       );
     case "funnel_workflow":
       return <FunnelWorkflowBlock data={d} />;
@@ -816,7 +823,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </div>
       );
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           {d.headline && <h2 className={`text-2xl font-bold mb-6 ${hAlign === "center" ? "text-center" : hAlign === "right" ? "text-right" : "text-left"}`} style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {showCourseCard ? (
             <div className="flex gap-6 items-start">
@@ -827,7 +834,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             <div className="max-w-3xl">{accordionEl}</div>
           )}
           <p className="text-xs text-gray-400 mt-3">Auto-populated from course curriculum</p>
-        </div>
+        </CC></div>
       );
     }
     case "pricing_options_auto":
@@ -841,7 +848,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const titleColor = d.cardTitleColor ?? "#111827";
       const priceColor = d.priceColor ?? "#179ca3";
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex justify-center gap-6 max-w-3xl mx-auto">
             {pCards.map((card: any, i: number) => {
@@ -863,7 +870,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             })}
           </div>
           <p className="text-xs text-gray-400 mt-3 text-center">Auto-populated from course pricing options</p>
-        </div>
+        </CC></div>
       );
     }
     case "divider":
@@ -886,39 +893,39 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         }
       };
       return (
-        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
+        <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC>
           <div className="flex gap-8">
             <div style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
             <div style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderCol("right")}</div>
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "divided_columns": {
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
-        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
+        <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC>
           <div className="grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "three_column": {
       const divStyle = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: d.dividerStyle ?? "solid", borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
-        <div className="px-4 sm:px-8 py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
+        <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-stretch">
             <div className="prose prose-sm pr-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-sm px-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
             <div className="prose prose-sm pl-4" dangerouslySetInnerHTML={{ __html: d.col3Html ?? "" }} />
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "spacer":
@@ -978,7 +985,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         description: "Comprehensive training resource for sonographers and clinicians.",
       }));
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold text-center mb-2" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-sm mb-6 opacity-70" style={{ color: d.textColor ?? "#111827" }}>{d.subtext}</p>}
           <div className={layout === "grid" ? `grid grid-cols-1 sm:grid-cols-${Math.min(maxItems, 3)} gap-4` : "space-y-3"}>
@@ -1000,7 +1007,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             ))}
           </div>
           <p className="text-[10px] text-gray-400 mt-3 text-center">Auto-populated from published products</p>
-        </div>
+        </CC></div>
       );
     }
     case "embedded_checkout":
@@ -1078,7 +1085,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         const isVideo = ["mp4", "webm", "mov", "ogg"].includes(ext);
         const isAudio = ["mp3", "wav", "ogg", "m4a"].includes(ext);
         return (
-          <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
             {d.label && <h3 className="text-lg font-semibold text-gray-800 mb-2">{d.label}</h3>}
             {d.description && <p className="text-sm text-gray-500 mb-3">{d.description}</p>}
             {isPdf && <iframe src={fileUrl} className="w-full rounded-lg border border-gray-200" style={{ height: `${d.inlineHeight ?? 600}px` }} title={fileName} />}
@@ -1094,12 +1101,12 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                 {d.showFileSize !== false && d.fileSize && <span className="opacity-70 text-xs">({d.fileSize})</span>}
               </a>
             </div>
-          </div>
+          </CC></div>
         );
       }
       // Card mode (default)
       return (
-        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}><CC>
           <div className="max-w-xl mx-auto flex items-center gap-4 p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
             {d.showIcon !== false && (
               <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${d.buttonColor ?? "#179ca3"}20` }}>
@@ -1118,7 +1125,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               {d.buttonText ?? "Download"}
             </a>
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "scorm_embed": {
@@ -1130,7 +1137,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const scormJustify = scormAlign === "left" ? "flex-start" : scormAlign === "right" ? "flex-end" : "center";
       const scormMaxWidth = d.maxWidth ?? "100%";
       return (
-        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff", display: "flex", flexDirection: "column", alignItems: scormJustify }}>
+        <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC style={{ display: "flex", flexDirection: "column", alignItems: scormJustify }}>
           <div style={{ width: scormMaxWidth, maxWidth: "100%" }}>
             {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
             {embedUrl ? (
@@ -1152,7 +1159,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             )}
             {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: scormAlign as any }}>{d.caption}</p>}
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "url_embed": {
@@ -1163,7 +1170,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const urlJustify = urlAlign === "left" ? "flex-start" : urlAlign === "right" ? "flex-end" : "center";
       const urlMaxWidth = d.maxWidth ?? "100%";
       return (
-        <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff", display: "flex", flexDirection: "column", alignItems: urlJustify }}>
+        <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC style={{ display: "flex", flexDirection: "column", alignItems: urlJustify }}>
           <div style={{ width: urlMaxWidth, maxWidth: "100%" }}>
             {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
             {url ? (
@@ -1187,7 +1194,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             )}
             {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: urlAlign as any }}>{d.caption}</p>}
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "column_layout": {
@@ -1196,7 +1203,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const leftRatio = d.leftRatio ?? 50;
       const gap = d.gap ?? 32;
       return (
-        <div className="py-4" style={{ backgroundColor: d.bgColor ?? "transparent", padding: `${d.paddingY ?? 16}px ${d.paddingX ?? 32}px` }}>
+        <div style={{ backgroundColor: d.bgColor ?? "transparent", padding: `${d.paddingY ?? 16}px 0` }}><CC>
           <div className="flex items-start" style={{ gap: `${gap}px` }}>
             <div style={{ flex: leftRatio, minWidth: 0 }}>
               {leftBlocks.length === 0 ? (
@@ -1217,11 +1224,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               )}
             </div>
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "carousel":
-      return <div className="px-4 py-4"><CarouselBlock data={d} /></div>;
+      return <div className="py-4" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC><CarouselBlock data={d} /></CC></div>;
     case "ticker":
       return <TickerBlockPreview d={d} />;
     case "countdown_v2":
@@ -1237,7 +1244,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const rows: Array<{ feature: string; values: Array<string | boolean | null> }> = d.rows ?? [];
       const accentCol = d.accentColor ?? "#179ca3";
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {!d.subtext && d.headline && <div className="mb-8" />}
@@ -1272,7 +1279,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </tbody>
             </table>
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "pricing_cards": {
@@ -1290,11 +1297,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         return attrs;
       };
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {!d.subtext && d.headline && <div className="mb-8" />}
-          <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${tiers.length || 1}, 1fr)`, maxWidth: "900px", margin: "0 auto" }}>
+          <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${tiers.length || 1}, 1fr)` }}>
             {tiers.map((tier, ti) => (
               <div key={ti} className="rounded-2xl overflow-hidden flex flex-col" style={{ border: tier.highlighted ? `2px solid ${accentColor}` : "1px solid #e5e7eb", boxShadow: tier.highlighted ? `0 8px 32px ${accentColor}22` : "0 1px 4px rgba(0,0,0,0.06)" }}>
                 {tier.badge && (
@@ -1322,7 +1329,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
             ))}
           </div>
-        </div>
+        </CC></div>
       );
     }
     case "form_embed":
@@ -1362,9 +1369,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         { title: "Session 3: Advanced Topics", date: "Mon, Jun 16 · 10:00 AM" },
       ];
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="space-y-3 max-w-2xl mx-auto">
+          <div className="space-y-3">
             {sampleSessions.map((s, i) => (
               <div key={i} className="flex items-center gap-4 p-4 rounded-xl border" style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}08` }}>
                 <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={{ backgroundColor: accentColor }}>{i + 1}</div>
@@ -1376,7 +1383,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             ))}
           </div>
           <p className="text-xs text-gray-400 mt-3 text-center">Auto-populated from cohort live sessions</p>
-        </div>
+        </CC></div>
       );
     }
     case "affiliate_signup": {
@@ -1386,8 +1393,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const ctaText = d.ctaText ?? "Become an Affiliate";
       const benefits = d.benefits ?? ["Earn up to 30% commission", "Real-time earnings dashboard", "Unique tracking links per course", "Monthly payouts via Stripe, PayPal, or ACH"];
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fdf9" }}>
-          <div className="max-w-2xl mx-auto text-center">
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fdf9" }}><CC className="text-center">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold mb-4" style={{ backgroundColor: `${accentColor}20`, color: accentColor }}>
               <span>💰</span> Affiliate Program
             </div>
@@ -1401,8 +1407,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               ))}
             </div>
             <button className="px-8 py-3 rounded-xl text-white font-semibold text-base" style={{ backgroundColor: accentColor }}>{ctaText}</button>
-          </div>
-        </div>
+        </CC></div>
       );
     }
     // ─── Webinar Blocks ──────────────────────────────────────────────────────────
@@ -1470,15 +1475,15 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </div>
       );
       if (wr_layout === "card") return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}><CC>
           <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8" style={{ border: `1px solid ${d.borderColor ?? "#e2e8f0"}` }}>
             {formContent}
           </div>
-        </div>
+        </CC></div>
       );
       if (wr_layout === "split") return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
-          <div className="max-w-4xl mx-auto grid grid-cols-2 gap-8 items-center">
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}><CC>
+          <div className="grid grid-cols-2 gap-8 items-center">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4" style={{ backgroundColor: `${wr_accentColor}20`, color: wr_accentColor }}>LIVE WEBINAR</div>
               <h2 className="text-3xl font-bold text-gray-900 mb-3">{d.headline ?? "Register for Free"}</h2>
@@ -1486,12 +1491,12 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             </div>
             <div className="bg-white rounded-2xl shadow-lg p-6" style={{ border: `1px solid ${d.borderColor ?? "#e2e8f0"}` }}>{formContent}</div>
           </div>
-        </div>
+        </CC></div>
       );
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}><CC>
           <div className="max-w-lg mx-auto">{formContent}</div>
-        </div>
+        </CC></div>
       );
     }
 
@@ -1520,17 +1525,17 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         ? <img src={d.avatarUrl} alt={d.name ?? "Host"} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4" style={{ borderColor: `${whb_accentColor}40` }} />
         : <div className="w-24 h-24 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${whb_accentColor}20` }}><Users size={32} style={{ color: whb_accentColor }} /></div>;
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold text-center mb-8" style={{ color: d.headlineColor ?? "#111827" }}>{d.headline}</h2>}
           {whb_layout === "centered" ? (
-            <div className="max-w-2xl mx-auto text-center">
+            <div className="text-center">
               <div className="flex justify-center mb-4">{avatar}</div>
               {bioContent}
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto flex gap-6 items-start">{avatar}{bioContent}</div>
+            <div className="flex gap-6 items-start">{avatar}{bioContent}</div>
           )}
-        </div>
+        </CC></div>
       );
     }
 
@@ -1551,8 +1556,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       };
       const embedUrl = getEmbedUrl(videoUrl, d.videoSource ?? "youtube");
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#0e1e2e" }}>
-          <div className="max-w-4xl mx-auto">
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#0e1e2e" }}><CC>
             <h2 className="text-3xl font-bold mb-3" style={{ color: d.textColor ?? "#fff" }}>{d.headline ?? "Watch the Replay"}</h2>
             {d.subheadline && <p className="mb-6 opacity-80" style={{ color: d.textColor ?? "#fff" }}>{d.subheadline}</p>}
             {embedUrl ? (
@@ -1582,8 +1586,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                 </div>
               </div>
             )}
-          </div>
-        </div>
+          </CC></div>
       );
     }
 
@@ -1591,8 +1594,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const wa_accentColor = d.accentColor ?? "#189aa1";
       const agendaItems: Array<{ time: string; title: string; description: string; speaker: string }> = d.items ?? [];
       return (
-        <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-3xl mx-auto">
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
             {d.headline && <h2 className="text-3xl font-bold mb-2" style={{ color: d.headlineColor ?? "#111827" }}>{d.headline}</h2>}
             {d.subheadline && <p className="text-gray-500 mb-8">{d.subheadline}</p>}
             <div className="space-y-0">
@@ -1612,8 +1614,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                 <p className="text-gray-400 text-sm text-center py-8">Add agenda items in block settings.</p>
               )}
             </div>
-          </div>
-        </div>
+          </CC></div>
       );
     }
 
@@ -1683,10 +1684,10 @@ function EnrollmentCounterBlockPreview({ d }: { d: Record<string, any> }) {
 
   return (
     <div
-      className="px-8 py-10"
+      className="py-10"
       style={{ backgroundColor: bgColor }}
     >
-      <div className={`flex flex-col items-${align === "left" ? "start" : align === "right" ? "end" : "center"} gap-2`}>
+      <CC><div className={`flex flex-col items-${align === "left" ? "start" : align === "right" ? "end" : "center"} gap-2`}>
         {showIcon && (
           <div className="w-12 h-12 rounded-full flex items-center justify-center mb-1" style={{ backgroundColor: `${accentColor}20` }}>
             <Users className="w-6 h-6" style={{ color: accentColor }} />
@@ -1705,7 +1706,7 @@ function EnrollmentCounterBlockPreview({ d }: { d: Record<string, any> }) {
         {subtext && (
           <p className="text-sm opacity-70 max-w-xs text-center" style={{ color: textColor }}>{subtext}</p>
         )}
-      </div>
+      </div></CC>
     </div>
   );
 }
@@ -1727,8 +1728,8 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
 
   if (layout === "centered") {
     return (
-      <div className="px-4 sm:px-8 py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-        <div className="max-w-2xl mx-auto text-center">
+      <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
+        <div className="text-center">
           {avatarUrl
             ? <img src={avatarUrl} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100" />
             : <div className="w-28 h-28 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4"><Users size={40} className="text-teal-600" /></div>}
@@ -1737,13 +1738,13 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
           {showBio && bio && <div className="text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: bio }} />}
           {showWebsite && website && <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-3 text-sm font-medium" style={{ color: titleColor }}><Globe size={14} /> {website.replace(/^https?:\/\//, "")}</a>}
         </div>
-      </div>
+      </CC></div>
     );
   }
 
   return (
-    <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-      <div className="max-w-3xl mx-auto flex gap-6 items-start">
+    <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
+      <div className="flex gap-6 items-start">
         {avatarUrl
           ? <img src={avatarUrl} alt={name} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4 border-teal-100" />
           : <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0"><Users size={32} className="text-teal-600" /></div>}
@@ -1754,7 +1755,7 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
           {showWebsite && website && <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-sm font-medium" style={{ color: titleColor }}><Globe size={14} /> {website.replace(/^https?:\/\//, "")}</a>}
         </div>
       </div>
-    </div>
+    </CC></div>
   );
 }
 
@@ -2032,9 +2033,9 @@ function LiveSessionBlockPreview({ d }: { d: Record<string, any> }) {
 
   return (
     <div
-      className="px-4 sm:px-8 py-6 sm:py-8"
+      className="py-6 sm:py-8"
       style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}
-    >
+    ><CC>
       <div
         className="rounded-2xl overflow-hidden shadow-md border"
         style={{ borderColor: `${accentColor}33` }}
@@ -2125,7 +2126,7 @@ function LiveSessionBlockPreview({ d }: { d: Record<string, any> }) {
           )}
         </div>
       </div>
-    </div>
+    </CC></div>
   );
 }
 
@@ -2465,13 +2466,13 @@ export function FormEmbedBlockPreview({ d }: { d: Record<string, any> }) {
 
   if (displayMode === "inline") {
     return (
-      <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: bgColor }}>
+      <div className="py-8 sm:py-10" style={{ backgroundColor: bgColor }}><CC>
         {d.headline && <h2 className="text-2xl font-bold mb-2 text-center" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
         {d.subtext && <p className="text-center text-gray-500 mb-6 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
         <div className="max-w-xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
           <FormBody />
         </div>
-      </div>
+      </CC></div>
     );
   }
 
@@ -2479,7 +2480,7 @@ export function FormEmbedBlockPreview({ d }: { d: Record<string, any> }) {
   const triggerLabel = displayMode === "popup_click" ? (d.triggerButtonText ?? "Open Form") : null;
 
   return (
-    <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: bgColor }}>
+    <div className="py-8 sm:py-10" style={{ backgroundColor: bgColor }}><CC>
       {d.headline && <h2 className="text-2xl font-bold mb-2 text-center" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
       {d.subtext && <p className="text-center text-gray-500 mb-6 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
 
@@ -2517,7 +2518,7 @@ export function FormEmbedBlockPreview({ d }: { d: Record<string, any> }) {
           </div>
         </div>
       )}
-    </div>
+    </CC></div>
   );
 }
 
@@ -2811,7 +2812,7 @@ function FileUploadBlockPreview({ d }: { d: Record<string, any> }) {
   const borderColor = d.borderColor ?? "#e2e8f0";
 
   return (
-    <div className="px-4 sm:px-8 py-8 sm:py-10" style={{ backgroundColor: bgColor }}>
+    <div className="py-8 sm:py-10" style={{ backgroundColor: bgColor }}><CC>
       <div className="max-w-xl mx-auto">
         {label && (
           <h3 className="text-lg font-semibold mb-2" style={{ color: "#111827" }}>{label}</h3>
@@ -2839,7 +2840,7 @@ function FileUploadBlockPreview({ d }: { d: Record<string, any> }) {
           </button>
         </div>
       </div>
-    </div>
+    </CC></div>
   );
 }
 

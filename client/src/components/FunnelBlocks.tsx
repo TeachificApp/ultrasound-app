@@ -32,8 +32,8 @@ export function FunnelWorkflowBlock({ data }: { data: Record<string, any> }) {
   const accentColor = data.accentColor ?? "#179ca3";
 
   return (
-    <section className="px-8 py-12" style={{ backgroundColor: data.bgColor ?? "#f8fffe" }}>
-      <div className="max-w-5xl mx-auto">
+    <section className="py-12" style={{ backgroundColor: data.bgColor ?? "#f8fffe" }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <div className="max-w-2xl mb-8">
           {data.eyebrow && <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: accentColor }}>{data.eyebrow}</p>}
           {data.headline && <h2 className="text-3xl font-bold text-gray-900">{data.headline}</h2>}
@@ -65,8 +65,8 @@ export function ProductOfferStackBlock({ data, onPrimaryCta }: { data: Record<st
   const accentColor = data.accentColor ?? "#179ca3";
 
   return (
-    <section className="px-8 py-12" style={{ backgroundColor: data.bgColor ?? "#ffffff" }}>
-      <div className="max-w-5xl mx-auto">
+    <section className="py-12" style={{ backgroundColor: data.bgColor ?? "#ffffff" }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <div className="text-center max-w-2xl mx-auto mb-8">
           {data.headline && <h2 className="text-3xl font-bold text-gray-900">{data.headline}</h2>}
           {data.subtext && <p className="text-gray-600 mt-3">{data.subtext}</p>}

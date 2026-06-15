@@ -43,7 +43,7 @@ import {
   Layout as LayoutTemplate, Database,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
   Repeat, Film, CalendarRange, ExternalLink, Link2, Mail, Activity, Briefcase,
-  Percent,
+  Percent, Search,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -155,6 +155,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
   const [localCourses, setLocalCourses] = useState<any[]>([]);
   const [reorderMode, setReorderMode] = useState(false);
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const typeLabel = typeFilter === "quiz" ? "Quiz" : typeFilter === "download" ? "Download" : typeFilter === "cohort" ? "Cohort" : "Course";
   const typeLabelPlural = typeFilter === "quiz" ? "quizzes" : typeFilter === "download" ? "downloads" : typeFilter === "cohort" ? "cohorts" : "courses";
@@ -211,12 +212,29 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
 
   const activeCourse = activeDragId ? localCourses.find((c: any) => c.id === activeDragId) : null;
 
+  // Filter by search query
+  const filteredCourses = searchQuery.trim()
+    ? localCourses.filter((c: any) => c.title?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : localCourses;
+
   // Paginate locally when not in reorder mode
   const pageSize = 20;
-  const displayCourses = reorderMode ? localCourses : localCourses.slice((page - 1) * pageSize, page * pageSize);
+  const displayCourses = reorderMode ? filteredCourses : filteredCourses.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="space-y-4">
+      {!reorderMode && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder={`Search ${typeLabelPlural}...`}
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
+          />
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {!reorderMode && (
