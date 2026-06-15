@@ -941,6 +941,20 @@ export const lmsLearnerRouter = router({
 
       if (pricingType === "free") throw new TRPCError({ code: "BAD_REQUEST", message: "Use enrollFree for free courses" });
 
+      // ── Zero-price intercept ───────────────────────────────────────────────────
+      // If the course/option price is $0, skip Stripe and enroll directly.
+      if (pricingType === "one_time" && Number(effectivePrice) === 0) {
+        const [existingZero] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
+          .from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+        if (!existingZero) {
+          await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id, affiliateCode: input.affiliateCode ?? null, enrollmentType: "full" });
+          db.insert(userActivityLogs).values({ userId: ctx.user.id, eventType: "course_enroll", description: `Enrolled in zero-price course: ${course.title}`, courseId: course.id, contentTitle: course.title, metadata: { courseSlug: input.courseSlug, enrollmentType: "free_zero_price" } }).catch(() => {});
+        } else if (existingZero.enrollmentType === "free_preview") {
+          await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existingZero.id));
+        }
+        return { freeEnrollment: true, courseSlug: course.slug, url: null };
+      }
+
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
       // Helper: validate a stored stripe price ID exists in the current Stripe account
@@ -990,7 +1004,30 @@ export const lmsLearnerRouter = router({
       if (input.promoCode) {
         try {
           const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
-          if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
+          if (promoCodes.data[0]) {
+            const pc = promoCodes.data[0];
+            discounts = [{ promotion_code: pc.id }];
+            // ── 100% promo intercept ───────────────────────────────────────────
+            // If the promo makes the price $0 (100% off), skip Stripe entirely.
+            const coupon = pc.coupon as any;
+            const effectivePriceCents = Math.round(Number(effectivePrice) * 100 * input.seats);
+            const discountedCents = coupon.percent_off === 100
+              ? 0
+              : coupon.amount_off
+                ? Math.max(0, effectivePriceCents - coupon.amount_off)
+                : effectivePriceCents;
+            if (discountedCents === 0 && pricingType === "one_time") {
+              const [existingPromo] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
+                .from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+              if (!existingPromo) {
+                await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id, affiliateCode: input.affiliateCode ?? null, enrollmentType: "full" });
+                db.insert(userActivityLogs).values({ userId: ctx.user.id, eventType: "course_enroll", description: `Enrolled via 100% promo: ${course.title}`, courseId: course.id, contentTitle: course.title, metadata: { courseSlug: input.courseSlug, enrollmentType: "free_promo", promoCode: input.promoCode } }).catch(() => {});
+              } else if (existingPromo.enrollmentType === "free_preview") {
+                await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existingPromo.id));
+              }
+              return { freeEnrollment: true, courseSlug: course.slug, url: null };
+            }
+          }
         } catch { /* ignore — checkout still works without promo */ }
       }
       const promoOpts = discounts ? { discounts } : { allow_promotion_codes: true };

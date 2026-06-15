@@ -334,7 +334,7 @@ export const webinarSessionRouter = router({
 
   // ─── Embedded Checkout Session ────────────────────────────────────────────
   createEmbeddedCheckoutSession: protectedProcedure
-    .input(z.object({ webinarSlug: z.string(), origin: z.string(), pricingOptionId: z.string().optional() }))
+    .input(z.object({ webinarSlug: z.string(), origin: z.string(), pricingOptionId: z.string().optional(), promoCode: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [webinar] = await db.select().from(webinars).where(eq(webinars.slug, input.webinarSlug)).limit(1);
@@ -348,6 +348,26 @@ export const webinarSessionRouter = router({
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      // ── 100% promo intercept for webinars ────────────────────────────────
+      if (input.promoCode) {
+        try {
+          const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
+          if (promoCodes.data.length > 0) {
+            const coupon = promoCodes.data[0].coupon as any;
+            let discountedCents = priceCents;
+            if (coupon.percent_off) discountedCents -= Math.round(priceCents * (coupon.percent_off / 100));
+            else if (coupon.amount_off) discountedCents -= Math.min(coupon.amount_off, priceCents);
+            if (discountedCents <= 0) {
+              // 100% off — register directly without Stripe
+              const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
+                .where(and(eq(webinarRegistrations.webinarId, webinar.id), eq(webinarRegistrations.userId, ctx.user.id))).limit(1);
+              if (!ex) await db.insert(webinarRegistrations).values({ webinarId: webinar.id, userId: ctx.user.id, registrationSource: "promo_free", email: ctx.user.email ?? "" });
+              return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: subtitle, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: 100, brand: webinar.brand ?? "all_about_ultrasound" };
+            }
+          }
+        } catch { /* ignore, fall through to Stripe */ }
+      }
+
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",

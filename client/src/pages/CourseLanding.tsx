@@ -1061,7 +1061,15 @@ export default function CourseLanding() {
     onError: (e) => toast.error(`Enrollment failed: ${e.message}`),
   });
   const createCheckout = trpc.lmsLearner.createCheckout.useMutation({
-    onSuccess: (data) => { if (data.checkoutUrl) window.open(data.checkoutUrl, "_blank"); },
+    onSuccess: (data) => {
+      if ((data as any).freeEnrollment) {
+        // Server bypassed Stripe (zero-price or 100% promo) — enroll directly
+        toast.success("Enrolled! You now have access to this course.");
+        navigate(`/courses/${slug}/player`);
+      } else if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, "_blank");
+      }
+    },
     onError: (e) => toast.error(`Checkout failed: ${e.message}`),
   });
   const registerFreePreview = trpc.lms.registerFreePreview.useMutation();

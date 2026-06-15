@@ -890,7 +890,13 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
           funnelId,
           pageId,
         });
-        if (result.checkoutUrl) window.open(result.checkoutUrl, "_blank");
+        if ((result as any).freeSuccess) {
+          toast.success("Access granted! Redirecting…");
+          const url = (result as any).successUrl;
+          if (url) setTimeout(() => { window.location.href = url; }, 1200);
+        } else if (result.checkoutUrl) {
+          window.open(result.checkoutUrl, "_blank");
+        }
       } catch (err: any) { toast.error(err.message || "Failed to start checkout"); }
       finally { setCheckoutLoadingIdx(null); }
       return;
@@ -1051,7 +1057,13 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
           funnelId,
           pageId,
         });
-        if (result.checkoutUrl) window.open(result.checkoutUrl, "_blank");
+        if ((result as any).freeSuccess) {
+          toast.success("Access granted! Redirecting…");
+          const url = (result as any).successUrl;
+          if (url) setTimeout(() => { window.location.href = url; }, 1200);
+        } else if (result.checkoutUrl) {
+          window.open(result.checkoutUrl, "_blank");
+        }
       } catch (err: any) { toast.error(err.message || "Failed to start checkout"); }
       finally { setCheckoutLoading(false); }
       return;
@@ -1139,7 +1151,13 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
           funnelId,
           pageId,
         });
-        if (result.checkoutUrl) window.open(result.checkoutUrl, "_blank");
+        if ((result as any).freeSuccess) {
+          toast.success("Access granted! Redirecting…");
+          const url = (result as any).successUrl;
+          if (url) setTimeout(() => { window.location.href = url; }, 1200);
+        } else if (result.checkoutUrl) {
+          window.open(result.checkoutUrl, "_blank");
+        }
       } catch (err: any) { toast.error(err.message || "Failed to start checkout"); }
       finally { setCheckoutLoading(false); }
       return;

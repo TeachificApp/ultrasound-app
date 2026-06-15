@@ -1449,13 +1449,39 @@ export const funnelPublicRouter = router({
             } else if (coupon.amount_off) {
               totalAmountCents -= Math.min(coupon.amount_off, totalAmountCents);
             }
-            totalAmountCents = Math.max(50, totalAmountCents);
+            totalAmountCents = Math.max(0, totalAmountCents);
           } else {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired promo code" });
           }
         } catch (e: any) {
           if (e instanceof TRPCError) throw e;
         }
+      }
+
+      // ── 100% promo intercept for funnels ──────────────────────────────────
+      if (totalAmountCents === 0) {
+        // Promo made total free — grant access directly without Stripe
+        const freeOrderRef = `free_promo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const resolvedUserId = ctx.user?.id ?? null;
+        if (resolvedUserId) {
+          const productType = selectedProduct.type;
+          const productId = selectedProduct.id;
+          if (productType === "course" || productType === "quiz" || productType === "cohort") {
+            const [ex] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+              .where(and(eq(lmsEnrollments.userId, resolvedUserId), eq(lmsEnrollments.courseId, productId))).limit(1);
+            if (!ex) await db.insert(lmsEnrollments).values({ userId: resolvedUserId, courseId: productId, orderId: null, affiliateCode: null });
+          } else if (productType === "download") {
+            const [ex] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
+              .where(and(eq(digitalPurchases.userId, resolvedUserId), eq(digitalPurchases.productId, productId))).limit(1);
+            if (!ex) await db.insert(digitalPurchases).values({ userId: resolvedUserId, productId, stripeCheckoutSessionId: freeOrderRef });
+          } else if (productType === "bundle") {
+            const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
+              .where(and(eq(bundleEnrollments.userId, resolvedUserId), eq(bundleEnrollments.bundleId, productId))).limit(1);
+            if (!ex) await db.insert(bundleEnrollments).values({ userId: resolvedUserId, bundleId: productId, stripeCheckoutSessionId: freeOrderRef });
+          }
+        }
+        const successUrl = funnel.thankYouPageUrl || `${input.origin}/`;
+        return { freeSuccess: true, successUrl, clientSecret: null, orderId: null, totalAmountCents: 0 };
       }
 
       if (totalAmountCents < 50) {
@@ -1746,13 +1772,38 @@ export const funnelPublicRouter = router({
         try {
           const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode, active: true, limit: 1 });
           if (promoCodes.data.length > 0) {
+            const coupon = promoCodes.data[0].coupon as any;
+            let discountedAmount = Math.round(Number(unitAmount));
+            if (coupon.percent_off) discountedAmount -= Math.round(discountedAmount * (coupon.percent_off / 100));
+            else if (coupon.amount_off) discountedAmount -= Math.min(coupon.amount_off, discountedAmount);
+            if (discountedAmount <= 0) {
+              // 100% off — grant access directly
+              const userId = ctx.user?.id ?? null;
+              if (userId) {
+                const freeRef = `free_promo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                if (input.productType === "course" || input.productType === "quiz" || input.productType === "cohort") {
+                  const [ex] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+                    .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.productId))).limit(1);
+                  if (!ex) await db.insert(lmsEnrollments).values({ userId, courseId: input.productId, orderId: null, affiliateCode: null });
+                } else if (input.productType === "download") {
+                  const [ex] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
+                    .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, input.productId))).limit(1);
+                  if (!ex) await db.insert(digitalPurchases).values({ userId, productId: input.productId, stripeCheckoutSessionId: freeRef });
+                } else if (input.productType === "bundle") {
+                  const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
+                    .where(and(eq(bundleEnrollments.userId, userId), eq(bundleEnrollments.bundleId, input.productId))).limit(1);
+                  if (!ex) await db.insert(bundleEnrollments).values({ userId, bundleId: input.productId, stripeCheckoutSessionId: freeRef });
+                }
+              }
+              return { checkoutUrl: null, freeSuccess: true, successUrl };
+            }
             sessionParams.discounts = [{ promotion_code: promoCodes.data[0].id }];
             delete sessionParams.allow_promotion_codes;
           }
-        } catch { /* ignore promo code errors */ }
+        } catch (e: any) { if (e instanceof TRPCError) throw e; /* ignore other promo code errors */ }
       }
       const session = await stripe.checkout.sessions.create(sessionParams);
-      return { checkoutUrl: session.url };
+      return { checkoutUrl: session.url, freeSuccess: false, successUrl: null };
     }),
 });
 

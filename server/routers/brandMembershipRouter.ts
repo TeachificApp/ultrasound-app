@@ -157,6 +157,35 @@ export const brandMembershipRouter = router({
       }
       const promoOpts = discounts ? { discounts } : { allow_promotion_codes: true };
 
+      // ── 100% promo intercept for brand memberships ────────────────────────
+      if (discounts && discounts.length > 0) {
+        try {
+          const pc = await stripe.promotionCodes.retrieve(discounts[0].promotion_code);
+          const coupon = (pc as any).coupon as any;
+          if (coupon.percent_off === 100) {
+            // Grant membership directly
+            const [existing] = await db.select({ id: brandMemberships.id })
+              .from(brandMemberships)
+              .where(and(eq(brandMemberships.userId, ctx.user.id), eq(brandMemberships.brand, brand)))
+              .limit(1);
+            if (existing) {
+              await db.update(brandMemberships)
+                .set({ tier: isLifetime ? "lifetime" : "premium", status: "active", updatedAt: new Date() })
+                .where(eq(brandMemberships.id, existing.id));
+            } else {
+              await db.insert(brandMemberships).values({
+                userId: ctx.user.id,
+                brand,
+                tier: isLifetime ? "lifetime" : "premium",
+                status: "active",
+                source: "promo_free",
+              });
+            }
+            return { checkoutUrl: null, free: true };
+          }
+        } catch { /* ignore */ }
+      }
+
       if (isLifetime) {
         // One-time payment for lifetime access
         // Use canonical price ID if available, otherwise fall back to price_data

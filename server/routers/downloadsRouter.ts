@@ -258,6 +258,20 @@ export const downloadsLearnerRouter = router({
           if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
         } catch { /* ignore invalid codes — checkout still works */ }
       }
+      // ── 100% promo intercept for downloads ─────────────────────────────────
+      if (discounts && discounts.length > 0) {
+        try {
+          const pc = await stripe.promotionCodes.retrieve(discounts[0].promotion_code);
+          const coupon = (pc as any).coupon as any;
+          const priceCents = Math.round(Number(product.price) * 100);
+          const discountedCents = coupon.percent_off === 100 ? 0 : coupon.amount_off ? Math.max(0, priceCents - coupon.amount_off) : priceCents;
+          if (discountedCents === 0) {
+            await db.insert(digitalPurchases).values({ userId: ctx.user.id, productId: product.id });
+            return { checkoutUrl: null, free: true };
+          }
+        } catch { /* ignore */ }
+      }
+
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,

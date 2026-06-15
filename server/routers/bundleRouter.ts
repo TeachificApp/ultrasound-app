@@ -167,6 +167,31 @@ export const bundleLearnerRouter = router({
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-12-18.acacia" as any });
       const origin = ctx.req.headers.origin || "https://app.allaboutultrasound.com";
       const isSubscription = selectedOption?.type === "subscription";
+
+      // ── 100% promo intercept for bundles ──────────────────────────────────
+      if (input.promoCode && !isSubscription) {
+        try {
+          const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
+          if (promoCodes.data[0]) {
+            const coupon = promoCodes.data[0].coupon as any;
+            const priceCents = Math.round(price * 100);
+            const discountedCents = coupon.percent_off === 100 ? 0 : coupon.amount_off ? Math.max(0, priceCents - coupon.amount_off) : priceCents;
+            if (discountedCents === 0) {
+              await db.insert(bundleEnrollments).values({ bundleId: input.bundleId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId });
+              const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, input.bundleId));
+              for (const item of items) {
+                if (item.itemType === "course") {
+                  const [courseEnr] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+                    .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, ctx.user.id))).limit(1);
+                  if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId: ctx.user.id, source: "bundle" });
+                }
+              }
+              return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
+            }
+          }
+        } catch { /* ignore — checkout still works without promo */ }
+      }
+
       const session = await stripe.checkout.sessions.create({
         mode: isSubscription ? "subscription" : "payment",
         customer_email: ctx.user.email || undefined,

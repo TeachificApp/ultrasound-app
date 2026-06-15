@@ -208,7 +208,17 @@ export const productsLearnerRouter = router({
       if (input.promoCode) {
         try {
           const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
-          if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
+          if (promoCodes.data[0]) {
+            discounts = [{ promotion_code: promoCodes.data[0].id }];
+            // ── 100% promo intercept for physical products ────────────────────
+            const coupon = promoCodes.data[0].coupon as any;
+            const priceCents = unitAmount;
+            const discountedCents = coupon.percent_off === 100 ? 0 : coupon.amount_off ? Math.max(0, priceCents - coupon.amount_off) : priceCents;
+            if (discountedCents === 0) {
+              await db.insert(productOrders).values({ userId: ctx.user.id, productId: product.id, quantity: input.quantity ?? 1, totalAmountCents: 0, status: "pending", stripeCheckoutSessionId: `free_promo_${Date.now()}` });
+              return { checkoutUrl: null, free: true };
+            }
+          }
         } catch { /* ignore */ }
       }
       const session = await stripe.checkout.sessions.create({

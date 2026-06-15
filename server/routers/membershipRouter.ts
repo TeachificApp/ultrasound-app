@@ -788,6 +788,27 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
       const [dc] = await db.select().from(membershipDiscountCodes).where(eq(membershipDiscountCodes.id, input.discountCodeId));
       if (dc?.stripePromotionCodeId) discounts = [{ promotion_code: dc.stripePromotionCodeId }];
     }
+    // ── 100% promo intercept for memberships ────────────────────────────────
+    if (discounts.length > 0 && !isRecurring) {
+      try {
+        const promoId = discounts[0].promotion_code;
+        const pc = await stripe.promotionCodes.retrieve(promoId);
+        const coupon = (pc as any).coupon as any;
+        const priceCents = plan.price ?? 0;
+        const discountedCents = coupon.percent_off === 100 ? 0 : coupon.amount_off ? Math.max(0, priceCents - coupon.amount_off) : priceCents;
+        if (discountedCents === 0) {
+          // Grant free membership access directly
+          const { membershipEnrollments } = await import("../../drizzle/schema");
+          const db2 = await getDb();
+          if (db2) {
+            const [ex] = await db2.select({ id: membershipEnrollments.id }).from(membershipEnrollments)
+              .where(and(eq(membershipEnrollments.userId, ctx.user.id), eq(membershipEnrollments.planId, plan.id))).limit(1);
+            if (!ex) await db2.insert(membershipEnrollments).values({ userId: ctx.user.id, planId: plan.id, status: "active", source: "promo_free" });
+          }
+          return { clientSecret: null, free: true, courseTitle: plan.title, courseSubtitle: null, courseDescription: plan.description ?? null, courseThumbnail: plan.coverImage ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: plan.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: plan.currency ?? "usd", minSeats: null, discountPercent: null };
+        }
+      } catch { /* ignore */ }
+    }
     const session = await stripe.checkout.sessions.create({
       ui_mode: "embedded",
       mode: isRecurring ? "subscription" : "payment",
