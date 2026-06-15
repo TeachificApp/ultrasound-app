@@ -248,8 +248,8 @@ export default function EducationLibrary() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Collection Filter Tabs — Thinkific-style */}
         {collections && collections.length > 0 && (
-          <div className="mb-6 overflow-x-auto">
-            <div className="flex gap-1.5 pb-1 min-w-max flex-wrap">
+          <div className="mb-6">
+            <div className="flex gap-1.5 pb-1 flex-wrap">
               <button
                 onClick={() => { setActiveCollection(null); setPage(1); }}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${

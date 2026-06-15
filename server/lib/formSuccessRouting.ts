@@ -28,6 +28,7 @@ export interface FormSuccessRoutingRuleInput {
   successModuleId: number;
   logicOperator: "all" | "any";
   conditions: FormSuccessCondition[] | string;
+  grantAccessActions?: string | null; // JSON: Array<{productType, productId}>
   sortOrder?: number;
   isEnabled?: boolean;
 }
@@ -217,6 +218,38 @@ export function selectSuccessModule(
   }
 
   return enabledModules.sort((a, b) => a.sortOrder - b.sortOrder)[0] ?? null;
+}
+
+/**
+ * Like selectSuccessModule but also returns the matched rule (for grantAccessActions).
+ */
+export function selectSuccessModuleWithRule(
+  rules: FormSuccessRoutingRuleInput[],
+  modules: GeneralFormSuccessModule[],
+  defaultModuleId: number | null | undefined,
+  ctx: FormSubmissionContext,
+): { module: GeneralFormSuccessModule | null; matchedRule: FormSuccessRoutingRuleInput | null } {
+  const enabledModules = modules.filter(m => m.isEnabled);
+  const moduleById = new Map(enabledModules.map(m => [m.id, m]));
+  const merge = buildMergeContext(ctx);
+
+  const sortedRules = [...rules]
+    .filter(r => r.isEnabled !== false)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+  for (const rule of sortedRules) {
+    if (!evaluateSuccessRule(rule, ctx, merge)) continue;
+    const mod = moduleById.get(rule.successModuleId);
+    if (mod) return { module: mod, matchedRule: rule };
+  }
+
+  if (defaultModuleId != null) {
+    const def = moduleById.get(defaultModuleId);
+    if (def) return { module: def, matchedRule: null };
+  }
+
+  const fallback = enabledModules.sort((a, b) => a.sortOrder - b.sortOrder)[0] ?? null;
+  return { module: fallback, matchedRule: null };
 }
 
 export function buildSuccessOutcome(

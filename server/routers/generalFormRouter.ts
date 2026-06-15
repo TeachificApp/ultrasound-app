@@ -54,6 +54,7 @@ import {
 } from "../lib/formSuccessModulesDb";
 import {
   selectSuccessModule,
+  selectSuccessModuleWithRule,
   buildSuccessOutcome,
   extractSubmitterInfo,
   type FormSubmissionContext,
@@ -2279,13 +2280,97 @@ ${pageText}`;
           submitterName: submitter.name,
           submitterEmail: submitter.email,
         };
-        const selected = selectSuccessModule(
+        const { module: selected, matchedRule } = selectSuccessModuleWithRule(
           rulesRaw,
           modules,
           (template as any).defaultSuccessModuleId ?? null,
           submissionCtx,
         );
         successOutcome = buildSuccessOutcome(selected, template, submissionCtx);
+        // Grant access to products if the matched rule has grantAccessActions and a userId is known
+        const grantUserId = input.userId ?? null;
+        if (matchedRule?.grantAccessActions && grantUserId) {
+          ;(async () => {
+            try {
+              const actions: Array<{ productType: string; productId: number }> = JSON.parse(matchedRule.grantAccessActions!);
+              const {
+                lmsEnrollments,
+                digitalPurchases,
+                digitalBundlePurchases,
+                physicalProductOrders,
+                membershipSubscriptions,
+                webinarRegistrations,
+              } = await import("../../drizzle/schema");
+              for (const action of actions) {
+                const { productType, productId } = action;
+                if (!productId) continue;
+                if (productType === "course") {
+                  const [existing] = await db.select({ id: lmsEnrollments.id })
+                    .from(lmsEnrollments)
+                    .where(and(eq(lmsEnrollments.userId, grantUserId), eq(lmsEnrollments.courseId, productId)))
+                    .limit(1);
+                  if (!existing) {
+                    await db.insert(lmsEnrollments).values({
+                      userId: grantUserId,
+                      courseId: productId,
+                      enrollmentType: "full",
+                      source: "form_grant",
+                    });
+                  } else if (existing && (existing as any).enrollmentType !== "full") {
+                    await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existing.id));
+                  }
+                } else if (productType === "download") {
+                  const [existing] = await db.select({ id: digitalPurchases.id })
+                    .from(digitalPurchases)
+                    .where(and(eq(digitalPurchases.userId, grantUserId), eq(digitalPurchases.productId, productId)))
+                    .limit(1);
+                  if (!existing) {
+                    await db.insert(digitalPurchases).values({ userId: grantUserId, productId });
+                  }
+                } else if (productType === "bundle") {
+                  const [existing] = await db.select({ id: digitalBundlePurchases.id })
+                    .from(digitalBundlePurchases)
+                    .where(and(eq(digitalBundlePurchases.userId, grantUserId), eq(digitalBundlePurchases.bundleId, productId)))
+                    .limit(1);
+                  if (!existing) {
+                    await db.insert(digitalBundlePurchases).values({ userId: grantUserId, bundleId: productId });
+                  }
+                } else if (productType === "physical") {
+                  await db.insert(physicalProductOrders).values({
+                    userId: grantUserId,
+                    productId,
+                    amountPaid: 0,
+                    currency: "usd",
+                    notes: "Granted via form routing rule",
+                    fulfillmentStatus: "delivered",
+                  });
+                } else if (productType === "membership") {
+                  const [existing] = await db.select({ id: membershipSubscriptions.id })
+                    .from(membershipSubscriptions)
+                    .where(and(eq(membershipSubscriptions.userId, grantUserId), eq(membershipSubscriptions.planId, productId)))
+                    .limit(1);
+                  if (!existing) {
+                    await db.insert(membershipSubscriptions).values({
+                      planId: productId,
+                      userId: grantUserId,
+                      status: "active",
+                    });
+                  }
+                } else if (productType === "webinar") {
+                  const [existing] = await db.select({ id: webinarRegistrations.id })
+                    .from(webinarRegistrations)
+                    .where(and(eq(webinarRegistrations.userId, grantUserId), eq(webinarRegistrations.webinarId, productId)))
+                    .limit(1);
+                  if (!existing) {
+                    await db.insert(webinarRegistrations).values({ userId: grantUserId, webinarId: productId });
+                  }
+                }
+              }
+            } catch (e: any) {
+              console.error("[FormGrantAccess] Failed to grant access:", e.message);
+            }
+          })();
+        }
       } catch (e: any) {
         console.error("[SuccessModules] Failed to build success outcome:", e.message);
       }
@@ -2630,6 +2715,7 @@ ${pageText}`;
       successModuleId: z.number(),
       logicOperator: z.enum(["all", "any"]).default("all"),
       conditions: z.string(),
+      grantAccessActions: z.string().optional(), // JSON array of {productType, productId}
       sortOrder: z.number().default(0),
       isEnabled: z.boolean().default(true),
     }))

@@ -25,7 +25,7 @@ import CarouselBlock from "@/components/CarouselBlock";
 import { useState, useEffect, useRef } from "react";
 import { useSeoHead } from "@/hooks/useSeoHead";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
-import { CountdownV2Block, ImageLinkWrapper } from "@/components/BlockPreview";
+import { CountdownV2Block, ImageLinkWrapper, CC } from "@/components/BlockPreview";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }

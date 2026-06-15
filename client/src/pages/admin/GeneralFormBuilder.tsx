@@ -2299,10 +2299,23 @@ function BranchingTab({ formId }: { formId: number }) {
                           {BRANCH_OPERATORS.map(op => <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      {!["is_empty", "is_not_empty"].includes(cond.operator) && (
-                        <input type="text" value={cond.value} onChange={e => updateCondition(cond.id, { value: e.target.value })}
-                          placeholder="value" className="h-7 px-2 text-xs border border-gray-200 rounded w-32 bg-white focus:outline-none focus:border-teal-400" />
-                      )}
+                      {!["is_empty", "is_not_empty"].includes(cond.operator) && (() => {
+                        const fieldOpts = getItemOptions(cond.fieldId);
+                        if (fieldOpts.length > 0) {
+                          return (
+                            <Select value={cond.value} onValueChange={v => updateCondition(cond.id, { value: v })}>
+                              <SelectTrigger className="h-7 text-xs w-36"><SelectValue placeholder="select value" /></SelectTrigger>
+                              <SelectContent>
+                                {fieldOpts.map((o: any) => <SelectItem key={o.id} value={o.value || o.label}>{o.label}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          );
+                        }
+                        return (
+                          <input type="text" value={cond.value} onChange={e => updateCondition(cond.id, { value: e.target.value })}
+                            placeholder="value" className="h-7 px-2 text-xs border border-gray-200 rounded w-32 bg-white focus:outline-none focus:border-teal-400" />
+                        );
+                      })()}
                       <button type="button" onClick={() => removeCondition(cond.id)} className="text-gray-400 hover:text-red-500 ml-auto">
                         <X className="w-3.5 h-3.5" />
                       </button>

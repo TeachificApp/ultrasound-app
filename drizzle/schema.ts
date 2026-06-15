@@ -4394,6 +4394,7 @@ export const generalFormSuccessRoutingRules = mysqlTable("generalFormSuccessRout
   successModuleId: int("successModuleId").notNull(),
   logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("all"),
   conditions: longtext("conditions").notNull(),
+  grantAccessActions: longtext("grantAccessActions"),
   sortOrder: int("sortOrder").notNull().default(0),
   isEnabled: boolean("isEnabled").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

@@ -172,7 +172,7 @@ export const productsLearnerRouter = router({
               description: product.subtitle ?? undefined,
               images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
             },
-            unit_amount: Math.round(Number(product.price)),
+            unit_amount: Math.round(Number(product.price) * 100),
           },
           quantity: 1,
         }],
@@ -196,7 +196,7 @@ export const productsLearnerRouter = router({
         termsUrl: settings?.termsUrl ?? "",
         privacyUrl: settings?.privacyUrl ?? "",
         productName: product.title,
-        displayPrice: Math.round(Number(product.price)),
+        displayPrice: Number(product.price),
         pricingType: "one_time",
         isSubscription: false,
         billingLabel: null,
@@ -1012,7 +1012,7 @@ Make ALL content specific and compelling based on the product title and descript
               description: product.subtitle ?? undefined,
               images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
             },
-            unit_amount: Math.round(Number(product.price)),
+            unit_amount: Math.round(Number(product.price) * 100),
           },
           quantity: 1,
         }],
@@ -1036,7 +1036,7 @@ Make ALL content specific and compelling based on the product title and descript
         termsUrl: settings?.termsUrl ?? "",
         privacyUrl: settings?.privacyUrl ?? "",
         productName: product.title,
-        displayPrice: Math.round(Number(product.price)),
+        displayPrice: Number(product.price),
         pricingType: "one_time",
         isSubscription: false,
         billingLabel: null,
@@ -1046,7 +1046,6 @@ Make ALL content specific and compelling based on the product title and descript
       };
     }),
 });
-
 // ─── Public: checkout page config for physical products ──────────────────────
 export const productsCheckoutPublicRouter = router({
   getPublicCheckoutPageConfig: publicProcedure

@@ -621,7 +621,7 @@ export const funnelRouter = router({
             product_data: {
               name: page.customPriceLabel || page.title || "Funnel Product",
             },
-            unit_amount: Math.round(Number(page.customPrice)),
+            unit_amount: Math.round(Number(page.customPrice) * 100),
           },
           quantity: 1,
         });
@@ -1703,7 +1703,7 @@ export const funnelPublicRouter = router({
       const stripe = getStripeClient();
       // ── Resolve product details ──────────────────────────────────────────────
       let productName = "";
-      let unitAmount = 0; // in cents
+      let unitAmount = 0; // in dollars — will be converted to cents for Stripe
       let currency = "usd";
       if (input.productType === "course" || input.productType === "quiz" || input.productType === "cohort") {
         const [course] = await db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, currency: lmsCourses.currency, isFree: lmsCourses.isFree, pricingType: lmsCourses.pricingType })
@@ -1748,7 +1748,7 @@ export const funnelPublicRouter = router({
           price_data: {
             currency,
             product_data: { name: productName },
-            unit_amount: Math.round(Number(unitAmount)),
+            unit_amount: Math.round(Number(unitAmount) * 100),
           },
           quantity: 1,
         }],

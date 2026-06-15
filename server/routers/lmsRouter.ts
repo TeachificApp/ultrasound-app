@@ -254,6 +254,7 @@ export const lmsPublicRouter = router({
           showInLibrary: p.showInLibrary,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
+          libraryOrder: p.libraryOrder ?? 9999,
           instructor: null,
           _source: "digital_product" as const,
         }));
@@ -275,13 +276,17 @@ export const lmsPublicRouter = router({
           showInLibrary: true,
           createdAt: q.createdAt,
           updatedAt: q.updatedAt,
+          libraryOrder: 9999,
           instructor: null,
           _source: "sono_quiz" as const,
         }));
-        // Merge all, sort by createdAt desc, then paginate
-        const combined = [...enriched, ...dpMapped, ...sqMapped].sort((a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        // Merge all: sort by libraryOrder asc (admin-set), then by createdAt desc as fallback
+        const combined = [...enriched, ...dpMapped, ...sqMapped].sort((a, b) => {
+          const aOrder = (a as any).libraryOrder ?? 9999;
+          const bOrder = (b as any).libraryOrder ?? 9999;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
         const totalCombined = Number(count) + dpRows.length + sqRows.length;
         const paginated = combined.slice(offset, offset + input.pageSize);
         return { courses: paginated, total: totalCombined, page: input.page, pageSize: input.pageSize };
