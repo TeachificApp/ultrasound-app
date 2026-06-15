@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { UserSearchCombobox, type SelectedUser } from "@/components/UserSearchCombobox";
 import { trpc } from "@/lib/trpc";
@@ -971,6 +971,14 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
     onSuccess: () => { utils.productsAdmin.getHidePricingOptions.invalidate({ productId }); toast.success("Setting saved"); },
     onError: (e: any) => toast.error(e.message),
   });
+  // BookVault settings
+  const { data: bvData } = trpc.productsAdmin.getBookvaultSettings.useQuery({ productId });
+  const [bvIsbn, setBvIsbn] = React.useState("");
+  React.useEffect(() => { if (bvData?.bookvaultIsbn) setBvIsbn(bvData.bookvaultIsbn); }, [bvData?.bookvaultIsbn]);
+  const bvMut = trpc.productsAdmin.updateBookvaultSettings.useMutation({
+    onSuccess: () => { utils.productsAdmin.getBookvaultSettings.invalidate({ productId }); toast.success("BookVault settings saved"); },
+    onError: (e: any) => toast.error(e.message),
+  });
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
   return (
     <div className="space-y-4">
@@ -981,6 +989,44 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
           <p className="text-xs text-teal-600 mt-0.5">Configure what happens immediately after a customer completes their purchase. Actions run in order.</p>
         </div>
       </div>
+
+      {/* BookVault Print-on-Demand */}
+      <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">BookVault Print-on-Demand</p>
+            <p className="text-xs text-gray-500 mt-0.5">Automatically fulfill physical book orders via BookVault when enabled. Requires a valid ISBN.</p>
+          </div>
+          <Switch
+            checked={bvData?.bookvaultEnabled ?? false}
+            onCheckedChange={(v) => bvMut.mutate({ productId, bookvaultEnabled: v, bookvaultIsbn: bvIsbn || null })}
+            disabled={bvMut.isPending}
+          />
+        </div>
+        {(bvData?.bookvaultEnabled) && (
+          <div className="space-y-2">
+            <Label className="text-xs text-gray-600">ISBN (13-digit)</Label>
+            <div className="flex gap-2">
+              <Input
+                value={bvIsbn}
+                onChange={(e) => setBvIsbn(e.target.value)}
+                placeholder="978-0-000000-00-0"
+                className="text-sm max-w-xs"
+                maxLength={32}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => bvMut.mutate({ productId, bookvaultEnabled: true, bookvaultIsbn: bvIsbn || null })}
+                disabled={bvMut.isPending}
+              >
+                {bvMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <HidePricingOptionsToggle
         value={hideData?.hidePricingOptions ?? false}
         onChange={(v) => hideToggleMut.mutate({ productId, hidePricingOptions: v })}

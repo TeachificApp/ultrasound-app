@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import MembershipPageBuilder from "@/components/MembershipPageBuilder";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
-import AfterPurchaseWorkflowEditor from "@/components/AfterPurchaseWorkflowEditor";
+import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
