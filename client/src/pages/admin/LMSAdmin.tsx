@@ -12425,6 +12425,8 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
     welcomeEmailBody: "",
     upsellEnabled: false,
     upsellCourseId: null as number | null,
+    upsellProductType: "course" as "course" | "quiz" | "webinar" | "download" | "membership",
+    upsellProductId: null as number | null,
     upsellHeadline: "",
     upsellDescription: "",
     completionRedirectUrl: "",
@@ -12446,6 +12448,8 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
       welcomeEmailBody: data.welcomeEmailBody ?? "",
       upsellEnabled: data.upsellEnabled ?? false,
       upsellCourseId: data.upsellCourseId ?? null,
+      upsellProductType: (data.upsellProductType as any) ?? (data.upsellCourseId ? "course" : "course"),
+      upsellProductId: data.upsellProductId ?? data.upsellCourseId ?? null,
       upsellHeadline: data.upsellHeadline ?? "",
       upsellDescription: data.upsellDescription ?? "",
       completionRedirectUrl: data.completionRedirectUrl ?? "",
@@ -12456,17 +12460,21 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
     setDirty(false);
   }, [data]);
 
-  // Course search for upsell picker
-  const [courseSearch, setCourseSearch] = React.useState("");
-  const { data: courseList } = trpc.lmsAdmin.listCourses.useQuery(
-    { status: "all", type: "all", page: 1, pageSize: 200 },
+  // All-product search for upsell picker
+  const [productSearch, setProductSearch] = React.useState("");
+  const { data: allProducts } = trpc.community.listAllProductsForLinkedAccess.useQuery(
+    undefined,
     { enabled: form.upsellEnabled }
   );
-  const filteredCourses = React.useMemo(() => {
-    if (!courseList?.courses) return [];
-    const q = courseSearch.toLowerCase();
-    return courseList.courses.filter((c: any) => c.title.toLowerCase().includes(q) && c.id !== courseId);
-  }, [courseList, courseSearch, courseId]);
+  const filteredProducts = React.useMemo(() => {
+    if (!allProducts) return [];
+    const q = productSearch.toLowerCase();
+    return allProducts.filter((p: any) =>
+      p.type === form.upsellProductType &&
+      p.title.toLowerCase().includes(q) &&
+      !(p.type === "course" && p.id === courseId)
+    );
+  }, [allProducts, productSearch, form.upsellProductType, courseId]);
 
   function patch(updates: Partial<typeof form>) {
     setForm(prev => ({ ...prev, ...updates }));
@@ -12482,7 +12490,9 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
       welcomeEmailSubject: form.welcomeEmailSubject || null,
       welcomeEmailBody: form.welcomeEmailBody || null,
       upsellEnabled: form.upsellEnabled,
-      upsellCourseId: form.upsellCourseId,
+      upsellCourseId: form.upsellProductType === "course" ? form.upsellProductId : null,
+      upsellProductType: form.upsellProductType,
+      upsellProductId: form.upsellProductId,
       upsellHeadline: form.upsellHeadline || null,
       upsellDescription: form.upsellDescription || null,
       completionRedirectUrl: form.completionRedirectUrl || null,
@@ -12495,7 +12505,7 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
 
   if (isLoading) return <div className="p-6 text-sm text-gray-500">Loading…</div>;
 
-  const selectedUpsellCourse = courseList?.courses?.find((c: any) => c.id === form.upsellCourseId);
+  const selectedUpsellProduct = allProducts?.find((p: any) => p.type === form.upsellProductType && p.id === form.upsellProductId);
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -12590,33 +12600,52 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
             </div>
             <Switch checked={form.upsellEnabled} onCheckedChange={(v) => patch({ upsellEnabled: v })} />
           </div>
-          <p className="text-sm text-gray-500">Show a related course offer on the thank-you page to increase revenue.</p>
+          <p className="text-sm text-gray-500">Show a related product offer on the thank-you page to increase revenue.</p>
           {form.upsellEnabled && (
             <div className="space-y-3">
               <div>
-                <Label className="text-sm font-medium">Upsell Course</Label>
+                <Label className="text-sm font-medium">Product Type</Label>
+                <select
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={form.upsellProductType}
+                  onChange={(e) => patch({ upsellProductType: e.target.value as any, upsellProductId: null })}
+                >
+                  <option value="course">Course</option>
+                  <option value="quiz">Quiz</option>
+                  <option value="webinar">Webinar</option>
+                  <option value="download">Download</option>
+                  <option value="membership">Membership</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Upsell Product</Label>
                 <div className="mt-1 relative">
                   <Input
-                    placeholder="Search courses…"
-                    value={courseSearch || (selectedUpsellCourse ? selectedUpsellCourse.title : "")}
-                    onChange={(e) => { setCourseSearch(e.target.value); patch({ upsellCourseId: null }); }}
+                    placeholder={`Search ${form.upsellProductType}s…`}
+                    value={productSearch || (selectedUpsellProduct ? selectedUpsellProduct.title : "")}
+                    onChange={(e) => { setProductSearch(e.target.value); patch({ upsellProductId: null }); }}
                   />
-                  {courseSearch && filteredCourses.length > 0 && (
+                  {productSearch && filteredProducts.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {filteredCourses.map((c: any) => (
+                      {filteredProducts.map((p: any) => (
                         <button
-                          key={c.id}
+                          key={p.id}
                           className="w-full text-left px-3 py-2 text-sm hover:bg-teal-50 hover:text-teal-700"
-                          onClick={() => { patch({ upsellCourseId: c.id }); setCourseSearch(""); }}
+                          onClick={() => { patch({ upsellProductId: p.id }); setProductSearch(""); }}
                         >
-                          {c.title}
+                          {p.title}
                         </button>
                       ))}
                     </div>
                   )}
+                  {productSearch && filteredProducts.length === 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-sm text-gray-500">
+                      No {form.upsellProductType}s found
+                    </div>
+                  )}
                 </div>
-                {selectedUpsellCourse && !courseSearch && (
-                  <p className="text-xs text-teal-600 mt-1">Selected: {selectedUpsellCourse.title}</p>
+                {selectedUpsellProduct && !productSearch && (
+                  <p className="text-xs text-teal-600 mt-1">Selected: {selectedUpsellProduct.title}</p>
                 )}
               </div>
               <div>

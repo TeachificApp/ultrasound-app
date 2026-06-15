@@ -2846,6 +2846,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   // Upsell offer shown on the thank-you page
   upsellEnabled: boolean("upsell_enabled").default(false).notNull(),
   upsellCourseId: int("upsell_course_id"),
+  upsellProductType: varchar("upsell_product_type", { length: 20 }).$type<"course" | "quiz" | "webinar" | "download" | "membership">(),
+  upsellProductId: int("upsell_product_id"),
   upsellHeadline: varchar("upsell_headline", { length: 500 }),
   upsellDescription: text("upsell_description"),
   // Completion actions
