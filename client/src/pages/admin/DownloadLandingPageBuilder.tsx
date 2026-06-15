@@ -85,11 +85,33 @@ export default function DownloadLandingPageBuilder() {
     window.addEventListener("mouseup", onUp);
   };
 
+  // Save-as-page-template dialog state
+  const [showSavePageTemplate, setShowSavePageTemplate] = useState(false);
+  const [savePageTemplateName, setSavePageTemplateName] = useState("");
+  const [savePageTemplateDesc, setSavePageTemplateDesc] = useState("");
+  const [isSavingPageTemplate, setIsSavingPageTemplate] = useState(false);
+
   // Save-as-template dialog state
   const [saveTemplateDialogBlock, setSaveTemplateDialogBlock] = useState<Block | null>(null);
   const [saveTemplateName, setSaveTemplateName] = useState("");
   const [saveTemplateDesc, setSaveTemplateDesc] = useState("");
   const utils = trpc.useUtils();
+  const savePageTemplateMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
+    onSuccess: () => {
+      toast.success("Page saved as template!");
+      utils.lmsAdmin.listPageTemplates.invalidate();
+      setShowSavePageTemplate(false);
+      setSavePageTemplateName("");
+      setSavePageTemplateDesc("");
+      setIsSavingPageTemplate(false);
+    },
+    onError: (e: any) => { toast.error(`Save failed: ${e.message}`); setIsSavingPageTemplate(false); },
+  });
+  const handleSavePageAsTemplate = () => {
+    if (!savePageTemplateName.trim()) { toast.error("Please enter a template name"); return; }
+    setIsSavingPageTemplate(true);
+    savePageTemplateMutation.mutate({ name: savePageTemplateName, description: savePageTemplateDesc, templateType: "page", blocks });
+  };
   const saveBlockTemplateMutation = trpc.blockTemplates.save.useMutation({
     onSuccess: () => {
       toast.success("Block saved as template!");
@@ -301,6 +323,13 @@ export default function DownloadLandingPageBuilder() {
           >
             <FolderOpen size={14} /> Apply Template
           </button>
+          <button
+            onClick={() => { setSavePageTemplateName(""); setSavePageTemplateDesc(""); setShowSavePageTemplate(true); }}
+            className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-lg px-3 py-1.5 transition-colors"
+            title="Save current page as a reusable template"
+          >
+            <Bookmark size={14} /> Save as Template
+          </button>
           <Button
             onClick={handleSave}
             disabled={isSaving}
@@ -324,6 +353,32 @@ export default function DownloadLandingPageBuilder() {
           }}
         />
       )}
+
+      {/* Save as Page Template Dialog */}
+      <Dialog open={showSavePageTemplate} onOpenChange={(open) => { if (!open) setShowSavePageTemplate(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Bookmark className="w-4 h-4 text-amber-500" /> Save Page as Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Template Name <span className="text-red-500">*</span></label>
+              <Input value={savePageTemplateName} onChange={e => setSavePageTemplateName(e.target.value)} placeholder="e.g. Download Sales Page" className="h-8 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Description (optional)</label>
+              <Input value={savePageTemplateDesc} onChange={e => setSavePageTemplateDesc(e.target.value)} placeholder="Brief description…" className="h-8 text-sm" />
+            </div>
+            <p className="text-xs text-gray-400">This will save all {blocks.length} block{blocks.length !== 1 ? "s" : ""} as a reusable page template.</p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={() => setShowSavePageTemplate(false)} className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg border border-gray-200 transition-colors">Cancel</button>
+            <Button onClick={handleSavePageAsTemplate} disabled={isSavingPageTemplate} className="bg-amber-500 hover:bg-amber-600 text-white text-sm h-9">
+              <BookmarkPlus className="w-4 h-4 mr-1" /> {isSavingPageTemplate ? "Saving…" : "Save Template"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Main Editor Area */}
       <div className="flex flex-1 overflow-hidden">
