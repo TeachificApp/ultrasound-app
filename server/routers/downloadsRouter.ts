@@ -746,6 +746,41 @@ export const downloadsAdminRouter = router({
       return { id: result.id, url, fileKey };
     }),
 
+  /**
+   * Register a file that was already uploaded via /api/upload-digital-file (multipart).
+   * The multipart route handles the actual S3 upload; this procedure just inserts the DB record.
+   */
+  registerUploadedFile: protectedProcedure
+    .input(z.object({
+      productId: z.number(),
+      fileName: z.string(),
+      fileUrl: z.string(),
+      fileKey: z.string(),
+      mimeType: z.string().optional(),
+      fileSize: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [maxOrder] = await db.select({ max: sql<number>`COALESCE(MAX(sort_order), 0)` })
+        .from(digitalProductFiles)
+        .where(eq(digitalProductFiles.productId, input.productId));
+
+      const [result] = await db.insert(digitalProductFiles).values({
+        productId: input.productId,
+        fileName: input.fileName,
+        fileUrl: input.fileUrl,
+        fileKey: input.fileKey,
+        fileSize: input.fileSize ?? 0,
+        mimeType: input.mimeType ?? null,
+        sortOrder: (maxOrder?.max ?? 0) + 1,
+      }).$returningId();
+
+      return { id: result.id, url: input.fileUrl, fileKey: input.fileKey };
+    }),
+
   /** Remove a file from a digital product */
   removeFile: protectedProcedure
     .input(z.object({ fileId: z.number() }))

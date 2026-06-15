@@ -715,7 +715,8 @@ function GrantDownloadAccessDialog({ open, productId, onClose }: { open: boolean
 // ─── File Manager ───────────────────────────────────────────────────────────
 function FileManager({ productId, files }: { productId: number; files: any[] }) {
   const utils = trpc.useUtils();
-  const uploadMut = trpc.downloadsAdmin.uploadFile.useMutation({
+  const [uploading, setUploading] = useState(false);
+  const registerFileMut = trpc.downloadsAdmin.registerUploadedFile.useMutation({
     onSuccess: () => { utils.downloadsAdmin.get.invalidate({ id: productId }); toast.success("File uploaded"); },
     onError: (e) => toast.error(e.message),
   });
@@ -727,21 +728,24 @@ function FileManager({ productId, files }: { productId: number; files: any[] }) 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) { toast.error("File must be under 50 MB"); return; }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = (reader.result as string).split(",")[1];
-      uploadMut.mutate({
-        productId,
-        fileName: file.name,
-        fileBase64: base64,
-        mimeType: file.type,
-        fileSize: file.size,
-      });
-    };
-    reader.readAsDataURL(file);
+    if (file.size > 200 * 1024 * 1024) { toast.error("File must be under 200 MB"); return; }
     e.target.value = "";
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload-digital-file", { method: "POST", body: formData, credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Upload failed" }));
+        throw new Error(err.error ?? "Upload failed");
+      }
+      const { url, fileKey, filename, size, mimeType } = await res.json();
+      registerFileMut.mutate({ productId, fileName: filename, fileUrl: url, fileKey, mimeType, fileSize: size });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const formatSize = (bytes: number) => {
@@ -756,8 +760,8 @@ function FileManager({ productId, files }: { productId: number; files: any[] }) 
         <CardTitle className="text-sm">Files ({files.length})</CardTitle>
         <div>
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} />
-          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadMut.isPending}>
-            <Upload className="w-4 h-4 mr-1" /> {uploadMut.isPending ? "Uploading..." : "Upload File"}
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading || registerFileMut.isPending}>
+            <Upload className="w-4 h-4 mr-1" /> {(uploading || registerFileMut.isPending) ? "Uploading..." : "Upload File"}
           </Button>
         </div>
       </CardHeader>

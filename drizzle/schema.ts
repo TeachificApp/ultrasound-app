@@ -4134,6 +4134,8 @@ export const physicalProducts = mysqlTable("physical_products", {
   seoImage: varchar("seo_image", { length: 512 }),
   // After Purchase Workflow — JSON array of workflow action objects
   afterPurchaseWorkflow: longtext("after_purchase_workflow"),
+  // Checkout page builder config (JSON)
+  checkoutPageConfig: longtext("checkout_page_config"),
   // Stats
   orderCount: int("order_count").default(0).notNull(),
   // Per-product publish domain override (null = use global productPublishDomain)

@@ -21,10 +21,7 @@ import { Package, Check, ShoppingCart, ArrowLeft, ExternalLink } from "lucide-re
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect, useRef } from "react";
-import { ImageLinkWrapper } from "@/components/BlockPreview";
-
-// ─── Block type (matches builder) ─────────────────────────────────────────────
-interface Block { id: string; type: string; data: Record<string, any>; }
+import { ImageLinkWrapper, BlockPreview, type Block } from "@/components/BlockPreview";
 
 // ─── Shopify Embed ─────────────────────────────────────────────────────────────
 function ShopifyEmbed({ embedCode }: { embedCode: string }) {
@@ -258,7 +255,8 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
       );
     }
     default:
-      return null;
+      // Delegate all other block types to the shared BlockPreview renderer
+      return <BlockPreview block={block} />;
   }
 }
 

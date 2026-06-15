@@ -543,6 +543,10 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: () => { toast.success("Access expiry updated."); refetch(); setExpiryEditId(null); setExpiryEditValue(""); },
     onError: (e) => toast.error(e.message),
   });
+  const resendEnrollmentEmail = trpc.adminUser.resendEnrollmentEmail.useMutation({
+    onSuccess: (res) => toast.success(`Access email resent to ${res.sentTo}`),
+    onError: (e) => toast.error(e.message),
+  });
 
   const enrollments = data.enrollments ?? [];
   const courses   = enrollments.filter((e: any) => !e.isQuiz && !e.isDownload);
@@ -684,6 +688,13 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       <Calendar className="w-3 h-3" /> Edit Expiry
                     </button>
                     <button
+                      onClick={() => resendEnrollmentEmail.mutate({ enrollmentId: e.enrollmentId })}
+                      disabled={resendEnrollmentEmail.isPending}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 disabled:opacity-50"
+                    >
+                      {resendEnrollmentEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
+                    </button>
+                    <button
                       onClick={() => setUnenrollConfirm(e.enrollmentId)}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                     >
@@ -791,6 +802,13 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
                     >
                       <Calendar className="w-3 h-3" /> Edit Expiry
+                    </button>
+                    <button
+                      onClick={() => resendEnrollmentEmail.mutate({ enrollmentId: e.enrollmentId })}
+                      disabled={resendEnrollmentEmail.isPending}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 disabled:opacity-50"
+                    >
+                      {resendEnrollmentEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
                     </button>
                     <button
                       onClick={() => setUnenrollConfirm(e.enrollmentId)}

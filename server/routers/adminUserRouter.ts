@@ -47,12 +47,15 @@ import {
   webinars,
   lmsLessonProgress,
   lmsLessons,
+  platformSettings,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail } from "../_core/email";
+import { sendEnrollmentEmail, sendDownloadAccessEmail } from "../lib/enrollmentEmail";
+import { getOrCreateAccessToken } from "../db";
 import { getBrandDisplayConfig } from "../../shared/brands";
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { or, like, gte, lte } from "drizzle-orm";
@@ -2640,6 +2643,72 @@ export const adminUserRouter = router({
         })
         .where(eq(users.id, user.id));
       return { success: true, email: user.email };
+    }),
+
+  /** Resend the enrollment welcome / access email for a specific enrollment */
+  resendEnrollmentEmail: protectedProcedure
+    .input(z.object({
+      enrollmentId: z.number().int(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Load enrollment + course + user in one go
+      const [[enrollmentRows], [settingsRows]] = await Promise.all([
+        db.execute(sql`
+          SELECT
+            e.id AS enrollmentId,
+            e.user_id AS userId,
+            c.id AS courseId,
+            c.title AS courseTitle,
+            c.slug AS courseSlug,
+            c.type AS courseType,
+            u.email AS userEmail,
+            COALESCE(u.display_name, u.name, u.email) AS userName
+          FROM lms_enrollments e
+          JOIN lms_courses c ON c.id = e.course_id
+          JOIN users u ON u.id = e.user_id
+          WHERE e.id = ${input.enrollmentId}
+          LIMIT 1
+        `),
+        db.select({
+          enrollmentEmailEnabled: platformSettings.enrollmentEmailEnabled,
+          enrollmentEmailSubject: platformSettings.enrollmentEmailSubject,
+          enrollmentEmailIntro: platformSettings.enrollmentEmailIntro,
+        }).from(platformSettings).limit(1),
+      ]);
+
+      const enrollment = (enrollmentRows as any[])[0];
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+
+      const settings = (settingsRows as any[])[0];
+      const userId = Number(enrollment.userId);
+      const accessToken = await getOrCreateAccessToken(userId);
+
+      let sent = false;
+      if (enrollment.courseType === "download") {
+        sent = await sendDownloadAccessEmail({
+          to: { name: String(enrollment.userName), email: String(enrollment.userEmail) },
+          productTitle: String(enrollment.courseTitle),
+          productSlug: String(enrollment.courseSlug),
+          customSubject: settings?.enrollmentEmailSubject,
+          customIntro: settings?.enrollmentEmailIntro,
+          accessToken,
+        });
+      } else {
+        sent = await sendEnrollmentEmail({
+          to: { name: String(enrollment.userName), email: String(enrollment.userEmail) },
+          courseTitle: String(enrollment.courseTitle),
+          courseSlug: String(enrollment.courseSlug),
+          customSubject: settings?.enrollmentEmailSubject,
+          customIntro: settings?.enrollmentEmailIntro,
+          accessToken,
+        });
+      }
+
+      return { success: sent, sentTo: String(enrollment.userEmail) };
     }),
 
   updateEnrollmentExpiry: protectedProcedure

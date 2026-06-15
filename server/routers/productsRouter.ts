@@ -127,6 +127,85 @@ export const productsLearnerRouter = router({
       return !!row2;
     }),
 
+  /** Create an embedded Stripe Checkout session for a physical product (learner-facing). */
+  createEmbeddedCheckoutSession: protectedProcedure
+    .input(z.object({ productSlug: z.string(), origin: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db.select().from(physicalProducts)
+        .where(eq(physicalProducts.slug, input.productSlug)).limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+      if (product.status !== "published" && !product.isFree) throw new TRPCError({ code: "FORBIDDEN", message: "This product is not available." });
+      if (product.checkoutMode !== "native") throw new TRPCError({ code: "BAD_REQUEST", message: "This product uses an external checkout." });
+      if (product.isFree || Number(product.price) === 0) {
+        // Auto-grant free product
+        await db.insert(physicalProductOrders).values({
+          userId: ctx.user.id,
+          productId: product.id,
+          pricingOptionId: null,
+          amountPaid: 0,
+          currency: product.currency,
+        }).onDuplicateKeyUpdate({ set: { userId: ctx.user.id } }).catch(() => {});
+        const { platformSettings } = await import("../../drizzle/schema");
+        const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
+        return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: settings?.termsUrl ?? "", privacyUrl: settings?.privacyUrl ?? "", productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null };
+      }
+      const { platformSettings } = await import("../../drizzle/schema");
+      const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const shippingOpts = product.requiresShipping
+        ? { shipping_address_collection: { allowed_countries: ["US", "CA", "AU", "GB"] as any } }
+        : {};
+      const session = await stripe.checkout.sessions.create({
+        ui_mode: "embedded",
+        mode: "payment",
+        customer_email: ctx.user.email ?? undefined,
+        client_reference_id: ctx.user.id.toString(),
+        allow_promotion_codes: true,
+        line_items: [{
+          price_data: {
+            currency: product.currency,
+            product_data: {
+              name: product.title,
+              description: product.subtitle ?? undefined,
+              images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
+            },
+            unit_amount: Math.round(Number(product.price)),
+          },
+          quantity: 1,
+        }],
+        metadata: { type: "physical_product", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=physical`,
+        ...shippingOpts,
+      });
+      return {
+        clientSecret: session.client_secret!,
+        free: false,
+        courseTitle: product.title,
+        courseSubtitle: product.subtitle ?? null,
+        courseDescription: product.description ?? null,
+        courseThumbnail: product.thumbnailUrl ?? null,
+        primaryColor: "#189aa1",
+        accentColor: "#4ad9e0",
+        gradientFrom: "#189aa1",
+        gradientTo: "#4ad9e0",
+        gradientDirection: "135deg",
+        playerTheme: "light",
+        termsUrl: settings?.termsUrl ?? "",
+        privacyUrl: settings?.privacyUrl ?? "",
+        productName: product.title,
+        displayPrice: Math.round(Number(product.price)),
+        pricingType: "one_time",
+        isSubscription: false,
+        billingLabel: null,
+        currency: product.currency,
+        minSeats: null,
+        discountPercent: null,
+      };
+    }),
+
   /** List the current user's orders */
   myOrders: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();

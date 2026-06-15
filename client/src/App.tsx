@@ -1006,6 +1006,35 @@ function IHeartEchoRouter() {
         {/* ── Physician Over-Read (public, token-based) ──────────────── */}
         <Route path="/physician-review/:token" component={PhysicianOverReadForm} />
 
+        {/* ── Shared content routes (also on app.allaboutultrasound.com + learn) ── */}
+        <Route path="/products">{() => <Suspense fallback={pageFallback}><ProductsListing /></Suspense>}</Route>
+        <Route path="/product/:slug" component={ProductLanding} />
+        <Route path="/downloads/:slug/files">{(params: { slug: string }) => <SsoRedirect path={`/downloads/${params.slug}/files`} />}</Route>
+        <Route path="/downloads/:slug" component={DownloadLanding} />
+        <Route path="/downloads" component={DownloadsBrowse} />
+        <Route path="/bundles/:slug" component={BundleLanding} />
+        <Route path="/checkout/complete">
+          <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
+        </Route>
+        <Route path="/checkout/:slug">
+          <Suspense fallback={pageFallback}><Checkout /></Suspense>
+        </Route>
+        <Route path="/memberships/:slug">{() => <Suspense fallback={pageFallback}><MembershipPage /></Suspense>}</Route>
+        <Route path="/my-memberships/:slug">{() => <Suspense fallback={pageFallback}><MyMemberships /></Suspense>}</Route>
+        <Route path="/my-memberships">{() => <Suspense fallback={pageFallback}><MyMemberships /></Suspense>}</Route>
+        <Route path="/quiz/:joinCode">{() => <SonoQuizPlay />}</Route>
+        <Route path="/community" component={CommunityHub} />
+        <Route path="/community/:slug" component={CommunityFeed} />
+        <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
+        <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
+        <Route path="/community/members/:userId" component={CommunityProfile} />
+        <Route path="/community/dms" component={CommunityDMs} />
+        <Route path="/community/dms/:userId" component={CommunityDMs} />
+        <Route path="/community/leaderboard" component={CommunityLeaderboard} />
+        <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
+        <Route path="/:slug/:pageSlug">{() => <PublicFunnelPageRoute />}</Route>
+        <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>
+
         <Route path="/404" component={NotFound} />
         <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
         <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
