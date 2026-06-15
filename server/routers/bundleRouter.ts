@@ -271,6 +271,16 @@ export const bundleAdminRouter = router({
       status: z.enum(["draft","published"]).optional(), description: z.string().optional(),
       coverImage: z.string().optional(), accessType: z.enum(["free","paid"]).optional(),
       pricingOptions: z.string().optional(), landingPageBlocks: z.string().optional(),
+      // Structured pricing fields
+      pricingType: z.enum(["free","one_time","subscription","payment_plan","trial_then_subscription"]).optional(),
+      price: z.number().optional(),
+      isFree: z.boolean().optional(),
+      subscriptionInterval: z.enum(["monthly","quarterly","annual"]).nullable().optional(),
+      trialDays: z.number().nullable().optional(),
+      downPayment: z.number().nullable().optional(),
+      installmentCount: z.number().nullable().optional(),
+      installmentAmount: z.number().nullable().optional(),
+      installmentIntervalDays: z.number().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -404,6 +414,37 @@ export const bundleAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(bundles).set({ afterPurchaseWorkflow: input.workflow }).where(eq(bundles.id, input.bundleId));
+      return { success: true };
+    }),
+  getHidePricingOptions: protectedProcedure
+    .input(z.object({ bundleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [row] = await db.select({ hidePricingOptions: bundles.hidePricingOptions }).from(bundles).where(eq(bundles.id, input.bundleId)).limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      return { hidePricingOptions: !!row.hidePricingOptions };
+    }),
+  updateHidePricingOptions: protectedProcedure
+    .input(z.object({ bundleId: z.number(), hidePricingOptions: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(bundles).set({ hidePricingOptions: input.hidePricingOptions ? 1 : 0 }).where(eq(bundles.id, input.bundleId));
+      return { success: true };
+    }),
+  getCheckoutPageConfig: protectedProcedure
+    .input(z.object({ bundleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [row] = await db.select({ landingPageBlocks: bundles.landingPageBlocks }).from(bundles).where(eq(bundles.id, input.bundleId)).limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      return { config: row.landingPageBlocks ?? null };
+    }),
+  saveCheckoutPageConfig: protectedProcedure
+    .input(z.object({ bundleId: z.number(), config: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      try { JSON.parse(input.config); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid JSON" }); }
+      await db.update(bundles).set({ landingPageBlocks: input.config }).where(eq(bundles.id, input.bundleId));
       return { success: true };
     }),
   listAvailableItems: protectedProcedure.query(async ({ ctx }) => {

@@ -115,9 +115,63 @@ async function syncDatabase(): Promise<SyncResult["dbSync"]> {
     const tables = parseInt(tableCount.trim(), 10);
     console.log(`[MirrorSync] Dump complete: ${tables} tables`);
 
+    // ── Step 1.5: Back up community-generated data from Railway ──────────────
+    // These tables contain user-generated content created on the production site.
+    // They must be preserved across syncs because the Manus TiDB may not have them.
+    const communityTables = [
+      "community_posts",
+      "community_post_comments",
+      "community_post_reactions",
+      "community_post_polls",
+      "community_poll_votes",
+      "community_members",
+      "community_hashtags",
+      "community_post_hashtags",
+      "community_xp_events",
+      "community_badges",
+      "community_user_badges",
+      "thinkific_post_imports",
+    ];
+    const backupFile = "/tmp/mirror_sync_community_backup.sql";
+    let communityBackupSuccess = false;
+    try {
+      // Check which tables actually exist in Railway before dumping
+      const { stdout: existingTablesRaw } = await execAsync(
+        `mysql -h ${rHost} -P ${rPort} -u ${rUser} -p'${rPass}' ${rDb} -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='${rDb}' AND table_name IN (${communityTables.map(t => `'${t}'`).join(',')})" 2>/dev/null`
+      );
+      const existingTables = existingTablesRaw.trim().split("\n").filter(Boolean);
+      if (existingTables.length > 0) {
+        const backupCmd = `mysqldump -h ${rHost} -P ${rPort} -u ${rUser} -p'${rPass}' --no-tablespaces --skip-lock-tables --set-gtid-purged=OFF ${rDb} ${existingTables.join(" ")}`;
+        await execAsync(`${backupCmd} > ${backupFile} 2>/dev/null`, { maxBuffer: 200 * 1024 * 1024 });
+        communityBackupSuccess = true;
+        console.log(`[MirrorSync] Community data backed up (${existingTables.length} tables)`);
+      } else {
+        console.log("[MirrorSync] No community tables found in Railway yet, skipping backup");
+      }
+    } catch (backupErr: any) {
+      console.warn("[MirrorSync] Community backup failed (non-fatal):", backupErr.message);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Step 2: Drop all tables in Railway
     console.log("[MirrorSync] Dropping existing Railway tables...");
-    const dropCmd = `mysql -h ${rHost} -P ${rPort} -u ${rUser} -p'${rPass}' ${rDb} -e "SET FOREIGN_KEY_CHECKS=0; SET GROUP_CONCAT_MAX_LEN=1000000; SET @tables=NULL; SELECT GROUP_CONCAT('\\\`',table_name,'\\\`') INTO @tables FROM information_schema.tables WHERE table_schema='${rDb}'; SET @tables=IFNULL(CONCAT('DROP TABLE IF EXISTS ',@tables),'SELECT 1'); PREPARE stmt FROM @tables; EXECUTE stmt; DEALLOCATE PREPARE stmt; SET FOREIGN_KEY_CHECKS=1;"`;
+    // Write drop SQL to a temp file to avoid shell quoting issues
+    const dropSqlFile = "/tmp/mirror_drop.sql";
+    const dropSqlContent = [
+      "SET FOREIGN_KEY_CHECKS=0;",
+      "SET GROUP_CONCAT_MAX_LEN=1000000;",
+      "SET @tables=NULL;",
+      `SELECT GROUP_CONCAT(table_name) INTO @tables FROM information_schema.tables WHERE table_schema='${rDb}';`,
+      "SET @tables=IFNULL(CONCAT('DROP TABLE IF EXISTS ',@tables),'SELECT 1');",
+      "PREPARE stmt FROM @tables;",
+      "EXECUTE stmt;",
+      "DEALLOCATE PREPARE stmt;",
+      "SET FOREIGN_KEY_CHECKS=1;",
+    ].join("\n");
+    await execAsync(`cat > ${dropSqlFile} << 'ENDSQL'\n${dropSqlContent}\nENDSQL`).catch(() =>
+      require("fs").writeFileSync(dropSqlFile, dropSqlContent)
+    );
+    const dropCmd = `mysql -h ${rHost} -P ${rPort} -u ${rUser} -p'${rPass}' ${rDb} < ${dropSqlFile}`;
     await execAsync(`${dropCmd} 2>/dev/null`);
 
     // Step 3: Import into Railway
@@ -125,8 +179,30 @@ async function syncDatabase(): Promise<SyncResult["dbSync"]> {
     const importCmd = `mysql -h ${rHost} -P ${rPort} -u ${rUser} -p'${rPass}' ${rDb} < ${dumpFile}`;
     await execAsync(`${importCmd} 2>/dev/null`, { maxBuffer: 100 * 1024 * 1024 });
 
+    // ── Step 3.5: Restore community-generated data ────────────────────────────
+    // Re-import the backed-up community tables, replacing what the Manus dump
+    // may have brought in (which could be stale or empty).
+    if (communityBackupSuccess) {
+      try {
+        console.log("[MirrorSync] Restoring community-generated data...");
+        // Drop the community tables that were just imported from Manus (they may be stale/empty)
+        const dropCommSqlFile = "/tmp/mirror_drop_community.sql";
+        const dropCommSqlContent = ["SET FOREIGN_KEY_CHECKS=0;", ...communityTables.map(t => `DROP TABLE IF EXISTS ${t};`), "SET FOREIGN_KEY_CHECKS=1;"].join("\n");
+        require("fs").writeFileSync(dropCommSqlFile, dropCommSqlContent);
+        const dropCommunityCmd = `mysql -h ${rHost} -P ${rPort} -u ${rUser} -p'${rPass}' ${rDb} < ${dropCommSqlFile}`;
+        await execAsync(`${dropCommunityCmd} 2>/dev/null`);
+        // Re-import the backed-up community data
+        const restoreCmd = `mysql -h ${rHost} -P ${rPort} -u ${rUser} -p'${rPass}' ${rDb} < ${backupFile}`;
+        await execAsync(`${restoreCmd} 2>/dev/null`, { maxBuffer: 200 * 1024 * 1024 });
+        console.log("[MirrorSync] Community data restored successfully");
+      } catch (restoreErr: any) {
+        console.warn("[MirrorSync] Community data restore failed (non-fatal):", restoreErr.message);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Cleanup
-    await execAsync(`rm -f ${dumpFile}`).catch(() => {});
+    await execAsync(`rm -f ${dumpFile} ${backupFile} /tmp/mirror_drop.sql /tmp/mirror_drop_community.sql`).catch(() => {});
 
     console.log(`[MirrorSync] DB sync complete: ${tables} tables imported to Railway`);
     return { success: true, tablesImported: tables };
