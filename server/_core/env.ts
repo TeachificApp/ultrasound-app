@@ -5,6 +5,7 @@ export const ENV = {
   // it sends this header so the server can emit canonical URLs pointing to the
   // root domain instead of the app subdomain.
   canonicalRootDomain: process.env.CANONICAL_ROOT_DOMAIN ?? "",
+  iheCanonicalRootDomain: process.env.IHE_CANONICAL_ROOT_DOMAIN ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",

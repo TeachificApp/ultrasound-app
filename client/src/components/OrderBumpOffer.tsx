@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Sparkles, X } from "lucide-react";
 
 interface OrderBumpOfferProps {
-  triggerType: "course" | "download" | "bundle";
+  triggerType: "course" | "quiz" | "download" | "bundle" | "physical" | "cohort" | "webinar" | "membership";
   triggerProductId: number;
   timing: "before_checkout" | "after_checkout";
   onAccept?: (bumpData: { bumpId: number; bumpType: string; bumpProductId: number; bumpPrice: number; headline?: string | null }) => void;
@@ -65,7 +65,7 @@ export default function OrderBumpOffer({ triggerType, triggerProductId, timing, 
     }
     acceptBump.mutate({
       bumpId: bump.id,
-      triggerOrderType: triggerType,
+      triggerOrderType: triggerType as any,
     });
   }
 
@@ -88,8 +88,20 @@ export default function OrderBumpOffer({ triggerType, triggerProductId, timing, 
             {bump.discountLabel}
           </span>
         )}
-        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${bump.bumpType === "physical" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
-          {bump.bumpType === "physical" ? "Physical add-on" : "Digital add-on"}
+        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+          bump.bumpType === "physical" ? "bg-amber-100 text-amber-700" :
+          bump.bumpType === "webinar" ? "bg-purple-100 text-purple-700" :
+          bump.bumpType === "membership" ? "bg-indigo-100 text-indigo-700" :
+          "bg-blue-100 text-blue-700"
+        }`}>
+          {bump.bumpType === "physical" ? "Physical add-on" :
+           bump.bumpType === "webinar" ? "Webinar" :
+           bump.bumpType === "membership" ? "Membership" :
+           bump.bumpType === "course" ? "Course" :
+           bump.bumpType === "quiz" ? "Quiz" :
+           bump.bumpType === "bundle" ? "Bundle" :
+           bump.bumpType === "cohort" ? "Cohort" :
+           "Digital add-on"}
         </span>
       </div>
 

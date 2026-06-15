@@ -4,9 +4,16 @@
  * Run this hook once at the top level of each domain's router (LMS, IHE, AAUS, Accreditation).
  * When the user is authenticated, it:
  *   1. Issues one short-lived SSO token per target domain (60-second TTL, single-use each)
- *   2. Pings each of the other domains' /api/sso/auto?token=TOKEN endpoint
+ *   2. Pings each of the other domains' /api/sso/auto?token=TOKEN&domain=HOSTNAME endpoint
  *      via a hidden <img> tag — the browser sends the request with credentials,
  *      and the server sets a session cookie for that domain
+ *
+ * Why ?domain= is required:
+ *   <img> tag requests carry no Origin, no Referer, and no x-forwarded-host headers.
+ *   Without the ?domain= param, the server's getPublicHostname() would fall back to
+ *   CANONICAL_ROOT_DOMAIN (the AAU domain) and scope the IHE cookie to the wrong domain.
+ *   By passing the target hostname explicitly, the server can always scope the cookie
+ *   correctly regardless of request headers.
  *
  * Accreditation domain rules:
  *  - Broadcasting FROM accreditation.iheartecho.com: only users with an active
@@ -26,8 +33,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 
 /** All known app domains that participate in cross-domain SSO */
 const ALL_DOMAINS = [
-  "https://app.iheartecho.com",   // canonical .com domain
-  "https://app.iheartecho.net",   // legacy .net domain (keep for existing sessions)
+  "https://app.iheartecho.com",   // canonical .com domain (primary)
   "https://app.allaboutultrasound.com",
   "https://learn.allaboutultrasound.com",
   "https://members.allaboutultrasound.com",
@@ -44,6 +50,14 @@ function isAccreditationDomain(): boolean {
 }
 
 /**
+ * Extract the hostname from a domain origin string.
+ * e.g. "https://app.iheartecho.com" → "app.iheartecho.com"
+ */
+function hostnameFromOrigin(origin: string): string {
+  try { return new URL(origin).hostname; } catch { return origin; }
+}
+
+/**
  * Returns the production domains that are NOT the current domain.
  * Always returns all non-current production domains regardless of
  * whether we're on a staging/dev hostname.
@@ -54,12 +68,17 @@ function getTargetDomains(): string[] {
 }
 
 /**
- * Injects a hidden <img> element that loads /api/sso/auto?token=TOKEN on the
- * target domain. The server sets a session cookie in the response.
+ * Injects a hidden <img> element that loads /api/sso/auto?token=TOKEN&domain=HOSTNAME
+ * on the target domain. The server sets a session cookie in the response.
+ *
+ * The ?domain= param is critical: <img> requests carry no Origin/Referer headers,
+ * so the server needs the explicit hostname to scope the cookie correctly.
+ *
  * The <img> is removed from the DOM after 15 seconds.
  */
 function pingDomain(domain: string, token: string): void {
-  const url = `${domain}/api/sso/auto?token=${encodeURIComponent(token)}`;
+  const hostname = hostnameFromOrigin(domain);
+  const url = `${domain}/api/sso/auto?token=${encodeURIComponent(token)}&domain=${encodeURIComponent(hostname)}`;
   const img = document.createElement("img");
   img.src = url;
   img.style.cssText = "position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;";
@@ -104,7 +123,7 @@ export function useCrossDomainSso() {
           // Mark as done so we don't re-broadcast on next navigation within this session
           sessionStorage.setItem(SSO_BROADCAST_KEY, "1");
 
-          // Ping each target domain with its own unique token
+          // Ping each target domain with its own unique token + explicit domain param
           targets.forEach((domain, i) => {
             const token = tokens[i];
             if (token) pingDomain(domain, token);

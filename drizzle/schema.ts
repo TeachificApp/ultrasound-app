@@ -3448,13 +3448,13 @@ export const orderBumps = mysqlTable("order_bumps", {
   conditionProductType: mysqlEnum("condition_product_type", ["course", "quiz", "download", "bundle", "physical"]),
   conditionProductId: int("condition_product_id"),
   // The trigger product — when a user buys this, the bump is offered (nullable for standalone)
-  triggerType: mysqlEnum("trigger_type", ["course", "quiz", "download", "bundle", "physical", "cohort"]).notNull().default("course"),
+  triggerType: mysqlEnum("trigger_type", ["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership"]).notNull().default("course"),
   triggerProductId: int("trigger_product_id").default(0).notNull(),
   // Conditional: if set, only show this bump when the user is purchasing this specific pricing option
   // null = show for ALL pricing options of the trigger product
   triggerPricingOptionId: int("trigger_pricing_option_id"),
   // The bump offer — what product is being offered as the bump
-  bumpType: mysqlEnum("bump_type", ["course", "quiz", "download", "bundle", "physical", "cohort"]).notNull().default("download"),
+  bumpType: mysqlEnum("bump_type", ["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership"]).notNull().default("download"),
   bumpProductId: int("bump_product_id").default(0).notNull(),
   // When to show the bump
   timing: mysqlEnum("timing", ["before_checkout", "after_checkout", "direct_link"]).default("after_checkout").notNull(),

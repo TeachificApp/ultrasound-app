@@ -1,9 +1,9 @@
 /**
  * ssoAuto.ts — Cross-domain silent SSO endpoint
  *
- * GET /api/sso/auto?token=TOKEN&origin=ORIGIN
+ * GET /api/sso/auto?token=TOKEN&domain=app.iheartecho.com
  *
- * Called by the SsoAutoLogin component on every app load when the user is
+ * Called by the useCrossDomainSso hook on every app load when the user is
  * already authenticated on another domain. It exchanges the short-lived SSO
  * token for a session cookie on THIS domain, signing the user in as a free
  * member (premium stays siloed to the originating app).
@@ -12,14 +12,21 @@
  * tag — this sidesteps CORS preflight issues entirely, since image loads are
  * simple cross-origin requests that always carry cookies.
  *
+ * Cookie domain scoping:
+ *  - The ?domain= query param is the authoritative source for cookie scoping.
+ *    It is set by the calling client (useCrossDomainSso) to the exact target
+ *    hostname (e.g. "app.iheartecho.com"). This is necessary because <img> tag
+ *    requests carry no Origin, no Referer, and no x-forwarded-host headers, so
+ *    getPublicHostname() would otherwise fall back to CANONICAL_ROOT_DOMAIN
+ *    (which is the AAU domain) and scope the cookie to the wrong domain.
+ *
  * Security notes:
  *  - Tokens are single-use (usedAt is set on first exchange)
  *  - Tokens expire after 60 seconds
- *  - The origin parameter is validated against the known app domains
+ *  - The ?domain= value is validated against the known app domains whitelist
  *  - CORS headers are set to allow credentials from known origins
  */
 import type { Express, Request, Response } from "express";
-import crypto from "crypto";
 import { eq, and, isNull, gt } from "drizzle-orm";
 import { getDb } from "../db";
 import { ssoTokens, users } from "../../drizzle/schema";
@@ -44,6 +51,16 @@ const ALLOWED_ORIGINS = new Set([
   // Staging / manus.space domains — allow any *.manus.space origin
 ]);
 
+/** Known hostnames that are valid ?domain= values for cookie scoping */
+const ALLOWED_COOKIE_DOMAINS = new Set([
+  "app.iheartecho.com",
+  "app.iheartecho.net",
+  "app.allaboutultrasound.com",
+  "learn.allaboutultrasound.com",
+  "members.allaboutultrasound.com",
+  "accreditation.iheartecho.com",
+]);
+
 function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
   if (ALLOWED_ORIGINS.has(origin)) return true;
@@ -59,15 +76,39 @@ function isAllowedOrigin(origin: string | undefined): boolean {
   return false;
 }
 
+/**
+ * Validate and return the cookie hostname from the ?domain= query param.
+ * Falls back to resolving from the request if not provided or invalid.
+ */
+function resolveCookieHostname(req: Request): string | undefined {
+  const domainParam = req.query.domain as string | undefined;
+  if (domainParam) {
+    const cleaned = domainParam.trim().split(":")[0].toLowerCase();
+    // Accept known production domains
+    if (ALLOWED_COOKIE_DOMAINS.has(cleaned)) return cleaned;
+    // Accept *.manus.space and *.manus.computer staging domains
+    if (cleaned.endsWith(".manus.space") || cleaned.endsWith(".manus.computer")) return cleaned;
+    // Accept localhost for dev
+    if (cleaned === "localhost" || cleaned === "127.0.0.1") return cleaned;
+  }
+  // Fallback: try x-forwarded-host (set by Cloudflare/nginx)
+  const xfh = req.headers["x-forwarded-host"];
+  if (xfh) {
+    const fwdHost = (Array.isArray(xfh) ? xfh[0] : xfh).split(",")[0].trim().split(":")[0];
+    if (fwdHost) return fwdHost;
+  }
+  return undefined;
+}
+
 export function registerSsoAutoRoute(app: Express) {
   /**
-   * GET /api/sso/auto?token=TOKEN
+   * GET /api/sso/auto?token=TOKEN&domain=HOSTNAME
    *
    * Exchanges a one-time SSO token for a session cookie on this domain.
    * Returns a 1×1 transparent GIF so it can be loaded via an <img> tag.
    *
-   * The browser automatically sends cookies with the response because the
-   * server sets Set-Cookie with SameSite=None;Secure.
+   * The ?domain= param is used to scope the cookie to the correct domain
+   * (critical for <img> tag requests which carry no Origin/Referer headers).
    */
   app.get("/api/sso/auto", async (req: Request, res: Response) => {
     // Set CORS headers to allow the calling origin to read the response
@@ -132,10 +173,16 @@ export function registerSsoAutoRoute(app: Express) {
         name: user.name ?? user.email ?? "User",
       });
 
-      const cookieOptions = getSessionCookieOptions(req);
+      // Resolve the target hostname from ?domain= param (most reliable for <img> pings)
+      // then fall back to standard request-based resolution.
+      const cookieHostname = resolveCookieHostname(req);
+      const cookieOptions = getSessionCookieOptions(req, cookieHostname);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      console.log(`[SsoAuto] Signed in user ${user.id} via cross-domain SSO from ${origin ?? "unknown"}`);
+      console.log(
+        `[SsoAuto] Signed in user ${user.id} via cross-domain SSO` +
+        ` | domain=${cookieHostname ?? "auto"} | origin=${origin ?? "unknown"}`
+      );
     } catch (err) {
       console.error("[SsoAuto] Error:", err);
       // Fall through — still send the GIF

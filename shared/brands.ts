@@ -75,7 +75,7 @@ export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
         senderName: "iHeartEcho™",
         supportEmail: "support@iheartecho.com",
         websiteUrl: "https://www.iheartecho.com",
-        appUrl: "https://app.iheartecho.net",
+        appUrl: "https://app.iheartecho.com",
         logoUrl: IHE_LOGO,
         primaryColor: "#189aa1",
         darkColor: "#0e1e2e",

@@ -15,7 +15,7 @@ import { BlockPreview } from "@/components/BlockPreview";
 import type { Block, BlockType } from "@/components/BlockPreview";
 import {
   Plus, Trash2, Edit, Copy, ToggleLeft, ToggleRight, TrendingUp,
-  ArrowRight, Package, BookOpen, Download, Layers, X, LayoutTemplate,
+  ArrowRight, Package, BookOpen, Download, Layers, X, LayoutTemplate, Video, Users,
   Rows, ChevronDown, ChevronUp, GripVertical,
 } from "lucide-react";
 import {
@@ -36,10 +36,10 @@ import { CSS } from "@dnd-kit/utilities";
 
 type OrderBump = {
   id: number;
-  triggerType: "course" | "quiz" | "download" | "bundle" | "physical" | "cohort";
+  triggerType: "course" | "quiz" | "download" | "bundle" | "physical" | "cohort" | "webinar" | "membership";
   triggerProductId: number;
   triggerPricingOptionId: number | null;
-  bumpType: "course" | "quiz" | "download" | "bundle" | "physical" | "cohort";
+  bumpType: "course" | "quiz" | "download" | "bundle" | "physical" | "cohort" | "webinar" | "membership";
   bumpProductId: number;
   timing: "before_checkout" | "after_checkout";
   bumpPrice: number;
@@ -68,6 +68,8 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   download: <Download size={14} className="text-blue-600" />,
   bundle: <Layers size={14} className="text-teal-600" />,
   physical: <Package size={14} className="text-amber-600" />,
+  webinar: <Video size={14} className="text-purple-600" />,
+  membership: <Users size={14} className="text-indigo-600" />,
 };
 
 const BUMP_BLOCK_TYPES: Array<{ type: BlockType; label: string; category: string }> = [
@@ -384,18 +386,22 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
   const { data: downloads, isLoading: downloadsLoading } = trpc.downloadsAdmin.list.useQuery();
   const { data: physicalProductsData, isLoading: physLoading } = trpc.productsAdmin.list.useQuery();
   const { data: bundlesData, isLoading: bundlesLoading } = trpc.downloadsAdmin.listBundles.useQuery();
+  const { data: webinarsData, isLoading: webinarsLoading } = trpc.webinarAdmin.list.useQuery({ pageSize: 200 });
+  const { data: membershipsData, isLoading: membershipsLoading } = trpc.membership.listAll.useQuery();
   const allCourses = coursesResult?.courses ?? [];
   const courses = (allCourses as any[]).filter((c: any) => c.type === "course");
   const quizzes = (allCourses as any[]).filter((c: any) => c.type === "quiz");
   const cohorts = (allCourses as any[]).filter((c: any) => c.type === "cohort");
   const physicalProducts = physicalProductsData ?? [];
   const bundles = bundlesData ?? [];
-  const isLoadingProducts = coursesLoading || downloadsLoading || physLoading || bundlesLoading;
+  const webinarList = webinarsData?.webinars ?? [];
+  const membershipList = (membershipsData as any[]) ?? [];
+  const isLoadingProducts = coursesLoading || downloadsLoading || physLoading || bundlesLoading || webinarsLoading || membershipsLoading;
 
   const [form, setForm] = useState({
-    triggerType: bump?.triggerType ?? "course" as "course" | "quiz" | "download" | "bundle" | "physical",
+    triggerType: bump?.triggerType ?? "course" as "course" | "quiz" | "download" | "bundle" | "physical" | "cohort" | "webinar" | "membership",
     triggerProductId: bump?.triggerProductId ?? 0,
-    bumpType: bump?.bumpType ?? "download" as "course" | "quiz" | "download" | "bundle" | "physical",
+    bumpType: bump?.bumpType ?? "download" as "course" | "quiz" | "download" | "bundle" | "physical" | "cohort" | "webinar" | "membership",
     bumpProductId: bump?.bumpProductId ?? 0,
     timing: bump?.timing ?? "after_checkout" as "before_checkout" | "after_checkout",
     bumpPrice: bump?.bumpPrice ?? 0,
@@ -458,6 +464,8 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
     if (type === "download") return (downloads as any[]) ?? [];
     if (type === "bundle") return (bundles as any[]);
     if (type === "physical") return (physicalProducts as any[]);
+    if (type === "webinar") return webinarList;
+    if (type === "membership") return membershipList;
     return [];
   }
 
@@ -535,6 +543,8 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
             <option value="download">Download</option>
             <option value="bundle">Bundle</option>
             <option value="physical">Physical Product</option>
+            <option value="webinar">Webinar</option>
+            <option value="membership">Membership</option>
           </select>
           <select value={form.triggerProductId} onChange={e => setForm({ ...form, triggerProductId: Number(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
@@ -552,6 +562,8 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
             <option value="download">Download</option>
             <option value="bundle">Bundle</option>
             <option value="physical">Physical Product</option>
+            <option value="webinar">Webinar</option>
+            <option value="membership">Membership</option>
           </select>
           <select value={form.bumpProductId} onChange={e => setForm({ ...form, bumpProductId: Number(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">

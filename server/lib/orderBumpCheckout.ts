@@ -7,12 +7,23 @@ import {
   digitalPurchases,
   lmsCourses,
   lmsEnrollments,
+  membershipPlans,
+  membershipSubscriptions,
   orderBumpConversions,
   orderBumps,
+  webinarRegistrations,
+  webinars,
 } from "../../drizzle/schema";
 
-type TriggerType = "course" | "download" | "bundle";
-type BumpType = "course" | "download" | "bundle" | "physical";
+export type ProductType =
+  | "course"
+  | "quiz"
+  | "download"
+  | "bundle"
+  | "physical"
+  | "cohort"
+  | "webinar"
+  | "membership";
 
 export type OrderBumpCheckoutLine = {
   lineItem: Record<string, unknown>;
@@ -25,7 +36,7 @@ export async function buildOrderBumpCheckoutLine(
   db: any,
   input: {
     orderBumpId?: number | null;
-    triggerType: TriggerType;
+    triggerType: ProductType;
     triggerProductId: number;
     currency: string;
   },
@@ -48,7 +59,7 @@ export async function buildOrderBumpCheckoutLine(
 
   if (!bump) return null;
 
-  const bumpType = bump.bumpType as BumpType;
+  const bumpType = bump.bumpType as ProductType;
   let name = bump.headline || "Order bump";
   let description = bump.subheadline || undefined;
   let imageUrl = bump.imageUrl || undefined;
@@ -62,11 +73,12 @@ export async function buildOrderBumpCheckoutLine(
       imageUrl = bump.imageUrl || product.thumbnailUrl || undefined;
       if (!amount) amount = product.price;
     }
-  } else if (bumpType === "course") {
+  } else if (bumpType === "course" || bumpType === "quiz" || bumpType === "cohort") {
     const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, bump.bumpProductId)).limit(1);
     if (course) {
       name = bump.headline || course.title;
       description = bump.subheadline || course.subtitle || undefined;
+      imageUrl = bump.imageUrl || course.thumbnailUrl || undefined;
       if (!amount) amount = course.price;
     }
   } else if (bumpType === "bundle") {
@@ -76,6 +88,22 @@ export async function buildOrderBumpCheckoutLine(
       description = bump.subheadline || bundle.subtitle || undefined;
       imageUrl = bump.imageUrl || bundle.thumbnailUrl || undefined;
       if (!amount) amount = bundle.price;
+    }
+  } else if (bumpType === "webinar") {
+    const [webinar] = await db.select().from(webinars).where(eq(webinars.id, bump.bumpProductId)).limit(1);
+    if (webinar) {
+      name = bump.headline || webinar.title;
+      description = bump.subheadline || webinar.description || undefined;
+      imageUrl = bump.imageUrl || webinar.thumbnailUrl || undefined;
+      // Webinar pricing is in pricingOptions JSON; admin must set bumpPrice explicitly
+    }
+  } else if (bumpType === "membership") {
+    const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.id, bump.bumpProductId)).limit(1);
+    if (plan) {
+      name = bump.headline || plan.title;
+      description = bump.subheadline || plan.description || undefined;
+      imageUrl = bump.imageUrl || plan.coverImage || undefined;
+      if (!amount) amount = plan.price;
     }
   }
 
@@ -115,13 +143,13 @@ export async function fulfillOrderBumpPurchase(
   input: {
     userId: number;
     sessionId: string;
-    triggerOrderType: TriggerType;
+    triggerOrderType: ProductType;
     triggerOrderId?: number | null;
   },
 ) {
   const bumpId = meta.order_bump_id ? Number(meta.order_bump_id) : null;
   const bumpProductId = meta.order_bump_product_id ? Number(meta.order_bump_product_id) : null;
-  const bumpType = meta.order_bump_type as BumpType | undefined;
+  const bumpType = meta.order_bump_type as ProductType | undefined;
   const bumpAmount = meta.order_bump_price ? Number(meta.order_bump_price) : 0;
 
   if (!bumpId || !bumpType) return;
@@ -139,7 +167,7 @@ export async function fulfillOrderBumpPurchase(
         stripeCheckoutSessionId: input.sessionId,
       });
     }
-  } else if (bumpType === "course" && bumpProductId) {
+  } else if ((bumpType === "course" || bumpType === "quiz" || bumpType === "cohort") && bumpProductId) {
     const [existing] = await db
       .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
       .from(lmsEnrollments)
@@ -186,6 +214,39 @@ export async function fulfillOrderBumpPurchase(
           stripeCheckoutSessionId: input.sessionId,
         });
       }
+    }
+  } else if (bumpType === "webinar" && bumpProductId) {
+    // Register user for the webinar
+    const [existing] = await db
+      .select()
+      .from(webinarRegistrations)
+      .where(and(eq(webinarRegistrations.userId, input.userId), eq(webinarRegistrations.webinarId, bumpProductId)))
+      .limit(1);
+    if (!existing) {
+      await db.insert(webinarRegistrations).values({
+        userId: input.userId,
+        webinarId: bumpProductId,
+        // sessionId is a checkout session ID, not a payment intent, but we store it for reference
+        stripePaymentIntentId: input.sessionId,
+      });
+    }
+  } else if (bumpType === "membership" && bumpProductId) {
+    // Create an active membership subscription (one-time/lifetime purchase via bump)
+    const [existing] = await db
+      .select()
+      .from(membershipSubscriptions)
+      .where(and(
+        eq(membershipSubscriptions.userId, input.userId),
+        eq(membershipSubscriptions.planId, bumpProductId),
+        eq(membershipSubscriptions.status, "active"),
+      ))
+      .limit(1);
+    if (!existing) {
+      await db.insert(membershipSubscriptions).values({
+        userId: input.userId,
+        planId: bumpProductId,
+        status: "active",
+      });
     }
   }
 

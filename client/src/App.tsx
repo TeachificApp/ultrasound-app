@@ -836,6 +836,7 @@ function LMSRouter() {
  */
 function IHeartEchoRouter() {
   usePageViewTracker();
+  useSsoConsumer(); // Exchange ?sso=TOKEN for a session cookie on arrival from AAU
   useCrossDomainSso(); // Silently sign user into all other domains as free member
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
