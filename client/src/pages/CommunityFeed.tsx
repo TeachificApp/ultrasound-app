@@ -91,11 +91,15 @@ function ReactionBar({ post, onReact }: { post: any; onReact: (emoji: string) =>
 function CommentThread({ postId, isOpen, onClose }: { postId: number; isOpen: boolean; onClose: () => void }) {
   const { user } = useAuth();
   const [body, setBody] = useState("");
+  const [selectedAliasId, setSelectedAliasId] = useState<number | null>(null);
   const utils = trpc.useUtils();
   const { data: post, isLoading } = trpc.community.member.getPost.useQuery(
     { postId },
     { enabled: isOpen }
   );
+  const { data: aliases } = trpc.admin.listPostingAliases.useQuery(undefined, {
+    enabled: isOpen && user?.role === "admin",
+  });
   const addComment = trpc.community.member.addComment.useMutation({
     onSuccess: () => {
       setBody("");
@@ -113,19 +117,24 @@ function CommentThread({ postId, isOpen, onClose }: { postId: number; isOpen: bo
         </div>
       ) : (
         <div className="space-y-3">
-          {post?.comments?.map((c: any) => (
-            <div key={c.id} className={`flex gap-3 ${c.parentId ? "ml-8" : ""}`}>
-              <AuthorAvatar author={c.author} />
-              <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-semibold text-gray-900">{c.author?.displayName || c.author?.name || "Unknown"}</span>
-                  {c.author?.credentials && <span className="text-xs text-teal-600 font-medium">{c.author.credentials}</span>}
-                  <span className="text-xs text-gray-400 ml-auto">{timeAgo(c.createdAt)}</span>
+          {post?.comments?.map((c: any) => {
+            const displayName = c.aliasName || c.author?.displayName || c.author?.name || "Unknown";
+            const displayAvatar = c.aliasAvatarUrl || c.author?.avatarUrl;
+            return (
+              <div key={c.id} className={`flex gap-3 ${c.parentId ? "ml-8" : ""}`}>
+                <AuthorAvatar author={{ name: displayName, avatarUrl: displayAvatar }} />
+                <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-gray-900">{displayName}</span>
+                    {!c.aliasName && c.author?.credentials && <span className="text-xs text-teal-600 font-medium">{c.author.credentials}</span>}
+                    {c.aliasName && <span className="text-xs text-purple-500 font-medium">alias</span>}
+                    <span className="text-xs text-gray-400 ml-auto">{timeAgo(c.createdAt)}</span>
+                  </div>
+                  {c.body && (c.body.startsWith('<') ? <RichTextDisplay content={c.body} className="text-sm text-gray-700" /> : <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.body}</p>)}
                 </div>
-                {c.body && (c.body.startsWith('<') ? <RichTextDisplay content={c.body} className="text-sm text-gray-700" /> : <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.body}</p>)}
               </div>
-            </div>
-          ))}
+            );
+          })}
           {(!post?.comments || post.comments.length === 0) && (
             <p className="text-sm text-gray-400 text-center py-4">No comments yet. Be the first!</p>
           )}
@@ -133,22 +142,44 @@ function CommentThread({ postId, isOpen, onClose }: { postId: number; isOpen: bo
       )}
       {user && (
         <div className="flex gap-3 mt-4">
-          <AuthorAvatar author={user} />
-          <div className="flex-1 flex gap-2">
-            <RichTextEditor
-              value={body}
-              onChange={setBody}
-              placeholder="Add a comment…"
-              minHeight={60}
-            />
-            <Button
-              size="sm"
-              className="self-end bg-teal-600 hover:bg-teal-700"
-              disabled={!body || addComment.isPending}
-              onClick={() => addComment.mutate({ postId, body })}
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+          <AuthorAvatar
+            author={selectedAliasId && aliases?.find((a: any) => a.id === selectedAliasId)
+              ? { name: aliases.find((a: any) => a.id === selectedAliasId)!.name, avatarUrl: aliases.find((a: any) => a.id === selectedAliasId)!.avatarUrl ?? undefined }
+              : user}
+          />
+          <div className="flex-1 space-y-2">
+            {user?.role === "admin" && aliases && aliases.length > 0 && (
+              <Select
+                value={selectedAliasId === null ? "self" : String(selectedAliasId)}
+                onValueChange={v => setSelectedAliasId(v === "self" ? null : Number(v))}
+              >
+                <SelectTrigger className="h-7 text-xs w-44">
+                  <SelectValue placeholder="Post as..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="self">Post as myself</SelectItem>
+                  {aliases.map((a: any) => (
+                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <div className="flex gap-2">
+              <RichTextEditor
+                value={body}
+                onChange={setBody}
+                placeholder="Add a comment…"
+                minHeight={60}
+              />
+              <Button
+                size="sm"
+                className="self-end bg-teal-600 hover:bg-teal-700"
+                disabled={!body || addComment.isPending}
+                onClick={() => addComment.mutate({ postId, body, aliasId: selectedAliasId ?? undefined })}
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       )}

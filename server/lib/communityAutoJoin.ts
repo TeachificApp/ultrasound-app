@@ -4,10 +4,13 @@
  * Called from:
  *   - upsertUser (any_signup)
  *   - Stripe webhook checkout.session.completed (any_purchase, course_enrollment, etc.)
+ *
+ * Also handles the "linked" accessType: communities whose linkedAccessItems JSON
+ * contains the purchased product are auto-joined by the buyer.
  */
 import { getDb } from "../db";
-import { communityWorkflowRules, communityMembers } from "../../drizzle/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { communityWorkflowRules, communityMembers, communities } from "../../drizzle/schema";
+import { eq, and } from "drizzle-orm";
 
 export type CommunityTrigger =
   | { type: "any_signup" }
@@ -16,11 +19,26 @@ export type CommunityTrigger =
   | { type: "webinar_registration"; entityId: number }
   | { type: "download_purchase"; entityId: number }
   | { type: "bundle_purchase"; entityId: number }
-  | { type: "brand_membership" };
+  | { type: "brand_membership" }
+  | { type: "membership_subscription"; entityId: number };
+
+/**
+ * Map trigger types to linkedAccessItems product types.
+ * course_enrollment covers both "course" and "quiz" types since quizzes are
+ * stored as lmsCourses with type="quiz" and use the same enrollment table.
+ */
+const TRIGGER_TO_PRODUCT_TYPES: Partial<Record<CommunityTrigger["type"], string[]>> = {
+  course_enrollment: ["course", "quiz"], // quiz is a subtype of course in lmsCourses
+  webinar_registration: ["webinar"],
+  download_purchase: ["download"],
+  membership_subscription: ["membership"],
+};
 
 /**
  * Evaluate all active workflow rules for the given trigger and add the user
  * to any matching communities (silently — no welcome email, no XP award).
+ * Also checks communities with accessType="linked" whose linkedAccessItems
+ * contain the purchased product.
  */
 export async function fireCommunityWorkflowRules(
   userId: number,
@@ -30,7 +48,7 @@ export async function fireCommunityWorkflowRules(
     const db = await getDb();
     if (!db) return;
 
-    // Find all active rules matching this trigger type
+    // ── 1. Workflow-rules-based auto-join ──────────────────────────────────────
     const matchingRules = await db
       .select()
       .from(communityWorkflowRules)
@@ -40,8 +58,6 @@ export async function fireCommunityWorkflowRules(
           eq(communityWorkflowRules.isActive, true),
         ),
       );
-
-    if (!matchingRules.length) return;
 
     for (const rule of matchingRules) {
       // For entity-specific triggers, only fire if entityId matches
@@ -76,6 +92,35 @@ export async function fireCommunityWorkflowRules(
       console.log(
         `[CommunityAutoJoin] User ${userId} added to community ${rule.communityId} via rule "${rule.name}" (trigger: ${trigger.type})`,
       );
+    }
+
+    // ── 2. linkedAccessItems-based auto-join ───────────────────────────────────
+    const productTypes = TRIGGER_TO_PRODUCT_TYPES[trigger.type];
+    if (productTypes && "entityId" in trigger) {
+      const entityId = (trigger as any).entityId as number;
+      const linkedCommunities = await db
+        .select({ id: communities.id, linkedAccessItems: communities.linkedAccessItems })
+        .from(communities)
+        .where(and(eq(communities.status, "published"), eq(communities.accessType, "linked")));
+
+      for (const c of linkedCommunities) {
+        if (!c.linkedAccessItems) continue;
+        try {
+          const items = JSON.parse(c.linkedAccessItems) as Array<{ type: string; id: number }>;
+          const matched = items.find(i => productTypes.includes(i.type) && i.id === entityId);
+          if (!matched) continue;
+
+          await db.insert(communityMembers).values({
+            communityId: c.id,
+            userId,
+            role: "member",
+            memberStatus: "approved",
+          }).onDuplicateKeyUpdate({ set: { memberStatus: "approved" } });
+          console.log(
+            `[CommunityAutoJoin] User ${userId} auto-joined community ${c.id} via linked ${matched.type} #${entityId}`,
+          );
+        } catch { /* skip malformed JSON */ }
+      }
     }
   } catch (err) {
     // Non-blocking — log but don't throw

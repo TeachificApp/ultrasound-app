@@ -193,14 +193,58 @@ const POST_FIELDS = `
   }
 `;
 
-/** Fetch a page of posts from a community (all spaces). */
+/**
+ * Fetch a page of posts from a community (all spaces).
+ * Uses a cost-safe query shape (replies:3, nested:5) to stay under the 1,000 cost limit.
+ * The main community can have thousands of posts; the full POST_FIELDS template exceeds
+ * the cost limit even for a single page.
+ */
 async function fetchCommunityPostsPage(communityId: string, cursor: string | null): Promise<PostsPage> {
   const data = await gql<any>(
     `
     query GetCommunityPosts($id: ID!, $cursor: String) {
       community(id: $id) {
         posts(first: 50, after: $cursor) {
-          nodes { ${POST_FIELDS} }
+          nodes {
+            id
+            title
+            content
+            type
+            depth
+            createdAt
+            updatedAt
+            replyCount
+            pinnedAt
+            author { id firstName lastName email }
+            replies(first: 3) {
+              nodes {
+                id
+                title
+                content
+                type
+                depth
+                createdAt
+                updatedAt
+                replyCount
+                pinnedAt
+                author { id firstName lastName email }
+                replies(first: 5) {
+                  nodes {
+                    id
+                    title
+                    content
+                    type
+                    depth
+                    createdAt
+                    updatedAt
+                    author { id firstName lastName email }
+                  }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
           pageInfo { hasNextPage endCursor }
         }
       }
@@ -421,6 +465,26 @@ async function ensureCommunity(opts: {
     .limit(1);
 
   if (existing.length > 0) return existing[0].id;
+
+  // Fallback: check by slug to avoid duplicate key errors on re-runs
+  const normalizedSlug = opts.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  const existingBySlug = await db
+    .select({ id: communities.id })
+    .from(communities)
+    .where(eq(communities.slug, normalizedSlug))
+    .limit(1);
+  if (existingBySlug.length > 0) {
+    // Link the existing community to this Thinkific ID so future lookups succeed
+    await db.update(communities)
+      .set({
+        thinkificCommunityId: opts.thinkificCommunityId,
+        thinkificSourceType: opts.thinkificSourceType,
+        ...(opts.thinkificSpaceId ? { thinkificSpaceId: opts.thinkificSpaceId } : {}),
+      })
+      .where(eq(communities.id, existingBySlug[0].id));
+    console.log(`[ThinkificCommunitySync] Linked existing community (slug=${normalizedSlug}) to Thinkific ID ${opts.thinkificCommunityId}`);
+    return existingBySlug[0].id;
+  }
 
   // Create new community
   const [result] = await db.insert(communities).values({

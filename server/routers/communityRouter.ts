@@ -44,6 +44,13 @@ import {
   thinkificCommunitySyncState,
   communityWorkflowRules,
   postingAliases,
+  webinars,
+  webinarRegistrations,
+  digitalProducts,
+  digitalPurchases,
+  membershipPlans,
+  membershipSubscriptions,
+  lmsQuizzes,
 } from "../../drizzle/schema";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -496,7 +503,22 @@ const communityMemberRouter = router({
           .from(users).where(inArray(users.id, commentUserIds))
       : [];
     const commentAuthorMap = Object.fromEntries(commentAuthors.map((a: any) => [a.id, a]));
-    const enrichedComments = comments.map((c: any) => ({ ...c, author: commentAuthorMap[c.userId] ?? null }));
+    // Load aliases for comments that have aliasId set
+    const commentAliasIds = [...new Set(comments.filter((c: any) => c.aliasId).map((c: any) => c.aliasId as number))];
+    let commentAliasMap: Record<number, any> = {};
+    if (commentAliasIds.length) {
+      const aliases = await db.select({ id: postingAliases.id, name: postingAliases.name, avatarUrl: postingAliases.avatarUrl })
+        .from(postingAliases).where(inArray(postingAliases.id, commentAliasIds));
+      commentAliasMap = Object.fromEntries(aliases.map((a: any) => [a.id, a]));
+    }
+    const enrichedComments = comments.map((c: any) => {
+      const alias = c.aliasId ? commentAliasMap[c.aliasId] : null;
+      const baseAuthor = commentAuthorMap[c.userId] ?? null;
+      const author = alias
+        ? { ...baseAuthor, name: alias.name, displayName: alias.name, avatarUrl: alias.avatarUrl ?? baseAuthor?.avatarUrl, isAlias: true }
+        : baseAuthor;
+      return { ...c, author };
+    });
 
     // Get poll if any
     let poll = null;
@@ -554,11 +576,15 @@ const communityMemberRouter = router({
     postId: z.number(),
     body: z.string().min(1).max(10000),
     parentId: z.number().optional(),
+    aliasId: z.number().optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [post] = await db.select().from(communityPosts).where(eq(communityPosts.id, input.postId)).limit(1);
     if (!post || post.isLocked) throw new TRPCError({ code: "FORBIDDEN", message: "Post is locked." });
+
+    // Only admins can post as an alias
+    const resolvedAliasId = (ctx.user.role === "admin" && input.aliasId) ? input.aliasId : null;
 
     // Check if member requires moderation
     const isAdminUser = ctx.user.role === "admin";
@@ -574,6 +600,7 @@ const communityMemberRouter = router({
     const [result] = await db.insert(communityPostComments).values({
       postId: input.postId,
       userId: ctx.user.id,
+      aliasId: resolvedAliasId,
       body: input.body,
       parentId: input.parentId ?? null,
       status: commentStatus,
@@ -1043,22 +1070,44 @@ const communityAdminRouter = router({
       .where(eq(lmsCourses.status, "public"))
       .orderBy(asc(lmsCourses.title));
   }),
-  /** Auto-grant community access when user enrolls in a linked course */
+  /** List all products (courses, quizzes, webinars, downloads, memberships) for linked access picker */
+  listAllProductsForLinkedAccess: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    const [courses, quizzes, webinarList, downloads, memberships] = await Promise.all([
+      db.select({ id: lmsCourses.id, title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.status, "public")).orderBy(asc(lmsCourses.title)),
+      db.select({ id: lmsQuizzes.id, title: lmsQuizzes.title }).from(lmsQuizzes).where(eq(lmsQuizzes.status, "published")).orderBy(asc(lmsQuizzes.title)),
+      db.select({ id: webinars.id, title: webinars.title }).from(webinars).where(eq(webinars.status, "published")).orderBy(asc(webinars.title)),
+      db.select({ id: digitalProducts.id, title: digitalProducts.title }).from(digitalProducts).where(eq(digitalProducts.status, "published")).orderBy(asc(digitalProducts.title)),
+      db.select({ id: membershipPlans.id, title: membershipPlans.title }).from(membershipPlans).where(eq(membershipPlans.status, "active")).orderBy(asc(membershipPlans.title)),
+    ]);
+    return [
+      ...courses.map((c: any) => ({ type: "course" as const, id: c.id, title: c.title })),
+      ...quizzes.map((q: any) => ({ type: "quiz" as const, id: q.id, title: q.title })),
+      ...webinarList.map((w: any) => ({ type: "webinar" as const, id: w.id, title: w.title })),
+      ...downloads.map((d: any) => ({ type: "download" as const, id: d.id, title: d.title })),
+      ...memberships.map((m: any) => ({ type: "membership" as const, id: m.id, title: m.title })),
+    ];
+  }),
+
+  /** Auto-grant community access when user purchases/enrolls in a linked product */
   grantLinkedCommunityAccess: protectedProcedure.input(z.object({
     userId: z.number(),
-    courseId: z.number(),
+    productType: z.enum(["course", "quiz", "webinar", "download", "membership"]),
+    productId: z.number(),
   })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    // Find communities that have this courseId in their linkedAccessItems
+    // Find communities that have this product in their linkedAccessItems
     const allCommunities = await db.select({ id: communities.id, linkedAccessItems: communities.linkedAccessItems })
       .from(communities).where(eq(communities.status, "published"));
     for (const c of allCommunities) {
       if (!c.linkedAccessItems) continue;
       try {
         const items = JSON.parse(c.linkedAccessItems) as Array<{ type: string; id: number }>;
-        const linked = items.some(i => i.type === "course" && i.id === input.courseId);
+        const linked = items.some(i => i.type === input.productType && i.id === input.productId);
         if (linked) {
           await db.insert(communityMembers).values({
             communityId: c.id, userId: input.userId, role: "member", memberStatus: "approved",

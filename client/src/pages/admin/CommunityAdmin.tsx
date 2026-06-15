@@ -158,7 +158,8 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
     (() => { try { return community?.linkedAccessItems ? JSON.parse(community.linkedAccessItems) : []; } catch { return []; } })()
   );
   const utils = trpc.useUtils();
-  const { data: courses } = trpc.community.admin.listCoursesForLinkedAccess.useQuery();
+  const { data: allProducts } = trpc.community.admin.listAllProductsForLinkedAccess.useQuery();
+  const [selectedProductType, setSelectedProductType] = useState<string>("course");
   const create = trpc.community.admin.createCommunity.useMutation({
     onSuccess: () => { toast.success("Community created!"); onSaved(); onClose(); utils.community.admin.listCommunities.invalidate(); },
     onError: (e) => toast.error(e.message),
@@ -173,12 +174,16 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
     if (community) update.mutate({ id: community.id, ...payload });
     else create.mutate(payload as any);
   }
-  function addLinkedCourse(courseId: number) {
-    const course = courses?.find((c: any) => c.id === courseId);
-    if (!course) return;
-    if (linkedItems.some(i => i.type === "course" && i.id === courseId)) return;
-    setLinkedItems(prev => [...prev, { type: "course", id: courseId, title: course.title }]);
+  function addLinkedProduct(productId: number) {
+    const product = allProducts?.find((p: any) => p.type === selectedProductType && p.id === productId);
+    if (!product) return;
+    if (linkedItems.some(i => i.type === selectedProductType && i.id === productId)) return;
+    setLinkedItems(prev => [...prev, { type: selectedProductType, id: productId, title: product.title }]);
   }
+  const PRODUCT_TYPE_LABELS: Record<string, string> = {
+    course: "Course", quiz: "Quiz", webinar: "Webinar", download: "Download", membership: "Membership",
+  };
+  const filteredProducts = allProducts?.filter((p: any) => p.type === selectedProductType && !linkedItems.some(i => i.type === p.type && i.id === p.id)) ?? [];
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
       <div className="grid grid-cols-2 gap-3">
@@ -215,6 +220,7 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
               <SelectItem value="free">Free — anyone can join</SelectItem>
               <SelectItem value="paid">Paid — requires payment</SelectItem>
               <SelectItem value="restricted">Restricted — admin approval required</SelectItem>
+              <SelectItem value="linked">Linked — auto-join via product purchase</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -247,19 +253,32 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
         <ImageUploadField label="Logo / Avatar" value={form.logoImage} communityId={community?.id} imageType="logo" onChange={url => setForm(f => ({ ...f, logoImage: url }))} />
         <ImageUploadField label="Icon (small)" value={form.iconImage} communityId={community?.id} imageType="icon" onChange={url => setForm(f => ({ ...f, iconImage: url }))} />
       </div>
-      {/* Linked Access Items */}
+      {/* Linked Access Items — shown for all access types but labeled differently */}
       <div>
         <label className="text-xs font-medium text-gray-600 mb-2 block">
-          <span className="flex items-center gap-1"><Link2 className="w-3.5 h-3.5" />Linked Course Access</span>
-          <span className="text-gray-400 font-normal block mt-0.5">Users enrolled in these courses automatically get community access</span>
+          <span className="flex items-center gap-1"><Link2 className="w-3.5 h-3.5" />Linked Product Access</span>
+          <span className="text-gray-400 font-normal block mt-0.5">
+            {form.accessType === "linked"
+              ? "Users who purchase any of these products are automatically added as members."
+              : "Optionally grant access to users who purchase specific products."}
+          </span>
         </label>
         <div className="flex gap-2 mb-2">
-          <Select onValueChange={v => addLinkedCourse(parseInt(v))}>
-            <SelectTrigger className="flex-1"><SelectValue placeholder="Add a course..." /></SelectTrigger>
+          <Select value={selectedProductType} onValueChange={setSelectedProductType}>
+            <SelectTrigger className="w-36 flex-shrink-0"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {courses?.filter((c: any) => !linkedItems.some(i => i.type === "course" && i.id === c.id)).map((c: any) => (
-                <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
+              {Object.entries(PRODUCT_TYPE_LABELS).map(([val, label]) => (
+                <SelectItem key={val} value={val}>{label}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select onValueChange={v => addLinkedProduct(parseInt(v))}>
+            <SelectTrigger className="flex-1"><SelectValue placeholder={`Add a ${PRODUCT_TYPE_LABELS[selectedProductType]?.toLowerCase()}...`} /></SelectTrigger>
+            <SelectContent>
+              {filteredProducts.map((p: any) => (
+                <SelectItem key={`${p.type}-${p.id}`} value={p.id.toString()}>{p.title}</SelectItem>
+              ))}
+              {filteredProducts.length === 0 && <SelectItem value="__none" disabled>No {PRODUCT_TYPE_LABELS[selectedProductType]?.toLowerCase()}s available</SelectItem>}
             </SelectContent>
           </Select>
         </div>
@@ -269,7 +288,7 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
               <div key={idx} className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5">
                 <Link2 className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
                 <span className="text-sm text-teal-800 flex-1">{item.title}</span>
-                <Badge variant="secondary" className="text-xs">{item.type}</Badge>
+                <Badge variant="secondary" className="text-xs capitalize">{item.type}</Badge>
                 <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-400 hover:text-red-600"
                   onClick={() => setLinkedItems(prev => prev.filter((_, i) => i !== idx))}>
                   <X className="w-3 h-3" />
@@ -278,7 +297,7 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
             ))}
           </div>
         ) : (
-          <p className="text-xs text-gray-400 italic">No linked courses. Add courses above to grant automatic access.</p>
+          <p className="text-xs text-gray-400 italic">No linked products. Add products above to grant automatic access.</p>
         )}
       </div>
       <DialogFooter>
@@ -1196,6 +1215,7 @@ export default function CommunityAdmin() {
         </TabsContent>
               {/* Page Editor tab */}
         <TabsContent value="page-editor">
+          <CommunitySelector />
           {activeCommunityId ? (
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -1217,6 +1237,7 @@ export default function CommunityAdmin() {
         </TabsContent>
         {/* Landing Page Editor tab */}
         <TabsContent value="landing-editor">
+          <CommunitySelector />
           {activeCommunityId ? (
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -1237,6 +1258,7 @@ export default function CommunityAdmin() {
           )}
         </TabsContent>
         <TabsContent value="workflow-rules">
+          <CommunitySelector />
           {activeCommunityId ? (
             <WorkflowRulesTab communityId={activeCommunityId} />
           ) : (

@@ -4838,7 +4838,7 @@ export const communities = mysqlTable("communities", {
   logoImage: text("logo_image"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
   privacy: mysqlEnum("privacy", ["public", "private", "paid", "invite_only", "course_gated"]).default("public").notNull(),
-  accessType: mysqlEnum("access_type", ["free", "paid", "restricted", "invite_only", "course_gated"]).default("free").notNull(),
+  accessType: mysqlEnum("access_type", ["free", "paid", "restricted", "invite_only", "course_gated", "linked"]).default("free").notNull(),
   /** Thinkific source: 'thinkific_community' | 'thinkific_space' | null for native */
   thinkificSourceType: mysqlEnum("thinkific_source_type", ["thinkific_community", "thinkific_space"]),
   /** Thinkific community ID this was imported from */
@@ -4911,6 +4911,8 @@ export const communityPostComments = mysqlTable("community_post_comments", {
   postId: int("post_id").notNull(),
   userId: int("user_id").notNull(),
   parentId: int("parent_id"),
+  /** If posted as a global posting alias, this overrides the display name/avatar */
+  aliasId: int("alias_id"),
   body: longtext("body").notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("approved").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -6414,6 +6416,7 @@ export const communityWorkflowRules = mysqlTable("community_workflow_rules", {
     "download_purchase",
     "bundle_purchase",
     "brand_membership",
+    "membership_subscription",
   ]).notNull(),
   entityId: int("entity_id"),
   isActive: boolean("is_active").default(true).notNull(),

@@ -142,6 +142,11 @@ async function handleMembershipCheckoutCompleted(session: Record<string, unknown
       return;
     }
     console.log(`[Stripe] Membership fulfilled: userId=${result.userId}, planId=${result.planId}, notes=${result.notes.join(", ")}`);
+    // Fire community workflow rules for membership subscription
+    if (result.userId && result.planId) {
+      fireCommunityWorkflowRules(result.userId, { type: "membership_subscription", entityId: result.planId }).catch(() => {});
+      fireCommunityWorkflowRules(result.userId, { type: "any_purchase" }).catch(() => {});
+    }
   } catch (err) {
     console.error(`[Stripe] Membership fulfillment error for session ${session.id}:`, err);
     throw err;
