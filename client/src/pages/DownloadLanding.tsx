@@ -412,7 +412,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
             ))}
-          </div>
+          </div></CC>
         </div>
       );
     }
@@ -568,6 +568,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
               {buying ? "Processing…" : d.ctaText}
             </button>
           )}
+          </CC>
         </div>
       );
     case "price_stack":
@@ -615,6 +616,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {buying ? "Processing…" : (d.ctaText ?? "Buy Now")}
           </button>
+          </CC>
         </div>
       );
     case "carousel":

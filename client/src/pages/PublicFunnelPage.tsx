@@ -764,6 +764,7 @@ function FunnelCurriculumBlock({ block }: { block: Block }) {
           ))}
         </Accordion>
       </div>
+      </div>
     </div>
   );
 }

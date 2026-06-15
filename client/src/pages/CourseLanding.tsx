@@ -442,7 +442,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                 {img.caption && <p className="text-xs text-gray-500 p-2 text-center">{img.caption}</p>}
               </div>
             ))}
-          </div>
+          </div></CC>
         </div>
       );
     case "bullets": {
@@ -688,6 +688,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
             </div>
           )}
           <ButtonSubtext d={d} />
+          </CC>
         </div>
       );
     case "cta_standalone":
@@ -875,6 +876,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               );
             })}
           </div>
+          </CC>
         </div>
       );
     }
@@ -910,6 +912,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               );
             })}
           </div>
+          </CC>
         </div>
       );
     }
@@ -1820,7 +1823,8 @@ function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
             </a>
           )}
         </div>
-      </div></CC>
+        </CC>
+      </div>
     );
   }
 

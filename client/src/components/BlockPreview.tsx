@@ -279,6 +279,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             </div>
           )}
           {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+        </CC>
         </div>
       );
     }
