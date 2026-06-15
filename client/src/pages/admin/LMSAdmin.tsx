@@ -1420,10 +1420,10 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         />
       )}
       {addLessonSection && (
-        <AddLessonDialog courseId={courseId} sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={(lesson) => { setAddLessonSection(null); refetch(); setEditLesson(lesson); }} />
+        <AddLessonDialog courseId={courseId} sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={() => { setAddLessonSection(null); refetch(); }} />
       )}
       {addLessonAtCourseLevel && (
-        <AddLessonDialog courseId={courseId} sectionId={undefined} onClose={() => setAddLessonAtCourseLevel(false)} onCreated={(lesson) => { setAddLessonAtCourseLevel(false); refetch(); setEditLesson(lesson); }} />
+        <AddLessonDialog courseId={courseId} sectionId={undefined} onClose={() => setAddLessonAtCourseLevel(false)} onCreated={() => { setAddLessonAtCourseLevel(false); refetch(); }} />
       )}
       {importMediaSection && (
         <ImportMediaAsLessonDialog sectionId={importMediaSection} courseId={courseId} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
