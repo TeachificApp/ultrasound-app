@@ -16,7 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import type { Block } from "@/components/BlockPreview";
 import { CountdownV2Block, ImageLinkWrapper, WebinarCountdownTimer } from "@/components/BlockPreview";
 import { BlockPreview } from "@/components/BlockPreview";
-import { applyVideoTrim } from "@/lib/videoTrim";
+import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
@@ -206,8 +206,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       );
     }
     case "video": {
-      const rawVidUrl = d.embedUrl ?? "";
-      const resolvedVidUrl = injectUserParams(rawVidUrl, user);
+      const resolvedVidUrl = injectUserParams(normalizeVideoUrl(d.embedUrl ?? ""), user);
       const isDirectVid = resolvedVidUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(resolvedVidUrl);
       const vidTrimStart = d.trimStart ?? 0;
       const vidTrimEnd = d.trimEnd ?? 0;

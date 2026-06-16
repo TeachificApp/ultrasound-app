@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { FileDown, Check, ShoppingCart, Download, ArrowLeft, Users, Globe, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
+import { normalizeVideoUrl } from "@/lib/videoTrim";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
@@ -172,15 +173,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
     }
     case "video": {
       let embedUrl = d.url ?? "";
-      if (embedUrl.includes("youtube.com/watch")) {
-        try { const vid = new URL(embedUrl).searchParams.get("v"); if (vid) embedUrl = `https://www.youtube.com/embed/${vid}`; } catch { /* keep original */ }
-      } else if (embedUrl.includes("youtu.be/")) {
-        const vid = embedUrl.split("youtu.be/")[1]?.split("?")[0]?.split("#")[0];
-        if (vid) embedUrl = `https://www.youtube.com/embed/${vid}`;
-      } else if (embedUrl.includes("youtube.com/shorts/")) {
-        const vid = embedUrl.split("youtube.com/shorts/")[1]?.split("?")[0]?.split("#")[0];
-        if (vid) embedUrl = `https://www.youtube.com/embed/${vid}`;
-      }
+      embedUrl = normalizeVideoUrl(embedUrl);
       const resolvedVidUrl = injectUserParams(embedUrl, user);
       return (
         <div className="py-6"><CC>

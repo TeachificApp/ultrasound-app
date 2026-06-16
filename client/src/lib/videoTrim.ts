@@ -39,11 +39,36 @@ export function formatSecondsToTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+/**
+ * Normalize any YouTube watch/share/shorts URL to the embed format.
+ * Vimeo watch URLs are also converted to embed format.
+ * Other URLs are returned unchanged.
+ */
+export function normalizeVideoUrl(url: string): string {
+  if (!url) return url;
+  if (url.includes("youtube.com/watch")) {
+    try { const vid = new URL(url).searchParams.get("v"); if (vid) return `https://www.youtube.com/embed/${vid}`; } catch { /* fall through */ }
+  }
+  if (url.includes("youtu.be/")) {
+    const vid = url.split("youtu.be/")[1]?.split("?")[0]?.split("#")[0];
+    if (vid) return `https://www.youtube.com/embed/${vid}`;
+  }
+  if (url.includes("youtube.com/shorts/")) {
+    const vid = url.split("youtube.com/shorts/")[1]?.split("?")[0]?.split("#")[0];
+    if (vid) return `https://www.youtube.com/embed/${vid}`;
+  }
+  if (/vimeo\.com\/(?!player\.vimeo|video\/)\d+/.test(url)) {
+    const m = url.match(/vimeo\.com\/(\d+)/);
+    if (m) return `https://player.vimeo.com/video/${m[1]}`;
+  }
+  return url;
+}
+
 type Platform = "youtube" | "vimeo" | "wistia" | "direct" | "other";
 
 function detectPlatform(url: string): Platform {
   if (/\.(mp4|webm|ogg|mov|m4v)([?#]|$)/i.test(url)) return "direct";
-  if (/youtube\.com\/embed|youtu\.be|youtube-nocookie\.com/i.test(url)) return "youtube";
+  if (/youtube\.com\/embed|youtube\.com\/watch|youtu\.be|youtube-nocookie\.com|youtube\.com\/shorts/i.test(url)) return "youtube";
   if (/player\.vimeo\.com|vimeo\.com/i.test(url)) return "vimeo";
   if (/wistia\.(com|net)/i.test(url)) return "wistia";
   return "other";

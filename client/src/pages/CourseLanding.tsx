@@ -26,7 +26,7 @@ import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import type { Block } from "@/components/BlockPreview";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
-import { applyVideoTrim } from "@/lib/videoTrim";
+import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 
@@ -379,7 +379,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       );
     }
     case "video": {
-      const resolvedVidUrl = injectUserParams(d.embedUrl ?? "", user);
+      const resolvedVidUrl = injectUserParams(normalizeVideoUrl(d.embedUrl ?? ""), user);
       const clIsDirectVid = resolvedVidUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(resolvedVidUrl);
       const clTrimStart = d.trimStart ?? 0;
       const clTrimEnd = d.trimEnd ?? 0;
