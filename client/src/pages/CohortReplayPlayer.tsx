@@ -51,7 +51,7 @@ type EmbedInfo =
 function getEmbedInfo(url: string): EmbedInfo {
   if (!url) return { kind: "plyr-video", src: url };
   // YouTube
-  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w.-]+)/);
+  const ytMatch = url.match(/(?:[?&]v=|youtu\.be\/|youtube\.com\/(?:shorts\/|embed\/))([-\w]+)/);
   if (ytMatch) return { kind: "plyr-youtube", videoId: ytMatch[1] };
   // Vimeo
   const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);

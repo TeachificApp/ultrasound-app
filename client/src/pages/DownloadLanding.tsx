@@ -173,10 +173,13 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
     case "video": {
       let embedUrl = d.url ?? "";
       if (embedUrl.includes("youtube.com/watch")) {
-        const vid = new URL(embedUrl).searchParams.get("v");
-        embedUrl = `https://www.youtube.com/embed/${vid}`;
+        try { const vid = new URL(embedUrl).searchParams.get("v"); if (vid) embedUrl = `https://www.youtube.com/embed/${vid}`; } catch { /* keep original */ }
       } else if (embedUrl.includes("youtu.be/")) {
-        embedUrl = `https://www.youtube.com/embed/${embedUrl.split("youtu.be/")[1]}`;
+        const vid = embedUrl.split("youtu.be/")[1]?.split("?")[0]?.split("#")[0];
+        if (vid) embedUrl = `https://www.youtube.com/embed/${vid}`;
+      } else if (embedUrl.includes("youtube.com/shorts/")) {
+        const vid = embedUrl.split("youtube.com/shorts/")[1]?.split("?")[0]?.split("#")[0];
+        if (vid) embedUrl = `https://www.youtube.com/embed/${vid}`;
       }
       const resolvedVidUrl = injectUserParams(embedUrl, user);
       return (

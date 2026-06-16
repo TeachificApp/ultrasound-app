@@ -676,13 +676,14 @@ export const downloadsAdminRouter = router({
       metaTitle: z.string().nullable().optional(),
       metaDescription: z.string().nullable().optional(),
       showInLibrary: z.boolean().optional(),
+      brand: z.enum(["aaus", "iheartecho"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, ...data } = input;
-      await db.update(digitalProducts).set(data).where(eq(digitalProducts.id, id));
+      await db.update(digitalProducts).set(data as any).where(eq(digitalProducts.id, id));
       return { success: true };
     }),
 

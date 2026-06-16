@@ -1546,8 +1546,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const getEmbedUrl = (url: string, source: string) => {
         if (!url) return "";
         if (source === "youtube") {
-          const match = url.match(/(?:v=|youtu\.be\/)([\w-]+)/);
-          return match ? `https://www.youtube.com/embed/${match[1]}` : url;
+          // Handle watch?v=, youtu.be/, shorts/, and already-embed URLs; strip query params
+          const ytMatch = url.match(/(?:[?&]v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/embed\/)([-\w]+)/);
+          if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+          // Fallback: already an embed or unknown format
+          return url;
         }
         if (source === "vimeo") {
           const match = url.match(/vimeo\.com\/(\d+)/);

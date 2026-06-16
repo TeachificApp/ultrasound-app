@@ -207,17 +207,15 @@ export const lmsPublicRouter = router({
       if (input.isFree !== undefined) conditions.push(eq(lmsCourses.isFree, input.isFree));
 
       const offset = (input.page - 1) * input.pageSize;
-      // Sort: explicit library order first (asc), then fall back to newest first
-      const courses = await db.select().from(lmsCourses).where(and(...conditions)).orderBy(asc(lmsCourses.libraryOrder), desc(lmsCourses.createdAt)).limit(input.pageSize).offset(offset);
-      const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsCourses).where(and(...conditions));
 
-      // Batch-fetch primary instructors for all courses in 2 queries (avoids N+1)
-      const courseIds = courses.map(c => c.id);
-      let enriched: any[] = courses.map(c => ({ ...c, instructor: null, _source: "lms_course" as const }));
-      if (courseIds.length > 0) {
+      // Helper: enrich courses with instructor data
+      const enrichWithInstructors = async (courseList: (typeof lmsCourses.$inferSelect)[]) => {
+        let enriched: any[] = courseList.map(c => ({ ...c, instructor: null, _source: "lms_course" as const }));
+        const ids = courseList.map(c => c.id);
+        if (ids.length === 0) return enriched;
         const ciRows = await db.select().from(lmsCourseInstructors)
           .where(and(
-            sql`${lmsCourseInstructors.courseId} IN (${sql.join(courseIds.map(id => sql`${id}`), sql`, `)})`,
+            sql`${lmsCourseInstructors.courseId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`,
             eq(lmsCourseInstructors.isPrimary, true)
           ));
         const instructorIds = Array.from(new Set(ciRows.map(ci => ci.instructorId)));
@@ -226,72 +224,59 @@ export const lmsPublicRouter = router({
             .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
           const insMap = new Map(insRows.map(i => [i.id, i]));
           const ciMap = new Map(ciRows.map(ci => [ci.courseId, ci]));
-          enriched = courses.map(c => {
+          enriched = courseList.map(c => {
             const ci = ciMap.get(c.id);
             return { ...c, instructor: ci ? (insMap.get(ci.instructorId) ?? null) : null, _source: "lms_course" as const };
           });
         }
-      }
+        return enriched;
+      };
 
-      // When no type filter (All Types), also include digitalProducts and sonoQuizzes
+      // When no type filter (All Types): fetch ALL items across all content types, then sort+paginate globally.
+      // This ensures admin-set libraryOrder is respected across courses, downloads, and quizzes.
       if (!input.type) {
-        const dpConditions = [eq(digitalProducts.status, "published"), eq(digitalProducts.showInLibrary, true)];
+        const allCourses = await db.select().from(lmsCourses).where(and(...conditions));
+        const allEnriched = await enrichWithInstructors(allCourses);
+
+        const dpConditions: any[] = [eq(digitalProducts.status, "published"), eq(digitalProducts.showInLibrary, true)];
         if (input.isFree !== undefined) dpConditions.push(eq(digitalProducts.isFree, input.isFree));
-        const dpRows = await db.select().from(digitalProducts).where(and(...dpConditions)).orderBy(desc(digitalProducts.createdAt));
+        if (input.brand) dpConditions.push(eq(digitalProducts.brand, input.brand as any));
+        const dpRows = await db.select().from(digitalProducts).where(and(...dpConditions));
         const dpMapped = dpRows.map(p => ({
-          id: p.id,
-          slug: p.slug,
-          title: p.title,
-          subtitle: p.subtitle ?? null,
-          description: p.description ?? null,
-          coverImageUrl: p.thumbnailUrl ?? null,
-          status: "public" as const,
-          type: "download" as const,
-          brand: "aaus" as const,
-          price: p.price,
-          isFree: p.isFree,
-          isFeatured: false,
-          showInLibrary: p.showInLibrary,
-          createdAt: p.createdAt,
-          updatedAt: p.updatedAt,
-          libraryOrder: p.libraryOrder ?? 9999,
-          instructor: null,
-          _source: "digital_product" as const,
+          id: p.id, slug: p.slug, title: p.title, subtitle: p.subtitle ?? null,
+          description: p.description ?? null, coverImageUrl: p.thumbnailUrl ?? null,
+          status: "public" as const, type: "download" as const, brand: (p.brand ?? "aaus") as any,
+          price: p.price, isFree: p.isFree, isFeatured: false, showInLibrary: p.showInLibrary,
+          createdAt: p.createdAt, updatedAt: p.updatedAt,
+          libraryOrder: (p.libraryOrder && p.libraryOrder > 0) ? p.libraryOrder : 9999,
+          instructor: null, _source: "digital_product" as const,
         }));
-        // Also include published sonoQuizzes
-        const sqRows = await db.select().from(sonoQuizzes).where(eq(sonoQuizzes.status, "published")).orderBy(desc(sonoQuizzes.createdAt));
+
+        const sqRows = await db.select().from(sonoQuizzes).where(eq(sonoQuizzes.status, "published"));
         const sqMapped = sqRows.map(q => ({
-          id: q.id,
-          slug: `quiz-${q.id}`,
-          title: q.title,
-          subtitle: q.description ?? null,
-          description: q.description ?? null,
-          coverImageUrl: q.coverImageUrl ?? null,
-          status: "public" as const,
-          type: "quiz" as const,
-          brand: "aaus" as const,
-          price: 0,
-          isFree: true,
-          isFeatured: false,
-          showInLibrary: true,
-          createdAt: q.createdAt,
-          updatedAt: q.updatedAt,
-          libraryOrder: 9999,
-          instructor: null,
-          _source: "sono_quiz" as const,
+          id: q.id, slug: `quiz-${q.id}`, title: q.title, subtitle: q.description ?? null,
+          description: q.description ?? null, coverImageUrl: q.coverImageUrl ?? null,
+          status: "public" as const, type: "quiz" as const, brand: "aaus" as any,
+          price: 0, isFree: true, isFeatured: false, showInLibrary: true,
+          createdAt: q.createdAt, updatedAt: q.updatedAt, libraryOrder: 9999,
+          instructor: null, _source: "sono_quiz" as const,
         }));
-        // Merge all: sort by libraryOrder asc (admin-set), then by createdAt desc as fallback
-        const combined = [...enriched, ...dpMapped, ...sqMapped].sort((a, b) => {
-          const aOrder = (a as any).libraryOrder ?? 9999;
-          const bOrder = (b as any).libraryOrder ?? 9999;
+
+        // Global sort: libraryOrder asc (0 = unset → treated as 9999), then createdAt desc
+        const combined = [...allEnriched, ...dpMapped, ...sqMapped].sort((a, b) => {
+          const aOrder = ((a as any).libraryOrder === 0 ? 9999 : ((a as any).libraryOrder ?? 9999));
+          const bOrder = ((b as any).libraryOrder === 0 ? 9999 : ((b as any).libraryOrder ?? 9999));
           if (aOrder !== bOrder) return aOrder - bOrder;
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
-        const totalCombined = Number(count) + dpRows.length + sqRows.length;
         const paginated = combined.slice(offset, offset + input.pageSize);
-        return { courses: paginated, total: totalCombined, page: input.page, pageSize: input.pageSize };
+        return { courses: paginated, total: combined.length, page: input.page, pageSize: input.pageSize };
       }
 
+      // Type-filtered path: single content type, limit/offset applied at DB level
+      const courses = await db.select().from(lmsCourses).where(and(...conditions)).orderBy(asc(lmsCourses.libraryOrder), desc(lmsCourses.createdAt)).limit(input.pageSize).offset(offset);
+      const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsCourses).where(and(...conditions));
+      const enriched = await enrichWithInstructors(courses);
       return { courses: enriched, total: Number(count), page: input.page, pageSize: input.pageSize };
     }),
 
@@ -440,9 +425,37 @@ export const lmsPublicRouter = router({
       .where(eq(lmsCollections.isPublished, true))
       .orderBy(asc(lmsCollections.position));
     return Promise.all(collections.map(async (col) => {
-      const [{ count }] = await db.select({ count: sql<number>`count(*)` })
-        .from(lmsCollectionCourses).where(eq(lmsCollectionCourses.collectionId, col.id));
-      return { ...col, courseCount: Number(count) };
+      // Count from new lmsCollectionItems table: only items whose underlying content is published/public
+      const newItems = await db.select({ itemType: lmsCollectionItems.itemType, itemId: lmsCollectionItems.itemId })
+        .from(lmsCollectionItems).where(eq(lmsCollectionItems.collectionId, col.id));
+      let publishedCount = 0;
+      if (newItems.length > 0) {
+        // Check each item's published status
+        for (const item of newItems) {
+          if (item.itemType === "course" || item.itemType === "quiz") {
+            const [r] = await db.select({ id: lmsCourses.id }).from(lmsCourses)
+              .where(and(eq(lmsCourses.id, item.itemId), eq(lmsCourses.status, "public"))).limit(1);
+            if (r) publishedCount++;
+          } else if (item.itemType === "download") {
+            const [r] = await db.select({ id: digitalProducts.id }).from(digitalProducts)
+              .where(and(eq(digitalProducts.id, item.itemId), eq(digitalProducts.status, "published"))).limit(1);
+            if (r) publishedCount++;
+          } else {
+            // For other types (webinar, bundle, membership, physical) count as published if in the table
+            publishedCount++;
+          }
+        }
+      } else {
+        // Legacy: count only public courses from lmsCollectionCourses
+        const legacyItems = await db.select({ courseId: lmsCollectionCourses.courseId })
+          .from(lmsCollectionCourses).where(eq(lmsCollectionCourses.collectionId, col.id));
+        for (const item of legacyItems) {
+          const [r] = await db.select({ id: lmsCourses.id }).from(lmsCourses)
+            .where(and(eq(lmsCourses.id, item.courseId), eq(lmsCourses.status, "public"))).limit(1);
+          if (r) publishedCount++;
+        }
+      }
+      return { ...col, courseCount: publishedCount };
     }));
   }),
 

@@ -1206,7 +1206,7 @@ function RecordingThumbnail({ recording, className }: { recording: any; classNam
 function getVideoEmbedUrl(url: string): { type: "iframe" | "video"; src: string } {
   if (!url) return { type: "video", src: url };
   // YouTube
-  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\.\w-]+)/);
+  const ytMatch = url.match(/(?:[?&]v=|youtu\.be\/|youtube\.com\/(?:shorts\/|embed\/))([-\w]+)/);
   if (ytMatch) return { type: "iframe", src: `https://www.youtube.com/embed/${ytMatch[1]}?rel=0` };
   // Vimeo
   const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\.?\d+)/);

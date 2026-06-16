@@ -3371,6 +3371,8 @@ export const digitalProducts = mysqlTable("digital_products", {
   downloadCount: int("download_count").default(0).notNull(),
   // Display order in the public Education Library (0 = unset/default, positive = explicit position)
   libraryOrder: int("library_order").default(0).notNull(),
+  // Brand association — which brand this download belongs to
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
   // Per-download publish domain override (null = use global downloadPublishDomain)
   publishDomain: varchar("publish_domain", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
