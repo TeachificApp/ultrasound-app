@@ -10,6 +10,7 @@ import {
   workshopResources,
   workshopEnrollments,
   workshopPricingOptions,
+  workshopWaitlistEntries,
   users,
   lmsEnrollments,
   lmsSections,
@@ -681,6 +682,7 @@ export const workshopAdminRouter = router({
         salesCloseDate: z.string().nullish(),
         salesOpenDate: z.string().nullish(),
         status: z.enum(["draft", "published", "cancelled", "completed"]).default("draft"),
+        instanceContent: z.string().nullish(),
       })
     )
     .mutation(async ({ input }) => {
@@ -709,6 +711,7 @@ export const workshopAdminRouter = router({
         salesOpenDate: input.salesOpenDate ? new Date(input.salesOpenDate) : undefined,
         status: input.status,
         enrolledCount: 0,
+        instanceContent: input.instanceContent ?? undefined,
       }).$returningId();
       return { id: ins.id };
     }),
@@ -738,6 +741,7 @@ export const workshopAdminRouter = router({
         salesCloseDate: z.string().nullish(),
         salesOpenDate: z.string().nullish(),
         status: z.enum(["draft", "published", "cancelled", "completed"]).optional(),
+        instanceContent: z.string().nullish(),
       })
     )
     .mutation(async ({ input }) => {
@@ -1031,5 +1035,89 @@ export const workshopAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(workshops).set({ hidePricingOptions: input.hidePricingOptions }).where(eq(workshops.id, input.workshopId));
       return { success: true };
+    }),
+
+  // ── Waitlist Settings ─────────────────────────────────────────────────────
+  getWaitlistSettings: protectedProcedure
+    .input(z.object({ workshopId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [w] = await db.select({
+        waitlistEnabled: workshops.waitlistEnabled,
+        waitlistHeading: workshops.waitlistHeading,
+        waitlistBody: workshops.waitlistBody,
+        waitlistCtaLabel: workshops.waitlistCtaLabel,
+        waitlistCtaUrl: workshops.waitlistCtaUrl,
+        waitlistRedirectUrl: workshops.waitlistRedirectUrl,
+        waitlistContentBlocks: workshops.waitlistContentBlocks,
+        waitlistSuccessMessage: workshops.waitlistSuccessMessage,
+      }).from(workshops).where(eq(workshops.id, input.workshopId)).limit(1);
+      if (!w) throw new TRPCError({ code: "NOT_FOUND" });
+      return w;
+    }),
+
+  saveWaitlistSettings: protectedProcedure
+    .input(z.object({
+      workshopId: z.number(),
+      waitlistEnabled: z.boolean(),
+      waitlistHeading: z.string().nullish(),
+      waitlistBody: z.string().nullish(),
+      waitlistCtaLabel: z.string().nullish(),
+      waitlistCtaUrl: z.string().nullish(),
+      waitlistRedirectUrl: z.string().nullish(),
+      waitlistContentBlocks: z.string().nullish(),
+      waitlistSuccessMessage: z.string().nullish(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { workshopId, ...data } = input;
+      await db.update(workshops).set(data).where(eq(workshops.id, workshopId));
+      return { success: true };
+    }),
+
+  getWaitlistEntries: protectedProcedure
+    .input(z.object({ workshopId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const entries = await db.select().from(workshopWaitlistEntries)
+        .where(eq(workshopWaitlistEntries.workshopId, input.workshopId))
+        .orderBy(desc(workshopWaitlistEntries.createdAt));
+      return entries;
+    }),
+});
+
+// ── Public waitlist router ────────────────────────────────────────────────────
+export const workshopWaitlistRouter = router({
+  join: publicProcedure
+    .input(z.object({
+      workshopId: z.number(),
+      name: z.string().min(1),
+      email: z.string().email(),
+      phone: z.string().optional(),
+      message: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Check if already on waitlist
+      const [existing] = await db.select({ id: workshopWaitlistEntries.id })
+        .from(workshopWaitlistEntries)
+        .where(and(
+          eq(workshopWaitlistEntries.workshopId, input.workshopId),
+          eq(workshopWaitlistEntries.email, input.email)
+        )).limit(1);
+      if (existing) return { success: true, alreadyRegistered: true };
+      await db.insert(workshopWaitlistEntries).values({
+        workshopId: input.workshopId,
+        name: input.name,
+        email: input.email,
+        phone: input.phone ?? null,
+        message: input.message ?? null,
+        createdAt: Date.now(),
+      });
+      return { success: true, alreadyRegistered: false };
     }),
 });

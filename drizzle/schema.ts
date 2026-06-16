@@ -6672,12 +6672,33 @@ export const workshops = mysqlTable("workshops", {
   // Checkout page builder config (JSON)
   checkoutPageConfig: longtext("checkout_page_config"),
 
+  // Waiting list settings
+  waitlistEnabled: boolean("waitlist_enabled").default(false).notNull(),
+  waitlistHeading: varchar("waitlist_heading", { length: 500 }),
+  waitlistBody: longtext("waitlist_body"),
+  waitlistCtaLabel: varchar("waitlist_cta_label", { length: 255 }),
+  waitlistCtaUrl: varchar("waitlist_cta_url", { length: 2048 }),
+  waitlistRedirectUrl: varchar("waitlist_redirect_url", { length: 2048 }),
+  waitlistContentBlocks: longtext("waitlist_content_blocks"),
+  waitlistSuccessMessage: longtext("waitlist_success_message"),
+
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type Workshop = typeof workshops.$inferSelect;
 export type InsertWorkshop = typeof workshops.$inferInsert;
+
+export const workshopWaitlistEntries = mysqlTable("workshop_waitlist_entries", {
+  id: int("id").autoincrement().primaryKey(),
+  workshopId: int("workshop_id").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  message: text("message"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type WorkshopWaitlistEntry = typeof workshopWaitlistEntries.$inferSelect;
 
 // ─── Workshop Instances ───────────────────────────────────────────────────────
 // Each instance represents one scheduled run of the workshop (a specific date,

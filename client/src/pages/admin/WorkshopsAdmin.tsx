@@ -25,6 +25,7 @@ import {
   BookOpen, FileText, Package, ChevronRight, Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
+import RichTextEditor from "@/components/RichTextEditor";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
@@ -253,6 +254,7 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
   const [instSalesCloseDate, setInstSalesCloseDate] = useState("");
   const [instSalesOpenDate, setInstSalesOpenDate] = useState("");
   const [instStatus, setInstStatus] = useState<"draft" | "published" | "cancelled" | "completed">("draft");
+  const [instContent, setInstContent] = useState("");
 
   // Resource dialog state
   const [resourceDialogOpen, setResourceDialogOpen] = useState(false);
@@ -352,6 +354,7 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
   function openNewInstance() {
     setEditingInstance(null);
     setInstTitle(""); setInstDescription(""); setInstStartDate(""); setInstEndDate("");
+    setInstContent("");
     setInstTimezone("America/New_York"); setInstLocationType("in_person");
     setInstVenueName(""); setInstVenueCity(""); setInstVenueState("");
     setInstCapacity(""); setInstPrice(""); setInstAvailableForPurchase(false);
@@ -376,6 +379,7 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
     setInstSalesCloseDate(inst.salesCloseDate ? new Date(inst.salesCloseDate).toISOString().slice(0, 16) : "");
     setInstSalesOpenDate(inst.salesOpenDate ? new Date(inst.salesOpenDate).toISOString().slice(0, 16) : "");
     setInstStatus(inst.status ?? "draft");
+    setInstContent(inst.instanceContent ?? "");
     setInstanceDialogOpen(true);
   }
 
@@ -397,6 +401,7 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
       salesCloseDate: instSalesCloseDate || null,
       salesOpenDate: instSalesOpenDate || null,
       status: instStatus,
+      instanceContent: instContent || null,
     };
     if (editingInstance) {
       updateInstanceMutation.mutate({ id: editingInstance.id, ...payload });
@@ -490,6 +495,7 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
           <TabsTrigger value="enrollments" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Enrollments ({enrollments.length})</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3.5 h-3.5 mr-1" />After Purchase</TabsTrigger>
           <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
+          <TabsTrigger value="waitlist" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Waitlist</TabsTrigger>
         </TabsList>
 
         {/* ── Settings Tab ── */}
@@ -1009,6 +1015,10 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
             </div>
           </div>
         </TabsContent>
+        {/* ── Waitlist Tab ── */}
+        <TabsContent value="waitlist" className="space-y-4 mt-4">
+          <WaitlistSettingsTab workshopId={workshopId} />
+        </TabsContent>
       </Tabs>
 
       {/* ── Instance Dialog ── */}
@@ -1114,6 +1124,11 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
                 <Input type="datetime-local" value={instSalesCloseDate} onChange={e => setInstSalesCloseDate(e.target.value)} className="mt-1 text-sm" />
                 <p className="text-xs text-gray-400 mt-0.5">If blank, auto-closes when start date passes</p>
               </div>
+            </div>
+            <div>
+              <Label className="text-xs font-medium">Instance Content (Rich Text)</Label>
+              <p className="text-xs text-gray-400 mb-1">Optional rich text shown on the workshop page for this specific instance (agenda, location details, instructor bio, etc.)</p>
+              <RichTextEditor value={instContent} onChange={setInstContent} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1290,4 +1305,187 @@ export function WorkshopsAdmin({ initialEditId }: { initialEditId?: number }) {
     return <WorkshopEditor workshopId={editingId} onBack={() => setEditingId(null)} />;
   }
   return <WorkshopsList onEdit={setEditingId} />;
+}
+
+// ── WaitlistSettingsTab ────────────────────────────────────────────────────────
+function WaitlistSettingsTab({ workshopId }: { workshopId: number }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.workshopAdmin.getWaitlistSettings.useQuery({ workshopId });
+  const { data: entries = [] } = trpc.workshopAdmin.getWaitlistEntries.useQuery({ workshopId });
+
+  const [enabled, setEnabled] = useState(false);
+  const [heading, setHeading] = useState("");
+  const [body, setBody] = useState("");
+  const [ctaLabel, setCtaLabel] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
+  const [redirectUrl, setRedirectUrl] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setEnabled(data.waitlistEnabled ?? false);
+      setHeading(data.waitlistHeading ?? "");
+      setBody(data.waitlistBody ?? "");
+      setCtaLabel(data.waitlistCtaLabel ?? "");
+      setCtaUrl(data.waitlistCtaUrl ?? "");
+      setRedirectUrl(data.waitlistRedirectUrl ?? "");
+      setSuccessMessage(data.waitlistSuccessMessage ?? "");
+      setDirty(false);
+    }
+  }, [data]);
+
+  const saveMutation = trpc.workshopAdmin.saveWaitlistSettings.useMutation({
+    onSuccess: () => {
+      toast.success("Waitlist settings saved");
+      utils.workshopAdmin.getWaitlistSettings.invalidate({ workshopId });
+      setDirty(false);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  function handleSave() {
+    saveMutation.mutate({
+      workshopId,
+      waitlistEnabled: enabled,
+      waitlistHeading: heading || null,
+      waitlistBody: body || null,
+      waitlistCtaLabel: ctaLabel || null,
+      waitlistCtaUrl: ctaUrl || null,
+      waitlistRedirectUrl: redirectUrl || null,
+      waitlistSuccessMessage: successMessage || null,
+    });
+  }
+
+  if (isLoading) return <div className="py-8 text-center text-sm text-gray-400">Loading waitlist settings…</div>;
+
+  return (
+    <div className="space-y-6">
+      {/* Enable toggle */}
+      <Card>
+        <CardContent className="pt-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-sm text-gray-900">Enable Waiting List Mode</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                When enabled AND no active enrolling instance exists, all CTAs on the workshop landing page will collect waitlist sign-ups instead of directing to checkout.
+              </p>
+            </div>
+            <Switch checked={enabled} onCheckedChange={v => { setEnabled(v); setDirty(true); }} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Waitlist form settings */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm">Waitlist Form & Messaging</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="text-xs">Heading</Label>
+            <Input
+              value={heading}
+              onChange={e => { setHeading(e.target.value); setDirty(true); }}
+              className="mt-1 text-sm"
+              placeholder="Join the Waitlist"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Body / Intro Text (Rich Text)</Label>
+            <div className="mt-1">
+              <RichTextEditor value={body} onChange={v => { setBody(v); setDirty(true); }} />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Success Message (shown after sign-up, Rich Text)</Label>
+            <div className="mt-1">
+              <RichTextEditor value={successMessage} onChange={v => { setSuccessMessage(v); setDirty(true); }} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* CTA / Redirect */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm">CTA Actions & Redirects</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">CTA Button Label (optional override)</Label>
+              <Input
+                value={ctaLabel}
+                onChange={e => { setCtaLabel(e.target.value); setDirty(true); }}
+                className="mt-1 text-sm"
+                placeholder="Join Waitlist"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">CTA Button URL (optional — overrides form)</Label>
+              <Input
+                value={ctaUrl}
+                onChange={e => { setCtaUrl(e.target.value); setDirty(true); }}
+                className="mt-1 text-sm"
+                placeholder="https://…"
+              />
+              <p className="text-xs text-gray-400 mt-0.5">If set, CTA navigates to this URL instead of opening the sign-up form.</p>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Post-Sign-Up Redirect URL (optional)</Label>
+            <Input
+              value={redirectUrl}
+              onChange={e => { setRedirectUrl(e.target.value); setDirty(true); }}
+              className="mt-1 text-sm"
+              placeholder="https://… (leave blank to show success message inline)"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Save */}
+      <div className="flex justify-end">
+        <Button
+          onClick={handleSave}
+          disabled={saveMutation.isPending || !dirty}
+          className="bg-teal-600 hover:bg-teal-700 text-white text-sm"
+        >
+          {saveMutation.isPending ? "Saving…" : "Save Waitlist Settings"}
+        </Button>
+      </div>
+
+      {/* Waitlist entries */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Waitlist Sign-Ups ({entries.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {entries.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">No sign-ups yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Name</TableHead>
+                  <TableHead className="text-xs">Email</TableHead>
+                  <TableHead className="text-xs">Phone</TableHead>
+                  <TableHead className="text-xs">Message</TableHead>
+                  <TableHead className="text-xs">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {entries.map((e: any) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="text-xs">{e.name}</TableCell>
+                    <TableCell className="text-xs">{e.email}</TableCell>
+                    <TableCell className="text-xs">{e.phone ?? "—"}</TableCell>
+                    <TableCell className="text-xs max-w-xs truncate">{e.message ?? "—"}</TableCell>
+                    <TableCell className="text-xs">{new Date(e.createdAt).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

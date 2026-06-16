@@ -56,7 +56,7 @@ import { interestsRouter } from "./routers/interestsRouter";
 import { productAnalyticsRouter } from "./routers/productAnalyticsRouter";
 import { sdmsCmeRouter } from "./routers/sdmsCmeRouter";
 import { widgetAdminRouter, widgetPublicRouter } from "./routers/widgetRouter";
-import { workshopPublicRouter, workshopLearnerRouter, workshopAdminRouter } from "./routers/workshopRouter";
+import { workshopPublicRouter, workshopLearnerRouter, workshopAdminRouter, workshopWaitlistRouter } from "./routers/workshopRouter";
 import { printfulAdminRouter, printfulPublicRouter } from "./routers/printfulRouter";
 import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuizAdminRouter } from "./routers/standaloneQuizRouter";
 import {
@@ -2040,6 +2040,7 @@ export const appRouter = router({
   workshop: workshopPublicRouter,
   workshopLearner: workshopLearnerRouter,
   workshopAdmin: workshopAdminRouter,
+  workshopWaitlist: workshopWaitlistRouter,
   printful: printfulPublicRouter,
   printfulAdmin: printfulAdminRouter,
 

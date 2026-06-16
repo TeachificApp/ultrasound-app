@@ -1,19 +1,27 @@
 /**
  * WorkshopLanding.tsx
  * Public sales page for a workshop — /workshops/:slug
- * Renders landing_blocks from the page builder when available, otherwise falls back
- * to a simple layout using description / pricing fields.
+ *
+ * Waitlist mode: when workshop.waitlistEnabled is true AND no active enrolling
+ * instance exists, all CTAs switch to waitlist sign-up mode.
+ * - If waitlistCtaUrl is set, CTAs navigate there.
+ * - Otherwise a modal collects name/email/phone/message and submits to
+ *   workshopWaitlist.join, then shows the success message or redirects.
  *
  * Also handles ?preview=admin to show an admin edit bar.
  */
-import { useParams, useLocation } from "wouter";
+import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Briefcase, Calendar, MapPin, Clock, Users, Edit2, ArrowLeft, ExternalLink, CheckCircle } from "lucide-react";
+import { Briefcase, Calendar, MapPin, Clock, Users, Edit2, ArrowLeft, ExternalLink, CheckCircle, Bell } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
@@ -129,12 +137,113 @@ function InstanceCard({
   );
 }
 
+// ─── Waitlist Modal ───────────────────────────────────────────────────────────
+function WaitlistModal({
+  open,
+  onClose,
+  workshop,
+}: {
+  open: boolean;
+  onClose: () => void;
+  workshop: any;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const joinMutation = trpc.workshopWaitlist.join.useMutation({
+    onSuccess: (res) => {
+      if (res.alreadyRegistered) {
+        toast.info("You're already on the waitlist for this workshop.");
+        onClose();
+        return;
+      }
+      setSubmitted(true);
+      // Redirect if configured
+      if (workshop.waitlistRedirectUrl) {
+        setTimeout(() => {
+          window.location.href = workshop.waitlistRedirectUrl;
+        }, 1500);
+      }
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+    joinMutation.mutate({ workshopId: workshop.id, name, email, phone: phone || undefined, message: message || undefined });
+  }
+
+  const heading = workshop.waitlistHeading || "Join the Waitlist";
+  const bodyHtml = workshop.waitlistBody;
+  const successHtml = workshop.waitlistSuccessMessage;
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Bell className="w-4 h-4 text-teal-600" />
+            {heading}
+          </DialogTitle>
+        </DialogHeader>
+
+        {submitted ? (
+          <div className="py-4">
+            {successHtml ? (
+              <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: successHtml }} />
+            ) : (
+              <div className="text-center py-4">
+                <CheckCircle className="w-10 h-10 text-teal-500 mx-auto mb-3" />
+                <p className="font-medium text-gray-900">You're on the list!</p>
+                <p className="text-sm text-gray-500 mt-1">We'll notify you as soon as new dates are announced.</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            {bodyHtml && (
+              <div className="prose prose-sm max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+            )}
+            <div>
+              <Label className="text-xs">Full Name *</Label>
+              <Input value={name} onChange={e => setName(e.target.value)} className="mt-1 text-sm" placeholder="Your name" required />
+            </div>
+            <div>
+              <Label className="text-xs">Email Address *</Label>
+              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1 text-sm" placeholder="you@example.com" required />
+            </div>
+            <div>
+              <Label className="text-xs">Phone (optional)</Label>
+              <Input value={phone} onChange={e => setPhone(e.target.value)} className="mt-1 text-sm" placeholder="+1 (555) 000-0000" />
+            </div>
+            <div>
+              <Label className="text-xs">Message (optional)</Label>
+              <Textarea value={message} onChange={e => setMessage(e.target.value)} className="mt-1 text-sm" rows={2} placeholder="Any questions or comments?" />
+            </div>
+            <Button
+              type="submit"
+              disabled={!name.trim() || !email.trim() || joinMutation.isPending}
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              {joinMutation.isPending ? "Submitting…" : (workshop.waitlistCtaLabel || "Join Waitlist")}
+            </Button>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function WorkshopLanding() {
   const { slug } = useParams<{ slug: string }>();
-  const [, navigate] = useLocation();
   const { user } = useAuth();
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   const { data, isLoading, error } = trpc.workshop.getBySlug.useQuery(
     { slug: slug! },
@@ -161,6 +270,9 @@ export default function WorkshopLanding() {
   const workshop = data?.workshop;
   const availableInstances = data?.availableInstances ?? [];
   const pricingOptions = data?.pricingOptions ?? [];
+
+  // Determine waitlist mode: enabled flag + no active enrolling instances
+  const isWaitlistMode = !!(workshop?.waitlistEnabled && availableInstances.length === 0);
 
   // Scroll to top on mount
   useEffect(() => { window.scrollTo(0, 0); }, [slug]);
@@ -205,7 +317,17 @@ export default function WorkshopLanding() {
     landingBlocks = [];
   }
 
+  // ── CTA handler — routes to waitlist or checkout ───────────────────────────
   function handleCta(pricingOptionId?: number) {
+    // Waitlist mode: CTA URL overrides the modal
+    if (isWaitlistMode) {
+      if (workshop!.waitlistCtaUrl) {
+        window.open(workshop!.waitlistCtaUrl, "_blank");
+      } else {
+        setWaitlistOpen(true);
+      }
+      return;
+    }
     if (!user) {
       window.location.href = getLoginUrl(window.location.pathname + window.location.search);
       return;
@@ -216,7 +338,6 @@ export default function WorkshopLanding() {
     if (!opt || opt.price === 0) {
       enrollMutation.mutate({ workshopId: workshop!.id });
     } else {
-      // For paid workshops without a specific instance, use the first available instance
       const firstInstance = availableInstances[0];
       if (firstInstance) {
         checkoutMutation.mutate({
@@ -231,6 +352,14 @@ export default function WorkshopLanding() {
   }
 
   function handleInstanceRegister(instanceId: number) {
+    if (isWaitlistMode) {
+      if (workshop!.waitlistCtaUrl) {
+        window.open(workshop!.waitlistCtaUrl, "_blank");
+      } else {
+        setWaitlistOpen(true);
+      }
+      return;
+    }
     if (!user) {
       window.location.href = getLoginUrl(window.location.pathname + window.location.search);
       return;
@@ -252,14 +381,34 @@ export default function WorkshopLanding() {
     <div className={`min-h-screen bg-white ${isPreview ? "pt-10" : ""}`}>
       {isPreview && <AdminPreviewBar workshopId={workshop.id} />}
 
+      {/* Waitlist banner (shown above page builder blocks too) */}
+      {isWaitlistMode && (
+        <div className="bg-teal-50 border-b border-teal-200 px-4 py-3 text-center">
+          <span className="text-sm text-teal-800 font-medium">
+            <Bell className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+            No upcoming dates are currently open for enrollment — join the waitlist to be notified first.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-3 border-teal-400 text-teal-700 hover:bg-teal-100 text-xs"
+            onClick={() => workshop.waitlistCtaUrl ? window.open(workshop.waitlistCtaUrl, "_blank") : setWaitlistOpen(true)}
+          >
+            {workshop.waitlistCtaLabel || "Join Waitlist"}
+          </Button>
+        </div>
+      )}
+
       {landingBlocks.length > 0 ? (
-        // Page builder blocks — click delegation for CTA buttons
+        // Page builder blocks — CTA delegation intercepts all enroll/checkout clicks
         <div
           onClick={(e) =>
             handleCtaBtnClick(
               e as React.MouseEvent<HTMLElement>,
-              // onEnroll (free)
-              () => enrollMutation.mutate({ workshopId: workshop!.id }),
+              // onEnroll (free) — in waitlist mode, open waitlist instead
+              isWaitlistMode
+                ? () => { workshop.waitlistCtaUrl ? window.open(workshop.waitlistCtaUrl, "_blank") : setWaitlistOpen(true); }
+                : () => enrollMutation.mutate({ workshopId: workshop!.id }),
               // onEnrollWithOption
               undefined,
               // onCheckoutPage (paid)
@@ -289,6 +438,9 @@ export default function WorkshopLanding() {
             <div className="flex flex-wrap gap-2 mb-3">
               <Badge variant="secondary" className="capitalize">{workshop.brand}</Badge>
               <Badge variant="outline" className="capitalize">{workshop.status}</Badge>
+              {isWaitlistMode && (
+                <Badge className="bg-teal-100 text-teal-700 border-teal-200">Waitlist Open</Badge>
+              )}
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{workshop.title}</h1>
             {workshop.subtitle && (
@@ -302,8 +454,30 @@ export default function WorkshopLanding() {
             )}
           </div>
 
-          {/* Available Instances */}
-          {availableInstances.length > 0 && (
+          {/* Waitlist CTA (fallback layout, no instances) */}
+          {isWaitlistMode && (
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-6">
+              {workshop.waitlistHeading && (
+                <h2 className="text-xl font-semibold text-teal-900 mb-2">{workshop.waitlistHeading}</h2>
+              )}
+              {workshop.waitlistBody && (
+                <div
+                  className="prose prose-sm text-teal-800 max-w-none mb-4"
+                  dangerouslySetInnerHTML={{ __html: workshop.waitlistBody }}
+                />
+              )}
+              <Button
+                onClick={() => workshop.waitlistCtaUrl ? window.open(workshop.waitlistCtaUrl, "_blank") : setWaitlistOpen(true)}
+                className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
+              >
+                <Bell className="w-4 h-4" />
+                {workshop.waitlistCtaLabel || "Join the Waitlist"}
+              </Button>
+            </div>
+          )}
+
+          {/* Available Instances (non-waitlist mode) */}
+          {!isWaitlistMode && availableInstances.length > 0 && (
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Dates</h2>
               <div className="space-y-3">
@@ -319,8 +493,8 @@ export default function WorkshopLanding() {
             </div>
           )}
 
-          {/* Pricing (no instances) */}
-          {availableInstances.length === 0 && pricingOptions.length > 0 && (
+          {/* Pricing (no instances, no waitlist mode) */}
+          {!isWaitlistMode && availableInstances.length === 0 && pricingOptions.length > 0 && (
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Registration</h2>
               <div className="space-y-3">
@@ -347,8 +521,8 @@ export default function WorkshopLanding() {
             </div>
           )}
 
-          {/* No instances, no pricing options */}
-          {availableInstances.length === 0 && pricingOptions.length === 0 && (
+          {/* No instances, no pricing, no waitlist */}
+          {!isWaitlistMode && availableInstances.length === 0 && pricingOptions.length === 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
               <Clock className="w-8 h-8 text-amber-500 mx-auto mb-2" />
               <p className="font-medium text-amber-800">No upcoming dates available</p>
@@ -356,6 +530,15 @@ export default function WorkshopLanding() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Waitlist sign-up modal */}
+      {isWaitlistMode && (
+        <WaitlistModal
+          open={waitlistOpen}
+          onClose={() => setWaitlistOpen(false)}
+          workshop={workshop}
+        />
       )}
     </div>
   );
