@@ -400,6 +400,18 @@ export default function Checkout() {
 
   const entityType = searchParams.entityType;
 
+  // Compute the correct back-link based on entity type
+  const backHref = entityType === "download" ? `/downloads/${slug}`
+    : entityType === "physical" ? `/product/${slug}`
+    : entityType === "webinar" ? `/webinars/${slug}`
+    : entityType === "membership" ? `/membership/${slug}`
+    : `/courses/${slug}`;
+  const backLabel = entityType === "download" ? "Back to product"
+    : entityType === "physical" ? "Back to product"
+    : entityType === "webinar" ? "Back to webinar"
+    : entityType === "membership" ? "Back to membership"
+    : "Back to course";
+
   const onSessionSuccess = (data: any) => {
     const { clientSecret: cs, ...meta } = data;
     setClientSecret(cs);
@@ -497,8 +509,8 @@ export default function Checkout() {
           <p className="text-gray-500 text-sm mb-6">
             {(createSession.error as any)?.message ?? "This course is not available for purchase right now."}
           </p>
-          <Link href={`/courses/${slug}`} className="inline-flex items-center gap-2 font-medium text-sm" style={linkStyle}>
-            <ArrowLeft className="h-4 w-4" /> Back to course
+          <Link href={backHref} className="inline-flex items-center gap-2 font-medium text-sm" style={linkStyle}>
+            <ArrowLeft className="h-4 w-4" /> {backLabel}
           </Link>
         </div>
       </div>
@@ -511,11 +523,11 @@ export default function Checkout() {
       <header className={`sticky top-0 z-10 border-b ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link
-            href={`/courses/${slug}`}
+            href={backHref}
             className={`flex items-center gap-2 text-sm font-medium transition-colors ${isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-800"}`}
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to course
+            {backLabel}
           </Link>
           <div className={`flex items-center gap-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
             <Lock className="h-3.5 w-3.5" />
