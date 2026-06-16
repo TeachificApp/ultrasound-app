@@ -127,6 +127,20 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
     },
     onError: (e) => toast.error(`Checkout failed: ${e.message}`),
   });
+  const workshopEnrollFree = trpc.workshopLearner.enrollFree.useMutation({
+    onSuccess: (data) => {
+      if (data.alreadyEnrolled) toast.success("You already have access to this workshop.");
+      else toast.success("Enrolled! You now have access to this workshop.");
+    },
+    onError: (e) => toast.error(`Workshop enrollment failed: ${e.message}`),
+  });
+  const communityJoin = trpc.community.join.useMutation({
+    onSuccess: (data) => {
+      if ((data as any).pending) toast.success("Request submitted! Your membership is pending approval.");
+      else toast.success("Joined! You now have access to this community.");
+    },
+    onError: (e) => toast.error(`Community join failed: ${e.message}`),
+  });
   // Group free enrollment dialog state
   const [gfeDialogOpen, setGfeDialogOpen] = useState(false);
   const [gfeCourseId, setGfeCourseId] = useState<number | null>(null);
@@ -161,6 +175,10 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
         await webinarRegister.mutateAsync({ webinarId: productId });
       } else if (productType === "download") {
         await downloadsCheckout.mutateAsync({ productId });
+      } else if (productType === "workshop") {
+        await workshopEnrollFree.mutateAsync({ workshopId: productId });
+      } else if (productType === "community") {
+        await communityJoin.mutateAsync({ communityId: productId });
       } else {
         toast.error(`Free enrollment not supported for product type: ${productType}`);
       }

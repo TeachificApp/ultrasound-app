@@ -1162,6 +1162,16 @@ function CTAActionPicker({
     undefined,
     { enabled: behavior === "free_enrollment" && freeEnrollType === "bundle" }
   );
+  // Communities
+  const { data: feCommunities } = trpc.community.listCommunities.useQuery(
+    undefined,
+    { enabled: behavior === "free_enrollment" && freeEnrollType === "community" }
+  );
+  // Workshops
+  const { data: feWorkshops } = trpc.workshopAdmin.list.useQuery(
+    { limit: 200, offset: 0 },
+    { enabled: behavior === "free_enrollment" && freeEnrollType === "workshop" }
+  );
   const freeEnrollItems: Array<{ id: number; label: string }> = React.useMemo(() => {
     if (freeEnrollType === "course" || freeEnrollType === "quiz" || freeEnrollType === "cohort") {
       return ((feCourses as any)?.courses ?? []).filter((c: any) => c.type === freeEnrollType).map((c: any) => ({ id: c.id, label: `${c.title} (${c.type})` }));
@@ -1169,8 +1179,10 @@ function CTAActionPicker({
     if (freeEnrollType === "webinar") return ((feWebinars as any)?.webinars ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Webinar #${w.id}` }));
     if (freeEnrollType === "download") return ((feDownloads as any) ?? []).map((d: any) => ({ id: d.id, label: d.title ?? d.name ?? `Download #${d.id}` }));
     if (freeEnrollType === "bundle") return ((feBundles as any) ?? []).map((b: any) => ({ id: b.id, label: b.title ?? b.name ?? `Bundle #${b.id}` }));
+    if (freeEnrollType === "community") return ((feCommunities as any) ?? []).map((c: any) => ({ id: c.id, label: c.title ?? `Community #${c.id}` }));
+    if (freeEnrollType === "workshop") return ((feWorkshops as any) ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}` }));
     return [];
-  }, [freeEnrollType, feCourses, feWebinars, feDownloads, feBundles]);
+  }, [freeEnrollType, feCourses, feWebinars, feDownloads, feBundles, feCommunities, feWorkshops]);
   // Pricing option picker state
   const [poCourseId, setPoCoursId] = React.useState<number | null>(pricingOptionCourseIdValue ?? null);
   const { data: poCoursesData } = trpc.lmsAdmin.listCourses.useQuery(
@@ -1324,7 +1336,7 @@ function CTAActionPicker({
       )}
       {behavior === "free_enrollment" && (
         <div className="space-y-2 bg-green-50 border border-green-200 rounded p-2">
-          <p className="text-[10px] text-green-700 font-medium">Enrolls the user directly — no Stripe, no payment. Use for free courses, quizzes, downloads, bundles, or webinars.</p>
+          <p className="text-[10px] text-green-700 font-medium">Enrolls the user directly — no Stripe, no payment. Use for free courses, quizzes, downloads, bundles, webinars, workshops, or communities.</p>
           <div>
             <label className="text-xs text-gray-500 block mb-0.5">Product Type</label>
             <select
@@ -1338,6 +1350,8 @@ function CTAActionPicker({
               <option value="webinar">Webinar</option>
               <option value="download">Download</option>
               <option value="bundle">Bundle</option>
+              <option value="workshop">Workshop</option>
+              <option value="community">Community</option>
             </select>
           </div>
           <div>

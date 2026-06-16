@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -521,6 +521,52 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
   });
 
   console.log(`[Stripe] Physical product order recorded: user ${userId}, product ${productId}, session ${session.id}`);
+}
+
+/**
+ * Handle workshop instance checkout completion.
+ * Triggered when a user completes Stripe checkout for a workshop instance.
+ */
+async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  if (meta.type !== "workshop") return;
+  const workshopId = meta.workshop_id ? parseInt(meta.workshop_id, 10) : null;
+  const instanceId = meta.instance_id ? parseInt(meta.instance_id, 10) : null;
+  const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
+  if (!workshopId || !instanceId || !userId) {
+    console.warn("[Stripe] Workshop checkout missing workshopId, instanceId, or userId in metadata");
+    return;
+  }
+  const db = await getDb();
+  if (!db) return;
+  // Idempotency check
+  const [existing] = await db.select({ id: workshopEnrollments.id })
+    .from(workshopEnrollments)
+    .where(and(
+      eq(workshopEnrollments.userId, userId),
+      eq(workshopEnrollments.instanceId, instanceId),
+      eq(workshopEnrollments.stripeSessionId, session.id as string),
+    )).limit(1);
+  if (existing) {
+    console.log(`[Stripe] Workshop enrollment already recorded: user ${userId}, instance ${instanceId}`);
+    return;
+  }
+  const amountPaid = (session.amount_total as number) ?? 0;
+  await db.insert(workshopEnrollments).values({
+    workshopId,
+    instanceId,
+    userId,
+    stripeSessionId: session.id as string,
+    amountPaid,
+    currency: (session.currency as string) ?? "usd",
+    status: "active",
+    accessGrantedAt: new Date(),
+  });
+  await notifyOwner({
+    title: "🏫 New Workshop Enrollment",
+    content: `User ID ${userId} (${meta.customer_email ?? "unknown"}) enrolled in workshop ID ${workshopId}, instance ID ${instanceId}. Amount: $${(amountPaid / 100).toFixed(2)}.`,
+  });
+  console.log(`[Stripe] Workshop enrollment recorded: user ${userId}, workshop ${workshopId}, instance ${instanceId}`);
 }
 
 /**
@@ -1867,6 +1913,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       await handleBrandMembershipCheckoutCompleted(sessionObj);
       await handleDualMembershipCheckoutCompleted(sessionObj);
       await handlePhysicalProductCheckoutCompleted(sessionObj);
+      await handleWorkshopCheckoutCompleted(sessionObj);
       await handleMembershipCheckoutCompleted(sessionObj);
       await handleDiyCheckoutCompleted(sessionObj);
       // Fire community workflow rules for any purchase (fire-and-forget)

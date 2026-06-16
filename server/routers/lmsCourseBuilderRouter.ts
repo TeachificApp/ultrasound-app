@@ -79,6 +79,8 @@ import {
   funnels,
   funnelPages,
   curriculumEmbedVisibility,
+  workshops,
+  digitalBundles,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -267,6 +269,96 @@ export const lmsCourseBuilderRouter = router({
         db.update(lmsCourses).set({ libraryOrder: c.libraryOrder }).where(eq(lmsCourses.id, c.id))
       ));
       return { success: true };
+    }),
+
+  /** Unified Library Order — fetch all content types and bulk-update their libraryOrder */
+  listAllLibraryItems: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [courses, downloads, bundles_list, workshops_list] = await Promise.all([
+      db.select({
+        id: lmsCourses.id,
+        title: lmsCourses.title,
+        type: lmsCourses.type,
+        status: lmsCourses.status,
+        brand: lmsCourses.brand,
+        thumbnailUrl: lmsCourses.thumbnailUrl,
+        libraryOrder: lmsCourses.libraryOrder,
+        showInLibrary: lmsCourses.showInLibrary,
+        createdAt: lmsCourses.createdAt,
+      }).from(lmsCourses),
+      db.select({
+        id: digitalProducts.id,
+        title: digitalProducts.title,
+        status: digitalProducts.status,
+        brand: digitalProducts.brand,
+        thumbnailUrl: digitalProducts.thumbnailUrl,
+        libraryOrder: digitalProducts.libraryOrder,
+        showInLibrary: digitalProducts.showInLibrary,
+        createdAt: digitalProducts.createdAt,
+      }).from(digitalProducts),
+      db.select({
+        id: digitalBundles.id,
+        title: digitalBundles.title,
+        status: digitalBundles.status,
+        brand: digitalBundles.brand,
+        thumbnailUrl: digitalBundles.thumbnailUrl,
+        libraryOrder: digitalBundles.libraryOrder,
+        showInLibrary: digitalBundles.showInLibrary,
+        createdAt: digitalBundles.createdAt,
+      }).from(digitalBundles),
+      db.select({
+        id: workshops.id,
+        title: workshops.title,
+        status: workshops.status,
+        brand: workshops.brand,
+        thumbnailUrl: workshops.thumbnailUrl,
+        libraryOrder: workshops.libraryOrder,
+        showInLibrary: workshops.showInLibrary,
+        createdAt: workshops.createdAt,
+      }).from(workshops),
+    ]);
+    const mapped = [
+      ...courses.map(c => ({ ...c, contentType: c.type as string })),
+      ...downloads.map(d => ({ ...d, contentType: "download" as string, type: "download" as string })),
+      ...bundles_list.map(b => ({ ...b, contentType: "bundle" as string, type: "bundle" as string })),
+      ...workshops_list.map(w => ({ ...w, contentType: "workshop" as string, type: "workshop" as string })),
+    ];
+    mapped.sort((a, b) => {
+      const ao = (a.libraryOrder === 0 || !a.libraryOrder) ? 99999 : a.libraryOrder;
+      const bo = (b.libraryOrder === 0 || !b.libraryOrder) ? 99999 : b.libraryOrder;
+      if (ao !== bo) return ao - bo;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    return mapped;
+  }),
+
+  /** Bulk-update libraryOrder for mixed content types */
+  reorderLibrary: protectedProcedure
+    .input(z.object({
+      items: z.array(z.object({
+        id: z.number(),
+        contentType: z.enum(["course", "quiz", "download", "cohort", "bundle", "workshop"]),
+        libraryOrder: z.number(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(input.items.map(item => {
+        if (item.contentType === "download") {
+          return db.update(digitalProducts).set({ libraryOrder: item.libraryOrder }).where(eq(digitalProducts.id, item.id));
+        } else if (item.contentType === "bundle") {
+          return db.update(digitalBundles).set({ libraryOrder: item.libraryOrder }).where(eq(digitalBundles.id, item.id));
+        } else if (item.contentType === "workshop") {
+          return db.update(workshops).set({ libraryOrder: item.libraryOrder }).where(eq(workshops.id, item.id));
+        } else {
+          return db.update(lmsCourses).set({ libraryOrder: item.libraryOrder }).where(eq(lmsCourses.id, item.id));
+        }
+      }));
+      return { success: true, updated: input.items.length };
     }),
 
   uploadCourseCoverImage: protectedProcedure

@@ -3311,6 +3311,10 @@ export const lmsCollections = mysqlTable("lms_collections", {
   coverImageUrl: text("cover_image_url"),
   position: int("position").default(0).notNull(),
   isPublished: boolean("is_published").default(true).notNull(),
+  // URL slug — used to create shareable direct links to this collection in the Education Library
+  // e.g. /education-library?collection=workshops
+  // null = no shareable URL (collection only accessible via the filter tab)
+  slug: varchar("slug", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3425,6 +3429,9 @@ export const digitalBundles = mysqlTable("digital_bundles", {
   discountPrice: int("discount_price").default(0).notNull(), // cents
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived"]).default("draft").notNull(),
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
+  libraryOrder: int("library_order").default(0).notNull(),
+  showInLibrary: boolean("show_in_library").default(true).notNull(),
   // Hide additional pricing options on the landing page
   hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
   // After Purchase Workflow — JSON array of workflow action objects
@@ -6530,3 +6537,236 @@ export const postingAliases = mysqlTable("posting_aliases", {
 });
 export type PostingAlias = typeof postingAliases.$inferSelect;
 export type InsertPostingAlias = typeof postingAliases.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Workshop Product Type
+// A Workshop is a course-like product with optional curriculum, physical-product
+// style landing page, and cohort-style scheduled instances.  Each instance can
+// be individually made available for purchase on the sales page; it falls off
+// automatically once its salesCloseDate passes (or, if not set, once the
+// workshop start date has passed).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const workshops = mysqlTable("workshops", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 500 }),
+  description: longtext("description"),
+  coverImageUrl: text("cover_image_url"),
+  thumbnailUrl: text("thumbnail_url"),
+
+  // Status / visibility
+  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived"]).default("draft").notNull(),
+
+  // Brand
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
+
+  // Pricing (per-instance can override)
+  price: int("price").default(0).notNull(),           // cents — default price
+  compareAtPrice: int("compare_at_price"),             // cents — crossed-out price
+  isFree: boolean("is_free").default(false).notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  pricingType: mysqlEnum("pricing_type", ["free", "one_time"]).default("one_time").notNull(),
+
+  // Curriculum toggle — when false, no curriculum tab is shown
+  curriculumEnabled: boolean("curriculum_enabled").default(true).notNull(),
+
+  // Landing page blocks (page builder JSON)
+  landingBlocks: longtext("landing_blocks"),
+  landingHeadline: varchar("landing_headline", { length: 500 }),
+  landingBody: longtext("landing_body"),
+
+  // SEO
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
+  metaKeywords: text("meta_keywords"),
+  seoTitle: varchar("seo_title", { length: 255 }),
+  seoDescription: text("seo_description"),
+  seoImage: varchar("seo_image", { length: 512 }),
+
+  // After-purchase settings
+  customThankYouEnabled: boolean("custom_thank_you_enabled").default(false).notNull(),
+  customThankYouBlocks: longtext("custom_thank_you_blocks"),
+  postPurchaseRedirectUrl: varchar("post_purchase_redirect_url", { length: 1024 }),
+  welcomeEmailEnabled: boolean("welcome_email_enabled").default(true).notNull(),
+  welcomeEmailSubject: varchar("welcome_email_subject", { length: 500 }),
+  welcomeEmailBody: longtext("welcome_email_body"),
+
+  // Hide additional pricing options on the landing page
+  hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
+
+  // Color scheme (mirrors lmsCourses)
+  primaryColor: varchar("primary_color", { length: 20 }).default("#179ca3"),
+  accentColor: varchar("accent_color", { length: 20 }).default("#0d9488"),
+
+  // Education Library
+  showInLibrary: boolean("show_in_library").default(true).notNull(),
+  libraryOrder: int("library_order").default(0).notNull(),
+  isFeatured: boolean("is_featured").default(false).notNull(),
+
+  // Per-product publish domain override
+  publishDomain: varchar("publish_domain", { length: 255 }),
+
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type Workshop = typeof workshops.$inferSelect;
+export type InsertWorkshop = typeof workshops.$inferInsert;
+
+// ─── Workshop Instances ───────────────────────────────────────────────────────
+// Each instance represents one scheduled run of the workshop (a specific date,
+// location, and optionally a different price).
+export const workshopInstances = mysqlTable("workshop_instances", {
+  id: int("id").autoincrement().primaryKey(),
+  workshopId: int("workshop_id").notNull(),
+
+  title: varchar("title", { length: 255 }).notNull(),          // e.g. "Dallas — June 2025"
+  description: text("description"),
+
+  // Schedule
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  timezone: varchar("timezone", { length: 64 }).default("America/New_York").notNull(),
+  durationMinutes: int("duration_minutes").default(480).notNull(), // default 8h
+
+  // Location
+  locationType: mysqlEnum("location_type", ["in_person", "virtual", "hybrid"]).default("in_person").notNull(),
+  venueName: varchar("venue_name", { length: 255 }),
+  venueAddress: text("venue_address"),
+  venueCity: varchar("venue_city", { length: 100 }),
+  venueState: varchar("venue_state", { length: 100 }),
+  venueCountry: varchar("venue_country", { length: 100 }),
+  meetingUrl: text("meeting_url"),                              // for virtual/hybrid
+
+  // Capacity
+  capacity: int("capacity"),                                    // null = unlimited
+  enrolledCount: int("enrolled_count").default(0).notNull(),
+
+  // Pricing override (null = use workshop default)
+  price: int("price"),                                          // cents
+  compareAtPrice: int("compare_at_price"),                      // cents
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+
+  // Sales window
+  // availableForPurchase: admin manually enables this instance on the sales page
+  availableForPurchase: boolean("available_for_purchase").default(false).notNull(),
+  // salesCloseDate: if set, instance drops off sales page at this time
+  // if null, auto-closes when startDate passes
+  salesCloseDate: timestamp("sales_close_date"),
+  // salesOpenDate: optional — instance won't appear before this date
+  salesOpenDate: timestamp("sales_open_date"),
+
+  // Status
+  status: mysqlEnum("status", ["draft", "published", "cancelled", "completed"]).default("draft").notNull(),
+
+  // Stripe product/price for this specific instance
+  stripeProductId: varchar("stripe_product_id", { length: 255 }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type WorkshopInstance = typeof workshopInstances.$inferSelect;
+export type InsertWorkshopInstance = typeof workshopInstances.$inferInsert;
+
+// ─── Workshop Resources ───────────────────────────────────────────────────────
+// Downloadable/linkable resources shown on the Resources tab (per-workshop or
+// per-instance).
+export const workshopResources = mysqlTable("workshop_resources", {
+  id: int("id").autoincrement().primaryKey(),
+  workshopId: int("workshop_id").notNull(),
+  // null = shared across all instances; set = specific instance only
+  instanceId: int("instance_id"),
+
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  cardImageUrl: text("card_image_url"),
+  actionType: mysqlEnum("action_type", ["link", "download"]).default("link").notNull(),
+  linkUrl: text("link_url"),
+  fileUrl: text("file_url"),
+  fileKey: varchar("file_key", { length: 512 }),
+  fileName: varchar("file_name", { length: 512 }),
+  status: mysqlEnum("status", ["draft", "published"]).default("published").notNull(),
+  position: int("position").default(0).notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type WorkshopResource = typeof workshopResources.$inferSelect;
+export type InsertWorkshopResource = typeof workshopResources.$inferInsert;
+
+// ─── Workshop Enrollments ─────────────────────────────────────────────────────
+// Tracks which users are enrolled in which workshop instance.
+export const workshopEnrollments = mysqlTable("workshop_enrollments", {
+  id: int("id").autoincrement().primaryKey(),
+  workshopId: int("workshop_id").notNull(),
+  instanceId: int("instance_id").notNull(),
+  userId: int("user_id").notNull(),
+
+  // Payment tracking
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeSessionId: varchar("stripe_session_id", { length: 255 }),
+  amountPaid: int("amount_paid").default(0).notNull(),          // cents
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+
+  // Status
+  status: mysqlEnum("status", ["active", "cancelled", "refunded"]).default("active").notNull(),
+
+  // Access
+  accessGrantedAt: timestamp("access_granted_at").defaultNow().notNull(),
+  accessExpiresAt: timestamp("access_expires_at"),               // null = no expiry
+
+  // Attendance tracking
+  attended: boolean("attended").default(false).notNull(),
+  attendedAt: timestamp("attended_at"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type WorkshopEnrollment = typeof workshopEnrollments.$inferSelect;
+export type InsertWorkshopEnrollment = typeof workshopEnrollments.$inferInsert;
+
+// ─── Workshop Pricing Options ─────────────────────────────────────────────────
+// Multiple named pricing tiers per workshop (mirrors lmsPricingOptions).
+export const workshopPricingOptions = mysqlTable("workshop_pricing_options", {
+  id: int("id").autoincrement().primaryKey(),
+  workshopId: int("workshop_id").notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  sublabel: varchar("sublabel", { length: 500 }),
+  pricingType: mysqlEnum("pricing_type", ["one_time", "free"]).default("one_time").notNull(),
+  price: int("price").default(0).notNull(),                     // cents
+  compareAtPrice: int("compare_at_price"),                      // cents
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  ctaLabel: varchar("cta_label", { length: 100 }),
+  sortOrder: int("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type WorkshopPricingOption = typeof workshopPricingOptions.$inferSelect;
+
+// ─── Product Add-On Items ─────────────────────────────────────────────────────
+// Universal "add-on" system: when a user purchases any product (source), they
+// automatically receive access to one or more additional items (target).
+// pricingOptionId IS NULL  → grant for ALL pricing options of this source product
+// pricingOptionId IS NOT NULL → grant ONLY when that specific pricing option is selected
+export const productAddonItems = mysqlTable("product_addon_items", {
+  id: int("id").autoincrement().primaryKey(),
+  sourceType: varchar("source_type", { length: 30 })
+    .$type<"course" | "download" | "webinar" | "bundle" | "membership" | "physical" | "workshop" | "cohort" | "quiz">()
+    .notNull(),
+  sourceId: int("source_id").notNull(),
+  // null = applies to all pricing options; set to a pricing option ID to restrict
+  pricingOptionId: int("pricing_option_id"),
+  targetType: varchar("target_type", { length: 30 })
+    .$type<"course" | "download" | "webinar" | "bundle" | "membership" | "physical" | "workshop" | "cohort" | "quiz">()
+    .notNull(),
+  targetId: int("target_id").notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type ProductAddonItem = typeof productAddonItems.$inferSelect;
+export type InsertProductAddonItem = typeof productAddonItems.$inferInsert;

@@ -56,6 +56,7 @@ import { interestsRouter } from "./routers/interestsRouter";
 import { productAnalyticsRouter } from "./routers/productAnalyticsRouter";
 import { sdmsCmeRouter } from "./routers/sdmsCmeRouter";
 import { widgetAdminRouter, widgetPublicRouter } from "./routers/widgetRouter";
+import { workshopPublicRouter, workshopLearnerRouter, workshopAdminRouter } from "./routers/workshopRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -2034,6 +2035,9 @@ export const appRouter = router({
   sdmsCme: sdmsCmeRouter,
   widgetAdmin: widgetAdminRouter,
   widgetPublic: widgetPublicRouter,
+  workshop: workshopPublicRouter,
+  workshopLearner: workshopLearnerRouter,
+  workshopAdmin: workshopAdminRouter,
 
   // ─── Email/Password Auth (white-label, no OAuth portal) ──────────────────────
   emailAuth: emailAuthRouter,
