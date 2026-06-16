@@ -19,7 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { BookOpen, CheckCircle, ChevronRight, Clock, Download, HelpCircle, Lock, PlayCircle, Star, Users, AlertTriangle, Globe, LayoutGrid, Layers, BookMarked, Timer, Tag, CreditCard, List } from "lucide-react";
+import { BookOpen, CheckCircle, ChevronRight, Clock, Download, HelpCircle, Lock, PlayCircle, Star, Users, AlertTriangle, Globe, LayoutGrid, Layers, BookMarked, Timer, Tag, CreditCard, List, Bell } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
@@ -1090,8 +1091,14 @@ export default function CourseLanding() {
   const [fpFirstName, setFpFirstName] = useState("");
   const [fpLastName, setFpLastName] = useState("");
   const [fpEmail, setFpEmail] = useState("");
-  const [fpSubmitting, setFpSubmitting] = useState(false);
-
+    const [fpSubmitting, setFpSubmitting] = useState(false);
+  // Cohort waitlist modal state
+  const [cohortWaitlistOpen, setCohortWaitlistOpen] = useState(false);
+  const [cwName, setCwName] = useState("");
+  const [cwEmail, setCwEmail] = useState("");
+  const [cwPhone, setCwPhone] = useState("");
+  const [cwMessage, setCwMessage] = useState("");
+  const [cwSubmitted, setCwSubmitted] = useState(false);
   const { data: course, isLoading } = trpc.lms.getCourse.useQuery({ slug: slug!, preview: isPreview || undefined }, { enabled: !!slug });
   const { data: myCourses } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
   const enrollment = myCourses?.find((e: any) => e.courseId === course?.id);
@@ -1366,7 +1373,31 @@ export default function CourseLanding() {
   const price = formatPrice(course);
   const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
   const isEnrollmentClosed = !enrollment && course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date();
-  const ctaText = enrollment ? "Continue Learning" : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
+  // Cohort waitlist mode: featuredGroup has waitlist enabled AND no open cohort group exists
+  const featuredGroup = (course as any).featuredGroup ?? null;
+  const hasOpenGroup = (course as any).hasOpenGroup ?? true;
+  const isWaitlistMode = !enrollment && !!(featuredGroup?.waitlistEnabled && !hasOpenGroup);
+  const waitlistCtaLabel = featuredGroup?.waitlistCtaLabel || "Join the Waitlist";
+  const ctaText = enrollment ? "Continue Learning" : isWaitlistMode ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
+  const joinCohortWaitlistMutation = trpc.lms.joinCohortWaitlist.useMutation({
+    onSuccess: (res) => {
+      if (res.alreadyRegistered) {
+        toast.info("You're already on the waitlist for this course.");
+        setCohortWaitlistOpen(false);
+        return;
+      }
+      setCwSubmitted(true);
+      const redir = featuredGroup?.waitlistRedirectUrl;
+      if (redir) setTimeout(() => { window.location.href = redir; }, 1500);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const handleWaitlistCta = () => {
+    if (featuredGroup?.waitlistCtaUrl) { window.open(featuredGroup.waitlistCtaUrl, "_blank"); return; }
+    setCwSubmitted(false); setCwName(""); setCwEmail(""); setCwPhone(""); setCwMessage("");
+    setCohortWaitlistOpen(true);
+  };
+  const handleEnrollOrWaitlist = () => { if (isWaitlistMode) { handleWaitlistCta(); } else { handleEnroll(); } };
 
   // Enrollment countdown: days remaining until close (only for cohorts, not yet closed, not enrolled)
   const enrollmentCountdownDays = (() => {
@@ -1409,6 +1440,7 @@ export default function CourseLanding() {
   // ── Blocks-based rendering ──
   if (blocks.length > 0) {
     return (
+      <>
       <div className="min-h-screen bg-white">
         {enrollment && (
           <EnrolledAccessBanner
@@ -1417,6 +1449,20 @@ export default function CourseLanding() {
           />
         )}
         {EnrollmentCountdownBanner}
+        {/* Waitlist banner — shown when no open cohort group exists but waitlist is enabled */}
+        {isWaitlistMode && (
+          <div className="w-full bg-teal-50 border-b border-teal-200 py-3 px-4">
+            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-teal-800">
+                <Bell className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                {featuredGroup?.waitlistHeading || "No upcoming dates are currently open for enrollment — join the waitlist to be notified first."}
+              </div>
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white flex-shrink-0" onClick={handleWaitlistCta}>
+                {waitlistCtaLabel}
+              </Button>
+            </div>
+          </div>
+        )}
         {blocks.map(block => {
           // Hide pricing options blocks if hidePricingOptions is set
           if (course?.hidePricingOptions && (block.type === "pricing_options_auto" || block.type === "pricing_cards")) return null;
@@ -1458,9 +1504,21 @@ export default function CourseLanding() {
           </div>
         )}
       </div>
+      <CohortWaitlistModal
+        open={cohortWaitlistOpen}
+        onClose={() => setCohortWaitlistOpen(false)}
+        featuredGroup={featuredGroup}
+        courseId={course?.id ?? 0}
+        name={cwName} setName={setCwName}
+        email={cwEmail} setEmail={setCwEmail}
+        phone={cwPhone} setPhone={setCwPhone}
+        message={cwMessage} setMessage={setCwMessage}
+        submitted={cwSubmitted}
+        mutation={joinCohortWaitlistMutation}
+      />
+    </>
     );
   }
-
   // ── Auto-generated fallback layout ──
   const heroColor = lp?.heroImageUrl ? undefined : "#179ca3";
   const heroBg = lp?.heroImageUrl
@@ -1585,9 +1643,15 @@ export default function CourseLanding() {
               )}
               {pricingType === "free" && <p className="text-xs text-gray-500">No payment required</p>}
             </div>
-            <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
-              {enrolling ? "Processing..." : ctaText}<ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
+            {isWaitlistMode ? (
+              <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleWaitlistCta}>
+                <Bell className="w-4 h-4 mr-2" />{waitlistCtaLabel}
+              </Button>
+            ) : (
+              <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
+                {enrolling ? "Processing..." : ctaText}<ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            )}
             {enrollment && (
               <Button variant="outline" className="w-full border-teal-300 text-teal-700 hover:bg-teal-50" size="sm" onClick={() => navigate(`/courses/${slug}/overview`)}>
                 <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Course Overview
@@ -1715,9 +1779,15 @@ export default function CourseLanding() {
               <p className="text-xs text-gray-500">{course.trialDays ?? 7}-day free trial, then billed {course.subscriptionInterval ?? "monthly"}</p>
             )}
 
-            <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
-              {enrolling ? "Processing..." : (selectedPricingOptionId ? (course.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.ctaLabel ?? ctaText) : ctaText)}
-            </Button>
+            {isWaitlistMode ? (
+              <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleWaitlistCta}>
+                <Bell className="w-4 h-4 mr-2" />{waitlistCtaLabel}
+              </Button>
+            ) : (
+              <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
+                {enrolling ? "Processing..." : (selectedPricingOptionId ? (course.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.ctaLabel ?? ctaText) : ctaText)}
+              </Button>
+            )}
             <ul className="space-y-2 text-sm text-gray-600">
               {totalLessons > 0 && <li className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-teal-500" />{totalLessons} lessons</li>}
               {totalDuration > 0 && <li className="flex items-center gap-2"><Clock className="w-4 h-4 text-teal-500" />{totalDuration} minutes of content</li>}
@@ -1729,6 +1799,19 @@ export default function CourseLanding() {
       </div>
     </div>
 
+    {/* Cohort Waitlist Modal */}
+    <CohortWaitlistModal
+      open={cohortWaitlistOpen}
+      onClose={() => setCohortWaitlistOpen(false)}
+      featuredGroup={featuredGroup}
+      courseId={course?.id ?? 0}
+      name={cwName} setName={setCwName}
+      email={cwEmail} setEmail={setCwEmail}
+      phone={cwPhone} setPhone={setCwPhone}
+      message={cwMessage} setMessage={setCwMessage}
+      submitted={cwSubmitted}
+      mutation={joinCohortWaitlistMutation}
+    />
     {/* Guest Checkout Modal — shown to unauthenticated users who click a CTA — build:v3 */}
     <Dialog open={guestModalOpen} onOpenChange={setGuestModalOpen}>
       <DialogContent className="max-w-md">
@@ -1866,5 +1949,85 @@ function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
         </div>
       </div></CC>
     </div>
+  );
+}
+
+// ─── Cohort Waitlist Modal ─────────────────────────────────────────────────────
+function CohortWaitlistModal({
+  open, onClose, featuredGroup, courseId,
+  name, setName, email, setEmail, phone, setPhone, message, setMessage,
+  submitted, mutation,
+}: {
+  open: boolean; onClose: () => void; featuredGroup: any; courseId: number;
+  name: string; setName: (v: string) => void;
+  email: string; setEmail: (v: string) => void;
+  phone: string; setPhone: (v: string) => void;
+  message: string; setMessage: (v: string) => void;
+  submitted: boolean;
+  mutation: ReturnType<typeof trpc.lms.joinCohortWaitlist.useMutation>;
+}) {
+  const collectPhone = featuredGroup?.waitlistCollectPhone ?? false;
+  const collectMessage = featuredGroup?.waitlistCollectMessage ?? false;
+  const messageLabel = featuredGroup?.waitlistMessageLabel || "Message (optional)";
+  const heading = featuredGroup?.waitlistModalHeading || "Join the Waitlist";
+  const subheading = featuredGroup?.waitlistModalSubheading || "Be the first to know when enrollment opens for the next cohort.";
+  const buttonLabel = featuredGroup?.waitlistCtaLabel || "Join the Waitlist";
+  const successHeading = featuredGroup?.waitlistSuccessHeading || "You're on the list!";
+  const successMessage = featuredGroup?.waitlistSuccessMessage || "We'll notify you as soon as enrollment opens for the next cohort.";
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mutation.mutate({ cohortGroupId: featuredGroup?.id ?? 0, courseId, name, email, phone: phone || undefined, message: message || undefined });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md">
+        {submitted ? (
+          <div className="text-center py-6 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto">
+              <Bell className="w-8 h-8 text-teal-600" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-teal-700 text-xl">{successHeading}</DialogTitle>
+              <DialogDescription>{successMessage}</DialogDescription>
+            </DialogHeader>
+            <Button variant="outline" className="mt-2" onClick={onClose}>Close</Button>
+          </div>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-teal-700">{heading}</DialogTitle>
+              <DialogDescription>{subheading}</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+              <div className="space-y-1">
+                <Label htmlFor="cw-name">Full Name <span className="text-red-500">*</span></Label>
+                <Input id="cw-name" value={name} onChange={e => setName(e.target.value)} placeholder="Jane Smith" required autoFocus />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cw-email">Email Address <span className="text-red-500">*</span></Label>
+                <Input id="cw-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jane@example.com" required />
+              </div>
+              {collectPhone && (
+                <div className="space-y-1">
+                  <Label htmlFor="cw-phone">Phone Number</Label>
+                  <Input id="cw-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 (555) 000-0000" />
+                </div>
+              )}
+              {collectMessage && (
+                <div className="space-y-1">
+                  <Label htmlFor="cw-message">{messageLabel}</Label>
+                  <Textarea id="cw-message" value={message} onChange={e => setMessage(e.target.value)} rows={3} />
+                </div>
+              )}
+              <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={mutation.isPending}>
+                {mutation.isPending ? "Submitting..." : buttonLabel}
+              </Button>
+            </form>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
