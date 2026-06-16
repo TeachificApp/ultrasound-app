@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { RefreshCw, Package, ShoppingCart, Store, ExternalLink, X } from "lucide-react";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -30,16 +30,15 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
 // ── Products Tab ──────────────────────────────────────────────────────────────
 
 function ProductsTab({ storeId }: { storeId: number }) {
-  const { toast } = useToast();
   const utils = trpc.useUtils();
 
   const cachedQuery = trpc.printfulAdmin.getCachedProducts.useQuery({ storeId });
   const syncMutation = trpc.printfulAdmin.syncProducts.useMutation({
     onSuccess: (data) => {
-      toast({ title: "Sync complete", description: `${data.synced} of ${data.total} products synced.` });
+      toast.success(`Sync complete — ${data.synced} of ${data.total} products synced.`);
       utils.printfulAdmin.getCachedProducts.invalidate({ storeId });
     },
-    onError: (err) => toast({ title: "Sync failed", description: err.message, variant: "destructive" }),
+    onError: (err) => toast.error(`Sync failed: ${err.message}`),
   });
 
   const products = cachedQuery.data ?? [];
@@ -114,7 +113,6 @@ function ProductsTab({ storeId }: { storeId: number }) {
 // ── Orders Tab ────────────────────────────────────────────────────────────────
 
 function OrdersTab({ storeId }: { storeId: number }) {
-  const { toast } = useToast();
   const utils = trpc.useUtils();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [offset, setOffset] = useState(0);
@@ -129,10 +127,10 @@ function OrdersTab({ storeId }: { storeId: number }) {
 
   const cancelMutation = trpc.printfulAdmin.cancelOrder.useMutation({
     onSuccess: () => {
-      toast({ title: "Order cancelled" });
+      toast.success("Order cancelled");
       utils.printfulAdmin.listOrders.invalidate();
     },
-    onError: (err) => toast({ title: "Cancel failed", description: err.message, variant: "destructive" }),
+    onError: (err) => toast.error(`Cancel failed: ${err.message}`),
   });
 
   const orders = ordersQuery.data?.orders ?? [];
