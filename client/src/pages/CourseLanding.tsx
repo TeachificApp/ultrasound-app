@@ -14,12 +14,12 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { BookOpen, CheckCircle, ChevronRight, Clock, Download, HelpCircle, Lock, PlayCircle, Star, Users, AlertTriangle, Globe, LayoutGrid, Layers, BookMarked, Timer, Tag, CreditCard, List, Bell } from "lucide-react";
+import { BookOpen, CheckCircle, ChevronRight, Clock, Download, HelpCircle, Lock, PlayCircle, Star, Users, AlertTriangle, Globe, LayoutGrid, Layers, BookMarked, Timer, Tag, CreditCard, List, Bell, MapPin, Calendar, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
@@ -93,6 +93,10 @@ export function handleCtaBtnClick(
     } else {
       onEnroll?.();
     }
+  } else if (action === "enroll_next_available") {
+    // Directs to checkout for the next available instance/cohort — same as direct_checkout
+    if (onCheckoutPage) onCheckoutPage(undefined);
+    else onEnroll?.();
   }
 }
 
@@ -242,17 +246,22 @@ function resolveBtnAction(
   if (b === "free_enrollment" && onFreeEnroll && freeEnrollProductId) {
     return () => onFreeEnroll(freeEnrollProductType ?? "course", freeEnrollProductId);
   }
+  // enroll_next_available → checkout for next available instance/cohort
+  if (b === "enroll_next_available") {
+    if (onCheckoutPage) return () => onCheckoutPage(undefined);
+  }
   // next_funnel_step, or default → onEnroll (free courses, already enrolled, etc.)
   return onEnroll;
 }
 
-function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage, onFreeEnroll }: {
+function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage, onFreeEnroll, onOpenGroupDetail }: {
   block: Block; course: any; onEnroll: () => void; onEnrollWithOption?: (pricingOptionId: number | undefined) => void; enrolling: boolean; ctaText: string; price: string;
   selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
   slug?: string; enrollment?: any; user?: UserParamSource | null;
   onFreePreviewClick?: (lessonId: number) => void;
   onCheckoutPage?: (pricingOptionId?: number) => void;
   onFreeEnroll?: (productType: string, productId: number) => void;
+  onOpenGroupDetail?: (groupId: number) => void;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -882,12 +891,108 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       );
     }
     case "cohort_sessions_auto": {
+      const displayMode = d.displayMode ?? "sessions";
+      const accentColor = d.accentColor ?? "#179ca3";
+      if (displayMode === "groups") {
+        // ── Groups mode: stacked cohort group cards ──
+        const allGroups: any[] = (course as any).cohortGroups ?? [];
+        const groupSelectionMode = d.groupSelectionMode ?? "all";
+        const selectedGroupIds: number[] = d.selectedGroupIds ?? [];
+        const visibleGroups = groupSelectionMode === "manual" && selectedGroupIds.length > 0
+          ? allGroups.filter((g: any) => selectedGroupIds.includes(g.id))
+          : allGroups;
+        if (visibleGroups.length === 0) return null;
+        const enrollNowText = d.enrollNowText ?? "Enroll Now";
+        const showEnrollNow = d.showEnrollNow !== false;
+        const statusBadge = (status: string) => {
+          const map: Record<string, { label: string; color: string }> = {
+            open: { label: "Enrolling Now", color: "#059669" },
+            active: { label: "In Progress", color: "#2563eb" },
+            completed: { label: "Completed", color: "#6b7280" },
+          };
+          const s = map[status];
+          if (!s) return null;
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: s.color }}>{s.label}</span>
+          );
+        };
+        const fmtGroupDate = (d: Date | string | null | undefined) => {
+          if (!d) return null;
+          try { return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return String(d); }
+        };
+        return (
+          <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+            <CC>
+              {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+              <div className="space-y-4">
+                {visibleGroups.map((g: any) => (
+                  <div
+                    key={g.id}
+                    className="rounded-2xl border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                    style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}
+                    onClick={() => onOpenGroupDetail?.(g.id)}
+                  >
+                    <div className="p-5">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <h3 className="font-bold text-gray-900 text-base">{g.name}</h3>
+                            {statusBadge(g.status)}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1">
+                            {(g.startDate || g.endDate) && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-teal-500" />
+                                {fmtGroupDate(g.startDate)}{g.endDate ? ` – ${fmtGroupDate(g.endDate)}` : ""}
+                              </span>
+                            )}
+                            {d.showLocation !== false && g.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-teal-500" />
+                                {g.location}
+                              </span>
+                            )}
+                            {d.showDuration !== false && g.durationHours && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-teal-500" />
+                                {g.durationHours}h total
+                              </span>
+                            )}
+                          </div>
+                          {d.showDescription !== false && g.description && (
+                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">{g.description}</p>
+                          )}
+                        </div>
+                        {showEnrollNow && (
+                          <Button
+                            size="sm"
+                            className="flex-shrink-0 text-white"
+                            style={{ backgroundColor: accentColor }}
+                            onClick={e => { e.stopPropagation(); onCheckoutPage?.(); }}
+                          >
+                            {enrollNowText}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {/* Click hint */}
+                    <div className="px-5 pb-3 flex items-center gap-1 text-[11px]" style={{ color: accentColor }}>
+                      <ChevronRight className="w-3 h-3" />
+                      View details for this cohort
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CC>
+          </div>
+        );
+      }
+      // ── Sessions mode (default) ──
       const sessions: any[] = course.cohortSessions ?? [];
       const now = new Date();
       const visibleSessions = d.showPastSessions
         ? sessions
         : sessions.filter((s: any) => new Date(s.sessionDate) >= now);
-      const accentColor = d.accentColor ?? "#179ca3";
       if (visibleSessions.length === 0) return null;
       return (
         <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
@@ -1092,6 +1197,8 @@ export default function CourseLanding() {
   const [fpLastName, setFpLastName] = useState("");
   const [fpEmail, setFpEmail] = useState("");
     const [fpSubmitting, setFpSubmitting] = useState(false);
+  // Cohort group detail modal state
+  const [selectedCohortGroupId, setSelectedCohortGroupId] = useState<number | null>(null);
   // Cohort waitlist modal state
   const [cohortWaitlistOpen, setCohortWaitlistOpen] = useState(false);
   const [cwName, setCwName] = useState("");
@@ -1476,10 +1583,10 @@ export default function CourseLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
                 <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} />
+                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} />
                 </div>
               ) : (
-                <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} />
+                <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} />
               )}
             </div>
           );
@@ -1515,6 +1622,12 @@ export default function CourseLanding() {
         message={cwMessage} setMessage={setCwMessage}
         submitted={cwSubmitted}
         mutation={joinCohortWaitlistMutation}
+      />
+      <CohortGroupDetailModal
+        open={selectedCohortGroupId !== null}
+        cohortGroupId={selectedCohortGroupId}
+        onClose={() => setSelectedCohortGroupId(null)}
+        onEnroll={() => { setSelectedCohortGroupId(null); handleGoToCheckoutPage(); }}
       />
     </>
     );
@@ -2027,6 +2140,141 @@ function CohortWaitlistModal({
             </form>
           </>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Cohort Group Detail Modal ─────────────────────────────────────────────────
+// Full-page modal that fetches and renders a cohort group's landing blocks.
+function CohortGroupDetailModal({
+  open,
+  cohortGroupId,
+  onClose,
+  onEnroll,
+}: {
+  open: boolean;
+  cohortGroupId: number | null;
+  onClose: () => void;
+  onEnroll: () => void;
+}) {
+  const { data, isLoading, error } = trpc.lms.getCohortGroupPage.useQuery(
+    { cohortGroupId: cohortGroupId! },
+    { enabled: open && cohortGroupId !== null }
+  );
+
+  const fmtDate = (d: Date | string | null | undefined) => {
+    if (!d) return null;
+    try {
+      return new Date(d).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    } catch { return String(d); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
+          <div>
+            {data && <h2 className="text-lg font-bold text-gray-900">{data.name}</h2>}
+            {!data && !isLoading && <h2 className="text-lg font-bold text-gray-900">Cohort Details</h2>}
+            {isLoading && <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              onClick={onEnroll}
+            >
+              Enroll Now
+            </Button>
+            <DialogClose asChild>
+              <button className="rounded-full p-1.5 hover:bg-gray-100 transition-colors" aria-label="Close">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </DialogClose>
+          </div>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading && (
+            <div className="p-8 space-y-4">
+              <div className="h-8 w-2/3 bg-gray-200 rounded animate-pulse" />
+              <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+              <div className="h-4 w-5/6 bg-gray-100 rounded animate-pulse" />
+              <div className="h-32 w-full bg-gray-100 rounded animate-pulse" />
+            </div>
+          )}
+          {error && (
+            <div className="p-8 text-center text-gray-500">
+              <p>Could not load cohort details. Please try again.</p>
+            </div>
+          )}
+          {data && (
+            <>
+              {/* If no landing blocks, show a basic detail view */}
+              {(!data.landingBlocks || data.landingBlocks.length === 0) ? (
+                <div className="p-8 max-w-2xl mx-auto space-y-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{data.name}</h3>
+                    {data.description && <p className="text-gray-600">{data.description}</p>}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {data.startDate && (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                        <Calendar className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">Start Date</p>
+                          <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.startDate)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {data.endDate && (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                        <Calendar className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">End Date</p>
+                          <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.endDate)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {data.maxStudents && (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                        <Users className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Capacity</p>
+                          <p className="text-sm text-gray-800 font-medium mt-0.5">{data.maxStudents} students max</p>
+                        </div>
+                      </div>
+                    )}
+                    {data.enrollmentCloseDate && (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-100">
+                        <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Enrollment Closes</p>
+                          <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.enrollmentCloseDate)}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-center pt-4">
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white px-8" onClick={onEnroll}>
+                      Enroll in This Cohort
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* Render landing blocks via BlockPreview */
+                <div>
+                  {(data.landingBlocks as any[]).map((block: any) => (
+                    <BlockPreview key={block.id} block={block} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

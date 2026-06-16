@@ -1589,4 +1589,31 @@ export const lmsCohortAdminRouter = router({
         .orderBy(desc(cohortWaitlistEntries.createdAt));
       return entries;
     }),
+  // ── Cohort Group Landing Page Builder ─────────────────────────────────
+  getCohortGroupLandingBlocks: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [group] = await db
+        .select({ id: lmsCohortGroups.id, courseId: lmsCohortGroups.courseId, name: lmsCohortGroups.name, landingBlocks: lmsCohortGroups.landingBlocks })
+        .from(lmsCohortGroups)
+        .where(eq(lmsCohortGroups.id, input.cohortGroupId))
+        .limit(1);
+      if (!group) throw new TRPCError({ code: "NOT_FOUND" });
+      return group;
+    }),
+  saveCohortGroupLandingBlocks: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number(), blocks: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db
+        .update(lmsCohortGroups)
+        .set({ landingBlocks: input.blocks })
+        .where(eq(lmsCohortGroups.id, input.cohortGroupId));
+      return { success: true };
+    }),
 });

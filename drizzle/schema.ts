@@ -5537,9 +5537,13 @@ export const lmsCohortGroups = mysqlTable("lms_cohort_groups", {
   endDate: timestamp("end_date"),
   enrollmentCloseDate: timestamp("enrollment_close_date"),
   maxStudents: int("max_students"), // null = unlimited
+  location: varchar("location", { length: 300 }), // e.g. "Dallas, TX" or "Online"
+  durationHours: int("duration_hours"), // total hours for the cohort program
   status: mysqlEnum("status", ["draft", "open", "active", "completed", "archived"]).default("draft").notNull(),
   // Page builder blocks for this specific cohort group's overview page
   pageBlocks: longtext("page_blocks"),
+  // Full page builder blocks for this specific cohort group's detail page
+  landingBlocks: longtext("landing_blocks"),
   // Landing page link override — which cohort to feature on the course landing page
   isFeaturedOnLanding: boolean("is_featured_on_landing").default(false).notNull(),
   sortOrder: int("sort_order").default(0).notNull(),
@@ -6770,9 +6774,10 @@ export const workshopInstances = mysqlTable("workshop_instances", {
   // Stripe product/price for this specific instance
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
 
-  // Rich-text content for this instance (agenda, location notes, instructor bio, etc.)
+    // Rich-text content for this instance (agenda, location notes, instructor bio, etc.)
   instanceContent: longtext("instance_content"),
-
+  // Full page builder blocks for this specific instance's detail page
+  landingBlocks: longtext("landing_blocks"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
