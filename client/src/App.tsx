@@ -90,6 +90,8 @@ const WebinarLandingPageBuilder = lazy(() => import("./pages/admin/WebinarLandin
 const WebinarPlayerPageBuilder = lazy(() => import("./pages/admin/WebinarPlayerPageBuilder"));
 const WorkshopLandingPageBuilder = lazy(() => import("./pages/admin/WorkshopLandingPageBuilder"));
 const WidgetManager = lazy(() => import("./pages/admin/WidgetManager"));
+const PrintfulAdmin = lazy(() => import("./pages/admin/PrintfulAdmin"));
+const MerchStore = lazy(() => import("./pages/MerchStore"));
 const WidgetRenderer = lazy(() => import("./pages/WidgetRenderer"));
 const MyDownloads = lazy(() => import("./pages/MyDownloads"));
 const BundleLanding = lazy(() => import("./pages/BundleLanding"));
@@ -489,7 +491,9 @@ function Router() {
         <Route path="/admin/webinars/:webinarId/player-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarPlayerPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/workshops/:workshopId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WorkshopLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/widgets">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><WidgetManager /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/printful">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PrintfulAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/widget/:token">{() => <Suspense fallback={<div />}><WidgetRenderer /></Suspense>}</Route>
+        <Route path="/merch">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MerchStore /></Suspense>}</Route>
         {/* ── Physical Products ────────────────────────────────────────────────────────────────────────────── */}
         {/* Products listing page */}
         <Route path="/products">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductsListing /></Suspense>}</Route>

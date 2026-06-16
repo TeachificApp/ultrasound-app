@@ -6909,3 +6909,24 @@ export const standaloneQuizAttemptAnswers = mysqlTable("standalone_quiz_attempt_
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type StandaloneQuizAttemptAnswer = typeof standaloneQuizAttemptAnswers.$inferSelect;
+
+// ── Printful Integration ──────────────────────────────────────────────────────
+// Caches synced products from Printful stores for storefront display.
+export const printfulSyncProducts = mysqlTable("printful_sync_products", {
+  id: int("id").autoincrement().primaryKey(),
+  printfulProductId: int("printful_product_id").notNull(),
+  storeId: int("store_id").notNull(),
+  externalId: varchar("external_id", { length: 255 }),
+  name: varchar("name", { length: 500 }).notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  variantCount: int("variant_count").default(0).notNull(),
+  syncedVariantCount: int("synced_variant_count").default(0).notNull(),
+  isIgnored: boolean("is_ignored").default(false).notNull(),
+  retailPrice: varchar("retail_price", { length: 50 }),
+  currency: varchar("currency", { length: 10 }).default("USD").notNull(),
+  variantsJson: longtext("variants_json"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type PrintfulSyncProductRow = typeof printfulSyncProducts.$inferSelect;

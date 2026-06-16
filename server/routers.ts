@@ -57,6 +57,7 @@ import { productAnalyticsRouter } from "./routers/productAnalyticsRouter";
 import { sdmsCmeRouter } from "./routers/sdmsCmeRouter";
 import { widgetAdminRouter, widgetPublicRouter } from "./routers/widgetRouter";
 import { workshopPublicRouter, workshopLearnerRouter, workshopAdminRouter } from "./routers/workshopRouter";
+import { printfulAdminRouter, printfulPublicRouter } from "./routers/printfulRouter";
 import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuizAdminRouter } from "./routers/standaloneQuizRouter";
 import {
   getUserById,
@@ -2039,6 +2040,8 @@ export const appRouter = router({
   workshop: workshopPublicRouter,
   workshopLearner: workshopLearnerRouter,
   workshopAdmin: workshopAdminRouter,
+  printful: printfulPublicRouter,
+  printfulAdmin: printfulAdminRouter,
 
   // ─── Email/Password Auth (white-label, no OAuth portal) ──────────────────────
   emailAuth: emailAuthRouter,

@@ -19,4 +19,5 @@ export const ENV = {
   thinkificAdminPassword: process.env.THINKIFIC_ADMIN_PASSWORD ?? "",
   thinkificGraphqlJwt: process.env.THINKIFIC_GRAPHQL_JWT ?? "",
   platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com",
+  printfulApiKey: process.env.PRINTFUL_API_KEY ?? "",
 };
