@@ -281,6 +281,11 @@ export const bundleAdminRouter = router({
       installmentCount: z.number().nullable().optional(),
       installmentAmount: z.number().nullable().optional(),
       installmentIntervalDays: z.number().nullable().optional(),
+      subtitle: z.string().optional(),
+      slug: z.string().optional(),
+      metaTitle: z.string().optional(),
+      metaDescription: z.string().optional(),
+      publishDomain: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });

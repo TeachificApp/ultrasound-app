@@ -3,7 +3,7 @@
  * Matches the visual/structural pattern of LMSAdmin (CoursesTab / CourseEditor)
  * Supports: live & prerecorded, free & paid, landing page editor, attendee tracking, analytics
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -224,6 +224,13 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
   const [maxAttendees, setMaxAttendees] = useState<number | "">("");
   const [requireRegistration, setRequireRegistration] = useState(true);
   const [publishDomain, setPublishDomain] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
+  const [coverImage, setCoverImage] = useState("");
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   // AI viewers
   const [aiViewersEnabled, setAiViewersEnabled] = useState(false);
   const [aiViewersMin, setAiViewersMin] = useState(50);
@@ -252,6 +259,11 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
     setMaxAttendees(webinar.maxAttendees ?? "");
     setRequireRegistration(webinar.requireRegistration ?? true);
     setPublishDomain((webinar as any).publishDomain ?? "");
+    setSubtitle((webinar as any).subtitle ?? "");
+    setSlug(webinar.slug ?? "");
+    setMetaTitle((webinar as any).metaTitle ?? "");
+    setMetaDescription((webinar as any).metaDescription ?? "");
+    setCoverImage((webinar as any).coverImage ?? (webinar as any).thumbnailUrl ?? "");
     setAiViewersEnabled(webinar.aiViewersEnabled ?? false);
     setAiViewersMin(webinar.aiViewersMin ?? 50);
     setAiViewersMax(webinar.aiViewersMax ?? 300);
@@ -262,6 +274,27 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
     onSuccess: () => { utils.webinarAdmin.getById.invalidate({ id: webinarId }); toast.success("Saved"); },
     onError: (e) => toast.error(e.message),
   });
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10_000_000) { toast.error("Image must be under 10 MB"); return; }
+    e.target.value = "";
+    setUploadingCover(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Upload failed"); }
+      const { url } = await res.json();
+      setCoverImage(url);
+      toast.success("Cover image uploaded");
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   function saveSettings() {
     updateMutation.mutate({
@@ -274,6 +307,11 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
       maxAttendees: maxAttendees !== "" ? Number(maxAttendees) : undefined,
       requireRegistration, publishDomain: publishDomain || undefined,
       aiViewersEnabled, aiViewersMin, aiViewersMax, aiViewersPeakAt,
+      subtitle: subtitle || undefined,
+      slug: slug || undefined,
+      metaTitle: metaTitle || undefined,
+      metaDescription: metaDescription || undefined,
+      coverImage: coverImage || undefined,
     });
   }
 
@@ -291,7 +329,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Button size="sm" variant="ghost" onClick={onBack} className="gap-1">
           <ChevronLeft className="w-4 h-4" /> Back
         </Button>
@@ -300,17 +338,22 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
           <div className="flex items-center gap-2 mt-0.5">
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(webinar.status)}`}>{webinar.status}</span>
             <Badge variant="outline" className="text-xs capitalize">{webinar.type}</Badge>
-            <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline flex items-center gap-1">
-              <ExternalLink className="w-3 h-3" /> View
-            </a>
-            <button
-              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
-              onClick={() => { navigator.clipboard.writeText(publicUrl); toast.success("URL copied"); }}
-            >
-              <Copy className="w-3 h-3" /> Copy URL
-            </button>
           </div>
         </div>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-600 select-all cursor-text" title="Webinar ID">ID: {webinar.id}</span>
+        <a href={`/webinars/${webinar.slug}`} target="_blank" rel="noopener noreferrer">
+          <Button size="sm" variant="ghost" className="text-xs text-gray-500 hover:text-teal-600 gap-1">
+            <Eye className="w-3.5 h-3.5" /> View Sales Page
+          </Button>
+        </a>
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-xs gap-1"
+          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout/${webinar.slug}?type=webinar`); toast.success("Checkout link copied"); }}
+        >
+          <Copy className="w-3.5 h-3.5" /> Copy Checkout Link
+        </Button>
         <Button
           size="sm"
           className="bg-teal-600 hover:bg-teal-700 text-white"
@@ -352,6 +395,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
           <TabsTrigger value="analytics" className="text-xs"><BarChart2 className="w-3.5 h-3.5 mr-1" />Analytics</TabsTrigger>
           <TabsTrigger value="domain" className="text-xs"><Globe className="w-3.5 h-3.5 mr-1" />Domain</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3.5 h-3.5 mr-1" />After Purchase</TabsTrigger>
+          <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
           <a href={`/admin/webinars/${webinarId}/landing-builder`} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-teal-600 text-teal-700 rounded-md hover:bg-teal-50 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -371,6 +415,10 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
               <div>
                 <Label className="text-xs font-medium text-gray-600">Title</Label>
                 <Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600">Subtitle <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <Input value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Short tagline shown below the title" className="mt-1 text-sm" />
               </div>
               <div>
                 <Label className="text-xs font-medium text-gray-600">Description</Label>
@@ -465,6 +513,43 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
             activityId={webinarId}
             defaultTitle={title}
           />
+          {/* Cover Image */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Cover Image</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex items-start gap-3">
+                {coverImage && <img src={coverImage} alt="Cover" className="w-24 h-16 object-cover rounded border border-gray-200" />}
+                <div className="flex flex-col gap-2 flex-1">
+                  <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleCoverUpload} />
+                  <Button type="button" size="sm" variant="outline" onClick={() => coverInputRef.current?.click()} disabled={uploadingCover}>
+                    {uploadingCover ? <><RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" /> Uploading...</> : "Upload Image"}
+                  </Button>
+                  <Input value={coverImage} onChange={e => setCoverImage(e.target.value)} placeholder="Or paste image URL" className="text-xs" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          {/* URL & SEO */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">URL &amp; SEO</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label className="text-xs font-medium text-gray-600">URL Slug</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm text-gray-400">/webinars/</span>
+                  <Input value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} className="flex-1 font-mono text-sm" placeholder="my-webinar" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600">Meta Title <span className="text-gray-400 font-normal">(SEO)</span></Label>
+                <Input value={metaTitle} onChange={e => setMetaTitle(e.target.value)} className="mt-1 text-sm" placeholder={title} />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600">Meta Description <span className="text-gray-400 font-normal">(SEO)</span></Label>
+                <Textarea value={metaDescription} onChange={e => setMetaDescription(e.target.value)} rows={2} className="mt-1 text-sm resize-none" placeholder="Brief description for search engines" />
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Video Tab */}
@@ -687,6 +772,43 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
         {/* After Purchase Tab */}
         <TabsContent value="after-purchase" className="pt-2">
           <WebinarAfterPurchaseTab webinarId={webinarId} />
+        </TabsContent>
+
+        {/* Checkout Page Tab */}
+        <TabsContent value="checkout-page" className="pt-2">
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Checkout Page Editor</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Customise the sections shown on the hosted checkout page at{" "}
+                    <a href={`/checkout/${webinar.slug}?type=webinar`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+                      /checkout/{webinar.slug}
+                    </a>.
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <a href={`/checkout/${webinar.slug}?type=webinar`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
+                    <ExternalLink className="w-3.5 h-3.5" /> Preview
+                  </a>
+                  <a href={`/admin/checkout-editor/webinar/${webinarId}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
+                    Open Page Editor
+                  </a>
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                {["Trust Seals & Badges","What You'll Learn","Money-Back Guarantee","Testimonials","FAQ","Custom HTML"].map(s => (
+                  <div key={s} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <div className="w-2 h-2 rounded-full bg-teal-400" />
+                    <span className="text-xs text-gray-600">{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

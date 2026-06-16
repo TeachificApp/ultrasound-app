@@ -3379,6 +3379,9 @@ export const digitalProducts = mysqlTable("digital_products", {
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
   // Per-download publish domain override (null = use global downloadPublishDomain)
   publishDomain: varchar("publish_domain", { length: 255 }),
+  // Stripe product/price IDs — auto-synced on save
+  stripeProductId: varchar("stripe_product_id", { length: 255 }),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4127,6 +4130,7 @@ export type LmsPricingOption = typeof lmsPricingOptions.$inferSelect;
 export const physicalProducts = mysqlTable("physical_products", {
   id: int("id").autoincrement().primaryKey(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
+  brand: mysqlEnum("brand", ["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   subtitle: varchar("subtitle", { length: 500 }),
   description: longtext("description"),       // Rich text product description
@@ -4637,10 +4641,13 @@ export type NewFreePreviewEnrollment = typeof freePreviewEnrollments.$inferInser
 export const webinars = mysqlTable("webinars", {
   id: int("id").autoincrement().primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 500 }),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   brand: mysqlEnum("brand", ["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound").notNull(),
   description: longtext("description"),
   coverImage: text("cover_image"),
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
   type: mysqlEnum("type", ["live", "prerecorded"]).default("live").notNull(),
   status: mysqlEnum("status", ["draft", "published", "ended"]).default("draft").notNull(),
   scheduledAt: bigint("scheduled_at", { mode: "number" }),
@@ -4698,6 +4705,9 @@ export const webinars = mysqlTable("webinars", {
   hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
   // After Purchase Workflow — JSON array of workflow action objects
   afterPurchaseWorkflow: longtext("after_purchase_workflow"),
+  // Stripe product/price IDs — auto-synced on save
+  stripeProductId: varchar("stripe_product_id", { length: 255 }),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4769,10 +4779,13 @@ export type WebinarFunnelStep = typeof webinarFunnelSteps.$inferSelect;
 export const bundles = mysqlTable("bundles", {
   id: int("id").autoincrement().primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 500 }),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   brand: mysqlEnum("brand", ["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound").notNull(),
   description: longtext("description"),
   coverImage: text("cover_image"),
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
   accessType: mysqlEnum("access_type", ["free", "paid"]).default("paid").notNull(),
   pricingOptions: longtext("pricing_options"),
@@ -4786,6 +4799,7 @@ export const bundles = mysqlTable("bundles", {
   installmentCount: int("installment_count").default(0),
   installmentAmount: int("installment_amount").default(0),
   installmentIntervalDays: int("installment_interval_days").default(30),
+  stripeProductId: varchar("stripe_product_id", { length: 255 }),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
   landingPageBlocks: longtext("landing_page_blocks"),
   afterPurchaseWorkflow: longtext("after_purchase_workflow"),
@@ -4820,10 +4834,13 @@ export type BundleEnrollment = typeof bundleEnrollments.$inferSelect;
 export const membershipPlans = mysqlTable("membership_plans", {
   id: int("id").autoincrement().primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 500 }),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   brand: mysqlEnum("brand", ["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound").notNull(),
   description: longtext("description"),
   coverImage: text("cover_image"),
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
   iconImage: text("icon_image"),
   accentColor: varchar("accent_color", { length: 32 }).default("#189aa1"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
@@ -6607,6 +6624,11 @@ export const workshops = mysqlTable("workshops", {
 
   // Per-product publish domain override
   publishDomain: varchar("publish_domain", { length: 255 }),
+
+  // After-purchase workflow (JSON array of workflow action objects)
+  afterPurchaseWorkflow: longtext("after_purchase_workflow"),
+  // Checkout page builder config (JSON)
+  checkoutPageConfig: longtext("checkout_page_config"),
 
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

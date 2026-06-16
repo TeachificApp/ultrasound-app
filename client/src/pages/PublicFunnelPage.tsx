@@ -403,8 +403,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       return (
         <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
           <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row gap-8">
-            <div style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
-            <div style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderCol("right")}</div>
+            <div className="min-w-0" style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
+            <div className="min-w-0" style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderCol("right")}</div>
           </div>
         </div>
       );
@@ -1357,8 +1357,8 @@ function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Recor
         <div style={{ position: "absolute", inset: 0, backgroundColor: data.bgOverlayColor, opacity: data.bgOverlayOpacity ?? 0.4, pointerEvents: "none" }} />
       )}
       <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="max-w-2xl mx-auto text-center relative">
-        <h2 className="text-2xl font-bold mb-2">{data.headline ?? "Get Access"}</h2>
-        {data.subtext && <p className="opacity-80 mb-6">{data.subtext}</p>}
+        {data.headline && <h2 className="text-2xl font-bold mb-2" dangerouslySetInnerHTML={{ __html: data.headline }} />}
+        {data.subtext && <p className="opacity-80 mb-6" dangerouslySetInnerHTML={{ __html: data.subtext }} />}
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 items-stretch">
           {(data.showNameField ?? true) && (
             <Input

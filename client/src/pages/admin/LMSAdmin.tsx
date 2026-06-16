@@ -63,6 +63,7 @@ import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { SdmsCmeConfigPanel, resolveLmsActivityType } from "@/components/admin/SdmsCmeConfigPanel";
 import { WebinarsAdmin } from "./WebinarsAdmin";
+import { WorkshopsAdmin } from "./WorkshopsAdmin";
 import BundlesAdmin from "./BundlesAdmin";
 import MembershipsAdmin from "./MembershipsAdmin";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
@@ -6844,6 +6845,7 @@ const LMS_NAV_GROUPS = [
       { value: "downloads",   label: "Downloads",   icon: Download },
       { value: "products",    label: "Products",    icon: ShoppingBag },
       { value: "webinars",    label: "Webinars",    icon: Radio },
+      { value: "workshops",   label: "Workshops",   icon: Briefcase },
       { value: "bundles",     label: "Bundles",     icon: Layers },
       { value: "memberships", label: "Memberships", icon: Award },
       { value: "communities", label: "Communities", icon: Globe },
@@ -6919,7 +6921,8 @@ export default function LMSAdmin() {
   const urlEditWebinar = urlParams?.get("editWebinar") ?? null;
   const urlEditBundle = urlParams?.get("editBundle") ?? null;
   const urlEditMembership = urlParams?.get("editMembership") ?? null;
-  const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : urlEditProduct ? "products" : urlEditWebinar ? "webinars" : urlEditBundle ? "bundles" : urlEditMembership ? "memberships" : "courses"));
+  const urlEditWorkshop = urlParams?.get("editWorkshop") ?? null;
+  const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : urlEditProduct ? "products" : urlEditWebinar ? "webinars" : urlEditWorkshop ? "workshops" : urlEditBundle ? "bundles" : urlEditMembership ? "memberships" : "courses"));
   const [editingCourseId, setEditingCourseId] = useState<number | null>(urlEditCourse ? Number(urlEditCourse) : null);
 
   // Flatten all tabs to find active group color
@@ -7012,6 +7015,7 @@ export default function LMSAdmin() {
               {activeTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
               {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
               {activeTab === "webinars"    && <WebinarsAdmin initialEditId={urlEditWebinar ? Number(urlEditWebinar) : undefined} />}
+              {activeTab === "workshops"   && <WorkshopsAdmin initialEditId={urlEditWorkshop ? Number(urlEditWorkshop) : undefined} />}
               {activeTab === "bundles"     && <BundlesAdmin initialEditId={urlEditBundle ? Number(urlEditBundle) : undefined} />}
               {activeTab === "memberships" && <MembershipsAdmin initialEditId={urlEditMembership ? Number(urlEditMembership) : undefined} />}
               {activeTab === "communities" && <CommunitiesTab />}

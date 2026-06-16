@@ -519,6 +519,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       metaTitle: product.metaTitle ?? "",
       metaDescription: product.metaDescription ?? "",
       publishDomain: (product as any).publishDomain ?? "",
+      brand: (product as any).brand ?? "all_about_ultrasound",
     });
   }
 
@@ -545,6 +546,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       metaTitle: form.metaTitle || null,
       metaDescription: form.metaDescription || null,
       publishDomain: form.publishDomain || null,
+      brand: form.brand || null,
     });
   };
 
@@ -721,6 +723,17 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               <div>
                 <Label className="text-sm">Meta Description (SEO)</Label>
                 <Textarea value={form.metaDescription ?? ""} onChange={e => setForm({ ...form, metaDescription: e.target.value })} placeholder="Brief description for search engines" className="mt-1 resize-none h-20" maxLength={500} />
+              </div>
+              <div>
+                <Label className="text-sm">Brand</Label>
+                <select
+                  className="mt-1 border rounded px-2 py-2 text-sm bg-background w-full"
+                  value={form.brand ?? "all_about_ultrasound"}
+                  onChange={e => setForm({ ...form, brand: e.target.value })}
+                >
+                  <option value="all_about_ultrasound">All About Ultrasound</option>
+                  <option value="iheartecho">iHeartEcho</option>
+                </select>
               </div>
               <div>
                 <Label className="text-sm">Publish Domain Override</Label>

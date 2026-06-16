@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Plus, Edit2, Trash2, Eye, EyeOff, Tag, Users, Package, LayoutTemplate,
   ChevronRight, GripVertical, X, Copy, RefreshCw, DollarSign, Percent,
@@ -20,6 +20,7 @@ import {
   Loader2, CheckCircle2, AlertTriangle, RotateCcw, Workflow
 } from "lucide-react";
 import MembershipPageBuilder from "@/components/MembershipPageBuilder";
+import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
@@ -50,6 +51,9 @@ type MembershipPlan = {
   sortOrder: number;
   publishDomain: string | null;
   settings: string | null;
+  subtitle: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
 };
 
 type AccessItem = {
@@ -421,6 +425,14 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
             {plan.status}
           </Badge>
         </div>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-600 select-all cursor-text" title="Plan ID">ID: {plan.id}</span>
+        {plan.slug && (
+          <a href={`/memberships/${plan.slug}`} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="ghost" className="text-xs text-gray-500 hover:text-teal-600">
+              <Eye className="w-3.5 h-3.5 mr-1" /> View Sales Page
+            </Button>
+          </a>
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -443,7 +455,7 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
         <TabsList className="shrink-0 mx-6 mt-4 w-auto justify-start bg-gray-100 rounded-lg p-1 h-auto flex-wrap gap-1">
           <TabsTrigger value="settings" className="text-xs data-[state=active]:bg-white">
             <Settings className="w-3.5 h-3.5 mr-1" /> Settings
@@ -474,7 +486,7 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
           </TabsTrigger>
         </TabsList>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0">
           <TabsContent value="settings" className="m-0 p-6">
             <MembershipSettingsTab plan={plan} onSave={(data) => updateMutation.mutate({ id: planId, ...data })} />
           </TabsContent>
@@ -795,19 +807,46 @@ function MembershipSettingsTab({
 }) {
   const [form, setForm] = useState({
     title: plan.title,
+    subtitle: plan.subtitle ?? "",
     description: plan.description ?? "",
     billingInterval: plan.billingInterval,
     price: String(plan.price / 100),
     compareAtPrice: plan.compareAtPrice ? String(plan.compareAtPrice / 100) : "",
     trialDays: String(plan.trialDays ?? 0),
     accentColor: plan.accentColor ?? "#189aa1",
-    stripeProductId: plan.stripeProductId ?? "",
-    stripePriceId: plan.stripePriceId ?? "",
+    brand: (plan as any).brand ?? "all_about_ultrasound",
+    coverImage: plan.coverImage ?? "",
+    slug: plan.slug ?? "",
+    metaTitle: plan.metaTitle ?? "",
+    metaDescription: plan.metaDescription ?? "",
     publishDomain: plan.publishDomain ?? "",
     featureBullets: plan.featureBullets
       ? (JSON.parse(plan.featureBullets) as string[]).join("\n")
       : "",
   });
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10_000_000) { toast.error("Image must be under 10 MB"); return; }
+    e.target.value = "";
+    setUploadingCover(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Upload failed"); }
+      const { url } = await res.json();
+      setForm(prev => ({ ...prev, coverImage: url }));
+      toast.success("Cover image uploaded");
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   const handleSave = () => {
     const bullets = form.featureBullets
@@ -816,14 +855,18 @@ function MembershipSettingsTab({
       .filter(Boolean);
     onSave({
       title: form.title,
+      subtitle: form.subtitle || null,
       description: form.description || null,
       billingInterval: form.billingInterval as any,
       price: Math.round(parseFloat(form.price || "0") * 100),
       compareAtPrice: form.compareAtPrice ? Math.round(parseFloat(form.compareAtPrice) * 100) : null,
       trialDays: parseInt(form.trialDays || "0", 10),
       accentColor: form.accentColor,
-      stripeProductId: form.stripeProductId || null,
-      stripePriceId: form.stripePriceId || null,
+      brand: form.brand,
+      coverImage: form.coverImage || null,
+      slug: form.slug || undefined,
+      metaTitle: form.metaTitle || null,
+      metaDescription: form.metaDescription || null,
       publishDomain: form.publishDomain || null,
       featureBullets: bullets.length > 0 ? JSON.stringify(bullets) : null,
     });
@@ -839,6 +882,10 @@ function MembershipSettingsTab({
             <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" />
           </div>
           <div>
+            <Label>Subtitle <span className="text-gray-400 font-normal">(optional)</span></Label>
+            <Input value={form.subtitle} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} className="mt-1" placeholder="Short tagline shown below the title" />
+          </div>
+          <div>
             <Label>Description</Label>
             <Textarea
               value={form.description}
@@ -848,20 +895,35 @@ function MembershipSettingsTab({
               placeholder="Brief description shown on the sales page"
             />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Brand</Label>
+              <select className="mt-1 border rounded px-2 py-2 text-sm bg-background w-full" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })}>
+                <option value="all_about_ultrasound">All About Ultrasound</option>
+                <option value="iheartecho">iHeartEcho</option>
+              </select>
+            </div>
+            <div>
+              <Label>Accent Color</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <input type="color" value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} className="w-10 h-10 rounded border border-gray-200 cursor-pointer" />
+                <Input value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} className="w-32 font-mono text-sm" />
+              </div>
+            </div>
+          </div>
           <div>
-            <Label>Accent Color</Label>
-            <div className="flex items-center gap-2 mt-1">
-              <input
-                type="color"
-                value={form.accentColor}
-                onChange={(e) => setForm({ ...form, accentColor: e.target.value })}
-                className="w-10 h-10 rounded border border-gray-200 cursor-pointer"
-              />
-              <Input
-                value={form.accentColor}
-                onChange={(e) => setForm({ ...form, accentColor: e.target.value })}
-                className="w-32 font-mono text-sm"
-              />
+            <Label>Cover Image</Label>
+            <div className="mt-1 flex items-start gap-3">
+              {form.coverImage && (
+                <img src={form.coverImage} alt="Cover" className="w-24 h-16 object-cover rounded border border-gray-200" />
+              )}
+              <div className="flex flex-col gap-2">
+                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleCoverUpload} />
+                <Button type="button" size="sm" variant="outline" onClick={() => coverInputRef.current?.click()} disabled={uploadingCover}>
+                  {uploadingCover ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> Uploading...</> : <><Search className="w-3.5 h-3.5 mr-1" /> Upload Image</>}
+                </Button>
+                <Input value={form.coverImage} onChange={(e) => setForm({ ...form, coverImage: e.target.value })} placeholder="Or paste image URL" className="text-xs" />
+              </div>
             </div>
           </div>
         </CardContent>
@@ -944,47 +1006,55 @@ function MembershipSettingsTab({
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-sm">Stripe Integration</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-sm">URL &amp; SEO</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label>Stripe Product ID</Label>
-            <Input
-              value={form.stripeProductId}
-              onChange={(e) => setForm({ ...form, stripeProductId: e.target.value })}
-              className="mt-1 font-mono text-sm"
-              placeholder="prod_..."
-            />
+            <Label>URL Slug</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-gray-400">/memberships/</span>
+              <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} className="flex-1 font-mono text-sm" placeholder="my-membership" />
+            </div>
           </div>
           <div>
-            <Label>Stripe Price ID</Label>
-            <Input
-              value={form.stripePriceId}
-              onChange={(e) => setForm({ ...form, stripePriceId: e.target.value })}
-              className="mt-1 font-mono text-sm"
-              placeholder="price_..."
-            />
+            <Label>Meta Title <span className="text-gray-400 font-normal">(SEO)</span></Label>
+            <Input value={form.metaTitle} onChange={(e) => setForm({ ...form, metaTitle: e.target.value })} className="mt-1" placeholder={form.title} />
           </div>
+          <div>
+            <Label>Meta Description <span className="text-gray-400 font-normal">(SEO)</span></Label>
+            <Textarea value={form.metaDescription} onChange={(e) => setForm({ ...form, metaDescription: e.target.value })} rows={2} className="mt-1" placeholder="Brief description for search engines" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-sm">Stripe Integration</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-700">Auto-sync enabled</p>
+              <p className="text-xs text-gray-500 mt-0.5">Stripe product &amp; price are automatically created and updated when you save pricing changes.</p>
+            </div>
+          </div>
+          {plan.stripeProductId && (
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2 bg-white rounded border border-gray-100">
+                <span className="text-gray-400">Product ID</span>
+                <p className="font-mono text-gray-700 truncate mt-0.5">{plan.stripeProductId}</p>
+              </div>
+              <div className="p-2 bg-white rounded border border-gray-100">
+                <span className="text-gray-400">Price ID</span>
+                <p className="font-mono text-gray-700 truncate mt-0.5">{plan.stripePriceId ?? "—"}</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-sm">Domain</CardTitle></CardHeader>
         <CardContent>
-          <Label>Publish Domain</Label>
-          <Select value={form.publishDomain || "__default__"} onValueChange={(v) => setForm({ ...form, publishDomain: v === "__default__" ? "" : v })}>
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="Default domain" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__default__">Default (all domains)</SelectItem>
-              <SelectItem value="learn.allaboutultrasound.com">learn.allaboutultrasound.com</SelectItem>
-              <SelectItem value="app.allaboutultrasound.com">app.allaboutultrasound.com</SelectItem>
-              <SelectItem value="members.allaboutultrasound.com">members.allaboutultrasound.com</SelectItem>
-              <SelectItem value="app.iheartecho.com">app.iheartecho.com (canonical)</SelectItem>
-              <SelectItem value="app.iheartecho.net">app.iheartecho.net (legacy)</SelectItem>
-              <SelectItem value="accreditation.iheartecho.com">accreditation.iheartecho.com</SelectItem>
-            </SelectContent>
-          </Select>
+          <PublishDomainSelect value={form.publishDomain} onChange={(v) => setForm({ ...form, publishDomain: v ?? "" })} />
         </CardContent>
       </Card>
 

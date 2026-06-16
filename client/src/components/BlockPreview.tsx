@@ -578,17 +578,32 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           )}
         </CC></div>
       );
-    case "lead_capture":
+    case "lead_capture": {
+      const lcBtnBg = d.btnBg ?? "#ffffff";
+      const lcBtnTxt = d.btnTextColor ?? "#179ca3";
+      const lcBtnBorder = d.btnBorderColor ?? lcBtnBg;
+      const lcBtnStyleType = d.btnStyle ?? "filled";
+      const lcBtnStyle = lcBtnStyleType === "outline"
+        ? { backgroundColor: "transparent", color: lcBtnTxt, border: `2px solid ${lcBtnBorder}` }
+        : { backgroundColor: lcBtnBg, color: lcBtnTxt, border: `2px solid ${lcBtnBorder}` };
+      const lcBgType = d.bgType ?? "color";
+      const lcBgStyle: React.CSSProperties = lcBgType === "gradient"
+        ? { background: `linear-gradient(${d.bgGradientAngle ?? 135}deg, ${d.bgGradientStart ?? "#179ca3"}, ${d.bgGradientEnd ?? "#0e4a50"})` }
+        : lcBgType === "image" && d.bgImageUrl
+        ? { backgroundImage: `url(${d.bgImageUrl})`, backgroundSize: d.bgImageSize ?? "cover", backgroundPosition: "center" }
+        : { backgroundColor: d.bgColor ?? "#179ca3" };
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}><CC className="text-center">
+        <div className="py-8 sm:py-12" style={{ ...lcBgStyle, color: d.textColor ?? "#fff" }}><CC className="text-center">
           {d.headline && <h2 className="text-2xl font-bold mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="opacity-90 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <div className="flex max-w-md mx-auto gap-2">
-            <input type="email" placeholder="Your email address" className="flex-1 px-4 py-3 rounded-lg text-gray-900 border-0 focus:ring-2 focus:ring-white/50" />
-            <button className="px-6 py-3 bg-white font-semibold rounded-lg" style={{ color: d.bgColor ?? "#179ca3" }}>{d.ctaText ?? "Send Me Access"}</button>
+            {(d.showNameField ?? true) && <input type="text" placeholder={d.namePlaceholder ?? "Your name"} className="flex-1 px-4 py-3 rounded-lg text-gray-900 border-0" />}
+            <input type="email" placeholder={d.emailPlaceholder ?? "Your email address"} className="flex-1 px-4 py-3 rounded-lg text-gray-900 border-0 focus:ring-2 focus:ring-white/50" />
+            <button className="px-6 py-3 font-semibold rounded-lg" style={lcBtnStyle}>{d.ctaText ?? "Send Me Access"}</button>
           </div>
         </CC></div>
       );
+    }
     case "cta_optin":
       return (
         <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}><CC style={{ textAlign: d.align ?? "center" }}>

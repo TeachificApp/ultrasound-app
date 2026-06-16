@@ -22,10 +22,12 @@ import {
   Hammer, Plus, Edit2, Trash2, Eye, Users, Settings,
   Calendar, Globe, Link2, RefreshCw, CheckCircle, Clock,
   DollarSign, ChevronLeft, Copy, ExternalLink, MapPin,
-  BookOpen, FileText, Package, ChevronRight,
+  BookOpen, FileText, Package, ChevronRight, Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
+import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
+import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function fmtDate(ts: number | Date | null | undefined) {
@@ -230,6 +232,8 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
   const [accentColor, setAccentColor] = useState("#0d9488");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
 
   // Instance dialog state
   const [instanceDialogOpen, setInstanceDialogOpen] = useState(false);
@@ -285,6 +289,8 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
     setAccentColor(w.accentColor ?? "#0d9488");
     setCoverImageUrl(w.coverImageUrl ?? "");
     setThumbnailUrl(w.thumbnailUrl ?? "");
+    setMetaTitle((w as any).metaTitle ?? "");
+    setMetaDescription((w as any).metaDescription ?? "");
   }, [data]);
 
   const updateMutation = trpc.workshopAdmin.update.useMutation({
@@ -338,6 +344,8 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
       primaryColor, accentColor,
       coverImageUrl: coverImageUrl || null,
       thumbnailUrl: thumbnailUrl || null,
+      metaTitle: metaTitle || null,
+      metaDescription: metaDescription || null,
     });
   }
 
@@ -449,34 +457,26 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Button size="sm" variant="ghost" onClick={onBack} className="gap-1">
           <ChevronLeft className="w-4 h-4" /> Back
         </Button>
         <div className="flex-1 min-w-0">
           <h2 className="text-lg font-semibold truncate">{workshop.title}</h2>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(workshop.status)}`}>
-              {workshop.status}
-            </span>
-            <span className="text-xs text-gray-400">/{workshop.slug}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(workshop.status)}`}>{workshop.status}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <a href={publicUrl} target="_blank" rel="noopener noreferrer">
-            <Button size="sm" variant="outline" className="gap-1 text-xs">
-              <Eye className="w-3.5 h-3.5" /> Preview
-            </Button>
-          </a>
-          <Button
-            size="sm"
-            onClick={() => { navigator.clipboard.writeText(publicUrl); toast.success("URL copied!"); }}
-            variant="outline"
-            className="gap-1 text-xs"
-          >
-            <Copy className="w-3.5 h-3.5" /> Copy URL
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-600 select-all cursor-text" title="Workshop ID">ID: {workshop.id}</span>
+        <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+          <Button size="sm" variant="ghost" className="text-xs text-gray-500 hover:text-teal-600 gap-1">
+            <Eye className="w-3.5 h-3.5" /> View Sales Page
           </Button>
-        </div>
+        </a>
+        <Button size="sm" variant="outline" className="gap-1 text-xs"
+          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout/${workshop.slug}?type=workshop`); toast.success("Checkout link copied!"); }}>
+          <Copy className="w-3.5 h-3.5" /> Copy Checkout Link
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -488,6 +488,8 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
           <TabsTrigger value="curriculum" className="text-xs"><BookOpen className="w-3.5 h-3.5 mr-1" />Curriculum</TabsTrigger>
           <TabsTrigger value="landing" className="text-xs"><Globe className="w-3.5 h-3.5 mr-1" />Landing Page</TabsTrigger>
           <TabsTrigger value="enrollments" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Enrollments ({enrollments.length})</TabsTrigger>
+          <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3.5 h-3.5 mr-1" />After Purchase</TabsTrigger>
+          <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
         </TabsList>
 
         {/* ── Settings Tab ── */}
@@ -557,6 +559,20 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
               <div>
                 <Label className="text-xs">Publish Domain (optional override)</Label>
                 <PublishDomainSelect value={publishDomain} onChange={setPublishDomain} className="mt-1 text-sm" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-sm">URL &amp; SEO</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label className="text-xs">Meta Title <span className="text-gray-400 font-normal">(SEO)</span></Label>
+                <Input value={metaTitle} onChange={e => setMetaTitle(e.target.value)} className="mt-1 text-sm" placeholder={title} />
+              </div>
+              <div>
+                <Label className="text-xs">Meta Description <span className="text-gray-400 font-normal">(SEO)</span></Label>
+                <Textarea value={metaDescription} onChange={e => setMetaDescription(e.target.value)} rows={2} className="mt-1 text-sm" placeholder="Brief description for search engines (150-160 chars)" />
               </div>
             </CardContent>
           </Card>
@@ -953,6 +969,46 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
             </div>
           )}
         </TabsContent>
+
+        {/* ── After Purchase Tab ── */}
+        <TabsContent value="after-purchase" className="space-y-4 mt-4">
+          <WorkshopAfterPurchaseSection workshopId={workshopId} />
+        </TabsContent>
+
+        {/* ── Checkout Page Tab ── */}
+        <TabsContent value="checkout-page" className="mt-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Checkout Page Editor</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Customise the sections shown on the hosted checkout page at{" "}
+                  <a href={`${window.location.origin}/checkout/${workshop.slug}?type=workshop`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+                    /checkout/{workshop.slug}
+                  </a>.
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <a href={`${window.location.origin}/checkout/${workshop.slug}?type=workshop`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
+                  <ExternalLink className="w-3.5 h-3.5" /> Preview
+                </a>
+                <a href={`/admin/checkout-editor/workshop/${workshopId}`}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
+                  Open Page Editor
+                </a>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              {["Trust Seals & Badges","What You'll Learn","Money-Back Guarantee","Testimonials","FAQ","Custom HTML"].map(s => (
+                <div key={s} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <div className="w-2 h-2 rounded-full bg-teal-400" />
+                  <span className="text-xs text-gray-600">{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* ── Instance Dialog ── */}
@@ -1194,6 +1250,34 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ── After Purchase Section ────────────────────────────────────────────────────
+function WorkshopAfterPurchaseSection({ workshopId }: { workshopId: number }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.workshopAdmin.getAfterPurchaseWorkflow.useQuery({ workshopId });
+  const saveMut = trpc.workshopAdmin.updateAfterPurchaseWorkflow.useMutation({
+    onSuccess: () => { utils.workshopAdmin.getAfterPurchaseWorkflow.invalidate({ workshopId }); toast.success("After purchase workflow saved"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const { data: hideData } = trpc.workshopAdmin.getHidePricingOptions.useQuery({ workshopId });
+  const hideToggleMut = trpc.workshopAdmin.updateHidePricingOptions.useMutation({
+    onSuccess: () => { utils.workshopAdmin.getHidePricingOptions.invalidate({ workshopId }); toast.success("Setting saved"); },
+    onError: (e) => toast.error(e.message),
+  });
+  if (isLoading) return <div className="text-center py-6 text-muted-foreground text-sm">Loading...</div>;
+  return (
+    <div className="space-y-4">
+      <HidePricingOptionsToggle
+        value={hideData?.hidePricingOptions ?? false}
+        onChange={(v) => hideToggleMut.mutate({ workshopId, hidePricingOptions: v })}
+      />
+      <AfterPurchaseWorkflowEditor
+        value={data?.afterPurchaseWorkflow ?? null}
+        onChange={(workflow) => saveMut.mutate({ workshopId, workflow })}
+      />
     </div>
   );
 }

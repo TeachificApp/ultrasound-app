@@ -12,6 +12,7 @@ import {
 import { eq, and, desc, asc, isNull, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "../_core/notification";
+import { syncStripeProduct } from "../stripeSync";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -245,6 +246,15 @@ const createMembership = adminProcedure
       .from(membershipPlans)
       .where(eq(membershipPlans.slug, slug));
     const finalSlug = existing ? `${slug}-${Date.now()}` : slug;
+    // Auto-sync Stripe product/price
+    const stripeSync = await syncStripeProduct({
+      existingProductId: input.stripeProductId ?? null,
+      existingPriceId: input.stripePriceId ?? null,
+      name: input.title,
+      price: input.price ?? 0,
+      billingInterval: (input.billingInterval as any) ?? "monthly",
+      metadata: { product_type: "membership" },
+    });
     const [result] = await db.insert(membershipPlans).values({
       title: input.title,
       slug: finalSlug,
@@ -256,8 +266,8 @@ const createMembership = adminProcedure
       trialDays: input.trialDays ?? 0,
       accentColor: input.accentColor ?? "#189aa1",
       status: input.status ?? "draft",
-      stripePriceId: input.stripePriceId ?? null,
-      stripeProductId: input.stripeProductId ?? null,
+      stripePriceId: stripeSync.stripePriceId ?? input.stripePriceId ?? null,
+      stripeProductId: stripeSync.stripeProductId ?? input.stripeProductId ?? null,
     });
     return { id: (result as any).insertId as number };
   });
@@ -286,6 +296,11 @@ const updateMembership = adminProcedure
       sortOrder: z.number().optional(),
       publishDomain: z.string().optional().nullable(),
       settings: z.string().optional().nullable(),
+      subtitle: z.string().optional().nullable(),
+      slug: z.string().optional(),
+      metaTitle: z.string().optional().nullable(),
+      metaDescription: z.string().optional().nullable(),
+      brand: z.enum(["all_about_ultrasound", "iheartecho"]).optional(),
     })
   )
   .mutation(async ({ input }) => {
@@ -295,6 +310,23 @@ const updateMembership = adminProcedure
     const updateData: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(rest)) {
       if (v !== undefined) updateData[k] = v;
+    }
+    // Auto-sync Stripe product/price when price/billing changes
+    if (rest.price !== undefined || rest.billingInterval !== undefined || rest.title !== undefined) {
+      const [existing] = await db.select().from(membershipPlans).where(eq(membershipPlans.id, id));
+      if (existing) {
+        const stripeSync = await syncStripeProduct({
+          existingProductId: (rest.stripeProductId as string | null | undefined) ?? existing.stripeProductId,
+          existingPriceId: (rest.stripePriceId as string | null | undefined) ?? existing.stripePriceId,
+          name: (rest.title as string | undefined) ?? existing.title,
+          description: (rest.description as string | undefined) ?? existing.description ?? undefined,
+          price: (rest.price as number | undefined) ?? existing.price ?? 0,
+          billingInterval: ((rest.billingInterval ?? existing.billingInterval) as any) ?? "monthly",
+          metadata: { product_type: "membership", product_id: String(id) },
+        });
+        if (stripeSync.stripeProductId) updateData.stripeProductId = stripeSync.stripeProductId;
+        if (stripeSync.stripePriceId) updateData.stripePriceId = stripeSync.stripePriceId;
+      }
     }
     await db.update(membershipPlans).set(updateData).where(eq(membershipPlans.id, id));
     return { success: true };

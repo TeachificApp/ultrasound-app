@@ -4,7 +4,7 @@
  */
 import { useState, useMemo, useEffect } from "react";
 import { useSeoHead } from "@/hooks/useSeoHead";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package } from "lucide-react";
+import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package, Link2 } from "lucide-react";
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-4 h-4" />,
@@ -184,8 +184,25 @@ export default function EducationLibrary() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [activeCollection, setActiveCollection] = useState<number | null>(null);
-
+  const [, navigate] = useLocation();
   const { user } = useAuth();
+
+  // Fetch collections for filter tabs (must be before useEffect that reads it)
+  const { data: collections } = trpc.lms.listCollections.useQuery();
+
+  // Sync collection from URL param on load and when collections load
+  useEffect(() => {
+    if (!collections) return;
+    const params = new URLSearchParams(window.location.search);
+    const slugParam = params.get("collection");
+    if (slugParam) {
+      const match = collections.find((c: any) => {
+        const autoSlug = c.slug ?? c.title?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        return autoSlug === slugParam;
+      });
+      if (match) setActiveCollection(match.id);
+    }
+  }, [collections]);
 
   // Fetch ownership data for smart routing (only when logged in)
   const { data: myCoursesData } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
@@ -206,9 +223,6 @@ export default function EducationLibrary() {
   const enrolledCourseIds = useMemo(() => new Set((myCoursesData ?? []).map((e: any) => e.courseId)), [myCoursesData]);
   const purchasedProductSlugs = useMemo(() => new Set((myPurchasesData ?? []).map((p: any) => p.slug)), [myPurchasesData]);
   const enrolledBundleIds = useMemo(() => new Set((myBundlesData ?? []).map((b: any) => b.id)), [myBundlesData]);
-
-  // Fetch collections for filter tabs
-  const { data: collections } = trpc.lms.listCollections.useQuery();
   const { data: collectionDetail } = trpc.lms.getCollection.useQuery(
     { id: activeCollection! },
     { enabled: activeCollection !== null }
@@ -251,7 +265,7 @@ export default function EducationLibrary() {
           <div className="mb-6">
             <div className="flex gap-1.5 pb-1 flex-wrap">
               <button
-                onClick={() => { setActiveCollection(null); setPage(1); }}
+                onClick={() => { setActiveCollection(null); setPage(1); navigate("/education-library"); }}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                   activeCollection === null
                     ? "bg-teal-600 text-white shadow-sm"
@@ -261,9 +275,13 @@ export default function EducationLibrary() {
                 All Content
               </button>
               {collections.map((col: any) => (
+                <div key={col.id} className="flex items-center gap-0.5">
                 <button
-                  key={col.id}
-                  onClick={() => { setActiveCollection(col.id); setPage(1); }}
+                  onClick={() => {
+                    setActiveCollection(col.id); setPage(1);
+                    const autoSlug = col.slug ?? col.title?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                    navigate(`/education-library?collection=${encodeURIComponent(autoSlug)}`);
+                  }}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                     activeCollection === col.id
                       ? "text-white shadow-sm"
@@ -274,6 +292,23 @@ export default function EducationLibrary() {
                   {col.title}
                   <span className="ml-1.5 text-xs opacity-70">({col.courseCount})</span>
                 </button>
+                <button
+                  title="Copy direct link to this collection"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const autoSlug = col.slug ?? col.title?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                    const url = `${window.location.origin}/education-library?collection=${encodeURIComponent(autoSlug)}`;
+                    navigator.clipboard.writeText(url).then(() => {
+                      const btn = e.currentTarget;
+                      btn.classList.add("text-teal-600");
+                      setTimeout(() => btn.classList.remove("text-teal-600"), 1500);
+                    });
+                  }}
+                  className="-ml-1 p-1 rounded-full text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                >
+                  <Link2 className="w-3 h-3" />
+                </button>
+                </div>
               ))}
             </div>
           </div>

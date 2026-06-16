@@ -3,6 +3,7 @@ import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, lte, or, sql, isNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { syncStripeProduct } from "../stripeSync";
 import {
   workshops,
   workshopInstances,
@@ -615,6 +616,8 @@ export const workshopAdminRouter = router({
         libraryOrder: z.number().optional(),
         isFeatured: z.boolean().optional(),
         publishDomain: z.string().nullish(),
+        afterPurchaseWorkflow: z.string().nullish(),
+        checkoutPageConfig: z.string().nullish(),
       })
     )
     .mutation(async ({ input }) => {
@@ -932,28 +935,42 @@ export const workshopAdminRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      // Delete existing and re-insert
+      // Fetch workshop title for Stripe product name
+      const [wk] = await db.select({ title: workshops.title }).from(workshops).where(eq(workshops.id, input.workshopId));
+      const workshopTitle = wk?.title ?? "Workshop";
+      // Delete existing and re-insert with Stripe sync
       await db.delete(workshopPricingOptions).where(eq(workshopPricingOptions.workshopId, input.workshopId));
       if (input.options.length > 0) {
-        await db.insert(workshopPricingOptions).values(
-          input.options.map((o) => ({
-            workshopId: input.workshopId,
-            label: o.label,
-            sublabel: o.sublabel,
-            pricingType: o.pricingType,
-            price: o.price,
-            compareAtPrice: o.compareAtPrice ?? undefined,
-            ctaLabel: o.ctaLabel,
-            sortOrder: o.sortOrder,
-            isActive: o.isActive,
-          }))
+        const syncedOptions = await Promise.all(
+          input.options.map(async (o) => {
+            const stripeSync = o.pricingType === "one_time" && o.price > 0
+              ? await syncStripeProduct({
+                  name: `${workshopTitle} — ${o.label}`,
+                  price: o.price,
+                  billingInterval: "one_time",
+                  metadata: { product_type: "workshop", workshop_id: String(input.workshopId) },
+                })
+              : { stripeProductId: null, stripePriceId: null };
+            return {
+              workshopId: input.workshopId,
+              label: o.label,
+              sublabel: o.sublabel,
+              pricingType: o.pricingType,
+              price: o.price,
+              compareAtPrice: o.compareAtPrice ?? undefined,
+              stripePriceId: stripeSync.stripePriceId ?? undefined,
+              ctaLabel: o.ctaLabel,
+              sortOrder: o.sortOrder,
+              isActive: o.isActive,
+            };
+          })
         );
+        await db.insert(workshopPricingOptions).values(syncedOptions);
       }
       return { success: true };
     }),
 
-  // ── Landing Page ───────────────────────────────────────────────────────────
-
+    // ── Landing Page ───────────────────────────────────────────────────────────
   /** Save landing page blocks */
   saveLandingBlocks: protectedProcedure
     .input(z.object({ id: z.number(), blocks: z.string() }))
@@ -964,6 +981,47 @@ export const workshopAdminRouter = router({
         .update(workshops)
         .set({ landingBlocks: input.blocks })
         .where(eq(workshops.id, input.id));
+      return { success: true };
+    }),
+
+  // ── After Purchase ─────────────────────────────────────────────────────────
+  getAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ workshopId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [w] = await db.select({ id: workshops.id, afterPurchaseWorkflow: workshops.afterPurchaseWorkflow })
+        .from(workshops).where(eq(workshops.id, input.workshopId)).limit(1);
+      if (!w) throw new TRPCError({ code: "NOT_FOUND" });
+      return { afterPurchaseWorkflow: w.afterPurchaseWorkflow ?? null };
+    }),
+
+  updateAfterPurchaseWorkflow: protectedProcedure
+    .input(z.object({ workshopId: z.number(), workflow: z.string().nullable() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(workshops).set({ afterPurchaseWorkflow: input.workflow }).where(eq(workshops.id, input.workshopId));
+      return { success: true };
+    }),
+
+  getHidePricingOptions: protectedProcedure
+    .input(z.object({ workshopId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [w] = await db.select({ id: workshops.id, hidePricingOptions: workshops.hidePricingOptions })
+        .from(workshops).where(eq(workshops.id, input.workshopId)).limit(1);
+      if (!w) throw new TRPCError({ code: "NOT_FOUND" });
+      return { hidePricingOptions: w.hidePricingOptions ?? false };
+    }),
+
+  updateHidePricingOptions: protectedProcedure
+    .input(z.object({ workshopId: z.number(), hidePricingOptions: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(workshops).set({ hidePricingOptions: input.hidePricingOptions }).where(eq(workshops.id, input.workshopId));
       return { success: true };
     }),
 });

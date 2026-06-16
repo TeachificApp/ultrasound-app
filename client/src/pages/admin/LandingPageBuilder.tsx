@@ -1162,8 +1162,8 @@ function CTAActionPicker({
     undefined,
     { enabled: behavior === "free_enrollment" && freeEnrollType === "bundle" }
   );
-  // Communities
-  const { data: feCommunities } = trpc.community.listCommunities.useQuery(
+  // Communities — use admin procedure so draft/unpublished communities also appear
+  const { data: feCommunities } = trpc.community.admin.listAllCommunities.useQuery(
     undefined,
     { enabled: behavior === "free_enrollment" && freeEnrollType === "community" }
   );
@@ -6086,13 +6086,12 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
 
 // ─── Template Library Panel ───────────────────────────────────────────────────
 
-function TemplateLibrary({ blocks, onInsert, onClose, initialTab }: {
+function TemplateLibrary({ blocks, onInsert, onClose }: {
   blocks: Block[];
   onInsert: (tplBlocks: Block[]) => void;
   onClose: () => void;
-  initialTab?: "page" | "block";
+  initialTab?: "page" | "block"; // kept for compat, ignored
 }) {
-  const [tab, setTab] = useState<"page" | "block">(initialTab ?? "page");
   const [saveName, setSaveName] = useState("");
   const [saveDesc, setSaveDesc] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -6111,7 +6110,7 @@ function TemplateLibrary({ blocks, onInsert, onClose, initialTab }: {
     if (!saveName.trim()) { toast.error("Please enter a template name"); return; }
     setIsSaving(true);
     try {
-      await saveMutation.mutateAsync({ name: saveName, description: saveDesc, templateType: tab, blocks });
+      await saveMutation.mutateAsync({ name: saveName, description: saveDesc, templateType: "page", blocks });
     } finally { setIsSaving(false); }
   };
 
@@ -6119,35 +6118,28 @@ function TemplateLibrary({ blocks, onInsert, onClose, initialTab }: {
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-[680px] max-h-[80vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-bold text-gray-900 flex items-center gap-2"><FolderOpen size={18} className="text-teal-600" /> Template Library</h2>
+          <h2 className="font-bold text-gray-900 flex items-center gap-2"><FolderOpen size={18} className="text-teal-600" /> Page Template Library</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-        </div>
-        <div className="flex border-b border-gray-100">
-          {(["page", "block"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2.5 text-sm font-medium capitalize transition-colors ${tab === t ? "border-b-2 border-teal-600 text-teal-700" : "text-gray-500 hover:text-gray-700"}`}>{t === "page" ? "Full Page Templates" : "Block Templates"}</button>
-          ))}
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Built-in sales funnel templates */}
-          {tab === "page" && (
-            <div className="border border-amber-200 rounded-xl p-4 bg-amber-50/70">
-              <p className="text-xs font-semibold text-amber-700 mb-3">Built-in Sales Funnel Templates</p>
-              <div className="space-y-2">
-                {FUNNEL_TEMPLATES.map((template, index) => (
-                  <div key={template.name} className="bg-white border border-amber-100 rounded-lg p-3">
-                    <h3 className="font-semibold text-gray-900 text-sm">{template.name}</h3>
-                    <p className="text-xs text-gray-500 mt-1">{template.description}</p>
-                    <Button onClick={() => { onInsert(getFunnelTemplateBlocks(index)); onClose(); }} className="mt-3 h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white">
-                      Insert funnel page
-                    </Button>
-                  </div>
-                ))}
-              </div>
+          <div className="border border-amber-200 rounded-xl p-4 bg-amber-50/70">
+            <p className="text-xs font-semibold text-amber-700 mb-3">Built-in Sales Funnel Templates</p>
+            <div className="space-y-2">
+              {FUNNEL_TEMPLATES.map((template, index) => (
+                <div key={template.name} className="bg-white border border-amber-100 rounded-lg p-3">
+                  <h3 className="font-semibold text-gray-900 text-sm">{template.name}</h3>
+                  <p className="text-xs text-gray-500 mt-1">{template.description}</p>
+                  <Button onClick={() => { onInsert(getFunnelTemplateBlocks(index)); onClose(); }} className="mt-3 h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white">
+                    Insert funnel page
+                  </Button>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
           {/* Save current page as template */}
           <div className="border border-dashed border-teal-300 rounded-xl p-4 bg-teal-50/50">
-            <p className="text-xs font-semibold text-teal-700 mb-3">Save Current {tab === "page" ? "Page" : "Selection"} as Template</p>
+            <p className="text-xs font-semibold text-teal-700 mb-3">Save Current Page as Template</p>
             <div className="space-y-2">
               <DebouncedInput value={saveName} onChange={v => setSaveName(v)} className="h-8 text-sm" placeholder="Template name..." />
               <DebouncedInput value={saveDesc} onChange={v => setSaveDesc(v)} className="h-8 text-sm" placeholder="Description (optional)" />
@@ -6158,7 +6150,7 @@ function TemplateLibrary({ blocks, onInsert, onClose, initialTab }: {
           </div>
           {/* Template list */}
           {!templates || templates.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-sm">No {tab} templates saved yet</div>
+            <div className="text-center py-8 text-gray-400 text-sm">No page templates saved yet</div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {templates.map((tpl: any) => (

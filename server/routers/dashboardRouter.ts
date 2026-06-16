@@ -33,6 +33,9 @@ import {
   bundles,
   communityMembers,
   communities,
+  workshopEnrollments,
+  workshopInstances,
+  workshops,
 } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
@@ -212,7 +215,34 @@ export const dashboardRouter = router({
       .where(eq(bundleEnrollments.userId, ctx.user.id))
       .orderBy(desc(bundleEnrollments.enrolledAt));
 
-    // 7. Community memberships
+    // 7. Workshop enrollments
+    const workshopRegs = await db
+      .select({
+        enrollmentId: workshopEnrollments.id,
+        workshopId: workshopEnrollments.workshopId,
+        instanceId: workshopEnrollments.instanceId,
+        enrolledAt: workshopEnrollments.accessGrantedAt,
+        attended: workshopEnrollments.attended,
+        status: workshopEnrollments.status,
+        workshopTitle: workshops.title,
+        workshopSlug: workshops.slug,
+        workshopBrand: workshops.brand,
+        workshopCover: workshops.coverImageUrl,
+        workshopStatus: workshops.status,
+        instanceTitle: workshopInstances.title,
+        instanceStartDate: workshopInstances.startDate,
+        instanceEndDate: workshopInstances.endDate,
+        instanceLocationType: workshopInstances.locationType,
+        instanceVenueCity: workshopInstances.venueCity,
+        instanceVenueState: workshopInstances.venueState,
+      })
+      .from(workshopEnrollments)
+      .innerJoin(workshops, eq(workshopEnrollments.workshopId, workshops.id))
+      .innerJoin(workshopInstances, eq(workshopEnrollments.instanceId, workshopInstances.id))
+      .where(and(eq(workshopEnrollments.userId, ctx.user.id), eq(workshopEnrollments.status, "active")))
+      .orderBy(desc(workshopEnrollments.accessGrantedAt));
+
+    // 8. Community memberships
     const communityRegs = await db
       .select({
         memberId: communityMembers.id,
@@ -250,6 +280,7 @@ export const dashboardRouter = router({
       webinars: webinarRegs,
       physicalProducts: physicalOrders,
       bundles: bundleRegs,
+      workshops: workshopRegs,
       communities: communityRegs,
       funnelPurchases: funnelPurchaseRows,
     };

@@ -1198,6 +1198,7 @@ export default function FunnelPageEditor() {
         <div className="flex border-b border-gray-200 shrink-0 overflow-x-auto scrollbar-none -mx-4 sm:-mx-6 px-4 sm:px-6">
           {([
             { id: "catalog", icon: <Plus className="w-3.5 h-3.5" />, label: "New Block" },
+            { id: "templates", icon: <Layers className="w-3.5 h-3.5" />, label: "Templates" },
             { id: "from_pages", icon: <BookOpen className="w-3.5 h-3.5" />, label: "Copy" },
             { id: "import_url", icon: <Globe className="w-3.5 h-3.5" />, label: "Import URL" },
           ] as const).map(tab => (

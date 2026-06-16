@@ -395,8 +395,8 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return (
         <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <CC><div className="grid gap-8" style={{ gridTemplateColumns: `${d.leftRatio ?? 50}% 1fr` }}>
-            <div className="prose" dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
-            <div className="prose" dangerouslySetInnerHTML={{ __html: d.rightHtml ?? "" }} />
+            <div className="prose min-w-0" dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
+            <div className="prose min-w-0" dangerouslySetInnerHTML={{ __html: d.rightHtml ?? "" }} />
           </div></CC>
         </div>
       );

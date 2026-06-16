@@ -412,6 +412,7 @@ export const productsAdminRouter = router({
       metaDescription: z.string().optional().nullable(),
       slug: z.string().optional(),
       publishDomain: z.string().max(255).nullable().optional(),
+      brand: z.string().optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       if ((ctx.user as any).role !== "admin" && (ctx.user as any).role !== "platform_admin") {

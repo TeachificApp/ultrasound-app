@@ -18,7 +18,7 @@ import {
   User, BookOpen, CreditCard, Award, Camera, Save, Lock, Eye, EyeOff,
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
   Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart, BarChart2, Bell,
-  GraduationCap, BookMarked, PenLine, ArrowRight, Video, Layers, Users, Star,
+  GraduationCap, BookMarked, PenLine, ArrowRight, Video, Layers, Users, Star, Briefcase, MapPin, CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -771,7 +771,7 @@ function CommunityProfileSection({ userId }: { userId: number }) {
 
 // ─── My Content Tab ───────────────────────────────────────────────────────────
 
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "products" | "bundles" | "memberships" | "communities";
+type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "workshops" | "products" | "bundles" | "memberships" | "communities";
 
 function MyContentTab() {
   const { data, isLoading } = trpc.dashboard.getMyContent.useQuery();
@@ -781,12 +781,13 @@ function MyContentTab() {
   // Auto-select first non-empty tab once data loads
   useEffect(() => {
     if (!data || autoTabSet) return;
-    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "webinars", "products", "bundles", "memberships", "communities"];
+    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "webinars", "workshops", "products", "bundles", "memberships", "communities"];
     const counts: Record<ContentSubTab, number> = {
       courses:      data.courses?.length ?? 0,
       quizzes:      data.quizzes?.length ?? 0,
       downloads:    data.downloads?.length ?? 0,
       webinars:     data.webinars?.length ?? 0,
+      workshops:    (data as any).workshops?.length ?? 0,
       products:     data.physicalProducts?.length ?? 0,
       bundles:      data.bundles?.length ?? 0,
       memberships:  0, // memberships shown in Subscriptions tab
@@ -806,6 +807,7 @@ function MyContentTab() {
     { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: data?.quizzes.length ?? 0 },
     { key: "downloads",    label: "Downloads",    icon: Download,       count: data?.downloads.length ?? 0 },
     { key: "webinars",     label: "Webinars",     icon: Video,          count: data?.webinars?.length ?? 0 },
+    { key: "workshops",    label: "Workshops",    icon: Briefcase,      count: (data as any)?.workshops?.length ?? 0 },
     { key: "products",     label: "Products",     icon: Package,        count: data?.physicalProducts.length ?? 0 },
     { key: "bundles",      label: "Bundles",      icon: Layers,         count: data?.bundles?.length ?? 0 },
     { key: "memberships",  label: "Memberships",  icon: Star,           count: 0 },
@@ -973,6 +975,35 @@ function MyContentTab() {
                   badgeColor={w.attended ? "emerald" : w.webinarStatus === "ended" ? "teal" : "blue"}
                   actions={[
                     { label: "View Webinar", icon: ExternalLink, href: `/webinar/${w.webinarSlug}` },
+                  ]}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {/* Workshops */}
+      {contentTab === "workshops" && (
+        <div>
+          {((data as any)?.workshops?.length ?? 0) === 0 ? (
+            <EmptyState icon={Briefcase} title="No workshop enrollments" description="Register for a workshop to see it here." />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(data as any)?.workshops?.map((w: any) => (
+                <ContentCard
+                  key={w.enrollmentId}
+                  thumbnail={w.workshopCover}
+                  title={w.workshopTitle}
+                  brand={w.workshopBrand}
+                  subtitle={[
+                    w.instanceTitle,
+                    w.instanceStartDate ? new Date(w.instanceStartDate).toLocaleDateString() : null,
+                    w.instanceVenueCity ? `${w.instanceVenueCity}${w.instanceVenueState ? `, ${w.instanceVenueState}` : ""}` : w.instanceLocationType === "virtual" ? "Virtual" : null,
+                  ].filter(Boolean).join(" · ")}
+                  badge={w.attended ? "Attended" : w.instanceLocationType === "virtual" ? "Virtual" : "In-Person"}
+                  badgeColor={w.attended ? "emerald" : "teal"}
+                  actions={[
+                    { label: "View Workshop", icon: ExternalLink, href: `/workshops/${w.workshopSlug}` },
                   ]}
                 />
               ))}

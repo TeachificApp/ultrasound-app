@@ -1,7 +1,7 @@
 /**
  * BundlesAdmin.tsx — Admin CRUD for multi-type bundles (courses, downloads, products, webinars, quizzes)
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,10 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, GripVertical, BookOpen, Download, ShoppingBag, Radio, HelpCircle, X, Users, DollarSign, Eye, Workflow, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, GripVertical, BookOpen, Download, ShoppingBag, Radio, HelpCircle, X, Users, DollarSign, Eye, Workflow, Search, Copy, ExternalLink, BarChart2, Settings, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PublishDomainSelect } from "@/components/PublishDomainSelect";
+import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 
@@ -202,25 +205,61 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
     onError: (e) => toast.error(e.message),
   });
 
+  const [activeTab, setActiveTab] = useState("settings");
   const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [accessType, setAccessType] = useState<"free" | "paid">("paid");
   const [pricingOptions, setPricingOptions] = useState("");
   const [coverImage, setCoverImage] = useState("");
+  const [slug, setSlug] = useState("");
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
+  const [publishDomain, setPublishDomain] = useState("");
+  const [brand, setBrand] = useState("all_about_ultrasound");
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [showAddItem, setShowAddItem] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Initialize form when data loads
   if (data && !initialized) {
     setTitle(data.bundle.title);
+    setSubtitle((data.bundle as any).subtitle ?? "");
     setDescription(data.bundle.description ?? "");
     setStatus(data.bundle.status as "draft" | "published");
     setAccessType(data.bundle.accessType as "free" | "paid");
     setPricingOptions(data.bundle.pricingOptions ?? "");
     setCoverImage(data.bundle.coverImage ?? "");
+    setSlug((data.bundle as any).slug ?? "");
+    setMetaTitle((data.bundle as any).metaTitle ?? "");
+    setMetaDescription((data.bundle as any).metaDescription ?? "");
+    setPublishDomain((data.bundle as any).publishDomain ?? "");
+    setBrand((data.bundle as any).brand ?? "all_about_ultrasound");
     setInitialized(true);
   }
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10_000_000) { toast.error("Image must be under 10 MB"); return; }
+    e.target.value = "";
+    setUploadingCover(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Upload failed"); }
+      const { url } = await res.json();
+      setCoverImage(url);
+      toast.success("Cover image uploaded");
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   if (isLoading || !data) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
 
@@ -230,173 +269,300 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
     updateMut.mutate({
       id: bundleId,
       title,
+      subtitle: subtitle || undefined,
       description: description || undefined,
       status,
       accessType,
       pricingOptions: pricingOptions || undefined,
       coverImage: coverImage || undefined,
+      slug: slug || undefined,
+      metaTitle: metaTitle || undefined,
+      metaDescription: metaDescription || undefined,
+      publishDomain: publishDomain || undefined,
+      brand: brand || undefined,
     });
   };
 
+  const checkoutUrl = `${window.location.origin}/checkout/${bundle.slug}?type=bundle`;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
+          <ArrowLeft className="w-4 h-4" /> Back
         </Button>
-        <h3 className="text-lg font-semibold flex-1 truncate">{bundle.title}</h3>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-semibold truncate">{bundle.title}</h3>
+          <div className="flex items-center gap-2 mt-0.5">
+            <Badge variant={status === "published" ? "default" : "secondary"} className="text-xs">{status}</Badge>
+            <Badge variant="outline" className="text-xs capitalize">{accessType}</Badge>
+          </div>
+        </div>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-600 select-all cursor-text" title="Bundle ID">ID: {bundle.id}</span>
+        {bundle.slug && (
+          <a href={`/bundles/${bundle.slug}`} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="ghost" className="text-xs text-gray-500 hover:text-teal-600 gap-1">
+              <Eye className="w-3.5 h-3.5" /> View Sales Page
+            </Button>
+          </a>
+        )}
+        <Button size="sm" variant="outline" className="text-xs gap-1"
+          onClick={() => { navigator.clipboard.writeText(checkoutUrl); toast.success("Checkout link copied"); }}>
+          <Copy className="w-3.5 h-3.5" /> Copy Checkout Link
+        </Button>
         <a href={`/admin/bundles/${bundleId}/landing-builder`} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-teal-600 text-teal-700 rounded-lg hover:bg-teal-50 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          Landing Page Builder
+          <ExternalLink className="w-3.5 h-3.5" /> Landing Builder
         </a>
-        <Button onClick={handleSave} disabled={updateMut.isPending}>
-          {updateMut.isPending ? "Saving..." : "Save Changes"}
+        <Button size="sm" onClick={handleSave} disabled={updateMut.isPending} className="bg-teal-600 hover:bg-teal-700 text-white">
+          {updateMut.isPending ? <><RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" /> Saving...</> : "Save Changes"}
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Package className="w-5 h-5 mx-auto mb-1 text-teal-600" />
-            <p className="text-2xl font-bold">{items.length}</p>
-            <p className="text-xs text-muted-foreground">Items</p>
-          </CardContent>
+      {/* Stats bar */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4 text-teal-500 shrink-0" />
+            <div><p className="text-xs text-gray-500">Items</p><p className="text-lg font-bold text-gray-800">{items.length}</p></div>
+          </div>
         </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Users className="w-5 h-5 mx-auto mb-1 text-blue-600" />
-            <p className="text-2xl font-bold">{enrollmentData?.total ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Enrollments</p>
-          </CardContent>
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-blue-500 shrink-0" />
+            <div><p className="text-xs text-gray-500">Enrollments</p><p className="text-lg font-bold text-gray-800">{enrollmentData?.total ?? 0}</p></div>
+          </div>
         </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Eye className="w-5 h-5 mx-auto mb-1 text-purple-600" />
-            <Badge variant={status === "published" ? "default" : "secondary"} className="text-xs">{status}</Badge>
-            <p className="text-xs text-muted-foreground mt-1">{accessType}</p>
-          </CardContent>
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-purple-500 shrink-0" />
+            <div><p className="text-xs text-gray-500">Status</p><p className="text-sm font-semibold text-gray-800 capitalize">{status}</p></div>
+          </div>
         </Card>
       </div>
 
-      {/* Basic Info */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Bundle Details</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label>Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="What's included in this bundle..." />
-          </div>
-          <div>
-            <Label>Cover Image URL</Label>
-            <Input value={coverImage} onChange={(e) => setCoverImage(e.target.value)} placeholder="https://..." />
-            {coverImage && <img src={coverImage} className="mt-2 w-32 h-20 object-cover rounded-lg" alt="Cover" />}
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as any)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Access Type</Label>
-              <Select value={accessType} onValueChange={(v) => setAccessType(v as any)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {accessType === "paid" && (
-            <div>
-              <Label>Pricing Options (JSON)</Label>
-              <Textarea
-                value={pricingOptions}
-                onChange={(e) => setPricingOptions(e.target.value)}
-                rows={4}
-                placeholder='[{"id":"one-time","label":"One-Time Purchase","price":99.99,"type":"one_time"}]'
-                className="font-mono text-xs"
-              />
-              <p className="text-xs text-muted-foreground mt-1">JSON array of pricing options. Each needs: id, label, price, type (one_time/subscription).</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="flex-wrap h-auto gap-1">
+          <TabsTrigger value="settings" className="text-xs"><Settings className="w-3.5 h-3.5 mr-1" />Settings</TabsTrigger>
+          <TabsTrigger value="items" className="text-xs"><Package className="w-3.5 h-3.5 mr-1" />Items</TabsTrigger>
+          <TabsTrigger value="enrollments" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Enrollments</TabsTrigger>
+          <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3.5 h-3.5 mr-1" />After Purchase</TabsTrigger>
+          <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
+        </TabsList>
 
-      {/* Bundle Items */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Bundle Items ({items.length})</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => setShowAddItem(true)}>
-              <Plus className="w-4 h-4 mr-1" /> Add Item
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {items.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No items yet. Add courses, downloads, products, webinars, or quizzes.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {items.map((item) => {
-                const Icon = ITEM_TYPE_ICONS[item.itemType] ?? Package;
-                return (
-                  <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg border bg-background">
-                    <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
-                    <div className={`px-2 py-0.5 rounded text-xs font-medium ${ITEM_TYPE_COLORS[item.itemType] ?? "bg-gray-100 text-gray-700"}`}>
-                      <Icon className="w-3 h-3 inline mr-1" />
-                      {ITEM_TYPE_LABELS[item.itemType] ?? item.itemType}
+        {/* Settings Tab */}
+        <TabsContent value="settings" className="space-y-4 pt-2">
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Basic Info</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Title</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Subtitle <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className="mt-1" placeholder="Short tagline shown below the title" />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="mt-1" placeholder="What's included in this bundle..." />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Brand</Label>
+                  <select className="mt-1 border rounded px-2 py-2 text-sm bg-background w-full" value={brand} onChange={(e) => setBrand(e.target.value)}>
+                    <option value="all_about_ultrasound">All About Ultrasound</option>
+                    <option value="iheartecho">iHeartEcho</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="published">Published</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label>Access Type</Label>
+                <Select value={accessType} onValueChange={(v) => setAccessType(v as any)}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {accessType === "paid" && (
+                <div>
+                  <Label>Pricing Options (JSON)</Label>
+                  <Textarea value={pricingOptions} onChange={(e) => setPricingOptions(e.target.value)} rows={4}
+                    placeholder='[{"id":"one-time","label":"One-Time Purchase","price":99.99,"type":"one_time"}]'
+                    className="font-mono text-xs mt-1" />
+                  <p className="text-xs text-muted-foreground mt-1">JSON array of pricing options. Each needs: id, label, price, type (one_time/subscription).</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Cover Image</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex items-start gap-3">
+                {coverImage && <img src={coverImage} alt="Cover" className="w-24 h-16 object-cover rounded border border-gray-200" />}
+                <div className="flex flex-col gap-2 flex-1">
+                  <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleCoverUpload} />
+                  <Button type="button" size="sm" variant="outline" onClick={() => coverInputRef.current?.click()} disabled={uploadingCover}>
+                    {uploadingCover ? <><RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" /> Uploading...</> : "Upload Image"}
+                  </Button>
+                  <Input value={coverImage} onChange={(e) => setCoverImage(e.target.value)} placeholder="Or paste image URL" className="text-xs" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-sm">URL &amp; SEO</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label>URL Slug</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm text-gray-400">/bundles/</span>
+                  <Input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} className="flex-1 font-mono text-sm" placeholder="my-bundle" />
+                </div>
+              </div>
+              <div>
+                <Label>Meta Title <span className="text-gray-400 font-normal">(SEO)</span></Label>
+                <Input value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} className="mt-1" placeholder={title} />
+              </div>
+              <div>
+                <Label>Meta Description <span className="text-gray-400 font-normal">(SEO)</span></Label>
+                <Textarea value={metaDescription} onChange={(e) => setMetaDescription(e.target.value)} rows={2} className="mt-1" placeholder="Brief description for search engines" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Domain</CardTitle></CardHeader>
+            <CardContent>
+              <PublishDomainSelect value={publishDomain} onChange={(v) => setPublishDomain(v ?? "")} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Items Tab */}
+        <TabsContent value="items" className="pt-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">Bundle Items ({items.length})</CardTitle>
+                <Button size="sm" variant="outline" onClick={() => setShowAddItem(true)}>
+                  <Plus className="w-4 h-4 mr-1" /> Add Item
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {items.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No items yet. Add courses, downloads, products, webinars, or quizzes.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {items.map((item) => {
+                    const Icon = ITEM_TYPE_ICONS[item.itemType] ?? Package;
+                    return (
+                      <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg border bg-background">
+                        <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
+                        <div className={`px-2 py-0.5 rounded text-xs font-medium ${ITEM_TYPE_COLORS[item.itemType] ?? "bg-gray-100 text-gray-700"}`}>
+                          <Icon className="w-3 h-3 inline mr-1" />
+                          {ITEM_TYPE_LABELS[item.itemType] ?? item.itemType}
+                        </div>
+                        <span className="flex-1 text-sm font-medium truncate">ID: {item.itemId}</span>
+                        <Button variant="ghost" size="sm" className="text-destructive h-7 w-7 p-0" onClick={() => removeItemMut.mutate({ itemId: item.id })}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Enrollments Tab */}
+        <TabsContent value="enrollments" className="pt-2">
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Enrollments ({enrollmentData?.total ?? 0})</CardTitle></CardHeader>
+            <CardContent>
+              {!enrollmentData || enrollmentData.enrollments.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No enrollments yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {enrollmentData.enrollments.map((enr) => (
+                    <div key={enr.id} className="flex items-center gap-3 p-2 rounded border text-sm">
+                      <div className="flex-1">
+                        <p className="font-medium">{enr.userName ?? "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">{enr.userEmail}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{new Date(enr.enrolledAt).toLocaleDateString()}</p>
                     </div>
-                    <span className="flex-1 text-sm font-medium truncate">ID: {item.itemId}</span>
-                    <Button variant="ghost" size="sm" className="text-destructive h-7 w-7 p-0" onClick={() => removeItemMut.mutate({ itemId: item.id })}>
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Enrollments */}
-      {enrollmentData && enrollmentData.enrollments.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Enrollments ({enrollmentData.total})</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {enrollmentData.enrollments.map((enr) => (
-                <div key={enr.id} className="flex items-center gap-3 p-2 rounded border text-sm">
-                  <div className="flex-1">
-                    <p className="font-medium">{enr.userName ?? "Unknown"}</p>
-                    <p className="text-xs text-muted-foreground">{enr.userEmail}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{new Date(enr.enrolledAt).toLocaleDateString()}</p>
+        {/* After Purchase Tab */}
+        <TabsContent value="after-purchase" className="pt-2">
+          <BundleAfterPurchaseSection bundleId={bundleId} />
+        </TabsContent>
+
+        {/* Checkout Page Tab */}
+        <TabsContent value="checkout-page" className="pt-2">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Checkout Page Editor</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Customise the sections shown on the hosted checkout page at{" "}
+                  <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+                    /checkout/{bundle.slug}
+                  </a>.
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
+                  <ExternalLink className="w-3.5 h-3.5" /> Preview
+                </a>
+                <a href={`/admin/checkout-editor/bundle/${bundleId}`}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
+                  Open Page Editor
+                </a>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              {["Trust Seals & Badges","What You'll Learn","Money-Back Guarantee","Testimonials","FAQ","Custom HTML"].map(s => (
+                <div key={s} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <div className="w-2 h-2 rounded-full bg-teal-400" />
+                  <span className="text-xs text-gray-600">{s}</span>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* After Purchase Workflow */}
-      <BundleAfterPurchaseSection bundleId={bundleId} />
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Add Item Dialog */}
       {showAddItem && (
