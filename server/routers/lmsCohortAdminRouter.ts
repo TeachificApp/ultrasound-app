@@ -79,6 +79,7 @@ import {
   lmsCohortMessages,
   lmsCohortStaff,
   postingAliases,
+  cohortWaitlistEntries,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1528,5 +1529,64 @@ export const lmsCohortAdminRouter = router({
         assigned++;
       }
       return { assigned };
+    }),
+
+  // ── Cohort Waitlist ──
+  getWaitlistSettings: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [group] = await db.select({
+        waitlistEnabled: lmsCohortGroups.waitlistEnabled,
+        waitlistHeading: lmsCohortGroups.waitlistHeading,
+        waitlistBody: lmsCohortGroups.waitlistBody,
+        waitlistCtaLabel: lmsCohortGroups.waitlistCtaLabel,
+        waitlistCtaUrl: lmsCohortGroups.waitlistCtaUrl,
+        waitlistRedirectUrl: lmsCohortGroups.waitlistRedirectUrl,
+        waitlistSuccessMessage: lmsCohortGroups.waitlistSuccessMessage,
+      }).from(lmsCohortGroups).where(eq(lmsCohortGroups.id, input.cohortGroupId)).limit(1);
+      return group ?? null;
+    }),
+
+  saveWaitlistSettings: protectedProcedure
+    .input(z.object({
+      cohortGroupId: z.number(),
+      waitlistEnabled: z.boolean(),
+      waitlistHeading: z.string().optional(),
+      waitlistBody: z.string().optional(),
+      waitlistCtaLabel: z.string().optional(),
+      waitlistCtaUrl: z.string().optional(),
+      waitlistRedirectUrl: z.string().optional(),
+      waitlistSuccessMessage: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { cohortGroupId, ...fields } = input;
+      await db.update(lmsCohortGroups).set({
+        waitlistEnabled: fields.waitlistEnabled,
+        waitlistHeading: fields.waitlistHeading ?? null,
+        waitlistBody: fields.waitlistBody ?? null,
+        waitlistCtaLabel: fields.waitlistCtaLabel ?? null,
+        waitlistCtaUrl: fields.waitlistCtaUrl ?? null,
+        waitlistRedirectUrl: fields.waitlistRedirectUrl ?? null,
+        waitlistSuccessMessage: fields.waitlistSuccessMessage ?? null,
+      }).where(eq(lmsCohortGroups.id, cohortGroupId));
+      return { success: true };
+    }),
+
+  getWaitlistEntries: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const entries = await db.select().from(cohortWaitlistEntries)
+        .where(eq(cohortWaitlistEntries.cohortGroupId, input.cohortGroupId))
+        .orderBy(desc(cohortWaitlistEntries.createdAt));
+      return entries;
     }),
 });

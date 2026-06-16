@@ -32,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import {
   BookOpen, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Clock, Copy, Download, Edit2, HelpCircle, Pencil, Plus, Trash2,
@@ -11985,7 +11986,7 @@ function CohortTab({ courseId }: { courseId: number }) {
           {/* Group create/edit dialog */}
           {groupDialog.open && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-y-auto max-h-[90vh]">
                 <div className="flex items-center justify-between p-5 border-b">
                   <h2 className="text-lg font-semibold">{groupDialog.group ? "Edit Cohort Group" : "Create Cohort Group"}</h2>
                   <button onClick={() => setGroupDialog({ open: false })} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -12050,6 +12051,16 @@ function CohortTab({ courseId }: { courseId: number }) {
                       <span className="font-medium">Feature on course landing page</span> — links the landing page CTA to this group's details
                     </label>
                   </div>
+
+                  {groupDialog.group ? (
+                    <div className="pt-2">
+                      <CohortWaitlistSettingsPanel cohortGroupId={groupDialog.group.id} />
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
+                      Save the cohort group first to configure waitlist settings and review sign-ups.
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2 px-5 py-4 border-t bg-gray-50 rounded-b-2xl">
                   <Button variant="outline" onClick={() => setGroupDialog({ open: false })}>Cancel</Button>
@@ -12311,7 +12322,170 @@ function CohortTab({ courseId }: { courseId: number }) {
   );
 }
 
-// ─── LMS Publish Domain Settings ─────────────────────────────────────────────
+// ─── Cohort Waitlist Settings Panel ─────────────────────────────────────────
+function CohortWaitlistSettingsPanel({ cohortGroupId }: { cohortGroupId: number }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.lmsAdmin.getWaitlistSettings.useQuery({ cohortGroupId }, { enabled: !!cohortGroupId });
+  const { data: entries = [] } = trpc.lmsAdmin.getWaitlistEntries.useQuery({ cohortGroupId }, { enabled: !!cohortGroupId });
+
+  const [enabled, setEnabled] = useState(false);
+  const [heading, setHeading] = useState("");
+  const [body, setBody] = useState("");
+  const [ctaLabel, setCtaLabel] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
+  const [redirectUrl, setRedirectUrl] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setEnabled(data.waitlistEnabled ?? false);
+      setHeading(data.waitlistHeading ?? "");
+      setBody(data.waitlistBody ?? "");
+      setCtaLabel(data.waitlistCtaLabel ?? "");
+      setCtaUrl(data.waitlistCtaUrl ?? "");
+      setRedirectUrl(data.waitlistRedirectUrl ?? "");
+      setSuccessMessage(data.waitlistSuccessMessage ?? "");
+      setDirty(false);
+    }
+  }, [data]);
+
+  const saveMutation = trpc.lmsAdmin.saveWaitlistSettings.useMutation({
+    onSuccess: async () => {
+      toast.success("Waitlist settings saved");
+      await Promise.all([
+        utils.lmsAdmin.getWaitlistSettings.invalidate({ cohortGroupId }),
+        utils.lmsAdmin.getWaitlistEntries.invalidate({ cohortGroupId }),
+        utils.lmsAdmin.listCohortGroups.invalidate(),
+      ]);
+      setDirty(false);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  function handleSave() {
+    saveMutation.mutate({
+      cohortGroupId,
+      waitlistEnabled: enabled,
+      waitlistHeading: heading || undefined,
+      waitlistBody: body || undefined,
+      waitlistCtaLabel: ctaLabel || undefined,
+      waitlistCtaUrl: ctaUrl || undefined,
+      waitlistRedirectUrl: redirectUrl || undefined,
+      waitlistSuccessMessage: successMessage || undefined,
+    });
+  }
+
+  if (isLoading) {
+    return <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">Loading waitlist settings…</div>;
+  }
+
+  return (
+    <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50/60 p-4">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">Waitlist</h3>
+          <p className="text-sm text-gray-500">
+            When enabled and no cohort group is open for enrollment, the course landing page can collect waitlist sign-ups instead of sending learners to checkout.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Enable waitlist mode</p>
+            <p className="text-xs text-gray-500">Switch CTAs to waitlist capture when enrollment is unavailable.</p>
+          </div>
+          <Switch checked={enabled} onCheckedChange={(value) => { setEnabled(value); setDirty(true); }} />
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div>
+            <Label className="text-xs">Heading</Label>
+            <Input value={heading} onChange={(e) => { setHeading(e.target.value); setDirty(true); }} className="mt-1 text-sm" placeholder="Join the Waitlist" />
+          </div>
+          <div>
+            <Label className="text-xs">Body / Intro Text</Label>
+            <div className="mt-1">
+              <RichTextEditor value={body} onChange={(value) => { setBody(value); setDirty(true); }} />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Success Message</Label>
+            <div className="mt-1">
+              <RichTextEditor value={successMessage} onChange={(value) => { setSuccessMessage(value); setDirty(true); }} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label className="text-xs">CTA Button Label</Label>
+              <Input value={ctaLabel} onChange={(e) => { setCtaLabel(e.target.value); setDirty(true); }} className="mt-1 text-sm" placeholder="Join Waitlist" />
+            </div>
+            <div>
+              <Label className="text-xs">CTA Button URL</Label>
+              <Input value={ctaUrl} onChange={(e) => { setCtaUrl(e.target.value); setDirty(true); }} className="mt-1 text-sm" placeholder="https://…" />
+              <p className="mt-1 text-xs text-gray-400">If set, the CTA can link to this URL instead of opening the sign-up form.</p>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Post-Sign-Up Redirect URL</Label>
+            <Input value={redirectUrl} onChange={(e) => { setRedirectUrl(e.target.value); setDirty(true); }} className="mt-1 text-sm" placeholder="https://…" />
+            <p className="mt-1 text-xs text-gray-400">Leave blank to show the success message inline after the form is submitted.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saveMutation.isPending || !dirty} className="bg-teal-600 hover:bg-teal-700 text-white">
+          {saveMutation.isPending ? "Saving…" : "Save Waitlist Settings"}
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="pt-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900">Waitlist Sign-Ups</h4>
+              <p className="text-xs text-gray-500">{entries.length} total submissions for this cohort group.</p>
+            </div>
+          </div>
+          {entries.length === 0 ? (
+            <p className="py-4 text-sm text-gray-400 text-center">No sign-ups yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Name</TableHead>
+                  <TableHead className="text-xs">Email</TableHead>
+                  <TableHead className="text-xs">Phone</TableHead>
+                  <TableHead className="text-xs">Message</TableHead>
+                  <TableHead className="text-xs">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {entries.map((entry: any) => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="text-xs">{entry.name}</TableCell>
+                    <TableCell className="text-xs">{entry.email}</TableCell>
+                    <TableCell className="text-xs">{entry.phone ?? "—"}</TableCell>
+                    <TableCell className="max-w-xs text-xs truncate">{entry.message ?? "—"}</TableCell>
+                    <TableCell className="text-xs">{new Date(entry.createdAt).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function LMSPublishDomainSettings() {
   const { data: settings, isLoading, refetch } = trpc.lmsGroup.getPlatformSettings.useQuery();
   const { data: domainsData } = trpc.lmsAdmin.getCustomDomains.useQuery();

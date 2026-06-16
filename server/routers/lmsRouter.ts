@@ -96,6 +96,7 @@ import {
   userActivityLogs,
   lmsDefaultTeamTiers,
   lmsCohortRecordingProgress,
+  cohortWaitlistEntries,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
@@ -330,7 +331,7 @@ export const lmsPublicRouter = router({
 
       // Sections + preview lessons
       // Batch all sub-queries in parallel to avoid sequential round-trips
-      const [sections, allLessonsRaw, cis, landingPageRow, pricingOptions, cohortSessions] = await Promise.all([
+      const [sections, allLessonsRaw, cis, landingPageRow, pricingOptions, cohortSessions, cohortGroupsRaw] = await Promise.all([
         db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
         db.select({
           id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type,
@@ -359,6 +360,22 @@ export const lmsPublicRouter = router({
         }).from(lmsCohortSessions)
           .where(and(eq(lmsCohortSessions.courseId, course.id), eq(lmsCohortSessions.status, "published")))
           .orderBy(asc(lmsCohortSessions.sessionDate)),
+        // Cohort groups — for waitlist mode detection on the landing page
+        db.select({
+          id: lmsCohortGroups.id,
+          name: lmsCohortGroups.name,
+          status: lmsCohortGroups.status,
+          isFeaturedOnLanding: lmsCohortGroups.isFeaturedOnLanding,
+          enrollmentCloseDate: lmsCohortGroups.enrollmentCloseDate,
+          waitlistEnabled: lmsCohortGroups.waitlistEnabled,
+          waitlistHeading: lmsCohortGroups.waitlistHeading,
+          waitlistBody: lmsCohortGroups.waitlistBody,
+          waitlistCtaLabel: lmsCohortGroups.waitlistCtaLabel,
+          waitlistCtaUrl: lmsCohortGroups.waitlistCtaUrl,
+          waitlistRedirectUrl: lmsCohortGroups.waitlistRedirectUrl,
+          waitlistSuccessMessage: lmsCohortGroups.waitlistSuccessMessage,
+        }).from(lmsCohortGroups)
+          .where(and(eq(lmsCohortGroups.courseId, course.id), sql`${lmsCohortGroups.status} NOT IN ('archived', 'draft')`)),
       ]);
 
       // Group lessons by sectionId
@@ -388,8 +405,11 @@ export const lmsPublicRouter = router({
       }
 
       const landingPage = landingPageRow[0] ?? null;
+      // Determine featured cohort group and waitlist mode for the landing page
+      const featuredGroup = cohortGroupsRaw.find(g => g.isFeaturedOnLanding) ?? cohortGroupsRaw[0] ?? null;
+      const hasOpenGroup = cohortGroupsRaw.some(g => g.status === "open");
 
-      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions };
+      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions, featuredGroup, hasOpenGroup };
     }),
 
   /** Get instructor public profile */
@@ -649,6 +669,39 @@ export const lmsPublicRouter = router({
       if (!row) return { valid: false };
       if (row.accessExpiresAt < new Date()) return { valid: false, expired: true };
       return { valid: true };
+    }),
+
+  /** Join the waitlist for a cohort group */
+  joinCohortWaitlist: publicProcedure
+    .input(z.object({
+      cohortGroupId: z.number(),
+      courseId: z.number(),
+      name: z.string().min(1).max(255),
+      email: z.string().email(),
+      phone: z.string().optional(),
+      message: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Check for duplicate
+      const [existing] = await db.select({ id: cohortWaitlistEntries.id })
+        .from(cohortWaitlistEntries)
+        .where(and(
+          eq(cohortWaitlistEntries.cohortGroupId, input.cohortGroupId),
+          eq(cohortWaitlistEntries.email, input.email),
+        ))
+        .limit(1);
+      if (existing) return { success: true, alreadyRegistered: true };
+      await db.insert(cohortWaitlistEntries).values({
+        cohortGroupId: input.cohortGroupId,
+        courseId: input.courseId,
+        name: input.name,
+        email: input.email,
+        phone: input.phone ?? null,
+        message: input.message ?? null,
+      });
+      return { success: true, alreadyRegistered: false };
     }),
 });
 

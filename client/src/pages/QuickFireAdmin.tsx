@@ -878,7 +878,7 @@ export default function QuickFireAdmin() {
         { label: "Pediatric Echo", topic: "Pediatric echocardiography — congenital heart disease, septal defects, AVSD, tetralogy of Fallot, coarctation, pediatric valve assessment, post-surgical evaluation", category: "Pediatric Echo" as QuestionCategory },
         { label: "ACS", topic: "Acute coronary syndrome echo — regional wall motion abnormalities, RWMA patterns, ischemic MR, post-MI complications, stress echo interpretation, TIMI flow", category: "ACS" as QuestionCategory },
         { label: "Fetal Echo", topic: "Fetal echocardiography — four-chamber view, outflow tracts, fetal arrhythmias, CHD screening, ductal arch, venous connections, fetal cardiac function", category: "Fetal Echo" as QuestionCategory },
-        { label: "ECG", topic: "ECG interpretation in cardiac patients — ST changes, bundle branch blocks, arrhythmia recognition, LVH criteria, QT prolongation, pacemaker rhythms", category: "POCUS" as QuestionCategory },
+        { label: "ECG", topic: "ECG interpretation in cardiac patients — ST changes, bundle branch blocks, arrhythmia recognition, LVH criteria, QT prolongation, pacemaker rhythms", category: "ECG" as QuestionCategory },
         { label: "POCUS", topic: "Point-of-care cardiac ultrasound — bedside echo, RUSH protocol, IVC assessment, pericardial effusion, tamponade, LV function estimation, pleural effusion", category: "POCUS" as QuestionCategory },
         { label: "Physics", topic: "Ultrasound physics for echocardiography — Doppler principles, aliasing, beam width artifacts, harmonic imaging, transducer selection, temporal resolution, frame rate optimization", category: "Physics" as QuestionCategory },
       ];

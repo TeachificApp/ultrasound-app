@@ -964,7 +964,7 @@ export const quickfireQuestions = mysqlTable("quickfireQuestions", {
     "Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester",
     "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics",
     // iHeartEcho categories
-    "ACS", "Adult Echo", "Pediatric Echo", "General"
+    "ACS", "Adult Echo", "Pediatric Echo", "ECG", "General"
   ]).default("Abdominal"),
   // Whether this question is active and eligible for daily sets
   isActive: boolean("isActive").default(true).notNull(),
@@ -1136,7 +1136,7 @@ export const quickfireChallenges = mysqlTable("quickfireChallenges", {
     "Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester",
     "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics",
     // iHeartEcho categories
-    "ACS", "Adult Echo", "Pediatric Echo", "General"
+    "ACS", "Adult Echo", "Pediatric Echo", "ECG", "General"
   ]).default("Abdominal").notNull(),
   difficulty: mysqlEnum("difficulty", ["beginner", "intermediate", "advanced"]).default("intermediate"),
   // Lifecycle status — queued = in the auto-publish queue, waiting for its turn; trash = soft-deleted (purged after 30 days)
@@ -2243,7 +2243,7 @@ export const educatorCourses = mysqlTable("educatorCourses", {
   // Cover image
   coverImageUrl: text("coverImageUrl"),
   // Category alignment (mirrors quickfire categories)
-  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).default("Abdominal"),
+  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics", "Adult Echo", "Pediatric Echo", "ACS", "ECG", "General"]).default("Abdominal"),
   // Status
   status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
   // Ordering within the org
@@ -2349,7 +2349,7 @@ export const educatorCompetencies = mysqlTable("educatorCompetencies", {
   title: varchar("title", { length: 300 }).notNull(),
   description: text("description"),
   // Category alignment
-  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).default("Abdominal"),
+  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics", "Adult Echo", "Pediatric Echo", "ACS", "ECG", "General"]).default("Abdominal"),
   // Difficulty level: 1=Novice, 2=Advanced Beginner, 3=Competent, 4=Proficient, 5=Expert
   maxLevel: int("maxLevel").default(5).notNull(),
   // Whether this competency is required for certification/completion
@@ -2460,7 +2460,7 @@ export const educatorPresentations = mysqlTable("educatorPresentations", {
   // Cover image
   coverImageUrl: text("coverImageUrl"),
   // Category alignment
-  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).default("Abdominal").notNull(),
+  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics", "Adult Echo", "Pediatric Echo", "ACS", "ECG", "General"]).default("Abdominal").notNull(),
   status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -2505,7 +2505,7 @@ export const sonoQuizzes = mysqlTable("sonoQuizzes", {
   // Cover image URL (CDN)
   coverImageUrl: text("coverImageUrl"),
   // Category tag
-  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics", "General"]).default("General").notNull(),
+  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics", "Adult Echo", "Pediatric Echo", "ACS", "ECG", "General"]).default("General").notNull(),
   // Number of questions (denormalized for quick display)
   questionCount: int("questionCount").default(0).notNull(),
   status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
@@ -5545,6 +5545,14 @@ export const lmsCohortGroups = mysqlTable("lms_cohort_groups", {
   sortOrder: int("sort_order").default(0).notNull(),
   // How many days students retain access from group start date (null = indefinite)
   accessDurationDays: int("access_duration_days"),
+  // Waitlist settings
+  waitlistEnabled: boolean("waitlist_enabled").default(false).notNull(),
+  waitlistHeading: varchar("waitlist_heading", { length: 500 }),
+  waitlistBody: longtext("waitlist_body"),
+  waitlistCtaLabel: varchar("waitlist_cta_label", { length: 255 }),
+  waitlistCtaUrl: varchar("waitlist_cta_url", { length: 2048 }),
+  waitlistRedirectUrl: varchar("waitlist_redirect_url", { length: 2048 }),
+  waitlistSuccessMessage: longtext("waitlist_success_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -5563,6 +5571,19 @@ export const lmsCohortGroupEnrollments = mysqlTable("lms_cohort_group_enrollment
 });
 export type LmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferSelect;
 export type InsertLmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferInsert;
+
+// ─── Cohort Waitlist Entries ──────────────────────────────────────────────────
+export const cohortWaitlistEntries = mysqlTable("cohort_waitlist_entries", {
+  id: int("id").autoincrement().primaryKey(),
+  cohortGroupId: int("cohort_group_id").notNull(),
+  courseId: int("course_id").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  message: text("message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CohortWaitlistEntry = typeof cohortWaitlistEntries.$inferSelect;
 
 // ─── Cohort Group Messages ────────────────────────────────────────────────────
 export const lmsCohortMessages = mysqlTable("lms_cohort_messages", {
