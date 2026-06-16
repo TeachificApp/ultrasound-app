@@ -7866,7 +7866,7 @@ function ScormEmbedBlockSettings({ d, set, dataRef, onChangeRef }: {
 }
 
 // ─── Block Templates Tab (shared across all page builders) ──────────────────
-function LandingBlockTemplatesTab({ onInsert }: { onInsert: (block: Block) => void }) {
+export function LandingBlockTemplatesTab({ onInsert }: { onInsert: (block: Block) => void }) {
   const [search, setSearch] = useState("");
   const { data: templates, isLoading } = trpc.blockTemplates.list.useQuery({ search: search || undefined });
   const deleteMutation = trpc.blockTemplates.delete.useMutation({
