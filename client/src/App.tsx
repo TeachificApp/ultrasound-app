@@ -24,6 +24,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import { usePageViewTracker } from "./hooks/useAnalytics";
 import { useSsoConsumer } from "./hooks/useSsoConsumer";
 import { useCrossDomainSso } from "./hooks/useCrossDomainSso";
+import { useSsoBridge } from "./hooks/useSsoBridge";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import { perBrandAdminRouteElements, perBrandUserRouteElements } from "./routes/perBrandRouteHelpers";
 
@@ -49,6 +50,7 @@ const Premium = lazy(() => import("./pages/Premium"));
 // ── LMS — LMS Management ─────────────────────────────────────────────────
 const Checkout = lazy(() => import("./pages/Checkout"));
 const CheckoutComplete = lazy(() => import("./pages/CheckoutComplete"));
+const WorkshopCheckout = lazy(() => import("./pages/WorkshopCheckout"));
 const EducationLibrary = lazy(() => import("./pages/EducationLibrary"));
 const LMSHome = lazy(() => import("./pages/LMSHome"));
 const CollectionDetail = lazy(() => import("./pages/CollectionDetail"));
@@ -75,6 +77,7 @@ const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
 // ── Workshops ────────────────────────────────────────────────────────────────
 const WorkshopsBrowse = lazy(() => import("./pages/WorkshopsBrowse"));
 const WorkshopDetail = lazy(() => import("./pages/WorkshopDetail"));
+const WorkshopLanding = lazy(() => import("./pages/WorkshopLanding"));
 const DownloadLanding = lazy(() => import("./pages/DownloadLanding"));
 const DownloadFiles = lazy(() => import("./pages/DownloadFiles"));
 const DownloadLandingPageBuilder = lazy(() => import("./pages/admin/DownloadLandingPageBuilder"));
@@ -214,6 +217,11 @@ const SonoQuizCreator = lazy(() => import("./pages/SonoQuizCreator"));
 const SonoQuizHost = lazy(() => import("./pages/SonoQuizHost"));
 const SonoQuizPlay = lazy(() => import("./pages/SonoQuizPlay"));
 const ImageQualityReview = lazy(() => import("./pages/ImageQualityReview"));
+// ── Standalone Quiz Creator ───────────────────────────────────────────────────
+const QuizCreatorAdmin = lazy(() => import("./pages/admin/QuizCreatorAdmin"));
+const StandaloneQuizPlayer = lazy(() => import("./pages/StandaloneQuizPlayer"));
+const StandaloneQuizResults = lazy(() => import("./pages/StandaloneQuizResults"));
+const StudentQuizDashboard = lazy(() => import("./pages/StudentQuizDashboard"));
 
 // ── DIY Accreditation™ (hidden, backend use) ──────────────────────────────────
 const DIYMemberPortal = lazy(() => import("./pages/DIYMemberPortal"));
@@ -555,6 +563,12 @@ function Router() {
         <Route path="/admin/sonoquiz/host/:sessionId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizHost /></RoleGuard>}</Route>
         <Route path="/quiz/:joinCode">{() => <SonoQuizPlay />}</Route>
         <Route path="/image-quality-review">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ImageQualityReview /></RoleGuard>}</Route>
+        {/* ── Standalone Quiz Creator ────────────────────────────────────────────────── */}
+        <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
+        <Route path="/quizzes/:quizId">{() => <StandaloneQuizPlayer />}</Route>
+        <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
+        <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
 
         {/* ── DIY Accreditation™ (hidden backend) ───────────────────────── */}
         <Route path="/diy-accreditation-plans" component={DIYAccreditationPlans} />
@@ -596,6 +610,7 @@ function Router() {
 function MembersRouter() {
   usePageViewTracker();
   useSsoConsumer();
+  useSsoBridge();   // Redirect-based SSO fallback when img-tag ping was blocked
   useCrossDomainSso();
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
@@ -653,6 +668,11 @@ function MembersRouter() {
       <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/sonoquiz/host/:sessionId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SonoQuizHost /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/sonoquiz">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SonoQuizCreator /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
+      <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
+      <Route path="/quizzes/:quizId">{() => <StandaloneQuizPlayer />}</Route>
+      <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
+      <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
       <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><DownloadLandingPageBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductLandingPageBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
@@ -722,6 +742,9 @@ function LMSRouter() {
       <Route path="/checkout/complete">
         <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
       </Route>
+      <Route path="/checkout/workshop/:slug">
+        <Suspense fallback={pageFallback}><WorkshopCheckout /></Suspense>
+      </Route>
       <Route path="/checkout/:slug">
         <Suspense fallback={pageFallback}><Checkout /></Suspense>
       </Route>
@@ -770,7 +793,7 @@ function LMSRouter() {
 
         {/* Workshops */}
         <Route path="/workshops" component={WorkshopsBrowse} />
-        <Route path="/workshops/:slug" component={WorkshopDetail} />
+        <Route path="/workshops/:slug" component={WorkshopLanding} />
         <Route path="/bundles/:slug" component={BundleLanding} />
 
         {/* ── Career Network ─────────────────────────────────────────────── */}
@@ -845,6 +868,7 @@ function LMSRouter() {
 function IHeartEchoRouter() {
   usePageViewTracker();
   useSsoConsumer(); // Exchange ?sso=TOKEN for a session cookie on arrival from AAU
+  useSsoBridge();   // Redirect-based SSO fallback when img-tag ping was blocked
   useCrossDomainSso(); // Silently sign user into all other domains as free member
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
@@ -1024,6 +1048,9 @@ function IHeartEchoRouter() {
         <Route path="/checkout/complete">
           <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
         </Route>
+        <Route path="/checkout/workshop/:slug">
+          <Suspense fallback={pageFallback}><WorkshopCheckout /></Suspense>
+        </Route>
         <Route path="/checkout/:slug">
           <Suspense fallback={pageFallback}><Checkout /></Suspense>
         </Route>
@@ -1031,6 +1058,9 @@ function IHeartEchoRouter() {
         <Route path="/my-memberships/:slug">{() => <Suspense fallback={pageFallback}><MyMemberships /></Suspense>}</Route>
         <Route path="/my-memberships">{() => <Suspense fallback={pageFallback}><MyMemberships /></Suspense>}</Route>
         <Route path="/quiz/:joinCode">{() => <SonoQuizPlay />}</Route>
+        <Route path="/quizzes/:quizId">{() => <StandaloneQuizPlayer />}</Route>
+        <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
+        <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
         <Route path="/community" component={CommunityHub} />
         <Route path="/community/:slug" component={CommunityFeed} />
         <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
@@ -1152,6 +1182,8 @@ function UpgradePromptWrapper() {
  */
 function AccreditationDivisionRouter() {
   usePageViewTracker();
+  useSsoConsumer(); // Exchange ?sso=TOKEN for a session cookie on arrival
+  useSsoBridge();   // Redirect-based SSO fallback when img-tag ping was blocked
   useCrossDomainSso(); // Silently sign user into all other domains as free member
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">

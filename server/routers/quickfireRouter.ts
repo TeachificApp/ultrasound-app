@@ -2436,23 +2436,26 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         ids.forEach((id) => allUsedIds.add(id));
       }
       const conflicts = input.questionIds.filter((qid) => allUsedIds.has(qid));
-      if (conflicts.length > 0) {
+      // Skip duplicates rather than failing the whole batch — only add non-conflicting questions
+      const nonConflictIds = input.questionIds.filter((qid) => !allUsedIds.has(qid));
+
+      if (nonConflictIds.length === 0) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: `${conflicts.length} question(s) are already in the active challenge queue. Remove duplicates and try again. Conflicting IDs: ${conflicts.join(", ")}`,
+          message: `All ${conflicts.length} selected question(s) are already in the active challenge queue. Conflicting IDs: ${conflicts.join(", ")}`,
         });
       }
 
-      // Fetch all requested questions
+      // Fetch all non-duplicate questions
       const qs = await db
         .select()
         .from(quickfireQuestions)
-        .where(inArray(quickfireQuestions.id, input.questionIds));
+        .where(inArray(quickfireQuestions.id, nonConflictIds));
 
       if (qs.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "No valid questions found" });
 
-      // Preserve the order the admin selected them in
-      const ordered = input.questionIds
+      // Preserve the order the admin selected them in (excluding duplicates)
+      const ordered = nonConflictIds
         .map((id) => qs.find((q) => q.id === id))
         .filter(Boolean) as typeof qs;
 
@@ -2489,7 +2492,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
           .where(inArray(quickfireQuestions.id, ordered.map((q) => q.id)));
       }
 
-      return { added: results.length, ids: results };
+      return { added: results.length, ids: results, skipped: conflicts.length, skippedIds: conflicts };
     }),
 
   /**

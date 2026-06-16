@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
+import { SdmsCmeConfigPanel, resolveWebinarActivityType } from "@/components/admin/SdmsCmeConfigPanel";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function fmtDate(ts: number | null | undefined) {

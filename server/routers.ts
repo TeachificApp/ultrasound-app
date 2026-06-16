@@ -57,6 +57,7 @@ import { productAnalyticsRouter } from "./routers/productAnalyticsRouter";
 import { sdmsCmeRouter } from "./routers/sdmsCmeRouter";
 import { widgetAdminRouter, widgetPublicRouter } from "./routers/widgetRouter";
 import { workshopPublicRouter, workshopLearnerRouter, workshopAdminRouter } from "./routers/workshopRouter";
+import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuizAdminRouter } from "./routers/standaloneQuizRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -2663,6 +2664,10 @@ export const appRouter = router({
   }),
 
   // ── Mirror Sync (admin only) ──────────────────────────────────────────────
+  // ─── Standalone Quiz Creator ────────────────────────────────────────────────
+  standaloneQuiz: standaloneQuizPublicRouter,
+  standaloneQuizLearner: standaloneQuizLearnerRouter,
+  standaloneQuizAdmin: standaloneQuizAdminRouter,
   mirrorSync: router({
     /** Get the status of the last mirror sync run */
     status: protectedProcedure.query(async ({ ctx }) => {

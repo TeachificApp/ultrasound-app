@@ -11,7 +11,6 @@ import {
   Briefcase, MapPin, Calendar, Clock, Users, ChevronRight,
   CheckCircle, ArrowLeft, Globe, Video, Building2
 } from "lucide-react";
-import LMSLayout from "@/components/LMSLayout";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 
@@ -107,34 +106,30 @@ export default function WorkshopDetail() {
 
   if (isLoading) {
     return (
-      <LMSLayout>
-        <div className="max-w-4xl mx-auto px-4 py-12 space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
-        </div>
-      </LMSLayout>
+      <div className="max-w-4xl mx-auto px-4 py-12 space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-6 w-3/4" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+      </div>
     );
   }
 
   if (error || !data) {
     return (
-      <LMSLayout>
-        <div className="max-w-4xl mx-auto px-4 py-20 text-center">
-          <Briefcase className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Workshop Not Found</h1>
-          <p className="text-gray-500 mb-6">
-            This workshop may have been removed or is no longer available.
-          </p>
-          <Link href="/workshops">
-            <Button variant="outline">
-              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Workshops
-            </Button>
-          </Link>
-        </div>
-      </LMSLayout>
+      <div className="max-w-4xl mx-auto px-4 py-20 text-center">
+        <Briefcase className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Workshop Not Found</h1>
+        <p className="text-gray-500 mb-6">
+          This workshop may have been removed or is no longer available.
+        </p>
+        <Link href="/workshops">
+          <Button variant="outline">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Workshops
+          </Button>
+        </Link>
+      </div>
     );
   }
 
@@ -145,8 +140,7 @@ export default function WorkshopDetail() {
     : null;
 
   return (
-    <LMSLayout>
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
         {/* Breadcrumb */}
         <div className="max-w-5xl mx-auto px-4 pt-6">
           <nav className="flex items-center gap-2 text-sm text-gray-500">
@@ -295,7 +289,6 @@ export default function WorkshopDetail() {
             </div>
           </div>
         </div>
-      </div>
-    </LMSLayout>
+    </div>
   );
 }

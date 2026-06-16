@@ -28,6 +28,8 @@
  */
 import type { Express, Request, Response } from "express";
 import { eq, and, isNull, gt } from "drizzle-orm";
+import * as crypto from "crypto";
+import { parse as parseCookieHeader } from "cookie";
 import { getDb } from "../db";
 import { ssoTokens, users } from "../../drizzle/schema";
 import { getSessionCookieOptions } from "../_core/cookies";
@@ -203,5 +205,89 @@ export function registerSsoAutoRoute(app: Express) {
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     }
     res.sendStatus(204);
+  });
+
+  /**
+   * GET /api/sso/bridge?return=<url>
+   *
+   * Redirect-based SSO bridge. Called by a secondary domain (e.g. app.iheartecho.com)
+   * when the user is not logged in. The browser is redirected here (to the primary domain
+   * app.allaboutultrasound.com), which checks the session cookie and either:
+   *   - Issues a short-lived SSO token and redirects back to ?return= URL with ?sso=TOKEN appended
+   *   - Redirects back to ?return= URL unchanged (no token) if not authenticated
+   *
+   * This works because it's a full-page redirect — the browser sends the first-party
+   * session cookie with the request, bypassing 3rd-party cookie restrictions entirely.
+   *
+   * Security: The ?return= URL is validated against the known app domains whitelist
+   * to prevent open redirect attacks.
+   */
+  app.get("/api/sso/bridge", async (req: Request, res: Response) => {
+    const returnUrl = req.query.return as string | undefined;
+
+    // Validate the return URL to prevent open redirect attacks
+    const isValidReturnUrl = (url: string): boolean => {
+      try {
+        const parsed = new URL(url);
+        const host = parsed.hostname;
+        if (ALLOWED_COOKIE_DOMAINS.has(host)) return true;
+        if (host.endsWith(".manus.space") || host.endsWith(".manus.computer")) return true;
+        if (host === "localhost" || host === "127.0.0.1") return true;
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    if (!returnUrl || !isValidReturnUrl(returnUrl)) {
+      // Invalid or missing return URL — redirect to home
+      return res.redirect("/");
+    }
+
+    // Try to authenticate the request using the session cookie
+    try {
+      const cookieHeader = req.headers.cookie;
+      const cookies = cookieHeader
+        ? new Map(Object.entries(parseCookieHeader(cookieHeader)))
+        : new Map<string, string>();
+      const sessionCookie = cookies.get(COOKIE_NAME);
+      const session = sessionCookie ? await sdk.verifySession(sessionCookie) : null;
+
+      if (!session) {
+        // Not authenticated — redirect back without a token
+        console.log(`[SsoBridge] No session, redirecting back to ${returnUrl}`);
+        return res.redirect(returnUrl);
+      }
+
+      // Authenticated — look up user and issue a short-lived SSO token
+      const db = await getDb();
+      if (!db) return res.redirect(returnUrl);
+
+      const [user] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.openId, session.openId))
+        .limit(1);
+
+      if (!user) return res.redirect(returnUrl);
+
+      const token = crypto.randomBytes(48).toString("hex");
+      const expiresAt = new Date(Date.now() + 60_000); // 60-second TTL
+      await db.insert(ssoTokens).values({ token, userId: user.id, expiresAt });
+
+      // Append ?sso=TOKEN to the return URL
+      const redirectUrl = new URL(returnUrl);
+      redirectUrl.searchParams.set("sso", token);
+
+      console.log(
+        `[SsoBridge] Issued SSO token for user ${user.id}` +
+        ` | return=${returnUrl}`
+      );
+      return res.redirect(redirectUrl.toString());
+    } catch (err) {
+      console.error("[SsoBridge] Error:", err);
+      // Fall through — redirect back without a token
+      return res.redirect(returnUrl);
+    }
   });
 }

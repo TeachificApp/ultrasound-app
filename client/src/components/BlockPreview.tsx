@@ -90,7 +90,8 @@ export type BlockType =
   | "webinar_agenda"
   | "conditional_text"
   | "sdms_cme_module"
-  | "enrollment_counter";
+  | "enrollment_counter"
+  | "quiz_embed";
 
 export interface Block {
   id: string;
@@ -1639,6 +1640,23 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
 
     case "enrollment_counter":
       return <EnrollmentCounterBlockPreview d={d} />;
+    case "quiz_embed": {
+      const quizId = d.quizId ? Number(d.quizId) : null;
+      if (!quizId) {
+        return (
+          <div className="px-6 py-8 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-center">
+            <svg className="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+            <p className="text-sm text-gray-400">No quiz selected. Edit this block to choose a quiz.</p>
+          </div>
+        );
+      }
+      const EmbeddedQuizPlayer = React.lazy(() => import("./EmbeddedQuizPlayer"));
+      return (
+        <React.Suspense fallback={<div className="flex items-center justify-center py-8 text-gray-400"><svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Loading quiz…</div>}>
+          <EmbeddedQuizPlayer quizId={quizId} showHeader={d.showHeader !== false} />
+        </React.Suspense>
+      );
+    }
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }

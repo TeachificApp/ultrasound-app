@@ -413,6 +413,7 @@ export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion
 BLOCK_CATALOG.push(
   { type: "lesson_quiz", label: "Lesson Quiz", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, category: "Content", defaultData: { title: "Knowledge Check", questions: [], showExplanations: true, passingScore: 70, shuffleQuestions: false } },
   { type: "lesson_flashcard", label: "Flashcard Deck", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, category: "Content", defaultData: { title: "Review Flashcards", cards: [], shuffleCards: true, showHints: true } },
+  { type: "quiz_embed", label: "Quiz Embed", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, category: "Content", defaultData: { quizId: null, showHeader: true } },
   { type: "scorm_embed", label: "SCORM / HTML Package", icon: <Package size={14} />, category: "Content",
     defaultData: { mediaAssetId: null, mediaAssetSlug: "", mediaAssetTitle: "", title: "", caption: "", height: 600, bgColor: "#ffffff" } },
   { type: "url_embed", label: "URL / iFrame Embed", icon: <Globe size={14} />, category: "Content",
@@ -4850,6 +4851,8 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           }}
         />
       );
+    case "quiz_embed":
+      return <QuizEmbedBlockSettings d={d} set={set} />;
     case "file_download": {
       return <FileDownloadBlockSettings d={d} set={set} setMany={setMany} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
     }
@@ -8896,3 +8899,54 @@ function UpgradePromptBlockSettings({ d, set }: { d: Record<string, any>; set: (
   );
 }
 
+
+// ─── Quiz Embed Block Settings ─────────────────────────────────────────────────
+function QuizEmbedBlockSettings({ d, set }: { d: Record<string, any>; set: (key: string, value: any) => void }) {
+  const { data: quizzesData, isLoading } = trpc.standaloneQuizAdmin.listQuizzes.useQuery(
+    { status: "published", pageSize: 100 },
+    { staleTime: 30_000 }
+  );
+  const quizzes = quizzesData?.quizzes ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs font-semibold text-gray-700 block mb-1">Select Quiz</label>
+        <p className="text-xs text-gray-400 mb-2">Only published quizzes are shown. The quiz will render inline for enrolled students.</p>
+        {isLoading ? (
+          <div className="h-8 bg-gray-100 rounded animate-pulse" />
+        ) : (
+          <select
+            value={d.quizId ?? ""}
+            onChange={e => set("quizId", e.target.value ? Number(e.target.value) : null)}
+            className="w-full h-8 text-xs border border-gray-200 rounded px-2"
+          >
+            <option value="">— Select a quiz —</option>
+            {quizzes.map((q: any) => (
+              <option key={q.quiz.id} value={q.quiz.id}>
+                {q.quiz.title} ({q.questionCount} Qs)
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="qe-show-header"
+          checked={d.showHeader !== false}
+          onChange={e => set("showHeader", e.target.checked)}
+          className="w-3.5 h-3.5 rounded"
+        />
+        <label htmlFor="qe-show-header" className="text-xs text-gray-600">Show quiz title header</label>
+      </div>
+
+      {d.quizId && (
+        <div className="bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 text-xs text-teal-700">
+          Quiz ID {d.quizId} selected. Students will see the full interactive quiz inline on this page.
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, asc, desc, eq, gt, gte, lte, or, sql, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, like, lte, or, sql, isNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { syncStripeProduct } from "../stripeSync";
@@ -491,23 +491,31 @@ export const workshopAdminRouter = router({
       z.object({
         search: z.string().optional(),
         status: z.string().optional(),
-        limit: z.number().default(50),
-        offset: z.number().default(0),
+        // Support both page/pageSize (client) and limit/offset (legacy)
+        page: z.number().default(1),
+        pageSize: z.number().default(20),
+        limit: z.number().optional(),
+        offset: z.number().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const limit = input.limit ?? input.pageSize;
+      const offset = input.offset ?? (input.page - 1) * limit;
       const conditions: any[] = [];
       if (input.status) conditions.push(eq(workshops.status, input.status as any));
-      const rows = await db
-        .select()
-        .from(workshops)
-        .where(conditions.length ? and(...conditions) : undefined)
-        .orderBy(desc(workshops.createdAt))
-        .limit(input.limit)
-        .offset(input.offset);
-      return rows;
+      if (input.search) conditions.push(like(workshops.title, `%${input.search}%`));
+      const [rows, countRows] = await Promise.all([
+        db.select().from(workshops)
+          .where(conditions.length ? and(...conditions) : undefined)
+          .orderBy(desc(workshops.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` }).from(workshops)
+          .where(conditions.length ? and(...conditions) : undefined),
+      ]);
+      return { workshops: rows, total: Number(countRows[0]?.count ?? 0) };
     }),
 
   /** Get a single workshop by id */
@@ -553,7 +561,7 @@ export const workshopAdminRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const result = await db.insert(workshops).values({
+      const [ins] = await db.insert(workshops).values({
         slug: input.slug,
         title: input.title,
         subtitle: input.subtitle,
@@ -571,8 +579,8 @@ export const workshopAdminRouter = router({
         hidePricingOptions: false,
         customThankYouEnabled: false,
         welcomeEmailEnabled: true,
-      });
-      return { id: (result as any).insertId };
+      }).$returningId();
+      return { id: ins.id };
     }),
 
   /** Update workshop settings */
@@ -678,7 +686,7 @@ export const workshopAdminRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const result = await db.insert(workshopInstances).values({
+      const [ins] = await db.insert(workshopInstances).values({
         workshopId: input.workshopId,
         title: input.title,
         description: input.description,
@@ -701,8 +709,8 @@ export const workshopAdminRouter = router({
         salesOpenDate: input.salesOpenDate ? new Date(input.salesOpenDate) : undefined,
         status: input.status,
         enrolledCount: 0,
-      });
-      return { id: (result as any).insertId };
+      }).$returningId();
+      return { id: ins.id };
     }),
 
   /** Update a workshop instance */
@@ -780,7 +788,7 @@ export const workshopAdminRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const result = await db.insert(workshopResources).values({
+      const [ins] = await db.insert(workshopResources).values({
         workshopId: input.workshopId,
         instanceId: input.instanceId ?? undefined,
         title: input.title,
@@ -793,8 +801,8 @@ export const workshopAdminRouter = router({
         fileName: input.fileName,
         status: input.status,
         position: input.position,
-      });
-      return { id: (result as any).insertId };
+      }).$returningId();
+      return { id: ins.id };
     }),
 
   /** Update a workshop resource */

@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Briefcase, Search, MapPin, Calendar, Clock, Users } from "lucide-react";
-import LMSLayout from "@/components/LMSLayout";
 import { format } from "date-fns";
 
 function WorkshopCard({ workshop }: { workshop: any }) {
@@ -95,19 +94,18 @@ export default function WorkshopsBrowse() {
   });
 
   return (
-    <LMSLayout>
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
         {/* Hero */}
-        <div className="bg-gradient-to-br from-teal-600 to-cyan-700 text-white py-14 px-4">
+        <div className="teal-header py-12 px-4">
           <div className="max-w-5xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 text-sm font-medium mb-4">
               <Briefcase className="w-4 h-4" />
               Hands-On Workshops
             </div>
-            <h1 className="text-4xl font-bold mb-3">Ultrasound Workshops</h1>
-            <p className="text-teal-100 text-lg max-w-2xl mx-auto">
+            <h1 className="text-3xl font-bold mb-2">Ultrasound Workshops</h1>
+            <p className="text-teal-100 text-base max-w-2xl mx-auto">
               Immersive, hands-on training experiences led by expert sonographers.
-              Earn CME credits and advance your clinical skills.
+              Build confidence, sharpen your technique, and advance your clinical skills.
             </p>
           </div>
         </div>
@@ -160,7 +158,6 @@ export default function WorkshopsBrowse() {
             </>
           )}
         </div>
-      </div>
-    </LMSLayout>
+    </div>
   );
 }

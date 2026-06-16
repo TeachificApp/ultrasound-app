@@ -868,7 +868,30 @@ export default function QuickFireAdmin() {
   const [aiMixedPreview, setAiMixedPreview] = useState<Array<{ type: string; question: any }>>([]);
   const [aiMixedSelected, setAiMixedSelected] = useState<Set<number>>(new Set());
   const [aiMixedImporting, setAiMixedImporting] = useState(false);
-  const [aiCategory, setAiCategory] = useState<QuestionCategory>("Abdominal");
+  const [aiCategory, setAiCategory] = useState<QuestionCategory>(() => defaultCategory as QuestionCategory);
+
+  // Brand-aware preset topics for the AI generator dialog
+  const aiPresetTopics = useMemo(() => {
+    if (adminBrand === "iheartecho") {
+      return [
+        { label: "Adult Echo", topic: "Adult echocardiography — LV/RV function, wall motion abnormalities, diastolic dysfunction grading, valvular disease assessment, pericardial effusion, cardiomyopathy", category: "Adult Echo" as QuestionCategory },
+        { label: "Pediatric Echo", topic: "Pediatric echocardiography — congenital heart disease, septal defects, AVSD, tetralogy of Fallot, coarctation, pediatric valve assessment, post-surgical evaluation", category: "Pediatric Echo" as QuestionCategory },
+        { label: "ACS", topic: "Acute coronary syndrome echo — regional wall motion abnormalities, RWMA patterns, ischemic MR, post-MI complications, stress echo interpretation, TIMI flow", category: "ACS" as QuestionCategory },
+        { label: "Fetal Echo", topic: "Fetal echocardiography — four-chamber view, outflow tracts, fetal arrhythmias, CHD screening, ductal arch, venous connections, fetal cardiac function", category: "Fetal Echo" as QuestionCategory },
+        { label: "ECG", topic: "ECG interpretation in cardiac patients — ST changes, bundle branch blocks, arrhythmia recognition, LVH criteria, QT prolongation, pacemaker rhythms", category: "POCUS" as QuestionCategory },
+        { label: "POCUS", topic: "Point-of-care cardiac ultrasound — bedside echo, RUSH protocol, IVC assessment, pericardial effusion, tamponade, LV function estimation, pleural effusion", category: "POCUS" as QuestionCategory },
+        { label: "Physics", topic: "Ultrasound physics for echocardiography — Doppler principles, aliasing, beam width artifacts, harmonic imaging, transducer selection, temporal resolution, frame rate optimization", category: "Physics" as QuestionCategory },
+      ];
+    }
+    return [
+      { label: "Abdominal", topic: "Abdominal ultrasound — liver, gallbladder, pancreas, spleen, kidneys, aorta, Doppler assessment, pathology identification", category: "Abdominal" as QuestionCategory },
+      { label: "Small Parts", topic: "Small parts ultrasound — thyroid nodule characterization, TIRADS scoring, parathyroid, scrotal/testicular assessment, lymph node evaluation, salivary glands", category: "Small Parts" as QuestionCategory },
+      { label: "OB/Gyn", topic: "OB & gynecologic ultrasound — uterine pathology, ovarian cysts, fibroids, endometrial assessment, 1st/2nd/3rd trimester OB, fetal biometry, placenta, fetal echo, CHD screening", category: "OB/Gyn" as QuestionCategory },
+      { label: "Vascular", topic: "Vascular ultrasound — DVT diagnosis, arterial duplex, carotid stenosis, ABI, renal artery stenosis, aortic aneurysm, Doppler waveform analysis", category: "Vascular" as QuestionCategory },
+      { label: "MSK", topic: "MSK ultrasound — tendon pathology, rotator cuff tears, joint effusions, nerve entrapment, dynamic assessment, guided injections", category: "MSK" as QuestionCategory },
+      { label: "POCUS", topic: "Point-of-care ultrasound (POCUS) — eFAST, RUSH protocol, lung POCUS, IVC assessment, pleural effusion, bedside assessment", category: "POCUS" as QuestionCategory },
+    ];
+  }, [adminBrand, defaultCategory]);
 
   // Challenge form question picker search
   const [challengeQSearch, setChallengeQSearch] = useState("");
@@ -986,7 +1009,14 @@ export default function QuickFireAdmin() {
 
   const batchApproveToQueueMutation = trpc.quickfire.adminBatchApproveToQueue.useMutation({
     onSuccess: (data: any) => {
-      toast.success(`${data.queued} question${data.queued !== 1 ? "s" : ""} added to the queue.`);
+      const added = data.added ?? data.queued ?? 0;
+      const skipped = data.skipped ?? 0;
+      if (skipped > 0) {
+        toast.success(`${added} question${added !== 1 ? "s" : ""} added to the queue.`);
+        toast.warning(`${skipped} duplicate${skipped !== 1 ? "s" : ""} skipped — already in the active queue. (IDs: ${(data.skippedIds ?? []).join(", ")})`);
+      } else {
+        toast.success(`${added} question${added !== 1 ? "s" : ""} added to the queue.`);
+      }
       setBulkSelected(new Set());
       setBulkMode(false);
       setBulkSchedulerOpen(false);
@@ -3190,14 +3220,7 @@ export default function QuickFireAdmin() {
               <div>
                 <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Clinical Topic <span className="text-red-500">*</span></label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {[
-                    { label: "Abdominal", topic: "Abdominal ultrasound — liver, gallbladder, pancreas, spleen, kidneys, aorta, Doppler assessment, pathology identification", category: "Abdominal" as QuestionCategory },
-                    { label: "Small Parts", topic: "Small parts ultrasound — thyroid nodule characterization, TIRADS scoring, parathyroid, scrotal/testicular assessment, lymph node evaluation, salivary glands", category: "Small Parts" as QuestionCategory },
-                    { label: "OB/Gyn", topic: "OB & gynecologic ultrasound — uterine pathology, ovarian cysts, fibroids, endometrial assessment, 1st/2nd/3rd trimester OB, fetal biometry, placenta, fetal echo, CHD screening", category: "OB/Gyn" as QuestionCategory },
-                    { label: "Vascular", topic: "Vascular ultrasound — DVT diagnosis, arterial duplex, carotid stenosis, ABI, renal artery stenosis, aortic aneurysm, Doppler waveform analysis", category: "Vascular" as QuestionCategory },
-                    { label: "MSK", topic: "MSK ultrasound — tendon pathology, rotator cuff tears, joint effusions, nerve entrapment, dynamic assessment, guided injections", category: "MSK" as QuestionCategory },
-                    { label: "POCUS", topic: "Point-of-care ultrasound (POCUS) — eFAST, RUSH protocol, lung POCUS, IVC assessment, pleural effusion, bedside assessment", category: "POCUS" as QuestionCategory },
-                  ].map(({ label, topic, category }) => (
+                  {aiPresetTopics.map(({ label, topic, category }) => (
                     <button
                       key={label}
                       type="button"
@@ -3215,7 +3238,7 @@ export default function QuickFireAdmin() {
                 <RichTextEditor
                   value={aiTopic}
                   onChange={setAiTopic}
-                  placeholder="e.g. DVT diagnosis criteria, abdominal aorta aneurysm, hepatic Doppler assessment..."
+                  placeholder={adminBrand === "iheartecho" ? "e.g. LV diastolic dysfunction grading, aortic stenosis severity, RWMA patterns in ACS..." : "e.g. DVT diagnosis criteria, abdominal aorta aneurysm, hepatic Doppler assessment..."}
                   minHeight={70}
                 />
               </div>

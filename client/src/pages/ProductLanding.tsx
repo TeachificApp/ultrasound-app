@@ -378,7 +378,29 @@ export default function ProductLanding() {
     );
   }
 
+  // Workshop redirect: if the physical product is not found or archived, check if there's a workshop with the same slug
+  const workshopCheckQuery = trpc.workshop.getBySlug.useQuery(
+    { slug: slug! },
+    { enabled: !!slug && (!!error || (!!product && product.status === "archived")), retry: false }
+  );
+  useEffect(() => {
+    if (workshopCheckQuery.data?.workshop) {
+      const search = window.location.search;
+      window.location.replace(`/workshops/${slug}${search}`);
+    }
+  }, [workshopCheckQuery.data]);
+
   if (error || !product) {
+    if (workshopCheckQuery.isLoading) {
+      return (
+        <div className="min-h-screen bg-gray-50 py-12">
+          <div className="max-w-4xl mx-auto px-4 space-y-6">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-64 rounded-xl" />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

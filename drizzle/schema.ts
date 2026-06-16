@@ -6834,3 +6834,75 @@ export const productAddonItems = mysqlTable("product_addon_items", {
 });
 export type ProductAddonItem = typeof productAddonItems.$inferSelect;
 export type InsertProductAddonItem = typeof productAddonItems.$inferInsert;
+
+// ─── Standalone Quizzes ───────────────────────────────────────────────────────
+// Quiz Creator tool: standalone quizzes and mock exams that wrap the question bank.
+// quiz = immediate feedback per question; mock_exam = no feedback until submitted.
+
+export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: longtext("description"),
+  type: mysqlEnum("type", ["quiz", "mock_exam"]).default("quiz").notNull(),
+  passingScore: int("passing_score").default(70).notNull(),
+  timeLimitMinutes: int("time_limit_minutes"),
+  shuffleQuestions: boolean("shuffle_questions").default(false).notNull(),
+  shuffleAnswers: boolean("shuffle_answers").default(false).notNull(),
+  showResultsImmediately: boolean("show_results_immediately").default(true).notNull(),
+  showResultsAfterDate: timestamp("show_results_after_date"),
+  showExplanations: boolean("show_explanations").default(true).notNull(),
+  allowRetakes: boolean("allow_retakes").default(true).notNull(),
+  maxAttempts: int("max_attempts"),
+  accessType: mysqlEnum("access_type", ["public", "enrolled", "members_only"]).default("enrolled").notNull(),
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  coverImageUrl: text("cover_image_url"),
+  instructions: longtext("instructions"),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type StandaloneQuiz = typeof standaloneQuizzes.$inferSelect;
+export type InsertStandaloneQuiz = typeof standaloneQuizzes.$inferInsert;
+
+// Junction table: which question_bank items are in a standalone quiz
+export const standaloneQuizQuestions = mysqlTable("standalone_quiz_questions", {
+  id: int("id").autoincrement().primaryKey(),
+  quizId: int("quiz_id").notNull(),
+  questionBankId: int("question_bank_id").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  points: int("points").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type StandaloneQuizQuestion = typeof standaloneQuizQuestions.$inferSelect;
+
+// Attempt: one per user per quiz attempt
+export const standaloneQuizAttempts = mysqlTable("standalone_quiz_attempts", {
+  id: int("id").autoincrement().primaryKey(),
+  quizId: int("quiz_id").notNull(),
+  userId: int("user_id").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  score: decimal("score", { precision: 5, scale: 2 }),
+  passed: boolean("passed"),
+  totalQuestions: int("total_questions").default(0).notNull(),
+  correctAnswers: int("correct_answers").default(0).notNull(),
+  totalPoints: int("total_points").default(0).notNull(),
+  earnedPoints: int("earned_points").default(0).notNull(),
+  timeSpentSeconds: int("time_spent_seconds"),
+  attemptNumber: int("attempt_number").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type StandaloneQuizAttempt = typeof standaloneQuizAttempts.$inferSelect;
+
+// Per-question answers within an attempt
+export const standaloneQuizAttemptAnswers = mysqlTable("standalone_quiz_attempt_answers", {
+  id: int("id").autoincrement().primaryKey(),
+  attemptId: int("attempt_id").notNull(),
+  questionId: int("question_id").notNull(), // FK → question_bank.id
+  givenAnswer: longtext("given_answer"),    // JSON string
+  isCorrect: boolean("is_correct"),
+  timeSpentSeconds: int("time_spent_seconds"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type StandaloneQuizAttemptAnswer = typeof standaloneQuizAttemptAnswers.$inferSelect;
