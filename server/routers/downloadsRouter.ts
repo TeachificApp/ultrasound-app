@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, sql, asc, or, like } from "drizzle-orm";
+import { and, desc, eq, sql, asc, or, like, gte, lte, count } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb, getUserById, getOrCreateAccessToken } from "../db";
@@ -9,6 +9,7 @@ import {
   digitalProductFiles,
   digitalPurchases,
   digitalDownloadEvents,
+  digitalPurchaseActivity,
   digitalBundles,
   digitalBundleItems,
   digitalBundlePurchases,
@@ -128,14 +129,16 @@ export const downloadsLearnerRouter = router({
 
       // Admin preview mode bypasses purchase check
       const isAdminPreview = input.preview && ctx.user.role === "admin";
+      let purchaseRow: Awaited<ReturnType<typeof import("../lib/downloadAccess").loadPurchaseForUser>> = null;
+
       if (!product.isFree && !isAdminPreview) {
-        const [purchase] = await db.select().from(digitalPurchases)
-          .where(and(
-            eq(digitalPurchases.userId, ctx.user.id),
-            eq(digitalPurchases.productId, input.productId),
-          )).limit(1);
-        if (!purchase) {
+        purchaseRow = await (await import("../lib/downloadAccess")).loadPurchaseForUser(db, ctx.user.id, input.productId);
+        if (!purchaseRow) {
           throw new TRPCError({ code: "FORBIDDEN", message: "You have not purchased this product" });
+        }
+        const { isPurchaseAccessActive } = await import("../lib/downloadAccess");
+        if (!isPurchaseAccessActive(purchaseRow)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Your download access for this order has expired or been revoked." });
         }
       }
 
@@ -143,7 +146,37 @@ export const downloadsLearnerRouter = router({
         .where(eq(digitalProductFiles.productId, input.productId))
         .orderBy(asc(digitalProductFiles.sortOrder));
 
-      return { product, files };
+      let fileStats: Awaited<ReturnType<typeof import("../lib/downloadAccess").getFileDownloadStatsForPurchase>> = [];
+      if (purchaseRow) {
+        const { getFileDownloadStatsForPurchase } = await import("../lib/downloadAccess");
+        fileStats = await getFileDownloadStatsForPurchase(db, purchaseRow, purchaseRow.productMaxDownloads);
+      } else if (isAdminPreview || product.isFree) {
+        fileStats = files.map((f) => ({
+          fileId: f.id,
+          fileName: f.fileName,
+          downloaded: 0,
+          remaining: null,
+          canDownload: true,
+        }));
+      }
+
+      const filesWithStats = files.map((f) => {
+        const stat = fileStats.find((s) => s.fileId === f.id);
+        return { ...f, downloadStats: stat ?? { downloaded: 0, remaining: null, canDownload: true } };
+      });
+
+      return {
+        product,
+        files: filesWithStats,
+        purchase: purchaseRow
+          ? {
+              id: purchaseRow.id,
+              maxDownloadsPerFile: purchaseRow.maxDownloadsPerFile,
+              accessExpiresAt: purchaseRow.accessExpiresAt,
+              status: purchaseRow.status,
+            }
+          : null,
+      };
     }),
 
   /** List user's purchased digital products */
@@ -281,40 +314,73 @@ export const downloadsLearnerRouter = router({
       return { checkoutUrl: session.url, free: false };
     }),
 
-  /** Track a file download event (analytics) */
+  /** Track a file download event (analytics + access enforcement) */
   trackDownload: protectedProcedure
     .input(z.object({ productId: z.number(), fileId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) return { success: false };
+      if (!db) return { success: false, reason: "DB unavailable" };
+
+      const {
+        loadPurchaseForUser,
+        validateDownloadAttempt,
+        logPurchaseActivity,
+      } = await import("../lib/downloadAccess");
+
+      const purchase = await loadPurchaseForUser(db, ctx.user.id, input.productId);
+      if (!purchase) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You have not purchased this product" });
+      }
+
+      const check = await validateDownloadAttempt(db, purchase, input.fileId, purchase.productMaxDownloads);
+      if (!check.allowed) {
+        throw new TRPCError({ code: "FORBIDDEN", message: check.reason });
+      }
+
+      const fwd = ctx.req?.headers?.["x-forwarded-for"];
+      const ip = typeof fwd === "string" ? fwd.split(",")[0].trim() : ctx.req?.socket?.remoteAddress || "unknown";
+      const userAgent = ctx.req?.headers?.["user-agent"]?.substring(0, 500) ?? null;
+
+      const [file] = await db.select({ fileName: digitalProductFiles.fileName })
+        .from(digitalProductFiles)
+        .where(eq(digitalProductFiles.id, input.fileId))
+        .limit(1);
+
       await db.insert(digitalDownloadEvents).values({
         userId: ctx.user.id,
         productId: input.productId,
         fileId: input.fileId,
+        purchaseId: purchase.id,
+        ipAddress: ip.substring(0, 64),
+        userAgent,
       });
-      // Increment product download count
+
       await db.update(digitalProducts)
         .set({ downloadCount: sql`download_count + 1` })
         .where(eq(digitalProducts.id, input.productId));
 
-      // Track IP access for sharing monitoring (non-blocking)
-      const { logIpAccess } = await import("../jobs/sharingMonitor");
-      const fwd = ctx.req?.headers?.["x-forwarded-for"];
-      const ip = typeof fwd === "string" ? fwd.split(",")[0].trim() : ctx.req?.socket?.remoteAddress || "unknown";
-      logIpAccess({ userId: ctx.user.id, ipAddress: ip, userAgent: ctx.req?.headers?.["user-agent"] || undefined, contentType: "download", contentId: input.productId }).catch(() => {});
+      await logPurchaseActivity(db, {
+        purchaseId: purchase.id,
+        eventType: "file_downloaded",
+        message: `'${file?.fileName ?? `File #${input.fileId}`}' downloaded by ${ip}`,
+        ipAddress: ip,
+        fileId: input.fileId,
+      });
 
-      // Log to unified activity table
+      const { logIpAccess } = await import("../jobs/sharingMonitor");
+      logIpAccess({ userId: ctx.user.id, ipAddress: ip, userAgent: userAgent ?? undefined, contentType: "download", contentId: input.productId }).catch(() => {});
+
       try {
         const { userActivityLogs } = await import("../../drizzle/schema");
         await db.insert(userActivityLogs).values({
           userId: ctx.user.id,
-          eventType: 'download',
-          description: `Downloaded file (product ${input.productId}, file ${input.fileId})`,
+          eventType: "download",
+          description: `Downloaded ${file?.fileName ?? `file #${input.fileId}`} (${purchase.productTitle})`,
           ipAddress: ip.substring(0, 64),
-          userAgent: ctx.req?.headers?.["user-agent"]?.substring(0, 500) ?? null,
-          metadata: { productId: input.productId, fileId: input.fileId },
+          userAgent,
+          metadata: { productId: input.productId, fileId: input.fileId, purchaseId: purchase.id },
         });
-      } catch (e) { /* non-blocking */ }
+      } catch { /* non-blocking */ }
 
       return { success: true };
     }),
@@ -590,6 +656,8 @@ export const downloadsAdminRouter = router({
       metaTitle: z.string().nullable().optional(),
       metaDescription: z.string().nullable().optional(),
       showInLibrary: z.boolean().optional(),
+      maxDownloadsPerFile: z.number().int().min(0).nullable().optional(),
+      defaultAccessDays: z.number().int().min(0).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -781,17 +849,320 @@ export const downloadsAdminRouter = router({
       userId: digitalDownloadEvents.userId,
       productId: digitalDownloadEvents.productId,
       fileId: digitalDownloadEvents.fileId,
+      purchaseId: digitalDownloadEvents.purchaseId,
       downloadedAt: digitalDownloadEvents.downloadedAt,
+      ipAddress: digitalDownloadEvents.ipAddress,
       productTitle: digitalProducts.title,
       fileName: digitalProductFiles.fileName,
+      userEmail: users.email,
+      userName: users.name,
     }).from(digitalDownloadEvents)
       .leftJoin(digitalProducts, eq(digitalDownloadEvents.productId, digitalProducts.id))
       .leftJoin(digitalProductFiles, eq(digitalDownloadEvents.fileId, digitalProductFiles.id))
+      .leftJoin(users, eq(digitalDownloadEvents.userId, users.id))
       .orderBy(desc(digitalDownloadEvents.downloadedAt))
       .limit(50);
 
     return { products, recentDownloads };
   }),
+
+  /** Dashboard: orders + downloads time series (last 30 days) */
+  getAccessDashboard: protectedProcedure
+    .input(z.object({ days: z.number().int().min(7).max(90).default(30) }).optional())
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return { series: [], summary: { ordersToday: 0, orders7d: 0, orders30d: 0, downloads30d: 0 } };
+
+      const days = input?.days ?? 30;
+      const from = new Date();
+      from.setDate(from.getDate() - days);
+      from.setHours(0, 0, 0, 0);
+
+      const orderRows = await db
+        .select({
+          day: sql<string>`DATE(${digitalPurchases.purchasedAt})`,
+          c: sql<number>`count(*)`,
+        })
+        .from(digitalPurchases)
+        .where(gte(digitalPurchases.purchasedAt, from))
+        .groupBy(sql`DATE(${digitalPurchases.purchasedAt})`);
+
+      const downloadRows = await db
+        .select({
+          day: sql<string>`DATE(${digitalDownloadEvents.downloadedAt})`,
+          c: sql<number>`count(*)`,
+        })
+        .from(digitalDownloadEvents)
+        .where(gte(digitalDownloadEvents.downloadedAt, from))
+        .groupBy(sql`DATE(${digitalDownloadEvents.downloadedAt})`);
+
+      const dayMap = new Map<string, { date: string; orders: number; downloads: number }>();
+      for (let i = 0; i < days; i++) {
+        const d = new Date(from);
+        d.setDate(d.getDate() + i);
+        const key = d.toISOString().slice(0, 10);
+        dayMap.set(key, { date: key, orders: 0, downloads: 0 });
+      }
+      for (const r of orderRows) {
+        const entry = dayMap.get(String(r.day).slice(0, 10));
+        if (entry) entry.orders = Number(r.c);
+      }
+      for (const r of downloadRows) {
+        const entry = dayMap.get(String(r.day).slice(0, 10));
+        if (entry) entry.downloads = Number(r.c);
+      }
+
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const d7 = new Date(now);
+      d7.setDate(d7.getDate() - 7);
+      const d30 = new Date(now);
+      d30.setDate(d30.getDate() - 30);
+
+      const [[ordersToday], [orders7d], [orders30d], [downloads30d]] = await Promise.all([
+        db.select({ c: count() }).from(digitalPurchases).where(gte(digitalPurchases.purchasedAt, todayStart)),
+        db.select({ c: count() }).from(digitalPurchases).where(gte(digitalPurchases.purchasedAt, d7)),
+        db.select({ c: count() }).from(digitalPurchases).where(gte(digitalPurchases.purchasedAt, d30)),
+        db.select({ c: count() }).from(digitalDownloadEvents).where(gte(digitalDownloadEvents.downloadedAt, d30)),
+      ]);
+
+      return {
+        series: Array.from(dayMap.values()),
+        summary: {
+          ordersToday: Number(ordersToday?.c ?? 0),
+          orders7d: Number(orders7d?.c ?? 0),
+          orders30d: Number(orders30d?.c ?? 0),
+          downloads30d: Number(downloads30d?.c ?? 0),
+        },
+      };
+    }),
+
+  /** List all download orders (FetchApp-style orders table) */
+  listOrders: protectedProcedure
+    .input(z.object({
+      page: z.number().min(1).default(1),
+      pageSize: z.number().min(1).max(100).default(25),
+      status: z.enum(["all", "open", "expired", "revoked", "refunded", "downloaded"]).default("all"),
+      search: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return { orders: [], total: 0 };
+
+      const offset = (input.page - 1) * input.pageSize;
+      const conditions: ReturnType<typeof eq>[] = [];
+      if (input.status !== "all" && input.status !== "downloaded") {
+        conditions.push(eq(digitalPurchases.status, input.status));
+      }
+      if (input.search?.trim()) {
+        const q = `%${input.search.trim()}%`;
+        conditions.push(or(
+          like(users.email, q),
+          like(users.name, q),
+          like(digitalProducts.title, q),
+        )!);
+      }
+
+      const purchases = await db
+        .select({
+          id: digitalPurchases.id,
+          userId: digitalPurchases.userId,
+          productId: digitalPurchases.productId,
+          amount: digitalPurchases.amount,
+          currency: digitalPurchases.currency,
+          status: digitalPurchases.status,
+          purchasedAt: digitalPurchases.purchasedAt,
+          accessExpiresAt: digitalPurchases.accessExpiresAt,
+          maxDownloadsPerFile: digitalPurchases.maxDownloadsPerFile,
+          stripeCheckoutSessionId: digitalPurchases.stripeCheckoutSessionId,
+          userName: users.name,
+          userEmail: users.email,
+          productTitle: digitalProducts.title,
+          productSlug: digitalProducts.slug,
+        })
+        .from(digitalPurchases)
+        .innerJoin(users, eq(users.id, digitalPurchases.userId))
+        .innerJoin(digitalProducts, eq(digitalProducts.id, digitalPurchases.productId))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(digitalPurchases.purchasedAt))
+        .limit(input.pageSize)
+        .offset(offset);
+
+      const [totalRow] = await db
+        .select({ c: count() })
+        .from(digitalPurchases)
+        .innerJoin(users, eq(users.id, digitalPurchases.userId))
+        .innerJoin(digitalProducts, eq(digitalProducts.id, digitalPurchases.productId))
+        .where(conditions.length ? and(...conditions) : undefined);
+
+      const { formatOrderRef } = await import("../lib/downloadAccess");
+
+      const orders = await Promise.all(purchases.map(async (p) => {
+        const [dlCount] = await db
+          .select({ c: count() })
+          .from(digitalDownloadEvents)
+          .where(eq(digitalDownloadEvents.purchaseId, p.id));
+        const [fileCount] = await db
+          .select({ c: count() })
+          .from(digitalProductFiles)
+          .where(eq(digitalProductFiles.productId, p.productId));
+        const hasDownloaded = Number(dlCount?.c ?? 0) > 0;
+        if (input.status === "downloaded" && !hasDownloaded) return null;
+        return {
+          ...p,
+          orderRef: formatOrderRef(p),
+          fileCount: Number(fileCount?.c ?? 0),
+          downloadEventCount: Number(dlCount?.c ?? 0),
+          hasDownloaded,
+          displayStatus: hasDownloaded && p.status === "open" ? "downloaded" as const : p.status,
+        };
+      }));
+
+      return {
+        orders: orders.filter(Boolean),
+        total: Number(totalRow?.c ?? 0),
+      };
+    }),
+
+  /** Order detail — files with downloaded/remaining + activity log */
+  getOrderDetail: protectedProcedure
+    .input(z.object({ purchaseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const [purchase] = await db
+        .select({
+          id: digitalPurchases.id,
+          userId: digitalPurchases.userId,
+          productId: digitalPurchases.productId,
+          amount: digitalPurchases.amount,
+          currency: digitalPurchases.currency,
+          status: digitalPurchases.status,
+          purchasedAt: digitalPurchases.purchasedAt,
+          accessExpiresAt: digitalPurchases.accessExpiresAt,
+          maxDownloadsPerFile: digitalPurchases.maxDownloadsPerFile,
+          stripeCheckoutSessionId: digitalPurchases.stripeCheckoutSessionId,
+          stripePaymentIntentId: digitalPurchases.stripePaymentIntentId,
+          userName: users.name,
+          userEmail: users.email,
+          productTitle: digitalProducts.title,
+          productSlug: digitalProducts.slug,
+          productMaxDownloads: digitalProducts.maxDownloadsPerFile,
+          productDefaultAccessDays: digitalProducts.defaultAccessDays,
+        })
+        .from(digitalPurchases)
+        .innerJoin(users, eq(users.id, digitalPurchases.userId))
+        .innerJoin(digitalProducts, eq(digitalProducts.id, digitalPurchases.productId))
+        .where(eq(digitalPurchases.id, input.purchaseId))
+        .limit(1);
+
+      if (!purchase) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const { getFileDownloadStatsForPurchase, formatOrderRef } = await import("../lib/downloadAccess");
+      const files = await getFileDownloadStatsForPurchase(db, purchase, purchase.productMaxDownloads);
+
+      const activity = await db
+        .select()
+        .from(digitalPurchaseActivity)
+        .where(eq(digitalPurchaseActivity.purchaseId, input.purchaseId))
+        .orderBy(desc(digitalPurchaseActivity.createdAt));
+
+      return {
+        ...purchase,
+        orderRef: formatOrderRef(purchase),
+        files,
+        activity,
+      };
+    }),
+
+  /** Update order download restrictions */
+  updateOrderAccess: protectedProcedure
+    .input(z.object({
+      purchaseId: z.number(),
+      maxDownloadsPerFile: z.number().int().min(0).nullable().optional(),
+      accessExpiresAt: z.string().datetime().nullable().optional(),
+      status: z.enum(["open", "expired", "revoked"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const updates: Record<string, unknown> = {};
+      if (input.maxDownloadsPerFile !== undefined) updates.maxDownloadsPerFile = input.maxDownloadsPerFile;
+      if (input.accessExpiresAt !== undefined) {
+        updates.accessExpiresAt = input.accessExpiresAt ? new Date(input.accessExpiresAt) : null;
+      }
+      if (input.status) updates.status = input.status;
+
+      await db.update(digitalPurchases).set(updates).where(eq(digitalPurchases.id, input.purchaseId));
+
+      const { logPurchaseActivity } = await import("../lib/downloadAccess");
+      await logPurchaseActivity(db, {
+        purchaseId: input.purchaseId,
+        eventType: "access_updated",
+        message: `Order access updated by admin (${ctx.user.email ?? ctx.user.id})`,
+        metadata: updates,
+      });
+
+      return { success: true };
+    }),
+
+  expireOrder: protectedProcedure
+    .input(z.object({ purchaseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(digitalPurchases).set({ status: "expired" }).where(eq(digitalPurchases.id, input.purchaseId));
+      const { logPurchaseActivity } = await import("../lib/downloadAccess");
+      await logPurchaseActivity(db, {
+        purchaseId: input.purchaseId,
+        eventType: "expired",
+        message: `Order expired by admin (${ctx.user.email ?? ctx.user.id})`,
+      });
+      return { success: true };
+    }),
+
+  reopenOrder: protectedProcedure
+    .input(z.object({ purchaseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(digitalPurchases).set({ status: "open" }).where(eq(digitalPurchases.id, input.purchaseId));
+      const { logPurchaseActivity } = await import("../lib/downloadAccess");
+      await logPurchaseActivity(db, {
+        purchaseId: input.purchaseId,
+        eventType: "reopened",
+        message: `Order reopened by admin (${ctx.user.email ?? ctx.user.id})`,
+      });
+      return { success: true };
+    }),
+
+  /** Resend purchase access email */
+  resendOrderEmail: protectedProcedure
+    .input(z.object({ purchaseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [purchase] = await db.select().from(digitalPurchases).where(eq(digitalPurchases.id, input.purchaseId)).limit(1);
+      if (!purchase) throw new TRPCError({ code: "NOT_FOUND" });
+      await sendPurchaseConfirmationEmail(purchase.userId, purchase.productId);
+      const { logPurchaseActivity } = await import("../lib/downloadAccess");
+      await logPurchaseActivity(db, {
+        purchaseId: input.purchaseId,
+        eventType: "email_sent",
+        message: `Download email resent by admin (${ctx.user.email ?? ctx.user.id})`,
+      });
+      return { success: true };
+    }),
 
   // ─── Bundle Admin CRUD ─────────────────────────────────────────────────────
   /** List all bundles (admin) */
@@ -1273,17 +1644,17 @@ Make ALL content specific and compelling based on the product title and descript
           currency: digitalPurchases.currency,
           status: digitalPurchases.status,
           stripePaymentIntentId: digitalPurchases.stripePaymentIntentId,
-          createdAt: digitalPurchases.createdAt,
+          purchasedAt: digitalPurchases.purchasedAt,
           userName: users.name,
           userEmail: users.email,
         })
           .from(digitalPurchases)
           .leftJoin(users, eq(users.id, digitalPurchases.userId))
           .where(eq(digitalPurchases.productId, input.productId))
-          .orderBy(desc(digitalPurchases.createdAt))
+          .orderBy(desc(digitalPurchases.purchasedAt))
           .limit(input.pageSize)
           .offset(offset),
-        db.select({ count: sql<number>`count(*)`, revenue: sql<number>`COALESCE(SUM(CASE WHEN status='paid' THEN amount ELSE 0 END), 0)` })
+        db.select({ count: sql<number>`count(*)`, revenue: sql<number>`COALESCE(SUM(CASE WHEN ${digitalPurchases.status}='open' OR ${digitalPurchases.status}='expired' THEN COALESCE(${digitalPurchases.amount}, 0) ELSE 0 END), 0)` })
           .from(digitalPurchases)
           .where(eq(digitalPurchases.productId, input.productId)),
       ]);

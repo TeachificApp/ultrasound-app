@@ -3330,6 +3330,10 @@ export const digitalProducts = mysqlTable("digital_products", {
   showInLibrary: boolean("show_in_library").default(true).notNull(),
   // Stats
   downloadCount: int("download_count").default(0).notNull(),
+  /** Default max downloads per file per order (NULL = unlimited) */
+  maxDownloadsPerFile: int("max_downloads_per_file").default(3),
+  /** Default days until purchase access expires (NULL = no expiry) */
+  defaultAccessDays: int("default_access_days"),
   // Display order in the public Education Library (0 = unset/default, positive = explicit position)
   libraryOrder: int("library_order").default(0).notNull(),
   // Per-download publish domain override (null = use global downloadPublishDomain)
@@ -3358,6 +3362,12 @@ export const digitalPurchases = mysqlTable("digital_purchases", {
   productId: int("product_id").notNull(),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  amount: int("amount"),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  status: mysqlEnum("status", ["open", "expired", "revoked", "refunded"]).default("open").notNull(),
+  /** Max downloads per file for this order (NULL = unlimited) */
+  maxDownloadsPerFile: int("max_downloads_per_file").default(3),
+  accessExpiresAt: timestamp("access_expires_at"),
   purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
 });
 export type DigitalPurchase = typeof digitalPurchases.$inferSelect;
@@ -3368,9 +3378,25 @@ export const digitalDownloadEvents = mysqlTable("digital_download_events", {
   userId: int("user_id").notNull(),
   productId: int("product_id").notNull(),
   fileId: int("file_id").notNull(),
+  purchaseId: int("purchase_id"),
   downloadedAt: timestamp("downloaded_at").defaultNow().notNull(),
+  ipAddress: varchar("ip_address", { length: 64 }),
+  userAgent: varchar("user_agent", { length: 500 }),
 });
 export type DigitalDownloadEvent = typeof digitalDownloadEvents.$inferSelect;
+
+/** Order activity log — payment, email, per-file downloads with IP */
+export const digitalPurchaseActivity = mysqlTable("digital_purchase_activity", {
+  id: int("id").autoincrement().primaryKey(),
+  purchaseId: int("purchase_id").notNull(),
+  eventType: varchar("event_type", { length: 32 }).notNull(),
+  message: text("message").notNull(),
+  ipAddress: varchar("ip_address", { length: 64 }),
+  fileId: int("file_id"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type DigitalPurchaseActivity = typeof digitalPurchaseActivity.$inferSelect;
 
 // ─── Digital Bundles ────────────────────────────────────────────────────────
 export const digitalBundles = mysqlTable("digital_bundles", {

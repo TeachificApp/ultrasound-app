@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -343,12 +343,45 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     return;
   }
 
+  const amountTotal = (session.amount_total as number) ?? 0;
+  const paymentIntentId = (session.payment_intent as string) ?? null;
+
+  const [productRow] = await db.select({
+    maxDownloadsPerFile: digitalProducts.maxDownloadsPerFile,
+    defaultAccessDays: digitalProducts.defaultAccessDays,
+    title: digitalProducts.title,
+  }).from(digitalProducts).where(eq(digitalProducts.id, productId)).limit(1);
+
+  const { computeAccessExpiresAt, logPurchaseActivity } = await import("../lib/downloadAccess");
+  const accessExpiresAt = computeAccessExpiresAt(productRow?.defaultAccessDays ?? null);
+
   const [newPurchase] = await db.insert(digitalPurchases).values({
     userId,
     productId,
     stripeCheckoutSessionId: session.id as string,
+    stripePaymentIntentId: paymentIntentId,
+    amount: amountTotal,
+    currency: (session.currency as string) ?? "usd",
+    status: "open",
+    maxDownloadsPerFile: productRow?.maxDownloadsPerFile ?? 3,
+    accessExpiresAt,
   });
   const newPurchaseId = (newPurchase as any)?.insertId ?? null;
+
+  if (newPurchaseId) {
+    try {
+      await logPurchaseActivity(db, {
+        purchaseId: newPurchaseId,
+        eventType: "order_received",
+        message: `Order received for ${productRow?.title ?? `product #${productId}`}`,
+      });
+      await logPurchaseActivity(db, {
+        purchaseId: newPurchaseId,
+        eventType: "payment_received",
+        message: `Payment received ($${(amountTotal / 100).toFixed(2)})`,
+      });
+    } catch { /* non-blocking if migration not applied */ }
+  }
 
   // Track affiliate conversion for digital download
   const downloadAffiliateCode = meta.affiliate_code ?? null;
@@ -388,6 +421,15 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
   } catch (_e) { /* non-blocking */ }
   // Send purchase confirmation email with file links
   await sendPurchaseConfirmationEmail(userId, productId);
+  if (newPurchaseId) {
+    try {
+      await logPurchaseActivity(db, {
+        purchaseId: newPurchaseId,
+        eventType: "email_sent",
+        message: "Download email sent",
+      });
+    } catch { /* non-blocking */ }
+  }
   await fulfillOrderBumpPurchase(db, meta, {
     userId,
     sessionId: session.id as string,

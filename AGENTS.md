@@ -74,6 +74,14 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 - `invoice.paid` and `customer.subscription.updated` extend `lms_enrollments.access_expires_at` when `stripe_subscription_id` is set.
 - Membership handler also matches checkout by Stripe price ID — if a price is on both `membership_plans` and LMS, verify product routing in Stripe metadata.
 
+### Digital download access (FetchApp-style)
+
+- Admin: **LMS Admin → Downloads → Download Access** tab — dashboard charts, orders list, order detail with per-file downloaded/remaining and IP activity log.
+- DB: `digital_purchases` (`status`, `max_downloads_per_file`, `access_expires_at`, `amount`), `digital_download_events` (`purchase_id`, `ip_address`), `digital_purchase_activity` (order timeline).
+- Migration: `drizzle/0012_digital_download_access.sql` before using limits/activity in production.
+- API: `downloadsAdmin.getAccessDashboard`, `listOrders`, `getOrderDetail`, `updateOrderAccess`, `expireOrder`, `reopenOrder`, `resendOrderEmail`.
+- Learner downloads enforced via `downloadsLearner.trackDownload` (must succeed before file opens).
+
 ### Key file locations
 
 - Server entry: `server/_core/index.ts`
