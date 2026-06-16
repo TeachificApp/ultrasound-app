@@ -2,6 +2,9 @@
  * CommunityAdmin.tsx
  * Admin panel for community management: communities, channels, members,
  * moderation, badges, admin profiles, linked access, sort order.
+ *
+ * Community editing uses an inline tab-based editor (not a dialog):
+ *   Settings | Appearance | Access Gating | Page Editor | Landing Page
  */
 import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
@@ -28,7 +31,8 @@ import {
   Hash, Award, Shield, Upload, UserPlus,
   UserMinus, MessageSquare, CheckSquare, X, ExternalLink,
   GripVertical, Link2, Image, UserCircle, ChevronUp, ChevronDown,
-  AlertCircle, Lock, PenSquare, LayoutTemplate, Zap, ToggleLeft, ToggleRight
+  AlertCircle, Lock, PenSquare, LayoutTemplate, Zap, ToggleLeft, ToggleRight,
+  Palette, BookOpen, ChevronLeft, Settings, Eye, Globe
 } from "lucide-react";
 import CommunityPageEditor from "@/components/CommunityPageEditor";
 import { Link } from "wouter";
@@ -46,49 +50,43 @@ function timeAgo(dateStr: string | Date) {
 
 // ─── Image Upload Helper ──────────────────────────────────────────────────────
 function ImageUploadField({
-  label, value, communityId, imageType, onChange,
+  label, value, communityId, imageType, onChange, aspectHint,
 }: {
   label: string; value: string; communityId?: number;
-  imageType: "cover" | "logo" | "icon"; onChange: (url: string) => void;
+  imageType: "cover" | "logo" | "icon" | "banner"; onChange: (url: string) => void;
+  aspectHint?: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const uploadCommunityImage = trpc.community.admin.uploadCommunityImage.useMutation({
+  const uploadMut = trpc.community.admin.uploadCommunityImage.useMutation({
     onSuccess: (data) => { onChange(data.url); setUploading(false); toast.success("Image uploaded"); },
-    onError: (e) => { setUploading(false); toast.error(e.message); },
-  });
-  const uploadIcon = trpc.community.admin.uploadCommunityIcon.useMutation({
-    onSuccess: (data) => { onChange(data.url); setUploading(false); toast.success("Icon uploaded"); },
     onError: (e) => { setUploading(false); toast.error(e.message); },
   });
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !communityId) { toast.error("Save the community first to upload images"); return; }
     setUploading(true);
     const reader = new FileReader();
     reader.onload = () => {
-      const base64 = (reader.result as string).split(",")[1];
-      if (imageType === "icon" && communityId) {
-        uploadIcon.mutate({ communityId, base64, mimeType: file.type });
-      } else {
-        uploadCommunityImage.mutate({ base64, mimeType: file.type, imageType });
-      }
+      const dataUri = reader.result as string;
+      uploadMut.mutate({ communityId, imageType, dataUri, mimeType: file.type as any });
     };
     reader.readAsDataURL(file);
   }
+  const isWide = imageType === "banner" || imageType === "cover";
   return (
     <div>
-      <label className="text-xs font-medium text-gray-600 mb-1 block">{label}</label>
-      <div className="flex items-center gap-3">
+      <label className="text-xs font-medium text-gray-600 mb-1 block">{label}{aspectHint && <span className="text-gray-400 font-normal ml-1">({aspectHint})</span>}</label>
+      <div className={`flex items-start gap-3 ${isWide ? "flex-col" : ""}`}>
         {value ? (
-          <img src={value} alt={label} className="w-16 h-16 rounded-lg object-cover border" />
+          <img src={value} alt={label} className={isWide ? "w-full h-28 rounded-lg object-cover border" : "w-16 h-16 rounded-lg object-cover border"} />
         ) : (
-          <div className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300">
+          <div className={`${isWide ? "w-full h-28" : "w-16 h-16"} rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300`}>
             <Image className="w-6 h-6" />
           </div>
         )}
-        <div className="flex flex-col gap-1">
-          <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading || !communityId}>
             <Upload className="w-3.5 h-3.5 mr-1" />{uploading ? "Uploading..." : "Upload"}
           </Button>
           {value && (
@@ -139,8 +137,307 @@ function AdminProfileAvatarUpload({ profileId, value, onChange }: { profileId?: 
   );
 }
 
-// ─── Community Form ───────────────────────────────────────────────────────────
-function CommunityForm({ community, onClose, onSaved }: { community?: any; onClose: () => void; onSaved: () => void }) {
+// ─── Access Gating Tab ────────────────────────────────────────────────────────
+function AccessGatingTab({ community }: { community: any }) {
+  const utils = trpc.useUtils();
+  const communityId = community.id;
+
+  // Course linkages (junction table)
+  const { data: courseLinkages, isLoading: clLoading } = trpc.community.admin.listCourseLinkages.useQuery({ communityId });
+  const { data: allCourses } = trpc.community.admin.listCoursesForLinkedAccess.useQuery();
+  const addCourseLinkage = trpc.community.admin.addCourseLinkage.useMutation({
+    onSuccess: () => { toast.success("Course linked!"); utils.community.admin.listCourseLinkages.invalidate({ communityId }); },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeCourseLinkage = trpc.community.admin.removeCourseLinkage.useMutation({
+    onSuccess: () => { toast.success("Course removed"); utils.community.admin.listCourseLinkages.invalidate({ communityId }); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Product linkages (linkedAccessItems JSON on community)
+  const [linkedItems, setLinkedItems] = useState<Array<{ type: string; id: number; title: string }>>(
+    (() => { try { return community?.linkedAccessItems ? JSON.parse(community.linkedAccessItems) : []; } catch { return []; } })()
+  );
+  const [selectedProductType, setSelectedProductType] = useState<string>("quiz");
+  const { data: allProducts } = trpc.community.admin.listAllProductsForLinkedAccess.useQuery();
+  const updateCommunity = trpc.community.admin.updateCommunity.useMutation({
+    onSuccess: () => { toast.success("Product links saved!"); utils.community.admin.listCommunities.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const linkedCourseIds = new Set((courseLinkages ?? []).map((l: any) => l.lmsCourseId));
+  const availableCourses = (allCourses ?? []).filter((c: any) => !linkedCourseIds.has(c.id));
+  const PRODUCT_TYPE_LABELS: Record<string, string> = {
+    quiz: "Quiz", webinar: "Webinar", download: "Download", membership: "Membership",
+  };
+  const filteredProducts = (allProducts ?? []).filter((p: any) => p.type === selectedProductType && !linkedItems.some(i => i.type === p.type && i.id === p.id));
+
+  function addProduct(productId: number) {
+    const product = (allProducts ?? []).find((p: any) => p.type === selectedProductType && p.id === productId);
+    if (!product) return;
+    const newItems = [...linkedItems, { type: selectedProductType, id: productId, title: product.title }];
+    setLinkedItems(newItems);
+    updateCommunity.mutate({ id: communityId, linkedAccessItems: JSON.stringify(newItems) });
+  }
+  function removeProduct(idx: number) {
+    const newItems = linkedItems.filter((_, i) => i !== idx);
+    setLinkedItems(newItems);
+    updateCommunity.mutate({ id: communityId, linkedAccessItems: JSON.stringify(newItems) });
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Access Type info */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <p className="text-sm font-medium text-amber-800">Access Type: <span className="font-bold capitalize">{community.accessType}</span></p>
+        <p className="text-xs text-amber-700 mt-1">
+          {community.accessType === "course_gated"
+            ? "Users must be enrolled in at least one linked course to join this community."
+            : community.accessType === "linked"
+            ? "Users who purchase any linked product are automatically added as members."
+            : "Change the Access Type in Settings to enable course or product gating."}
+        </p>
+      </div>
+
+      {/* Course Linkages */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h4 className="font-semibold text-gray-900 flex items-center gap-2"><BookOpen className="w-4 h-4 text-teal-600" />Linked Courses</h4>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {community.accessType === "course_gated"
+                ? "Users enrolled in any of these courses can join this community."
+                : "Link courses to this community. Set Access Type to 'Course Gated' to enforce enrollment."}
+            </p>
+          </div>
+          <Select onValueChange={v => addCourseLinkage.mutate({ communityId, lmsCourseId: parseInt(v) })} disabled={availableCourses.length === 0}>
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder={availableCourses.length === 0 ? "All courses linked" : "Link a course..."} />
+            </SelectTrigger>
+            <SelectContent>
+              {availableCourses.map((c: any) => (
+                <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {clLoading ? (
+          <div className="space-y-2">{[1,2].map(i => <Skeleton key={i} className="h-12 rounded-lg" />)}</div>
+        ) : !courseLinkages?.length ? (
+          <div className="text-center py-8 border-2 border-dashed rounded-xl text-gray-400">
+            <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">No courses linked yet. Use the dropdown above to link courses.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {courseLinkages.map((l: any) => (
+              <div key={l.id} className="flex items-center gap-3 bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5">
+                <BookOpen className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                <span className="flex-1 text-sm font-medium text-teal-900">{l.courseTitle ?? `Course #${l.lmsCourseId}`}</span>
+                {l.courseSlug && <span className="text-xs text-teal-500">/{l.courseSlug}</span>}
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
+                  onClick={() => removeCourseLinkage.mutate({ linkageId: l.id })}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Product Linkages */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h4 className="font-semibold text-gray-900 flex items-center gap-2"><Link2 className="w-4 h-4 text-teal-600" />Linked Products</h4>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {community.accessType === "linked"
+                ? "Users who purchase any of these products are automatically added as members."
+                : "Link products to this community. Set Access Type to 'Linked' to auto-enroll buyers."}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2 mb-3">
+          <Select value={selectedProductType} onValueChange={setSelectedProductType}>
+            <SelectTrigger className="w-36 flex-shrink-0"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {Object.entries(PRODUCT_TYPE_LABELS).map(([val, label]) => (
+                <SelectItem key={val} value={val}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select onValueChange={v => addProduct(parseInt(v))}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder={`Add a ${PRODUCT_TYPE_LABELS[selectedProductType]?.toLowerCase()}...`} />
+            </SelectTrigger>
+            <SelectContent>
+              {filteredProducts.map((p: any) => (
+                <SelectItem key={`${p.type}-${p.id}`} value={p.id.toString()}>{p.title}</SelectItem>
+              ))}
+              {filteredProducts.length === 0 && <SelectItem value="__none" disabled>No {PRODUCT_TYPE_LABELS[selectedProductType]?.toLowerCase()}s available</SelectItem>}
+            </SelectContent>
+          </Select>
+        </div>
+        {linkedItems.length === 0 ? (
+          <div className="text-center py-8 border-2 border-dashed rounded-xl text-gray-400">
+            <Link2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">No products linked yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {linkedItems.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5">
+                <Link2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <span className="flex-1 text-sm font-medium text-blue-900">{item.title}</span>
+                <Badge variant="secondary" className="text-xs capitalize">{item.type}</Badge>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
+                  onClick={() => removeProduct(idx)}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Appearance Tab ───────────────────────────────────────────────────────────
+function AppearanceTab({ community, onSaved }: { community: any; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    bannerImage: community?.bannerImage ?? "",
+    welcomeMessage: community?.welcomeMessage ?? "",
+    headerStyle: community?.headerStyle ?? "banner",
+    layoutStyle: community?.layoutStyle ?? "sidebar",
+    primaryColor: community?.primaryColor ?? "#189aa1",
+    secondaryColor: community?.secondaryColor ?? "#4ad9e0",
+    backgroundColor: community?.backgroundColor ?? "",
+    seoTitle: community?.seoTitle ?? "",
+    seoDescription: community?.seoDescription ?? "",
+  });
+  const utils = trpc.useUtils();
+  const update = trpc.community.admin.updateCommunity.useMutation({
+    onSuccess: () => { toast.success("Appearance saved!"); onSaved(); utils.community.admin.listCommunities.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Banner Image */}
+      <div>
+        <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><Image className="w-4 h-4 text-teal-600" />Banner Image</h4>
+        <ImageUploadField
+          label="Wide Header Banner"
+          value={form.bannerImage}
+          communityId={community?.id}
+          imageType="banner"
+          aspectHint="recommended 1200×300px"
+          onChange={url => setForm(f => ({ ...f, bannerImage: url }))}
+        />
+      </div>
+
+      {/* Welcome Message */}
+      <div>
+        <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-teal-600" />Welcome Message</h4>
+        <Textarea
+          value={form.welcomeMessage}
+          onChange={e => setForm(f => ({ ...f, welcomeMessage: e.target.value }))}
+          placeholder="Write a welcome message shown to new members when they join..."
+          className="min-h-[100px] resize-none"
+        />
+      </div>
+
+      {/* Layout Options */}
+      <div>
+        <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><LayoutTemplate className="w-4 h-4 text-teal-600" />Layout & Style</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Header Style</label>
+            <Select value={form.headerStyle} onValueChange={v => setForm(f => ({ ...f, headerStyle: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="banner">Banner — full-width image header</SelectItem>
+                <SelectItem value="minimal">Minimal — compact header with logo</SelectItem>
+                <SelectItem value="none">None — no header image</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Layout Style</label>
+            <Select value={form.layoutStyle} onValueChange={v => setForm(f => ({ ...f, layoutStyle: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sidebar">Sidebar — channels + members panel</SelectItem>
+                <SelectItem value="full-width">Full Width — no sidebar</SelectItem>
+                <SelectItem value="centered">Centered — narrow centered feed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* Colors */}
+      <div>
+        <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><Palette className="w-4 h-4 text-teal-600" />Brand Colors</h4>
+        <div className="grid grid-cols-3 gap-4">
+          {([
+            { key: "primaryColor", label: "Primary Color" },
+            { key: "secondaryColor", label: "Secondary Color" },
+            { key: "backgroundColor", label: "Background Color" },
+          ] as const).map(({ key, label }) => (
+            <div key={key}>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">{label}</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={form[key] || "#ffffff"}
+                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                  className="w-9 h-9 rounded cursor-pointer border"
+                />
+                <Input
+                  value={form[key]}
+                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                  placeholder="#hex"
+                  className="flex-1"
+                />
+                {form[key] && (
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-400" onClick={() => setForm(f => ({ ...f, [key]: "" }))}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* SEO */}
+      <div>
+        <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><Globe className="w-4 h-4 text-teal-600" />SEO / Meta</h4>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">SEO Title <span className="text-gray-400 font-normal">(overrides community title in search results)</span></label>
+            <Input value={form.seoTitle} onChange={e => setForm(f => ({ ...f, seoTitle: e.target.value }))} placeholder="e.g. Join the Ultrasound Community" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">SEO Description</label>
+            <Textarea value={form.seoDescription} onChange={e => setForm(f => ({ ...f, seoDescription: e.target.value }))} placeholder="Brief description for search engines..." className="min-h-[80px] resize-none" />
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-2">
+        <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => update.mutate({ id: community.id, ...form })} disabled={update.isPending}>
+          {update.isPending ? "Saving..." : "Save Appearance"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Community Settings Tab ───────────────────────────────────────────────────
+function CommunitySettingsTab({ community, onSaved }: { community: any; onSaved: () => void }) {
   const [form, setForm] = useState({
     title: community?.title ?? "",
     slug: community?.slug ?? "",
@@ -153,39 +450,229 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
     logoImage: community?.logoImage ?? "",
     iconImage: community?.iconImage ?? "",
     sortOrder: community?.sortOrder ?? 0,
+    status: community?.status ?? "draft",
   });
-  const [linkedItems, setLinkedItems] = useState<Array<{ type: string; id: number; title: string }>>(
-    (() => { try { return community?.linkedAccessItems ? JSON.parse(community.linkedAccessItems) : []; } catch { return []; } })()
-  );
   const utils = trpc.useUtils();
-  const { data: allProducts } = trpc.community.admin.listAllProductsForLinkedAccess.useQuery();
-  const [selectedProductType, setSelectedProductType] = useState<string>("course");
-  const create = trpc.community.admin.createCommunity.useMutation({
-    onSuccess: () => { toast.success("Community created!"); onSaved(); onClose(); utils.community.admin.listCommunities.invalidate(); },
-    onError: (e) => toast.error(e.message),
-  });
   const update = trpc.community.admin.updateCommunity.useMutation({
-    onSuccess: () => { toast.success("Community updated!"); onSaved(); onClose(); utils.community.admin.listCommunities.invalidate(); },
+    onSuccess: () => { toast.success("Settings saved!"); onSaved(); utils.community.admin.listCommunities.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
-  function handleSubmit() {
-    if (!form.title.trim() || !form.slug.trim()) { toast.error("Title and slug are required"); return; }
-    const payload = { ...form, linkedAccessItems: JSON.stringify(linkedItems) };
-    if (community) update.mutate({ id: community.id, ...payload });
-    else create.mutate(payload as any);
-  }
-  function addLinkedProduct(productId: number) {
-    const product = allProducts?.find((p: any) => p.type === selectedProductType && p.id === productId);
-    if (!product) return;
-    if (linkedItems.some(i => i.type === selectedProductType && i.id === productId)) return;
-    setLinkedItems(prev => [...prev, { type: selectedProductType, id: productId, title: product.title }]);
-  }
-  const PRODUCT_TYPE_LABELS: Record<string, string> = {
-    course: "Course", quiz: "Quiz", webinar: "Webinar", download: "Download", membership: "Membership",
-  };
-  const filteredProducts = allProducts?.filter((p: any) => p.type === selectedProductType && !linkedItems.some(i => i.type === p.type && i.id === p.id)) ?? [];
+
   return (
-    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Title *</label>
+          <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Community title" />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Slug *</label>
+          <Input value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s+/g, "-") }))} placeholder="url-slug" />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 mb-1 block">Description</label>
+        <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What is this community about?" className="min-h-[80px] resize-none" />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+          <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="published">Published</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Privacy</label>
+          <Select value={form.privacy} onValueChange={v => setForm(f => ({ ...f, privacy: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="public">Public</SelectItem>
+              <SelectItem value="private">Private</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="invite_only">Invite Only</SelectItem>
+              <SelectItem value="course_gated">Course Gated</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Access Type</label>
+          <Select value={form.accessType} onValueChange={v => setForm(f => ({ ...f, accessType: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="free">Free — anyone can join</SelectItem>
+              <SelectItem value="paid">Paid — requires payment</SelectItem>
+              <SelectItem value="restricted">Restricted — admin approval</SelectItem>
+              <SelectItem value="invite_only">Invite Only</SelectItem>
+              <SelectItem value="linked">Linked — auto-join via product</SelectItem>
+              <SelectItem value="course_gated">Course Gated — must be enrolled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Brand</label>
+          <Select value={form.brand} onValueChange={v => setForm(f => ({ ...f, brand: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all_about_ultrasound">All About Ultrasound™</SelectItem>
+              <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Sort Order</label>
+          <Input type="number" value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: parseInt(e.target.value) || 0 }))} className="w-full" />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 mb-1 block">Accent Color</label>
+        <div className="flex items-center gap-2">
+          <input type="color" value={form.accentColor} onChange={e => setForm(f => ({ ...f, accentColor: e.target.value }))} className="w-10 h-10 rounded cursor-pointer border" />
+          <Input value={form.accentColor} onChange={e => setForm(f => ({ ...f, accentColor: e.target.value }))} className="w-36" />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <ImageUploadField label="Cover Image" value={form.coverImage} communityId={community?.id} imageType="cover" aspectHint="16:9" onChange={url => setForm(f => ({ ...f, coverImage: url }))} />
+        <ImageUploadField label="Logo / Avatar" value={form.logoImage} communityId={community?.id} imageType="logo" aspectHint="square" onChange={url => setForm(f => ({ ...f, logoImage: url }))} />
+        <ImageUploadField label="Icon (small)" value={form.iconImage} communityId={community?.id} imageType="icon" aspectHint="square" onChange={url => setForm(f => ({ ...f, iconImage: url }))} />
+      </div>
+      <div className="pt-2">
+        <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
+          if (!form.title.trim() || !form.slug.trim()) { toast.error("Title and slug are required"); return; }
+          update.mutate({ id: community.id, ...form });
+        }} disabled={update.isPending}>
+          {update.isPending ? "Saving..." : "Save Settings"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Inline Community Editor ──────────────────────────────────────────────────
+function CommunityEditor({ community, onBack }: { community: any; onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState("settings");
+  const utils = trpc.useUtils();
+
+  return (
+    <div>
+      {/* Editor Header */}
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b">
+        <Button variant="ghost" size="sm" onClick={onBack} className="text-gray-500 hover:text-gray-700 -ml-1">
+          <ChevronLeft className="w-4 h-4 mr-1" />Back
+        </Button>
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-9 h-9 rounded-lg flex-shrink-0 overflow-hidden border">
+            {community.iconImage ? (
+              <img src={community.iconImage} alt={community.title} className="w-full h-full object-cover" />
+            ) : community.logoImage ? (
+              <img src={community.logoImage} alt={community.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white font-bold text-sm"
+                style={{ backgroundColor: community.accentColor || "#189aa1" }}>
+                {community.title.charAt(0)}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-bold text-gray-900 truncate">{community.title}</h2>
+            <div className="flex items-center gap-2">
+              <Badge variant={community.status === "published" ? "default" : "secondary"}
+                className={`text-xs ${community.status === "published" ? "bg-green-100 text-green-700 border-green-200" : ""}`}>
+                {community.status}
+              </Badge>
+              <span className="text-xs text-gray-400">/{community.slug}</span>
+            </div>
+          </div>
+        </div>
+        <Link href={`/community/${community.slug}`}>
+          <Button variant="outline" size="sm" className="text-teal-600 border-teal-200 flex-shrink-0">
+            <Eye className="w-3.5 h-3.5 mr-1" />View
+          </Button>
+        </Link>
+      </div>
+
+      {/* Editor Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6 flex-wrap h-auto gap-1">
+          <TabsTrigger value="settings"><Settings className="w-3.5 h-3.5 mr-1.5" />Settings</TabsTrigger>
+          <TabsTrigger value="appearance"><Palette className="w-3.5 h-3.5 mr-1.5" />Appearance</TabsTrigger>
+          <TabsTrigger value="gating"><Lock className="w-3.5 h-3.5 mr-1.5" />Access Gating</TabsTrigger>
+          <TabsTrigger value="page-editor"><LayoutTemplate className="w-3.5 h-3.5 mr-1.5" />Page Editor</TabsTrigger>
+          <TabsTrigger value="landing-editor"><Globe className="w-3.5 h-3.5 mr-1.5" />Landing Page</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="settings">
+          <CommunitySettingsTab community={community} onSaved={() => utils.community.admin.listCommunities.invalidate()} />
+        </TabsContent>
+
+        <TabsContent value="appearance">
+          <AppearanceTab community={community} onSaved={() => utils.community.admin.listCommunities.invalidate()} />
+        </TabsContent>
+
+        <TabsContent value="gating">
+          <AccessGatingTab community={community} />
+        </TabsContent>
+
+        <TabsContent value="page-editor">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-gray-900">Community Experience Page Editor</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Edit the content blocks shown on the community's main page for members.</p>
+              </div>
+              <a href={`/admin/communities/${community.id}/experience-builder`} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex-shrink-0">
+                <ExternalLink className="w-3.5 h-3.5" />Open Full Editor
+              </a>
+            </div>
+            <CommunityPageEditor communityId={community.id} pageType="page" />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="landing-editor">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-gray-900">Community Sales Landing Page Editor</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Edit the public-facing landing page blocks shown before users join the community.</p>
+              </div>
+              <a href={`/admin/communities/${community.id}/sales-builder`} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex-shrink-0">
+                <ExternalLink className="w-3.5 h-3.5" />Open Full Editor
+              </a>
+            </div>
+            <CommunityPageEditor communityId={community.id} pageType="landing" />
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ─── Create Community Form (dialog) ──────────────────────────────────────────
+function CreateCommunityForm({ onClose, onSaved }: { onClose: () => void; onSaved: (id: number) => void }) {
+  const [form, setForm] = useState({
+    title: "", slug: "", description: "",
+    brand: "all_about_ultrasound", privacy: "public", accessType: "free",
+    accentColor: "#189aa1",
+  });
+  const utils = trpc.useUtils();
+  const create = trpc.community.admin.createCommunity.useMutation({
+    onSuccess: (data: any) => {
+      toast.success("Community created!");
+      utils.community.admin.listCommunities.invalidate();
+      onSaved(data?.id ?? 0);
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-gray-600 mb-1 block">Title *</label>
@@ -209,6 +696,8 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
               <SelectItem value="public">Public</SelectItem>
               <SelectItem value="private">Private</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="invite_only">Invite Only</SelectItem>
+              <SelectItem value="course_gated">Course Gated</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -217,10 +706,11 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
           <Select value={form.accessType} onValueChange={v => setForm(f => ({ ...f, accessType: v }))}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="free">Free — anyone can join</SelectItem>
-              <SelectItem value="paid">Paid — requires payment</SelectItem>
-              <SelectItem value="restricted">Restricted — admin approval required</SelectItem>
-              <SelectItem value="linked">Linked — auto-join via product purchase</SelectItem>
+              <SelectItem value="free">Free</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="restricted">Restricted</SelectItem>
+              <SelectItem value="linked">Linked</SelectItem>
+              <SelectItem value="course_gated">Course Gated</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -235,75 +725,13 @@ function CommunityForm({ community, onClose, onSaved }: { community?: any; onClo
           </Select>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium text-gray-600 mb-1 block">Sort Order</label>
-          <Input type="number" value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: parseInt(e.target.value) || 0 }))} className="w-28" />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 mb-1 block">Accent Color</label>
-          <div className="flex items-center gap-2">
-            <input type="color" value={form.accentColor} onChange={e => setForm(f => ({ ...f, accentColor: e.target.value }))} className="w-10 h-10 rounded cursor-pointer border" />
-            <Input value={form.accentColor} onChange={e => setForm(f => ({ ...f, accentColor: e.target.value }))} className="w-32" />
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <ImageUploadField label="Cover Image" value={form.coverImage} communityId={community?.id} imageType="cover" onChange={url => setForm(f => ({ ...f, coverImage: url }))} />
-        <ImageUploadField label="Logo / Avatar" value={form.logoImage} communityId={community?.id} imageType="logo" onChange={url => setForm(f => ({ ...f, logoImage: url }))} />
-        <ImageUploadField label="Icon (small)" value={form.iconImage} communityId={community?.id} imageType="icon" onChange={url => setForm(f => ({ ...f, iconImage: url }))} />
-      </div>
-      {/* Linked Access Items — shown for all access types but labeled differently */}
-      <div>
-        <label className="text-xs font-medium text-gray-600 mb-2 block">
-          <span className="flex items-center gap-1"><Link2 className="w-3.5 h-3.5" />Linked Product Access</span>
-          <span className="text-gray-400 font-normal block mt-0.5">
-            {form.accessType === "linked"
-              ? "Users who purchase any of these products are automatically added as members."
-              : "Optionally grant access to users who purchase specific products."}
-          </span>
-        </label>
-        <div className="flex gap-2 mb-2">
-          <Select value={selectedProductType} onValueChange={setSelectedProductType}>
-            <SelectTrigger className="w-36 flex-shrink-0"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {Object.entries(PRODUCT_TYPE_LABELS).map(([val, label]) => (
-                <SelectItem key={val} value={val}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select onValueChange={v => addLinkedProduct(parseInt(v))}>
-            <SelectTrigger className="flex-1"><SelectValue placeholder={`Add a ${PRODUCT_TYPE_LABELS[selectedProductType]?.toLowerCase()}...`} /></SelectTrigger>
-            <SelectContent>
-              {filteredProducts.map((p: any) => (
-                <SelectItem key={`${p.type}-${p.id}`} value={p.id.toString()}>{p.title}</SelectItem>
-              ))}
-              {filteredProducts.length === 0 && <SelectItem value="__none" disabled>No {PRODUCT_TYPE_LABELS[selectedProductType]?.toLowerCase()}s available</SelectItem>}
-            </SelectContent>
-          </Select>
-        </div>
-        {linkedItems.length > 0 ? (
-          <div className="space-y-1">
-            {linkedItems.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5">
-                <Link2 className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
-                <span className="text-sm text-teal-800 flex-1">{item.title}</span>
-                <Badge variant="secondary" className="text-xs capitalize">{item.type}</Badge>
-                <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-400 hover:text-red-600"
-                  onClick={() => setLinkedItems(prev => prev.filter((_, i) => i !== idx))}>
-                  <X className="w-3 h-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-gray-400 italic">No linked products. Add products above to grant automatic access.</p>
-        )}
-      </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSubmit} disabled={create.isPending || update.isPending}>
-          {community ? "Save Changes" : "Create Community"}
+        <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
+          if (!form.title.trim() || !form.slug.trim()) { toast.error("Title and slug are required"); return; }
+          create.mutate(form as any);
+        }} disabled={create.isPending}>
+          {create.isPending ? "Creating..." : "Create Community"}
         </Button>
       </DialogFooter>
     </div>
@@ -683,7 +1111,6 @@ function SortOrderTab({ communities, onRefresh }: { communities: any[]; onRefres
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 // ─── Workflow Rules Tab ───────────────────────────────────────────────────────
 const TRIGGER_LABELS: Record<string, string> = {
   any_signup: "Any new account signup",
@@ -805,14 +1232,13 @@ function WorkflowRulesTab({ communityId }: { communityId: number }) {
 }
 
 
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function CommunityAdmin() {
   const { user } = useAuth();
   const isAdmin = (user as any)?.role === "admin";
-  const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-  const urlEditCommunity = urlParams?.get("editCommunity") ?? null;
-  const [activeCommunityId, setActiveCommunityId] = useState<number | null>(urlEditCommunity ? Number(urlEditCommunity) : null);
-  const [showCommunityForm, setShowCommunityForm] = useState(false);
-  const [editCommunity, setEditCommunity] = useState<any>(null);
+  const [editingCommunity, setEditingCommunity] = useState<any>(null); // null = list view, object = editor view
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [activeCommunityId, setActiveCommunityId] = useState<number | null>(null);
   const [showChannelForm, setShowChannelForm] = useState(false);
   const [editChannel, setEditChannel] = useState<any>(null);
   const [awardBadgeUserId, setAwardBadgeUserId] = useState<number | null>(null);
@@ -903,6 +1329,19 @@ export default function CommunityAdmin() {
     </div>
   );
 
+  // ── Inline Editor View ──────────────────────────────────────────────────────
+  if (editingCommunity) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <CommunityEditor
+          community={editingCommunity}
+          onBack={() => setEditingCommunity(null)}
+        />
+      </div>
+    );
+  }
+
+  // ── List View ───────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -910,7 +1349,7 @@ export default function CommunityAdmin() {
           <h1 className="text-2xl font-bold text-gray-900">Community Admin</h1>
           <p className="text-gray-500 text-sm mt-1">Manage communities, channels, members, moderation, admin profiles, and page content</p>
         </div>
-        <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => { setEditCommunity(null); setShowCommunityForm(true); }}>
+        <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setShowCreateDialog(true)}>
           <Plus className="w-4 h-4 mr-2" />New Community
         </Button>
       </div>
@@ -931,8 +1370,6 @@ export default function CommunityAdmin() {
             {totalModerationCount > 0 && <Badge className="ml-1.5 bg-red-500 text-white text-xs">{totalModerationCount}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="badges"><Award className="w-4 h-4 mr-2" />Badges</TabsTrigger>
-          <TabsTrigger value="page-editor"><LayoutTemplate className="w-4 h-4 mr-2" />Page Editor</TabsTrigger>
-          <TabsTrigger value="landing-editor"><LayoutTemplate className="w-4 h-4 mr-2" />Landing Page</TabsTrigger>
           <TabsTrigger value="workflow-rules"><Zap className="w-4 h-4 mr-2" />Workflow Rules</TabsTrigger>
         </TabsList>
 
@@ -964,8 +1401,9 @@ export default function CommunityAdmin() {
                         <h3 className="font-semibold text-gray-900">{c.title}</h3>
                         <Badge variant="outline" className="text-xs">{c.privacy}</Badge>
                         <Badge variant={c.accessType === "free" ? "secondary" : "outline"}
-                          className={`text-xs ${c.accessType === "restricted" ? "border-amber-300 text-amber-700 bg-amber-50" : c.accessType === "paid" ? "bg-teal-100 text-teal-700 border-teal-200" : ""}`}>
+                          className={`text-xs ${c.accessType === "restricted" ? "border-amber-300 text-amber-700 bg-amber-50" : c.accessType === "paid" ? "bg-teal-100 text-teal-700 border-teal-200" : c.accessType === "course_gated" ? "bg-purple-100 text-purple-700 border-purple-200" : ""}`}>
                           {c.accessType === "restricted" && <Lock className="w-2.5 h-2.5 mr-1" />}
+                          {c.accessType === "course_gated" && <BookOpen className="w-2.5 h-2.5 mr-1" />}
                           {c.accessType}
                         </Badge>
                         <Badge variant={c.status === "published" ? "default" : "secondary"}
@@ -989,8 +1427,9 @@ export default function CommunityAdmin() {
                       <Button variant="outline" size="sm" onClick={() => setActiveCommunityId(c.id)}>
                         <Hash className="w-3.5 h-3.5 mr-1" />Select
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => { setEditCommunity(c); setShowCommunityForm(true); }}>
-                        <Edit2 className="w-3.5 h-3.5" />
+                      <Button variant="outline" size="sm" onClick={() => setEditingCommunity(c)}
+                        className="text-teal-700 border-teal-200 hover:bg-teal-50">
+                        <Edit2 className="w-3.5 h-3.5 mr-1" />Edit
                       </Button>
                       <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700"
                         onClick={() => { if (confirm(`Delete "${c.title}"? This cannot be undone.`)) deleteCommunity.mutate({ id: c.id }); }}>
@@ -1070,7 +1509,7 @@ export default function CommunityAdmin() {
         <TabsContent value="pending">
           <CommunitySelector />
           {!activeCommunityId ? (
-            <Card><CardContent className="py-12 text-center text-gray-400">Select a community to view pending membership requests.</CardContent></Card>
+            <Card><CardContent className="py-12 text-center text-gray-400">Select a community to view pending requests.</CardContent></Card>
           ) : (
             <PendingMembersTab communityId={activeCommunityId} />
           )}
@@ -1080,10 +1519,10 @@ export default function CommunityAdmin() {
         <TabsContent value="profiles">
           <CommunitySelector />
           {!activeCommunityId ? (
-            <Card><CardContent className="py-12 text-center text-gray-400">Select a community to manage its admin profiles.</CardContent></Card>
-          ) : (
-            <AdminProfilesTab communityId={activeCommunityId} communitySlug={activeCommunity?.slug ?? ""} />
-          )}
+            <Card><CardContent className="py-12 text-center text-gray-400">Select a community to manage admin profiles.</CardContent></Card>
+          ) : activeCommunity ? (
+            <AdminProfilesTab communityId={activeCommunityId} communitySlug={activeCommunity.slug} />
+          ) : null}
         </TabsContent>
 
         {/* Moderation tab */}
@@ -1215,50 +1654,8 @@ export default function CommunityAdmin() {
             </div>
           )}
         </TabsContent>
-              {/* Page Editor tab */}
-        <TabsContent value="page-editor">
-          <CommunitySelector />
-          {activeCommunityId ? (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-gray-900">Community Experience Page Editor</h3>
-                  <p className="text-sm text-gray-500 mt-0.5">Edit the content blocks shown on the community's main page for members.</p>
-                </div>
-                <a href={`/admin/communities/${activeCommunityId}/experience-builder`} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex-shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  Open Full Editor
-                </a>
-              </div>
-              <CommunityPageEditor communityId={activeCommunityId} pageType="page" />
-            </div>
-          ) : (
-            <div className="text-center py-12 text-gray-400">Select a community above to edit its page.</div>
-          )}
-        </TabsContent>
-        {/* Landing Page Editor tab */}
-        <TabsContent value="landing-editor">
-          <CommunitySelector />
-          {activeCommunityId ? (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-gray-900">Community Sales Landing Page Editor</h3>
-                  <p className="text-sm text-gray-500 mt-0.5">Edit the public-facing landing page blocks shown before users join the community.</p>
-                </div>
-                <a href={`/admin/communities/${activeCommunityId}/sales-builder`} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex-shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  Open Full Editor
-                </a>
-              </div>
-              <CommunityPageEditor communityId={activeCommunityId} pageType="landing" />
-            </div>
-          ) : (
-            <div className="text-center py-12 text-gray-400">Select a community above to edit its landing page.</div>
-          )}
-        </TabsContent>
+
+        {/* Workflow Rules tab */}
         <TabsContent value="workflow-rules">
           <CommunitySelector />
           {activeCommunityId ? (
@@ -1268,16 +1665,16 @@ export default function CommunityAdmin() {
           )}
         </TabsContent>
       </Tabs>
-      {/* Community form dialog */}
-      <Dialog open={showCommunityForm} onOpenChange={setShowCommunityForm}>
+
+      {/* Create Community dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editCommunity ? "Edit Community" : "Create Community"}</DialogTitle>
+            <DialogTitle>Create Community</DialogTitle>
           </DialogHeader>
-          <CommunityForm
-            community={editCommunity}
-            onClose={() => { setShowCommunityForm(false); setEditCommunity(null); }}
-            onSaved={() => {}}
+          <CreateCommunityForm
+            onClose={() => setShowCreateDialog(false)}
+            onSaved={(id) => { setShowCreateDialog(false); }}
           />
         </DialogContent>
       </Dialog>

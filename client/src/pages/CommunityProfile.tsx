@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   UserPlus, UserMinus, MapPin, Globe, Calendar, MessageSquare,
-  Star, Flame, Award, Users, ChevronLeft, Shield
+  Star, Flame, Award, Users, ChevronLeft, Shield, Mail
 } from "lucide-react";
 
 function XPBar({ xp }: { xp: any }) {
@@ -134,18 +134,25 @@ export default function CommunityProfile() {
                     {profile.specialty && <p className="text-gray-500 text-sm">{profile.specialty}</p>}
                   </div>
                   {!isOwnProfile && currentUser && (
-                    <Button
-                      size="sm"
-                      variant={profile.isFollowing ? "outline" : "default"}
-                      className={profile.isFollowing ? "" : "bg-teal-600 hover:bg-teal-700 text-white"}
-                      onClick={() => followMutation.mutate({ targetUserId: profile.id })}
-                      disabled={followMutation.isPending}
-                    >
-                      {profile.isFollowing
-                        ? <><UserMinus className="w-4 h-4 mr-1" />Unfollow</>
-                        : <><UserPlus className="w-4 h-4 mr-1" />Follow</>
-                      }
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant={profile.isFollowing ? "outline" : "default"}
+                        className={profile.isFollowing ? "" : "bg-teal-600 hover:bg-teal-700 text-white"}
+                        onClick={() => followMutation.mutate({ targetUserId: profile.id })}
+                        disabled={followMutation.isPending}
+                      >
+                        {profile.isFollowing
+                          ? <><UserMinus className="w-4 h-4 mr-1" />Unfollow</>
+                          : <><UserPlus className="w-4 h-4 mr-1" />Follow</>
+                        }
+                      </Button>
+                      <Link href={`/community/dms/${profile.id}`}>
+                        <Button size="sm" variant="outline" title="Send a direct message">
+                          <Mail className="w-4 h-4 mr-1" />Message
+                        </Button>
+                      </Link>
+                    </div>
                   )}
                 </div>
 

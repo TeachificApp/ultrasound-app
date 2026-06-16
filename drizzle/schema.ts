@@ -4941,6 +4941,16 @@ export const communities = mysqlTable("communities", {
   sortOrder: int("sort_order").default(0).notNull(),
   iconImage: text("icon_image"),
   linkedAccessItems: longtext("linked_access_items"),
+  // ─── Branding / UI Editor fields ─────────────────────────────────────────
+  bannerImage: text("banner_image"),
+  welcomeMessage: text("welcome_message"),
+  headerStyle: varchar("header_style", { length: 32 }).default("banner"),
+  layoutStyle: varchar("layout_style", { length: 32 }).default("sidebar"),
+  primaryColor: varchar("primary_color", { length: 32 }),
+  secondaryColor: varchar("secondary_color", { length: 32 }),
+  backgroundColor: varchar("background_color", { length: 32 }),
+  seoTitle: varchar("seo_title", { length: 255 }),
+  seoDescription: text("seo_description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

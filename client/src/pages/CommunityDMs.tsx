@@ -27,12 +27,23 @@ function timeAgo(dateStr: string | Date) {
 }
 
 export default function CommunityDMs() {
-  const { conversationId } = useParams<{ conversationId?: string }>();
+  const { conversationId, userId } = useParams<{ conversationId?: string; userId?: string }>();
   const { isAuthenticated, user } = useAuth();
   const [, navigate] = useLocation();
   const [messageBody, setMessageBody] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
+
+  // If userId param is present, get-or-create a conversation and redirect
+  const getOrCreate = trpc.community.member.getOrCreateConversation.useMutation({
+    onSuccess: (conv) => { navigate(`/community/dms/c/${conv.id}`, { replace: true }); },
+    onError: (e) => toast.error(e.message),
+  });
+  useEffect(() => {
+    if (userId && isAuthenticated && !conversationId) {
+      getOrCreate.mutate({ otherUserId: parseInt(userId) });
+    }
+  }, [userId, isAuthenticated]);
 
   const { data: conversations, isLoading: convsLoading } = trpc.community.member.myConversations.useQuery(
     undefined,
@@ -71,7 +82,7 @@ export default function CommunityDMs() {
         <div className="text-center">
           <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Sign in to view messages</h2>
-          <a href={getLoginUrl("/community/messages")}>
+                    <a href={getLoginUrl("/community/dms")}>
             <Button className="bg-teal-600 hover:bg-teal-700 text-white">Sign In</Button>
           </a>
         </div>
@@ -114,7 +125,7 @@ export default function CommunityDMs() {
                   return (
                     <button
                       key={conv.id}
-                      onClick={() => navigate(`/community/messages/${conv.id}`)}
+                      onClick={() => navigate(`/community/dms/c/${conv.id}`)})
                       className={`w-full text-left p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b ${isActive ? "bg-teal-50 border-l-2 border-l-teal-500" : ""}`}
                     >
                       <Avatar className="w-10 h-10 flex-shrink-0">

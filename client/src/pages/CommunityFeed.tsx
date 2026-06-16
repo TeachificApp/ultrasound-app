@@ -1,6 +1,7 @@
 /**
  * CommunityFeed.tsx
- * The main community space view: channel sidebar, post feed, post creation, reactions, comments.
+ * The main community space view: channel sidebar, post feed, post creation,
+ * reactions, comments, and a collapsible members sidebar with DM buttons.
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
@@ -20,7 +21,8 @@ import {
   MessageSquare, Heart, Bookmark, BookmarkCheck, MoreHorizontal,
   Image as ImageIcon, BarChart2, Send, ChevronDown, ChevronUp,
   Pin, Lock, EyeOff, Flag, Trash2, Edit2, Hash, Plus, Users, X,
-  ThumbsUp, Smile, Star, Flame
+  ThumbsUp, Smile, Star, Flame, Mail, ChevronRight, ChevronLeft,
+  UserCircle, Search
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
@@ -229,7 +231,7 @@ function PostCard({ post, isAdmin, communityId }: { post: any; isAdmin: boolean;
         {/* Header */}
         <div className="flex items-start gap-3 mb-3">
           <Link href={post.author?.id ? `/community/members/${post.author.id}` : "#"}>
-            <AuthorAvatar author={post.author} size="md" className="cursor-pointer hover:opacity-80 transition-opacity" />
+            <AuthorAvatar author={post.author} size="md" />
           </Link>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -311,15 +313,17 @@ function PostCard({ post, isAdmin, communityId }: { post: any; isAdmin: boolean;
           <ReactionBar post={post} onReact={(emoji) => reactMutation.mutate({ postId: post.id, emoji })} />
           <button
             onClick={() => setCommentsOpen(o => !o)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-sm text-gray-500 hover:bg-gray-100 transition-colors"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-sm transition-colors ${
+              commentsOpen ? "bg-teal-50 text-teal-600 border border-teal-200" : "text-gray-500 hover:bg-gray-100"
+            }`}
           >
             <MessageSquare className="w-4 h-4" />
             <span>{post.commentCount || 0}</span>
           </button>
           <button
             onClick={() => bookmarkMutation.mutate({ postId: post.id })}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-sm transition-colors ml-auto ${
-              post.isBookmarked ? "text-teal-600 bg-teal-50" : "text-gray-500 hover:bg-gray-100"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-sm transition-colors ${
+              post.isBookmarked ? "bg-amber-50 text-amber-600 border border-amber-200" : "text-gray-500 hover:bg-gray-100"
             }`}
           >
             {post.isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
@@ -333,171 +337,89 @@ function PostCard({ post, isAdmin, communityId }: { post: any; isAdmin: boolean;
   );
 }
 
+// ─── Create Post Box ──────────────────────────────────────────────────────────
 function CreatePostBox({ communityId, channelId, onPosted }: { communityId: number; channelId: number; onPosted: () => void }) {
   const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [postType, setPostType] = useState<"text" | "image" | "video" | "poll" | "case_study">("text");
-  const [imageDataUri, setImageDataUri] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [pollQuestion, setPollQuestion] = useState("");
-  const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [hashtags, setHashtags] = useState("");
   const [selectedAliasId, setSelectedAliasId] = useState<number | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
-
-  // Load posting aliases for admin users
-  const { data: aliases } = trpc.admin.listPostingAliases.useQuery(undefined, {
-    enabled: user?.role === "admin",
-  });
-
-  const uploadImage = trpc.community.member.uploadPostImage.useMutation({
-    onSuccess: (data) => setImageUrl(data.url),
-    onError: (e) => toast.error("Image upload failed: " + e.message),
-  });
-
+  const { data: aliases } = trpc.admin.listPostingAliases.useQuery(undefined, { enabled: user?.role === "admin" });
   const createPost = trpc.community.member.createPost.useMutation({
     onSuccess: () => {
-      setBody(""); setTitle(""); setImageDataUri(null); setImageUrl(null);
-      setPollQuestion(""); setPollOptions(["", ""]); setExpanded(false);
-      toast.success("Post published!");
+      setTitle(""); setBody(""); setHashtags(""); setExpanded(false); setSelectedAliasId(null);
       utils.community.member.getFeed.invalidate({ communityId });
       onPosted();
     },
     onError: (e) => toast.error(e.message),
   });
-
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 8_000_000) { toast.error("Image must be under 8 MB"); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUri = reader.result as string;
-      setImageDataUri(dataUri);
-      uploadImage.mutate({ dataUri, mimeType: file.type as any });
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function handleSubmit() {
-    if (!body.trim()) { toast.error("Post body is required"); return; }
-    const attachments = imageUrl ? [{ url: imageUrl, type: "image/jpeg" }] : undefined;
-    const poll = postType === "poll" && pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2
-      ? { question: pollQuestion.trim(), options: pollOptions.filter(o => o.trim()) }
-      : undefined;
-    createPost.mutate({
-      communityId, channelId,
-      title: title.trim() || undefined,
-      body: body.trim(),
-      postType, attachments, poll,
-      aliasId: selectedAliasId ?? undefined,
-    });
-  }
-
   if (!user) return null;
-
   return (
-    <Card className="mb-6">
+    <Card className="mb-4">
       <CardContent className="p-4">
         {!expanded ? (
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(true)}>
-            <AuthorAvatar author={user} size="md" />
-            <div className="flex-1 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-4 py-2.5 text-sm text-gray-500">
+            <AuthorAvatar author={user} />
+            <div className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2.5 text-sm text-gray-500 transition-colors">
               Share something with the community…
             </div>
           </div>
         ) : (
-          <div>
-            {/* Post as selector for admins */}
+          <div className="space-y-3">
             {user?.role === "admin" && aliases && aliases.length > 0 && (
-              <div className="flex items-center gap-2 mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                <span className="text-xs font-medium text-amber-700 whitespace-nowrap">Post as:</span>
-                <Select
-                  value={selectedAliasId === null ? "self" : String(selectedAliasId)}
-                  onValueChange={v => setSelectedAliasId(v === "self" ? null : Number(v))}
-                >
-                  <SelectTrigger className="h-7 text-xs border-amber-300 bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="self">Myself ({user.name})</SelectItem>
-                    {aliases.map(a => (
-                      <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.email})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select
+                value={selectedAliasId === null ? "self" : String(selectedAliasId)}
+                onValueChange={v => setSelectedAliasId(v === "self" ? null : Number(v))}
+              >
+                <SelectTrigger className="h-8 text-xs w-48">
+                  <SelectValue placeholder="Post as..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="self">Post as myself</SelectItem>
+                  {aliases.map((a: any) => (
+                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
-            <div className="flex items-start gap-3 mb-3">
-              <AuthorAvatar
-                author={selectedAliasId && aliases?.find(a => a.id === selectedAliasId)
-                  ? { name: aliases.find(a => a.id === selectedAliasId)!.name, avatarUrl: aliases.find(a => a.id === selectedAliasId)!.avatarUrl ?? undefined }
-                  : user}
-                size="md"
-              />
-              <div className="flex-1">
-                <Input
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="Title (optional)"
-                  className="mb-2 text-sm"
-                />
-                <RichTextEditor
-                  value={body}
-                  onChange={setBody}
-                  placeholder="Share a case, ask a question, or start a discussion… Use #hashtags to categorize."
-                  minHeight={100}
-                />
-              </div>
-            </div>
-
-            {/* Image preview */}
-            {imageDataUri && (
-              <div className="relative mb-3 ml-13">
-                <img src={imageDataUri} alt="Preview" className="rounded-lg max-h-48 object-cover" />
-                {uploadImage.isPending && <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-lg text-sm text-gray-500">Uploading…</div>}
-                <button onClick={() => { setImageDataUri(null); setImageUrl(null); }} className="absolute top-2 right-2 bg-white rounded-full p-1 shadow">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            )}
-
-            {/* Poll builder */}
-            {postType === "poll" && (
-              <div className="ml-13 mb-3 border rounded-xl p-3 space-y-2">
-                <Input value={pollQuestion} onChange={e => setPollQuestion(e.target.value)} placeholder="Poll question…" className="text-sm" />
-                {pollOptions.map((opt, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input value={opt} onChange={e => { const o = [...pollOptions]; o[i] = e.target.value; setPollOptions(o); }} placeholder={`Option ${i + 1}`} className="text-sm" />
-                    {pollOptions.length > 2 && <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))}><X className="w-3 h-3" /></Button>}
-                  </div>
-                ))}
-                {pollOptions.length < 6 && <Button variant="ghost" size="sm" onClick={() => setPollOptions([...pollOptions, ""])} className="text-teal-600"><Plus className="w-3 h-3 mr-1" />Add option</Button>}
-              </div>
-            )}
-
-            {/* Toolbar */}
-            <div className="flex items-center gap-2 mt-3">
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
-              <Button variant="ghost" size="sm" className="text-gray-500 hover:text-teal-600" onClick={() => { setPostType("image"); fileRef.current?.click(); }}>
-                <ImageIcon className="w-4 h-4 mr-1" />Photo
+            <Input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Post title (optional)"
+              className="font-medium"
+            />
+            <RichTextEditor
+              value={body}
+              onChange={setBody}
+              placeholder="What's on your mind?"
+              minHeight={120}
+            />
+            <Input
+              value={hashtags}
+              onChange={e => setHashtags(e.target.value)}
+              placeholder="#hashtags (comma-separated)"
+              className="text-sm"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setExpanded(false); setTitle(""); setBody(""); setHashtags(""); }}>
+                Cancel
               </Button>
-              <Button variant="ghost" size="sm" className={`text-gray-500 hover:text-teal-600 ${postType === "poll" ? "text-teal-600 bg-teal-50" : ""}`}
-                onClick={() => setPostType(postType === "poll" ? "text" : "poll")}>
-                <BarChart2 className="w-4 h-4 mr-1" />Poll
+              <Button
+                size="sm"
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                disabled={!body.trim() || createPost.isPending}
+                onClick={() => createPost.mutate({
+                  communityId, channelId,
+                  title: title.trim() || undefined,
+                  body,
+                  hashtags: hashtags.trim() || undefined,
+                  aliasId: selectedAliasId ?? undefined,
+                })}
+              >
+                <Send className="w-4 h-4 mr-1" />Post
               </Button>
-              <Button variant="ghost" size="sm" className={`text-gray-500 hover:text-teal-600 ${postType === "case_study" ? "text-teal-600 bg-teal-50" : ""}`}
-                onClick={() => setPostType(postType === "case_study" ? "text" : "case_study")}>
-                <Hash className="w-4 h-4 mr-1" />Case
-              </Button>
-              <div className="ml-auto flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { setExpanded(false); setBody(""); setTitle(""); }}>Cancel</Button>
-                <Button size="sm" className="bg-teal-600 hover:bg-teal-700" disabled={!body || createPost.isPending || uploadImage.isPending} onClick={handleSubmit}>
-                  {createPost.isPending ? "Posting…" : "Post"}
-                </Button>
-              </div>
             </div>
           </div>
         )}
@@ -506,13 +428,160 @@ function CreatePostBox({ communityId, channelId, onPosted }: { communityId: numb
   );
 }
 
+// ─── Members Sidebar ──────────────────────────────────────────────────────────
+function MembersSidebar({ communityId, currentUserId }: { communityId: number; currentUserId?: number }) {
+  const [search, setSearch] = useState("");
+  const { data: members, isLoading } = trpc.community.member.getRecentMembers.useQuery(
+    { communityId, limit: 40 },
+    { enabled: !!communityId }
+  );
+
+  const filtered = (members ?? []).filter((m: any) => {
+    if (!search) return true;
+    const name = (m.displayName || m.name || "").toLowerCase();
+    return name.includes(search.toLowerCase());
+  });
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Members</h3>
+        <span className="text-xs text-gray-400">{members?.length ?? 0}</span>
+      </div>
+
+      {/* Avatar strip — top 8 members */}
+      {!search && (members?.length ?? 0) > 0 && (
+        <div className="flex -space-x-2 mb-3">
+          {(members ?? []).slice(0, 8).map((m: any) => (
+            <Link key={m.userId} href={`/community/members/${m.userId}`}>
+              <Avatar className="w-7 h-7 border-2 border-white cursor-pointer hover:z-10 hover:scale-110 transition-transform">
+                <AvatarImage src={m.avatarUrl ?? undefined} />
+                <AvatarFallback className="text-[10px] bg-teal-100 text-teal-700 font-bold">
+                  {(m.displayName || m.name || "?").charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
+          ))}
+          {(members?.length ?? 0) > 8 && (
+            <div className="w-7 h-7 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 font-semibold">
+              +{(members?.length ?? 0) - 8}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+        <Input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search members..."
+          className="pl-8 h-8 text-xs"
+        />
+      </div>
+
+      {/* Member list */}
+      <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 rounded-lg" />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-4">{search ? "No members found" : "No members yet"}</p>
+        ) : (
+          filtered.map((m: any) => (
+            <div key={m.userId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 group">
+              <Link href={`/community/members/${m.userId}`} className="flex items-center gap-2 flex-1 min-w-0">
+                <Avatar className="w-7 h-7 flex-shrink-0">
+                  <AvatarImage src={m.avatarUrl ?? undefined} />
+                  <AvatarFallback className="text-[10px] bg-teal-100 text-teal-700 font-semibold">
+                    {(m.displayName || m.name || "?").charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-gray-800 truncate">{m.displayName || m.name}</p>
+                  {m.credentials && <p className="text-[10px] text-teal-600 truncate">{m.credentials}</p>}
+                </div>
+              </Link>
+              {/* DM button — only show for other members */}
+              {currentUserId && m.userId !== currentUserId && (
+                <Link href={`/community/dms/${m.userId}`}>
+                  <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-teal-50 text-teal-600" title={`Message ${m.displayName || m.name}`}>
+                    <Mail className="w-3.5 h-3.5" />
+                  </button>
+                </Link>
+              )}
+              {m.role === "admin" && (
+                <span className="text-[9px] font-bold bg-teal-600 text-white px-1.5 py-0.5 rounded-full flex-shrink-0">A</span>
+              )}
+              {m.role === "moderator" && (
+                <span className="text-[9px] font-bold bg-purple-600 text-white px-1.5 py-0.5 rounded-full flex-shrink-0">M</span>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Channel Header with Avatar Strip ────────────────────────────────────────
+function ChannelHeader({
+  channel, community, memberCount, recentMembers, showMembersSidebar, onToggleSidebar
+}: {
+  channel: any; community: any; memberCount: number;
+  recentMembers: any[]; showMembersSidebar: boolean; onToggleSidebar: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between mb-4 pb-3 border-b">
+      <div className="flex items-center gap-2 min-w-0">
+        <Hash className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <h2 className="font-semibold text-gray-900 truncate">{channel?.name ?? "All Posts"}</h2>
+        {channel?.description && (
+          <span className="text-xs text-gray-400 hidden sm:block truncate">— {channel.description}</span>
+        )}
+      </div>
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Overlapping member avatars */}
+        {recentMembers.length > 0 && (
+          <div className="flex -space-x-1.5 items-center">
+            {recentMembers.slice(0, 5).map((m: any) => (
+              <Avatar key={m.userId} className="w-6 h-6 border-2 border-white">
+                <AvatarImage src={m.avatarUrl ?? undefined} />
+                <AvatarFallback className="text-[9px] bg-teal-100 text-teal-700 font-bold">
+                  {(m.displayName || m.name || "?").charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            ))}
+            <span className="text-xs text-gray-500 ml-2 font-medium">{memberCount.toLocaleString()}</span>
+          </div>
+        )}
+        {/* Toggle members sidebar */}
+        <button
+          onClick={onToggleSidebar}
+          className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full transition-colors ${
+            showMembersSidebar ? "bg-teal-50 text-teal-600 border border-teal-200" : "text-gray-500 hover:bg-gray-100"
+          }`}
+          title={showMembersSidebar ? "Hide members" : "Show members"}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Members</span>
+          {showMembersSidebar ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function CommunityFeed() {
   const { slug } = useParams<{ slug: string }>();
   const { isAuthenticated, user } = useAuth();
   const [, navigate] = useLocation();
   const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
   const [sort, setSort] = useState<"newest" | "trending">("newest");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showMembersSidebar, setShowMembersSidebar] = useState(true);
 
   const { data: community, isLoading: communityLoading } = trpc.community.public.getCommunity.useQuery(
     { slug: slug! },
@@ -535,6 +604,12 @@ export default function CommunityFeed() {
   const isAdmin = (user as any)?.role === "admin";
   const isMember = !!membership || isAdmin;
 
+  // Recent members for sidebar and avatar strip
+  const { data: recentMembers } = trpc.community.member.getRecentMembers.useQuery(
+    { communityId: community?.id ?? 0, limit: 40 },
+    { enabled: !!community?.id && isMember }
+  );
+
   // Set default channel
   useEffect(() => {
     if (community?.channels?.length && !activeChannelId) {
@@ -553,6 +628,7 @@ export default function CommunityFeed() {
   );
 
   const allPosts = feed?.pages.flatMap((p: any) => p.items) ?? [];
+  const activeChannel = community?.channels?.find((c: any) => c.id === activeChannelId);
 
   useEffect(() => {
     if (community?.title) document.title = `${community.title} | Community | All About Ultrasound™`;
@@ -562,13 +638,14 @@ export default function CommunityFeed() {
   if (communityLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto px-4 py-8">
           <Skeleton className="h-40 rounded-xl mb-6" />
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-5 gap-6">
             <Skeleton className="h-64 rounded-xl" />
             <div className="col-span-3 space-y-4">
               {[1,2,3].map(i => <Skeleton key={i} className="h-36 rounded-xl" />)}
             </div>
+            <Skeleton className="h-64 rounded-xl" />
           </div>
         </div>
       </div>
@@ -592,12 +669,16 @@ export default function CommunityFeed() {
     <div className="min-h-screen bg-gray-50">
       {/* Community header */}
       <div className="relative" style={{ background: `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}cc 100%)` }}>
-        {community.coverImage && (
+        {community.bannerImage ? (
+          <div className="absolute inset-0">
+            <img src={community.bannerImage} alt="" className="w-full h-full object-cover opacity-30" />
+          </div>
+        ) : community.coverImage ? (
           <div className="absolute inset-0">
             <img src={community.coverImage} alt="" className="w-full h-full object-cover opacity-20" />
           </div>
-        )}
-        <div className="relative max-w-5xl mx-auto px-4 py-8">
+        ) : null}
+        <div className="relative max-w-6xl mx-auto px-4 py-8">
           <div className="flex items-start gap-4">
             {community.logoImage ? (
               <img src={community.logoImage} alt={community.title} className="w-16 h-16 rounded-xl object-cover shadow-md" />
@@ -633,11 +714,11 @@ export default function CommunityFeed() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className={`grid gap-6 ${showMembersSidebar && isMember ? "grid-cols-1 lg:grid-cols-[200px_1fr_220px]" : "grid-cols-1 lg:grid-cols-[200px_1fr]"}`}>
           {/* Channels sidebar */}
           <div className="lg:col-span-1">
-            <Card>
+            <Card className="sticky top-4">
               <CardContent className="p-3">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 mb-2">Channels</h3>
                 <div className="space-y-0.5">
@@ -656,12 +737,40 @@ export default function CommunityFeed() {
                     </button>
                   ))}
                 </div>
+
+                {/* Quick links */}
+                <div className="mt-3 pt-3 border-t space-y-0.5">
+                  <Link href="/community/leaderboard">
+                    <button className="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 text-gray-600 hover:bg-gray-100 transition-colors">
+                      <Star className="w-3.5 h-3.5 opacity-60" />Leaderboard
+                    </button>
+                  </Link>
+                  {isAuthenticated && (
+                    <Link href="/community/dms">
+                      <button className="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 text-gray-600 hover:bg-gray-100 transition-colors">
+                        <Mail className="w-3.5 h-3.5 opacity-60" />Messages
+                      </button>
+                    </Link>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Feed */}
-          <div className="lg:col-span-3">
+          <div className="min-w-0">
+            {/* Channel header with avatar strip */}
+            {isMember && (
+              <ChannelHeader
+                channel={activeChannel}
+                community={community}
+                memberCount={community.memberCount ?? 0}
+                recentMembers={recentMembers ?? []}
+                showMembersSidebar={showMembersSidebar}
+                onToggleSidebar={() => setShowMembersSidebar(s => !s)}
+              />
+            )}
+
             {/* Sort bar */}
             <div className="flex items-center gap-2 mb-4">
               <button onClick={() => setSort("newest")} className={`text-sm px-3 py-1.5 rounded-full font-medium transition-colors ${sort === "newest" ? "bg-teal-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}>
@@ -724,6 +833,17 @@ export default function CommunityFeed() {
               </>
             )}
           </div>
+
+          {/* Members sidebar (collapsible) */}
+          {showMembersSidebar && isMember && (
+            <div className="hidden lg:block">
+              <Card className="sticky top-4 max-h-[calc(100vh-6rem)] overflow-hidden flex flex-col">
+                <CardContent className="p-3 flex-1 flex flex-col min-h-0">
+                  <MembersSidebar communityId={community.id} currentUserId={user?.id} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
     </div>

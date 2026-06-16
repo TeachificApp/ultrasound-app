@@ -879,6 +879,30 @@ const communityMemberRouter = router({
 
     return { ...u, xp: xp ?? null, badges: badgeRows.map(b => b.badge), isFollowing, recentPosts };
   }),
+
+  /** Get recent/active members for the community sidebar */
+  getRecentMembers: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    limit: z.number().min(1).max(50).default(20),
+  })).query(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db.select({
+      id: communityMembers.id,
+      userId: communityMembers.userId,
+      joinedAt: communityMembers.joinedAt,
+      role: communityMembers.role,
+      name: users.name,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+      credentials: users.credentials,
+    }).from(communityMembers)
+      .innerJoin(users, eq(users.id, communityMembers.userId))
+      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.memberStatus, "approved")))
+      .orderBy(desc(communityMembers.joinedAt))
+      .limit(input.limit);
+    return rows;
+  }),
 });
 
 // ─── Admin sub-router ─────────────────────────────────────────────────────────
@@ -914,10 +938,12 @@ const communityAdminRouter = router({
   updateCommunity: protectedProcedure.input(z.object({
     id: z.number(),
     title: z.string().min(1).max(255).optional(),
+    slug: z.string().min(1).max(255).optional(),
     description: z.string().optional(),
+    brand: z.enum(["all_about_ultrasound", "iheartecho"]).optional(),
     status: z.enum(["draft", "published"]).optional(),
     privacy: z.enum(["public", "private", "paid", "invite_only", "course_gated"]).optional(),
-    accessType: z.enum(["free", "paid", "restricted", "invite_only", "course_gated"]).optional(),
+    accessType: z.enum(["free", "paid", "restricted", "invite_only", "course_gated", "linked"]).optional(),
     accentColor: z.string().optional(),
     coverImage: z.string().optional(),
     logoImage: z.string().optional(),
@@ -925,6 +951,16 @@ const communityAdminRouter = router({
     sortOrder: z.number().optional(),
     linkedAccessItems: z.string().optional(), // JSON array of {type, id, title}
     pageBlocks: z.string().optional(),
+    // Branding / UI Editor fields
+    bannerImage: z.string().optional(),
+    welcomeMessage: z.string().optional(),
+    headerStyle: z.string().optional(),
+    layoutStyle: z.string().optional(),
+    primaryColor: z.string().optional(),
+    secondaryColor: z.string().optional(),
+    backgroundColor: z.string().optional(),
+    seoTitle: z.string().optional(),
+    seoDescription: z.string().optional(),
   })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);
     const db = await getDb();
@@ -1294,9 +1330,9 @@ const communityAdminRouter = router({
   /** Upload community cover/logo image */
   uploadCommunityImage: protectedProcedure.input(z.object({
     communityId: z.number(),
-    imageType: z.enum(["cover", "logo"]),
+    imageType: z.enum(["cover", "logo", "banner", "icon"]),
     dataUri: z.string().min(1).max(10_000_000),
-    mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+    mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
   })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);
     const db = await getDb();
@@ -1309,7 +1345,10 @@ const communityAdminRouter = router({
     const suffix = randomBytes(4).toString("hex");
     const fileKey = `community-${input.imageType}/${input.communityId}-${suffix}.${ext}`;
     const { url } = await storagePut(fileKey, buffer, input.mimeType);
-    const updateData = input.imageType === "cover" ? { coverImage: url } : { logoImage: url };
+    const updateData = input.imageType === "cover" ? { coverImage: url }
+      : input.imageType === "logo" ? { logoImage: url }
+      : input.imageType === "banner" ? { bannerImage: url }
+      : { iconImage: url };
     await db.update(communities).set(updateData).where(eq(communities.id, input.communityId));
     return { url };
   }),

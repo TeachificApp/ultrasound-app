@@ -753,6 +753,7 @@ function LMSRouter() {
             <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
             <Route path="/community/members/:userId" component={CommunityProfile} />
             <Route path="/community/dms" component={CommunityDMs} />
+            <Route path="/community/dms/c/:conversationId" component={CommunityDMs} />
             <Route path="/community/dms/:userId" component={CommunityDMs} />
             <Route path="/community/leaderboard" component={CommunityLeaderboard} />
             <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityAdmin /></RoleGuard>}</Route>
@@ -1029,6 +1030,7 @@ function IHeartEchoRouter() {
         <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
         <Route path="/community/members/:userId" component={CommunityProfile} />
         <Route path="/community/dms" component={CommunityDMs} />
+        <Route path="/community/dms/c/:conversationId" component={CommunityDMs} />
         <Route path="/community/dms/:userId" component={CommunityDMs} />
         <Route path="/community/leaderboard" component={CommunityLeaderboard} />
         <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
