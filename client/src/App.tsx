@@ -72,6 +72,9 @@ import StandaloneLandingPage from "./pages/StandaloneLandingPage";
 
 // ── Digital Downloads ──────────────────────────────────────────────────────────
 const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
+// ── Workshops ────────────────────────────────────────────────────────────────
+const WorkshopsBrowse = lazy(() => import("./pages/WorkshopsBrowse"));
+const WorkshopDetail = lazy(() => import("./pages/WorkshopDetail"));
 const DownloadLanding = lazy(() => import("./pages/DownloadLanding"));
 const DownloadFiles = lazy(() => import("./pages/DownloadFiles"));
 const DownloadLandingPageBuilder = lazy(() => import("./pages/admin/DownloadLandingPageBuilder"));
@@ -764,6 +767,10 @@ function LMSRouter() {
         {/* Digital Downloads */}
         <Route path="/my-downloads" component={MyDownloads} />
         <Route path="/downloads" component={DownloadsBrowse} />
+
+        {/* Workshops */}
+        <Route path="/workshops" component={WorkshopsBrowse} />
+        <Route path="/workshops/:slug" component={WorkshopDetail} />
         <Route path="/bundles/:slug" component={BundleLanding} />
 
         {/* ── Career Network ─────────────────────────────────────────────── */}
