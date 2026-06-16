@@ -128,37 +128,59 @@ export const lmsQuizLandingRouter = router({
   addQuestion: protectedProcedure
     .input(z.object({
       quizId: z.number(), question: z.string().min(1),
-      type: z.enum(["mcq", "truefalse"]).default("mcq"),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).default("mcq"),
       options: z.array(z.string()).optional(),
-      correctAnswer: z.string().min(1),
+      correctAnswer: z.string().optional(),
+      correctAnswers: z.array(z.number().int()).optional(),
+      hotspotMarkers: z.string().optional(),
+      matchingPairs: z.string().optional(),
       explanation: z.string().optional(),
+      questionImageUrl: z.string().optional(),
+      questionVideoUrl: z.string().optional(),
+      feedbackImageUrl: z.string().optional(),
+      feedbackVideoUrl: z.string().optional(),
       position: z.number().int().default(0),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { options, correctAnswers, ...rest } = input;
       const [result] = await db.insert(lmsQuizQuestions).values({
-        ...input, options: input.options ? JSON.stringify(input.options) : null, explanation: input.explanation ?? null,
-      }).$returningId();
+        ...rest,
+        correctAnswer: rest.correctAnswer ?? "",
+        options: options ? JSON.stringify(options) : null,
+        correctAnswers: correctAnswers ? JSON.stringify(correctAnswers) : null,
+        explanation: rest.explanation ?? null,
+      } as any).$returningId();
       return { id: result.id };
     }),
 
   updateQuestion: protectedProcedure
     .input(z.object({
       id: z.number(), question: z.string().min(1).optional(),
-      type: z.enum(["mcq", "truefalse"]).optional(),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).optional(),
       options: z.array(z.string()).optional(),
-      correctAnswer: z.string().optional(), explanation: z.string().optional(), position: z.number().int().optional(),
+      correctAnswer: z.string().nullable().optional(),
+      correctAnswers: z.array(z.number().int()).nullable().optional(),
+      hotspotMarkers: z.string().nullable().optional(),
+      matchingPairs: z.string().nullable().optional(),
+      explanation: z.string().nullable().optional(),
+      questionImageUrl: z.string().nullable().optional(),
+      questionVideoUrl: z.string().nullable().optional(),
+      feedbackImageUrl: z.string().nullable().optional(),
+      feedbackVideoUrl: z.string().nullable().optional(),
+      position: z.number().int().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, options, ...rest } = input;
+      const { id, options, correctAnswers, ...rest } = input;
       const updates: Record<string, unknown> = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
       if (options !== undefined) updates.options = JSON.stringify(options);
-      if (Object.keys(updates).length > 0) await db.update(lmsQuizQuestions).set(updates).where(eq(lmsQuizQuestions.id, id));
+      if (correctAnswers !== undefined) updates.correctAnswers = correctAnswers ? JSON.stringify(correctAnswers) : null;
+      if (Object.keys(updates).length > 0) await db.update(lmsQuizQuestions).set(updates as any).where(eq(lmsQuizQuestions.id, id));
       return { success: true };
     }),
 
@@ -322,10 +344,17 @@ Rules:
       quizId: z.number(),
       questions: z.array(z.object({
         question: z.string().min(1),
-        type: z.enum(["mcq", "truefalse"]),
-        options: z.array(z.string()),
-        correctAnswer: z.string().min(1),
+        type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]),
+        options: z.array(z.string()).optional(),
+        correctAnswer: z.string().optional(),
+        correctAnswers: z.array(z.number().int()).optional(),
+        hotspotMarkers: z.string().optional(),
+        matchingPairs: z.string().optional(),
         explanation: z.string().optional(),
+        questionImageUrl: z.string().optional(),
+        questionVideoUrl: z.string().optional(),
+        feedbackImageUrl: z.string().optional(),
+        feedbackVideoUrl: z.string().optional(),
       })),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -342,15 +371,16 @@ Rules:
       let nextPos = existing.length > 0 ? (existing[0].pos ?? 0) + 1 : 0;
 
       for (const q of input.questions) {
+        const { options, correctAnswers, ...rest } = q;
         await db.insert(lmsQuizQuestions).values({
           quizId: input.quizId,
-          question: q.question,
-          type: q.type as "mcq" | "truefalse",
-          options: JSON.stringify(q.options),
-          correctAnswer: q.correctAnswer,
-          explanation: q.explanation ?? null,
+          ...rest,
+          correctAnswer: rest.correctAnswer ?? "",
+          options: options ? JSON.stringify(options) : null,
+          correctAnswers: correctAnswers ? JSON.stringify(correctAnswers) : null,
+          explanation: rest.explanation ?? null,
           position: nextPos++,
-        });
+        } as any);
       }
 
       return { inserted: input.questions.length };

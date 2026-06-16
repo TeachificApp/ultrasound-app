@@ -3032,10 +3032,20 @@ export const lmsQuizQuestions = mysqlTable("lms_quiz_questions", {
   id: int("id").autoincrement().primaryKey(),
   quizId: int("quiz_id").notNull(),
   question: text("question").notNull(),
-  type: mysqlEnum("type", ["mcq", "truefalse"]).default("mcq").notNull(),
-  options: text("options"), // JSON array of strings
+  type: mysqlEnum("type", ["mcq", "truefalse", "multiselect", "hotspot", "matching"]).default("mcq").notNull(),
+  options: text("options"), // JSON array of strings or {text,imageUrl?,videoUrl?} objects
   correctAnswer: varchar("correct_answer", { length: 255 }).notNull(),
+  /** For multiselect: JSON array of correct answer indices. For hotspot: JSON {x,y,radius}. */
+  correctAnswers: text("correct_answers"),
   explanation: text("explanation"),
+  questionImageUrl: text("question_image_url"),
+  questionVideoUrl: text("question_video_url"),
+  /** Hotspot: JSON array of { id, x, y, radius, label, isCorrect } */
+  hotspotMarkers: text("hotspot_markers"),
+  /** Matching: JSON array of { id, left, right } */
+  matchingPairs: text("matching_pairs"),
+  feedbackImageUrl: text("feedback_image_url"),
+  feedbackVideoUrl: text("feedback_video_url"),
   position: int("position").default(0).notNull(),
 });
 export type LmsQuizQuestion = typeof lmsQuizQuestions.$inferSelect;
@@ -5060,20 +5070,42 @@ export type LessonTemplate = typeof lessonTemplates.$inferSelect;
 // Options are stored as JSON array of objects: { text, imageUrl?, videoUrl? }
 // Quiz-level settings (randomizeQuestions, randomizeAnswers) live on lms_quizzes.
 
+export const questionBankFolders = mysqlTable("question_bank_folders", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  parentId: int("parent_id"),
+  color: varchar("color", { length: 32 }).default("#179ca3").notNull(),
+  createdByAdminId: int("created_by_admin_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type QuestionBankFolder = typeof questionBankFolders.$inferSelect;
+
 export const questionBank = mysqlTable("question_bank", {
   id: int("id").autoincrement().primaryKey(),
   question: longtext("question").notNull(),
-  type: mysqlEnum("type", ["mcq", "truefalse"]).default("mcq").notNull(),
+  type: mysqlEnum("type", ["mcq", "truefalse", "multiselect", "hotspot", "matching"]).default("mcq").notNull(),
   // JSON array of { text: string, imageUrl?: string, videoUrl?: string }
   options: longtext("options"),
   correctAnswer: varchar("correct_answer", { length: 500 }).notNull(),
+  /** For multiselect: JSON array of correct answer indices. For hotspot: JSON {x,y,radius}. For matching: not used (use matchingPairs) */
+  correctAnswers: text("correct_answers"),
   explanation: longtext("explanation"),
   // Media attached to the question stem
   questionImageUrl: text("question_image_url"),
   questionVideoUrl: text("question_video_url"),
+  /** Hotspot: JSON array of { id, x, y, radius, label, isCorrect } */
+  hotspotMarkers: text("hotspot_markers"),
+  /** Matching: JSON array of { id, left, right } */
+  matchingPairs: text("matching_pairs"),
+  /** Feedback media */
+  feedbackImageUrl: text("feedback_image_url"),
+  feedbackVideoUrl: text("feedback_video_url"),
   // Source tracking
   sourceQuizId: int("source_quiz_id"), // FK → lms_quizzes.id (if created via quiz builder)
   sourceQuizQuestionId: int("source_quiz_question_id"), // FK → lms_quiz_questions.id
+  folderId: int("folder_id"), // FK → question_bank_folders.id
   createdByAdminId: int("created_by_admin_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

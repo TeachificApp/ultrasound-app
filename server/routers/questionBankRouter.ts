@@ -12,6 +12,7 @@ import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
 import {
   questionBank,
+  questionBankFolders,
   questionBankTags,
   questionBankTagMap,
   lmsQuizQuestions,
@@ -39,16 +40,22 @@ async function assertAdmin(ctx: { user: { id: number; role: string } }) {
 // ─── Shared question input schema ─────────────────────────────────────────────
 const questionInput = z.object({
   question: z.string().min(1),
-  type: z.enum(["mcq", "truefalse"]).default("mcq"),
+  type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).default("mcq"),
   options: z.array(z.object({
     text: z.string(),
     imageUrl: z.string().optional(),
     videoUrl: z.string().optional(),
   })).optional(),
-  correctAnswer: z.string().min(1),
+  correctAnswer: z.string().optional(),
+  correctAnswers: z.array(z.number().int()).optional(),
+  hotspotMarkers: z.string().optional(), // JSON string
+  matchingPairs: z.string().optional(),  // JSON string
   explanation: z.string().optional(),
   questionImageUrl: z.string().optional(),
   questionVideoUrl: z.string().optional(),
+  feedbackImageUrl: z.string().optional(),
+  feedbackVideoUrl: z.string().optional(),
+  folderId: z.number().int().optional(),
   tagIds: z.array(z.number().int()).optional(),
 });
 
@@ -106,7 +113,8 @@ export const questionBankRouter = router({
     .input(z.object({
       search: z.string().optional(),
       tagIds: z.array(z.number().int()).optional(),
-      type: z.enum(["mcq", "truefalse"]).optional(),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).optional(),
+      folderId: z.number().int().nullable().optional(),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(25),
     }))
@@ -118,6 +126,13 @@ export const questionBankRouter = router({
       const conditions: any[] = [];
       if (input.search) conditions.push(like(questionBank.question, `%${input.search}%`));
       if (input.type) conditions.push(eq(questionBank.type, input.type));
+      if (input.folderId !== undefined) {
+        if (input.folderId === null) {
+          conditions.push(sql`${questionBank.folderId} IS NULL`);
+        } else {
+          conditions.push(eq(questionBank.folderId, input.folderId));
+        }
+      }
 
       // Tag filter: get question IDs that have ALL the requested tags
       let tagFilteredIds: number[] | null = null;
@@ -165,6 +180,9 @@ export const questionBankRouter = router({
         questions: questions.map(q => ({
           ...q,
           options: q.options ? JSON.parse(q.options) : [],
+          correctAnswers: (q as any).correctAnswers ? JSON.parse((q as any).correctAnswers) : [],
+          hotspotMarkers: (q as any).hotspotMarkers ? JSON.parse((q as any).hotspotMarkers) : [],
+          matchingPairs: (q as any).matchingPairs ? JSON.parse((q as any).matchingPairs) : [],
           tags: tagsByQuestion.get(q.id) ?? [],
         })),
         total: Number(count),
@@ -186,7 +204,14 @@ export const questionBankRouter = router({
         .from(questionBankTagMap)
         .innerJoin(questionBankTags, eq(questionBankTagMap.tagId, questionBankTags.id))
         .where(eq(questionBankTagMap.questionId, input.id));
-      return { ...q, options: q.options ? JSON.parse(q.options) : [], tags: tagRows.map(r => r.tag) };
+      return {
+        ...q,
+        options: q.options ? JSON.parse(q.options) : [],
+        correctAnswers: (q as any).correctAnswers ? JSON.parse((q as any).correctAnswers) : [],
+        hotspotMarkers: (q as any).hotspotMarkers ? JSON.parse((q as any).hotspotMarkers) : [],
+        matchingPairs: (q as any).matchingPairs ? JSON.parse((q as any).matchingPairs) : [],
+        tags: tagRows.map(r => r.tag),
+      };
     }),
 
   createQuestion: protectedProcedure
@@ -195,12 +220,16 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { tagIds, options, ...rest } = input;
+      const { tagIds, options, correctAnswers, hotspotMarkers, matchingPairs, ...rest } = input;
       const [result] = await db.insert(questionBank).values({
         ...rest,
+        correctAnswer: rest.correctAnswer ?? "",
         options: options ? JSON.stringify(options) : null,
+        correctAnswers: correctAnswers ? JSON.stringify(correctAnswers) : null,
+        hotspotMarkers: hotspotMarkers ?? null,
+        matchingPairs: matchingPairs ?? null,
         createdByAdminId: ctx.user.id,
-      }).$returningId();
+      } as any).$returningId();
       if (tagIds && tagIds.length > 0) {
         await db.insert(questionBankTagMap).values(tagIds.map(tagId => ({ questionId: result.id, tagId })));
       }
@@ -211,21 +240,28 @@ export const questionBankRouter = router({
     .input(z.object({
       id: z.number(),
       question: z.string().min(1).optional(),
-      type: z.enum(["mcq", "truefalse"]).optional(),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).optional(),
       options: z.array(z.object({ text: z.string(), imageUrl: z.string().optional(), videoUrl: z.string().optional() })).optional(),
-      correctAnswer: z.string().optional(),
-      explanation: z.string().optional(),
+      correctAnswer: z.string().nullable().optional(),
+      correctAnswers: z.array(z.number().int()).nullable().optional(),
+      hotspotMarkers: z.string().nullable().optional(),
+      matchingPairs: z.string().nullable().optional(),
+      explanation: z.string().nullable().optional(),
       questionImageUrl: z.string().nullable().optional(),
       questionVideoUrl: z.string().nullable().optional(),
+      feedbackImageUrl: z.string().nullable().optional(),
+      feedbackVideoUrl: z.string().nullable().optional(),
+      folderId: z.number().int().nullable().optional(),
       tagIds: z.array(z.number().int()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, tagIds, options, ...rest } = input;
+      const { id, tagIds, options, correctAnswers, ...rest } = input;
       const updates: Record<string, unknown> = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
       if (options !== undefined) updates.options = JSON.stringify(options);
+      if (correctAnswers !== undefined) updates.correctAnswers = correctAnswers ? JSON.stringify(correctAnswers) : null;
       if (Object.keys(updates).length > 0) {
         await db.update(questionBank).set(updates).where(eq(questionBank.id, id));
       }
@@ -382,10 +418,17 @@ export const questionBankRouter = router({
           question: q.question,
           type: q.type,
           options: opts ? JSON.stringify(opts) : null,
-          correctAnswer: q.correctAnswer,
-          explanation: q.explanation ?? null,
+          correctAnswer: (q as any).correctAnswer ?? "",
+          correctAnswers: (q as any).correctAnswers ?? null,
+          hotspotMarkers: (q as any).hotspotMarkers ?? null,
+          matchingPairs: (q as any).matchingPairs ?? null,
+          explanation: (q as any).explanation ?? null,
+          questionImageUrl: (q as any).questionImageUrl ?? null,
+          questionVideoUrl: (q as any).questionVideoUrl ?? null,
+          feedbackImageUrl: (q as any).feedbackImageUrl ?? null,
+          feedbackVideoUrl: (q as any).feedbackVideoUrl ?? null,
           position: pos++,
-        });
+        } as any);
       }
 
       return { imported: questions.length };
@@ -426,12 +469,19 @@ export const questionBankRouter = router({
         question: qq.question,
         type: qq.type,
         options: opts,
-        correctAnswer: qq.correctAnswer,
+        correctAnswer: qq.correctAnswer ?? "",
+        correctAnswers: (qq as any).correctAnswers ?? null,
+        hotspotMarkers: (qq as any).hotspotMarkers ?? null,
+        matchingPairs: (qq as any).matchingPairs ?? null,
         explanation: qq.explanation ?? null,
+        questionImageUrl: (qq as any).questionImageUrl ?? null,
+        questionVideoUrl: (qq as any).questionVideoUrl ?? null,
+        feedbackImageUrl: (qq as any).feedbackImageUrl ?? null,
+        feedbackVideoUrl: (qq as any).feedbackVideoUrl ?? null,
         sourceQuizId: qq.quizId,
         sourceQuizQuestionId: qq.id,
         createdByAdminId: ctx.user.id,
-      }).$returningId();
+      } as any).$returningId();
 
       if (input.tagIds && input.tagIds.length > 0) {
         await db.insert(questionBankTagMap).values(input.tagIds.map(tagId => ({ questionId: result.id, tagId })));
@@ -608,6 +658,89 @@ export const questionBankRouter = router({
 
       const totalInserted = results.reduce((sum, r) => sum + r.inserted, 0);
       return { results, totalInserted };
+    }),
+
+  // ─── Folder CRUD ─────────────────────────────────────────────────────────────
+
+  listFolders: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const folders = await db.select().from(questionBankFolders).orderBy(asc(questionBankFolders.name));
+      // Get question count per folder
+      const counts = await db
+        .select({ folderId: questionBank.folderId, count: sql<number>`COUNT(*)` })
+        .from(questionBank)
+        .where(sql`${questionBank.folderId} IS NOT NULL`)
+        .groupBy(questionBank.folderId);
+      const countMap = Object.fromEntries(counts.map(c => [c.folderId, Number(c.count)]));
+      return folders.map(f => ({ ...f, questionCount: countMap[f.id] ?? 0 }));
+    }),
+
+  createFolder: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(200),
+      description: z.string().max(500).optional(),
+      parentId: z.number().int().optional(),
+      color: z.string().max(32).default("#179ca3"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [result] = await db.insert(questionBankFolders).values({
+        name: input.name,
+        description: input.description ?? null,
+        parentId: input.parentId ?? null,
+        color: input.color,
+        createdByAdminId: ctx.user.id,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  updateFolder: protectedProcedure
+    .input(z.object({
+      id: z.number().int(),
+      name: z.string().min(1).max(200).optional(),
+      description: z.string().max(500).optional(),
+      color: z.string().max(32).optional(),
+      parentId: z.number().int().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, ...rest } = input;
+      await db.update(questionBankFolders).set(rest).where(eq(questionBankFolders.id, id));
+      return { ok: true };
+    }),
+
+  deleteFolder: protectedProcedure
+    .input(z.object({ id: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Unset folder_id on questions in this folder
+      await db.update(questionBank).set({ folderId: null }).where(eq(questionBank.folderId, input.id));
+      await db.delete(questionBankFolders).where(eq(questionBankFolders.id, input.id));
+      return { ok: true };
+    }),
+
+  moveToFolder: protectedProcedure
+    .input(z.object({
+      questionIds: z.array(z.number().int()).min(1),
+      folderId: z.number().int().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(questionBank)
+        .set({ folderId: input.folderId })
+        .where(inArray(questionBank.id, input.questionIds));
+      return { moved: input.questionIds.length };
     }),
 });
 

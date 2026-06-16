@@ -123,84 +123,466 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
 }
 
 // ─── Inline Lesson Quiz (for lesson_quiz content blocks) ────────────────────
-function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; requirePassToComplete?: boolean } }) {
-  const questions = data.questions ?? [];
-  const shuffled = data.shuffleQuestions
-    ? [...questions].sort(() => Math.random() - 0.5)
-    : questions;
-  const [selected, setSelected] = useState<Record<number, number>>({});
+function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean } }) {
+  const rawQuestions = data.questions ?? [];
+  // Stabilize shuffle with useMemo so re-renders don't re-shuffle
+  const shuffledQuestions = useMemo(() => {
+    if (!data.shuffleQuestions) return rawQuestions;
+    return [...rawQuestions].sort(() => Math.random() - 0.5);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.shuffleQuestions, rawQuestions.length]);
+
+  // Per-question shuffled answer order (also stabilized)
+  const shuffledAnswerOrders = useMemo(() => {
+    return shuffledQuestions.map((q: any) => {
+      const opts: string[] = q.options ?? [];
+      if (!data.shuffleAnswers || q.type === "truefalse" || q.type === "hotspot" || q.type === "matching") {
+        return opts.map((_: any, i: number) => i);
+      }
+      const indices = opts.map((_: any, i: number) => i);
+      return [...indices].sort(() => Math.random() - 0.5);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shuffledQuestions, data.shuffleAnswers]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  // selected: { [questionIndex]: answerIndex | number[] | {x,y} }
+  const [selected, setSelected] = useState<Record<number, any>>({});
   const [submitted, setSubmitted] = useState(false);
-  const [showResults, setShowResults] = useState(false);
+  const [hotspotClick, setHotspotClick] = useState<Record<number, {x: number; y: number}>>({});
+  const [matchingAnswers, setMatchingAnswers] = useState<Record<number, Record<string, string>>>({});
+  const hotspotContainerRef = useRef<HTMLDivElement | null>(null);
 
-  if (questions.length === 0) return null;
+  if (rawQuestions.length === 0) return null;
 
-  const score = submitted
-    ? Math.round((shuffled.filter((q, i) => selected[i] === q.correctAnswer).length / shuffled.length) * 100)
-    : 0;
+  const total = shuffledQuestions.length;
+  const q = shuffledQuestions[currentIndex];
+  const qType = q?.type ?? "mcq";
+  const answerOrder = shuffledAnswerOrders[currentIndex] ?? [];
+  const opts: string[] = q?.options ?? [];
+
+  // Scoring
+  const computeScore = () => {
+    let correct = 0;
+    shuffledQuestions.forEach((question: any, i: number) => {
+      const qt = question.type ?? "mcq";
+      if (qt === "mcq" || qt === "truefalse") {
+        if (selected[i] === question.correctAnswer) correct++;
+      } else if (qt === "multiselect") {
+        const sel: number[] = selected[i] ?? [];
+        const ca: number[] = question.correctAnswers ?? [];
+        if (sel.length === ca.length && sel.every((x: number) => ca.includes(x))) correct++;
+      } else if (qt === "hotspot") {
+        const click = hotspotClick[i];
+        if (click) {
+          const markers: any[] = question.hotspotMarkers ?? [];
+          const correctMarkers = markers.filter((m: any) => m.isCorrect);
+          const hit = correctMarkers.some((m: any) => Math.abs(m.x - click.x) < 10 && Math.abs(m.y - click.y) < 10);
+          if (hit) correct++;
+        }
+      } else if (qt === "matching") {
+        const pairs: any[] = question.matchingPairs ?? [];
+        const answers = matchingAnswers[i] ?? {};
+        const allCorrect = pairs.every((p: any) => answers[p.id] === p.right);
+        if (allCorrect && pairs.length > 0) correct++;
+      }
+    });
+    return Math.round((correct / total) * 100);
+  };
+
+  const score = submitted ? computeScore() : 0;
   const passed = score >= (data.passingScore ?? 70);
 
+  const isCurrentAnswered = () => {
+    if (qType === "mcq" || qType === "truefalse") return selected[currentIndex] !== undefined;
+    if (qType === "multiselect") return (selected[currentIndex] ?? []).length > 0;
+    if (qType === "hotspot") return !!hotspotClick[currentIndex];
+    if (qType === "matching") {
+      const pairs: any[] = q.matchingPairs ?? [];
+      const answers = matchingAnswers[currentIndex] ?? {};
+      return pairs.every((p: any) => answers[p.id]);
+    }
+    return false;
+  };
+
+  const allAnswered = shuffledQuestions.every((_: any, i: number) => {
+    const qt = shuffledQuestions[i]?.type ?? "mcq";
+    if (qt === "mcq" || qt === "truefalse") return selected[i] !== undefined;
+    if (qt === "multiselect") return (selected[i] ?? []).length > 0;
+    if (qt === "hotspot") return !!hotspotClick[i];
+    if (qt === "matching") {
+      const pairs: any[] = shuffledQuestions[i]?.matchingPairs ?? [];
+      const answers = matchingAnswers[i] ?? {};
+      return pairs.every((p: any) => answers[p.id]);
+    }
+    return false;
+  });
+
+  const handleRetake = () => {
+    setSelected({});
+    setSubmitted(false);
+    setHotspotClick({});
+    setMatchingAnswers({});
+    setCurrentIndex(0);
+  };
+
+  const handleHotspotClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (submitted) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setHotspotClick(prev => ({ ...prev, [currentIndex]: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } }));
+  };
+
+  const progressPct = total > 0 ? ((currentIndex + 1) / total) * 100 : 0;
+  const answeredCount = Object.keys(selected).length + Object.keys(hotspotClick).length + Object.keys(matchingAnswers).length;
+
+  // Determine if current answer is correct (for post-submit feedback)
+  const isCurrentCorrect = () => {
+    if (!submitted) return false;
+    if (qType === "mcq" || qType === "truefalse") return selected[currentIndex] === q.correctAnswer;
+    if (qType === "multiselect") {
+      const sel: number[] = selected[currentIndex] ?? [];
+      const ca: number[] = q.correctAnswers ?? [];
+      return sel.length === ca.length && sel.every((x: number) => ca.includes(x));
+    }
+    if (qType === "hotspot") {
+      const click = hotspotClick[currentIndex];
+      if (!click) return false;
+      const markers: any[] = q.hotspotMarkers ?? [];
+      return markers.filter((m: any) => m.isCorrect).some((m: any) => Math.abs(m.x - click.x) < 10 && Math.abs(m.y - click.y) < 10);
+    }
+    if (qType === "matching") {
+      const pairs: any[] = q.matchingPairs ?? [];
+      const answers = matchingAnswers[currentIndex] ?? {};
+      return pairs.every((p: any) => answers[p.id] === p.right) && pairs.length > 0;
+    }
+    return false;
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
-      <div className="px-5 py-3 bg-gradient-to-r from-teal-600 to-teal-500 flex items-center gap-2">
-        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-        <h3 className="text-white font-semibold text-sm">{data.title || "Knowledge Check"}</h3>
-        <span className="ml-auto text-teal-100 text-xs">{questions.length} question{questions.length !== 1 ? "s" : ""}{data.requirePassToComplete !== false ? ` · Pass: ${data.passingScore ?? 70}%` : ""}</span>
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-3 bg-gradient-to-r from-teal-700 to-teal-500 flex items-center gap-3">
+        <svg className="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+        <h3 className="text-white font-semibold text-sm flex-1 truncate">{data.title || "Knowledge Check"}</h3>
+        <span className="text-teal-100 text-xs shrink-0">Question {currentIndex + 1} of {total}</span>
       </div>
-      <div className="p-5 space-y-5">
-        {submitted && (
-          <div className={`rounded-lg p-3 border text-sm font-semibold ${
-            passed ? "bg-green-50 border-green-300 text-green-700" : "bg-red-50 border-red-300 text-red-700"
-          }`}>
+
+      {/* Progress bar */}
+      <div className="h-1.5 bg-teal-100">
+        <div className="h-full bg-teal-500 transition-all duration-300" style={{ width: `${progressPct}%` }} />
+      </div>
+
+      {/* Results banner (shown after submit) */}
+      {submitted && (
+        <div className={`px-5 py-3 border-b text-sm font-semibold flex items-center gap-3 ${
+          passed ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"
+        }`}>
+          <span className="text-lg">{passed ? "🎉" : "📝"}</span>
+          <span className="flex-1">
             {data.requirePassToComplete !== false
-              ? (passed ? `✓ Passed! Score: ${score}%` : `✗ Score: ${score}% — ${data.passingScore ?? 70}% required to pass`)
+              ? (passed ? `Passed! Score: ${score}%` : `Score: ${score}% — ${data.passingScore ?? 70}% required to pass`)
               : `Score: ${score}%`}
-            {!passed && (
-              <button className="ml-3 text-xs underline" onClick={() => { setSelected({}); setSubmitted(false); setShowResults(false); }}>Retake</button>
+          </span>
+          {!passed && (
+            <button className="text-xs underline font-normal" onClick={handleRetake}>Retake</button>
+          )}
+        </div>
+      )}
+
+      {/* Question card */}
+      <div className="p-5">
+        {/* Question number badge + type */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-teal-600 text-white text-xs font-bold shrink-0">{currentIndex + 1}</span>
+          <span className="text-xs text-gray-400 uppercase tracking-wide font-medium">
+            {qType === "mcq" ? "Multiple Choice" : qType === "truefalse" ? "True / False" : qType === "multiselect" ? "Select All That Apply" : qType === "hotspot" ? "Hotspot" : "Matching"}
+          </span>
+          {submitted && (
+            <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full ${
+              isCurrentCorrect() ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
+            }`}>
+              {isCurrentCorrect() ? "✓ Correct" : "✗ Incorrect"}
+            </span>
+          )}
+        </div>
+
+        {/* Question text + image side by side if image exists */}
+        <div className={`flex gap-4 mb-4 ${q.imageUrl || q.hotspotImageUrl ? "flex-col sm:flex-row" : ""}`}>
+          <div className="flex-1">
+            <p className="font-semibold text-gray-900 text-base leading-snug">{q.question}</p>
+            {q.videoUrl && (
+              <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
+                {q.videoUrl.includes("youtube") || q.videoUrl.includes("youtu.be") ? (
+                  <iframe
+                    src={q.videoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
+                    className="w-full aspect-video"
+                    allowFullScreen
+                    title="Question video"
+                  />
+                ) : (
+                  <video src={q.videoUrl} controls className="w-full max-h-40 rounded" />
+                )}
+              </div>
+            )}
+          </div>
+          {q.imageUrl && qType !== "hotspot" && (
+            <img src={q.imageUrl} alt="" className="w-full sm:w-48 h-auto sm:h-36 rounded-xl border border-gray-200 object-cover shrink-0" />
+          )}
+        </div>
+
+        {/* ── Answer area by type ── */}
+
+        {/* MCQ */}
+        {(qType === "mcq" || qType === "truefalse") && (
+          <div className="space-y-2">
+            {answerOrder.map((origIdx: number, displayIdx: number) => {
+              const opt = opts[origIdx] ?? "";
+              const isSelected = selected[currentIndex] === origIdx;
+              const isCorrect = submitted && origIdx === q.correctAnswer;
+              const isWrong = submitted && isSelected && origIdx !== q.correctAnswer;
+              const ansImg = q.answerImages?.[origIdx];
+              return (
+                <button
+                  key={origIdx}
+                  disabled={submitted}
+                  onClick={() => !submitted && setSelected(s => ({ ...s, [currentIndex]: origIdx }))}
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm transition-all flex items-center gap-3 ${
+                    isCorrect ? "border-green-500 bg-green-50 text-green-800 font-medium" :
+                    isWrong ? "border-red-400 bg-red-50 text-red-800" :
+                    isSelected ? "border-teal-500 bg-teal-50 text-teal-900 shadow-sm" :
+                    "border-gray-200 hover:border-teal-400 hover:bg-teal-50/40 text-gray-700"
+                  }`}
+                >
+                  <span className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
+                    isCorrect ? "border-green-500 bg-green-500 text-white" :
+                    isWrong ? "border-red-400 bg-red-400 text-white" :
+                    isSelected ? "border-teal-500 bg-teal-500 text-white" :
+                    "border-gray-300 text-gray-400"
+                  }`}>
+                    {["A","B","C","D","E","F"][displayIdx]}
+                  </span>
+                  {ansImg && <img src={ansImg} alt="" className="h-8 w-auto rounded border border-gray-200 object-cover shrink-0" />}
+                  <span className="flex-1">{opt}</span>
+                  {isCorrect && <span className="text-green-600 shrink-0">✓</span>}
+                  {isWrong && <span className="text-red-500 shrink-0">✗</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Multi-Select */}
+        {qType === "multiselect" && (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400 mb-1">Select all that apply</p>
+            {answerOrder.map((origIdx: number, displayIdx: number) => {
+              const opt = opts[origIdx] ?? "";
+              const isSelected = (selected[currentIndex] ?? []).includes(origIdx);
+              const isCorrect = submitted && (q.correctAnswers ?? []).includes(origIdx);
+              const isWrong = submitted && isSelected && !(q.correctAnswers ?? []).includes(origIdx);
+              return (
+                <button
+                  key={origIdx}
+                  disabled={submitted}
+                  onClick={() => {
+                    if (submitted) return;
+                    const prev: number[] = selected[currentIndex] ?? [];
+                    const next = prev.includes(origIdx) ? prev.filter((x: number) => x !== origIdx) : [...prev, origIdx];
+                    setSelected(s => ({ ...s, [currentIndex]: next }));
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm transition-all flex items-center gap-3 ${
+                    isCorrect ? "border-green-500 bg-green-50 text-green-800 font-medium" :
+                    isWrong ? "border-red-400 bg-red-50 text-red-800" :
+                    isSelected ? "border-teal-500 bg-teal-50 text-teal-900 shadow-sm" :
+                    "border-gray-200 hover:border-teal-400 hover:bg-teal-50/40 text-gray-700"
+                  }`}
+                >
+                  <span className={`w-5 h-5 rounded border-2 flex items-center justify-center text-xs shrink-0 ${
+                    isCorrect ? "border-green-500 bg-green-500 text-white" :
+                    isWrong ? "border-red-400 bg-red-400 text-white" :
+                    isSelected ? "border-teal-500 bg-teal-500 text-white" :
+                    "border-gray-300"
+                  }`}>
+                    {isSelected || isCorrect ? "✓" : ""}
+                  </span>
+                  <span className="w-5 text-xs font-bold text-gray-400 shrink-0">{["A","B","C","D","E","F"][displayIdx]}</span>
+                  <span className="flex-1">{opt}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Hotspot */}
+        {qType === "hotspot" && (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400">{submitted ? "" : "Click on the correct location in the image"}</p>
+            <div
+              className={`relative rounded-xl overflow-hidden border-2 ${submitted ? "border-gray-200" : "border-teal-300 cursor-crosshair"}`}
+              onClick={handleHotspotClick}
+            >
+              {q.hotspotImageUrl ? (
+                <img src={q.hotspotImageUrl} alt="Hotspot" className="w-full h-auto" />
+              ) : q.imageUrl ? (
+                <img src={q.imageUrl} alt="Hotspot" className="w-full h-auto" />
+              ) : (
+                <div className="bg-gray-100 h-48 flex items-center justify-center text-gray-400 text-sm">No image</div>
+              )}
+              {/* User click marker */}
+              {hotspotClick[currentIndex] && (
+                <div
+                  className={`absolute w-8 h-8 rounded-full border-4 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 shadow-lg text-white text-xs font-bold ${
+                    submitted
+                      ? isCurrentCorrect() ? "bg-green-500 border-green-700" : "bg-red-500 border-red-700"
+                      : "bg-teal-500 border-teal-700"
+                  }`}
+                  style={{ left: `${hotspotClick[currentIndex].x}%`, top: `${hotspotClick[currentIndex].y}%` }}
+                >
+                  {submitted ? (isCurrentCorrect() ? "✓" : "✗") : "●"}
+                </div>
+              )}
+              {/* Show correct markers after submit */}
+              {submitted && (q.hotspotMarkers ?? []).filter((m: any) => m.isCorrect).map((m: any) => (
+                <div
+                  key={m.id}
+                  className="absolute w-8 h-8 rounded-full bg-green-400/70 border-2 border-green-600 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 text-white text-xs font-bold"
+                  style={{ left: `${m.x}%`, top: `${m.y}%` }}
+                  title={m.label}
+                >
+                  ✓
+                </div>
+              ))}
+            </div>
+            {!hotspotClick[currentIndex] && !submitted && (
+              <p className="text-xs text-amber-600">Click on the image to mark your answer</p>
             )}
           </div>
         )}
-        {shuffled.map((q: any, i: number) => (
-          <div key={i} className="space-y-2">
-            <p className="font-medium text-gray-900 text-sm">{i + 1}. {q.question}</p>
-            {q.imageUrl && <img src={q.imageUrl} alt="" className="max-h-48 rounded-lg border border-gray-200 object-cover" />}
-            <div className="space-y-1.5">
-              {(q.options ?? []).map((opt: string, j: number) => {
-                const isSelected = selected[i] === j;
-                const isCorrect = submitted && j === q.correctAnswer;
-                const isWrong = submitted && isSelected && j !== q.correctAnswer;
-                return (
-                  <button
-                    key={j}
+
+        {/* Matching */}
+        {qType === "matching" && (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400 mb-2">Match each item on the left to its correct pair on the right</p>
+            {(q.matchingPairs ?? []).map((pair: any, pi: number) => {
+              const rightOptions = [...(q.matchingPairs ?? [])].map((p: any) => p.right).sort();
+              const currentAnswer = matchingAnswers[currentIndex]?.[pair.id];
+              const isCorrect = submitted && currentAnswer === pair.right;
+              const isWrong = submitted && currentAnswer && currentAnswer !== pair.right;
+              return (
+                <div key={pair.id} className="flex items-center gap-2">
+                  <div className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium ${
+                    isCorrect ? "border-green-400 bg-green-50 text-green-800" :
+                    isWrong ? "border-red-300 bg-red-50 text-red-700" :
+                    "border-gray-200 bg-gray-50 text-gray-700"
+                  }`}>
+                    {pair.left}
+                  </div>
+                  <span className="text-gray-300 text-sm shrink-0">→</span>
+                  <select
                     disabled={submitted}
-                    onClick={() => !submitted && setSelected(s => ({ ...s, [i]: j }))}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-lg border text-sm transition-all ${
-                      isCorrect ? "border-green-500 bg-green-50 text-green-800 font-medium" :
-                      isWrong ? "border-red-400 bg-red-50 text-red-800" :
-                      isSelected ? "border-teal-500 bg-teal-50 text-teal-900" :
-                      "border-gray-200 hover:border-teal-400 hover:bg-teal-50/50 text-gray-700"
+                    value={currentAnswer ?? ""}
+                    onChange={(e) => setMatchingAnswers(prev => ({
+                      ...prev,
+                      [currentIndex]: { ...(prev[currentIndex] ?? {}), [pair.id]: e.target.value }
+                    }))}
+                    className={`flex-1 px-2 py-2 rounded-lg border text-sm ${
+                      isCorrect ? "border-green-400 bg-green-50 text-green-800" :
+                      isWrong ? "border-red-300 bg-red-50 text-red-700" :
+                      "border-gray-200 bg-white text-gray-700"
                     }`}
                   >
-                    <span className="font-semibold mr-2 text-gray-400">{["A","B","C","D"][j]}.</span>{opt}
-                    {isCorrect && <span className="ml-2 text-green-600">✓</span>}
-                    {isWrong && <span className="ml-2 text-red-500">✗</span>}
-                  </button>
-                );
-              })}
-            </div>
-            {submitted && data.showExplanations && q.explanation && (
-              <p className="text-xs text-gray-500 bg-gray-50 rounded p-2 border border-gray-100 italic">{q.explanation}</p>
+                    <option value="">Select…</option>
+                    {rightOptions.map((opt: string) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  {submitted && isCorrect && <span className="text-green-600 shrink-0">✓</span>}
+                  {submitted && isWrong && <span className="text-red-500 shrink-0">✗</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Explanation + feedback media (shown after submit) */}
+        {submitted && data.showExplanations && (q.explanation || q.feedbackImageUrl || q.feedbackVideoUrl) && (
+          <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+            {q.explanation && <p className="text-sm text-gray-600 italic">{q.explanation}</p>}
+            {q.feedbackImageUrl && (
+              <img src={q.feedbackImageUrl} alt="Feedback" className="max-h-48 rounded-lg border border-gray-200 object-cover" />
+            )}
+            {q.feedbackVideoUrl && (
+              <div className="rounded-lg overflow-hidden border border-gray-200">
+                {q.feedbackVideoUrl.includes("youtube") || q.feedbackVideoUrl.includes("youtu.be") ? (
+                  <iframe
+                    src={q.feedbackVideoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
+                    className="w-full aspect-video"
+                    allowFullScreen
+                    title="Feedback video"
+                  />
+                ) : (
+                  <video src={q.feedbackVideoUrl} controls className="w-full max-h-40 rounded" />
+                )}
+              </div>
             )}
           </div>
-        ))}
-        {!submitted && (
-          <button
-            className="mt-2 px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
-            disabled={Object.keys(selected).length < shuffled.length}
-            onClick={() => setSubmitted(true)}
-          >
-            Submit Answers
-          </button>
         )}
+
+        {/* Navigation */}
+        <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-100">
+          <button
+            onClick={() => setCurrentIndex(i => Math.max(0, i - 1))}
+            disabled={currentIndex === 0}
+            className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
+          >
+            ← Previous
+          </button>
+
+          <div className="flex gap-1">
+            {shuffledQuestions.map((_: any, i: number) => {
+              const isAnswered = shuffledQuestions[i]?.type === "hotspot" ? !!hotspotClick[i]
+                : shuffledQuestions[i]?.type === "matching" ? Object.keys(matchingAnswers[i] ?? {}).length > 0
+                : selected[i] !== undefined;
+              return (
+                <button
+                  key={i}
+                  onClick={() => setCurrentIndex(i)}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    i === currentIndex ? "bg-teal-600 w-4" :
+                    isAnswered ? "bg-teal-300" :
+                    "bg-gray-200"
+                  }`}
+                />
+              );
+            })}
+          </div>
+
+          {currentIndex < total - 1 ? (
+            <button
+              onClick={() => setCurrentIndex(i => Math.min(total - 1, i + 1))}
+              className="px-4 py-2 text-sm font-medium text-teal-700 border border-teal-300 rounded-lg hover:bg-teal-50 transition-colors"
+            >
+              Next →
+            </button>
+          ) : !submitted ? (
+            <button
+              onClick={() => setSubmitted(true)}
+              disabled={!allAnswered}
+              className="px-4 py-2 text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white rounded-lg disabled:opacity-50 transition-colors"
+            >
+              Submit
+            </button>
+          ) : (
+            <button
+              onClick={handleRetake}
+              className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Retake
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
