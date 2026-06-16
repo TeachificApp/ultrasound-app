@@ -125,7 +125,7 @@ export default function CommunityDMs() {
                   return (
                     <button
                       key={conv.id}
-                      onClick={() => navigate(`/community/dms/c/${conv.id}`)})
+                      onClick={() => navigate(`/community/dms/c/${conv.id}`)}
                       className={`w-full text-left p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b ${isActive ? "bg-teal-50 border-l-2 border-l-teal-500" : ""}`}
                     >
                       <Avatar className="w-10 h-10 flex-shrink-0">

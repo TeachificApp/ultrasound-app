@@ -77,7 +77,7 @@ export const DEFAULT_AUDIENCE_FILTER: AudienceFilter = {
   interestIds: [],
   roles: [],
   subscriptionType: "all",
-  userStatus: "active",
+  userStatus: "all",
   specificEmails: [],
   enrolledInCourseIds: [],
   completedCourseIds: [],
