@@ -11,16 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Link } from "wouter";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 import {
   Plus, Copy, Trash2, Edit2, Eye, RefreshCw, Code2, ArrowLeft,
-  LayoutGrid, List, Rows3, Sparkles, CheckCircle2, X, ChevronLeft
+  LayoutGrid, List, Rows3, Sparkles, CheckCircle2, X, ChevronLeft,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface WidgetItem { type: "course" | "quiz"; id: number }
+type ItemType = "course" | "quiz" | "download" | "bundle" | "webinar" | "membership" | "physical" | "workshop" | "community";
+
+interface WidgetItem { type: ItemType; id: number }
 
 interface WidgetFormData {
   name: string;
@@ -54,11 +55,34 @@ const DEFAULT_FORM: WidgetFormData = {
   isActive: true,
 };
 
+// ─── Type metadata ────────────────────────────────────────────────────────────
+
+const TYPE_META: Record<ItemType, { label: string; emoji: string; color: string }> = {
+  course:     { label: "Course",      emoji: "🎓", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  quiz:       { label: "Quiz",        emoji: "📝", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+  download:   { label: "Download",    emoji: "📥", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
+  bundle:     { label: "Bundle",      emoji: "📦", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
+  webinar:    { label: "Webinar",     emoji: "🎙️", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" },
+  membership: { label: "Membership",  emoji: "⭐", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" },
+  physical:   { label: "Physical",    emoji: "📦", color: "bg-stone-100 text-stone-700 dark:bg-stone-900/30 dark:text-stone-300" },
+  workshop:   { label: "Workshop",    emoji: "🛠️", color: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300" },
+  community:  { label: "Community",   emoji: "👥", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" },
+};
+
+const TYPE_GROUPS: { label: string; types: ItemType[] }[] = [
+  { label: "Courses & Quizzes", types: ["course", "quiz"] },
+  { label: "Downloads & Bundles", types: ["download", "bundle"] },
+  { label: "Webinars & Workshops", types: ["webinar", "workshop"] },
+  { label: "Memberships", types: ["membership"] },
+  { label: "Physical Products", types: ["physical"] },
+  { label: "Communities", types: ["community"] },
+];
+
 // ─── Embed code generator ─────────────────────────────────────────────────────
 
 function buildEmbedCode(token: string, origin: string): string {
   const widgetUrl = `${origin}/widget/${token}`;
-  return `<!-- All About Ultrasound Course Widget -->
+  return `<!-- All About Ultrasound Content Widget -->
 <iframe
   id="aau-widget-${token.slice(0, 8)}"
   src="${widgetUrl}"
@@ -67,7 +91,7 @@ function buildEmbedCode(token: string, origin: string): string {
   frameborder="0"
   scrolling="no"
   style="border:none; width:100%; min-height:200px;"
-  title="Course Widget"
+  title="Content Widget"
 ></iframe>
 <script>
   window.addEventListener("message", function(e) {
@@ -79,9 +103,9 @@ function buildEmbedCode(token: string, origin: string): string {
 </script>`;
 }
 
-// ─── Course Picker Dialog ─────────────────────────────────────────────────────
+// ─── Content Picker Dialog ────────────────────────────────────────────────────
 
-function CoursePicker({
+function ContentPicker({
   open,
   onClose,
   selected,
@@ -94,75 +118,75 @@ function CoursePicker({
 }) {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<WidgetItem[]>(selected);
-  const [typeFilter, setTypeFilter] = useState<"all" | "course" | "quiz">("all");
+  const [typeFilter, setTypeFilter] = useState<ItemType | "all">("all");
 
-  const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery(
-    { status: "public", type: "all", page: 1, pageSize: 200 },
-    { enabled: open }
-  );
+  const { data: allContent = [], isLoading } = trpc.widgetAdmin.listAllContent.useQuery(undefined, { enabled: open });
 
   useEffect(() => { if (open) setDraft(selected); }, [open]);
 
-  const courses = (coursesData?.courses ?? []).filter(c => {
+  const filtered = allContent.filter(c => {
     const matchesType = typeFilter === "all" || c.type === typeFilter;
     const matchesSearch = !search || c.title.toLowerCase().includes(search.toLowerCase());
     return matchesType && matchesSearch;
   });
 
-  function toggle(id: number, type: "course" | "quiz") {
+  function toggle(id: number, type: ItemType) {
     setDraft(prev => {
-      const exists = prev.some(i => i.id === id);
-      return exists ? prev.filter(i => i.id !== id) : [...prev, { id, type }];
+      const key = `${type}:${id}`;
+      const exists = prev.some(i => `${i.type}:${i.id}` === key);
+      return exists ? prev.filter(i => `${i.type}:${i.id}` !== key) : [...prev, { id, type }];
     });
   }
 
-  function isSelected(id: number) { return draft.some(i => i.id === id); }
+  function isSelected(id: number, type: string) { return draft.some(i => i.id === id && i.type === type); }
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Select Courses & Quizzes</DialogTitle>
+          <DialogTitle>Select Content</DialogTitle>
         </DialogHeader>
         <div className="flex gap-2 mb-3">
           <Input placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} className="flex-1" />
           <Select value={typeFilter} onValueChange={v => setTypeFilter(v as any)}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="course">Courses</SelectItem>
-              <SelectItem value="quiz">Quizzes</SelectItem>
+              {Object.entries(TYPE_META).map(([t, m]) => (
+                <SelectItem key={t} value={t}>{m.emoji} {m.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div className="overflow-y-auto flex-1 space-y-1 pr-1">
-          {courses.map(c => {
-            const sel = isSelected(c.id);
-            const itemType = (c.type === "quiz" ? "quiz" : "course") as "course" | "quiz";
+          {isLoading && <div className="text-center text-muted-foreground py-8 text-sm">Loading…</div>}
+          {!isLoading && filtered.length === 0 && (
+            <div className="text-center text-muted-foreground py-8 text-sm">No content found</div>
+          )}
+          {filtered.map(c => {
+            const meta = TYPE_META[c.type as ItemType] ?? { label: c.type, emoji: "📄", color: "" };
+            const sel = isSelected(c.id, c.type);
             return (
               <div
-                key={c.id}
+                key={`${c.type}:${c.id}`}
                 className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-colors ${sel ? "border-teal-500 bg-teal-50 dark:bg-teal-900/20" : "border-transparent hover:bg-muted"}`}
-                onClick={() => toggle(c.id, itemType)}
+                onClick={() => toggle(c.id, c.type as ItemType)}
               >
                 {c.coverImageUrl ? (
-                  <img src={c.coverImageUrl} alt="" className="w-12 h-8 object-cover rounded" />
+                  <img src={c.coverImageUrl} alt="" className="w-12 h-8 object-cover rounded shrink-0" />
                 ) : (
-                  <div className="w-12 h-8 bg-muted rounded flex items-center justify-center text-lg">
-                    {c.type === "quiz" ? "📝" : "🎓"}
+                  <div className="w-12 h-8 bg-muted rounded flex items-center justify-center text-lg shrink-0">
+                    {meta.emoji}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{c.title}</div>
-                  <Badge variant="outline" className="text-xs capitalize">{c.type}</Badge>
+                  <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-medium ${meta.color}`}>{meta.label}</span>
                 </div>
                 {sel && <CheckCircle2 className="w-5 h-5 text-teal-500 shrink-0" />}
               </div>
             );
           })}
-          {courses.length === 0 && (
-            <div className="text-center text-muted-foreground py-8 text-sm">No courses found</div>
-          )}
         </div>
         <DialogFooter className="mt-3">
           <div className="text-sm text-muted-foreground mr-auto">{draft.length} selected</div>
@@ -196,11 +220,9 @@ function WidgetForm({
     setForm(prev => ({ ...prev, [key]: value }));
   }
 
-  const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery(
-    { status: "all", type: "all", page: 1, pageSize: 500 },
-    { staleTime: 60_000 }
-  );
-  const courseMap = new Map((coursesData?.courses ?? []).map(c => [c.id, c]));
+  // Fetch all content for the selected-items display names
+  const { data: allContent = [] } = trpc.widgetAdmin.listAllContent.useQuery(undefined, { staleTime: 60_000 });
+  const contentMap = new Map(allContent.map(c => [`${c.type}:${c.id}`, c]));
 
   return (
     <div className="space-y-6">
@@ -266,7 +288,7 @@ function WidgetForm({
         </div>
         <div>
           <Label>Button URL Override</Label>
-          <Input value={form.buttonUrl} onChange={e => set("buttonUrl", e.target.value)} placeholder="Leave blank to use course URL" className="mt-1" />
+          <Input value={form.buttonUrl} onChange={e => set("buttonUrl", e.target.value)} placeholder="Leave blank to use content URL" className="mt-1" />
         </div>
       </div>
 
@@ -278,7 +300,7 @@ function WidgetForm({
         </div>
         <div className="flex items-center gap-2">
           <Switch checked={form.showEnrollButton} onCheckedChange={v => set("showEnrollButton", v)} id="sw-btn" />
-          <Label htmlFor="sw-btn">Show Enroll Button</Label>
+          <Label htmlFor="sw-btn">Show Button</Label>
         </div>
         <div className="flex items-center gap-2">
           <Switch checked={form.isActive} onCheckedChange={v => set("isActive", v)} id="sw-active" />
@@ -292,36 +314,35 @@ function WidgetForm({
         <Input type="number" min={1} max={50} value={form.maxCards} onChange={e => set("maxCards", parseInt(e.target.value) || 6)} className="mt-1" />
       </div>
 
-      {/* Course/Quiz selection */}
+      {/* Content selection */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <Label>Selected Courses & Quizzes</Label>
+          <Label>Selected Content</Label>
           <Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
             <Plus className="w-4 h-4 mr-1" /> Add / Edit
           </Button>
         </div>
         {form.items.length === 0 ? (
           <div className="border-2 border-dashed rounded-lg p-6 text-center text-muted-foreground text-sm">
-            No courses selected — click "Add / Edit" to pick courses and quizzes
+            No content selected — click "Add / Edit" to pick from all product types
           </div>
         ) : (
           <div className="space-y-1">
             {form.items.map((item, idx) => {
-              const course = courseMap.get(item.id);
+              const content = contentMap.get(`${item.type}:${item.id}`);
+              const meta = TYPE_META[item.type] ?? { label: item.type, emoji: "📄", color: "" };
               return (
-                <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/30">
+                <div key={`${item.type}:${item.id}`} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/30">
                   <span className="text-muted-foreground text-xs w-5 text-right">{idx + 1}.</span>
-                  {course?.coverImageUrl ? (
-                    <img src={course.coverImageUrl} alt="" className="w-10 h-6 object-cover rounded" />
+                  {content?.coverImageUrl ? (
+                    <img src={content.coverImageUrl} alt="" className="w-10 h-6 object-cover rounded shrink-0" />
                   ) : (
-                    <div className="w-10 h-6 bg-muted rounded flex items-center justify-center text-sm">
-                      {item.type === "quiz" ? "📝" : "🎓"}
-                    </div>
+                    <div className="w-10 h-6 bg-muted rounded flex items-center justify-center text-sm shrink-0">{meta.emoji}</div>
                   )}
-                  <span className="flex-1 text-sm font-medium truncate">{course?.title ?? `ID: ${item.id}`}</span>
-                  <Badge variant="outline" className="text-xs capitalize">{item.type}</Badge>
+                  <span className="flex-1 text-sm font-medium truncate">{content?.title ?? `ID: ${item.id}`}</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${meta.color}`}>{meta.label}</span>
                   <button
-                    onClick={() => set("items", form.items.filter(i => i.id !== item.id))}
+                    onClick={() => set("items", form.items.filter(i => !(i.id === item.id && i.type === item.type)))}
                     className="text-muted-foreground hover:text-destructive transition-colors"
                   >
                     <X className="w-4 h-4" />
@@ -333,7 +354,7 @@ function WidgetForm({
         )}
       </div>
 
-      <CoursePicker
+      <ContentPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         selected={form.items}
@@ -489,7 +510,7 @@ export default function WidgetManager() {
             <Code2 className="w-6 h-6 text-teal-500" /> Embed Widgets
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Create embeddable course/quiz card grids for any external website
+            Create embeddable card grids for any external website — courses, downloads, webinars, memberships, and more
           </p>
         </div>
         <Button onClick={() => setMode("create")} className="bg-teal-600 hover:bg-teal-700 text-white">
@@ -504,7 +525,7 @@ export default function WidgetManager() {
           <div className="text-sm">
             <p className="font-semibold text-teal-800 dark:text-teal-200 mb-1">How it works</p>
             <p className="text-teal-700 dark:text-teal-300">
-              Create a widget, select which courses and quizzes to display, then copy the embed code and paste it into any website, blog, or landing page. The widget auto-resizes to fit its content.
+              Create a widget, select which content to display (courses, quizzes, downloads, bundles, webinars, workshops, memberships, physical products, or communities), then copy the embed code and paste it into any website or landing page.
             </p>
           </div>
         </div>
@@ -525,8 +546,13 @@ export default function WidgetManager() {
       ) : (
         <div className="space-y-3">
           {widgets.map(w => {
-            let itemCount = 0;
-            try { itemCount = JSON.parse(w.items || "[]").length; } catch {}
+            let items: WidgetItem[] = [];
+            try { items = JSON.parse(w.items || "[]"); } catch {}
+            // Count by type
+            const typeCounts = items.reduce<Record<string, number>>((acc, i) => {
+              acc[i.type] = (acc[i.type] ?? 0) + 1;
+              return acc;
+            }, {});
             return (
               <div key={w.id} className="border rounded-xl p-4 bg-card flex items-center gap-4">
                 <div className="flex-1 min-w-0">
@@ -539,7 +565,18 @@ export default function WidgetManager() {
                     <Badge variant="outline" className="capitalize">{w.theme}</Badge>
                   </div>
                   {w.title && <p className="text-sm text-muted-foreground mt-0.5">{w.title}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">{itemCount} item{itemCount !== 1 ? "s" : ""} · Token: <code className="bg-muted px-1 rounded text-xs">{w.token.slice(0, 12)}…</code></p>
+                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    {Object.entries(typeCounts).map(([t, count]) => {
+                      const meta = TYPE_META[t as ItemType] ?? { emoji: "📄", label: t, color: "" };
+                      return (
+                        <span key={t} className={`text-xs px-1.5 py-0.5 rounded font-medium ${meta.color}`}>
+                          {meta.emoji} {count} {meta.label}{count !== 1 ? "s" : ""}
+                        </span>
+                      );
+                    })}
+                    {items.length === 0 && <span className="text-xs text-muted-foreground">No items</span>}
+                    <span className="text-xs text-muted-foreground ml-1">· Token: <code className="bg-muted px-1 rounded text-xs">{w.token.slice(0, 12)}…</code></span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 flex-wrap">
                   <Button variant="outline" size="sm" onClick={() => setPreviewToken(w.token)} title="Preview">

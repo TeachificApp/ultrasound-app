@@ -88,11 +88,36 @@ function formatPrice(card: Card): string {
   return base;
 }
 
+// ─── Product type metadata ───────────────────────────────────────────────────
+
+const TYPE_EMOJI: Record<string, string> = {
+  course: "🎓", quiz: "📝", download: "📥", bundle: "📦",
+  webinar: "🎙️", membership: "⭐", physical: "🛒", workshop: "🛠️", community: "👥",
+};
+const TYPE_LABEL: Record<string, string> = {
+  course: "Course", quiz: "Quiz", download: "Download", bundle: "Bundle",
+  webinar: "Webinar", membership: "Membership", physical: "Product", workshop: "Workshop", community: "Community",
+};
+function typeEmoji(t: string) { return TYPE_EMOJI[t] ?? "📄"; }
+function typeLabel(t: string) { return TYPE_LABEL[t] ?? t; }
+
 // ─── Course URL builder ───────────────────────────────────────────────────────
 
 function courseUrl(card: Card): string {
   const base = "https://learn.allaboutultrasound.com";
-  return card.slug ? `${base}/courses/${card.slug}` : `${base}/education-library`;
+  if (!card.slug) return `${base}/education-library`;
+  switch (card.type) {
+    case "course": return `${base}/courses/${card.slug}`;
+    case "quiz": return `${base}/quizzes/${card.slug}`;
+    case "download": return `${base}/downloads/${card.slug}`;
+    case "bundle": return `${base}/bundles/${card.slug}`;
+    case "webinar": return `${base}/webinars/${card.slug}`;
+    case "membership": return `${base}/membership/${card.slug}`;
+    case "physical": return `${base}/product/${card.slug}`;
+    case "workshop": return `${base}/workshops/${card.slug}`;
+    case "community": return `${base}/community/${card.slug}`;
+    default: return `${base}/education-library`;
+  }
 }
 
 // ─── Card components ──────────────────────────────────────────────────────────
@@ -153,14 +178,14 @@ function StandardCard({
               fontSize: 32,
             }}
           >
-            {card.type === "quiz" ? "📝" : "🎓"}
+            {typeEmoji(card.type)}
           </div>
         )}
       </div>
       {/* Body */}
       <div style={{ padding: "14px 16px", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: theme.accent }}>
-          {card.type === "quiz" ? "Quiz" : "Course"}
+          {typeLabel(card.type)}
         </div>
         <div style={{ fontSize: 15, fontWeight: 700, color: theme.text, lineHeight: 1.35 }}>{card.title}</div>
         {card.subtitle && (
@@ -238,7 +263,7 @@ function CompactCard({
           <img src={card.coverImageUrl} alt={card.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
         ) : (
           <div style={{ width: "100%", height: "100%", minHeight: 72, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
-            {card.type === "quiz" ? "📝" : "🎓"}
+            {typeEmoji(card.type)}
           </div>
         )}
       </div>
@@ -276,7 +301,7 @@ function MinimalCard({
   const href = buttonUrl || courseUrl(card);
   return (
     <div style={{ padding: "10px 0", borderBottom: `1px solid ${theme.cardBorder}`, display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{ fontSize: 20 }}>{card.type === "quiz" ? "📝" : "🎓"}</div>
+      <div style={{ fontSize: 20 }}>{typeEmoji(card.type)}</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{card.title}</div>
         {showPrice && <div style={{ fontSize: 12, color: theme.priceColor, fontWeight: 600 }}>{formatPrice(card)}</div>}
