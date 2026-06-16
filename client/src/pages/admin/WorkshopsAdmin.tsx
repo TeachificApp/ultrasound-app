@@ -278,8 +278,8 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
     setDescription(w.description ?? "");
     setStatus((w.status as any) ?? "draft");
     setBrand((w.brand as any) ?? "aaus");
-    setPrice(w.price ?? 0);
-    setCompareAtPrice(w.compareAtPrice ?? "");
+    setPrice((w.price ?? 0) / 100);
+    setCompareAtPrice(w.compareAtPrice != null ? w.compareAtPrice / 100 : "");
     setIsFree(w.isFree ?? false);
     setCurriculumEnabled(w.curriculumEnabled ?? true);
     setShowInLibrary(w.showInLibrary ?? true);
@@ -590,8 +590,8 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
                     <Label className="text-xs">Default Price ($)</Label>
                     <Input
                       type="number"
-                      value={price / 100}
-                      onChange={e => setPrice(Math.round(Number(e.target.value) * 100))}
+                      value={price}
+                      onChange={e => setPrice(Number(e.target.value))}
                       className="mt-1 text-sm"
                       min={0}
                       step={0.01}

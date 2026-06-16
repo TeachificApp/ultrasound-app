@@ -6728,6 +6728,9 @@ export const workshopInstances = mysqlTable("workshop_instances", {
   // Stripe product/price for this specific instance
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
 
+  // Rich-text content for this instance (agenda, location notes, instructor bio, etc.)
+  instanceContent: longtext("instance_content"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
