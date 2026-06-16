@@ -1105,8 +1105,22 @@ CRITICAL REQUIREMENTS:
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const collections = await db.select().from(lmsCollections).orderBy(asc(lmsCollections.position));
     return Promise.all(collections.map(async (col) => {
-      const cc = await db.select({ courseId: lmsCollectionCourses.courseId })
-        .from(lmsCollectionCourses).where(eq(lmsCollectionCourses.collectionId, col.id));
+      // Prefer lmsCollectionItems (multi-type, new table) for count
+      const newItems = await db
+        .select({ itemId: lmsCollectionItems.itemId, itemType: lmsCollectionItems.itemType })
+        .from(lmsCollectionItems)
+        .where(eq(lmsCollectionItems.collectionId, col.id));
+      if (newItems.length > 0) {
+        const courseIds = newItems
+          .filter(i => i.itemType === "course" || i.itemType === "quiz")
+          .map(i => i.itemId);
+        return { ...col, courseCount: newItems.length, courseIds };
+      }
+      // Fall back to legacy lmsCollectionCourses if no multi-type items yet
+      const cc = await db
+        .select({ courseId: lmsCollectionCourses.courseId })
+        .from(lmsCollectionCourses)
+        .where(eq(lmsCollectionCourses.collectionId, col.id));
       return { ...col, courseCount: cc.length, courseIds: cc.map(c => c.courseId) };
     }));
   }),
