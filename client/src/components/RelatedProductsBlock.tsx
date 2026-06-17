@@ -109,7 +109,13 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
   let items: ProductItem[] = [];
 
   if (selectionMode === "manual") {
-    items = (manualData ?? []).map((p) => ({
+    // Deduplicate by numeric id (same lmsCourse may appear under both "course" and "quiz" type if type changed)
+    const seenIds = new Set<number>();
+    items = (manualData ?? []).filter(p => {
+      if (seenIds.has(p.id)) return false;
+      seenIds.add(p.id);
+      return true;
+    }).map((p) => ({
       id: `${p.type}-${p.id}`,
       slug: p.slug,
       title: p.title,

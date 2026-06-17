@@ -4727,7 +4727,15 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     case "related_products": {
       const selMode = d.selectionMode ?? "auto";
       const manualItems: Array<{ type: string; id: number }> = d.manualItems ?? [];
-      const filteredCatalog = (productCatalog ?? []).filter(p =>
+      // Deduplicate catalog by type+id (a quiz course may appear as both "course" and "quiz" if type changed)
+      const seenCatalogKeys = new Set<string>();
+      const dedupedCatalog = (productCatalog ?? []).filter(p => {
+        const key = `${p.type}-${p.id}`;
+        if (seenCatalogKeys.has(key)) return false;
+        seenCatalogKeys.add(key);
+        return true;
+      });
+      const filteredCatalog = dedupedCatalog.filter(p =>
         !rpSearch || p.name.toLowerCase().includes(rpSearch.toLowerCase())
       );
       const typeLabels: Record<string, string> = { course: "Course", download: "Download", bundle: "Bundle", physical: "Physical" };

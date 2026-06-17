@@ -128,9 +128,20 @@ export const funnelRouter = router({
       for (const b of bundles as any[]) map.set(`bundle-${b.id}`, { ...b, type: "bundle", isFree: false, price: b.price ?? 0, href: `/bundles/${b.slug}` });
       for (const p of physicals as any[]) map.set(`physical-${p.id}`, { ...p, type: "physical", isFree: false, href: `/shop/${p.slug}` });
 
+      // Deduplicate: if the same lmsCourse id was saved under both "course" and "quiz" types
+      // (e.g., type changed in DB), only return it once.
+      const seenLmsCourseIds = new Set<number>();
       return input.items
         .map(i => map.get(`${i.type}-${i.id}`))
-        .filter(Boolean) as Array<{
+        .filter((item): item is NonNullable<typeof item> => {
+          if (!item) return false;
+          const it = item as any;
+          if (it.type === "course" || it.type === "quiz" || it.type === "cohort") {
+            if (seenLmsCourseIds.has(it.id)) return false;
+            seenLmsCourseIds.add(it.id);
+          }
+          return true;
+        }) as Array<{
           id: number; type: string; slug: string; title: string;
           description: string | null; price: number; isFree: boolean;
           imageUrl: string | null; href: string;
