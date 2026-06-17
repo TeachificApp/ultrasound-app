@@ -2782,7 +2782,7 @@ export const lmsCourses = mysqlTable("lms_courses", {
   description: longtext("description"),
   coverImageUrl: text("cover_image_url"),
   status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived"]).default("draft").notNull(),
-  type: mysqlEnum("type", ["course", "quiz", "download", "cohort"]).default("course").notNull(),
+  type: mysqlEnum("type", ["course", "quiz", "download", "cohort", "workshop"]).default("course").notNull(),
   // Cohort-specific: close enrollment after this date (null = always open)
   enrollmentCloseDate: timestamp("enrollment_close_date"),
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
@@ -2886,6 +2886,14 @@ export const lmsCourses = mysqlTable("lms_courses", {
   publishDomain: varchar("publish_domain", { length: 255 }),
   // Multi-cohort mode: when true, live sessions/assignments/recordings are scoped per cohort group
   multiCohortMode: boolean("multi_cohort_mode").default(false).notNull(),
+  // Course-level waitlist settings (cohort/workshop type courses only)
+  waitlistEnabled: boolean("waitlist_enabled").default(false).notNull(),
+  waitlistHeading: varchar("waitlist_heading", { length: 500 }),
+  waitlistBody: longtext("waitlist_body"),
+  waitlistCtaLabel: varchar("waitlist_cta_label", { length: 255 }),
+  waitlistCtaUrl: varchar("waitlist_cta_url", { length: 2048 }),
+  waitlistRedirectUrl: varchar("waitlist_redirect_url", { length: 2048 }),
+  waitlistSuccessMessage: longtext("waitlist_success_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -6784,6 +6792,10 @@ export const workshopInstances = mysqlTable("workshop_instances", {
   price: int("price"),                                          // cents
   compareAtPrice: int("compare_at_price"),                      // cents
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
+
+  // Enrollment window
+  // enrollmentCloseDate: if set, new enrollments are blocked after this date
+  enrollmentCloseDate: timestamp("enrollment_close_date"),
 
   // Sales window
   // availableForPurchase: admin manually enables this instance on the sales page

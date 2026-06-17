@@ -2904,9 +2904,11 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     onChangeRef.current(next);
   }, []);
   const setMany = useCallback((patch: Record<string, any>) => {
+    console.log('[BlockSettings] setMany called', patch);
     const next = { ...dataRef.current, ...patch };
     dataRef.current = next;
     onChangeRef.current(next);
+    console.log('[BlockSettings] setMany done', next);
   }, []);
   // Upload hooks — must be at top level (React rules of hooks)
   const bgImageRef = useRef<HTMLInputElement>(null);
@@ -2940,6 +2942,21 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     const workshops = ((cicWorkshopsData as any)?.workshops ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}`, kind: "workshop" as const }));
     return [...cohorts, ...workshops];
   }, [cicCohortsData, cicWorkshopsData]);
+  // cohort_sessions_auto: dynamic search for cohort groups (manual selection mode)
+  const [cssSearch, setCssSearch] = useState("");
+  const { data: cssCohortsData } = trpc.lmsAdmin.listCourses.useQuery(
+    { status: "all", type: "cohort", pageSize: 200 },
+    { enabled: block.type === "cohort_sessions_auto", staleTime: 30_000 }
+  );
+  const { data: cssWorkshopsData } = trpc.workshopAdmin.list.useQuery(
+    { limit: 200, offset: 0 },
+    { enabled: block.type === "cohort_sessions_auto", staleTime: 30_000 }
+  );
+  const cssAllItems: Array<{ id: number; label: string; kind: "cohort" | "workshop" }> = React.useMemo(() => {
+    const cohorts = ((cssCohortsData as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: c.title ?? `Cohort #${c.id}`, kind: "cohort" as const }));
+    const workshops = ((cssWorkshopsData as any)?.workshops ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}`, kind: "workshop" as const }));
+    return [...cohorts, ...workshops];
+  }, [cssCohortsData, cssWorkshopsData]);
   // remaining_seats: dynamic search for workshop instances and cohort groups
   const [rsSearch, setRsSearch] = useState("");
   const [rsSourceType, setRsSourceType] = useState<"workshop_instance" | "cohort_group">(d.sourceType ?? "workshop_instance");
@@ -4877,18 +4894,71 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   </button>
                 ))}
               </div>
-              {(d.groupSelectionMode ?? "all") === "manual" && (
-                <p className="text-[10px] text-gray-500 mt-1.5">Enter comma-separated cohort group IDs to show specific groups.</p>
-              )}
-              {(d.groupSelectionMode ?? "all") === "manual" && (
-                <input
-                  type="text"
-                  className="w-full mt-1 h-8 text-xs border rounded px-2"
-                  placeholder="e.g. 12, 15, 23"
-                  value={(d.selectedGroupIds ?? []).join(", ")}
-                  onChange={e => set("selectedGroupIds", e.target.value.split(",").map((s: string) => Number(s.trim())).filter(Boolean))}
-                />
-              )}
+              {(d.groupSelectionMode ?? "all") === "manual" && (() => {
+                const selectedIds: number[] = d.selectedGroupIds ?? [];
+                const filtered = cssAllItems.filter(item =>
+                  !cssSearch || item.label.toLowerCase().includes(cssSearch.toLowerCase())
+                );
+                return (
+                  <div className="mt-2 space-y-1.5">
+                    {/* Selected tags */}
+                    {selectedIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {selectedIds.map(id => {
+                          const item = cssAllItems.find(i => i.id === id);
+                          return (
+                            <span key={id} className="inline-flex items-center gap-1 bg-teal-100 text-teal-800 text-[10px] px-1.5 py-0.5 rounded">
+                              {item?.label ?? `#${id}`}
+                              <button onClick={() => set("selectedGroupIds", selectedIds.filter(i => i !== id))} className="text-teal-400 hover:text-red-500 ml-0.5">×</button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {/* Search input */}
+                    <input
+                      type="text"
+                      className="w-full h-7 text-xs border rounded px-2"
+                      placeholder="Search cohorts & workshops…"
+                      value={cssSearch}
+                      onChange={e => setCssSearch(e.target.value)}
+                    />
+                    {/* Results list */}
+                    {cssAllItems.length === 0 && (
+                      <p className="text-[10px] text-gray-400">Loading…</p>
+                    )}
+                    {cssAllItems.length > 0 && filtered.length === 0 && (
+                      <p className="text-[10px] text-gray-400">No matches found.</p>
+                    )}
+                    {filtered.length > 0 && (
+                      <div className="max-h-40 overflow-y-auto border rounded divide-y">
+                        {filtered.map(item => {
+                          const isSelected = selectedIds.includes(item.id);
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                if (isSelected) {
+                                  set("selectedGroupIds", selectedIds.filter(id => id !== item.id));
+                                } else {
+                                  set("selectedGroupIds", [...selectedIds, item.id]);
+                                }
+                              }}
+                              className={`w-full text-left px-2 py-1.5 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
+                            >
+                              <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] ${isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"}`}>
+                                {isSelected ? "✓" : ""}
+                              </span>
+                              <span className="flex-1 truncate">{item.label}</span>
+                              <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort" ? "Cohort" : "Workshop"}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
           <div className="border-t pt-3">
@@ -5177,7 +5247,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => setMany({ sourceId: item.id, sourceName: item.label })}
+                          onClick={(e) => { console.log('[RS] button clicked', item.id, item.label, e.type); setMany({ sourceId: item.id, sourceName: item.label }); }}
                           className={`w-full text-left px-2 py-2 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
                         >
                           <span

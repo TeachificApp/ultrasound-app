@@ -23,6 +23,7 @@ import {
   Calendar, Globe, Link2, RefreshCw, CheckCircle, Clock,
   DollarSign, ChevronLeft, Copy, ExternalLink, MapPin,
   BookOpen, FileText, Package, ChevronRight, Workflow,
+  Download, Mail, UserCheck, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
@@ -253,6 +254,7 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
   const [instAvailableForPurchase, setInstAvailableForPurchase] = useState(false);
   const [instSalesCloseDate, setInstSalesCloseDate] = useState("");
   const [instSalesOpenDate, setInstSalesOpenDate] = useState("");
+  const [instEnrollmentCloseDate, setInstEnrollmentCloseDate] = useState("");
   const [instStatus, setInstStatus] = useState<"draft" | "published" | "cancelled" | "completed">("draft");
   const [instContent, setInstContent] = useState("");
 
@@ -358,7 +360,7 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
     setInstTimezone("America/New_York"); setInstLocationType("in_person");
     setInstVenueName(""); setInstVenueCity(""); setInstVenueState("");
     setInstCapacity(""); setInstPrice(""); setInstAvailableForPurchase(false);
-    setInstSalesCloseDate(""); setInstSalesOpenDate(""); setInstStatus("draft");
+    setInstSalesCloseDate(""); setInstSalesOpenDate(""); setInstEnrollmentCloseDate(""); setInstStatus("draft");
     setInstanceDialogOpen(true);
   }
 
@@ -378,6 +380,7 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
     setInstAvailableForPurchase(inst.availableForPurchase ?? false);
     setInstSalesCloseDate(inst.salesCloseDate ? new Date(inst.salesCloseDate).toISOString().slice(0, 16) : "");
     setInstSalesOpenDate(inst.salesOpenDate ? new Date(inst.salesOpenDate).toISOString().slice(0, 16) : "");
+    setInstEnrollmentCloseDate(inst.enrollmentCloseDate ? new Date(inst.enrollmentCloseDate).toISOString().slice(0, 10) : "");
     setInstStatus(inst.status ?? "draft");
     setInstContent(inst.instanceContent ?? "");
     setInstanceDialogOpen(true);
@@ -400,6 +403,7 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
       availableForPurchase: instAvailableForPurchase,
       salesCloseDate: instSalesCloseDate || null,
       salesOpenDate: instSalesOpenDate || null,
+      enrollmentCloseDate: instEnrollmentCloseDate || null,
       status: instStatus,
       instanceContent: instContent || null,
     };
@@ -1129,6 +1133,13 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
                 <p className="text-xs text-gray-400 mt-0.5">If blank, auto-closes when start date passes</p>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Enrollment Close Date (optional)</Label>
+                <Input type="date" value={instEnrollmentCloseDate} onChange={e => setInstEnrollmentCloseDate(e.target.value)} className="mt-1 text-sm" />
+                <p className="text-xs text-gray-400 mt-0.5">Block new enrollments after this date</p>
+              </div>
+            </div>
             <div>
               <Label className="text-xs font-medium">Instance Content (Rich Text)</Label>
               <p className="text-xs text-gray-400 mb-1">Optional rich text shown on the workshop page for this specific instance (agenda, location details, instructor bio, etc.)</p>
@@ -1325,6 +1336,10 @@ function WaitlistSettingsTab({ workshopId }: { workshopId: number }) {
   const [redirectUrl, setRedirectUrl] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [dirty, setDirty] = useState(false);
+  // Grant access dialog
+  const [grantEntry, setGrantEntry] = useState<any>(null);
+  const [grantType, setGrantType] = useState<"free" | "paid">("paid");
+  const [priceOverride, setPriceOverride] = useState("");
 
   useEffect(() => {
     if (data) {
@@ -1465,28 +1480,51 @@ function WaitlistSettingsTab({ workshopId }: { workshopId: number }) {
           {entries.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">No sign-ups yet.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Name</TableHead>
-                  <TableHead className="text-xs">Email</TableHead>
-                  <TableHead className="text-xs">Phone</TableHead>
-                  <TableHead className="text-xs">Message</TableHead>
-                  <TableHead className="text-xs">Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {entries.map((e: any) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="text-xs">{e.name}</TableCell>
-                    <TableCell className="text-xs">{e.email}</TableCell>
-                    <TableCell className="text-xs">{e.phone ?? "—"}</TableCell>
-                    <TableCell className="text-xs max-w-xs truncate">{e.message ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{new Date(e.createdAt).toLocaleDateString()}</TableCell>
+            <>
+              <div className="flex justify-end mb-2">
+                <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => {
+                  const csv = ["Name,Email,Phone,Message,Date", ...entries.map((e: any) => [
+                    `"${(e.name||'').replace(/"/g,'""')}"`,
+                    `"${(e.email||'').replace(/"/g,'""')}"`,
+                    `"${(e.phone||'').replace(/"/g,'""')}"`,
+                    `"${(e.message||'').replace(/"/g,'""')}"`,
+                    `"${new Date(e.createdAt).toISOString()}"`,
+                  ].join(','))].join('\n');
+                  const a = document.createElement('a');
+                  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+                  a.download = `waitlist-workshop-${workshopId}.csv`;
+                  a.click();
+                }}><Download className="w-3 h-3" />Export CSV</Button>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Name</TableHead>
+                    <TableHead className="text-xs">Email</TableHead>
+                    <TableHead className="text-xs">Phone</TableHead>
+                    <TableHead className="text-xs">Message</TableHead>
+                    <TableHead className="text-xs">Date</TableHead>
+                    <TableHead className="text-xs">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {entries.map((e: any) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="text-xs">{e.name}</TableCell>
+                      <TableCell className="text-xs">{e.email}</TableCell>
+                      <TableCell className="text-xs">{e.phone ?? "—"}</TableCell>
+                      <TableCell className="text-xs max-w-xs truncate">{e.message ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{new Date(e.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="outline" className="text-xs gap-1 h-7" onClick={() => { setGrantEntry(e); setGrantType("paid"); setPriceOverride(""); }}>
+                          <UserCheck className="w-3 h-3" />Grant Access
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </>
           )}
         </CardContent>
       </Card>

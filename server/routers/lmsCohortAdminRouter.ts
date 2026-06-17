@@ -663,15 +663,68 @@ export const lmsCohortAdminRouter = router({
         // Weekly/biweekly with one or more days selected:
         // For each week cycle, emit one instance per selected day (sorted), preserving the
         // parent's time-of-day. Start from the Sunday of the parent's week.
-        const parentDay = parentDate.getDay(); // 0=Sun
-        const weekStart = new Date(parentDate);
-        weekStart.setDate(weekStart.getDate() - parentDay);
-        weekStart.setHours(0, 0, 0, 0);
-        const parentTime = {
-          h: parentDate.getHours(),
-          m: parentDate.getMinutes(),
-          s: parentDate.getSeconds(),
-        };
+        // IMPORTANT: Use timezone-aware day/time to avoid UTC offset bugs (e.g. 7:30 PM ET
+        // is stored as next-day UTC, causing getDay() to return the wrong weekday).
+        const tz = parent.timezone ?? "America/New_York";
+        const tzParts = new Intl.DateTimeFormat("en-US", {
+          timeZone: tz,
+          weekday: "short",
+          hour: "numeric",
+          minute: "numeric",
+          second: "numeric",
+          hour12: false,
+        }).formatToParts(parentDate);
+        const tzWeekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+        const tzWeekdayStr = tzParts.find(p => p.type === "weekday")?.value ?? "";
+        const parentDay = tzWeekdayMap[tzWeekdayStr] ?? parentDate.getDay();
+        // Get local time components in the session timezone
+        const tzTimeParts = new Intl.DateTimeFormat("en-US", {
+          timeZone: tz,
+          hour: "numeric",
+          minute: "numeric",
+          second: "numeric",
+          hour12: false,
+        }).formatToParts(parentDate);
+        const getTimePart = (type: string) => parseInt(tzTimeParts.find(p => p.type === type)?.value ?? "0", 10);
+        // hour12:false can return 24 for midnight — normalize to 0
+        const tzH = getTimePart("hour") % 24;
+        const tzM = getTimePart("minute");
+        const tzS = getTimePart("second");
+        // Build weekStart as the Sunday of the parent's local week, expressed as a
+        // UTC-midnight date (we'll set local time via toLocaleString trick below).
+        // Strategy: find the calendar date of Sunday in the parent's local week, then
+        // build ISO date strings to avoid any UTC shift.
+        const parentLocalDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(parentDate);
+        // parentLocalDateStr is "YYYY-MM-DD" in the session timezone
+        const [pyStr, pmStr, pdStr] = parentLocalDateStr.split("-");
+        const py = parseInt(pyStr, 10), pm = parseInt(pmStr, 10) - 1, pd = parseInt(pdStr, 10);
+        // weekStart = Sunday of this local week (UTC midnight of that calendar date)
+        const weekStartUTCMidnight = new Date(Date.UTC(py, pm, pd - parentDay));
+        const weekStart = weekStartUTCMidnight;
+        // Helper: build a candidate Date for a given weekday offset from weekStart,
+        // at the session's local time in the session timezone.
+        function buildCandidate(daysFromWeekStart: number): Date {
+          // Compute the target calendar date (UTC midnight)
+          const targetUTCMidnight = new Date(weekStart.getTime() + daysFromWeekStart * 24 * 60 * 60 * 1000);
+          const [tpyStr, tpmStr, tpdStr] = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(targetUTCMidnight).split("-");
+          // Build the ISO string in the target timezone and parse it
+          const isoStr = `${tpyStr}-${tpmStr}-${tpdStr}T${String(tzH).padStart(2,"0")}:${String(tzM).padStart(2,"0")}:${String(tzS).padStart(2,"0")}`;
+          // Parse as local time in the target timezone using a trick:
+          // We want the UTC instant that corresponds to isoStr in `tz`.
+          // Use Date.parse with explicit offset via Intl or just use a UTC-offset approach.
+          // Simplest reliable method: find the UTC offset for that date/time in the timezone.
+          const approxUtc = new Date(isoStr + "Z"); // treat as UTC first
+          // Get the offset by checking what local time that UTC instant gives in tz
+          const checkStr = new Intl.DateTimeFormat("en-CA", {
+            timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+            hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+          }).format(approxUtc);
+          // checkStr is like "2027-01-07, 00:30:00" — compare with isoStr to find offset
+          const checkParts = checkStr.replace(", ", "T");
+          const diffMs = approxUtc.getTime() - new Date(checkParts + "Z").getTime();
+          return new Date(approxUtc.getTime() + diffMs);
+        }
+        const parentTime = { h: tzH, m: tzM, s: tzS }; // kept for reference, unused below
         const sortedDays = [...allowedDays].sort((a, b) => a - b);
         // Extend end date by 1 day to be inclusive (end date is typically set to midnight UTC
         // but sessions are at a specific time, so we need to include the end date's day)
@@ -680,9 +733,8 @@ export const lmsCohortAdminRouter = router({
         let done = false;
         while (!done && occurrenceNum < maxCount) {
           for (const dayOfWeek of sortedDays) {
-            const candidate = new Date(weekStart);
-            candidate.setDate(candidate.getDate() + weekOffset * weekIntervalDays + dayOfWeek);
-            candidate.setHours(parentTime.h, parentTime.m, parentTime.s, 0);
+            const daysFromWeekStart = weekOffset * weekIntervalDays + dayOfWeek;
+            const candidate = buildCandidate(daysFromWeekStart);
             // Skip dates on or before the parent session date
             if (candidate <= parentDate) continue;
             if (inclusiveEndDate && candidate >= inclusiveEndDate) { done = true; break; }
@@ -1589,6 +1641,185 @@ export const lmsCohortAdminRouter = router({
         .orderBy(desc(cohortWaitlistEntries.createdAt));
       return entries;
     }),
+  // ── Course-Level Waitlist Settings ─────────────────────────────────────
+  getCourseWaitlistSettings: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({
+        waitlistEnabled: lmsCourses.waitlistEnabled,
+        waitlistHeading: lmsCourses.waitlistHeading,
+        waitlistBody: lmsCourses.waitlistBody,
+        waitlistCtaLabel: lmsCourses.waitlistCtaLabel,
+        waitlistCtaUrl: lmsCourses.waitlistCtaUrl,
+        waitlistRedirectUrl: lmsCourses.waitlistRedirectUrl,
+        waitlistSuccessMessage: lmsCourses.waitlistSuccessMessage,
+      }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      return course ?? null;
+    }),
+
+  saveCourseWaitlistSettings: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      waitlistEnabled: z.boolean(),
+      waitlistHeading: z.string().optional(),
+      waitlistBody: z.string().optional(),
+      waitlistCtaLabel: z.string().optional(),
+      waitlistCtaUrl: z.string().optional(),
+      waitlistRedirectUrl: z.string().optional(),
+      waitlistSuccessMessage: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { courseId, ...fields } = input;
+      await db.update(lmsCourses).set({
+        waitlistEnabled: fields.waitlistEnabled,
+        waitlistHeading: fields.waitlistHeading ?? null,
+        waitlistBody: fields.waitlistBody ?? null,
+        waitlistCtaLabel: fields.waitlistCtaLabel ?? null,
+        waitlistCtaUrl: fields.waitlistCtaUrl ?? null,
+        waitlistRedirectUrl: fields.waitlistRedirectUrl ?? null,
+        waitlistSuccessMessage: fields.waitlistSuccessMessage ?? null,
+      } as any).where(eq(lmsCourses.id, courseId));
+      return { success: true };
+    }),
+
+  getCourseWaitlistEntries: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const entries = await db.select().from(cohortWaitlistEntries)
+        .where(eq(cohortWaitlistEntries.courseId, input.courseId))
+        .orderBy(desc(cohortWaitlistEntries.createdAt));
+      return entries;
+    }),
+
+  exportCourseWaitlistCsv: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const entries = await db.select().from(cohortWaitlistEntries)
+        .where(eq(cohortWaitlistEntries.courseId, input.courseId))
+        .orderBy(desc(cohortWaitlistEntries.createdAt));
+      const header = "Name,Email,Phone,Message,Date";
+      const rows = entries.map(e => [
+        `"${(e.name || "").replace(/"/g, '""')}"`,
+        `"${(e.email || "").replace(/"/g, '""')}"`,
+        `"${(e.phone || "").replace(/"/g, '""')}"`,
+        `"${(e.message || "").replace(/"/g, '""')}"`,
+        `"${new Date(e.createdAt).toISOString()}"`,
+      ].join(","));
+      return { csv: [header, ...rows].join("\n") };
+    }),
+
+  /** Grant waitlist access: paid (Stripe checkout link) or free (direct enrollment) */
+  grantCourseWaitlistAccess: protectedProcedure
+    .input(z.object({
+      entryId: z.number(),
+      courseId: z.number(),
+      accessType: z.enum(["free", "paid"]),
+      priceOverrideCents: z.number().int().min(0).optional(),
+      origin: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [entry] = await db.select().from(cohortWaitlistEntries)
+        .where(eq(cohortWaitlistEntries.id, input.entryId)).limit(1);
+      if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: "Waitlist entry not found" });
+      const [course] = await db.select().from(lmsCourses)
+        .where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+
+      // Find or create user
+      let userId: number;
+      const [existingUser] = await db.select({ id: users.id })
+        .from(users).where(eq(users.email, entry.email)).limit(1);
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        const [newUser] = await db.insert(users).values({
+          email: entry.email,
+          name: entry.name,
+          role: "user" as any,
+        }).$returningId();
+        userId = newUser.id;
+      }
+
+      if (input.accessType === "free") {
+        const [existing] = await db.select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.courseId)))
+          .limit(1);
+        if (!existing) {
+          await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId, enrollmentType: "full" });
+        }
+        await sendEnrollmentEmail({ userId, courseId: input.courseId, db });
+        return { success: true, type: "free", message: `Free access granted and enrollment email sent to ${entry.email}` };
+      } else {
+        const Stripe = (await import("stripe")).default;
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+        const priceInCents = input.priceOverrideCents !== undefined
+          ? input.priceOverrideCents
+          : (course.price ?? 0);
+        if (priceInCents === 0) {
+          const [existing] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+            .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
+          if (!existing) {
+            await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId, enrollmentType: "full" });
+          }
+          await sendEnrollmentEmail({ userId, courseId: input.courseId, db });
+          return { success: true, type: "free", message: `Zero-price access granted and enrollment email sent to ${entry.email}` };
+        }
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          customer_email: entry.email,
+          line_items: [{
+            price_data: {
+              currency: "usd",
+              product_data: { name: course.title },
+              unit_amount: priceInCents,
+            },
+            quantity: 1,
+          }],
+          success_url: `${input.origin}/courses/${course.slug}?enrolled=1`,
+          cancel_url: `${input.origin}/courses/${course.slug}`,
+          metadata: {
+            courseId: String(input.courseId),
+            courseSlug: course.slug,
+            waitlistEntryId: String(input.entryId),
+            grantedByAdminId: String(ctx.user.id),
+          },
+          client_reference_id: String(userId),
+          allow_promotion_codes: true,
+        });
+        await sendEmail({
+          to: { name: entry.name, email: entry.email },
+          subject: `Your spot in ${course.title} — Complete your enrollment`,
+          htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
+            <h2 style="color:#189aa1">You've been granted access to ${course.title}</h2>
+            <p>Hi ${entry.name},</p>
+            <p>Great news! You've been selected from the waitlist for <strong>${course.title}</strong>.</p>
+            <p>Please complete your enrollment by clicking the button below:</p>
+            <p style="text-align:center;margin:30px 0">
+              <a href="${session.url}" style="background:#189aa1;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">Complete Enrollment — $${(priceInCents / 100).toFixed(2)}</a>
+            </p>
+            <p style="color:#666;font-size:13px">This link is unique to you. If you have any questions, please reply to this email.</p>
+          </div>`,
+        });
+        return { success: true, type: "paid", checkoutUrl: session.url, message: `Checkout link sent to ${entry.email}` };
+      }
+    }),
+
   // ── Cohort Group Landing Page Builder ─────────────────────────────────
   getCohortGroupLandingBlocks: protectedProcedure
     .input(z.object({ cohortGroupId: z.number() }))

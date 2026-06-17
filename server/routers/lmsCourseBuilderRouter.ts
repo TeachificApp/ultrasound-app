@@ -125,7 +125,7 @@ export const lmsCourseBuilderRouter = router({
     .input(z.object({
       title: z.string().min(1).max(255),
       subtitle: z.string().max(500).optional(),
-      type: z.enum(["course", "quiz", "download", "cohort"]).default("course"),
+      type: z.enum(["course", "quiz", "download", "cohort", "workshop"]).default("course"),
       brand: z.enum(["aaus", "iheartecho"]).default("aaus"),
       pricingType: z.enum(["free", "one_time", "subscription", "payment_plan", "trial_then_subscription"]).default("one_time"),
       price: z.number().min(0).default(0),
@@ -171,8 +171,16 @@ export const lmsCourseBuilderRouter = router({
       description: z.string().optional(),
       coverImageUrl: z.string().optional(),
       status: z.enum(["draft", "public", "hidden", "private", "archived"]).optional(),
-      type: z.enum(["course", "quiz", "download", "cohort"]).optional(),
+      type: z.enum(["course", "quiz", "download", "cohort", "workshop"]).optional(),
       enrollmentCloseDate: z.string().nullable().optional(), // ISO date string or null
+      // Course-level waitlist settings
+      waitlistEnabled: z.boolean().optional(),
+      waitlistHeading: z.string().nullable().optional(),
+      waitlistBody: z.string().nullable().optional(),
+      waitlistCtaLabel: z.string().nullable().optional(),
+      waitlistCtaUrl: z.string().nullable().optional(),
+      waitlistRedirectUrl: z.string().nullable().optional(),
+      waitlistSuccessMessage: z.string().nullable().optional(),
       brand: z.enum(["aaus", "iheartecho"]).optional(),
       price: z.number().min(0).optional(),
       isFree: z.boolean().optional(),

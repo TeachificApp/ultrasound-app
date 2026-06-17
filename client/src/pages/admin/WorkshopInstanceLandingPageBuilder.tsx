@@ -38,6 +38,9 @@ export default function WorkshopInstanceLandingPageBuilder() {
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Keep a ref so onChange callback always has the latest selectedId
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedId;
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [pageInfo, setPageInfo] = useState<{ title: string; workshopSlug?: string } | null>(null);
@@ -390,8 +393,8 @@ export default function WorkshopInstanceLandingPageBuilder() {
                   <X className="w-3.5 h-3.5" />
                 </Button>
               </div>
-              <BlockSettings block={selectedBlock}
-                onChange={data => setBlocks(prev => prev.map(b => b.id === selectedId ? { ...b, data } : b))} />
+              <BlockSettings key={selectedId ?? "none"} block={selectedBlock}
+                onChange={data => { const sid = selectedIdRef.current; setBlocks(prev => prev.map(b => b.id === sid ? { ...b, data } : b)); }} />
             </div>
           ) : (
             <div className="p-4 space-y-4">

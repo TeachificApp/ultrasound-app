@@ -755,6 +755,7 @@ export const workshopAdminRouter = router({
         availableForPurchase: z.boolean().default(false),
         salesCloseDate: z.string().nullish(),
         salesOpenDate: z.string().nullish(),
+        enrollmentCloseDate: z.string().nullish(),
         status: z.enum(["draft", "published", "cancelled", "completed"]).default("draft"),
         instanceContent: z.string().nullish(),
       })
@@ -783,6 +784,7 @@ export const workshopAdminRouter = router({
         availableForPurchase: input.availableForPurchase,
         salesCloseDate: input.salesCloseDate ? new Date(input.salesCloseDate) : undefined,
         salesOpenDate: input.salesOpenDate ? new Date(input.salesOpenDate) : undefined,
+        enrollmentCloseDate: input.enrollmentCloseDate ? new Date(input.enrollmentCloseDate) : undefined,
         status: input.status,
         enrolledCount: 0,
         instanceContent: input.instanceContent ?? undefined,
@@ -814,6 +816,7 @@ export const workshopAdminRouter = router({
         availableForPurchase: z.boolean().optional(),
         salesCloseDate: z.string().nullish(),
         salesOpenDate: z.string().nullish(),
+        enrollmentCloseDate: z.string().nullish(),
         status: z.enum(["draft", "published", "cancelled", "completed"]).optional(),
         instanceContent: z.string().nullish(),
       })
@@ -821,12 +824,13 @@ export const workshopAdminRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, startDate, endDate, salesCloseDate, salesOpenDate, ...rest } = input;
+      const { id, startDate, endDate, salesCloseDate, salesOpenDate, enrollmentCloseDate, ...rest } = input;
       const updateData: Record<string, any> = { ...rest };
       if (startDate) updateData.startDate = new Date(startDate);
       if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
       if (salesCloseDate !== undefined) updateData.salesCloseDate = salesCloseDate ? new Date(salesCloseDate) : null;
       if (salesOpenDate !== undefined) updateData.salesOpenDate = salesOpenDate ? new Date(salesOpenDate) : null;
+      if (enrollmentCloseDate !== undefined) updateData.enrollmentCloseDate = enrollmentCloseDate ? new Date(enrollmentCloseDate) : null;
       await db.update(workshopInstances).set(updateData).where(eq(workshopInstances.id, id));
       return { success: true };
     }),
@@ -1161,6 +1165,109 @@ export const workshopAdminRouter = router({
         .orderBy(desc(workshopWaitlistEntries.createdAt));
       return entries;
     }),
+  exportWaitlistCsv: protectedProcedure
+    .input(z.object({ workshopId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const entries = await db.select().from(workshopWaitlistEntries)
+        .where(eq(workshopWaitlistEntries.workshopId, input.workshopId))
+        .orderBy(desc(workshopWaitlistEntries.createdAt));
+      const header = "Name,Email,Phone,Message,Date";
+      const rows = entries.map(e => [
+        `"${(e.name || "").replace(/"/g, '""')}"`,
+        `"${(e.email || "").replace(/"/g, '""')}"`,
+        `"${(e.phone || "").replace(/"/g, '""')}"`,
+        `"${(e.message || "").replace(/"/g, '""')}"`,
+        `"${new Date(e.createdAt).toISOString()}"`,
+      ].join(","));
+      return { csv: [header, ...rows].join("\n") };
+    }),
+
+  grantWaitlistAccess: protectedProcedure
+    .input(z.object({
+      entryId: z.number(),
+      workshopId: z.number(),
+      accessType: z.enum(["free", "paid"]),
+      priceOverrideCents: z.number().int().min(0).optional(),
+      origin: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [entry] = await db.select().from(workshopWaitlistEntries)
+        .where(eq(workshopWaitlistEntries.id, input.entryId)).limit(1);
+      if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: "Waitlist entry not found" });
+      const [workshop] = await db.select().from(workshops)
+        .where(eq(workshops.id, input.workshopId)).limit(1);
+      if (!workshop) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop not found" });
+
+      let userId: number;
+      const [existingUser] = await db.select({ id: users.id })
+        .from(users).where(eq(users.email, entry.email)).limit(1);
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        const [newUser] = await db.insert(users).values({
+          email: entry.email,
+          name: entry.name,
+          role: "user" as any,
+        }).$returningId();
+        userId = newUser.id;
+      }
+
+      const { sendEmail } = await import("../_core/email");
+
+      if (input.accessType === "free") {
+        const [existing] = await db.select({ id: workshopEnrollments.id })
+          .from(workshopEnrollments)
+          .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.workshopId, input.workshopId)))
+          .limit(1);
+        if (!existing) {
+          await db.insert(workshopEnrollments).values({ userId, workshopId: input.workshopId, enrollmentType: "full" as any });
+        }
+        await sendEmail({
+          to: { name: entry.name, email: entry.email },
+          subject: `You've been granted access to ${workshop.title}`,
+          htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px"><h2 style="color:#189aa1">Welcome to ${workshop.title}!</h2><p>Hi ${entry.name},</p><p>You've been granted free access to <strong>${workshop.title}</strong>.</p><p style="text-align:center;margin:30px 0"><a href="${input.origin}/workshops/${workshop.slug}" style="background:#189aa1;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">Access Your Workshop</a></p></div>`,
+        });
+        return { success: true, type: "free", message: `Free access granted and email sent to ${entry.email}` };
+      } else {
+        const Stripe = (await import("stripe")).default;
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+        const priceInCents = input.priceOverrideCents !== undefined ? input.priceOverrideCents : (workshop.price ?? 0);
+        if (priceInCents === 0) {
+          const [existing] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)
+            .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.workshopId, input.workshopId))).limit(1);
+          if (!existing) {
+            await db.insert(workshopEnrollments).values({ userId, workshopId: input.workshopId, enrollmentType: "full" as any });
+          }
+          await sendEmail({
+            to: { name: entry.name, email: entry.email },
+            subject: `You've been granted access to ${workshop.title}`,
+            htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px"><h2 style="color:#189aa1">Welcome to ${workshop.title}!</h2><p>Hi ${entry.name},</p><p>You've been granted free access to <strong>${workshop.title}</strong>.</p><p style="text-align:center;margin:30px 0"><a href="${input.origin}/workshops/${workshop.slug}" style="background:#189aa1;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">Access Your Workshop</a></p></div>`,
+          });
+          return { success: true, type: "free", message: `Zero-price access granted and email sent to ${entry.email}` };
+        }
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          customer_email: entry.email,
+          line_items: [{ price_data: { currency: "usd", product_data: { name: workshop.title }, unit_amount: priceInCents }, quantity: 1 }],
+          success_url: `${input.origin}/workshops/${workshop.slug}?enrolled=1`,
+          cancel_url: `${input.origin}/workshops/${workshop.slug}`,
+          metadata: { workshopId: String(input.workshopId), waitlistEntryId: String(input.entryId), grantedByAdminId: String(ctx.user.id) },
+          client_reference_id: String(userId),
+          allow_promotion_codes: true,
+        });
+        await sendEmail({
+          to: { name: entry.name, email: entry.email },
+          subject: `Your spot in ${workshop.title} — Complete your enrollment`,
+          htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px"><h2 style="color:#189aa1">You've been granted access to ${workshop.title}</h2><p>Hi ${entry.name},</p><p>Great news! You've been selected from the waitlist for <strong>${workshop.title}</strong>.</p><p>Please complete your enrollment:</p><p style="text-align:center;margin:30px 0"><a href="${session.url}" style="background:#189aa1;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">Complete Enrollment — $${(priceInCents / 100).toFixed(2)}</a></p></div>`,
+        });
+        return { success: true, type: "paid", checkoutUrl: session.url, message: `Checkout link sent to ${entry.email}` };
+      }
+    }),
+
   // ── Instance Landing Page Builder ─────────────────────────────────────────
   getInstanceLandingBlocks: protectedProcedure
     .input(z.object({ instanceId: z.number() }))

@@ -31,6 +31,7 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
   const {
     sourceType = "workshop_instance",
     sourceId = null,
+    sourceName = "",
     headline = "Limited Seats Available",
     subtext = "Seats are filling up fast — secure yours today.",
     showProgressBar = true,
@@ -176,19 +177,7 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
               </div>
             )}
 
-            {showProgressBar && capacity !== null && capacity > 0 && (
-              <div className="space-y-1">
-                <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="h-3 rounded-full transition-all duration-700"
-                    style={{ width: `${pct}%`, backgroundColor: barColor }}
-                  />
-                </div>
-                <p className="text-xs opacity-50 text-center">
-                  {enrolled} of {capacity} seats filled
-                </p>
-              </div>
-            )}
+{/* Progress bar + total count: admin preview only */}
           </div>
         )}
 

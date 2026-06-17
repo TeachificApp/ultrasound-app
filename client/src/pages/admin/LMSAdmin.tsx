@@ -70,6 +70,7 @@ import MembershipsAdmin from "./MembershipsAdmin";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 import { CohortResourcesAdminSection } from "@/components/cohort/CohortResourcesAdminSection";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
+import { CourseWaitlistTab } from "@/components/CourseWaitlistTab";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -1191,6 +1192,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           {course.type === "cohort" && (
             <TabsTrigger value="cohort" className="text-xs">Cohort</TabsTrigger>
           )}
+          {(course.type === "cohort" || course.type === "workshop") && (
+            <TabsTrigger value="waitlist" className="text-xs">Waitlist</TabsTrigger>
+          )}
           <TabsTrigger value="curriculum" className="text-xs">
             {course.type === "quiz" ? "Questions" : course.type === "download" ? "Files" : "Curriculum"}
           </TabsTrigger>
@@ -1417,6 +1421,12 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         <TabsContent value="cohort" className="mt-4">
           <CohortTab courseId={courseId} />
         </TabsContent>
+        {/* Waitlist Tab */}
+        <TabsContent value="waitlist" className="mt-4">
+          {visitedTabs.has("waitlist") && (
+            <CourseWaitlistTab courseId={courseId} course={course} />
+          )}
+        </TabsContent>
 
         {/* Embed Tab */}
         <TabsContent value="embed" className="mt-4">
@@ -1618,7 +1628,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [description, setDescription] = useState(course.description ?? "");
   const [status, setStatus] = useState(course.status);
   const [brand, setBrand] = useState(course.brand);
-  const [courseType, setCourseType] = useState<"course" | "quiz" | "download" | "cohort">(course.type ?? "course");
+  const [courseType, setCourseType] = useState<"course" | "quiz" | "download" | "cohort" | "workshop">(course.type ?? "course");
   const [enrollmentCloseDate, setEnrollmentCloseDate] = useState<string>(
     course.enrollmentCloseDate ? new Date(course.enrollmentCloseDate).toISOString().split("T")[0] : ""
   );
@@ -1779,18 +1789,19 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         </div>
         <div>
           <Label className="text-sm">Content Type</Label>
-          <Select value={courseType} onValueChange={v => setCourseType(v as "course" | "quiz" | "download" | "cohort")}>
+          <Select value={courseType} onValueChange={v => setCourseType(v as "course" | "quiz" | "download" | "cohort" | "workshop")}>
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="course">Course — appears in Courses section</SelectItem>
               <SelectItem value="quiz">Quiz — appears in Quizzes section</SelectItem>
               <SelectItem value="download">Download — appears in Downloads section</SelectItem>
               <SelectItem value="cohort">Cohort — live/coaching program with sessions &amp; assignments</SelectItem>
+              <SelectItem value="workshop">Workshop — live in-person or virtual workshop</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-400 mt-1">Changing this moves the content to a different section of the Education Library.</p>
         </div>
-        {courseType === "cohort" && (
+        {(courseType === "cohort" || courseType === "workshop") && (
           <div>
             <Label className="text-sm">Enrollment Close Date</Label>
             <Input
