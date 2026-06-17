@@ -65,6 +65,7 @@ type ProductItem = {
   href: string;
   pricingType?: string | null;
   subscriptionInterval?: string | null;
+  appLabel?: string;
 };
 
 export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) {
@@ -128,6 +129,7 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
       href: p.href,
       pricingType: (p as any).pricingType ?? null,
       subscriptionInterval: (p as any).subscriptionInterval ?? null,
+      appLabel: (p as any).appLabel ?? undefined,
     }));
   } else {
     const courseItems: ProductItem[] = (coursesData?.courses ?? []).filter((c) => (c as any).type !== "quiz").map((c) => ({
@@ -286,12 +288,18 @@ function ProductCard({ item, accent, textColor, cardBg, showPrice, showDescripti
       style={{ backgroundColor: cardBg }}
     >
       {/* Fixed-height thumbnail — never grows */}
-      <div className="h-36 flex-shrink-0 overflow-hidden">
+      <div className="h-36 flex-shrink-0 overflow-hidden relative">
         {item.imageUrl ? (
           <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: accent + "22" }}>
             <Icon size={36} style={{ color: accent, opacity: 0.6 }} />
+          </div>
+        )}
+        {/* App name overlay */}
+        {item.type === "app" && item.appLabel && (
+          <div className="absolute inset-0 flex items-end justify-start p-3 bg-gradient-to-t from-black/70 via-black/20 to-transparent">
+            <span className="text-white font-bold text-sm leading-tight drop-shadow-md">{item.appLabel}</span>
           </div>
         )}
       </div>
@@ -357,12 +365,17 @@ function ProductListRow({ item, accent, textColor, cardBg, showPrice, showDescri
       style={{ backgroundColor: cardBg }}
     >
       {/* Fixed thumbnail */}
-      <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden">
+      <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden relative">
         {item.imageUrl ? (
           <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: accent + "22" }}>
             <Icon size={24} style={{ color: accent, opacity: 0.6 }} />
+          </div>
+        )}
+        {item.type === "app" && item.appLabel && (
+          <div className="absolute inset-0 flex items-end justify-start p-1 bg-gradient-to-t from-black/70 via-black/20 to-transparent rounded-lg">
+            <span className="text-white font-bold text-[9px] leading-tight drop-shadow-md">{item.appLabel}</span>
           </div>
         )}
       </div>

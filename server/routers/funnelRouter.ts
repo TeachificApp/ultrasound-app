@@ -59,11 +59,13 @@ export const funnelRouter = router({
       db.select({ id: workshops.id, title: workshops.title, slug: workshops.slug, price: workshops.price, thumbnailUrl: workshops.thumbnailUrl, isFree: workshops.isFree }).from(workshops).where(eq(workshops.status, "public")).orderBy(asc(workshops.title)),
     ]);
     // Hardcoded app products (UltrasoundAssist + EchoAssist, Free + Premium)
+    const AAUS_HERO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp";
+    const IHE_HERO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
     const APP_PRODUCTS = [
-      { id: 1001, type: "app" as const, name: "UltrasoundAssist™ — Free", price: 0, imageUrl: "", href: "https://app.allaboutultrasound.com", isFree: true },
-      { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: -1, imageUrl: "", href: "https://app.allaboutultrasound.com", isFree: false },
-      { id: 1003, type: "app" as const, name: "EchoAssist™ — Free", price: 0, imageUrl: "", href: "https://app.iheartecho.com", isFree: true },
-      { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: -1, imageUrl: "", href: "https://app.iheartecho.com", isFree: false },
+      { id: 1001, type: "app" as const, name: "UltrasoundAssist™ — Free", price: 0, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: true, appLabel: "UltrasoundAssist" },
+      { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: -1, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "UltrasoundAssist" },
+      { id: 1003, type: "app" as const, name: "EchoAssist™ — Free", price: 0, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: true, appLabel: "EchoAssist" },
+      { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: -1, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: false, appLabel: "EchoAssist" },
     ];
     return [
       ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
@@ -71,7 +73,7 @@ export const funnelRouter = router({
       ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, price: b.price ?? 0, imageUrl: b.thumbnailUrl ?? "" })),
       ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, price: p.price ?? 0, imageUrl: p.thumbnailUrl ?? "" })),
       ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, price: w.price ?? 0, imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
-      ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, price: 0, imageUrl: c.coverImage ?? "", isFree: c.accessType === "free" })),
+      ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, price: 0, imageUrl: c.coverImage ?? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp", isFree: c.accessType === "free" })),
       ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: w.price ?? 0, imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
       ...APP_PRODUCTS,
     ];
@@ -101,11 +103,13 @@ export const funnelRouter = router({
       const allLmsCourseIds = [...new Set([...courseIds, ...cohortIds])];
 
       // Hardcoded app products registry
-      const APP_REGISTRY: Record<number, { id: number; type: string; title: string; slug: string; description: string; price: number; isFree: boolean; imageUrl: string; href: string }> = {
-        1001: { id: 1001, type: "app", title: "UltrasoundAssist™ — Free", slug: "ultrasound-assist-free", description: "AI-powered ultrasound clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: "", href: "https://app.allaboutultrasound.com" },
-        1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: -1, isFree: false, imageUrl: "", href: "https://app.allaboutultrasound.com" },
-        1003: { id: 1003, type: "app", title: "EchoAssist™ — Free", slug: "echo-assist-free", description: "AI-powered echocardiography clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: "", href: "https://app.iheartecho.com" },
-        1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: -1, isFree: false, imageUrl: "", href: "https://app.iheartecho.com" },
+      const AAUS_HERO_R = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp";
+      const IHE_HERO_R = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
+      const APP_REGISTRY: Record<number, { id: number; type: string; title: string; slug: string; description: string; price: number; isFree: boolean; imageUrl: string; href: string; appLabel?: string }> = {
+        1001: { id: 1001, type: "app", title: "UltrasoundAssist™ — Free", slug: "ultrasound-assist-free", description: "AI-powered ultrasound clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist" },
+        1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: -1, isFree: false, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist" },
+        1003: { id: 1003, type: "app", title: "EchoAssist™ — Free", slug: "echo-assist-free", description: "AI-powered echocardiography clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist" },
+        1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: -1, isFree: false, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist" },
       };
 
       const [courses, downloads, bundles, physicals, webinarRows, communityRows, workshopRows] = await Promise.all([
@@ -163,7 +167,8 @@ export const funnelRouter = router({
       for (const b of bundles as any[]) map.set(`bundle-${b.id}`, { ...b, type: "bundle", isFree: false, price: b.price ?? 0, href: `/bundles/${b.slug}` });
       for (const p of physicals as any[]) map.set(`physical-${p.id}`, { ...p, type: "physical", isFree: false, href: `/shop/${p.slug}` });
       for (const w of webinarRows as any[]) map.set(`webinar-${w.id}`, { ...w, type: "webinar", isFree: w.accessType === "free", price: w.price ?? 0, href: `/webinars/${w.slug}` });
-      for (const c of communityRows as any[]) map.set(`community-${c.id}`, { ...c, type: "community", isFree: c.accessType === "free", price: 0, href: `/community/${c.slug}` });
+      const COMMUNITY_FALLBACK_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
+      for (const c of communityRows as any[]) map.set(`community-${c.id}`, { ...c, type: "community", isFree: c.accessType === "free", price: 0, href: `/community/${c.slug}`, imageUrl: c.imageUrl ?? COMMUNITY_FALLBACK_IMG });
       for (const w of workshopRows as any[]) map.set(`workshop-${w.id}`, { ...w, type: "workshop", isFree: w.isFree ?? false, price: w.price ?? 0, href: `/workshops/${w.slug}` });
       for (const appId of appIds) {
         const app = APP_REGISTRY[appId];
@@ -188,6 +193,7 @@ export const funnelRouter = router({
           description: string | null; price: number; isFree: boolean;
           imageUrl: string | null; href: string;
           pricingType?: string | null; subscriptionInterval?: string | null;
+          appLabel?: string;
         }>;
     }),
 
