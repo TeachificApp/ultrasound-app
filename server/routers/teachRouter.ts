@@ -456,7 +456,10 @@ export const teachRouter = router({
               res.on("error", reject);
             }).on("error", reject);
           });
-          const parsed = await parsePptxBuffer(buffer, await uploadPptxImage(ctx.user.id, folder));
+          // Parse without uploadImage so images are embedded as base64 data URLs.
+          // This avoids per-image S3 uploads during parsing, which caused Cloud Run
+          // 180s timeout failures on large PPTX files.
+          const parsed = await parsePptxBuffer(buffer);
           slidesData = JSON.stringify(parsed.slides);
           if (parsed.masterSlides.length > 0) {
             const [masterResult] = await db.insert(teachSlideMasters).values({

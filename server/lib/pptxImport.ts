@@ -236,6 +236,18 @@ async function parseShapeTree(
       } catch {
         warnings.push(`Failed to upload image ${mediaPath}`);
       }
+    } else {
+      // No uploader provided — embed as base64 data URL for immediate rendering
+      try {
+        const file = await zip.file(mediaPath)?.async("nodebuffer");
+        if (file) {
+          const name = mediaPath.split("/").pop() ?? "image.png";
+          const mime = mimeFromExt(name);
+          src = `data:${mime};base64,${file.toString("base64")}`;
+        }
+      } catch {
+        warnings.push(`Failed to embed image ${mediaPath}`);
+      }
     }
 
     elements.push({
