@@ -526,3 +526,35 @@ describe("Email change verification URL construction", () => {
     expect(url.startsWith("https://custom.domain.com")).toBe(true);
   });
 });
+
+// ── setPassword input validation ─────────────────────────────────────────────
+const setPasswordSchemaTest = z.object({
+  newPassword: z.string().min(8).max(128),
+});
+
+describe("setPassword input validation", () => {
+  it("accepts a valid new password", () => {
+    const result = setPasswordSchemaTest.safeParse({ newPassword: "StrongPass1!" });
+    expect(result.success).toBe(true);
+  });
+  it("rejects a password shorter than 8 characters", () => {
+    const result = setPasswordSchemaTest.safeParse({ newPassword: "short" });
+    expect(result.success).toBe(false);
+  });
+  it("accepts a password of exactly 8 characters", () => {
+    const result = setPasswordSchemaTest.safeParse({ newPassword: "12345678" });
+    expect(result.success).toBe(true);
+  });
+  it("rejects a password exceeding 128 characters", () => {
+    const result = setPasswordSchemaTest.safeParse({ newPassword: "A".repeat(129) });
+    expect(result.success).toBe(false);
+  });
+  it("accepts a password of exactly 128 characters", () => {
+    const result = setPasswordSchemaTest.safeParse({ newPassword: "A".repeat(128) });
+    expect(result.success).toBe(true);
+  });
+  it("rejects missing newPassword field", () => {
+    const result = setPasswordSchemaTest.safeParse({});
+    expect(result.success).toBe(false);
+  });
+});

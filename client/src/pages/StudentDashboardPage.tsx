@@ -189,6 +189,18 @@ function ProfileTab() {
       toast.success("Password changed successfully.");
       setPasswordForm({ current: "", newPw: "", confirm: "" });
       setPasswordOpen(false);
+      utils.dashboard.getProfile.invalidate();
+      utils.auth.me.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const setPassword = trpc.auth.setPassword.useMutation({
+    onSuccess: () => {
+      toast.success("Password set! You can now sign in with your email and password.");
+      setPasswordForm({ current: "", newPw: "", confirm: "" });
+      setPasswordOpen(false);
+      utils.dashboard.getProfile.invalidate();
+      utils.auth.me.invalidate();
     },
     onError: (e) => toast.error(e.message),
   });
@@ -350,17 +362,17 @@ function ProfileTab() {
       {/* Password */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-3">
         <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Password</h3>
-        {profile.hasPassword ? (
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm text-gray-600">Your account uses email/password login.</p>
-            <Button variant="outline" size="sm" onClick={() => setPasswordOpen(true)}>
-              <Lock className="w-3.5 h-3.5 mr-1.5" />
-              Change Password
-            </Button>
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500">Your account uses OAuth login (no password set).</p>
-        )}
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm text-gray-600">
+            {profile.hasPassword
+              ? "Your account has a password set."
+              : "No password set. Add one to sign in with email and password."}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setPasswordOpen(true)}>
+            <Lock className="w-3.5 h-3.5 mr-1.5" />
+            {profile.hasPassword ? "Change Password" : "Set Password"}
+          </Button>
+        </div>
       </div>
 
       {/* Email Change Dialog */}
@@ -388,64 +400,94 @@ function ProfileTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Password Change Dialog */}
-      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+      {/* Password Dialog — handles both Set Password (no existing) and Change Password */}
+      <Dialog open={passwordOpen} onOpenChange={(open) => {
+        setPasswordOpen(open);
+        if (!open) setPasswordForm({ current: "", newPw: "", confirm: "" });
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change Password</DialogTitle>
-            <DialogDescription>Enter your current password and choose a new one.</DialogDescription>
+            <DialogTitle>{profile.hasPassword ? "Change Password" : "Set Password"}</DialogTitle>
+            <DialogDescription>
+              {profile.hasPassword
+                ? "Enter your current password and choose a new one."
+                : "Choose a password to enable email and password sign-in for your account."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Current Password</Label>
-              <div className="relative">
-                <Input
-                  type={showCurrent ? "text" : "password"}
-                  value={passwordForm.current}
-                  onChange={e => setPasswordForm(f => ({ ...f, current: e.target.value }))}
-                  placeholder="Current password"
-                />
-                <button type="button" onClick={() => setShowCurrent(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            {profile.hasPassword && (
+              <div className="space-y-1.5">
+                <Label>Current Password</Label>
+                <div className="relative">
+                  <Input
+                    type={showCurrent ? "text" : "password"}
+                    value={passwordForm.current}
+                    onChange={e => setPasswordForm(f => ({ ...f, current: e.target.value }))}
+                    placeholder="Current password"
+                    autoComplete="current-password"
+                  />
+                  <button type="button" onClick={() => setShowCurrent(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
             <div className="space-y-1.5">
-              <Label>New Password</Label>
+              <Label>{profile.hasPassword ? "New Password" : "Password"}</Label>
               <div className="relative">
                 <Input
                   type={showNew ? "text" : "password"}
                   value={passwordForm.newPw}
                   onChange={e => setPasswordForm(f => ({ ...f, newPw: e.target.value }))}
                   placeholder="At least 8 characters"
+                  autoComplete="new-password"
                 />
                 <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                   {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {passwordForm.newPw && passwordForm.newPw.length < 8 && (
+                <p className="text-xs text-red-500">Password must be at least 8 characters.</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Confirm New Password</Label>
+              <Label>Confirm {profile.hasPassword ? "New " : ""}Password</Label>
               <Input
                 type="password"
                 value={passwordForm.confirm}
                 onChange={e => setPasswordForm(f => ({ ...f, confirm: e.target.value }))}
-                placeholder="Repeat new password"
+                placeholder="Repeat password"
+                autoComplete="new-password"
               />
+              {passwordForm.confirm && passwordForm.newPw !== passwordForm.confirm && (
+                <p className="text-xs text-red-500">Passwords do not match.</p>
+              )}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPasswordOpen(false)}>Cancel</Button>
             <Button
               onClick={() => {
+                if (passwordForm.newPw.length < 8) { toast.error("Password must be at least 8 characters."); return; }
                 if (passwordForm.newPw !== passwordForm.confirm) { toast.error("Passwords do not match."); return; }
-                changePassword.mutate({ currentPassword: passwordForm.current, newPassword: passwordForm.newPw });
+                if (profile.hasPassword) {
+                  if (!passwordForm.current) { toast.error("Please enter your current password."); return; }
+                  changePassword.mutate({ currentPassword: passwordForm.current, newPassword: passwordForm.newPw });
+                } else {
+                  setPassword.mutate({ newPassword: passwordForm.newPw });
+                }
               }}
-              disabled={changePassword.isPending || !passwordForm.current || !passwordForm.newPw}
+              disabled={
+                (profile.hasPassword ? changePassword.isPending : setPassword.isPending) ||
+                (profile.hasPassword && !passwordForm.current) ||
+                !passwordForm.newPw || !passwordForm.confirm
+              }
               className="bg-[#189aa1] hover:bg-[#157f85] text-white"
             >
-              {changePassword.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Update Password
+              {(profile.hasPassword ? changePassword.isPending : setPassword.isPending)
+                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                : null}
+              {profile.hasPassword ? "Update Password" : "Set Password"}
             </Button>
           </DialogFooter>
         </DialogContent>
