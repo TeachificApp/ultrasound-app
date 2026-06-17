@@ -5082,7 +5082,8 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             ) : (
               <select 
                 value={d.sourceId || ""} 
-                onChange={(e) => {
+                onChangeCapture={(e: any) => {
+                  e.stopPropagation();
                   const id = parseInt(e.target.value);
                   const item = rsItems.find(i => i.id === id);
                   if (item) {
