@@ -318,7 +318,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   { type: "pricing_options_auto", label: "Pricing Options", icon: <CreditCard size={14} />, category: "Conversion",
     defaultData: { headline: "Choose Your Plan", bgColor: "#f9fafb" } },
   { type: "cohort_sessions_auto", label: "Live Sessions (Auto)", icon: <Timer size={14} />, category: "Content",
-    defaultData: { headline: "Upcoming Live Sessions", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true } },
+    defaultData: { headline: "Upcoming Live Sessions", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true, showLocation: true, displayMode: "sessions", groupSelectionMode: "all", selectedGroupIds: [], enrollNowText: "Enroll Now", showEnrollNow: true } },
   { type: "related_products", label: "Related Products", icon: <Package size={14} />, category: "Smart",
     defaultData: {
       headline: "You Might Also Like",
@@ -1035,7 +1035,8 @@ type CTAAction =
   | "url" | "send_email" | "next_funnel_step" | "direct_checkout"
   | "free_preview" | "group_purchase" | "order_bump_lp"
   | "scroll_to_section" | "open_popup" | "download_file" | "pricing_option"
-  | "landing_page" | "funnel_page" | "free_enrollment" | "group_free_enrollment";
+  | "landing_page" | "funnel_page" | "free_enrollment" | "group_free_enrollment"
+  | "enroll_next_available";
 
 const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   url: "Link to URL",
@@ -1053,6 +1054,7 @@ const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   scroll_to_section: "Scroll to Section",
   open_popup: "Open Video / Form / Popup",
   download_file: "Download File",
+  enroll_next_available: "Enroll in Next Available (Workshop/Cohort)",
 };
 
 function CTAActionPicker({
@@ -1517,6 +1519,11 @@ function CTAActionPicker({
             <p className="text-[10px] text-purple-500 break-all">/{fpFunnelSlug}/{fpPageSlug}</p>
           )}
         </div>
+      )}
+      {behavior === "enroll_next_available" && (
+        <p className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-2 py-1.5">
+          Automatically directs to checkout for the next available workshop instance or cohort group. Use this for generalized CTAs on the page — the system picks the soonest enrollable option at runtime.
+        </p>
       )}
     </div>
   );
@@ -4643,10 +4650,52 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
         </div>
       );
     }
-    case "cohort_sessions_auto":
+    case "cohort_sessions_auto": {
+      const displayMode = d.displayMode ?? "sessions";
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Mode</p>
+            <div className="flex gap-1">
+              {(["sessions", "groups"] as const).map(m => (
+                <button key={m} onClick={() => set("displayMode", m)}
+                  className={`flex-1 py-1.5 text-xs rounded border capitalize ${displayMode === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
+                  {m === "sessions" ? "Live Sessions List" : "Cohort/Instance Cards"}
+                </button>
+              ))}
+            </div>
+            {displayMode === "groups" && (
+              <p className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-2 py-1.5 mt-2">
+                Shows stacked cards for each cohort group (or workshop instance). Each card has an Enroll Now button. Clicking a card opens the full detail page for that group/instance.
+              </p>
+            )}
+          </div>
+          {displayMode === "groups" && (
+            <div className="border-t pt-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Group Selection</p>
+              <div className="flex gap-1">
+                {(["all", "manual"] as const).map(m => (
+                  <button key={m} onClick={() => set("groupSelectionMode", m)}
+                    className={`flex-1 py-1.5 text-xs rounded border capitalize ${(d.groupSelectionMode ?? "all") === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
+                    {m === "all" ? "All Available (Dynamic)" : "Manual Selection"}
+                  </button>
+                ))}
+              </div>
+              {(d.groupSelectionMode ?? "all") === "manual" && (
+                <p className="text-[10px] text-gray-500 mt-1.5">Enter comma-separated cohort group IDs to show specific groups.</p>
+              )}
+              {(d.groupSelectionMode ?? "all") === "manual" && (
+                <input
+                  type="text"
+                  className="w-full mt-1 h-8 text-xs border rounded px-2"
+                  placeholder="e.g. 12, 15, 23"
+                  value={(d.selectedGroupIds ?? []).join(", ")}
+                  onChange={e => set("selectedGroupIds", e.target.value.split(",").map((s: string) => Number(s.trim())).filter(Boolean))}
+                />
+              )}
+            </div>
+          )}
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Design</p>
             <div className="space-y-2">
@@ -4658,14 +4707,32 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Options</p>
             <div className="space-y-2">
-              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDescription ?? true} onChange={e => set("showDescription", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show session description</label></div>
-              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDuration ?? true} onChange={e => set("showDuration", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show duration</label></div>
-              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPastSessions ?? false} onChange={e => set("showPastSessions", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show past sessions</label></div>
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDescription ?? true} onChange={e => set("showDescription", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show description</label></div>
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDuration ?? true} onChange={e => set("showDuration", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show duration / hours</label></div>
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocation ?? true} onChange={e => set("showLocation", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show location</label></div>
+              {displayMode === "sessions" && (
+                <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPastSessions ?? false} onChange={e => set("showPastSessions", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show past sessions</label></div>
+              )}
+              {displayMode === "groups" && (
+                <>
+                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.showEnrollNow ?? true} onChange={e => set("showEnrollNow", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Enroll Now button on each card</label></div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Enroll Now Button Text</label>
+                    <input type="text" className="w-full h-8 text-xs border rounded px-2" value={d.enrollNowText ?? "Enroll Now"} onChange={e => set("enrollNowText", e.target.value)} placeholder="Enroll Now" />
+                  </div>
+                </>
+              )}
             </div>
           </div>
-          <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Sessions are auto-populated from the cohort live sessions you create in the Course → Cohort tab.</p>
+          {displayMode === "sessions" && (
+            <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Sessions are auto-populated from the cohort live sessions you create in the Course → Cohort tab.</p>
+          )}
+          {displayMode === "groups" && (
+            <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Cards are auto-populated from available cohort groups. Clicking a card opens the full detail page for that group. Use <strong>Enroll in Next Available</strong> CTA action type for generalized CTAs elsewhere on the page.</p>
+          )}
         </div>
       );
+    }
     case "divider":
       return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Style</label><div className="flex gap-1">{(["solid", "dashed", "dotted"] as const).map(s => <button key={s} onClick={() => set("style", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.style ?? "solid") === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Color" field="color" /><div><label className="text-xs text-gray-500 block mb-1">Thickness (px)</label><Input type="number" value={d.thickness ?? 1} onChange={e => set("thickness", Number(e.target.value))} className="h-8 text-sm" min={1} max={10} /></div><div><label className="text-xs text-gray-500 block mb-1">Rounding (px)</label><Input type="number" value={d.borderRadius ?? 0} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={20} /></div><div><label className="text-xs text-gray-500 block mb-1">Vertical Spacing (px)</label><Input type="number" value={d.spacing ?? 32} onChange={e => set("spacing", Number(e.target.value))} className="h-8 text-sm" min={0} max={200} /></div></div>);
     case "two_column": {

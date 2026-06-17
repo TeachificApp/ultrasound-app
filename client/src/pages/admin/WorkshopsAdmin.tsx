@@ -732,6 +732,10 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
+                          onClick={() => window.open(`/admin/workshops/${workshopId}/instances/${inst.id}/page-builder`, "_blank")}>
+                          Edit Page
+                        </Button>
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEditInstance(inst)}>
                           <Edit2 className="w-3.5 h-3.5" />
                         </Button>

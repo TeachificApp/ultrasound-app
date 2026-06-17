@@ -93,6 +93,10 @@ export function handleCtaBtnClick(
     } else {
       onEnroll?.();
     }
+  } else if (action === "enroll_next_available") {
+    // Directs to checkout for the next available instance/cohort — same as direct_checkout
+    if (onCheckoutPage) onCheckoutPage(undefined);
+    else onEnroll?.();
   }
 }
 
@@ -241,6 +245,10 @@ function resolveBtnAction(
   // free_enrollment → direct free access grant for any product type
   if (b === "free_enrollment" && onFreeEnroll && freeEnrollProductId) {
     return () => onFreeEnroll(freeEnrollProductType ?? "course", freeEnrollProductId);
+  }
+  // enroll_next_available → checkout for next available instance/cohort
+  if (b === "enroll_next_available") {
+    if (onCheckoutPage) return () => onCheckoutPage(undefined);
   }
   // next_funnel_step, or default → onEnroll (free courses, already enrolled, etc.)
   return onEnroll;

@@ -11732,6 +11732,10 @@ function CohortTab({ courseId }: { courseId: number }) {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="outline" className="text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
+                        onClick={() => window.open(`/admin/lms/${courseId}/cohorts/${group.id}/page-builder`, "_blank")}>
+                        Edit Page
+                      </Button>
                       <Button size="sm" variant="outline" onClick={() => { setSelectedGroupId(selectedGroupId === group.id ? null : group.id); }} className="text-xs">
                         {selectedGroupId === group.id ? "Hide Students" : "Manage Students"}
                       </Button>

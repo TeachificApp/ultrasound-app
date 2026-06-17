@@ -364,7 +364,13 @@ export const lmsPublicRouter = router({
         db.select({
           id: lmsCohortGroups.id,
           name: lmsCohortGroups.name,
+          description: lmsCohortGroups.description,
+          startDate: lmsCohortGroups.startDate,
+          endDate: lmsCohortGroups.endDate,
           status: lmsCohortGroups.status,
+          maxStudents: lmsCohortGroups.maxStudents,
+          location: lmsCohortGroups.location,
+          durationHours: lmsCohortGroups.durationHours,
           isFeaturedOnLanding: lmsCohortGroups.isFeaturedOnLanding,
           enrollmentCloseDate: lmsCohortGroups.enrollmentCloseDate,
           waitlistEnabled: lmsCohortGroups.waitlistEnabled,
@@ -406,10 +412,11 @@ export const lmsPublicRouter = router({
 
       const landingPage = landingPageRow[0] ?? null;
       // Determine featured cohort group and waitlist mode for the landing page
-      const featuredGroup = cohortGroupsRaw.find(g => g.isFeaturedOnLanding) ?? cohortGroupsRaw[0] ?? null;
+            const featuredGroup = cohortGroupsRaw.find(g => g.isFeaturedOnLanding) ?? cohortGroupsRaw[0] ?? null;
       const hasOpenGroup = cohortGroupsRaw.some(g => g.status === "open");
-
-      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions, featuredGroup, hasOpenGroup };
+      // Include all non-archived cohort groups so the Live Sessions Auto block can show them
+      const cohortGroups = cohortGroupsRaw;
+      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions, featuredGroup, hasOpenGroup, cohortGroups };
     }),
 
   /** Get instructor public profile */
@@ -702,6 +709,32 @@ export const lmsPublicRouter = router({
         message: input.message ?? null,
       });
       return { success: true, alreadyRegistered: false };
+    }),
+
+  /** Public: get landing blocks + basic info for a specific cohort group */
+  getCohortGroupPage: publicProcedure
+    .input(z.object({ cohortGroupId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const row = await db
+        .select()
+        .from(lmsCohortGroups)
+        .where(eq(lmsCohortGroups.id, input.cohortGroupId))
+        .then(r => r[0] ?? null);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        id: row.id,
+        courseId: row.courseId,
+        name: row.name,
+        description: row.description,
+        startDate: row.startDate,
+        endDate: row.endDate,
+        enrollmentCloseDate: row.enrollmentCloseDate,
+        maxStudents: row.maxStudents,
+        status: row.status,
+        landingBlocks: row.landingBlocks ? JSON.parse(row.landingBlocks) : [],
+      };
     }),
 });
 

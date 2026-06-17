@@ -89,6 +89,8 @@ const BundleLandingPageBuilder = lazy(() => import("./pages/admin/BundleLandingP
 const WebinarLandingPageBuilder = lazy(() => import("./pages/admin/WebinarLandingPageBuilder"));
 const WebinarPlayerPageBuilder = lazy(() => import("./pages/admin/WebinarPlayerPageBuilder"));
 const WorkshopLandingPageBuilder = lazy(() => import("./pages/admin/WorkshopLandingPageBuilder"));
+const WorkshopInstanceLandingPageBuilder = lazy(() => import("./pages/admin/WorkshopInstanceLandingPageBuilder"));
+const CohortGroupLandingPageBuilder = lazy(() => import("./pages/admin/CohortGroupLandingPageBuilder"));
 const WidgetManager = lazy(() => import("./pages/admin/WidgetManager"));
 const PrintfulAdmin = lazy(() => import("./pages/admin/PrintfulAdmin"));
 const MerchStore = lazy(() => import("./pages/MerchStore"));
@@ -490,6 +492,8 @@ function Router() {
         <Route path="/admin/webinars/:webinarId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/webinars/:webinarId/player-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarPlayerPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/workshops/:workshopId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WorkshopLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/workshops/:workshopId/instances/:instanceId/page-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WorkshopInstanceLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/lms/:courseId/cohorts/:cohortGroupId/page-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CohortGroupLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/widgets">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><WidgetManager /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/printful">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PrintfulAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/widget/:token">{() => <Suspense fallback={<div />}><WidgetRenderer /></Suspense>}</Route>
@@ -819,6 +823,8 @@ function LMSRouter() {
         {/* ── Physical Products ───────────────────────────────────────────────── */}
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/workshops/:workshopId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WorkshopLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/workshops/:workshopId/instances/:instanceId/page-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WorkshopInstanceLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/lms/:courseId/cohorts/:cohortGroupId/page-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CohortGroupLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/webinars/:webinarId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/bundles/:bundleId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><BundleLandingPageBuilder /></RoleGuard>}</Route>
                 <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
@@ -1029,6 +1035,8 @@ function IHeartEchoRouter() {
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/workshops/:workshopId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WorkshopLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/workshops/:workshopId/instances/:instanceId/page-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WorkshopInstanceLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/lms/:courseId/cohorts/:cohortGroupId/page-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CohortGroupLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/webinars/:webinarId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/bundles/:bundleId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><BundleLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>

@@ -137,6 +137,37 @@ export const workshopPublicRouter = router({
         .offset(input.offset);
       return rows;
     }),
+
+  /** Public: get landing blocks + basic info for a specific workshop instance */
+  getInstancePage: publicProcedure
+    .input(z.object({ instanceId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const row = await db
+        .select()
+        .from(workshopInstances)
+        .where(eq(workshopInstances.id, input.instanceId))
+        .then(r => r[0] ?? null);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        id: row.id,
+        title: row.title,
+        startDate: row.startDate,
+        endDate: row.endDate,
+        timezone: row.timezone,
+        durationMinutes: row.durationMinutes,
+        locationType: row.locationType,
+        venueName: row.venueName,
+        venueCity: row.venueCity,
+        venueState: row.venueState,
+        venueAddress: row.venueAddress,
+        meetingUrl: row.meetingUrl,
+        description: row.description,
+        instanceContent: row.instanceContent,
+        landingBlocks: row.landingBlocks ? JSON.parse(row.landingBlocks) : [],
+      };
+    }),
 });
 
 // ─── Learner Router ───────────────────────────────────────────────────────────
@@ -1086,6 +1117,31 @@ export const workshopAdminRouter = router({
         .where(eq(workshopWaitlistEntries.workshopId, input.workshopId))
         .orderBy(desc(workshopWaitlistEntries.createdAt));
       return entries;
+    }),
+  // ── Instance Landing Page Builder ─────────────────────────────────────────
+  getInstanceLandingBlocks: protectedProcedure
+    .input(z.object({ instanceId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [inst] = await db
+        .select({ id: workshopInstances.id, workshopId: workshopInstances.workshopId, title: workshopInstances.title, landingBlocks: workshopInstances.landingBlocks })
+        .from(workshopInstances)
+        .where(eq(workshopInstances.id, input.instanceId))
+        .limit(1);
+      if (!inst) throw new TRPCError({ code: "NOT_FOUND" });
+      return inst;
+    }),
+  saveInstanceLandingBlocks: protectedProcedure
+    .input(z.object({ instanceId: z.number(), blocks: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db
+        .update(workshopInstances)
+        .set({ landingBlocks: input.blocks })
+        .where(eq(workshopInstances.id, input.instanceId));
+      return { success: true };
     }),
 });
 
