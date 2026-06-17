@@ -5081,21 +5081,22 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               </div>
             ) : (
               <select 
-                value={d.sourceId || ""} 
-                onChangeCapture={(e: any) => {
-                  e.stopPropagation();
+                value={String(d.sourceId || "")} 
+                onChange={(e: any) => {
                   const id = parseInt(e.target.value);
-                  const item = rsItems.find(i => i.id === id);
-                  if (item) {
-                    set("sourceId", id);
-                    set("sourceName", item.label);
+                  if (!isNaN(id)) {
+                    const item = rsItems.find(i => i.id === id);
+                    if (item) {
+                      set("sourceId", id);
+                      set("sourceName", item.label);
+                    }
                   }
                 }}
                 className="h-8 text-xs px-2 py-1 border rounded w-full bg-white cursor-pointer"
               >
                 <option value="">Select {rsSourceType === "workshop_instance" ? "Workshop Instance" : "Cohort Group"}...</option>
                 {rsItems.map(item => (
-                  <option key={item.id} value={item.id}>
+                  <option key={item.id} value={String(item.id)}>
                     {item.label}
                   </option>
                 ))}
