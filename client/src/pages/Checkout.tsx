@@ -25,6 +25,8 @@ import { trpc } from "@/lib/trpc";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   ShieldCheck, RefreshCw, Lock, AlertCircle, ArrowLeft, CheckCircle2, BookOpen,
   Award, Star, Heart, Zap, Shield, BadgeCheck, ChevronDown, ChevronRight,
@@ -413,6 +415,14 @@ export default function Checkout() {
     : "Back to course";
 
   const onSessionSuccess = (data: any) => {
+    // Free plan: enrollment already completed server-side, redirect to member area
+    if (data.free === true && !data.clientSecret) {
+      const dest = entityType === "membership" && slug
+        ? `/my-memberships/${slug}`
+        : "/my-dashboard";
+      window.location.href = dest;
+      return;
+    }
     const { clientSecret: cs, ...meta } = data;
     setClientSecret(cs);
     setSessionMeta(meta);
@@ -428,11 +438,28 @@ export default function Checkout() {
   const createWebinarSession = trpc.webinarAdmin.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
   const createMembershipSession = trpc.membership.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
 
+  // ── Guest registration for unauthenticated membership checkout ────────────
+  const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestFormError, setGuestFormError] = useState<string | null>(null);
+  const guestCheckoutRegister = trpc.membership.guestCheckoutRegister.useMutation({
+    onSuccess: (data) => {
+      // After creating account + setting cookie, navigate to checkout (now authenticated)
+      window.location.href = data.checkoutPath;
+    },
+    onError: (e) => setGuestFormError(e.message),
+  });
   const createSession = {
     isPending: createCourseSession.isPending || createDownloadSession.isPending || createPhysicalSession.isPending || createWebinarSession.isPending || createMembershipSession.isPending,
     isError: createCourseSession.isError || createDownloadSession.isError || createPhysicalSession.isError || createWebinarSession.isError || createMembershipSession.isError,
     error: createCourseSession.error ?? createDownloadSession.error ?? createPhysicalSession.error ?? createWebinarSession.error ?? createMembershipSession.error,
   };
+  const isUnauthorizedMembershipError =
+    createSession.isError &&
+    entityType === "membership" &&
+    ((createSession.error as any)?.data?.code === "UNAUTHORIZED" ||
+      (createSession.error as any)?.message?.toLowerCase().includes("unauthorized") ||
+      (createSession.error as any)?.message?.toLowerCase().includes("not authenticated"));
 
   // Trigger session creation once on mount (useEffect — avoids React Strict Mode double Stripe sessions)
   const sessionStarted = useRef(false);
@@ -501,6 +528,69 @@ export default function Checkout() {
 
   // ── Error state ───────────────────────────────────────────────────────────
   if (createSession.isError) {
+    // Special case: unauthenticated user trying to access a membership checkout
+    // Show a guest registration form so they can create an account and proceed
+    if (isUnauthorizedMembershipError) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-3">
+                <Award className="h-6 w-6 text-teal-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-1">Create your free account</h2>
+              <p className="text-gray-500 text-sm">Enter your details to get instant access.</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="guest-name" className="text-sm font-medium text-gray-700">Full Name</Label>
+                <Input
+                  id="guest-name"
+                  type="text"
+                  placeholder="Jane Smith"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="guest-email" className="text-sm font-medium text-gray-700">Email Address</Label>
+                <Input
+                  id="guest-email"
+                  type="email"
+                  placeholder="jane@example.com"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              {guestFormError && (
+                <p className="text-red-500 text-sm">{guestFormError}</p>
+              )}
+              <Button
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white"
+                disabled={guestCheckoutRegister.isPending || !guestName.trim() || !guestEmail.trim()}
+                onClick={() => {
+                  setGuestFormError(null);
+                  guestCheckoutRegister.mutate({
+                    planSlug: slug ?? "",
+                    name: guestName.trim(),
+                    email: guestEmail.trim(),
+                    origin: window.location.origin,
+                  });
+                }}
+              >
+                {guestCheckoutRegister.isPending ? "Creating account…" : "Continue to Checkout"}
+              </Button>
+              <p className="text-center text-xs text-gray-400">
+                Already have an account?{" "}
+                <a href={`/api/oauth/login?returnPath=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="text-teal-600 hover:underline">Sign in</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-8 max-w-md w-full text-center">

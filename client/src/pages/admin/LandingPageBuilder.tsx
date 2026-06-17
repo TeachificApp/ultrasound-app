@@ -1192,6 +1192,11 @@ function CTAActionPicker({
     { limit: 200, offset: 0 },
     { enabled: behavior === "free_enrollment" && freeEnrollType === "workshop" }
   );
+  // Memberships
+  const { data: feMemberships } = trpc.membership.listAll.useQuery(
+    undefined,
+    { enabled: behavior === "free_enrollment" && freeEnrollType === "membership" }
+  );
   const freeEnrollItems: Array<{ id: number; label: string }> = React.useMemo(() => {
     if (freeEnrollType === "course" || freeEnrollType === "quiz" || freeEnrollType === "cohort") {
       return ((feCourses as any)?.courses ?? []).filter((c: any) => c.type === freeEnrollType).map((c: any) => ({ id: c.id, label: `${c.title} (${c.type})` }));
@@ -1201,8 +1206,9 @@ function CTAActionPicker({
     if (freeEnrollType === "bundle") return ((feBundles as any) ?? []).map((b: any) => ({ id: b.id, label: b.title ?? b.name ?? `Bundle #${b.id}` }));
     if (freeEnrollType === "community") return ((feCommunities as any) ?? []).map((c: any) => ({ id: c.id, label: c.title ?? `Community #${c.id}` }));
     if (freeEnrollType === "workshop") return ((feWorkshops as any) ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}` }));
+    if (freeEnrollType === "membership") return ((feMemberships as any) ?? []).map((m: any) => ({ id: m.id, label: m.title ?? `Membership #${m.id}` }));
     return [];
-  }, [freeEnrollType, feCourses, feWebinars, feDownloads, feBundles, feCommunities, feWorkshops]);
+  }, [freeEnrollType, feCourses, feWebinars, feDownloads, feBundles, feCommunities, feWorkshops, feMemberships]);
   // Pricing option picker state
   const [poCourseId, setPoCoursId] = React.useState<number | null>(pricingOptionCourseIdValue ?? null);
   const { data: poCoursesData } = trpc.lmsAdmin.listCourses.useQuery(
@@ -1356,7 +1362,7 @@ function CTAActionPicker({
       )}
       {behavior === "free_enrollment" && (
         <div className="space-y-2 bg-green-50 border border-green-200 rounded p-2">
-          <p className="text-[10px] text-green-700 font-medium">Enrolls the user directly — no Stripe, no payment. Use for free courses, quizzes, downloads, bundles, webinars, workshops, or communities.</p>
+          <p className="text-[10px] text-green-700 font-medium">Enrolls the user directly — no Stripe, no payment. Use for free courses, quizzes, downloads, bundles, webinars, workshops, communities, or memberships.</p>
           <div>
             <label className="text-xs text-gray-500 block mb-0.5">Product Type</label>
             <select
@@ -1372,6 +1378,7 @@ function CTAActionPicker({
               <option value="bundle">Bundle</option>
               <option value="workshop">Workshop</option>
               <option value="community">Community</option>
+              <option value="membership">Membership</option>
             </select>
           </div>
           <div>

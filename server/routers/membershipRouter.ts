@@ -792,6 +792,26 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
 
     const isFree = !plan.price || Number(plan.price) === 0;
     if (isFree) {
+      // Enroll user in the free membership directly (idempotent)
+      try {
+        const { fulfillMembershipPurchase } = await import("../lib/membershipFulfillment");
+        await fulfillMembershipPurchase(
+          db as any,
+          plan.id,
+          { userId: ctx.user.id, isNew: false, resetToken: null },
+          {
+            sessionId: null,
+            stripeSubscriptionId: null,
+            stripeCustomerId: null,
+            customerEmail: ctx.user.email ?? null,
+            customerName: ctx.user.name ?? null,
+            skipEmail: false,
+            forceWelcomeEmail: true,
+          },
+        );
+      } catch (err) {
+        console.error("[createMembershipEmbeddedCheckoutSession] Free enrollment failed:", err);
+      }
       return { clientSecret: null, free: true, courseTitle: plan.title, courseSubtitle: null, courseDescription: plan.description ?? null, courseThumbnail: plan.coverImage ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: plan.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: plan.currency ?? "usd", minSeats: null, discountPercent: null };
     }
     const { platformSettings } = await import("../../drizzle/schema");
@@ -914,14 +934,38 @@ const guestMembershipCheckoutRegister = publicProcedure
     await db.update(users).set({ openId }).where(and(eq(users.id, user.id), isNull(users.openId)));
     const sessionToken = await sdk.createSessionToken(openId, { name: input.name, expiresInMs: ONE_YEAR_MS });
     const cookieOptions = getSessionCookieOptions(ctx.req);
-    ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+    // For free plans, enroll directly and redirect to member page
+    if (!plan.stripePriceId || !plan.price || Number(plan.price) === 0) {
+      try {
+        const { fulfillMembershipPurchase } = await import("../lib/membershipFulfillment");
+        await fulfillMembershipPurchase(
+          db as any,
+          plan.id,
+          { userId: user.id, isNew: false, resetToken: null },
+          {
+            sessionId: null,
+            stripeSubscriptionId: null,
+            stripeCustomerId: null,
+            customerEmail: input.email.trim().toLowerCase(),
+            customerName: input.name.trim(),
+            skipEmail: false,
+            forceWelcomeEmail: true,
+          },
+        );
+      } catch (err) {
+        console.error("[guestMembershipCheckoutRegister] Free enrollment failed:", err);
+      }
+      return {
+        userId: user.id,
+        checkoutPath: `/my-memberships/${input.planSlug}`,
+      };
+    }
     return {
       userId: user.id,
       checkoutPath: `/checkout/${input.planSlug}?type=membership`,
     };
   });
-
 const getMembershipCheckoutSessionStatus = publicProcedure
   .input(z.object({ sessionId: z.string() }))
   .query(async ({ ctx, input }) => {
@@ -1304,6 +1348,66 @@ const updateMembershipHidePricingOptions = adminProcedure
     return { success: true };
   });
 
+/**
+ * selfEnrollFree — lets an authenticated user self-enroll in a free (no Stripe price) membership plan.
+ * Sends a welcome email (unlike ensureFreeMembership which is always silent).
+ */
+const selfEnrollFree = protectedProcedure
+  .input(z.object({ planId: z.number().int().positive() }))
+  .mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    // Verify the plan exists and is free (no Stripe price ID)
+    const [plan] = await db
+      .select()
+      .from(membershipPlans)
+      .where(eq(membershipPlans.id, input.planId))
+      .limit(1);
+    if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+    if (plan.stripePriceId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "This membership requires payment. Please use the checkout flow." });
+    }
+    // Idempotent — check if already enrolled
+    const [existing] = await db
+      .select({ id: membershipSubscriptions.id })
+      .from(membershipSubscriptions)
+      .where(and(eq(membershipSubscriptions.userId, ctx.user.id), eq(membershipSubscriptions.planId, input.planId)))
+      .limit(1);
+    if (existing) return { success: true, alreadyEnrolled: true };
+    // Insert subscription row
+    await db.insert(membershipSubscriptions).values({
+      planId: input.planId,
+      userId: ctx.user.id,
+      status: "active",
+      stripeSubscriptionId: null,
+      stripeCustomerId: null,
+      currentPeriodEnd: null,
+    });
+    // Look up user email + name for welcome email
+    const [userRow] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
+    // Fulfill plan access items and send welcome email via the standard fulfillment path
+    try {
+      const { fulfillMembershipPurchase } = await import("../lib/membershipFulfillment");
+      await fulfillMembershipPurchase(
+        db as any,
+        input.planId,
+        { userId: ctx.user.id, isNew: false, resetToken: null },
+        {
+          sessionId: null,
+          stripeSubscriptionId: null,
+          stripeCustomerId: null,
+          customerEmail: userRow?.email ?? null,
+          customerName: userRow?.name ?? null,
+          skipEmail: false,
+          forceWelcomeEmail: true,
+        },
+      );
+    } catch (fulfillErr) {
+      console.error("[selfEnrollFree] fulfillMembershipPurchase failed:", fulfillErr);
+    }
+    return { success: true, alreadyEnrolled: false };
+  });
+
 export const membershipRouter = router({
   // Public
   listPublic: listPublicMemberships,
@@ -1314,6 +1418,7 @@ export const membershipRouter = router({
   myMemberships: getMyMemberships,
   checkAccess: checkMembershipAccess,
   createCheckout: createMembershipCheckout,
+  selfEnrollFree: selfEnrollFree,
 
   // Admin
   listAll: listAllMemberships,

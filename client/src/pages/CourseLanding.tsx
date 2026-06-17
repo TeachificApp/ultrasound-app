@@ -1475,6 +1475,10 @@ export default function CourseLanding() {
     },
     onError: (e) => toast.error(`Community join failed: ${e.message}`),
   });
+  const membershipEnrollFree = trpc.membership.selfEnrollFree.useMutation({
+    onSuccess: () => toast.success("Enrolled! You now have access to this membership."),
+    onError: (e) => toast.error(`Membership enrollment failed: ${e.message}`),
+  });
   // Cohort waitlist mutation — must be declared before early returns to satisfy Rules of Hooks
   // Use a ref so the onSuccess callback can access the latest featuredGroup at call time
   const featuredGroupRef = useRef<any>(null);
@@ -1515,6 +1519,8 @@ export default function CourseLanding() {
         await workshopEnrollFree.mutateAsync({ workshopId: productId });
       } else if (productType === "community") {
         await communityJoin.mutateAsync({ communityId: productId });
+      } else if (productType === "membership") {
+        await membershipEnrollFree.mutateAsync({ planId: productId });
       } else {
         toast.error(`Free enrollment not supported for product type: ${productType}`);
       }

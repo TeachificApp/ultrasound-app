@@ -872,6 +872,9 @@ function LMSRouter() {
         <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
+        <Route path="/memberships/:slug">{() => <Suspense fallback={pageFallback}><MembershipPage /></Suspense>}</Route>
+        <Route path="/my-memberships/:slug">{() => <Suspense fallback={pageFallback}><MyMemberships /></Suspense>}</Route>
+        <Route path="/my-memberships">{() => <Suspense fallback={pageFallback}><MyMemberships /></Suspense>}</Route>
         <Route path="/teach" component={TeachDashboard} />
         <Route path="/teach/master/:id/design" component={TeachMasterDesigner} />
         <Route path="/teach/presentation/:id/edit" component={TeachPresentationEditor} />
