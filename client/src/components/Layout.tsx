@@ -17,7 +17,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl, getThinkificFreeUrl } from "@/const";
+import { getLoginUrl } from "@/const";
 import { useBrand } from "@/hooks/useBrand";
 import { getBrandNavConfig } from "@/config/brandNav";
 import { isLearnDomain, isMembersDomain, isAccreditationDomain } from "@/hooks/useSubdomain";
@@ -651,9 +651,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             ) : (
               <div className="flex items-center gap-2">
                 <a
-                  href={getThinkificFreeUrl()}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="/register"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all hover:opacity-90 border border-[#189aa1] text-[#189aa1] bg-transparent"
                 >
                   Register
