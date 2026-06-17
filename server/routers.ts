@@ -20,6 +20,7 @@ import { formBuilderRouter } from "./routers/formBuilderRouter";
 import { generalFormRouter } from "./routers/generalFormRouter";
 import { accreditationManagerRouter } from "./routers/accreditationManagerRouter";
 import { educatorRouter } from "./routers/educatorRouter";
+import { teachRouter } from "./routers/teachRouter";
 import { sonoQuizRouter } from "./routers/sonoQuizRouter";
 import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import { menuLinksRouter } from "./routers/menuLinksRouter";
@@ -2052,6 +2053,7 @@ export const appRouter = router({
   // ─── Daily Challenge Engine ───────────────────────────────────────────────────
   quickfire: quickfireRouter,
   educator: educatorRouter,
+  teach: teachRouter,
   sonoQuiz: sonoQuizRouter,
 
   // ─── Echo Case Library ────────────────────────────────────────────────────────

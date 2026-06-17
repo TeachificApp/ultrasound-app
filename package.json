@@ -106,6 +106,7 @@
     "drizzle-orm": "^0.44.5",
     "embla-carousel-react": "^8.6.0",
     "express": "^4.21.2",
+    "fast-xml-parser": "^5.9.2",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.23.22",
     "html-to-image": "^1.11.13",

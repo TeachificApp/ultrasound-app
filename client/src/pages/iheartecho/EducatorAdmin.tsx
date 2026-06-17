@@ -29,7 +29,7 @@ import {
   GraduationCap, Users, BookOpen, BarChart3, Award, Plus, Trash2,
   Edit, ChevronRight, Loader2, CheckCircle2, Clock, AlertCircle,
   UserPlus, Mail, MoreVertical, TrendingUp, FileText, Layers,
-  ClipboardList, Star, ArrowRight, RefreshCw, Eye, Lock
+  ClipboardList, Star, ArrowRight, RefreshCw, Eye, Lock, Presentation,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -1107,6 +1107,11 @@ export default function EducatorAdmin() {
                 <Link href="/educator-assist">
                   <Button variant="outline" size="sm" className="gap-2 text-xs">
                     <Eye className="w-3.5 h-3.5" /> View Platform Page
+                  </Button>
+                </Link>
+                <Link href="/teach">
+                  <Button size="sm" className="gap-2 text-xs text-white" style={{ background: BRAND }}>
+                    <Presentation className="w-3.5 h-3.5" /> TEACH
                   </Button>
                 </Link>
               </div>

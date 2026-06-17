@@ -44,7 +44,7 @@ import {
   Layout as LayoutTemplate, Database,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
   Repeat, Film, CalendarRange, ExternalLink, Link2, Mail, Activity, Briefcase,
-  Percent, Search,
+  Percent, Search, Presentation,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -71,6 +71,7 @@ import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 import { CohortResourcesAdminSection } from "@/components/cohort/CohortResourcesAdminSection";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import { CourseWaitlistTab } from "@/components/CourseWaitlistTab";
+import TeachAdminPanel from "@/pages/admin/TeachAdminPanel";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -5944,7 +5945,9 @@ function InstructorsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-gray-800">Instructor Profiles</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Link instructor profiles to user accounts and control what analytics they can see in their portal.</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Link instructor profiles to user accounts, manage analytics access, and open the TEACH workspace for presentations and media.
+          </p>
         </div>
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setCreateOpen(true)}>
           <Plus className="w-4 h-4 mr-1" /> New Instructor
@@ -6008,6 +6011,16 @@ function InstructorsTab() {
                   {/* Analytics permissions */}
                   {ins.linkedUser && (
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <Link href="/teach">
+                        <Button size="sm" variant="outline" className="h-6 text-xs text-teal-700 border-teal-200">
+                          <Presentation className="w-3 h-3 mr-1" /> TEACH
+                        </Button>
+                      </Link>
+                      <Link href="/instructor-portal">
+                        <Button size="sm" variant="ghost" className="h-6 text-xs text-gray-600">
+                          Instructor Portal
+                        </Button>
+                      </Link>
                       {ins.analyticsPerms && ins.analyticsPerms.length > 0 ? (
                         ins.analyticsPerms.map((m: string) => (
                           <span key={m} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5">{m.replace(/_/g, " ")}</span>
@@ -6880,6 +6893,7 @@ const LMS_NAV_GROUPS = [
       { value: "career_network", label: "Career Network ↗", icon: Briefcase, href: getAdminUrl("/admin/career-network") },
       { value: "groups",      label: "Teams",      icon: Users },
       { value: "instructors", label: "Instructors", icon: GraduationCap },
+      { value: "teach",       label: "TEACH",       icon: Presentation },
       { value: "certificates",label: "Certificates",icon: CheckCircle },
       { value: "enrollments", label: "Enrollments", icon: UserCheck },
       { value: "orders",       label: "Orders",       icon: ShoppingBag },
@@ -7035,6 +7049,7 @@ export default function LMSAdmin() {
               {activeTab === "collections" && <CollectionsTab />}
               {activeTab === "groups"      && <GroupsTab />}
               {activeTab === "instructors" && <InstructorsTab />}
+              {activeTab === "teach"       && <TeachAdminPanel />}
               {activeTab === "certificates"&& <CertificateTemplatesAdmin />}
               {activeTab === "enrollments" && <EnrollmentsWithPreviewsTab />}
               {activeTab === "orders"      && <OrdersManagementTab />}
