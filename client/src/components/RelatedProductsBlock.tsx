@@ -70,7 +70,7 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
   const d = data;
   const selectionMode = d.selectionMode ?? "auto";
   const productType = d.productType ?? "both";
-  const maxItems = d.maxItems ?? 3;
+  const maxItems = Math.max(1, Math.min(12, Number(d.maxItems ?? 3) || 3));
   const layout = d.layout ?? "grid";
   const accent = d.accentColor ?? "#179ca3";
   const textColor = d.textColor ?? "#111827";
@@ -129,7 +129,7 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
       subscriptionInterval: (p as any).subscriptionInterval ?? null,
     }));
   } else {
-    const courseItems: ProductItem[] = (coursesData?.courses ?? []).map((c) => ({
+    const courseItems: ProductItem[] = (coursesData?.courses ?? []).filter((c) => (c as any).type !== "quiz").map((c) => ({
       id: `course-${c.id}`,
       slug: c.slug,
       title: c.title,
