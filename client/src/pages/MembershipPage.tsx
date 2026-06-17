@@ -146,7 +146,7 @@ export default function MembershipPage() {
             if (block.type === "related_products") {
               return <RelatedProductsBlock key={block.id} data={block.data ?? {}} currentType={undefined} />;
             }
-            return <BlockPreview key={block.id} block={block} />;
+            return <BlockPreview key={block.id} block={block} onEnroll={startCheckout} onCheckoutPage={startCheckout} />;
           })}
         </div>
       ) : (

@@ -165,7 +165,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         <div
           className="relative px-4 sm:px-8 py-10 sm:py-16 overflow-hidden w-full box-border"
           style={{ ...heroBg, ...heroTopBorderStyle, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), cursor: heroClickHandler ? "pointer" : undefined, minHeight: `${heroMinHeight}px`, ...(heroMaxHeight ? { maxHeight: heroMaxHeight, overflow: "hidden" } : {}) }}
-          onClick={e => { handleCtaBtnClick(e as React.MouseEvent<HTMLElement>); if (!( e.target as HTMLElement).closest('[data-cta-btn]')) heroClickHandler?.(); }}
+          onClick={e => { handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage); if (!( e.target as HTMLElement).closest('[data-cta-btn]')) heroClickHandler?.(); }}
         >
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
@@ -223,7 +223,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     case "text":
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}>
           <CC style={{ textAlign: d.align ?? "left" }}><div className="prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} /></CC>
         </div>
       );
@@ -563,7 +563,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </button>
       );
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC className="text-center">
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC className="text-center">
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {priceAbove && priceBlock}
@@ -577,7 +577,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     case "cta_standalone": {
       const standaloneCtaBeh = d.ctaBehavior ?? (d.ctaLink && d.ctaLink.startsWith("http") ? "url" : "direct_checkout");
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC style={{ textAlign: d.align ?? "center" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -628,7 +628,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
     case "cta_optin": {
       const optinCtaBeh = d.ctaBehavior ?? "direct_checkout";
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC style={{ textAlign: d.align ?? "center" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -939,7 +939,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       };
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC>
           <div className="flex gap-8">
             <div style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
             <div style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderCol("right")}</div>
@@ -951,7 +951,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC>
           <div className="grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
@@ -964,7 +964,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       const divStyle = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: d.dividerStyle ?? "solid", borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-stretch">
             <div className="prose prose-sm pr-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-sm px-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
