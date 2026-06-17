@@ -12067,15 +12067,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                     </label>
                   </div>
 
-                  {groupDialog.group ? (
-                    <div className="pt-2">
-                      <CohortWaitlistSettingsPanel cohortGroupId={groupDialog.group.id} />
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
-                      Save the cohort group first to configure waitlist settings and review sign-ups.
-                    </div>
-                  )}
+
                 </div>
                 <div className="flex justify-end gap-2 px-5 py-4 border-t bg-gray-50 rounded-b-2xl">
                   <Button variant="outline" onClick={() => setGroupDialog({ open: false })}>Cancel</Button>
