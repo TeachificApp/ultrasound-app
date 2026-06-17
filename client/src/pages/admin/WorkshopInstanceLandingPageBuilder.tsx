@@ -27,7 +27,7 @@ import {
   uid, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, LandingBlockTemplatesTab,
 } from "./LandingPageBuilder";
 import {
-  ArrowLeft, Save, Eye, Plus, X, Layers, Copy, Search, Bookmark, BookOpen, Globe,
+  ArrowLeft, Save, Eye, Plus, X, Layers, Copy, Search, Bookmark, BookOpen, Globe, FolderOpen, Trash2,
 } from "lucide-react";
 
 export default function WorkshopInstanceLandingPageBuilder() {
@@ -73,6 +73,12 @@ export default function WorkshopInstanceLandingPageBuilder() {
     window.addEventListener("mouseup", onUp);
   };
 
+  // ── Page Template state ──
+  const [pageTemplateOpen, setPageTemplateOpen] = useState(false);
+  const [ptSaveName, setPtSaveName] = useState("");
+  const [ptSaveDesc, setPtSaveDesc] = useState("");
+  const [ptIsSaving, setPtIsSaving] = useState(false);
+
   const [saveTemplateDialogBlock, setSaveTemplateDialogBlock] = useState<Block | null>(null);
   const [saveTemplateName, setSaveTemplateName] = useState("");
   const [saveTemplateDesc, setSaveTemplateDesc] = useState("");
@@ -87,6 +93,39 @@ export default function WorkshopInstanceLandingPageBuilder() {
     },
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
   });
+  const { data: pageTemplates, refetch: refetchPageTemplates } = trpc.lmsAdmin.listPageTemplates.useQuery(
+    { templateType: "page" },
+    { enabled: pageTemplateOpen }
+  );
+  const savePageTemplateMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
+    onSuccess: () => {
+      toast.success("Page template saved!");
+      setPtSaveName("");
+      setPtSaveDesc("");
+      refetchPageTemplates();
+    },
+    onError: (e: any) => toast.error(`Save failed: ${e.message}`),
+  });
+  const deletePageTemplateMutation = trpc.lmsAdmin.deletePageTemplate.useMutation({
+    onSuccess: () => { toast.success("Template deleted"); refetchPageTemplates(); },
+    onError: (e: any) => toast.error(`Delete failed: ${e.message}`),
+  });
+  const handleSavePageTemplate = async () => {
+    if (!ptSaveName.trim()) { toast.error("Please enter a template name"); return; }
+    setPtIsSaving(true);
+    try {
+      await savePageTemplateMutation.mutateAsync({ name: ptSaveName, description: ptSaveDesc, templateType: "page", blocks });
+    } finally { setPtIsSaving(false); }
+  };
+  const handleApplyPageTemplate = (tpl: any) => {
+    const tplBlocks: Block[] = (Array.isArray(tpl.blocks) ? tpl.blocks : []).map((b: Block) => ({ ...b, id: uid() }));
+    if (blocks.length > 0 && !confirm(`Replace all ${blocks.length} block(s) with ${tplBlocks.length} blocks from "${tpl.name}"?`)) return;
+    setBlocks(tplBlocks);
+    setSelectedId(null);
+    setPageTemplateOpen(false);
+    toast.success(`Applied template "${tpl.name}"!`);
+  };
+
   const handleSaveBlockAsTemplate = useCallback((block: Block) => {
     setSaveTemplateName("");
     setSaveTemplateDesc("");
@@ -271,13 +310,17 @@ export default function WorkshopInstanceLandingPageBuilder() {
             <span className="text-sm font-semibold text-gray-800 ml-1">{pageInfo?.title ?? "Loading…"}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
           {pageInfo?.workshopSlug && (
             <Button variant="outline" size="sm" className="gap-1"
               onClick={() => window.open(`/workshops/${pageInfo.workshopSlug}`, "_blank")}>
               <Eye className="w-4 h-4" /> Preview Workshop
             </Button>
           )}
+          <Button variant="outline" size="sm" className="gap-1 border-teal-300 text-teal-700 hover:bg-teal-50"
+            onClick={() => setPageTemplateOpen(true)}>
+            <FolderOpen className="w-4 h-4" /> Page Templates
+          </Button>
           <Button size="sm" className="gap-1 bg-teal-600 hover:bg-teal-700 text-white"
             onClick={handleSave} disabled={isSaving}>
             <Save className="w-4 h-4" />
@@ -552,6 +595,57 @@ export default function WorkshopInstanceLandingPageBuilder() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Page Template Library Dialog ── */}
+      <Dialog open={pageTemplateOpen} onOpenChange={setPageTemplateOpen}>
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-teal-700 flex items-center gap-2">
+              <FolderOpen className="w-5 h-5" /> Page Template Library
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-1 space-y-4">
+            {/* Save current page */}
+            <div className="border border-dashed border-teal-300 rounded-xl p-4 bg-teal-50/50">
+              <p className="text-xs font-semibold text-teal-700 mb-3">Save Current Page as Template</p>
+              <div className="space-y-2">
+                <input value={ptSaveName} onChange={e => setPtSaveName(e.target.value)}
+                  className="w-full h-8 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-1 focus:ring-teal-400"
+                  placeholder="Template name…" />
+                <input value={ptSaveDesc} onChange={e => setPtSaveDesc(e.target.value)}
+                  className="w-full h-8 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-1 focus:ring-teal-400"
+                  placeholder="Description (optional)" />
+                <Button onClick={handleSavePageTemplate} disabled={ptIsSaving || blocks.length === 0}
+                  className="w-full h-8 text-sm bg-teal-600 hover:bg-teal-700 text-white">
+                  {ptIsSaving ? "Saving…" : `Save as Template (${blocks.length} block${blocks.length !== 1 ? "s" : ""})`}
+                </Button>
+              </div>
+            </div>
+            {/* Template list */}
+            {!pageTemplates || pageTemplates.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 text-sm">No page templates saved yet</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {pageTemplates.map((tpl: any) => (
+                  <div key={tpl.id} className="border border-gray-200 rounded-xl p-4 hover:border-teal-300 transition-colors">
+                    <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">{tpl.name}</h3>
+                    {tpl.description && <p className="text-xs text-gray-500 mb-2 line-clamp-2">{tpl.description}</p>}
+                    <p className="text-xs text-gray-400 mb-3">{Array.isArray(tpl.blocks) ? tpl.blocks.length : 0} block{Array.isArray(tpl.blocks) && tpl.blocks.length !== 1 ? "s" : ""}</p>
+                    <div className="flex gap-2">
+                      <Button onClick={() => handleApplyPageTemplate(tpl)}
+                        className="flex-1 h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white">Apply</Button>
+                      <button onClick={() => deletePageTemplateMutation.mutate({ id: tpl.id })}
+                        className="w-7 h-7 border border-gray-200 rounded text-gray-400 hover:text-red-500 flex items-center justify-center flex-shrink-0">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
