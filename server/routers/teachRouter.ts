@@ -4,7 +4,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull, lt } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -13,6 +13,7 @@ import {
   educatorOrgs,
   mediaAssets,
   mediaVersions,
+  teachFolders,
   teachMaterialPermissions,
   teachMaterials,
   teachSlideMasters,
@@ -319,6 +320,11 @@ export const teachRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const teachCtx = await requireTeachAccess(ctx.user.id);
+      // File size enforcement: unlimited for admins, 200 MB for instructors
+      const maxBytes = (teachCtx.isPlatformAdmin || teachCtx.isEducationManager) ? Infinity : 200 * 1024 * 1024;
+      if (input.fileSize > maxBytes) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "File exceeds the 200 MB limit for instructors." });
+      }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -554,6 +560,11 @@ export const teachRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const teachCtx = await requireTeachAccess(ctx.user.id);
+      // File size enforcement: unlimited for admins, 200 MB for instructors
+      const maxBytes = (teachCtx.isPlatformAdmin || teachCtx.isEducationManager) ? Infinity : 200 * 1024 * 1024;
+      if (input.fileSize > maxBytes) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "File exceeds the 200 MB limit for instructors." });
+      }
       if (!input.fileName.match(/\.pptx$/i)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Only .pptx files are supported for import" });
       }
@@ -807,6 +818,168 @@ export const teachRouter = router({
       return { ok: true, slideCount: slides.length };
     }),
 
+  // ─── Folder management ────────────────────────────────────────────────
+  listFolders: protectedProcedure.query(async ({ ctx }) => {
+    const teachCtx = await requireTeachAccess(ctx.user.id);
+    const db = await getDb();
+    if (!db) return [];
+    if (teachCtx.isPlatformAdmin || teachCtx.isEducationManager) {
+      const { inArray } = await import("drizzle-orm");
+      const rows = await db.select().from(teachFolders).orderBy(teachFolders.name);
+      const ownerIds = [...new Set(rows.map((r) => r.ownerUserId))];
+      const owners = ownerIds.length > 0
+        ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
+        : [];
+      return rows.map((r) => ({ ...r, ownerName: owners.find((o) => o.id === r.ownerUserId)?.name ?? null }));
+    }
+    return db.select().from(teachFolders).where(eq(teachFolders.ownerUserId, ctx.user.id)).orderBy(teachFolders.name);
+  }),
+
+  createFolder: protectedProcedure
+    .input(z.object({ name: z.string().min(1).max(300), parentId: z.number().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireTeachAccess(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [result] = await db.insert(teachFolders).values({
+        ownerUserId: ctx.user.id,
+        name: input.name,
+        parentId: input.parentId ?? null,
+      });
+      return { id: (result as { insertId: number }).insertId };
+    }),
+
+  renameFolder: protectedProcedure
+    .input(z.object({ folderId: z.number(), name: z.string().min(1).max(300) }))
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await requireTeachAccess(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [folder] = await db.select().from(teachFolders).where(eq(teachFolders.id, input.folderId)).limit(1);
+      if (!folder) throw new TRPCError({ code: "NOT_FOUND" });
+      if (folder.ownerUserId !== ctx.user.id && !teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      await db.update(teachFolders).set({ name: input.name }).where(eq(teachFolders.id, input.folderId));
+      return { ok: true };
+    }),
+
+  deleteFolder: protectedProcedure
+    .input(z.object({ folderId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await requireTeachAccess(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [folder] = await db.select().from(teachFolders).where(eq(teachFolders.id, input.folderId)).limit(1);
+      if (!folder) throw new TRPCError({ code: "NOT_FOUND" });
+      if (folder.ownerUserId !== ctx.user.id && !teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      // Move materials in this folder back to root
+      await db.update(teachMaterials).set({ folderId: null, folderName: null }).where(eq(teachMaterials.folderId, input.folderId));
+      await db.delete(teachFolders).where(eq(teachFolders.id, input.folderId));
+      return { ok: true };
+    }),
+
+  moveMaterialToFolder: protectedProcedure
+    .input(z.object({ materialId: z.number(), folderId: z.number().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await requireTeachAccess(ctx.user.id);
+      const material = await getMaterialOrThrow(input.materialId);
+      if (material.ownerUserId !== ctx.user.id && !teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      let folderName: string | null = null;
+      if (input.folderId != null) {
+        const [folder] = await db.select().from(teachFolders).where(eq(teachFolders.id, input.folderId)).limit(1);
+        if (!folder) throw new TRPCError({ code: "NOT_FOUND", message: "Folder not found" });
+        folderName = folder.name;
+      }
+      await db.update(teachMaterials).set({ folderId: input.folderId, folderName }).where(eq(teachMaterials.id, input.materialId));
+      return { ok: true };
+    }),
+
+  renameMaterial: protectedProcedure
+    .input(z.object({ materialId: z.number(), title: z.string().min(1).max(300) }))
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await requireTeachAccess(ctx.user.id);
+      const material = await getMaterialOrThrow(input.materialId);
+      if (material.ownerUserId !== ctx.user.id && !teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(teachMaterials).set({ title: input.title }).where(eq(teachMaterials.id, input.materialId));
+      return { ok: true };
+    }),
+
+  trashMaterial: protectedProcedure
+    .input(z.object({ materialId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await requireTeachAccess(ctx.user.id);
+      const material = await getMaterialOrThrow(input.materialId);
+      if (material.ownerUserId !== ctx.user.id && !teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(teachMaterials).set({ trashedAt: new Date(), trashedBy: ctx.user.id }).where(eq(teachMaterials.id, input.materialId));
+      return { ok: true };
+    }),
+
+  restoreMaterial: protectedProcedure
+    .input(z.object({ materialId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await requireTeachAccess(ctx.user.id);
+      const material = await getMaterialOrThrow(input.materialId);
+      if (material.ownerUserId !== ctx.user.id && !teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(teachMaterials).set({ trashedAt: null, trashedBy: null }).where(eq(teachMaterials.id, input.materialId));
+      return { ok: true };
+    }),
+
+  listTrash: protectedProcedure.query(async ({ ctx }) => {
+    const teachCtx = await requireTeachAccess(ctx.user.id);
+    const db = await getDb();
+    if (!db) return [];
+    if (teachCtx.isPlatformAdmin || teachCtx.isEducationManager) {
+      const { inArray } = await import("drizzle-orm");
+      const rows = await db.select().from(teachMaterials).where(isNotNull(teachMaterials.trashedAt)).orderBy(desc(teachMaterials.trashedAt));
+      const ownerIds = [...new Set(rows.map((r) => r.ownerUserId))];
+      const owners = ownerIds.length > 0
+        ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
+        : [];
+      return rows.map((r) => ({ ...r, slidesData: undefined, ownerName: owners.find((o) => o.id === r.ownerUserId)?.name ?? null }));
+    }
+    const rows = await db.select().from(teachMaterials)
+      .where(and(eq(teachMaterials.ownerUserId, ctx.user.id), isNotNull(teachMaterials.trashedAt)))
+      .orderBy(desc(teachMaterials.trashedAt));
+    return rows.map((r) => ({ ...r, slidesData: undefined }));
+  }),
+
+  purgeExpiredTrash: protectedProcedure.mutation(async ({ ctx }) => {
+    const teachCtx = await getTeachUserContext(ctx.user.id);
+    if (!teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const expired = await db.select({ id: teachMaterials.id }).from(teachMaterials)
+      .where(and(isNotNull(teachMaterials.trashedAt), lt(teachMaterials.trashedAt, cutoff)));
+    for (const row of expired) {
+      await db.delete(teachMaterialPermissions).where(eq(teachMaterialPermissions.materialId, row.id));
+      await db.delete(teachMaterials).where(eq(teachMaterials.id, row.id));
+    }
+    return { purged: expired.length };
+  }),
+
+  // ─── Admin force master ────────────────────────────────────────────────
   adminForceMaster: protectedProcedure
     .input(
       z.object({

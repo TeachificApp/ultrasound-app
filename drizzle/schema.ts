@@ -2511,11 +2511,32 @@ export const teachMaterials = mysqlTable("teach_materials", {
   /** When true, master layout is locked; content edits only */
   masterForced: boolean("master_forced").default(false).notNull(),
   status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
+  /** Folder organisation — FK to teach_folders.id; null = root */
+  folderId: int("folder_id"),
+  /** Cached folder name for display without a join */
+  folderName: varchar("folder_name", { length: 300 }),
+  /** When set, the file is in the trash; auto-purged after 30 days */
+  trashedAt: timestamp("trashed_at"),
+  /** userId who trashed the file */
+  trashedBy: int("trashed_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type TeachMaterial = typeof teachMaterials.$inferSelect;
 export type InsertTeachMaterial = typeof teachMaterials.$inferInsert;
+
+/** Folder hierarchy for TEACH materials (per-user; admins can see all) */
+export const teachFolders = mysqlTable("teach_folders", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerUserId: int("owner_user_id").notNull(),
+  name: varchar("name", { length: 300 }).notNull(),
+  /** null = top-level folder */
+  parentId: int("parent_id"),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type TeachFolder = typeof teachFolders.$inferSelect;
 
 export const teachSlideMasters = mysqlTable("teach_slide_masters", {
   id: int("id").autoincrement().primaryKey(),

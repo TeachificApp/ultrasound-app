@@ -7,7 +7,7 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getOrCreateUserByEmail } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users, webinarRegistrations, bundleEnrollments } from "../../drizzle/schema";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users, webinarRegistrations, bundleEnrollments, webinars, communities, workshops } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql, inArray, or, like, isNotNull } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 import { computeFunnelCheckoutTotalCents } from "../lib/checkoutPricing";
@@ -49,17 +49,31 @@ export const funnelRouter = router({
   listAllProducts: protectedProcedure.query(async ({ ctx }) => {
     if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     const db = await getDb();
-    const [courses, downloads, bundles, physical] = await Promise.all([
+    const [courses, downloads, bundles, physical, webinarList, communityList, workshopList] = await Promise.all([
       db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl, courseType: lmsCourses.type }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, thumbnailUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
       db.select({ id: digitalBundles.id, title: digitalBundles.title, price: digitalBundles.discountPrice, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
       db.select({ id: physicalProducts.id, title: physicalProducts.title, price: physicalProducts.price, thumbnailUrl: physicalProducts.thumbnailUrl }).from(physicalProducts).orderBy(asc(physicalProducts.title)),
+      db.select({ id: webinars.id, title: webinars.title, slug: webinars.slug, price: webinars.price, coverImage: webinars.coverImage, accessType: webinars.accessType }).from(webinars).where(eq(webinars.status, "published")).orderBy(asc(webinars.title)),
+      db.select({ id: communities.id, title: communities.title, slug: communities.slug, coverImage: communities.coverImage, accessType: communities.accessType }).from(communities).where(eq(communities.status, "published")).orderBy(asc(communities.title)),
+      db.select({ id: workshops.id, title: workshops.title, slug: workshops.slug, price: workshops.price, thumbnailUrl: workshops.thumbnailUrl, isFree: workshops.isFree }).from(workshops).where(eq(workshops.status, "public")).orderBy(asc(workshops.title)),
     ]);
+    // Hardcoded app products (UltrasoundAssist + EchoAssist, Free + Premium)
+    const APP_PRODUCTS = [
+      { id: 1001, type: "app" as const, name: "UltrasoundAssist™ — Free", price: 0, imageUrl: "", href: "/app/ultrasound-assist", isFree: true },
+      { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: 0, imageUrl: "", href: "/app/ultrasound-assist/premium", isFree: false },
+      { id: 1003, type: "app" as const, name: "EchoAssist™ — Free", price: 0, imageUrl: "", href: "/app/echo-assist", isFree: true },
+      { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: 0, imageUrl: "", href: "/app/echo-assist/premium", isFree: false },
+    ];
     return [
       ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
       ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, price: d.price ?? 0, imageUrl: d.thumbnailUrl ?? "" })),
       ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, price: b.price ?? 0, imageUrl: b.thumbnailUrl ?? "" })),
       ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, price: p.price ?? 0, imageUrl: p.thumbnailUrl ?? "" })),
+      ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, price: w.price ?? 0, imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
+      ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, price: 0, imageUrl: c.coverImage ?? "", isFree: c.accessType === "free" })),
+      ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: w.price ?? 0, imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
+      ...APP_PRODUCTS,
     ];
   }),
 
@@ -80,9 +94,21 @@ export const funnelRouter = router({
       const downloadIds = input.items.filter(i => i.type === "download").map(i => i.id);
       const bundleIds = input.items.filter(i => i.type === "bundle").map(i => i.id);
       const physicalIds = input.items.filter(i => i.type === "physical").map(i => i.id);
+      const webinarIds = input.items.filter(i => i.type === "webinar").map(i => i.id);
+      const communityIds = input.items.filter(i => i.type === "community").map(i => i.id);
+      const workshopIds = input.items.filter(i => i.type === "workshop").map(i => i.id);
+      const appIds = input.items.filter(i => i.type === "app").map(i => i.id);
       const allLmsCourseIds = [...new Set([...courseIds, ...cohortIds])];
 
-      const [courses, downloads, bundles, physicals] = await Promise.all([
+      // Hardcoded app products registry
+      const APP_REGISTRY: Record<number, { id: number; type: string; title: string; slug: string; description: string; price: number; isFree: boolean; imageUrl: string; href: string }> = {
+        1001: { id: 1001, type: "app", title: "UltrasoundAssist™ — Free", slug: "ultrasound-assist-free", description: "AI-powered ultrasound clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: "", href: "/app/ultrasound-assist" },
+        1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: 0, isFree: false, imageUrl: "", href: "/app/ultrasound-assist/premium" },
+        1003: { id: 1003, type: "app", title: "EchoAssist™ — Free", slug: "echo-assist-free", description: "AI-powered echocardiography clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: "", href: "/app/echo-assist" },
+        1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: 0, isFree: false, imageUrl: "", href: "/app/echo-assist/premium" },
+      };
+
+      const [courses, downloads, bundles, physicals, webinarRows, communityRows, workshopRows] = await Promise.all([
         allLmsCourseIds.length > 0
           ? db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, description: lmsCourses.subtitle, imageUrl: lmsCourses.coverImageUrl, courseType: lmsCourses.type, pricingType: lmsCourses.pricingType, subscriptionInterval: lmsCourses.subscriptionInterval }).from(lmsCourses).where(inArray(lmsCourses.id, allLmsCourseIds))
           : [],
@@ -94,6 +120,15 @@ export const funnelRouter = router({
           : [],
         physicalIds.length > 0
           ? db.select({ id: physicalProducts.id, title: physicalProducts.title, slug: physicalProducts.slug, price: physicalProducts.price, description: physicalProducts.description, imageUrl: physicalProducts.thumbnailUrl }).from(physicalProducts).where(inArray(physicalProducts.id, physicalIds))
+          : [],
+        webinarIds.length > 0
+          ? db.select({ id: webinars.id, title: webinars.title, slug: webinars.slug, price: webinars.price, description: webinars.subtitle, imageUrl: webinars.coverImage, accessType: webinars.accessType }).from(webinars).where(inArray(webinars.id, webinarIds))
+          : [],
+        communityIds.length > 0
+          ? db.select({ id: communities.id, title: communities.title, slug: communities.slug, description: communities.description, imageUrl: communities.coverImage, accessType: communities.accessType }).from(communities).where(inArray(communities.id, communityIds))
+          : [],
+        workshopIds.length > 0
+          ? db.select({ id: workshops.id, title: workshops.title, slug: workshops.slug, price: workshops.price, description: workshops.subtitle, imageUrl: workshops.thumbnailUrl, isFree: workshops.isFree }).from(workshops).where(inArray(workshops.id, workshopIds))
           : [],
       ]);
 
@@ -127,6 +162,13 @@ export const funnelRouter = router({
       for (const d of downloads as any[]) map.set(`download-${d.id}`, { ...d, type: "download", isFree: d.isFree ?? false, href: `/downloads/${d.slug}` });
       for (const b of bundles as any[]) map.set(`bundle-${b.id}`, { ...b, type: "bundle", isFree: false, price: b.price ?? 0, href: `/bundles/${b.slug}` });
       for (const p of physicals as any[]) map.set(`physical-${p.id}`, { ...p, type: "physical", isFree: false, href: `/shop/${p.slug}` });
+      for (const w of webinarRows as any[]) map.set(`webinar-${w.id}`, { ...w, type: "webinar", isFree: w.accessType === "free", price: w.price ?? 0, href: `/webinars/${w.slug}` });
+      for (const c of communityRows as any[]) map.set(`community-${c.id}`, { ...c, type: "community", isFree: c.accessType === "free", price: 0, href: `/community/${c.slug}` });
+      for (const w of workshopRows as any[]) map.set(`workshop-${w.id}`, { ...w, type: "workshop", isFree: w.isFree ?? false, price: w.price ?? 0, href: `/workshops/${w.slug}` });
+      for (const appId of appIds) {
+        const app = APP_REGISTRY[appId];
+        if (app) map.set(`app-${appId}`, app);
+      }
 
       // Deduplicate: if the same lmsCourse id was saved under both "course" and "quiz" types
       // (e.g., type changed in DB), only return it once.

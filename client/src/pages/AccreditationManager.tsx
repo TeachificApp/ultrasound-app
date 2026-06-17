@@ -1101,7 +1101,7 @@ function CreateAccountPanel() {
 
   const createMutation = trpc.accreditationManager.createManagedUser.useMutation({
     onSuccess: (data) => {
-      toast.success(`Account created (User ID: ${data.userId})`);
+      toast.success("Account created successfully");
       setResult(data);
       setEmail(""); setDisplayName(""); setCredentials("");
     },
@@ -1151,7 +1151,7 @@ function CreateAccountPanel() {
           <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-green-800">Account created successfully</p>
-            <p className="text-xs text-green-600 mt-1">User ID: {result.userId} — The user can now log in and set their password via the Forgot Password flow.</p>
+            <p className="text-xs text-green-600 mt-1">The user can now log in and set their password via the Forgot Password flow.</p>
           </div>
         </div>
       )}

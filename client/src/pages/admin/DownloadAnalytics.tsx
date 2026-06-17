@@ -405,7 +405,7 @@ function DashboardCharts() {
               <div key={d.id} className="text-xs border-b pb-2">
                 <p className="font-medium truncate">{d.fileName ?? `File #${d.fileId}`}</p>
                 <p className="text-muted-foreground">
-                  {d.userEmail ?? `User #${d.userId}`}
+                  {d.userEmail ?? "Unknown User"}
                   {d.ipAddress ? ` · ${d.ipAddress}` : ""}
                 </p>
                 <p className="text-muted-foreground">{new Date(d.downloadedAt).toLocaleString()}</p>

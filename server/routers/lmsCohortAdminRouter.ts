@@ -1865,7 +1865,7 @@ export const lmsCohortAdminRouter = router({
         })
         .from(lmsCohortGroups)
         .innerJoin(lmsCourses, eq(lmsCohortGroups.courseId, lmsCourses.id))
-        .where(sql`${lmsCohortGroups.status} NOT IN ('archived', 'draft')`)
+        .where(sql`${lmsCohortGroups.status} != 'archived'`)
         .orderBy(asc(lmsCohortGroups.startDate));
       return groups;
     }),

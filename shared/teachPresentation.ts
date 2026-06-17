@@ -65,6 +65,11 @@ export interface TeachTextStyle {
   color: string;
   backgroundColor?: string;
   fontFamily?: string;
+  /** Bullet / numbered list type */
+  listType?: "none" | "bullet" | "numbered";
+  lineHeight?: number;
+  letterSpacing?: number;
+  textDecoration?: "none" | "underline" | "line-through";
 }
 
 export type TeachPlaceholderRole = "title" | "subtitle" | "body" | "body2" | "media" | "footer";
@@ -106,12 +111,20 @@ export type TeachMasterLayoutRole =
   | "blank"
   | "custom";
 
+export type TeachBackgroundType = "solid" | "gradient" | "image";
+export interface TeachBackgroundGradient {
+  type: "linear" | "radial";
+  angle?: number;
+  stops: Array<{ color: string; position: number }>;
+}
 export interface TeachSlide {
   id: string;
   title: string;
   notes?: string;
   backgroundColor?: string;
   backgroundImage?: string;
+  backgroundType?: TeachBackgroundType;
+  backgroundGradient?: TeachBackgroundGradient;
   transition?: TeachSlideTransitionConfig;
   /** Auto-advance to next slide after N ms (null = manual only) */
   advanceAfterMs?: number | null;
@@ -354,6 +367,108 @@ export function animationCssClass(type: TeachAnimationType): string {
 
 export function slideTransitionClass(type: TeachSlideTransition): string {
   return `teach-slide-trans-${type}`;
+}
+
+/** Built-in font options for the TEACH editor */
+export const TEACH_FONTS = [
+  { label: "System Default", value: "" },
+  { label: "Inter", value: "Inter, sans-serif" },
+  { label: "Roboto", value: "Roboto, sans-serif" },
+  { label: "Open Sans", value: "'Open Sans', sans-serif" },
+  { label: "Lato", value: "Lato, sans-serif" },
+  { label: "Poppins", value: "Poppins, sans-serif" },
+  { label: "Montserrat", value: "Montserrat, sans-serif" },
+  { label: "Playfair Display", value: "'Playfair Display', serif" },
+  { label: "Merriweather", value: "Merriweather, serif" },
+  { label: "Source Code Pro", value: "'Source Code Pro', monospace" },
+] as const;
+
+export interface TeachTheme {
+  name: string;
+  backgroundColor: string;
+  backgroundType: TeachBackgroundType;
+  backgroundGradient?: TeachBackgroundGradient;
+  titleColor: string;
+  bodyColor: string;
+  accentColor: string;
+  fontFamily: string;
+}
+
+export const TEACH_THEMES: TeachTheme[] = [
+  {
+    name: "Teal Professional",
+    backgroundColor: "#189aa1",
+    backgroundType: "gradient",
+    backgroundGradient: { type: "linear", angle: 135, stops: [{ color: "#189aa1", position: 0 }, { color: "#0d6b70", position: 100 }] },
+    titleColor: "#ffffff",
+    bodyColor: "#e0f7f8",
+    accentColor: "#4ad9e0",
+    fontFamily: "Poppins, sans-serif",
+  },
+  {
+    name: "Clean White",
+    backgroundColor: "#ffffff",
+    backgroundType: "solid",
+    titleColor: "#111827",
+    bodyColor: "#374151",
+    accentColor: "#189aa1",
+    fontFamily: "Inter, sans-serif",
+  },
+  {
+    name: "Dark Mode",
+    backgroundColor: "#1a1a2e",
+    backgroundType: "gradient",
+    backgroundGradient: { type: "linear", angle: 135, stops: [{ color: "#1a1a2e", position: 0 }, { color: "#16213e", position: 100 }] },
+    titleColor: "#4ad9e0",
+    bodyColor: "#e2e8f0",
+    accentColor: "#189aa1",
+    fontFamily: "Roboto, sans-serif",
+  },
+  {
+    name: "Warm Coral",
+    backgroundColor: "#fff5f5",
+    backgroundType: "gradient",
+    backgroundGradient: { type: "linear", angle: 120, stops: [{ color: "#fff5f5", position: 0 }, { color: "#ffe4e1", position: 100 }] },
+    titleColor: "#c0392b",
+    bodyColor: "#4a1942",
+    accentColor: "#e74c3c",
+    fontFamily: "Lato, sans-serif",
+  },
+  {
+    name: "Ocean Blue",
+    backgroundColor: "#0077b6",
+    backgroundType: "gradient",
+    backgroundGradient: { type: "linear", angle: 160, stops: [{ color: "#0077b6", position: 0 }, { color: "#023e8a", position: 100 }] },
+    titleColor: "#ffffff",
+    bodyColor: "#caf0f8",
+    accentColor: "#90e0ef",
+    fontFamily: "Montserrat, sans-serif",
+  },
+  {
+    name: "Elegant Serif",
+    backgroundColor: "#faf8f5",
+    backgroundType: "solid",
+    titleColor: "#2c2c2c",
+    bodyColor: "#4a4a4a",
+    accentColor: "#8b6914",
+    fontFamily: "'Playfair Display', serif",
+  },
+];
+
+/** Build CSS background string from slide background settings */
+export function buildSlideBackground(slide: TeachSlide): Record<string, string> {
+  if (slide.backgroundType === "gradient" && slide.backgroundGradient) {
+    const g = slide.backgroundGradient;
+    const stops = g.stops.map((s) => `${s.color} ${s.position}%`).join(", ");
+    const gradient = g.type === "radial"
+      ? `radial-gradient(circle, ${stops})`
+      : `linear-gradient(${g.angle ?? 135}deg, ${stops})`;
+    return { background: gradient };
+  }
+  if (slide.backgroundType === "image" && slide.backgroundImage) {
+    return { backgroundImage: `url(${slide.backgroundImage})`, backgroundSize: "cover", backgroundPosition: "center" };
+  }
+  return { backgroundColor: slide.backgroundColor ?? "#ffffff" };
 }
 
 /** Presenter sync keys in localStorage */

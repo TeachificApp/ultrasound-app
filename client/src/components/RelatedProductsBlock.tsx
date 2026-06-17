@@ -22,7 +22,7 @@ interface ManualItem {
 interface RelatedProductsBlockData {
   headline?: string;
   subtext?: string;
-  productType?: "course" | "download" | "both" | "bundle" | "physical" | "all";
+  productType?: "course" | "cohort" | "quiz" | "download" | "both" | "bundle" | "physical" | "all" | "webinar" | "community" | "workshop" | "app";
   selectionMode?: "auto" | "manual";
   manualItems?: ManualItem[];
   maxItems?: number;
@@ -60,7 +60,7 @@ type ProductItem = {
   price: number;
   isFree: boolean;
   imageUrl: string;
-  type: "course" | "download" | "bundle" | "physical";
+  type: string;
   href: string;
   pricingType?: string | null;
   subscriptionInterval?: string | null;
@@ -79,7 +79,7 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
   // ── AUTO mode queries ──────────────────────────────────────────────────────
   const needsCourses =
     selectionMode === "auto" &&
-    (productType === "course" || productType === "both" || productType === "all");
+    (productType === "course" || productType === "cohort" || productType === "quiz" || productType === "both" || productType === "all");
   const needsDownloads =
     selectionMode === "auto" &&
     (productType === "download" || productType === "both" || productType === "all");
@@ -155,9 +155,12 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
       href: `/downloads/${p.slug}`,
     }));
 
-    if (productType === "course") items = courseItems;
+    // For auto mode: filter by productType
+    if (productType === "course" || productType === "cohort" || productType === "quiz") items = courseItems;
     else if (productType === "download") items = downloadItems;
     else items = [...courseItems, ...downloadItems];
+    // Note: webinar/community/workshop/app in auto mode fall through to manual mode;
+    // use Manual Pick selection mode for those types.
 
     // Exclude current product
     if (d.excludeCurrentSlug !== false && currentSlug) {
@@ -259,11 +262,17 @@ interface CardProps {
 
 function typeInfo(type: string) {
   switch (type) {
-    case "course":   return { Icon: BookOpen,  label: "Course" };
-    case "download": return { Icon: FileDown,  label: "Digital Download" };
-    case "bundle":   return { Icon: Package,   label: "Bundle" };
-    case "physical": return { Icon: Package,   label: "Physical" };
-    default:         return { Icon: Package,   label: type };
+    case "course":    return { Icon: BookOpen,  label: "Course" };
+    case "cohort":    return { Icon: BookOpen,  label: "Cohort" };
+    case "quiz":      return { Icon: BookOpen,  label: "Quiz" };
+    case "download":  return { Icon: FileDown,  label: "Digital Download" };
+    case "bundle":    return { Icon: Package,   label: "Bundle" };
+    case "physical":  return { Icon: Package,   label: "Physical" };
+    case "webinar":   return { Icon: ExternalLink, label: "Webinar" };
+    case "community": return { Icon: Package,   label: "Community" };
+    case "workshop":  return { Icon: BookOpen,  label: "Workshop" };
+    case "app":       return { Icon: ExternalLink, label: "App" };
+    default:          return { Icon: Package,   label: type };
   }
 }
 

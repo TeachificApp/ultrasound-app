@@ -4738,7 +4738,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       const filteredCatalog = dedupedCatalog.filter(p =>
         !rpSearch || p.name.toLowerCase().includes(rpSearch.toLowerCase())
       );
-      const typeLabels: Record<string, string> = { course: "Course", download: "Download", bundle: "Bundle", physical: "Physical" };
+      const typeLabels: Record<string, string> = { course: "Course", cohort: "Cohort", quiz: "Quiz", download: "Download", bundle: "Bundle", physical: "Physical", webinar: "Webinar", community: "Community", workshop: "Workshop", app: "App" };
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Headline" field="headline" />
@@ -4755,14 +4755,21 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           {selMode === "auto" && (
             <div>
               <label className="text-xs text-gray-500 block mb-1">Product Type</label>
+              <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-1">Webinars, Communities, Workshops, and Apps require <strong>Manual Pick</strong> mode.</p>
               <Select value={d.productType ?? "both"} onValueChange={v => set("productType", v)}>
                 <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="both">Courses &amp; Downloads</SelectItem>
                   <SelectItem value="course">Courses Only</SelectItem>
+                  <SelectItem value="cohort">Cohorts Only</SelectItem>
+                  <SelectItem value="quiz">Quizzes Only</SelectItem>
                   <SelectItem value="download">Downloads Only</SelectItem>
                   <SelectItem value="bundle">Bundles Only</SelectItem>
                   <SelectItem value="physical">Physical Products Only</SelectItem>
+                  <SelectItem value="webinar">Webinars Only</SelectItem>
+                  <SelectItem value="community">Communities Only</SelectItem>
+                  <SelectItem value="workshop">Workshops Only</SelectItem>
+                  <SelectItem value="app">Apps Only</SelectItem>
                   <SelectItem value="all">All Products</SelectItem>
                 </SelectContent>
               </Select>
@@ -4940,7 +4947,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               const selectedParentId: number | null = d.selectedParentId ?? null;
               const selectedParentKind: string | null = d.selectedParentKind ?? null;
               const filteredByParent = selectedParentId != null
-                ? cicAllItems.filter(item => item.parentId === selectedParentId && item.parentKind === selectedParentKind)
+                ? cicAllItems.filter(item => Number(item.parentId) === Number(selectedParentId) && item.parentKind === selectedParentKind)
                 : cicAllItems;
               const filtered = filteredByParent.filter(item =>
                 !cicSearch || item.label.toLowerCase().includes(cicSearch.toLowerCase())
@@ -5101,7 +5108,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   const selectedParentId: number | null = d.selectedParentId ?? null;
                   const selectedParentKind: string | null = d.selectedParentKind ?? null;
                   const filteredByParent = selectedParentId != null
-                    ? cssAllItems.filter(item => item.parentId === selectedParentId && item.parentKind === selectedParentKind)
+                    ? cssAllItems.filter(item => Number(item.parentId) === Number(selectedParentId) && item.parentKind === selectedParentKind)
                     : cssAllItems;
                   const filtered = filteredByParent.filter(item =>
                     !cssSearch || item.label.toLowerCase().includes(cssSearch.toLowerCase())

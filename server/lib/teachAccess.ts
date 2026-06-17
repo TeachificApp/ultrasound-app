@@ -3,7 +3,7 @@
  * Used by LMS Instructors and EducatorAssist™ educators.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   educatorOrgMembers,
@@ -149,10 +149,10 @@ export async function listAccessibleMaterials(userId: number, opts?: { ownerOnly
 
   if ((ctx.isPlatformAdmin || ctx.isEducationManager) && !opts?.ownerOnly) {
     const { desc } = await import("drizzle-orm");
-    return db.select().from(teachMaterials).orderBy(desc(teachMaterials.updatedAt));
+    return db.select().from(teachMaterials).where(isNull(teachMaterials.trashedAt)).orderBy(desc(teachMaterials.updatedAt));
   }
 
-  const owned = await db.select().from(teachMaterials).where(eq(teachMaterials.ownerUserId, userId));
+  const owned = await db.select().from(teachMaterials).where(and(eq(teachMaterials.ownerUserId, userId), isNull(teachMaterials.trashedAt)));
 
   if (opts?.ownerOnly) return owned;
 
