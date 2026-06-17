@@ -16,6 +16,7 @@ import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
+import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
@@ -92,7 +93,8 @@ export type BlockType =
   | "conditional_text"
   | "sdms_cme_module"
   | "enrollment_counter"
-  | "quiz_embed";
+  | "quiz_embed"
+  | "remaining_seats";
 
 export interface Block {
   id: string;
@@ -1767,6 +1769,8 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       );
     }
 
+    case "remaining_seats":
+      return <RemainingSeatsBlock data={d} preview={true} />;
     case "enrollment_counter":
       return <EnrollmentCounterBlockPreview d={d} />;
     case "quiz_embed": {

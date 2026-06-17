@@ -738,6 +738,36 @@ export const lmsPublicRouter = router({
         landingBlocks: row.landingBlocks ? JSON.parse(row.landingBlocks) : [],
       };
     }),
+
+  /** Public: get live seat availability for a cohort group (no cache — real-time) */
+  getCohortSeatAvailability: publicProcedure
+    .input(z.object({ cohortGroupId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [group] = await db
+        .select({ id: lmsCohortGroups.id, name: lmsCohortGroups.name, maxStudents: lmsCohortGroups.maxStudents })
+        .from(lmsCohortGroups)
+        .where(eq(lmsCohortGroups.id, input.cohortGroupId))
+        .limit(1);
+      if (!group) throw new TRPCError({ code: "NOT_FOUND" });
+      // Count active enrollments directly from the enrollments table for accuracy
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(lmsCohortGroupEnrollments)
+        .where(eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId));
+      const enrolled = Number(countRow?.count ?? 0);
+      const capacity = group.maxStudents ?? null;
+      const remaining = capacity !== null ? Math.max(0, capacity - enrolled) : null;
+      return {
+        cohortGroupId: group.id,
+        name: group.name,
+        capacity,
+        enrolled,
+        remaining, // null = unlimited
+        isFull: capacity !== null && enrolled >= capacity,
+      };
+    }),
 });
 
 // ─── Learner Router ───────────────────────────────────────────────────────────

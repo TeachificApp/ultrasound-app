@@ -27,6 +27,7 @@ import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
+import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -610,6 +611,10 @@ export default function WorkshopLanding() {
                   </div>
                 </div>
               );
+            }
+            // remaining_seats — live seat availability block
+            if (block.type === "remaining_seats") {
+              return <RemainingSeatsBlock key={block.id} data={block.data} />;
             }
             return (
               <BlockPreview

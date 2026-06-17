@@ -321,6 +321,21 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     defaultData: { headline: "Upcoming Live Sessions", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true, showLocation: true, displayMode: "sessions", showPastSessions: false } },
   { type: "cohort_instance_cards_auto", label: "Cohort Groups / Instances (Auto)", icon: <Layers size={14} />, category: "Content",
     defaultData: { headline: "Upcoming Cohorts", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true, showLocation: true, groupSelectionMode: "all", selectedGroupIds: [], enrollNowText: "Enroll Now", showEnrollNow: true } },
+  { type: "remaining_seats", label: "Remaining Seats (Live)", icon: <Users size={14} />, category: "Content",
+    defaultData: {
+      sourceType: "workshop_instance" as "workshop_instance" | "cohort_group",
+      sourceId: null as number | null,
+      sourceName: "",
+      headline: "Limited Seats Available",
+      subtext: "Seats are filling up fast \u2014 secure yours today.",
+      showProgressBar: true,
+      showCount: true,
+      urgencyThreshold: 5,
+      bgColor: "#ffffff",
+      accentColor: "#179ca3",
+      textColor: "#111827",
+      fullMessage: "This session is fully booked.",
+    } },
   { type: "related_products", label: "Related Products", icon: <Package size={14} />, category: "Smart",
     defaultData: {
       headline: "You Might Also Like",
@@ -2906,6 +2921,48 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
   const pricingSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   // Related Products manual picker search — must be at top level (React rules of hooks)
   const [rpSearch, setRpSearch] = useState("");
+  // cohort_instance_cards_auto: dynamic search for cohort courses and workshops
+  const [cicSearch, setCicSearch] = useState("");
+  const { data: cicCohortsData } = trpc.lmsAdmin.listCourses.useQuery(
+    { status: "all", type: "cohort", pageSize: 200 },
+    { enabled: block.type === "cohort_instance_cards_auto", staleTime: 30_000 }
+  );
+  const { data: cicWorkshopsData } = trpc.workshopAdmin.list.useQuery(
+    { limit: 200, offset: 0 },
+    { enabled: block.type === "cohort_instance_cards_auto", staleTime: 30_000 }
+  );
+  const cicAllItems: Array<{ id: number; label: string; kind: "cohort" | "workshop" }> = React.useMemo(() => {
+    const cohorts = ((cicCohortsData as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: c.title ?? `Cohort #${c.id}`, kind: "cohort" as const }));
+    const workshops = ((cicWorkshopsData as any)?.workshops ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}`, kind: "workshop" as const }));
+    return [...cohorts, ...workshops];
+  }, [cicCohortsData, cicWorkshopsData]);
+  // remaining_seats: dynamic search for workshop instances and cohort groups
+  const [rsSearch, setRsSearch] = useState("");
+  const [rsSourceType, setRsSourceType] = useState<"workshop_instance" | "cohort_group">(d.sourceType ?? "workshop_instance");
+  const { data: rsWorkshopsData } = trpc.workshopAdmin.list.useQuery(
+    { limit: 200, offset: 0 },
+    { enabled: block.type === "remaining_seats", staleTime: 30_000 }
+  );
+  const { data: rsCohortsData } = trpc.lmsAdmin.listCourses.useQuery(
+    { status: "all", type: "cohort", pageSize: 200 },
+    { enabled: block.type === "remaining_seats", staleTime: 30_000 }
+  );
+  // Build flat list of workshop instances for remaining_seats picker
+  const rsWorkshopInstances: Array<{ id: number; label: string }> = React.useMemo(() => {
+    const workshops = (rsWorkshopsData as any)?.workshops ?? [];
+    const items: Array<{ id: number; label: string }> = [];
+    for (const w of workshops) {
+      const instances = w.instances ?? [];
+      for (const inst of instances) {
+        items.push({ id: inst.id, label: `${w.title} — ${inst.title ?? `Instance #${inst.id}`}` });
+      }
+    }
+    return items;
+  }, [rsWorkshopsData]);
+  // Build flat list of cohort groups for remaining_seats picker
+  const rsCohortGroups: Array<{ id: number; label: string }> = React.useMemo(() => {
+    return ((rsCohortsData as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: c.title ?? `Cohort #${c.id}` }));
+  }, [rsCohortsData]);
   const handleFileUpload = async (file: File, targetField: string, context: string) => {
     if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return; }
     setUploading(targetField);
@@ -4682,18 +4739,70 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 </button>
               ))}
             </div>
-            {(d.groupSelectionMode ?? "all") === "manual" && (
-              <p className="text-[10px] text-gray-500 mt-1.5">Enter comma-separated cohort group IDs to show specific groups.</p>
-            )}
-            {(d.groupSelectionMode ?? "all") === "manual" && (
-              <input
-                type="text"
-                className="w-full mt-1 h-8 text-xs border rounded px-2"
-                placeholder="e.g. 12, 15, 23"
-                value={(d.selectedGroupIds ?? []).join(", ")}
-                onChange={e => set("selectedGroupIds", e.target.value.split(",").map((s: string) => Number(s.trim())).filter(Boolean))}
-              />
-            )}
+            {(d.groupSelectionMode ?? "all") === "manual" && (() => {
+              const selectedIds: number[] = d.selectedGroupIds ?? [];
+              const filtered = cicAllItems.filter(item =>
+                !cicSearch || item.label.toLowerCase().includes(cicSearch.toLowerCase())
+              );
+              const selectedItems = cicAllItems.filter(item => selectedIds.includes(item.id));
+              return (
+                <div className="mt-2 space-y-2">
+                  {/* Selected tags */}
+                  {selectedItems.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {selectedItems.map(item => (
+                        <span key={item.id} className="inline-flex items-center gap-1 bg-teal-50 text-teal-700 border border-teal-200 rounded px-2 py-0.5 text-[10px]">
+                          <span className="opacity-60">{item.kind === "cohort" ? "Cohort" : "Workshop"}</span>
+                          <span>{item.label}</span>
+                          <button onClick={() => set("selectedGroupIds", selectedIds.filter(id => id !== item.id))} className="text-teal-400 hover:text-red-500 ml-0.5">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Search input */}
+                  <input
+                    type="text"
+                    className="w-full h-7 text-xs border rounded px-2"
+                    placeholder="Search cohorts & workshops…"
+                    value={cicSearch}
+                    onChange={e => setCicSearch(e.target.value)}
+                  />
+                  {/* Results list */}
+                  {cicAllItems.length === 0 && (
+                    <p className="text-[10px] text-gray-400">Loading…</p>
+                  )}
+                  {cicAllItems.length > 0 && filtered.length === 0 && (
+                    <p className="text-[10px] text-gray-400">No matches found.</p>
+                  )}
+                  {filtered.length > 0 && (
+                    <div className="max-h-40 overflow-y-auto border rounded divide-y">
+                      {filtered.map(item => {
+                        const isSelected = selectedIds.includes(item.id);
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                set("selectedGroupIds", selectedIds.filter(id => id !== item.id));
+                              } else {
+                                set("selectedGroupIds", [...selectedIds, item.id]);
+                              }
+                            }}
+                            className={`w-full text-left px-2 py-1.5 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
+                          >
+                            <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] ${isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"}`}>
+                              {isSelected ? "✓" : ""}
+                            </span>
+                            <span className="flex-1 truncate">{item.label}</span>
+                            <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort" ? "Cohort" : "Workshop"}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Design</p>
@@ -4930,6 +5039,87 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           }}
         />
       );
+    case "remaining_seats": {
+      const rsItems = rsSourceType === "workshop_instance" ? rsWorkshopInstances : rsCohortGroups;
+      const rsFiltered = rsSearch ? rsItems.filter(i => i.label.toLowerCase().includes(rsSearch.toLowerCase())) : rsItems;
+      return (
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Source Type</label>
+            <Select value={rsSourceType} onValueChange={(v: any) => { setRsSourceType(v); set("sourceType", v); set("sourceId", null); set("sourceName", ""); }}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="workshop_instance">Workshop Instance</SelectItem>
+                <SelectItem value="cohort_group">Cohort Group</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              {rsSourceType === "workshop_instance" ? "Select Workshop Instance" : "Select Cohort Group"}
+            </label>
+            <div className="relative mb-1">
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Input value={rsSearch} onChange={e => setRsSearch(e.target.value)} className="h-7 text-xs pl-6" placeholder="Search..." />
+            </div>
+            <div className="max-h-40 overflow-y-auto border rounded bg-white space-y-0.5 p-1">
+              {rsFiltered.length === 0 && <p className="text-xs text-gray-400 p-2 text-center">{rsItems.length === 0 ? "Loading..." : "No results"}</p>}
+              {rsFiltered.map(item => (
+                <button key={item.id} type="button"
+                  onClick={() => { set("sourceId", item.id); set("sourceName", item.label); }}
+                  className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-teal-50 transition-colors ${
+                    d.sourceId === item.id ? "bg-teal-100 text-teal-800 font-medium" : "text-gray-700"
+                  }`}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            {d.sourceId && <p className="text-xs text-teal-700 mt-1">Selected: <strong>{d.sourceName || `ID ${d.sourceId}`}</strong></p>}
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Headline</label>
+            <DebouncedInput value={d.headline ?? ""} onChange={v => set("headline", v)} className="h-8 text-xs" placeholder="Limited Seats Available" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Subtext</label>
+            <DebouncedInput value={d.subtext ?? ""} onChange={v => set("subtext", v)} className="h-8 text-xs" placeholder="Seats are filling up fast..." />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Sold Out Message</label>
+            <DebouncedInput value={d.fullMessage ?? ""} onChange={v => set("fullMessage", v)} className="h-8 text-xs" placeholder="This session is fully booked." />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Urgency Threshold (seats)</label>
+            <Input type="number" min={1} max={50} value={d.urgencyThreshold ?? 5} onChange={e => set("urgencyThreshold", parseInt(e.target.value) || 5)} className="h-8 text-xs" />
+            <p className="text-[10px] text-gray-400 mt-0.5">Show urgency styling when remaining seats ≤ this number</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={d.showProgressBar !== false} onChange={e => set("showProgressBar", e.target.checked)} className="rounded" />
+              Show progress bar
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={d.showCount !== false} onChange={e => set("showCount", e.target.checked)} className="rounded" />
+              Show seat count
+            </label>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">BG Color</label>
+              <input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="h-8 w-full rounded border cursor-pointer" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Accent</label>
+              <input type="color" value={d.accentColor ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} className="h-8 w-full rounded border cursor-pointer" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Text</label>
+              <input type="color" value={d.textColor ?? "#111827"} onChange={e => set("textColor", e.target.value)} className="h-8 w-full rounded border cursor-pointer" />
+            </div>
+          </div>
+        </div>
+      );
+    }
     case "quiz_embed":
       return <QuizEmbedBlockSettings d={d} set={set} />;
     case "file_download": {

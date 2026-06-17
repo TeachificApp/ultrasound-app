@@ -138,6 +138,36 @@ export const workshopPublicRouter = router({
       return rows;
     }),
 
+  /** Public: get live seat availability for a workshop instance (no cache — real-time) */
+  getSeatAvailability: publicProcedure
+    .input(z.object({ instanceId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [instance] = await db
+        .select({
+          id: workshopInstances.id,
+          title: workshopInstances.title,
+          capacity: workshopInstances.capacity,
+          enrolledCount: workshopInstances.enrolledCount,
+        })
+        .from(workshopInstances)
+        .where(eq(workshopInstances.id, input.instanceId))
+        .limit(1);
+      if (!instance) throw new TRPCError({ code: "NOT_FOUND" });
+      const capacity = instance.capacity ?? null;
+      const enrolled = instance.enrolledCount ?? 0;
+      const remaining = capacity !== null ? Math.max(0, capacity - enrolled) : null;
+      return {
+        instanceId: instance.id,
+        title: instance.title,
+        capacity,
+        enrolled,
+        remaining, // null = unlimited
+        isFull: capacity !== null && enrolled >= capacity,
+      };
+    }),
+
   /** Public: get landing blocks + basic info for a specific workshop instance */
   getInstancePage: publicProcedure
     .input(z.object({ instanceId: z.number() }))

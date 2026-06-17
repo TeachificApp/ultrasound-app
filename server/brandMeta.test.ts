@@ -16,6 +16,36 @@ const BRAND_META: Record<string, { title: string; description: string; ogTitle: 
     themeColor: "#0e1e2e",
     appTitle: "iHeartEcho",
   },
+  "learn.allaboutultrasound": {
+    title: "All About Ultrasound | iHeartEcho",
+    description: "All About Ultrasound | iHeartEcho — General, Vascular & Cardiac Ultrasound Clinical Intelligence.",
+    ogTitle: "All About Ultrasound | iHeartEcho",
+    ogDescription: "General, Vascular & Cardiac Ultrasound Clinical Intelligence learning platform.",
+    ogImage: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png",
+    ogUrl: "https://learn.allaboutultrasound.com",
+    themeColor: "#189aa1",
+    appTitle: "AAUS | iHeartEcho",
+  },
+  "app.allaboutultrasound": {
+    title: "All About Ultrasound | iHeartEcho",
+    description: "All About Ultrasound | iHeartEcho — General, Vascular & Cardiac Ultrasound Clinical Intelligence.",
+    ogTitle: "All About Ultrasound | iHeartEcho",
+    ogDescription: "General, Vascular & Cardiac Ultrasound Clinical Intelligence learning platform.",
+    ogImage: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png",
+    ogUrl: "https://app.allaboutultrasound.com",
+    themeColor: "#189aa1",
+    appTitle: "AAUS | iHeartEcho",
+  },
+  "members.allaboutultrasound": {
+    title: "All About Ultrasound | iHeartEcho",
+    description: "All About Ultrasound | iHeartEcho — General, Vascular & Cardiac Ultrasound Clinical Intelligence.",
+    ogTitle: "All About Ultrasound | iHeartEcho",
+    ogDescription: "General, Vascular & Cardiac Ultrasound Clinical Intelligence learning platform.",
+    ogImage: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png",
+    ogUrl: "https://members.allaboutultrasound.com",
+    themeColor: "#189aa1",
+    appTitle: "AAUS | iHeartEcho",
+  },
 };
 
 function injectBrandMeta(html: string, host: string): string {
@@ -58,7 +88,7 @@ const SAMPLE_HTML = `<!DOCTYPE html>
 
 describe("injectBrandMeta", () => {
   it("returns unchanged HTML for non-branded hosts", () => {
-    const result = injectBrandMeta(SAMPLE_HTML, "app.allaboutultrasound.com");
+    const result = injectBrandMeta(SAMPLE_HTML, "someother.example.com");
     expect(result).toBe(SAMPLE_HTML);
   });
 
@@ -112,8 +142,36 @@ describe("injectBrandMeta", () => {
     expect(count).toBe(1);
   });
 
-  it("does not inject og:url for non-iheartecho hosts", () => {
-    const result = injectBrandMeta(SAMPLE_HTML, "app.allaboutultrasound.com");
+  it("does not inject og:url for completely unbranded hosts", () => {
+    const result = injectBrandMeta(SAMPLE_HTML, "someother.example.com");
     expect(result).not.toContain('property="og:url"');
+  });
+
+  it("injects AAUS OG tags and og:url for learn.allaboutultrasound.com", () => {
+    const result = injectBrandMeta(SAMPLE_HTML, "learn.allaboutultrasound.com");
+    expect(result).toContain("<title>All About Ultrasound | iHeartEcho</title>");
+    expect(result).toContain('property="og:title" content="All About Ultrasound | iHeartEcho"');
+    expect(result).toContain('property="og:url" content="https://learn.allaboutultrasound.com"');
+    expect(result).toContain('name="theme-color" content="#189aa1"');
+    expect(result).toContain('name="apple-mobile-web-app-title" content="AAUS | iHeartEcho"');
+  });
+
+  it("injects AAUS OG tags and og:url for app.allaboutultrasound.com", () => {
+    const result = injectBrandMeta(SAMPLE_HTML, "app.allaboutultrasound.com");
+    expect(result).toContain("<title>All About Ultrasound | iHeartEcho</title>");
+    expect(result).toContain('property="og:url" content="https://app.allaboutultrasound.com"');
+  });
+
+  it("injects AAUS OG tags and og:url for members.allaboutultrasound.com", () => {
+    const result = injectBrandMeta(SAMPLE_HTML, "members.allaboutultrasound.com");
+    expect(result).toContain("<title>All About Ultrasound | iHeartEcho</title>");
+    expect(result).toContain('property="og:url" content="https://members.allaboutultrasound.com"');
+  });
+
+  it("iheartecho key takes priority over allaboutultrasound for iheartecho hosts", () => {
+    // app.iheartecho.com should match iheartecho key, not any AAUS key
+    const result = injectBrandMeta(SAMPLE_HTML, "app.iheartecho.com");
+    expect(result).toContain("<title>iHeartEcho \u2014 Echocardiography Clinical Intelligence</title>");
+    expect(result).toContain('property="og:url" content="https://app.iheartecho.com"');
   });
 });

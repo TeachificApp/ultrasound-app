@@ -27,6 +27,36 @@ const BRAND_META: Record<string, { title: string; description: string; ogTitle: 
     themeColor: "#0e1e2e",
     appTitle: "iHeartEcho",
   },
+  "learn.allaboutultrasound": {
+    title: "All About Ultrasound | iHeartEcho",
+    description: "All About Ultrasound | iHeartEcho — General, Vascular & Cardiac Ultrasound Clinical Intelligence.",
+    ogTitle: "All About Ultrasound | iHeartEcho",
+    ogDescription: "General, Vascular & Cardiac Ultrasound Clinical Intelligence learning platform.",
+    ogImage: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png",
+    ogUrl: "https://learn.allaboutultrasound.com",
+    themeColor: "#189aa1",
+    appTitle: "AAUS | iHeartEcho",
+  },
+  "app.allaboutultrasound": {
+    title: "All About Ultrasound | iHeartEcho",
+    description: "All About Ultrasound | iHeartEcho — General, Vascular & Cardiac Ultrasound Clinical Intelligence.",
+    ogTitle: "All About Ultrasound | iHeartEcho",
+    ogDescription: "General, Vascular & Cardiac Ultrasound Clinical Intelligence learning platform.",
+    ogImage: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png",
+    ogUrl: "https://app.allaboutultrasound.com",
+    themeColor: "#189aa1",
+    appTitle: "AAUS | iHeartEcho",
+  },
+  "members.allaboutultrasound": {
+    title: "All About Ultrasound | iHeartEcho",
+    description: "All About Ultrasound | iHeartEcho — General, Vascular & Cardiac Ultrasound Clinical Intelligence.",
+    ogTitle: "All About Ultrasound | iHeartEcho",
+    ogDescription: "General, Vascular & Cardiac Ultrasound Clinical Intelligence learning platform.",
+    ogImage: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png",
+    ogUrl: "https://members.allaboutultrasound.com",
+    themeColor: "#189aa1",
+    appTitle: "AAUS | iHeartEcho",
+  },
 };
 
 /**

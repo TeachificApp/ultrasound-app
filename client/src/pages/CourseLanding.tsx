@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
+import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import type { Block } from "@/components/BlockPreview";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
@@ -1315,6 +1316,8 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     // File download block — delegate to shared BlockPreview renderer
     case "file_download":
       return <BlockPreview block={block} />;
+    case "remaining_seats":
+      return <RemainingSeatsBlock data={block.data} />;
     default:
       return null;
   }
