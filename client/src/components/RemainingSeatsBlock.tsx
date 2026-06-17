@@ -83,7 +83,7 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
           <div className="mt-4 p-4 rounded-xl border-2 border-dashed" style={{ borderColor: accentColor + "40" }}>
             {sourceId ? (
               <p className="text-sm opacity-70">
-                Preview: {sourceName || `${sourceType === "workshop_instance" ? "Workshop Instance" : "Cohort"} #${sourceId}`}
+                {sourceName || `${sourceType === "workshop_instance" ? "Workshop Instance" : "Cohort"} #${sourceId}`}
               </p>
             ) : (
               <p className="text-sm opacity-50">Select a source in the settings panel to show live seat availability.</p>

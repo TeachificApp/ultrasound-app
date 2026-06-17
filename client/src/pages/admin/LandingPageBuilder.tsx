@@ -2927,36 +2927,54 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
   const pricingSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   // Related Products manual picker search — must be at top level (React rules of hooks)
   const [rpSearch, setRpSearch] = useState("");
-  // cohort_instance_cards_auto: dynamic search for cohort courses and workshops
+  // cohort_instance_cards_auto: dynamic search for individual cohort groups and workshop instances
   const [cicSearch, setCicSearch] = useState("");
-  const { data: cicCohortsData } = trpc.lmsAdmin.listCourses.useQuery(
-    { status: "all", type: "cohort", pageSize: 200 },
+  const { data: cicGroupsData } = trpc.lmsAdmin.listAllCohortGroups.useQuery(
+    undefined,
     { enabled: block.type === "cohort_instance_cards_auto", staleTime: 30_000 }
   );
   const { data: cicWorkshopsData } = trpc.workshopAdmin.list.useQuery(
     { limit: 200, offset: 0 },
     { enabled: block.type === "cohort_instance_cards_auto", staleTime: 30_000 }
   );
-  const cicAllItems: Array<{ id: number; label: string; kind: "cohort" | "workshop" }> = React.useMemo(() => {
-    const cohorts = ((cicCohortsData as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: c.title ?? `Cohort #${c.id}`, kind: "cohort" as const }));
-    const workshops = ((cicWorkshopsData as any)?.workshops ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}`, kind: "workshop" as const }));
-    return [...cohorts, ...workshops];
-  }, [cicCohortsData, cicWorkshopsData]);
-  // cohort_sessions_auto: dynamic search for cohort groups (manual selection mode)
+  const cicAllItems: Array<{ id: number; label: string; kind: "cohort_group" | "workshop_instance" }> = React.useMemo(() => {
+    const groups = ((cicGroupsData as any) ?? []).map((g: any) => ({
+      id: g.id,
+      label: `${g.courseTitle ?? "Course"} \u2014 ${g.name ?? `Group #${g.id}`}`,
+      kind: "cohort_group" as const,
+    }));
+    const instances: Array<{ id: number; label: string; kind: "workshop_instance" }> = [];
+    for (const w of ((cicWorkshopsData as any)?.workshops ?? [])) {
+      for (const inst of (w.instances ?? [])) {
+        instances.push({ id: inst.id, label: `${w.title} \u2014 ${inst.title ?? `Instance #${inst.id}`}`, kind: "workshop_instance" as const });
+      }
+    }
+    return [...groups, ...instances];
+  }, [cicGroupsData, cicWorkshopsData]);
+  // cohort_sessions_auto: dynamic search for individual cohort groups and workshop instances
   const [cssSearch, setCssSearch] = useState("");
-  const { data: cssCohortsData } = trpc.lmsAdmin.listCourses.useQuery(
-    { status: "all", type: "cohort", pageSize: 200 },
+  const { data: cssGroupsData } = trpc.lmsAdmin.listAllCohortGroups.useQuery(
+    undefined,
     { enabled: block.type === "cohort_sessions_auto", staleTime: 30_000 }
   );
   const { data: cssWorkshopsData } = trpc.workshopAdmin.list.useQuery(
     { limit: 200, offset: 0 },
     { enabled: block.type === "cohort_sessions_auto", staleTime: 30_000 }
   );
-  const cssAllItems: Array<{ id: number; label: string; kind: "cohort" | "workshop" }> = React.useMemo(() => {
-    const cohorts = ((cssCohortsData as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: c.title ?? `Cohort #${c.id}`, kind: "cohort" as const }));
-    const workshops = ((cssWorkshopsData as any)?.workshops ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}`, kind: "workshop" as const }));
-    return [...cohorts, ...workshops];
-  }, [cssCohortsData, cssWorkshopsData]);
+  const cssAllItems: Array<{ id: number; label: string; kind: "cohort_group" | "workshop_instance" }> = React.useMemo(() => {
+    const groups = ((cssGroupsData as any) ?? []).map((g: any) => ({
+      id: g.id,
+      label: `${g.courseTitle ?? "Course"} \u2014 ${g.name ?? `Group #${g.id}`}`,
+      kind: "cohort_group" as const,
+    }));
+    const instances: Array<{ id: number; label: string; kind: "workshop_instance" }> = [];
+    for (const w of ((cssWorkshopsData as any)?.workshops ?? [])) {
+      for (const inst of (w.instances ?? [])) {
+        instances.push({ id: inst.id, label: `${w.title} \u2014 ${inst.title ?? `Instance #${inst.id}`}`, kind: "workshop_instance" as const });
+      }
+    }
+    return [...groups, ...instances];
+  }, [cssGroupsData, cssWorkshopsData]);
   // cohort_instance_cards_auto embed mode: pick a specific cohort group or workshop instance
   const [embedSearch, setEmbedSearch] = useState("");
   const isEmbedMode = block.type === "cohort_instance_cards_auto" && (d.cardDisplayMode ?? "stacked") === "embed";
@@ -4877,7 +4895,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     <div className="flex flex-wrap gap-1">
                       {selectedItems.map(item => (
                         <span key={item.id} className="inline-flex items-center gap-1 bg-teal-50 text-teal-700 border border-teal-200 rounded px-2 py-0.5 text-[10px]">
-                          <span className="opacity-60">{item.kind === "cohort" ? "Cohort" : "Workshop"}</span>
+                          <span className="opacity-60">{item.kind === "cohort_group" ? "Cohort Group" : "Workshop Instance"}</span>
                           <span>{item.label}</span>
                           <button onClick={() => set("selectedGroupIds", selectedIds.filter(id => id !== item.id))} className="text-teal-400 hover:text-red-500 ml-0.5">×</button>
                         </span>
@@ -4919,7 +4937,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                               {isSelected ? "✓" : ""}
                             </span>
                             <span className="flex-1 truncate">{item.label}</span>
-                            <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort" ? "Cohort" : "Workshop"}</span>
+                            <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort_group" ? "Cohort Group" : "Workshop Instance"}</span>
                           </button>
                         );
                       })}
@@ -5042,7 +5060,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                                 {isSelected ? "✓" : ""}
                               </span>
                               <span className="flex-1 truncate">{item.label}</span>
-                              <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort" ? "Cohort" : "Workshop"}</span>
+                              <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort_group" ? "Cohort Group" : "Workshop Instance"}</span>
                             </button>
                           );
                         })}
