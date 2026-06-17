@@ -5457,7 +5457,7 @@ export const mediaUploadSessions = mysqlTable("media_upload_sessions", {
   mimeType: varchar("mime_type", { length: 128 }).notNull(),
   totalChunks: int("total_chunks").notNull(),
   // JSON array of { partNumber, etag } objects for completed parts
-  completedParts: text("completed_parts").notNull().default("[]"),
+  completedParts: text("completed_parts").notNull(),
   // Metadata for final asset creation
   fileName: varchar("file_name", { length: 512 }).notNull(),
   fileSize: int("file_size").notNull().default(0),
