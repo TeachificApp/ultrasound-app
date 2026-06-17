@@ -2939,16 +2939,20 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
   // remaining_seats: dynamic search for workshop instances and cohort groups
   const [rsSearch, setRsSearch] = useState("");
   const [rsSourceType, setRsSourceType] = useState<"workshop_instance" | "cohort_group">(d.sourceType ?? "workshop_instance");
-  const { data: rsWorkshopsData } = trpc.workshopAdmin.list.useQuery(
+  
+  // Always fetch both workshops and cohorts for remaining_seats block (no conditional enable)
+  const { data: rsWorkshopsData, isLoading: rsWorkshopsLoading } = trpc.workshopAdmin.list.useQuery(
     { limit: 200, offset: 0 },
     { enabled: block.type === "remaining_seats", staleTime: 30_000 }
   );
-  const { data: rsCohortsData } = trpc.lmsAdmin.listCourses.useQuery(
+  const { data: rsCohortsData, isLoading: rsCohortsLoading } = trpc.lmsAdmin.listCourses.useQuery(
     { status: "all", type: "cohort", pageSize: 200 },
     { enabled: block.type === "remaining_seats", staleTime: 30_000 }
   );
+  
   // Build flat list of workshop instances for remaining_seats picker
   const rsWorkshopInstances: Array<{ id: number; label: string }> = React.useMemo(() => {
+    if (!rsWorkshopsData) return [];
     const workshops = (rsWorkshopsData as any)?.workshops ?? [];
     const items: Array<{ id: number; label: string }> = [];
     for (const w of workshops) {
@@ -2959,8 +2963,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     }
     return items;
   }, [rsWorkshopsData]);
+  
   // Build flat list of cohort groups for remaining_seats picker
   const rsCohortGroups: Array<{ id: number; label: string }> = React.useMemo(() => {
+    if (!rsCohortsData) return [];
     return ((rsCohortsData as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: c.title ?? `Cohort #${c.id}` }));
   }, [rsCohortsData]);
   const handleFileUpload = async (file: File, targetField: string, context: string) => {
@@ -5041,6 +5047,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       );
     case "remaining_seats": {
       const rsItems = rsSourceType === "workshop_instance" ? rsWorkshopInstances : rsCohortGroups;
+      const rsIsLoading = rsSourceType === "workshop_instance" ? rsWorkshopsLoading : rsCohortsLoading;
       const rsFiltered = rsSearch ? rsItems.filter(i => i.label.toLowerCase().includes(rsSearch.toLowerCase())) : rsItems;
       return (
         <div className="space-y-4">
@@ -5055,16 +5062,33 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             </Select>
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">
+            <label className="text-xs font-medium text-gray-600 block mb-1 flex items-center gap-2">
               {rsSourceType === "workshop_instance" ? "Select Workshop Instance" : "Select Cohort Group"}
+              {rsIsLoading && <Loader2 size={12} className="animate-spin text-teal-600" />}
             </label>
             <div className="relative mb-1">
               <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-              <Input value={rsSearch} onChange={e => setRsSearch(e.target.value)} className="h-7 text-xs pl-6" placeholder="Search..." />
+              <Input 
+                value={rsSearch} 
+                onChange={e => setRsSearch(e.target.value)} 
+                className="h-7 text-xs pl-6" 
+                placeholder="Search..." 
+                disabled={rsIsLoading}
+              />
             </div>
             <div className="max-h-40 overflow-y-auto border rounded bg-white space-y-0.5 p-1">
-              {rsFiltered.length === 0 && <p className="text-xs text-gray-400 p-2 text-center">{rsItems.length === 0 ? "Loading..." : "No results"}</p>}
-              {rsFiltered.map(item => (
+              {rsIsLoading && (
+                <div className="text-xs text-gray-400 p-2 text-center">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin" />
+                    Loading {rsSourceType === "workshop_instance" ? "workshops" : "cohorts"}...
+                  </div>
+                </div>
+              )}
+              {!rsIsLoading && rsFiltered.length === 0 && (
+                <p className="text-xs text-gray-400 p-2 text-center">{rsItems.length === 0 ? "No items found" : "No results match your search"}</p>
+              )}
+              {!rsIsLoading && rsFiltered.map(item => (
                 <button key={item.id} type="button"
                   onClick={() => { set("sourceId", item.id); set("sourceName", item.label); }}
                   className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-teal-50 transition-colors ${
@@ -5074,7 +5098,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 </button>
               ))}
             </div>
-            {d.sourceId && <p className="text-xs text-teal-700 mt-1">Selected: <strong>{d.sourceName || `ID ${d.sourceId}`}</strong></p>}
+            {d.sourceId && <p className="text-xs text-teal-700 mt-1">✓ Selected: <strong>{d.sourceName || `ID ${d.sourceId}`}</strong></p>}
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 block mb-1">Headline</label>

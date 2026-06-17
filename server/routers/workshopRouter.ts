@@ -577,7 +577,19 @@ export const workshopAdminRouter = router({
         db.select({ count: sql<number>`count(*)` }).from(workshops)
           .where(conditions.length ? and(...conditions) : undefined),
       ]);
-      return { workshops: rows, total: Number(countRows[0]?.count ?? 0) };
+      // Fetch instances for each workshop
+      const workshopsWithInstances = await Promise.all(
+        rows.map(async (w) => {
+          const instances = await db
+            .select()
+            .from(workshopInstances)
+            .where(eq(workshopInstances.workshopId, w.id))
+            .orderBy(asc(workshopInstances.startDate));
+          return { ...w, instances };
+        })
+      );
+      
+      return { workshops: workshopsWithInstances, total: Number(countRows[0]?.count ?? 0) };
     }),
 
   /** Get a single workshop by id */
