@@ -2899,10 +2899,14 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
   dataRef.current = block.data ?? {};
   onChangeRef.current = onChange;
   const set = useCallback((key: string, value: any) => {
-    onChangeRef.current({ ...dataRef.current, [key]: value });
+    const next = { ...dataRef.current, [key]: value };
+    dataRef.current = next;
+    onChangeRef.current(next);
   }, []);
   const setMany = useCallback((patch: Record<string, any>) => {
-    onChangeRef.current({ ...dataRef.current, ...patch });
+    const next = { ...dataRef.current, ...patch };
+    dataRef.current = next;
+    onChangeRef.current(next);
   }, []);
   // Upload hooks — must be at top level (React rules of hooks)
   const bgImageRef = useRef<HTMLInputElement>(null);
@@ -5109,12 +5113,22 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     case "remaining_seats": {
       const rsItems = rsSourceType === "workshop_instance" ? rsWorkshopInstances : rsCohortGroups;
       const rsIsLoading = rsSourceType === "workshop_instance" ? rsWorkshopsLoading : rsCohortsLoading;
-      const rsFiltered = rsSearch ? rsItems.filter(i => i.label.toLowerCase().includes(rsSearch.toLowerCase())) : rsItems;
+      const rsFiltered = rsSearch
+        ? rsItems.filter(i => i.label.toLowerCase().includes(rsSearch.toLowerCase()))
+        : rsItems;
+      const rsSelectedId = d.sourceId != null ? Number(d.sourceId) : null;
       return (
         <div className="space-y-4">
           <div>
             <label className="text-xs font-medium text-gray-600 block mb-1">Source Type</label>
-            <Select value={rsSourceType} onValueChange={(v: any) => { setRsSourceType(v); set("sourceType", v); set("sourceId", null); set("sourceName", ""); }}>
+            <Select
+              value={rsSourceType}
+              onValueChange={(v: "workshop_instance" | "cohort_group") => {
+                setRsSourceType(v);
+                setRsSearch("");
+                setMany({ sourceType: v, sourceId: null, sourceName: "" });
+              }}
+            >
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="workshop_instance">Workshop Instance</SelectItem>
@@ -5135,29 +5149,56 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 </div>
               </div>
             ) : (
-              <select 
-                value={String(d.sourceId || "")} 
-                onChange={(e: any) => {
-                  const id = parseInt(e.target.value);
-                  if (!isNaN(id)) {
-                    const item = rsItems.find(i => i.id === id);
-                    if (item) {
-                      set("sourceId", id);
-                      set("sourceName", item.label);
-                    }
-                  }
-                }}
-                className="h-8 text-xs px-2 py-1 border rounded w-full bg-white cursor-pointer"
-              >
-                <option value="">Select {rsSourceType === "workshop_instance" ? "Workshop Instance" : "Cohort Group"}...</option>
-                {rsItems.map(item => (
-                  <option key={item.id} value={String(item.id)}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    className="w-full h-8 text-xs border rounded pl-7 pr-2"
+                    placeholder="Search..."
+                    value={rsSearch}
+                    onChange={e => setRsSearch(e.target.value)}
+                  />
+                </div>
+                {rsItems.length === 0 && (
+                  <p className="text-[10px] text-gray-400">
+                    No {rsSourceType === "workshop_instance" ? "workshop instances" : "cohort groups"} found.
+                  </p>
+                )}
+                {rsItems.length > 0 && rsFiltered.length === 0 && (
+                  <p className="text-[10px] text-gray-400">No matches found.</p>
+                )}
+                {rsFiltered.length > 0 && (
+                  <div className="max-h-48 overflow-y-auto border rounded divide-y">
+                    {rsFiltered.map(item => {
+                      const isSelected = rsSelectedId === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setMany({ sourceId: item.id, sourceName: item.label })}
+                          className={`w-full text-left px-2 py-2 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
+                        >
+                          <span
+                            className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] ${
+                              isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"
+                            }`}
+                          >
+                            {isSelected ? "✓" : ""}
+                          </span>
+                          <span className="flex-1 truncate">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
-            {d.sourceId && <p className="text-xs text-teal-700 mt-1">✓ Selected: <strong>{d.sourceName || `ID ${d.sourceId}`}</strong></p>}
+            {rsSelectedId != null && (
+              <p className="text-xs text-teal-700 mt-1">
+                ✓ Selected: <strong>{d.sourceName || `ID ${rsSelectedId}`}</strong>
+              </p>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 block mb-1">Headline</label>

@@ -132,4 +132,30 @@ describe("Remaining Seats Block - Data Structure", () => {
     expect(items[1].label).toBe("Advanced Vascular - Summer 2026");
     expect(items[2].label).toBe("Pediatric Echo - Fall 2026");
   });
+
+  it("should persist sourceId and sourceName when applying selection patch atomically", () => {
+    // Simulates BlockSettings setMany — both fields must survive a single update
+    const initial = {
+      sourceType: "workshop_instance" as const,
+      sourceId: null as number | null,
+      sourceName: "",
+      headline: "Limited Seats Available",
+    };
+
+    const item = { id: 101, label: "Intro to Adult Echocardiography — August 17-19, 2026" };
+    const next = { ...initial, sourceId: item.id, sourceName: item.label };
+
+    expect(next.sourceId).toBe(101);
+    expect(next.sourceName).toBe(item.label);
+
+    // Sequential single-key updates without merging stale state would drop sourceId
+    let ref = { ...initial };
+    const staleSet = (key: keyof typeof ref, value: unknown) => {
+      ref = { ...initial, [key]: value };
+    };
+    staleSet("sourceId", item.id);
+    staleSet("sourceName", item.label);
+    expect(ref.sourceId).toBeNull();
+    expect(ref.sourceName).toBe(item.label);
+  });
 });
