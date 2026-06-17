@@ -962,6 +962,24 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                           {d.showDescription !== false && g.description && (
                             <p className="text-sm text-gray-600 mt-2 line-clamp-2">{g.description}</p>
                           )}
+                          {/* Available seats */}
+                          {g.maxStudents != null && (() => {
+                            const enrolled = Number(g.enrollmentCount ?? 0);
+                            const available = Math.max(0, g.maxStudents - enrolled);
+                            const pct = g.maxStudents > 0 ? enrolled / g.maxStudents : 0;
+                            const isLow = available <= 3 && available > 0;
+                            const isFull = available === 0;
+                            return (
+                              <div className="mt-2 flex items-center gap-2">
+                                <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden" style={{ maxWidth: 120 }}>
+                                  <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: isFull ? '#dc2626' : isLow ? '#f59e0b' : accentColor }} />
+                                </div>
+                                <span className={`text-[11px] font-medium ${isFull ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-500'}`}>
+                                  {isFull ? 'Fully Booked' : `${available} seat${available === 1 ? '' : 's'} left`}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </div>
                         {showEnrollNow && (
                           <Button
@@ -989,11 +1007,14 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       }
       // ── Sessions mode (default) ──
       const sessions: any[] = course.cohortSessions ?? [];
+      if (sessions.length === 0) return null;
       const now = new Date();
+      const futureSessions = sessions.filter((s: any) => new Date(s.sessionDate) >= now);
+      // If showPastSessions is on, show all; otherwise show future sessions.
+      // If no future sessions exist, fall back to showing all sessions so the block is never empty.
       const visibleSessions = d.showPastSessions
         ? sessions
-        : sessions.filter((s: any) => new Date(s.sessionDate) >= now);
-      if (visibleSessions.length === 0) return null;
+        : (futureSessions.length > 0 ? futureSessions : sessions);
       return (
         <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <CC>

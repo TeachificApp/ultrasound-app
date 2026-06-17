@@ -1415,7 +1415,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                 </div>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-3 text-center">Auto-populated from cohort groups</p>
+
           </CC></div>
         );
       }
@@ -1438,7 +1438,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mt-3 text-center">Auto-populated from cohort live sessions</p>
+
         </CC></div>
       );
     }

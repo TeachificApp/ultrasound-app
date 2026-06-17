@@ -380,6 +380,8 @@ export const lmsPublicRouter = router({
           waitlistCtaUrl: lmsCohortGroups.waitlistCtaUrl,
           waitlistRedirectUrl: lmsCohortGroups.waitlistRedirectUrl,
           waitlistSuccessMessage: lmsCohortGroups.waitlistSuccessMessage,
+          // Live enrollment count for available-seats calculation
+          enrollmentCount: sql<number>`(SELECT COUNT(*) FROM lms_cohort_group_enrollments WHERE cohort_group_id = ${lmsCohortGroups.id})`,
         }).from(lmsCohortGroups)
           .where(and(eq(lmsCohortGroups.courseId, course.id), sql`${lmsCohortGroups.status} NOT IN ('archived', 'draft')`)),
       ]);
