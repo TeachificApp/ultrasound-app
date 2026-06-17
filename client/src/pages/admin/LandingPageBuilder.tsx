@@ -5080,34 +5080,25 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 </div>
               </div>
             ) : (
-              <div className="border rounded bg-white">
-                <div className="relative">
-                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
-                  <Input 
-                    value={rsSearch} 
-                    onChange={e => setRsSearch(e.target.value)} 
-                    className="h-7 text-xs pl-6" 
-                    placeholder="Search..." 
-                  />
-                </div>
-                <div className="max-h-40 overflow-y-auto">
-                  {rsFiltered.length === 0 ? (
-                    <p className="text-xs text-gray-400 p-3 text-center">{rsItems.length === 0 ? "No items found" : "No results match your search"}</p>
-                  ) : (
-                    <div className="space-y-0">
-                      {rsFiltered.map(item => (
-                        <button key={item.id} type="button"
-                          onClick={() => { set("sourceId", item.id); set("sourceName", item.label); }}
-                          className={`w-full text-left text-xs px-3 py-2 hover:bg-teal-50 transition-colors ${
-                            d.sourceId === item.id ? "bg-teal-100 text-teal-800 font-medium" : "text-gray-700"
-                          }`}>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <select 
+                value={d.sourceId || ""} 
+                onChange={(e) => {
+                  const id = parseInt(e.target.value);
+                  const item = rsItems.find(i => i.id === id);
+                  if (item) {
+                    set("sourceId", id);
+                    set("sourceName", item.label);
+                  }
+                }}
+                className="h-8 text-xs px-2 py-1 border rounded w-full bg-white cursor-pointer"
+              >
+                <option value="">Select {rsSourceType === "workshop_instance" ? "Workshop Instance" : "Cohort Group"}...</option>
+                {rsItems.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
             )}
             {d.sourceId && <p className="text-xs text-teal-700 mt-1">✓ Selected: <strong>{d.sourceName || `ID ${d.sourceId}`}</strong></p>}
           </div>
