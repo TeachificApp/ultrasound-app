@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { BlockPreview } from "@/components/BlockPreview";
+import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { Check, Award, Loader2, Tag } from "lucide-react";
 
 const BILLING_LABELS: Record<string, string> = {
@@ -141,6 +142,10 @@ export default function MembershipPage() {
         <div>
           {blocks.map((block: any) => {
             if (plan?.hidePricingOptions && (block.type === "pricing_options_auto" || block.type === "pricing_cards")) return null;
+            // Use the real data-fetching component for related_products instead of BlockPreview's mock
+            if (block.type === "related_products") {
+              return <RelatedProductsBlock key={block.id} data={block.data ?? {}} currentType={undefined} />;
+            }
             return <BlockPreview key={block.id} block={block} />;
           })}
         </div>

@@ -11,6 +11,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BlockPreview } from "@/components/BlockPreview";
+import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { toast } from "sonner";
 import {
   Award, BookOpen, Download, Users, Globe, Package, Tag, ChevronRight,
@@ -239,9 +240,12 @@ function MembershipDetail({ entry, onBack, onRefetch }: { entry: any; onBack: ()
       {/* Admin-configured member page blocks */}
       {blocks.length > 0 ? (
         <div>
-          {blocks.map((block: any) => (
-            <BlockPreview key={block.id} block={block} />
-          ))}
+          {blocks.map((block: any) => {
+            if (block.type === "related_products") {
+              return <RelatedProductsBlock key={block.id} data={block.data ?? {}} currentType={undefined} />;
+            }
+            return <BlockPreview key={block.id} block={block} />;
+          })}
         </div>
       ) : (
         /* Default member page layout */
