@@ -2486,6 +2486,50 @@ export type EducatorAnnouncement = typeof educatorAnnouncements.$inferSelect;
 export type InsertEducatorAnnouncement = typeof educatorAnnouncements.$inferInsert;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// TEACH — Instructor presentation & media workspace
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shared by LMS Instructors and EducatorAssist™ educators.
+// Files are stored in the media repository under Teach/user-{userId}/.
+// EducatorAssist™ subscription platform remains gated by educatorPlatformVisible.
+
+export const teachMaterials = mysqlTable("teach_materials", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerUserId: int("owner_user_id").notNull(),
+  /** lms_instructor = commercial LMS instructor; educator_assist = EducatorAssist™ org educator */
+  ownerContext: mysqlEnum("owner_context", ["lms_instructor", "educator_assist"]).notNull().default("lms_instructor"),
+  lmsInstructorId: int("lms_instructor_id"),
+  educatorOrgId: int("educator_org_id"),
+  materialType: mysqlEnum("material_type", ["presentation", "media", "document"]).notNull().default("media"),
+  title: varchar("title", { length: 300 }).notNull(),
+  description: text("description"),
+  /** Link to mediaAssets row when uploaded file is in the Teach folder */
+  mediaAssetId: int("media_asset_id"),
+  /** JSON slide array for presentation type: { id, title, content, imageUrl, notes }[] */
+  slidesData: longtext("slides_data"),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type TeachMaterial = typeof teachMaterials.$inferSelect;
+export type InsertTeachMaterial = typeof teachMaterials.$inferInsert;
+
+export const teachMaterialPermissions = mysqlTable("teach_material_permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  materialId: int("material_id").notNull(),
+  granteeUserId: int("grantee_user_id").notNull(),
+  canView: boolean("can_view").default(true).notNull(),
+  canPresent: boolean("can_present").default(false).notNull(),
+  canEdit: boolean("can_edit").default(false).notNull(),
+  canManage: boolean("can_manage").default(false).notNull(),
+  canCopy: boolean("can_copy").default(false).notNull(),
+  canDownload: boolean("can_download").default(false).notNull(),
+  grantedByUserId: int("granted_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type TeachMaterialPermission = typeof teachMaterialPermissions.$inferSelect;
+export type InsertTeachMaterialPermission = typeof teachMaterialPermissions.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SONOQUIZ — Live Kahoot-Style Quiz Platform
 // ═══════════════════════════════════════════════════════════════════════════════
 

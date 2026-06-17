@@ -29,7 +29,7 @@ import {
   Settings, CreditCard, ChevronRight, AlertCircle, Eye, RefreshCw,
   BarChart2, TrendingUp, Users, Activity, List,
   PlusCircle, Pencil, Trash2, GripVertical, Upload, Video, FileText,
-  ChevronDown, ChevronUp, FolderOpen, Loader2, ExternalLink
+  ChevronDown, ChevronUp, FolderOpen, Loader2, ExternalLink, Presentation,
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1125,6 +1125,11 @@ export default function InstructorPortal() {
                 Welcome back, <strong>{user.name}</strong>
               </p>
             </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/teach">
+                <Presentation className="w-4 h-4 mr-1" /> TEACH
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/learn">
                 <ChevronRight className="w-4 h-4 mr-1" /> Back to Library

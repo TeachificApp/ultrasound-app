@@ -104,6 +104,10 @@ const ProductLandingPageBuilder = lazy(() => import("./pages/admin/ProductLandin
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
 const InstructorPortal = lazy(() => import("./pages/InstructorPortal"));
+const TeachDashboard = lazy(() => import("./pages/teach/TeachDashboard"));
+const TeachPresentationEditor = lazy(() => import("./pages/teach/TeachPresentationEditor"));
+const TeachPresenter = lazy(() => import("./pages/teach/TeachPresenter"));
+const TeachPresenterNotes = lazy(() => import("./pages/teach/TeachPresenterNotes"));
 const AffiliateRedirect = lazy(() => import("./pages/AffiliateRedirect"));
 const UltrasoundAssistHub = lazy(() => import("./pages/UltrasoundAssistHub"));
 const ObGynCalculators = lazy(() => import("./pages/ObGynCalculators"));
@@ -704,6 +708,10 @@ function MembersRouter() {
         <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
+        <Route path="/teach" component={TeachDashboard} />
+        <Route path="/teach/presentation/:id/edit" component={TeachPresentationEditor} />
+        <Route path="/teach/presentation/:id/present" component={TeachPresenter} />
+        <Route path="/teach/presentation/:id/notes" component={TeachPresenterNotes} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
               <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
               <Route path="/my-downloads" component={MyDownloads} />
@@ -859,6 +867,10 @@ function LMSRouter() {
         <Route path="/my-team" component={MyTeamPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
+        <Route path="/teach" component={TeachDashboard} />
+        <Route path="/teach/presentation/:id/edit" component={TeachPresentationEditor} />
+        <Route path="/teach/presentation/:id/present" component={TeachPresenter} />
+        <Route path="/teach/presentation/:id/notes" component={TeachPresenterNotes} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
@@ -1120,7 +1132,7 @@ const RESERVED_FUNNEL_SLUGS = new Set([
   "reset-password", "unsubscribe", "flashcards", "case-library", "registry-review",
   "cme", "quickfire", "soundbytes", "ultrasound-assist", "scan-coach-hub",
   "calculators", "clinical-intelligence", "pocus-assist", "pocus-assist-hub",
-  "fetal-echo-assist", "learn-fetal-echo", "affiliate-dashboard", "instructor-portal",
+  "fetal-echo-assist", "learn-fetal-echo", "affiliate-dashboard", "instructor-portal", "teach",
   "educator-assist", "educator-admin", "student-dashboard", "image-quality-review",
   "accreditation-manager", "accreditation-navigator", "diy-accreditation-plans",
   "memberships", "my-memberships", "404", "terms", "privacy", "contact",
