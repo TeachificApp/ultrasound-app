@@ -2940,6 +2940,12 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
   const [rsSearch, setRsSearch] = useState("");
   const [rsSourceType, setRsSourceType] = useState<"workshop_instance" | "cohort_group">(d.sourceType ?? "workshop_instance");
   
+  // Sync rsSourceType and rsSearch when block data changes
+  React.useEffect(() => {
+    setRsSourceType(d.sourceType ?? "workshop_instance");
+    setRsSearch("");
+  }, [block.id, d.sourceType]);
+  
   // Always fetch both workshops and cohorts for remaining_seats block (no conditional enable)
   const { data: rsWorkshopsData, isLoading: rsWorkshopsLoading } = trpc.workshopAdmin.list.useQuery(
     { limit: 200, offset: 0 },
@@ -5066,38 +5072,43 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               {rsSourceType === "workshop_instance" ? "Select Workshop Instance" : "Select Cohort Group"}
               {rsIsLoading && <Loader2 size={12} className="animate-spin text-teal-600" />}
             </label>
-            <div className="relative mb-1">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-              <Input 
-                value={rsSearch} 
-                onChange={e => setRsSearch(e.target.value)} 
-                className="h-7 text-xs pl-6" 
-                placeholder="Search..." 
-                disabled={rsIsLoading}
-              />
-            </div>
-            <div className="max-h-40 overflow-y-auto border rounded bg-white space-y-0.5 p-1">
-              {rsIsLoading && (
-                <div className="text-xs text-gray-400 p-2 text-center">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <Loader2 size={12} className="animate-spin" />
-                    Loading {rsSourceType === "workshop_instance" ? "workshops" : "cohorts"}...
-                  </div>
+            {rsIsLoading ? (
+              <div className="text-xs text-gray-400 p-3 text-center border rounded bg-gray-50">
+                <div className="flex items-center justify-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin" />
+                  Loading {rsSourceType === "workshop_instance" ? "workshops" : "cohorts"}...
                 </div>
-              )}
-              {!rsIsLoading && rsFiltered.length === 0 && (
-                <p className="text-xs text-gray-400 p-2 text-center">{rsItems.length === 0 ? "No items found" : "No results match your search"}</p>
-              )}
-              {!rsIsLoading && rsFiltered.map(item => (
-                <button key={item.id} type="button"
-                  onClick={() => { set("sourceId", item.id); set("sourceName", item.label); }}
-                  className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-teal-50 transition-colors ${
-                    d.sourceId === item.id ? "bg-teal-100 text-teal-800 font-medium" : "text-gray-700"
-                  }`}>
-                  {item.label}
-                </button>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="border rounded bg-white">
+                <div className="relative">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                  <Input 
+                    value={rsSearch} 
+                    onChange={e => setRsSearch(e.target.value)} 
+                    className="h-7 text-xs pl-6" 
+                    placeholder="Search..." 
+                  />
+                </div>
+                <div className="max-h-40 overflow-y-auto">
+                  {rsFiltered.length === 0 ? (
+                    <p className="text-xs text-gray-400 p-3 text-center">{rsItems.length === 0 ? "No items found" : "No results match your search"}</p>
+                  ) : (
+                    <div className="space-y-0">
+                      {rsFiltered.map(item => (
+                        <button key={item.id} type="button"
+                          onClick={() => { set("sourceId", item.id); set("sourceName", item.label); }}
+                          className={`w-full text-left text-xs px-3 py-2 hover:bg-teal-50 transition-colors ${
+                            d.sourceId === item.id ? "bg-teal-100 text-teal-800 font-medium" : "text-gray-700"
+                          }`}>
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             {d.sourceId && <p className="text-xs text-teal-700 mt-1">✓ Selected: <strong>{d.sourceName || `ID ${d.sourceId}`}</strong></p>}
           </div>
           <div>

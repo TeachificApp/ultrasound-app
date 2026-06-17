@@ -72,17 +72,36 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
     isFull: boolean;
   } | undefined;
 
-  // Preview mode: show static placeholder
-  if (preview || !sourceId) {
+  // Preview mode: show static placeholder with selected instance info
+  if (preview) {
     return (
       <div style={{ backgroundColor: bgColor, color: textColor }} className="py-8 px-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
           {headline && <h3 className="text-xl font-bold">{headline}</h3>}
           {subtext && <p className="text-sm opacity-70">{subtext}</p>}
           <div className="mt-4 p-4 rounded-xl border-2 border-dashed" style={{ borderColor: accentColor + "40" }}>
-            <p className="text-sm opacity-50">
-              {sourceId ? "Loading seat data..." : "Select a source in the settings panel to show live seat availability."}
-            </p>
+            {sourceId ? (
+              <p className="text-sm opacity-70">
+                Preview: {sourceName || `${sourceType === "workshop_instance" ? "Workshop Instance" : "Cohort"} #${sourceId}`}
+              </p>
+            ) : (
+              <p className="text-sm opacity-50">Select a source in the settings panel to show live seat availability.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No sourceId selected
+  if (!sourceId) {
+    return (
+      <div style={{ backgroundColor: bgColor, color: textColor }} className="py-8 px-4">
+        <div className="max-w-2xl mx-auto text-center space-y-3">
+          {headline && <h3 className="text-xl font-bold">{headline}</h3>}
+          {subtext && <p className="text-sm opacity-70">{subtext}</p>}
+          <div className="mt-4 p-4 rounded-xl border-2 border-dashed" style={{ borderColor: accentColor + "40" }}>
+            <p className="text-sm opacity-50">Select a source in the settings panel to show live seat availability.</p>
           </div>
         </div>
       </div>

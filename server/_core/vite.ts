@@ -88,6 +88,16 @@ function injectBrandMeta(html: string, host: string): string {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  // Redirect learn.allaboutultrasound.com to app.allaboutultrasound.com
+  app.use((req, res, next) => {
+    const host = req.hostname || req.headers.host || "";
+    if (host.includes("learn.allaboutultrasound.com")) {
+      const redirectUrl = `https://app.allaboutultrasound.com${req.originalUrl}`;
+      return res.redirect(301, redirectUrl);
+    }
+    next();
+  });
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
@@ -134,9 +144,19 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
+  // Redirect learn.allaboutultrasound.com to app.allaboutultrasound.com
+  app.use((req, res, next) => {
+    const host = req.hostname || req.headers.host || "";
+    if (host.includes("learn.allaboutultrasound.com")) {
+      const redirectUrl = `https://app.allaboutultrasound.com${req.originalUrl}`;
+      return res.redirect(301, redirectUrl);
+    }
+    next();
+  });
+
   const distPath =
     process.env.NODE_ENV === "development"
-      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
+      ? path.resolve(import.meta.dirname, "../../../", "dist", "public")
       : path.resolve(import.meta.dirname, "public");
   if (!fs.existsSync(distPath)) {
     console.error(
