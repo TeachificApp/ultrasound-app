@@ -5,13 +5,14 @@
 import { describe, it, expect } from "vitest";
 
 // Inline the logic under test so we can unit-test it without importing the full vite module
-const BRAND_META: Record<string, { title: string; description: string; ogTitle: string; ogDescription: string; ogImage: string; themeColor: string; appTitle: string }> = {
+const BRAND_META: Record<string, { title: string; description: string; ogTitle: string; ogDescription: string; ogImage: string; ogUrl: string; themeColor: string; appTitle: string }> = {
   iheartecho: {
     title: "iHeartEcho — Echocardiography Clinical Intelligence",
     description: "iHeartEcho — Echocardiography clinical intelligence for cardiac ultrasound students, sonographers, echocardiographers, and cardiologists.",
     ogTitle: "iHeartEcho — Echocardiography Clinical Intelligence",
     ogDescription: "Real-time echo interpretation and measurement assistant for cardiac ultrasound professionals.",
     ogImage: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-512_79ee0572.png",
+    ogUrl: "https://app.iheartecho.com",
     themeColor: "#0e1e2e",
     appTitle: "iHeartEcho",
   },
@@ -21,7 +22,7 @@ function injectBrandMeta(html: string, host: string): string {
   const brandKey = Object.keys(BRAND_META).find(k => host.includes(k));
   if (!brandKey) return html;
   const m = BRAND_META[brandKey];
-  return html
+  let result = html
     .replace(/<title>[^<]*<\/title>/, `<title>${m.title}</title>`)
     .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, `$1${m.description}$2`)
     .replace(/(<meta\s+property="og:title"\s+content=")[^"]*(")/, `$1${m.ogTitle}$2`)
@@ -29,6 +30,15 @@ function injectBrandMeta(html: string, host: string): string {
     .replace(/(<meta\s+property="og:image"\s+content=")[^"]*(")/, `$1${m.ogImage}$2`)
     .replace(/(<meta\s+name="theme-color"\s+content=")[^"]*(")/, `$1${m.themeColor}$2`)
     .replace(/(<meta\s+name="apple-mobile-web-app-title"\s+content=")[^"]*(")/, `$1${m.appTitle}$2`);
+  const ogUrlTag = `<meta property="og:url" content="${m.ogUrl}" />`;
+  if (result.includes('property="og:url"')) {
+    result = result.replace(/(<meta\s+property="og:url"\s+content=")[^"]*(")/, `$1${m.ogUrl}$2`);
+  } else if (result.includes('property="og:type"')) {
+    result = result.replace(/(<meta\s+property="og:type"[^>]*>)/, `$1\n    ${ogUrlTag}`);
+  } else {
+    result = result.replace(/<\/head>/, `    ${ogUrlTag}\n  </head>`);
+  }
+  return result;
 }
 
 const SAMPLE_HTML = `<!DOCTYPE html>
@@ -78,5 +88,32 @@ describe("injectBrandMeta", () => {
   it("does NOT inject UltrasoundAssist branding for iheartecho host", () => {
     const result = injectBrandMeta(SAMPLE_HTML, "app.iheartecho.com");
     expect(result).not.toContain("UltrasoundAssist");
+  });
+
+  it("injects og:url after og:type when og:url is absent", () => {
+    const result = injectBrandMeta(SAMPLE_HTML, "app.iheartecho.com");
+    expect(result).toContain('<meta property="og:url" content="https://app.iheartecho.com" />');
+    // og:url should appear after og:type
+    const typeIdx = result.indexOf('property="og:type"');
+    const urlIdx = result.indexOf('property="og:url"');
+    expect(urlIdx).toBeGreaterThan(typeIdx);
+  });
+
+  it("replaces existing og:url when already present", () => {
+    const htmlWithOgUrl = SAMPLE_HTML.replace(
+      '<meta property="og:type" content="website" />',
+      '<meta property="og:type" content="website" />\n  <meta property="og:url" content="https://old-url.com" />'
+    );
+    const result = injectBrandMeta(htmlWithOgUrl, "app.iheartecho.com");
+    expect(result).toContain('content="https://app.iheartecho.com"');
+    expect(result).not.toContain('content="https://old-url.com"');
+    // Should not duplicate the tag
+    const count = (result.match(/property="og:url"/g) || []).length;
+    expect(count).toBe(1);
+  });
+
+  it("does not inject og:url for non-iheartecho hosts", () => {
+    const result = injectBrandMeta(SAMPLE_HTML, "app.allaboutultrasound.com");
+    expect(result).not.toContain('property="og:url"');
   });
 });

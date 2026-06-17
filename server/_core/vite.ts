@@ -16,13 +16,14 @@ const SPA_CATCH_ALL_REGEX = /^\/(?!media\/|api\/|manus-storage\/).*/;
  * Brand meta config keyed by hostname substring.
  * Social crawlers don't execute JS, so OG tags must be injected server-side.
  */
-const BRAND_META: Record<string, { title: string; description: string; ogTitle: string; ogDescription: string; ogImage: string; themeColor: string; appTitle: string }> = {
+const BRAND_META: Record<string, { title: string; description: string; ogTitle: string; ogDescription: string; ogImage: string; ogUrl: string; themeColor: string; appTitle: string }> = {
   iheartecho: {
     title: "iHeartEcho — Echocardiography Clinical Intelligence",
     description: "iHeartEcho — Echocardiography clinical intelligence for cardiac ultrasound students, sonographers, echocardiographers, and cardiologists.",
     ogTitle: "iHeartEcho — Echocardiography Clinical Intelligence",
     ogDescription: "Real-time echo interpretation and measurement assistant for cardiac ultrasound professionals.",
     ogImage: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-512_79ee0572.png",
+    ogUrl: "https://app.iheartecho.com",
     themeColor: "#0e1e2e",
     appTitle: "iHeartEcho",
   },
@@ -36,7 +37,7 @@ function injectBrandMeta(html: string, host: string): string {
   const brandKey = Object.keys(BRAND_META).find(k => host.includes(k));
   if (!brandKey) return html;
   const m = BRAND_META[brandKey];
-  return html
+  let result = html
     .replace(/<title>[^<]*<\/title>/, `<title>${m.title}</title>`)
     .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, `$1${m.description}$2`)
     .replace(/(<meta\s+property="og:title"\s+content=")[^"]*(")/, `$1${m.ogTitle}$2`)
@@ -44,6 +45,16 @@ function injectBrandMeta(html: string, host: string): string {
     .replace(/(<meta\s+property="og:image"\s+content=")[^"]*(")/, `$1${m.ogImage}$2`)
     .replace(/(<meta\s+name="theme-color"\s+content=")[^"]*(")/, `$1${m.themeColor}$2`)
     .replace(/(<meta\s+name="apple-mobile-web-app-title"\s+content=")[^"]*(")/, `$1${m.appTitle}$2`);
+  // Inject or replace og:url — insert after og:type if present, otherwise before </head>
+  const ogUrlTag = `<meta property="og:url" content="${m.ogUrl}" />`;
+  if (result.includes('property="og:url"')) {
+    result = result.replace(/(<meta\s+property="og:url"\s+content=")[^"]*(")/, `$1${m.ogUrl}$2`);
+  } else if (result.includes('property="og:type"')) {
+    result = result.replace(/(<meta\s+property="og:type"[^>]*>)/, `$1\n    ${ogUrlTag}`);
+  } else {
+    result = result.replace(/<\/head>/, `    ${ogUrlTag}\n  </head>`);
+  }
+  return result;
 }
 
 export async function setupVite(app: Express, server: Server) {

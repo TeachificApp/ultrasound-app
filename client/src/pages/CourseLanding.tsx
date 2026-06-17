@@ -2326,7 +2326,7 @@ function CohortGroupDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="max-w-5xl sm:max-w-5xl w-full h-[90vh] flex flex-col p-0 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
           <div>
