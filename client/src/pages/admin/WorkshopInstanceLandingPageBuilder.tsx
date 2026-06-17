@@ -306,7 +306,7 @@ export default function WorkshopInstanceLandingPageBuilder() {
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b shadow-sm z-10 shrink-0">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" className="gap-1 text-gray-600"
-            onClick={() => navigate(`/admin/workshops/${numericWorkshopId}`)}>
+            onClick={() => navigate(`/admin/lms?editWorkshop=${numericWorkshopId}`)}>
             <ArrowLeft className="w-4 h-4" /> Back to Workshop
           </Button>
           <div className="h-5 w-px bg-gray-200" />
