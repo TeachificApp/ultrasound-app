@@ -2937,16 +2937,24 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     { limit: 200, offset: 0 },
     { enabled: block.type === "cohort_instance_cards_auto", staleTime: 30_000 }
   );
-  const cicAllItems: Array<{ id: number; label: string; kind: "cohort_group" | "workshop_instance" }> = React.useMemo(() => {
+  const cicParents: Array<{ id: number; label: string; kind: "course" | "workshop" }> = React.useMemo(() => {
+    const courses = Array.from(new Map(((cicGroupsData as any) ?? []).map((g: any) => [g.courseId, { id: g.courseId, label: g.courseTitle ?? `Course #${g.courseId}`, kind: "course" as const }])).values());
+    const wshops = ((cicWorkshopsData as any)?.workshops ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}`, kind: "workshop" as const }));
+    return [...courses, ...wshops];
+  }, [cicGroupsData, cicWorkshopsData]);
+  const cicAllItems: Array<{ id: number; label: string; kind: "cohort_group" | "workshop_instance"; parentId: number; parentKind: "course" | "workshop"; parentLabel: string }> = React.useMemo(() => {
     const groups = ((cicGroupsData as any) ?? []).map((g: any) => ({
       id: g.id,
-      label: `${g.courseTitle ?? "Course"} \u2014 ${g.name ?? `Group #${g.id}`}`,
+      label: g.name ?? `Group #${g.id}`,
       kind: "cohort_group" as const,
+      parentId: g.courseId,
+      parentKind: "course" as const,
+      parentLabel: g.courseTitle ?? `Course #${g.courseId}`,
     }));
-    const instances: Array<{ id: number; label: string; kind: "workshop_instance" }> = [];
+    const instances: Array<{ id: number; label: string; kind: "workshop_instance"; parentId: number; parentKind: "workshop"; parentLabel: string }> = [];
     for (const w of ((cicWorkshopsData as any)?.workshops ?? [])) {
       for (const inst of (w.instances ?? [])) {
-        instances.push({ id: inst.id, label: `${w.title} \u2014 ${inst.title ?? `Instance #${inst.id}`}`, kind: "workshop_instance" as const });
+        instances.push({ id: inst.id, label: inst.title ?? `Instance #${inst.id}`, kind: "workshop_instance" as const, parentId: w.id, parentKind: "workshop" as const, parentLabel: w.title ?? `Workshop #${w.id}` });
       }
     }
     return [...groups, ...instances];
@@ -2961,16 +2969,24 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     { limit: 200, offset: 0 },
     { enabled: block.type === "cohort_sessions_auto", staleTime: 30_000 }
   );
-  const cssAllItems: Array<{ id: number; label: string; kind: "cohort_group" | "workshop_instance" }> = React.useMemo(() => {
+  const cssParents: Array<{ id: number; label: string; kind: "course" | "workshop" }> = React.useMemo(() => {
+    const courses = Array.from(new Map(((cssGroupsData as any) ?? []).map((g: any) => [g.courseId, { id: g.courseId, label: g.courseTitle ?? `Course #${g.courseId}`, kind: "course" as const }])).values());
+    const wshops = ((cssWorkshopsData as any)?.workshops ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}`, kind: "workshop" as const }));
+    return [...courses, ...wshops];
+  }, [cssGroupsData, cssWorkshopsData]);
+  const cssAllItems: Array<{ id: number; label: string; kind: "cohort_group" | "workshop_instance"; parentId: number; parentKind: "course" | "workshop"; parentLabel: string }> = React.useMemo(() => {
     const groups = ((cssGroupsData as any) ?? []).map((g: any) => ({
       id: g.id,
-      label: `${g.courseTitle ?? "Course"} \u2014 ${g.name ?? `Group #${g.id}`}`,
+      label: g.name ?? `Group #${g.id}`,
       kind: "cohort_group" as const,
+      parentId: g.courseId,
+      parentKind: "course" as const,
+      parentLabel: g.courseTitle ?? `Course #${g.courseId}`,
     }));
-    const instances: Array<{ id: number; label: string; kind: "workshop_instance" }> = [];
+    const instances: Array<{ id: number; label: string; kind: "workshop_instance"; parentId: number; parentKind: "workshop"; parentLabel: string }> = [];
     for (const w of ((cssWorkshopsData as any)?.workshops ?? [])) {
       for (const inst of (w.instances ?? [])) {
-        instances.push({ id: inst.id, label: `${w.title} \u2014 ${inst.title ?? `Instance #${inst.id}`}`, kind: "workshop_instance" as const });
+        instances.push({ id: inst.id, label: inst.title ?? `Instance #${inst.id}`, kind: "workshop_instance" as const, parentId: w.id, parentKind: "workshop" as const, parentLabel: w.title ?? `Workshop #${w.id}` });
       }
     }
     return [...groups, ...instances];
@@ -3015,11 +3031,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     { limit: 200, offset: 0 },
     { enabled: block.type === "remaining_seats", staleTime: 30_000 }
   );
-  const { data: rsCohortsData, isLoading: rsCohortsLoading } = trpc.lmsAdmin.listCourses.useQuery(
-    { status: "all", type: "cohort", pageSize: 200 },
+  const { data: rsCohortsData, isLoading: rsCohortsLoading } = trpc.lmsAdmin.listAllCohortGroups.useQuery(
+    undefined,
     { enabled: block.type === "remaining_seats", staleTime: 30_000 }
   );
-  
   // Build flat list of workshop instances for remaining_seats picker
   const rsWorkshopInstances: Array<{ id: number; label: string }> = React.useMemo(() => {
     if (!rsWorkshopsData) return [];
@@ -3033,12 +3048,38 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     }
     return items;
   }, [rsWorkshopsData]);
-  
-  // Build flat list of cohort groups for remaining_seats picker
+  // Build flat list of cohort groups for remaining_seats picker (uses actual cohort group IDs)
   const rsCohortGroups: Array<{ id: number; label: string }> = React.useMemo(() => {
     if (!rsCohortsData) return [];
-    return ((rsCohortsData as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: c.title ?? `Cohort #${c.id}` }));
+    return ((rsCohortsData as any) ?? []).map((g: any) => ({
+      id: g.id,
+      label: `${g.courseTitle ?? "Course"} — ${g.name ?? `Group #${g.id}`}`,
+    }));
   }, [rsCohortsData]);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   const handleFileUpload = async (file: File, targetField: string, context: string) => {
     if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return; }
     setUploading(targetField);
@@ -4874,7 +4915,8 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           )}
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Group Selection</p>
-            <div className="flex gap-1">
+            {/* Step 1: All vs Manual */}
+            <div className="flex gap-1 mb-2">
               {(["all", "manual"] as const).map(m => (
                 <button key={m} onClick={() => set("groupSelectionMode", m)}
                   className={`flex-1 py-1.5 text-xs rounded border capitalize ${(d.groupSelectionMode ?? "all") === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
@@ -4882,67 +4924,105 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 </button>
               ))}
             </div>
+            {(d.groupSelectionMode ?? "all") === "all" && (
+              <p className="text-[10px] text-gray-500">Automatically shows all available cohort groups and workshop instances.</p>
+            )}
             {(d.groupSelectionMode ?? "all") === "manual" && (() => {
               const selectedIds: number[] = d.selectedGroupIds ?? [];
-              const filtered = cicAllItems.filter(item =>
+              const selectedParentId: number | null = d.selectedParentId ?? null;
+              const selectedParentKind: string | null = d.selectedParentKind ?? null;
+              const filteredByParent = selectedParentId != null
+                ? cicAllItems.filter(item => item.parentId === selectedParentId && item.parentKind === selectedParentKind)
+                : cicAllItems;
+              const filtered = filteredByParent.filter(item =>
                 !cicSearch || item.label.toLowerCase().includes(cicSearch.toLowerCase())
               );
               const selectedItems = cicAllItems.filter(item => selectedIds.includes(item.id));
               return (
-                <div className="mt-2 space-y-2">
-                  {/* Selected tags */}
-                  {selectedItems.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {selectedItems.map(item => (
-                        <span key={item.id} className="inline-flex items-center gap-1 bg-teal-50 text-teal-700 border border-teal-200 rounded px-2 py-0.5 text-[10px]">
-                          <span className="opacity-60">{item.kind === "cohort_group" ? "Cohort Group" : "Workshop Instance"}</span>
-                          <span>{item.label}</span>
-                          <button onClick={() => set("selectedGroupIds", selectedIds.filter(id => id !== item.id))} className="text-teal-400 hover:text-red-500 ml-0.5">×</button>
-                        </span>
+                <div className="space-y-2">
+                  {/* Step 1: Parent selector */}
+                  <div>
+                    <p className="text-[10px] text-gray-500 mb-1 font-medium">Step 1 — Select course or workshop:</p>
+                    <select
+                      className="w-full h-7 text-xs border rounded px-2 bg-white"
+                      value={selectedParentId != null ? `${selectedParentKind}:${selectedParentId}` : ""}
+                      onChange={e => {
+                        if (!e.target.value) {
+                          set("selectedParentId", null);
+                          set("selectedParentKind", null);
+                        } else {
+                          const [kind, id] = e.target.value.split(":");
+                          set("selectedParentId", Number(id));
+                          set("selectedParentKind", kind);
+                        }
+                      }}
+                    >
+                      <option value="">— All courses & workshops —</option>
+                      {cicParents.map(p => (
+                        <option key={`${p.kind}:${p.id}`} value={`${p.kind}:${p.id}`}>
+                          {p.kind === "course" ? "Course" : "Workshop"}: {p.label}
+                        </option>
                       ))}
-                    </div>
-                  )}
-                  {/* Search input */}
-                  <input
-                    type="text"
-                    className="w-full h-7 text-xs border rounded px-2"
-                    placeholder="Search cohorts & workshops…"
-                    value={cicSearch}
-                    onChange={e => setCicSearch(e.target.value)}
-                  />
-                  {/* Results list */}
-                  {cicAllItems.length === 0 && (
-                    <p className="text-[10px] text-gray-400">Loading…</p>
-                  )}
-                  {cicAllItems.length > 0 && filtered.length === 0 && (
-                    <p className="text-[10px] text-gray-400">No matches found.</p>
-                  )}
-                  {filtered.length > 0 && (
-                    <div className="max-h-40 overflow-y-auto border rounded divide-y">
-                      {filtered.map(item => {
-                        const isSelected = selectedIds.includes(item.id);
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              if (isSelected) {
-                                set("selectedGroupIds", selectedIds.filter(id => id !== item.id));
-                              } else {
-                                set("selectedGroupIds", [...selectedIds, item.id]);
-                              }
-                            }}
-                            className={`w-full text-left px-2 py-1.5 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
-                          >
-                            <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] ${isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"}`}>
-                              {isSelected ? "✓" : ""}
-                            </span>
-                            <span className="flex-1 truncate">{item.label}</span>
-                            <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort_group" ? "Cohort Group" : "Workshop Instance"}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                    </select>
+                  </div>
+                  {/* Step 2: Group/instance checklist */}
+                  <div>
+                    <p className="text-[10px] text-gray-500 mb-1 font-medium">Step 2 — Select specific groups/instances:</p>
+                    {selectedItems.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-1.5">
+                        {selectedItems.map(item => (
+                          <span key={item.id} className="inline-flex items-center gap-1 bg-teal-50 text-teal-700 border border-teal-200 rounded px-2 py-0.5 text-[10px]">
+                            <span className="opacity-60">{item.parentLabel}</span>
+                            <span>·</span>
+                            <span>{item.label}</span>
+                            <button onClick={() => set("selectedGroupIds", selectedIds.filter(id => id !== item.id))} className="text-teal-400 hover:text-red-500 ml-0.5">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      className="w-full h-7 text-xs border rounded px-2 mb-1"
+                      placeholder="Search groups & instances…"
+                      value={cicSearch}
+                      onChange={e => setCicSearch(e.target.value)}
+                    />
+                    {cicAllItems.length === 0 && (
+                      <p className="text-[10px] text-gray-400">Loading…</p>
+                    )}
+                    {cicAllItems.length > 0 && filtered.length === 0 && (
+                      <p className="text-[10px] text-gray-400">No matches found.</p>
+                    )}
+                    {filtered.length > 0 && (
+                      <div className="max-h-40 overflow-y-auto border rounded divide-y">
+                        {filtered.map(item => {
+                          const isSelected = selectedIds.includes(item.id);
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                if (isSelected) {
+                                  set("selectedGroupIds", selectedIds.filter(id => id !== item.id));
+                                } else {
+                                  set("selectedGroupIds", [...selectedIds, item.id]);
+                                }
+                              }}
+                              className={`w-full text-left px-2 py-1.5 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
+                            >
+                              <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] ${isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"}`}>
+                                {isSelected ? "✓" : ""}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <span className="block truncate">{item.label}</span>
+                                <span className="block text-[9px] text-gray-400 truncate">{item.parentLabel}</span>
+                              </div>
+                              <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort_group" ? "Cohort" : "Workshop"}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })()}
@@ -4994,82 +5074,120 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             )}
           </div>
           {displayMode === "groups" && (
-            <div className="border-t pt-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Group Selection</p>
-              <div className="flex gap-1">
-                {(["all", "manual"] as const).map(m => (
-                  <button key={m} onClick={() => set("groupSelectionMode", m)}
-                    className={`flex-1 py-1.5 text-xs rounded border capitalize ${(d.groupSelectionMode ?? "all") === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
-                    {m === "all" ? "All Available (Dynamic)" : "Manual Selection"}
-                  </button>
-                ))}
-              </div>
-              {(d.groupSelectionMode ?? "all") === "manual" && (() => {
-                const selectedIds: number[] = d.selectedGroupIds ?? [];
-                const filtered = cssAllItems.filter(item =>
-                  !cssSearch || item.label.toLowerCase().includes(cssSearch.toLowerCase())
-                );
-                return (
-                  <div className="mt-2 space-y-1.5">
-                    {/* Selected tags */}
-                    {selectedIds.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {selectedIds.map(id => {
-                          const item = cssAllItems.find(i => i.id === id);
-                          return (
-                            <span key={id} className="inline-flex items-center gap-1 bg-teal-100 text-teal-800 text-[10px] px-1.5 py-0.5 rounded">
-                              {item?.label ?? `#${id}`}
-                              <button onClick={() => set("selectedGroupIds", selectedIds.filter(i => i !== id))} className="text-teal-400 hover:text-red-500 ml-0.5">×</button>
-                            </span>
-                          );
-                        })}
+              <div className="border-t pt-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Group Selection</p>
+                {/* Step 1: All vs Manual */}
+                <div className="flex gap-1 mb-2">
+                  {(["all", "manual"] as const).map(m => (
+                    <button key={m} onClick={() => set("groupSelectionMode", m)}
+                      className={`flex-1 py-1.5 text-xs rounded border capitalize ${(d.groupSelectionMode ?? "all") === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
+                      {m === "all" ? "All Available (Dynamic)" : "Manual Selection"}
+                    </button>
+                  ))}
+                </div>
+                {(d.groupSelectionMode ?? "all") === "all" && (
+                  <p className="text-[10px] text-gray-500">Automatically shows all available cohort groups and workshop instances.</p>
+                )}
+                {(d.groupSelectionMode ?? "all") === "manual" && (() => {
+                  const selectedIds: number[] = d.selectedGroupIds ?? [];
+                  const selectedParentId: number | null = d.selectedParentId ?? null;
+                  const selectedParentKind: string | null = d.selectedParentKind ?? null;
+                  const filteredByParent = selectedParentId != null
+                    ? cssAllItems.filter(item => item.parentId === selectedParentId && item.parentKind === selectedParentKind)
+                    : cssAllItems;
+                  const filtered = filteredByParent.filter(item =>
+                    !cssSearch || item.label.toLowerCase().includes(cssSearch.toLowerCase())
+                  );
+                  const selectedItems = cssAllItems.filter(item => selectedIds.includes(item.id));
+                  return (
+                    <div className="space-y-2">
+                      {/* Step 1: Parent selector */}
+                      <div>
+                        <p className="text-[10px] text-gray-500 mb-1 font-medium">Step 1 — Select course or workshop:</p>
+                        <select
+                          className="w-full h-7 text-xs border rounded px-2 bg-white"
+                          value={selectedParentId != null ? `${selectedParentKind}:${selectedParentId}` : ""}
+                          onChange={e => {
+                            if (!e.target.value) {
+                              set("selectedParentId", null);
+                              set("selectedParentKind", null);
+                            } else {
+                              const [kind, id] = e.target.value.split(":");
+                              set("selectedParentId", Number(id));
+                              set("selectedParentKind", kind);
+                            }
+                          }}
+                        >
+                          <option value="">— All courses & workshops —</option>
+                          {cssParents.map(p => (
+                            <option key={`${p.kind}:${p.id}`} value={`${p.kind}:${p.id}`}>
+                              {p.kind === "course" ? "Course" : "Workshop"}: {p.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    )}
-                    {/* Search input */}
-                    <input
-                      type="text"
-                      className="w-full h-7 text-xs border rounded px-2"
-                      placeholder="Search cohorts & workshops…"
-                      value={cssSearch}
-                      onChange={e => setCssSearch(e.target.value)}
-                    />
-                    {/* Results list */}
-                    {cssAllItems.length === 0 && (
-                      <p className="text-[10px] text-gray-400">Loading…</p>
-                    )}
-                    {cssAllItems.length > 0 && filtered.length === 0 && (
-                      <p className="text-[10px] text-gray-400">No matches found.</p>
-                    )}
-                    {filtered.length > 0 && (
-                      <div className="max-h-40 overflow-y-auto border rounded divide-y">
-                        {filtered.map(item => {
-                          const isSelected = selectedIds.includes(item.id);
-                          return (
-                            <button
-                              key={item.id}
-                              onClick={() => {
-                                if (isSelected) {
-                                  set("selectedGroupIds", selectedIds.filter(id => id !== item.id));
-                                } else {
-                                  set("selectedGroupIds", [...selectedIds, item.id]);
-                                }
-                              }}
-                              className={`w-full text-left px-2 py-1.5 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
-                            >
-                              <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] ${isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"}`}>
-                                {isSelected ? "✓" : ""}
+                      {/* Step 2: Group/instance checklist */}
+                      <div>
+                        <p className="text-[10px] text-gray-500 mb-1 font-medium">Step 2 — Select specific groups/instances:</p>
+                        {selectedItems.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-1.5">
+                            {selectedItems.map(item => (
+                              <span key={item.id} className="inline-flex items-center gap-1 bg-teal-50 text-teal-700 border border-teal-200 rounded px-2 py-0.5 text-[10px]">
+                                <span className="opacity-60">{item.parentLabel}</span>
+                                <span>·</span>
+                                <span>{item.label}</span>
+                                <button onClick={() => set("selectedGroupIds", selectedIds.filter(id => id !== item.id))} className="text-teal-400 hover:text-red-500 ml-0.5">×</button>
                               </span>
-                              <span className="flex-1 truncate">{item.label}</span>
-                              <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort_group" ? "Cohort Group" : "Workshop Instance"}</span>
-                            </button>
-                          );
-                        })}
+                            ))}
+                          </div>
+                        )}
+                        <input
+                          type="text"
+                          className="w-full h-7 text-xs border rounded px-2 mb-1"
+                          placeholder="Search groups & instances…"
+                          value={cssSearch}
+                          onChange={e => setCssSearch(e.target.value)}
+                        />
+                        {cssAllItems.length === 0 && (
+                          <p className="text-[10px] text-gray-400">Loading…</p>
+                        )}
+                        {cssAllItems.length > 0 && filtered.length === 0 && (
+                          <p className="text-[10px] text-gray-400">No matches found.</p>
+                        )}
+                        {filtered.length > 0 && (
+                          <div className="max-h-40 overflow-y-auto border rounded divide-y">
+                            {filtered.map(item => {
+                              const isSelected = selectedIds.includes(item.id);
+                              return (
+                                <button
+                                  key={item.id}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      set("selectedGroupIds", selectedIds.filter(id => id !== item.id));
+                                    } else {
+                                      set("selectedGroupIds", [...selectedIds, item.id]);
+                                    }
+                                  }}
+                                  className={`w-full text-left px-2 py-1.5 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
+                                >
+                                  <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] ${isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"}`}>
+                                    {isSelected ? "✓" : ""}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="block truncate">{item.label}</span>
+                                    <span className="block text-[9px] text-gray-400 truncate">{item.parentLabel}</span>
+                                  </div>
+                                  <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort_group" ? "Cohort" : "Workshop"}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
+                    </div>
+                  );
+                })()}
+              </div>
           )}
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Design</p>
@@ -9524,3 +9642,4 @@ function QuizEmbedBlockSettings({ d, set }: { d: Record<string, any>; set: (key:
     </div>
   );
 }
+

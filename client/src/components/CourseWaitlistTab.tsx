@@ -27,7 +27,7 @@ export function CourseWaitlistTab({ courseId, course }: CourseWaitlistTabProps) 
 
   // ── Settings ──────────────────────────────────────────────────────────────
   const { data: settings, isLoading: settingsLoading, refetch: refetchSettings } =
-    trpc.lmsCohortAdmin.getCourseWaitlistSettings.useQuery({ courseId });
+    trpc.lmsAdmin.getCourseWaitlistSettings.useQuery({ courseId });
 
   const [waitlistEnabled, setWaitlistEnabled] = useState(false);
   const [heading, setHeading] = useState("");
@@ -51,7 +51,7 @@ export function CourseWaitlistTab({ courseId, course }: CourseWaitlistTabProps) 
     }
   }, [settings]);
 
-  const saveSettings = trpc.lmsCohortAdmin.saveCourseWaitlistSettings.useMutation({
+  const saveSettings = trpc.lmsAdmin.saveCourseWaitlistSettings.useMutation({
     onSuccess: () => { toast.success("Waitlist settings saved"); setSettingsDirty(false); refetchSettings(); },
     onError: e => toast.error(`Failed to save: ${e.message}`),
   });
@@ -71,9 +71,9 @@ export function CourseWaitlistTab({ courseId, course }: CourseWaitlistTabProps) 
 
   // ── Entries ────────────────────────────────────────────────────────────────
   const { data: entries, isLoading: entriesLoading, refetch: refetchEntries } =
-    trpc.lmsCohortAdmin.getCourseWaitlistEntries.useQuery({ courseId });
+    trpc.lmsAdmin.getCourseWaitlistEntries.useQuery({ courseId });
 
-  const exportCsv = trpc.lmsCohortAdmin.exportCourseWaitlistCsv.useQuery(
+  const exportCsv = trpc.lmsAdmin.exportCourseWaitlistCsv.useQuery(
     { courseId },
     { enabled: false }
   );
@@ -97,7 +97,7 @@ export function CourseWaitlistTab({ courseId, course }: CourseWaitlistTabProps) 
   const [priceOverride, setPriceOverride] = useState<string>("");
   const [useOverride, setUseOverride] = useState(false);
 
-  const grantAccess = trpc.lmsCohortAdmin.grantCourseWaitlistAccess.useMutation({
+  const grantAccess = trpc.lmsAdmin.grantCourseWaitlistAccess.useMutation({
     onSuccess: (data) => {
       toast.success(data.message);
       setGrantEntry(null);

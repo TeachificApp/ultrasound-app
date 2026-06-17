@@ -73,22 +73,16 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
     isFull: boolean;
   } | undefined;
 
-  // Preview mode: show static placeholder with selected instance info
+  // Preview mode: show static placeholder (no live data fetch)
   if (preview) {
     return (
       <div style={{ backgroundColor: bgColor, color: textColor }} className="py-8 px-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
           {headline && <h3 className="text-xl font-bold">{headline}</h3>}
           {subtext && <p className="text-sm opacity-70">{subtext}</p>}
-          <div className="mt-4 p-4 rounded-xl border-2 border-dashed" style={{ borderColor: accentColor + "40" }}>
-            {sourceId ? (
-              <p className="text-sm opacity-70">
-                {sourceName || `${sourceType === "workshop_instance" ? "Workshop Instance" : "Cohort"} #${sourceId}`}
-              </p>
-            ) : (
-              <p className="text-sm opacity-50">Select a source in the settings panel to show live seat availability.</p>
-            )}
-          </div>
+          {!sourceId && (
+            <p className="text-xs opacity-40 mt-2">Select a source in the settings panel to show live seat availability.</p>
+          )}
         </div>
       </div>
     );

@@ -10085,7 +10085,7 @@ function CurriculumEmbedTab({ course }: { course: any }) {
   const slug = course.slug ?? "";
 
   // ── Shared options ──────────────────────────────────────────────────────────
-  const [accentColor, setAccentColor] = useState("#14b8a6");
+  const [accentColor, setAccentColor] = useState("#14adb8");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [ctaUrl, setCtaUrl] = useState(`${baseUrl}/checkout/${slug}`);
   const [ctaLabel, setCtaLabel] = useState("Enroll Now");
@@ -10358,13 +10358,13 @@ function CurriculumEmbedTab({ course }: { course: any }) {
       </div>
 
       {/* ── Section 3: Embed Visibility Control ── */}
-      <CurriculumEmbedVisibilityPanel courseId={course.id} sections={course.sections ?? []} />
+      <EmbedVisibilitySection courseId={course.id} sections={course.sections ?? []} />
     </div>
   );
 }
 
-// ─── Curriculum Embed Visibility Panel ───────────────────────────────────────
-function CurriculumEmbedVisibilityPanel({ courseId, sections }: { courseId: number; sections: any[] }) {
+// ─── Embed Visibility Section (used inside CurriculumEmbedTab) ──────────────
+function EmbedVisibilitySection({ courseId, sections }: { courseId: number; sections: any[] }) {
   const utils = trpc.useUtils();
   const { data: visData, isLoading } = trpc.lmsCourseBuilder.getCurriculumEmbedVisibility.useQuery({ courseId });
   const setVisibility = trpc.lmsCourseBuilder.setCurriculumEmbedVisibility.useMutation({
