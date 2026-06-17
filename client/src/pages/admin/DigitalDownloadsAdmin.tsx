@@ -980,7 +980,7 @@ export default function DigitalDownloadsAdmin({ initialEditId }: { initialEditId
       <TabsList>
         <TabsTrigger value="products">Products</TabsTrigger>
         <TabsTrigger value="bundles">Bundles</TabsTrigger>
-        <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        <TabsTrigger value="analytics">Download Access</TabsTrigger>
       </TabsList>
       <TabsContent value="products" className="mt-4">
         <ProductList onEdit={setEditingId} />

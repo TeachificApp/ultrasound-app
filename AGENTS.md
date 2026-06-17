@@ -59,7 +59,28 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 - Fulfillment grants `membership_subscriptions`, enrolls courses/quizzes, downloads, bundles, and brand tiers per `membership_plan_access`.
 - Checkout complete fallback: `membership.getCheckoutSessionStatus` (used when `?type=membership` on `/checkout/complete`).
 - Admin manual reconcile (production): `membership.reconcileStripeMembership` with `stripeSubscriptionId` or `stripeCheckoutSessionId` + customer email.
+- Duplicate Stripe subs: webhook auto-cancels extras; admin can run `membership.cancelDuplicateStripeSubscriptions` with `keepSubscriptionId` + `stripeCustomerId`.
+- Enrollments respect `access_expires_at` (Thinkific import + membership renewals). Run Thinkific resync enrollments to revoke expired imports.
+- Checkout blocks repurchase when active membership/enrollment exists; embedded checkout uses `useEffect` to avoid double Stripe sessions.
 - Guest checkout before embedded membership pay: `membership.guestCheckoutRegister` then `/checkout/:planSlug?type=membership`.
+
+### Stripe LMS course checkout (learn.allaboutultrasound.com)
+
+- Webhook handler delegates guest + logged-in LMS purchases to `server/lib/lmsCheckoutFulfillment.ts` on `checkout.session.completed` when metadata has `course_id` / `hosted_checkout_*` or Stripe price matches `lms_courses` / `lms_pricing_options`.
+- Guest buyers: no `user_id` / `order_id` in metadata — fulfillment resolves email from `customer_details`, creates account, order, enrollment, and sends enrollment email.
+- Checkout complete fallback: `lms.getCheckoutSessionStatus` calls `reconcileLmsCheckoutFromStripeSession` for any completed session (not only logged-in users).
+- Admin manual reconcile (production): `lmsEnrollmentAdmin.reconcileStripeLmsCheckout` with `stripeSubscriptionId` or `stripeCheckoutSessionId` + customer email when needed.
+- **Manual enroll then link Stripe**: after `lmsEnrollmentAdmin.addEnrollment`, call `lmsEnrollmentAdmin.linkStripeSubscription` with `userId` + `courseId` (or `enrollmentId`) and `stripeSubscriptionId`. Sets `lms_orders.stripe_subscription_id` and `lms_enrollments.stripe_subscription_id` / `access_expires_at` / `source='stripe'`. CLI: `node scripts/link-lms-stripe-subscription.mjs --user-id … --course-id … --subscription sub_…`.
+- `invoice.paid` and `customer.subscription.updated` extend `lms_enrollments.access_expires_at` when `stripe_subscription_id` is set.
+- Membership handler also matches checkout by Stripe price ID — if a price is on both `membership_plans` and LMS, verify product routing in Stripe metadata.
+
+### Digital download access (FetchApp-style)
+
+- Admin: **LMS Admin → Downloads → Download Access** tab — dashboard charts, orders list, order detail with per-file downloaded/remaining and IP activity log.
+- DB: `digital_purchases` (`status`, `max_downloads_per_file`, `access_expires_at`, `amount`), `digital_download_events` (`purchase_id`, `ip_address`), `digital_purchase_activity` (order timeline).
+- Migration: `drizzle/0012_digital_download_access.sql` before using limits/activity in production.
+- API: `downloadsAdmin.getAccessDashboard`, `listOrders`, `getOrderDetail`, `updateOrderAccess`, `expireOrder`, `reopenOrder`, `resendOrderEmail`.
+- Learner downloads enforced via `downloadsLearner.trackDownload` (must succeed before file opens).
 
 ### Key file locations
 

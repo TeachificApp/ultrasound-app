@@ -42,6 +42,21 @@ export default function DownloadFiles() {
   }, [isSuccess]);
   const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
   const trackDownload = trpc.downloadsLearner.trackDownload.useMutation();
+  const utils = trpc.useUtils();
+
+  const handleDownload = async (file: { id: number; fileName: string; fileUrl: string; downloadStats?: { canDownload: boolean; downloaded: number; remaining: number | null } }) => {
+    if (file.downloadStats && !file.downloadStats.canDownload) {
+      toast.error("Download limit reached or access expired.");
+      return;
+    }
+    try {
+      await trackDownload.mutateAsync({ productId: product!.id, fileId: file.id });
+      await utils.downloadsLearner.getDownloadFiles.invalidate({ productId: product!.id });
+      window.open(file.fileUrl, "_blank", "noopener,noreferrer");
+    } catch (e: any) {
+      toast.error(e.message ?? "Download not allowed");
+    }
+  };
 
   if (authLoading || productLoading) {
     return (
@@ -155,23 +170,36 @@ export default function DownloadFiles() {
           </Card>
         ) : (
           <div className="space-y-3">
+            {downloadData?.purchase?.accessExpiresAt && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Access expires {new Date(downloadData.purchase.accessExpiresAt).toLocaleString()}
+              </p>
+            )}
             <p className="text-sm text-gray-500 mb-4">{files.length} file{files.length !== 1 ? "s" : ""} available for download</p>
             {files.map((file: any) => (
               <div key={file.id} className="space-y-0">
-              <Card className="hover:border-teal-400 transition-colors">
+              <Card className={`hover:border-teal-400 transition-colors ${file.downloadStats && !file.downloadStats.canDownload ? "opacity-60" : ""}`}>
                 <CardContent className="p-4 flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
                     <FileDown className="w-5 h-5 text-teal-600" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{file.fileName}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {file.fileSize > 0 && (
                         <span className="text-xs text-gray-400">
                           {file.fileSize < 1024 * 1024 ? `${(file.fileSize / 1024).toFixed(0)} KB` : `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`}
                         </span>
                       )}
                       {file.mimeType && <Badge variant="outline" className="text-xs">{file.mimeType.split("/")[1]?.toUpperCase()}</Badge>}
+                      {file.downloadStats && (
+                        <>
+                          <Badge className="text-xs bg-blue-600">Downloaded: {file.downloadStats.downloaded}</Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            Remaining: {file.downloadStats.remaining === null ? "∞" : file.downloadStats.remaining}
+                          </Badge>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -181,12 +209,15 @@ export default function DownloadFiles() {
                         {pdfViewerUrl === file.fileUrl ? "Close" : "View"}
                       </Button>
                     )}
-                    <a href={file.fileUrl} target="_blank" rel="noopener noreferrer" download={file.fileName}
-                      onClick={() => trackDownload.mutate({ productId: product!.id, fileId: file.id })}>
-                      <Button size="sm" variant="outline" className="gap-1">
-                        <Download className="w-4 h-4" /> Download
-                      </Button>
-                    </a>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      disabled={file.downloadStats && !file.downloadStats.canDownload}
+                      onClick={() => handleDownload(file)}
+                    >
+                      <Download className="w-4 h-4" /> Download
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

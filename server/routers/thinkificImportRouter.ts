@@ -1355,7 +1355,12 @@ export const thinkificImportRouter = router({
               const accessExpiresAt = e.expiry_date ? new Date(e.expiry_date) : null;
               if (existing) {
                 await db.update(lmsEnrollments)
-                  .set({ progressPct, completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null, accessExpiresAt, source: "thinkific" })
+                  .set({
+                    progressPct,
+                    completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null,
+                    accessExpiresAt,
+                    source: "thinkific",
+                  })
                   .where(eq(lmsEnrollments.id, existing.id));
               } else {
                 await db.insert(lmsEnrollments).values({

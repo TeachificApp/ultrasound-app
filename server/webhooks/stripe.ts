@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -121,10 +121,22 @@ async function handleCheckoutSessionCompleted(session: Record<string, unknown>) 
 
 async function handleMembershipCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata as Record<string, string>) ?? {};
-  if (meta.type !== "membership") return;
-
   const db = await getDb();
   if (!db) return;
+
+  let isMembership = meta.type === "membership";
+  if (!isMembership) {
+    try {
+      const { extractStripePriceId } = await import("../lib/lmsCheckoutFulfillment");
+      const { resolveMembershipPlanId } = await import("../lib/membershipFulfillment");
+      const priceId = extractStripePriceId(session);
+      if (priceId) {
+        const planId = await resolveMembershipPlanId(db as any, { stripePriceId: priceId });
+        if (planId) isMembership = true;
+      }
+    } catch { /* ignore */ }
+  }
+  if (!isMembership) return;
 
   try {
     const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
@@ -337,12 +349,45 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     return;
   }
 
+  const amountTotal = (session.amount_total as number) ?? 0;
+  const paymentIntentId = (session.payment_intent as string) ?? null;
+
+  const [productRow] = await db.select({
+    maxDownloadsPerFile: digitalProducts.maxDownloadsPerFile,
+    defaultAccessDays: digitalProducts.defaultAccessDays,
+    title: digitalProducts.title,
+  }).from(digitalProducts).where(eq(digitalProducts.id, productId)).limit(1);
+
+  const { computeAccessExpiresAt, logPurchaseActivity } = await import("../lib/downloadAccess");
+  const accessExpiresAt = computeAccessExpiresAt(productRow?.defaultAccessDays ?? null);
+
   const [newPurchase] = await db.insert(digitalPurchases).values({
     userId,
     productId,
     stripeCheckoutSessionId: session.id as string,
+    stripePaymentIntentId: paymentIntentId,
+    amount: amountTotal,
+    currency: (session.currency as string) ?? "usd",
+    status: "open",
+    maxDownloadsPerFile: productRow?.maxDownloadsPerFile ?? 3,
+    accessExpiresAt,
   });
   const newPurchaseId = (newPurchase as any)?.insertId ?? null;
+
+  if (newPurchaseId) {
+    try {
+      await logPurchaseActivity(db, {
+        purchaseId: newPurchaseId,
+        eventType: "order_received",
+        message: `Order received for ${productRow?.title ?? `product #${productId}`}`,
+      });
+      await logPurchaseActivity(db, {
+        purchaseId: newPurchaseId,
+        eventType: "payment_received",
+        message: `Payment received ($${(amountTotal / 100).toFixed(2)})`,
+      });
+    } catch { /* non-blocking if migration not applied */ }
+  }
 
   // Track affiliate conversion for digital download
   const downloadAffiliateCode = meta.affiliate_code ?? null;
@@ -382,6 +427,15 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
   } catch (_e) { /* non-blocking */ }
   // Send purchase confirmation email with file links
   await sendPurchaseConfirmationEmail(userId, productId);
+  if (newPurchaseId) {
+    try {
+      await logPurchaseActivity(db, {
+        purchaseId: newPurchaseId,
+        eventType: "email_sent",
+        message: "Download email sent",
+      });
+    } catch { /* non-blocking */ }
+  }
   await fulfillOrderBumpPurchase(db, meta, {
     userId,
     sessionId: session.id as string,
@@ -1524,6 +1578,40 @@ async function handleInvoicePaid(invoice: Record<string, unknown>) {
         .set({ accessExpiresAt: expiresAt })
         .where(eq(lmsEnrollments.id, enr.id));
       console.log(`[Stripe] invoice.paid — LMS enrollment ${enr.id} expiry extended to ${expiresAt.toISOString()}`);
+    }
+  }
+}
+
+/**
+ * LMS course subscription lifecycle — sync access_expires_at with Stripe period end.
+ */
+async function handleLmsSubscriptionLifecycle(subscription: Record<string, unknown>, eventType: string) {
+  const subscriptionId = subscription.id as string;
+  if (!subscriptionId) return;
+  const db = await getDb();
+  if (!db) return;
+
+  const [enrollment] = await db.select({ id: lmsEnrollments.id })
+    .from(lmsEnrollments)
+    .where(eq(lmsEnrollments.stripeSubscriptionId, subscriptionId))
+    .limit(1);
+  if (!enrollment) return;
+
+  const status = subscription.status as string;
+  const periodEnd = subscription.current_period_end as number | undefined;
+  const accessExpiresAt = periodEnd ? new Date(periodEnd * 1000) : null;
+
+  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
+    await db.update(lmsEnrollments)
+      .set({ accessExpiresAt: accessExpiresAt ?? new Date() })
+      .where(eq(lmsEnrollments.id, enrollment.id));
+    console.log(`[Stripe] LMS enrollment ${enrollment.id} access ended (sub ${subscriptionId}, status ${status})`);
+  } else if (status === "active" || status === "trialing") {
+    if (accessExpiresAt) {
+      await db.update(lmsEnrollments)
+        .set({ accessExpiresAt })
+        .where(eq(lmsEnrollments.id, enrollment.id));
+      console.log(`[Stripe] LMS enrollment ${enrollment.id} period end synced to ${accessExpiresAt.toISOString()}`);
     }
   }
 }
