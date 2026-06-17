@@ -10,10 +10,41 @@ import React, { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
-import { GraduationCap, ExternalLink, Star, BookOpen, Clock, Info } from "lucide-react";
+import { GraduationCap, ExternalLink, Star, BookOpen, Clock, Info, Play } from "lucide-react";
 import { parseCreditHoursFromName } from "@/lib/cmeUtils";
+import { LEARN_APP_URL } from "@/hooks/useSubdomain";
 
 const BRAND = "#189aa1";
+
+/** Build the native course player URL */
+function buildNativeCoursePlayerUrl(nativeLmsCourseId: number): string {
+  return `${LEARN_APP_URL}/learn/course/${nativeLmsCourseId}`;
+}
+
+/** Build the native course landing page URL */
+function buildNativeCourseLandingUrl(slug: string): string {
+  return `${LEARN_APP_URL}/courses/${slug}`;
+}
+
+/** Build the best available URL — native first, Thinkific fallback */
+function buildBestCourseUrl(
+  nativeLmsCourseId: number | null | undefined,
+  slug: string | undefined,
+  thinkificFallback: string,
+  email?: string | null
+): string {
+  if (nativeLmsCourseId) return buildNativeCoursePlayerUrl(nativeLmsCourseId);
+  if (slug) {
+    const url = buildNativeCourseLandingUrl(slug);
+    if (email) return `${url}?prefill_email=${encodeURIComponent(email)}`;
+    return url;
+  }
+  if (email) {
+    const sep = thinkificFallback.includes("?") ? "&" : "?";
+    return `${thinkificFallback}${sep}prefill_email=${encodeURIComponent(email)}`;
+  }
+  return thinkificFallback;
+}
 
 // ─── Static Fallback Data ─────────────────────────────────────────────────────
 // Used when the Thinkific API is unavailable. Keep in sync with live data.
@@ -35,6 +66,10 @@ interface CmeCourse {
   isFree?: boolean;
   /** Thinkific course ID — used to match enrollment records */
   thinkificCourseId?: number | null;
+  /** Native LMS course ID — if set, link to native player instead of Thinkific */
+  nativeLmsCourseId?: number | null;
+  /** Native course slug — if set, link to native landing page */
+  slug?: string;
 }
 
 const STATIC_CME_COURSES: CmeCourse[] = [
@@ -192,12 +227,14 @@ function mapLiveCourse(c: {
   thinkificProductId: number;
   thinkificCourseId?: number | null;
   name: string;
+  slug: string;
   description: string | null;
   price: string;
   cardImageUrl: string | null;
   enrollUrl: string;
   courseUrl: string;
   hasCertificate: boolean;
+  nativeLmsCourseId?: number | null;
 }): CmeCourse {
   const credit = parseCreditHoursFromName(c.name);
   const isFree = parseFloat(c.price) === 0;
@@ -230,6 +267,8 @@ function mapLiveCourse(c: {
     isBundle,
     isFree,
     thinkificCourseId: c.thinkificCourseId,
+    nativeLmsCourseId: c.nativeLmsCourseId ?? null,
+    slug: c.slug,
   };
 }
 
@@ -278,12 +317,12 @@ export default function CmeHub() {
             </h1>
             <p className="text-[#4ad9e0] font-semibold text-base mb-3">All About Ultrasound™ — E-Learning & CME</p>
             <p className="text-white/70 text-sm leading-relaxed max-w-lg">
-              Browse accredited continuing medical education courses from All About Ultrasound. Click "Learn More" to view course details or "Enroll" to go directly to checkout — your email is pre-filled.
+              Browse accredited continuing medical education courses from All About Ultrasound. Click "Details" to view course information or "Start" to go directly to the course.
             </p>
             {user && (
               <div className="mt-3 inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                <span className="text-xs text-white/80">Signed in as <span className="text-white font-medium">{user.email}</span> — checkout links are pre-filled</span>
+                <span className="text-xs text-white/80">Signed in as <span className="text-white font-medium">{user.email}</span></span>
               </div>
             )}
           </div>
@@ -343,23 +382,25 @@ export default function CmeHub() {
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-2xl font-black text-white">{featured.price}</span>
                     <a
-                      href={featured.courseUrl}
+                      href={buildBestCourseUrl(featured.nativeLmsCourseId, featured.slug, featured.courseUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border border-white/30 text-white hover:bg-white/10 transition-all"
                     >
-                      Learn More <Info className="w-3.5 h-3.5" />
+                      {(featured.nativeLmsCourseId || featured.slug) ? <>Details <Info className="w-3.5 h-3.5" /></> : <>Learn More <Info className="w-3.5 h-3.5" /></>}
                     </a>
                     <a
-                      href={buildCheckoutUrl(featured.enrollUrl, user?.email)}
+                      href={buildBestCourseUrl(featured.nativeLmsCourseId, featured.slug, featured.enrollUrl, user?.email)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
                       style={{ background: featured.thinkificCourseId && enrolledSet.has(featured.thinkificCourseId) ? "#059669" : BRAND }}
                     >
                       {featured.thinkificCourseId && enrolledSet.has(featured.thinkificCourseId)
-                        ? "Continue Learning"
-                        : <>Enroll Now <ExternalLink className="w-3.5 h-3.5" /></>}
+                        ? <><Play className="w-3.5 h-3.5" /> Continue</>
+                        : (featured.nativeLmsCourseId || featured.slug)
+                          ? <><Play className="w-3.5 h-3.5" /> Start</>
+                          : <>Enroll Now <ExternalLink className="w-3.5 h-3.5" /></>}
                     </a>
                   </div>
                 </div>
@@ -422,30 +463,45 @@ export default function CmeHub() {
                         </span>
                       </div>
                       <div className="flex gap-2">
-                        {/* Learn More */}
+                        {/* Details / Learn More */}
                         <a
-                          href={course.courseUrl}
+                          href={course.nativeLmsCourseId
+                            ? buildNativeCoursePlayerUrl(course.nativeLmsCourseId)
+                            : course.slug
+                              ? buildNativeCourseLandingUrl(course.slug)
+                              : course.courseUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold py-1.5 px-2 rounded-lg border transition-all hover:bg-[#f0fbfc]"
                           style={{ borderColor: BRAND, color: BRAND }}
                           onClick={e => e.stopPropagation()}
                         >
-                          Learn More <Info className="w-3 h-3" />
+                          {(course.nativeLmsCourseId || course.slug) ? <>Details <Info className="w-3 h-3" /></> : <>Learn More <Info className="w-3 h-3" /></>}
                         </a>
                         {/* Enroll / Continue Learning */}
-                        <a
-                          href={buildCheckoutUrl(course.enrollUrl, user?.email)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold py-1.5 px-2 rounded-lg text-white transition-all hover:opacity-90"
-                          style={{ background: course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId) ? "#059669" : BRAND }}
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId)
-                            ? "Continue Learning"
-                            : <>Enroll <ExternalLink className="w-3 h-3" /></>}
-                        </a>
+                        {(() => {
+                          const isEnrolled = !!(course.thinkificCourseId && enrolledSet.has(course.thinkificCourseId));
+                          const actionUrl = isEnrolled
+                            ? buildBestCourseUrl(course.nativeLmsCourseId, course.slug, course.courseUrl)
+                            : buildBestCourseUrl(course.nativeLmsCourseId, course.slug, course.enrollUrl, user?.email);
+                          const isNative = !!(course.nativeLmsCourseId || course.slug);
+                          return (
+                            <a
+                              href={actionUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold py-1.5 px-2 rounded-lg text-white transition-all hover:opacity-90"
+                              style={{ background: isEnrolled ? "#059669" : BRAND }}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              {isEnrolled
+                                ? <><Play className="w-3 h-3" /> Continue</>
+                                : isNative
+                                  ? <><Play className="w-3 h-3" /> Start</>
+                                  : <>Enroll <ExternalLink className="w-3 h-3" /></>}
+                            </a>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -467,17 +523,17 @@ export default function CmeHub() {
         <div className="mt-10 p-4 rounded-xl bg-[#f0fbfc] border border-[#189aa1]/20 flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <Clock className="w-4 h-4 text-[#189aa1] flex-shrink-0 mt-0.5 sm:mt-0" />
           <p className="text-xs text-gray-600 leading-relaxed">
-            All courses are from <strong>All About Ultrasound™</strong>. "Learn More" opens the course details page; "Enroll" opens the checkout page
-            {user?.email ? ` with your email (${user.email}) pre-filled` : " — log in to iHeartEcho™ to have your email pre-filled automatically"}.
+            All courses are from <strong>All About Ultrasound™</strong>. "Details" opens the course page; "Start" or "Enroll" takes you directly to the course
+            {user?.email ? ` — signed in as ${user.email}` : " — log in to iHeartEcho™ to track your progress"}.
             SDMS CME credits are awarded upon course completion and post-test.
           </p>
           <a
-            href="https://member.allaboutultrasound.com/collections/cme"
+            href={`${LEARN_APP_URL}/education-library`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-[#189aa1] hover:underline"
           >
-            View all on site <ExternalLink className="w-3 h-3" />
+            Education Library <ExternalLink className="w-3 h-3" />
           </a>
         </div>
       </div>

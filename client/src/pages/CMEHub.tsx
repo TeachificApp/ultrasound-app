@@ -1,13 +1,13 @@
 /**
  * CME Hub — All About Ultrasound™
- * Displays accredited CME/CE courses from the Thinkific catalog.
+ * Displays accredited CME/CE courses from the native catalog.
  * Uses cmeCatalog.getCatalog (E-Learning & CME collection).
  * Brand: Teal #189aa1, Aqua #4ad9e0
  *
- * Routing:
- *  - If course has a nativeLmsCourseId → enrolled users go to learn.allaboutultrasound.com/learn/course/:id
- *  - If course has a slug → course landing page is learn.allaboutultrasound.com/courses/:slug
- *  - Unenrolled users → learn.allaboutultrasound.com/courses/:slug (or Thinkific enroll fallback)
+ * Routing (priority order):
+ *  1. nativeLmsCourseId → native course player on learn.allaboutultrasound.com
+ *  2. slug → native course landing page on learn.allaboutultrasound.com
+ *  3. Thinkific fallback only when neither native option exists
  */
 import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -42,23 +42,35 @@ function buildCoursePlayerUrl(nativeLmsCourseId: number): string {
   return `${LEARN_APP_URL}/learn/course/${nativeLmsCourseId}`;
 }
 
-/** Build the course landing page URL on learn.allaboutultrasound.com */
+/** Build the native course landing page URL on learn.allaboutultrasound.com */
 function buildCourseLandingUrl(slug: string): string {
   return `${LEARN_APP_URL}/courses/${slug}`;
 }
 
-/** Build enroll URL — prefer native landing page, fall back to Thinkific checkout */
-function buildEnrollUrl(slug: string | undefined, thinkificEnrollUrl: string, email?: string | null): string {
+/**
+ * Build the best available URL for a course action.
+ * Priority: native player > native landing page > Thinkific fallback.
+ */
+function buildBestUrl(
+  nativeLmsCourseId: number | null,
+  slug: string | undefined,
+  thinkificFallback: string,
+  email?: string | null
+): string {
+  if (nativeLmsCourseId) {
+    return buildCoursePlayerUrl(nativeLmsCourseId);
+  }
   if (slug) {
     const url = buildCourseLandingUrl(slug);
     if (email) return `${url}?prefill_email=${encodeURIComponent(email)}`;
     return url;
   }
+  // Only reach Thinkific if no native option exists
   if (email) {
-    const sep = thinkificEnrollUrl.includes("?") ? "&" : "?";
-    return `${thinkificEnrollUrl}${sep}prefill_email=${encodeURIComponent(email)}`;
+    const sep = thinkificFallback.includes("?") ? "&" : "?";
+    return `${thinkificFallback}${sep}prefill_email=${encodeURIComponent(email)}`;
   }
-  return thinkificEnrollUrl;
+  return thinkificFallback;
 }
 
 export default function CMEHub() {
@@ -153,13 +165,25 @@ export default function CMEHub() {
               const isEnrolled = enrolledCourseIds.includes(course.thinkificProductId);
               const hasNative = !!course.nativeLmsCourseId;
               const hasSlug = !!course.slug;
+              const isNativeOrSlug = hasNative || hasSlug;
 
-              // Determine the primary action URL
+              // Best URL for card image / title click
+              const detailUrl = buildBestUrl(course.nativeLmsCourseId, course.slug, course.courseUrl);
+
+              // Best URL for the primary CTA (enroll/start)
+              const actionUrl = buildBestUrl(
+                course.nativeLmsCourseId,
+                course.slug,
+                course.enrollUrl,
+                user?.email
+              );
+
+              // For enrolled users: go directly to the course player if native, else landing page
               const continueUrl = hasNative
                 ? buildCoursePlayerUrl(course.nativeLmsCourseId!)
-                : course.courseUrl; // Thinkific fallback for enrolled
-
-              const enrollUrl = buildEnrollUrl(course.slug, course.enrollUrl, user?.email);
+                : hasSlug
+                  ? buildCourseLandingUrl(course.slug)
+                  : course.courseUrl;
 
               return (
                 <div
@@ -167,9 +191,9 @@ export default function CMEHub() {
                   className="rounded-xl border bg-white overflow-hidden flex flex-col hover:shadow-md transition-shadow"
                   style={{ borderColor: BRAND_BORDER }}
                 >
-                  {/* Card image — clicking goes to course landing page */}
+                  {/* Card image — clicking goes to native course page */}
                   <a
-                    href={hasSlug ? buildCourseLandingUrl(course.slug) : course.courseUrl}
+                    href={detailUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block"
@@ -205,7 +229,7 @@ export default function CMEHub() {
                     )}
 
                     <a
-                      href={hasSlug ? buildCourseLandingUrl(course.slug) : course.courseUrl}
+                      href={detailUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-semibold text-gray-900 text-sm leading-snug mb-1 flex-1 hover:underline"
@@ -221,7 +245,7 @@ export default function CMEHub() {
                           className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
                           style={{ background: BRAND_LIGHT, color: BRAND }}
                         >
-                          Available on this platform
+                          ✓ Available on this platform
                         </span>
                       </div>
                     )}
@@ -244,14 +268,15 @@ export default function CMEHub() {
                             className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
                             style={{ background: BRAND }}
                           >
-                            {hasNative ? <Play className="w-3 h-3" /> : <ExternalLink className="w-3 h-3" />}
+                            <Play className="w-3 h-3" />
                             Continue
                           </a>
                         ) : (
                           <>
-                            {hasSlug && (
+                            {/* Show Details button only when there's a separate detail page */}
+                            {isNativeOrSlug && (
                               <a
-                                href={buildCourseLandingUrl(course.slug)}
+                                href={detailUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border"
@@ -261,14 +286,14 @@ export default function CMEHub() {
                               </a>
                             )}
                             <a
-                              href={enrollUrl}
+                              href={actionUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
                               style={{ background: BRAND }}
                             >
-                              <ExternalLink className="w-3 h-3" />
-                              Enroll
+                              {isNativeOrSlug ? <Play className="w-3 h-3" /> : <ExternalLink className="w-3 h-3" />}
+                              {isNativeOrSlug ? "Start" : "Enroll"}
                             </a>
                           </>
                         )}
