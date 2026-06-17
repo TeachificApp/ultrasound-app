@@ -1054,7 +1054,6 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const visibleGroupsCICA = groupSelectionModeCICA === "manual" && selectedGroupIdsCICA.length > 0
         ? allGroupsCICA.filter((g: any) => selectedGroupIdsCICA.includes(g.id))
         : allGroupsCICA;
-      if (visibleGroupsCICA.length === 0) return null;
       const enrollNowTextCICA = d.enrollNowText ?? "Enroll Now";
       const showEnrollNowCICA = d.showEnrollNow !== false;
       const fmtGroupDateCICA = (dt: Date | string | null | undefined) => {
@@ -1072,28 +1071,60 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: s.color }}>{s.label}</span>;
       };
       if (cardDisplayMode === "embed") {
-        // ── Embed mode: render each group's full detail inline ──
+        // ── Embed mode: render a single group/instance inline ──
+        const embedSelectionMode = d.embedSelectionMode ?? "auto";
+        const embedSelectedId: number | null = d.embedSelectedId ?? null;
+        const embedSelectedKind: string | null = d.embedSelectedKind ?? null;
+        // Determine which group/instance to embed
+        let embedGroupId: number | null = null;
+        let embedInstanceId: number | null = null;
+        let embedKind: "cohort_group" | "workshop_instance" = "cohort_group";
+        if (embedSelectionMode === "manual" && embedSelectedId && embedSelectedKind) {
+          if (embedSelectedKind === "cohort_group") {
+            embedGroupId = embedSelectedId;
+            embedKind = "cohort_group";
+          } else if (embedSelectedKind === "workshop_instance") {
+            embedInstanceId = embedSelectedId;
+            embedKind = "workshop_instance";
+          }
+        } else {
+          // Auto: pick the cohort group with the nearest upcoming startDate
+          const now = Date.now();
+          const upcoming = allGroupsCICA
+            .filter((g: any) => g.startDate && new Date(g.startDate).getTime() > now)
+            .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+          const target = upcoming[0] ?? allGroupsCICA[0];
+          if (target) { embedGroupId = target.id; embedKind = "cohort_group"; }
+        }
+        if (!embedGroupId && !embedInstanceId) return null;
         return (
           <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
             <CC>
               {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
-              <div className="space-y-10">
-                {visibleGroupsCICA.map((g: any) => (
-                  <CohortGroupEmbedSection
-                    key={g.id}
-                    groupId={g.id}
-                    accentColor={accentColorCICA}
-                    onEnroll={() => onCheckoutPage?.()}
-                    enrollNowText={enrollNowTextCICA}
-                    showEnrollNow={showEnrollNowCICA}
-                  />
-                ))}
-              </div>
+              {embedKind === "cohort_group" && embedGroupId && (
+                <CohortGroupEmbedSection
+                  groupId={embedGroupId}
+                  accentColor={accentColorCICA}
+                  onEnroll={() => onCheckoutPage?.()}
+                  enrollNowText={enrollNowTextCICA}
+                  showEnrollNow={showEnrollNowCICA}
+                />
+              )}
+              {embedKind === "workshop_instance" && embedInstanceId && (
+                <WorkshopInstanceEmbedSection
+                  instanceId={embedInstanceId}
+                  accentColor={accentColorCICA}
+                  onEnroll={() => onCheckoutPage?.()}
+                  enrollNowText={enrollNowTextCICA}
+                  showEnrollNow={showEnrollNowCICA}
+                />
+              )}
             </CC>
           </div>
         );
       }
       // ── Stacked cards mode (default) ──
+      if (visibleGroupsCICA.length === 0) return null;
       return (
         <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <CC>
@@ -2559,6 +2590,94 @@ function CohortGroupEmbedSection({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── WorkshopInstanceEmbedSection ─────────────────────────────────────────────
+function WorkshopInstanceEmbedSection({
+  instanceId,
+  accentColor,
+  onEnroll,
+  enrollNowText,
+  showEnrollNow,
+}: {
+  instanceId: number;
+  accentColor: string;
+  onEnroll: () => void;
+  enrollNowText: string;
+  showEnrollNow: boolean;
+}) {
+  const { data, isLoading, error } = trpc.workshop.getInstancePage.useQuery({ instanceId });
+  const fmtDate = (d: Date | string | null | undefined) => {
+    if (!d) return null;
+    try {
+      return new Date(d).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    } catch { return String(d); }
+  };
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border p-8 space-y-4" style={{ borderColor: `${accentColor}33` }}>
+        <div className="h-8 w-2/3 bg-gray-200 rounded animate-pulse" />
+        <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+        <div className="h-4 w-5/6 bg-gray-100 rounded animate-pulse" />
+      </div>
+    );
+  }
+  if (error || !data) {
+    return (
+      <div className="rounded-2xl border p-8 text-center text-gray-500" style={{ borderColor: `${accentColor}33` }}>
+        <p>Could not load workshop instance details.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}22` }}>
+      <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColor}08`, borderColor: `${accentColor}22` }}>
+        <h3 className="text-lg font-bold text-gray-900">{data.title}</h3>
+        {showEnrollNow && (
+          <Button size="sm" className="text-white flex-shrink-0" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
+            {enrollNowText}
+          </Button>
+        )}
+      </div>
+      <div className="p-6 space-y-4">
+        {(data.startDate || data.endDate) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {data.startDate && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                <div>
+                  <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">Start Date</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.startDate)}</p>
+                </div>
+              </div>
+            )}
+            {data.endDate && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                <div>
+                  <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">End Date</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.endDate)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {data.description && <p className="text-gray-600 text-sm">{data.description}</p>}
+        {(data.landingBlocks as any[])?.length > 0 && (
+          <div>
+            {(data.landingBlocks as any[]).map((block: any) => (
+              <BlockPreview key={block.id} block={block} />
+            ))}
+          </div>
+        )}
+        {showEnrollNow && (
+          <div className="text-center pt-2">
+            <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
+              {enrollNowText}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

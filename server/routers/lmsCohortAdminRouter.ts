@@ -1847,4 +1847,26 @@ export const lmsCohortAdminRouter = router({
         .where(eq(lmsCohortGroups.id, input.cohortGroupId));
       return { success: true };
     }),
+  /** List all cohort groups across all courses (for embed block selection in LandingPageBuilder) */
+  listAllCohortGroups: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const groups = await db
+        .select({
+          id: lmsCohortGroups.id,
+          name: lmsCohortGroups.name,
+          courseId: lmsCohortGroups.courseId,
+          startDate: lmsCohortGroups.startDate,
+          endDate: lmsCohortGroups.endDate,
+          status: lmsCohortGroups.status,
+          courseTitle: lmsCourses.title,
+        })
+        .from(lmsCohortGroups)
+        .innerJoin(lmsCourses, eq(lmsCohortGroups.courseId, lmsCourses.id))
+        .where(sql`${lmsCohortGroups.status} NOT IN ('archived', 'draft')`)
+        .orderBy(asc(lmsCohortGroups.startDate));
+      return groups;
+    }),
 });

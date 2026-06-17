@@ -2957,6 +2957,31 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     const workshops = ((cssWorkshopsData as any)?.workshops ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `Workshop #${w.id}`, kind: "workshop" as const }));
     return [...cohorts, ...workshops];
   }, [cssCohortsData, cssWorkshopsData]);
+  // cohort_instance_cards_auto embed mode: pick a specific cohort group or workshop instance
+  const [embedSearch, setEmbedSearch] = useState("");
+  const isEmbedMode = block.type === "cohort_instance_cards_auto" && (d.cardDisplayMode ?? "stacked") === "embed";
+  const { data: embedAllGroupsData } = trpc.lmsAdmin.listAllCohortGroups.useQuery(
+    undefined,
+    { enabled: isEmbedMode, staleTime: 30_000 }
+  );
+  const { data: embedWorkshopsData } = trpc.workshopAdmin.list.useQuery(
+    { limit: 200, offset: 0 },
+    { enabled: isEmbedMode, staleTime: 30_000 }
+  );
+  const embedAllItems: Array<{ id: number; label: string; kind: "cohort_group" | "workshop_instance" }> = React.useMemo(() => {
+    const groups = ((embedAllGroupsData as any) ?? []).map((g: any) => ({
+      id: g.id,
+      label: `${g.courseTitle ?? "Course"} — ${g.name ?? `Group #${g.id}`}`,
+      kind: "cohort_group" as const,
+    }));
+    const instances: Array<{ id: number; label: string; kind: "workshop_instance" }> = [];
+    for (const w of ((embedWorkshopsData as any)?.workshops ?? [])) {
+      for (const inst of (w.instances ?? [])) {
+        instances.push({ id: inst.id, label: `${w.title} — ${inst.title ?? `Instance #${inst.id}`}`, kind: "workshop_instance" as const });
+      }
+    }
+    return [...groups, ...instances];
+  }, [embedAllGroupsData, embedWorkshopsData]);
   // remaining_seats: dynamic search for workshop instances and cohort groups
   const [rsSearch, setRsSearch] = useState("");
   const [rsSourceType, setRsSourceType] = useState<"workshop_instance" | "cohort_group">(d.sourceType ?? "workshop_instance");
@@ -4762,6 +4787,73 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               </p>
             )}
           </div>
+          {(d.cardDisplayMode ?? "stacked") === "embed" && (
+            <div className="border-t pt-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Embed Selection</p>
+              <div className="flex gap-1">
+                {(["auto", "manual"] as const).map(m => (
+                  <button key={m} onClick={() => set("embedSelectionMode", m)}
+                    className={`flex-1 py-1.5 text-xs rounded border capitalize ${
+                      (d.embedSelectionMode ?? "auto") === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"
+                    }`}>
+                    {m === "auto" ? "Next Upcoming (Auto)" : "Manual Selection"}
+                  </button>
+                ))}
+              </div>
+              {(d.embedSelectionMode ?? "auto") === "auto" && (
+                <p className="text-[10px] text-gray-500 mt-1.5">
+                  Automatically shows the cohort group or workshop instance with the nearest upcoming start date.
+                </p>
+              )}
+              {(d.embedSelectionMode ?? "auto") === "manual" && (() => {
+                const selId: number | null = d.embedSelectedId ?? null;
+                const selKind: string | null = d.embedSelectedKind ?? null;
+                const selItem = embedAllItems.find(i => i.id === selId && i.kind === selKind);
+                const filtered = embedAllItems.filter(item =>
+                  !embedSearch || item.label.toLowerCase().includes(embedSearch.toLowerCase())
+                );
+                return (
+                  <div className="mt-2 space-y-1.5">
+                    {selItem && (
+                      <div className="flex items-center gap-1 bg-teal-50 border border-teal-200 rounded px-2 py-1">
+                        <span className="text-[10px] text-teal-700 flex-1 truncate">{selItem.label}</span>
+                        <button onClick={() => { set("embedSelectedId", null); set("embedSelectedKind", null); }} className="text-teal-400 hover:text-red-500 text-xs">×</button>
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      className="w-full h-7 text-xs border rounded px-2"
+                      placeholder="Search cohort groups & workshop instances…"
+                      value={embedSearch}
+                      onChange={e => setEmbedSearch(e.target.value)}
+                    />
+                    {embedAllItems.length === 0 && <p className="text-[10px] text-gray-400">Loading…</p>}
+                    {embedAllItems.length > 0 && filtered.length === 0 && <p className="text-[10px] text-gray-400">No matches found.</p>}
+                    {filtered.length > 0 && (
+                      <div className="max-h-40 overflow-y-auto border rounded divide-y">
+                        {filtered.map(item => {
+                          const isSelected = item.id === selId && item.kind === selKind;
+                          return (
+                            <button
+                              key={`${item.kind}-${item.id}`}
+                              onClick={() => { set("embedSelectedId", item.id); set("embedSelectedKind", item.kind); }}
+                              className={`w-full text-left px-2 py-1.5 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
+                            >
+                              <span className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 flex items-center justify-center text-[9px] ${isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"}`}>
+                                {isSelected ? "●" : ""}
+                              </span>
+                              <span className="flex-1 truncate">{item.label}</span>
+                              <span className="text-[9px] text-gray-400 flex-shrink-0">{item.kind === "cohort_group" ? "Cohort Group" : "Workshop Instance"}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Group Selection</p>
             <div className="flex gap-1">
