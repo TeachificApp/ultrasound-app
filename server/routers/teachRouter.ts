@@ -35,6 +35,38 @@ import {
 } from "../../shared/teachSlideMaster";
 import { parsePptxBuffer } from "../lib/pptxImport";
 
+// ── S3-backed slides storage ──────────────────────────────────────────────────
+// When slides JSON exceeds this threshold (10 MB), store it in S3 instead of
+// the MySQL slides_data column (TiDB max_allowed_packet = 64 MB).
+const SLIDES_S3_THRESHOLD = 10 * 1024 * 1024; // 10 MB
+
+async function persistSlidesJson(
+  json: string,
+  userId: number,
+  label: string,
+): Promise<{ slidesData: string | null; slidesDataUrl: string | null }> {
+  if (Buffer.byteLength(json, "utf8") <= SLIDES_S3_THRESHOLD) {
+    return { slidesData: json, slidesDataUrl: null };
+  }
+  const key = `teach-slides/${userId}/${label}-${randomBytes(8).toString("hex")}.json`;
+  const { url } = await storagePut(key, Buffer.from(json, "utf8"), "application/json");
+  return { slidesData: null, slidesDataUrl: url };
+}
+
+async function fetchSlidesJson(url: string): Promise<string> {
+  const https = await import("https");
+  const http = await import("http");
+  return new Promise<string>((resolve, reject) => {
+    const proto = url.startsWith("https") ? https.default : http.default;
+    proto.get(url as any, (res: any) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+      res.on("error", reject);
+    }).on("error", reject);
+  });
+}
+
 const slideSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -127,7 +159,16 @@ async function getMasterOrThrow(masterId: number) {
 }
 
 async function resolveSlidesForMaterial(material: typeof teachMaterials.$inferSelect) {
-  let slides = parseTeachSlides(material.slidesData);
+  // If slides JSON was offloaded to S3 (too large for DB), fetch it first
+  let rawSlidesData = material.slidesData;
+  if (!rawSlidesData && (material as any).slidesDataUrl) {
+    try {
+      rawSlidesData = await fetchSlidesJson((material as any).slidesDataUrl);
+    } catch (e) {
+      console.error("[resolveSlidesForMaterial] Failed to fetch slides from S3:", e);
+    }
+  }
+  let slides = parseTeachSlides(rawSlidesData);
   if (material.slideMasterId) {
     const db = await getDb();
     if (db) {
@@ -299,7 +340,15 @@ export const teachRouter = router({
       const updates: Record<string, unknown> = {};
       if (input.title !== undefined) updates.title = input.title;
       if (input.description !== undefined) updates.description = input.description;
-      if (input.slides !== undefined) updates.slidesData = JSON.stringify(input.slides);
+      if (input.slides !== undefined) {
+        const persisted = await persistSlidesJson(
+          JSON.stringify(input.slides),
+          ctx.user.id,
+          generateSlug(material.title),
+        );
+        updates.slidesData = persisted.slidesData;
+        updates.slidesDataUrl = persisted.slidesDataUrl;
+      }
       if (input.status !== undefined) updates.status = input.status;
       await db.update(teachMaterials).set(updates).where(eq(teachMaterials.id, input.materialId));
       return { ok: true };
@@ -362,13 +411,20 @@ export const teachRouter = router({
         input.mimeType.includes("presentation") || input.fileName.match(/\.(ppt|pptx)$/i);
 
       let slidesData: string | null = null;
+      let slidesDataUrl: string | null = null;
       let slideMasterId: number | null = null;
       const isPptx = input.fileName.match(/\.pptx$/i) || input.mimeType.includes("presentationml");
 
       if (isPptx) {
         try {
           const parsed = await parsePptxBuffer(buffer, await uploadPptxImage(ctx.user.id, folder));
-          slidesData = JSON.stringify(parsed.slides);
+          const persisted = await persistSlidesJson(
+            JSON.stringify(parsed.slides),
+            ctx.user.id,
+            generateSlug(input.title),
+          );
+          slidesData = persisted.slidesData;
+          slidesDataUrl = persisted.slidesDataUrl;
           if (parsed.masterSlides.length > 0) {
             const [masterResult] = await db.insert(teachSlideMasters).values({
               ownerUserId: ctx.user.id,
@@ -397,6 +453,7 @@ export const teachRouter = router({
         description: input.description ?? null,
         mediaAssetId: assetId,
         slidesData,
+        slidesDataUrl,
         slideMasterId,
         status: "draft",
       });
@@ -440,6 +497,7 @@ export const teachRouter = router({
       const isPresentation = input.mimeType.includes("presentation") || input.fileName.match(/\.(ppt|pptx)$/i);
 
       let slidesData: string | null = null;
+      let slidesDataUrl: string | null = null;
       let slideMasterId: number | null = null;
 
       if (isPptx) {
@@ -460,7 +518,14 @@ export const teachRouter = router({
           // This avoids per-image S3 uploads during parsing, which caused Cloud Run
           // 180s timeout failures on large PPTX files.
           const parsed = await parsePptxBuffer(buffer);
-          slidesData = JSON.stringify(parsed.slides);
+          // For large presentations, store slides JSON in S3 to avoid MySQL 64 MB limit
+          const persisted = await persistSlidesJson(
+            JSON.stringify(parsed.slides),
+            ctx.user.id,
+            generateSlug(input.title),
+          );
+          slidesData = persisted.slidesData;
+          slidesDataUrl = persisted.slidesDataUrl;
           if (parsed.masterSlides.length > 0) {
             const [masterResult] = await db.insert(teachSlideMasters).values({
               ownerUserId: ctx.user.id,
@@ -489,6 +554,7 @@ export const teachRouter = router({
         description: input.description ?? null,
         mediaAssetId: input.assetId,
         slidesData,
+        slidesDataUrl,
         slideMasterId,
         status: "draft",
       });
@@ -630,6 +696,7 @@ export const teachRouter = router({
         title: `${material.title} (Copy)`,
         description: material.description,
         slidesData: material.slidesData,
+        slidesDataUrl: (material as any).slidesDataUrl ?? null,
         mediaAssetId: null,
         status: "draft",
       });
@@ -711,6 +778,12 @@ export const teachRouter = router({
         uploadedByUserId: ctx.user.id,
       });
 
+      const importPersisted = await persistSlidesJson(
+        JSON.stringify(slides),
+        ctx.user.id,
+        slug,
+      );
+
       const [matResult] = await db.insert(teachMaterials).values({
         ownerUserId: ctx.user.id,
         ownerContext: input.ownerContext,
@@ -720,7 +793,8 @@ export const teachRouter = router({
         title: input.title,
         description: input.description ?? null,
         mediaAssetId: assetId,
-        slidesData: JSON.stringify(slides),
+        slidesData: importPersisted.slidesData,
+        slidesDataUrl: importPersisted.slidesDataUrl,
         slideMasterId,
         masterForced: false,
         status: "draft",
@@ -894,14 +968,20 @@ export const teachRouter = router({
       }
 
       const masterSlides = parseMasterSlides(master.masterSlidesData);
-      const slides = applyMasterToPresentation(parseTeachSlides(material.slidesData), masterSlides);
+      const slides = applyMasterToPresentation(await resolveSlidesForMaterial(material), masterSlides);
 
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const masterPersisted = await persistSlidesJson(
+        JSON.stringify(slides),
+        ctx.user.id,
+        generateSlug(material.title),
+      );
       await db
         .update(teachMaterials)
         .set({
-          slidesData: JSON.stringify(slides),
+          slidesData: masterPersisted.slidesData,
+          slidesDataUrl: masterPersisted.slidesDataUrl,
           slideMasterId: input.masterId,
           masterForced: input.forced,
         })
@@ -1087,15 +1167,21 @@ export const teachRouter = router({
       const material = await getMaterialOrThrow(input.materialId);
       const master = await getMasterOrThrow(input.masterId);
       const slides = applyMasterToPresentation(
-        parseTeachSlides(material.slidesData),
+        await resolveSlidesForMaterial(material),
         parseMasterSlides(master.masterSlidesData),
       );
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const adminPersisted = await persistSlidesJson(
+        JSON.stringify(slides),
+        material.ownerUserId,
+        generateSlug(material.title),
+      );
       await db
         .update(teachMaterials)
         .set({
-          slidesData: JSON.stringify(slides),
+          slidesData: adminPersisted.slidesData,
+          slidesDataUrl: adminPersisted.slidesDataUrl,
           slideMasterId: input.masterId,
           masterForced: true,
         })

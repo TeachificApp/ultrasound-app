@@ -2506,6 +2506,8 @@ export const teachMaterials = mysqlTable("teach_materials", {
   mediaAssetId: int("media_asset_id"),
   /** JSON slide array for presentation type: { id, title, content, imageUrl, notes }[] */
   slidesData: longtext("slides_data"),
+  /** S3 URL to slides JSON when the payload exceeds the DB column limit (>10 MB) */
+  slidesDataUrl: text("slides_data_url"),
   /** Applied slide master template */
   slideMasterId: int("slide_master_id"),
   /** When true, master layout is locked; content edits only */

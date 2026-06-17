@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
@@ -392,10 +393,17 @@ export default function TeachDashboard() {
               <Button className="bg-teal-600 hover:bg-teal-700 text-white" size="sm" onClick={() => setCreateOpen(true)}>
                 <Plus className="w-4 h-4 mr-1" /> New Presentation
               </Button>
-              <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
-                {uploadProgress ? `Uploading ${uploadProgress.current}/${uploadProgress.total}…` : "Upload File"}
-              </Button>
+              <div className="flex flex-col gap-1">
+                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
+                  {uploading ? "Uploading…" : "Upload File"}
+                </Button>
+                {uploadProgress && (
+                  <div className="w-36">
+                    <Progress value={Math.round((uploadProgress.current / uploadProgress.total) * 100)} className="h-1.5" />
+                  </div>
+                )}
+              </div>
               <Button variant="outline" size="sm" disabled={createMaster.isPending} onClick={() => createMaster.mutate({ name: "New Slide Master", isGlobal: false })}>
                 {createMaster.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <LayoutTemplate className="w-4 h-4 mr-1" />}
                 New Slide Master

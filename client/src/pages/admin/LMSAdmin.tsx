@@ -8253,8 +8253,16 @@ function CollectionFormDialog({
   // Load existing items for edit mode
   const { data: existingItems } = trpc.lmsEnrollmentAdmin.getCollectionItems.useQuery(
     { collectionId: initial?.id ?? 0 },
-    { enabled: !!initial?.id, onSuccess: (data) => { if (data && selectedItems.length === 0) setSelectedItems(data.map(i => ({ itemType: i.itemType, itemId: i.itemId }))); } }
+    { enabled: !!initial?.id }
   );
+  // Populate selectedItems once existing items are loaded (onSuccess is deprecated in React Query v5)
+  const [itemsInitialized, setItemsInitialized] = React.useRef(false);
+  useEffect(() => {
+    if (existingItems && !itemsInitialized.current) {
+      itemsInitialized.current = true;
+      setSelectedItems(existingItems.map(i => ({ itemType: i.itemType, itemId: i.itemId })));
+    }
+  }, [existingItems]);
 
   // Fetch all content types
   const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 500 });
