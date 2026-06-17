@@ -3415,8 +3415,8 @@ export type LmsCollectionCourse = typeof lmsCollectionCourses.$inferSelect;
 export const lmsCollectionItems = mysqlTable("lms_collection_items", {
   id: int("id").autoincrement().primaryKey(),
   collectionId: int("collection_id").notNull(),
-  /** Content type: course, quiz, webinar, download, bundle, membership, physical */
-  itemType: mysqlEnum("item_type", ["course", "quiz", "webinar", "download", "bundle", "membership", "physical"]).notNull(),
+  /** Content type: course, quiz, webinar, download, bundle, membership, physical, workshop */
+  itemType: mysqlEnum("item_type", ["course", "quiz", "webinar", "download", "bundle", "membership", "physical", "workshop"]).notNull(),
   itemId: int("item_id").notNull(),
   position: int("position").default(0).notNull(),
 });

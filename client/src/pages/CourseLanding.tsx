@@ -1210,16 +1210,27 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     }
     case "divider":
       return <div style={{ padding: `${d.spacing ?? 32}px 32px` }}><hr style={{ borderTop: `${d.thickness ?? 1}px ${d.style ?? "solid"} ${d.color ?? "#e5e7eb"}`, borderRadius: d.borderRadius ? `${d.borderRadius}px` : undefined }} /></div>;
-    case "two_column":
+    case "two_column": {
+      const renderTwoCol = (side: "left" | "right") => {
+        const colType = d[`${side}Type`] ?? "rich_text";
+        switch (colType) {
+          case "rich_text": return <div className="prose min-w-0" dangerouslySetInnerHTML={{ __html: d[`${side}Html`] ?? "" }} />;
+          case "cta": return <div className="flex items-center justify-center h-full"><a href={d[`${side}CtaLink`] || "#"} className="px-8 py-4 rounded-lg font-bold text-lg shadow-lg inline-block" style={{ backgroundColor: d[`${side}CtaColor`] ?? "#179ca3", color: d[`${side}CtaTextColor`] ?? "#fff" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>{d[`${side}CtaText`] ?? "Click Here"}</a></div>;
+          case "image": return d[`${side}ImageUrl`] ? <img src={d[`${side}ImageUrl`]} alt={d[`${side}ImageAlt`] ?? ""} className="w-full rounded-lg shadow" /> : null;
+          case "video": return d[`${side}VideoUrl`] ? <div className="relative w-full rounded-lg overflow-hidden shadow" style={{ paddingBottom: "56.25%" }}><iframe src={d[`${side}VideoUrl`]} className="absolute inset-0 w-full h-full" allowFullScreen /></div> : null;
+          default: return <div className="prose min-w-0" dangerouslySetInnerHTML={{ __html: d[`${side}Html`] ?? "" }} />;
+        }
+      };
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
-          <CC><div className="flex flex-col md:flex-row gap-8">
-            <div className="prose min-w-0" style={{ flex: d.leftRatio ?? 50 }} dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
-            <div className="prose min-w-0" style={{ flex: 100 - (d.leftRatio ?? 50) }} dangerouslySetInnerHTML={{ __html: d.rightHtml ?? "" }} />
+          <CC><div className="flex flex-col md:flex-row gap-8 items-center">
+            <div className="min-w-0" style={{ flex: d.leftRatio ?? 50 }}>{renderTwoCol("left")}</div>
+            <div className="min-w-0" style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderTwoCol("right")}</div>
           </div></CC>
         </div>
       );
+    }
     case "divided_columns": {
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
