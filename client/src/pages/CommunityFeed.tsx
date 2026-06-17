@@ -279,7 +279,7 @@ function PostCard({ post, isAdmin, communityId }: { post: any; isAdmin: boolean;
                 </DropdownMenuItem>
               </>}
               {user?.id !== post.userId && (
-                <DropdownMenuItem onClick={() => reportMutation.mutate({ targetType: "post", targetId: post.id, reason: "Inappropriate content" })}>
+                <DropdownMenuItem onClick={() => reportMutation.mutate({ targetType: "post", targetId: post.id, reason: "Inappropriate content", communityId })}>
                   <Flag className="w-4 h-4 mr-2" />Report
                 </DropdownMenuItem>
               )}

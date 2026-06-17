@@ -5409,8 +5409,9 @@ export type CommunityDMMessage = typeof communityDMMessages.$inferSelect;
 export const communityReports = mysqlTable("community_reports", {
   id: int("id").autoincrement().primaryKey(),
   reporterId: int("reporter_id").notNull(),
-  targetType: mysqlEnum("target_type", ["post", "comment", "user"]).notNull(),
+  targetType: mysqlEnum("target_type", ["post", "comment", "user", "dm_message"]).notNull(),
   targetId: int("target_id").notNull(),
+  communityId: int("community_id"),
   reason: varchar("reason", { length: 255 }).notNull(),
   status: mysqlEnum("status", ["pending", "reviewed", "dismissed"]).default("pending").notNull(),
   reviewedByAdminId: int("reviewed_by_admin_id"),

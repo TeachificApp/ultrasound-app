@@ -32,7 +32,7 @@ import {
   UserMinus, MessageSquare, CheckSquare, X, ExternalLink,
   GripVertical, Link2, Image, UserCircle, ChevronUp, ChevronDown,
   AlertCircle, Lock, PenSquare, LayoutTemplate, Zap, ToggleLeft, ToggleRight,
-  Palette, BookOpen, ChevronLeft, Settings, Eye, Globe
+  Palette, BookOpen, ChevronLeft, Settings, Eye, Globe, Mail
 } from "lucide-react";
 import CommunityPageEditor from "@/components/CommunityPageEditor";
 import { Link } from "wouter";
@@ -1251,8 +1251,8 @@ export default function CommunityAdmin() {
     { enabled: !!activeCommunityId && isAdmin }
   );
   const { data: reports } = trpc.community.admin.listReports.useQuery(
-    { communityId: activeCommunityId ?? undefined },
-    { enabled: isAdmin }
+    { communityId: activeCommunityId ?? undefined, status: "pending" },
+    { enabled: isAdmin && !!activeCommunityId }
   );
   const { data: pendingComments } = trpc.community.admin.listPendingComments.useQuery(
     { communityId: activeCommunityId! },
@@ -1271,9 +1271,21 @@ export default function CommunityAdmin() {
     onError: (e) => toast.error(e.message),
   });
   const resolveReport = trpc.community.admin.resolveReport.useMutation({
-    onSuccess: () => { toast.success("Report resolved"); utils.community.admin.listReports.invalidate(); },
+    onSuccess: () => {
+      toast.success("Report resolved");
+      utils.community.admin.listReports.invalidate({ communityId: activeCommunityId ?? undefined, status: "pending" });
+    },
     onError: (e) => toast.error(e.message),
   });
+  const { data: dmConversations, refetch: refetchDms } = trpc.community.admin.listDMConversations.useQuery(
+    { limit: 30 },
+    { enabled: isAdmin }
+  );
+  const [oversightConvId, setOversightConvId] = useState<number | null>(null);
+  const { data: oversightMessages } = trpc.community.admin.getDMMessagesAdmin.useQuery(
+    { conversationId: oversightConvId! },
+    { enabled: isAdmin && !!oversightConvId }
+  );
   const moderateComment = trpc.community.admin.moderateComment.useMutation({
     onSuccess: () => { toast.success("Comment moderated"); utils.community.admin.listPendingComments.invalidate({ communityId: activeCommunityId! }); },
     onError: (e) => toast.error(e.message),
@@ -1547,6 +1559,9 @@ export default function CommunityAdmin() {
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-gray-900 text-sm">{r.reason}</p>
+                              <p className="text-xs text-gray-500 mt-1 capitalize">
+                                {r.targetType?.replace("_", " ")} · {r.targetSummary}
+                              </p>
                               {r.details && <p className="text-sm text-gray-500 mt-1">{r.details}</p>}
                               <p className="text-xs text-gray-400 mt-1">Reported {timeAgo(r.createdAt)} · by {r.reporterName}</p>
                             </div>
@@ -1566,6 +1581,64 @@ export default function CommunityAdmin() {
                     ))}
                   </div>
                 )}
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-teal-600" />Direct Message Oversight
+                </h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Review member DM threads when reported or for safety oversight. Selecting a conversation loads the message history.
+                </p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <CardContent className="p-0 max-h-72 overflow-y-auto divide-y">
+                      {(dmConversations ?? []).length === 0 ? (
+                        <p className="p-4 text-sm text-gray-400 text-center">No DM conversations yet</p>
+                      ) : (
+                        (dmConversations ?? []).map((conv: any) => (
+                          <button
+                            key={conv.id}
+                            type="button"
+                            className={`w-full text-left p-3 hover:bg-gray-50 ${oversightConvId === conv.id ? "bg-teal-50" : ""}`}
+                            onClick={() => setOversightConvId(conv.id)}
+                          >
+                            <p className="text-sm font-medium text-gray-900">
+                              {(conv.userA?.displayName || conv.userA?.name || "?")}
+                              {" ↔ "}
+                              {(conv.userB?.displayName || conv.userB?.name || "?")}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate mt-0.5">
+                              {conv.lastMessage?.body ?? "No messages"}
+                            </p>
+                          </button>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4 max-h-72 overflow-y-auto">
+                      {!oversightConvId ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Select a conversation</p>
+                      ) : !oversightMessages?.items?.length ? (
+                        <p className="text-sm text-gray-400 text-center py-8">No messages in this thread</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {oversightMessages.items.map((msg: any) => (
+                            <div key={msg.id} className="text-sm border rounded-lg p-2 bg-gray-50">
+                              <p className="text-xs text-gray-500 mb-1">
+                                {msg.sender?.displayName || msg.sender?.name || msg.sender?.email} · {timeAgo(msg.createdAt)}
+                              </p>
+                              <p className="text-gray-800 whitespace-pre-wrap">{msg.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchDms()}>
+                  Refresh conversations
+                </Button>
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">

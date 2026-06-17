@@ -75,6 +75,57 @@ async function assertAdmin(ctx: any) {
   if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 }
 
+/** Resolve community_id for a report target */
+async function resolveReportCommunityId(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  targetType: "post" | "comment" | "user" | "dm_message",
+  targetId: number,
+): Promise<number | null> {
+  if (targetType === "post") {
+    const [row] = await db
+      .select({ communityId: communityPosts.communityId })
+      .from(communityPosts)
+      .where(eq(communityPosts.id, targetId))
+      .limit(1);
+    return row?.communityId ?? null;
+  }
+  if (targetType === "comment") {
+    const [row] = await db
+      .select({ communityId: communityPosts.communityId })
+      .from(communityPostComments)
+      .innerJoin(communityPosts, eq(communityPosts.id, communityPostComments.postId))
+      .where(eq(communityPostComments.id, targetId))
+      .limit(1);
+    return row?.communityId ?? null;
+  }
+  if (targetType === "dm_message") {
+    return null;
+  }
+  return null;
+}
+
+async function applyReportRemoval(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  targetType: "post" | "comment" | "user" | "dm_message",
+  targetId: number,
+) {
+  if (targetType === "post") {
+    await db.update(communityPosts).set({ isHidden: true }).where(eq(communityPosts.id, targetId));
+    return;
+  }
+  if (targetType === "comment") {
+    await db
+      .update(communityPostComments)
+      .set({ status: "rejected" })
+      .where(eq(communityPostComments.id, targetId));
+    return;
+  }
+  if (targetType === "dm_message") {
+    await db.delete(communityDMMessages).where(eq(communityDMMessages.id, targetId));
+    return;
+  }
+}
+
 async function assertCommunityMember(db: any, communityId: number, userId: number) {
   const [m] = await db.select().from(communityMembers)
     .where(and(eq(communityMembers.communityId, communityId), eq(communityMembers.userId, userId)))
@@ -860,8 +911,12 @@ const communityMemberRouter = router({
 
     const conditions = [eq(communityDMMessages.conversationId, input.conversationId)];
     if (input.cursor) conditions.push(lt(communityDMMessages.id, input.cursor));
-    const msgs = await db.select().from(communityDMMessages).where(and(...conditions))
-      .orderBy(desc(communityDMMessages.createdAt)).limit(input.limit + 1);
+    const msgs = await db
+      .select()
+      .from(communityDMMessages)
+      .where(and(...conditions))
+      .orderBy(desc(communityDMMessages.id))
+      .limit(input.limit + 1);
     const hasMore = msgs.length > input.limit;
 
     // Mark as read
@@ -880,13 +935,15 @@ const communityMemberRouter = router({
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const trimmed = input.body.trim();
+    if (!trimmed) throw new TRPCError({ code: "BAD_REQUEST", message: "Message cannot be empty." });
     const [conv] = await db.select().from(communityDMConversations).where(eq(communityDMConversations.id, input.conversationId)).limit(1);
     if (!conv || (conv.userAId !== ctx.user.id && conv.userBId !== ctx.user.id)) throw new TRPCError({ code: "FORBIDDEN" });
 
     const [result] = await db.insert(communityDMMessages).values({
       conversationId: input.conversationId,
       senderId: ctx.user.id,
-      body: input.body,
+      body: trimmed,
       attachmentUrl: input.attachmentUrl ?? null,
     }).$returningId();
 
@@ -901,13 +958,23 @@ const communityMemberRouter = router({
 
   /** Report content */
   reportContent: protectedProcedure.input(z.object({
-    targetType: z.enum(["post", "comment", "user"]),
+    targetType: z.enum(["post", "comment", "user", "dm_message"]),
     targetId: z.number(),
     reason: z.string().min(1).max(255),
+    communityId: z.number().optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    await db.insert(communityReports).values({ reporterId: ctx.user.id, targetType: input.targetType, targetId: input.targetId, reason: input.reason });
+    const communityId =
+      input.communityId ??
+      (await resolveReportCommunityId(db, input.targetType, input.targetId));
+    await db.insert(communityReports).values({
+      reporterId: ctx.user.id,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      communityId,
+      reason: input.reason,
+    });
     return { success: true };
   }),
 
@@ -1387,23 +1454,155 @@ const communityAdminRouter = router({
     return { isLocked: !post.isLocked };
   }),
 
-  /** List pending reports */
-  listReports: protectedProcedure.input(z.object({ status: z.enum(["pending", "reviewed", "dismissed"]).default("pending") })).query(async ({ ctx, input }) => {
+  /** List pending reports (optionally scoped to a community) */
+  listReports: protectedProcedure.input(z.object({
+    status: z.enum(["pending", "reviewed", "dismissed"]).default("pending"),
+    communityId: z.number().optional(),
+  })).query(async ({ ctx, input }) => {
     await assertAdmin(ctx);
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(communityReports).where(eq(communityReports.status, input.status)).orderBy(desc(communityReports.createdAt)).limit(100);
+
+    const conditions = [eq(communityReports.status, input.status)];
+
+    const rows = await db
+      .select()
+      .from(communityReports)
+      .where(and(...conditions))
+      .orderBy(desc(communityReports.createdAt))
+      .limit(200);
+
+    let filtered = rows;
+    if (input.communityId) {
+      const postIds = rows.filter((r) => r.targetType === "post").map((r) => r.targetId);
+      const commentIds = rows.filter((r) => r.targetType === "comment").map((r) => r.targetId);
+
+      const postsInCommunity =
+        postIds.length > 0
+          ? await db
+              .select({ id: communityPosts.id })
+              .from(communityPosts)
+              .where(
+                and(
+                  inArray(communityPosts.id, postIds),
+                  eq(communityPosts.communityId, input.communityId),
+                ),
+              )
+          : [];
+      const postIdSet = new Set(postsInCommunity.map((p) => p.id));
+
+      const commentsInCommunity =
+        commentIds.length > 0
+          ? await db
+              .select({ id: communityPostComments.id })
+              .from(communityPostComments)
+              .innerJoin(communityPosts, eq(communityPosts.id, communityPostComments.postId))
+              .where(
+                and(
+                  inArray(communityPostComments.id, commentIds),
+                  eq(communityPosts.communityId, input.communityId),
+                ),
+              )
+          : [];
+      const commentIdSet = new Set(commentsInCommunity.map((c) => c.id));
+
+      filtered = rows.filter((r) => {
+        if (r.communityId === input.communityId) return true;
+        if (r.targetType === "post") return postIdSet.has(r.targetId);
+        if (r.targetType === "comment") return commentIdSet.has(r.targetId);
+        return false;
+      }).slice(0, 100);
+    } else {
+      filtered = rows.slice(0, 100);
+    }
+
+    if (!filtered.length) return [];
+
+    const postIds = filtered.filter((r) => r.targetType === "post").map((r) => r.targetId);
+    const commentIds = filtered.filter((r) => r.targetType === "comment").map((r) => r.targetId);
+    const dmIds = filtered.filter((r) => r.targetType === "dm_message").map((r) => r.targetId);
+
+    const reporterIds = [...new Set(filtered.map((r) => r.reporterId))];
+    const reporters = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(inArray(users.id, reporterIds));
+    const reporterMap = Object.fromEntries(reporters.map((u) => [u.id, u]));
+
+    const posts =
+      postIds.length > 0
+        ? await db
+            .select({ id: communityPosts.id, title: communityPosts.title, body: communityPosts.body })
+            .from(communityPosts)
+            .where(inArray(communityPosts.id, postIds))
+        : [];
+    const postMap = Object.fromEntries(posts.map((p) => [p.id, p]));
+
+    const comments =
+      commentIds.length > 0
+        ? await db
+            .select({ id: communityPostComments.id, body: communityPostComments.body })
+            .from(communityPostComments)
+            .where(inArray(communityPostComments.id, commentIds))
+        : [];
+    const commentMap = Object.fromEntries(comments.map((c) => [c.id, c]));
+
+    const dmMsgs =
+      dmIds.length > 0
+        ? await db
+            .select({ id: communityDMMessages.id, body: communityDMMessages.body })
+            .from(communityDMMessages)
+            .where(inArray(communityDMMessages.id, dmIds))
+        : [];
+    const dmMap = Object.fromEntries(dmMsgs.map((m) => [m.id, m]));
+
+    return filtered.map((r) => {
+      const reporter = reporterMap[r.reporterId];
+      let targetSummary = "";
+      if (r.targetType === "post") {
+        const p = postMap[r.targetId];
+        targetSummary = p?.title || (p?.body ? p.body.slice(0, 120) : `Post #${r.targetId}`);
+      } else if (r.targetType === "comment") {
+        targetSummary = commentMap[r.targetId]?.body?.slice(0, 120) ?? `Comment #${r.targetId}`;
+      } else if (r.targetType === "dm_message") {
+        targetSummary = dmMap[r.targetId]?.body?.slice(0, 120) ?? `DM #${r.targetId}`;
+      } else {
+        targetSummary = `User #${r.targetId}`;
+      }
+      return {
+        ...r,
+        reporterName: reporter?.name ?? reporter?.email ?? `User ${r.reporterId}`,
+        targetSummary,
+      };
+    });
   }),
 
-  /** Resolve a report */
+  /** Resolve a report — dismiss or remove reported content */
   resolveReport: protectedProcedure.input(z.object({
     reportId: z.number(),
-    status: z.enum(["reviewed", "dismissed"]),
+    action: z.enum(["dismiss", "remove"]),
   })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    await db.update(communityReports).set({ status: input.status, reviewedByAdminId: ctx.user.id, reviewedAt: new Date() })
+    const [report] = await db
+      .select()
+      .from(communityReports)
+      .where(eq(communityReports.id, input.reportId))
+      .limit(1);
+    if (!report) throw new TRPCError({ code: "NOT_FOUND" });
+
+    if (input.action === "remove") {
+      await applyReportRemoval(db, report.targetType, report.targetId);
+    }
+
+    await db
+      .update(communityReports)
+      .set({
+        status: input.action === "dismiss" ? "dismissed" : "reviewed",
+        reviewedByAdminId: ctx.user.id,
+        reviewedAt: new Date(),
+      })
       .where(eq(communityReports.id, input.reportId));
     return { success: true };
   }),
@@ -1898,6 +2097,120 @@ const communityAdminRouter = router({
     await db.delete(communityWorkflowRules).where(eq(communityWorkflowRules.id, input.id));
     return { success: true };
   }),
+
+  // ─── DM oversight (admin) ───────────────────────────────────────────────────
+
+  /** List recent DM conversations for admin oversight */
+  listDMConversations: protectedProcedure
+    .input(z.object({ search: z.string().optional(), limit: z.number().min(1).max(100).default(50) }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) return [];
+
+      const convs = await db
+        .select()
+        .from(communityDMConversations)
+        .orderBy(desc(communityDMConversations.lastMessageAt))
+        .limit(input.limit);
+
+      const userIds = new Set<number>();
+      for (const c of convs) {
+        userIds.add(c.userAId);
+        userIds.add(c.userBId);
+      }
+      const userList = userIds.size
+        ? await db
+            .select({
+              id: users.id,
+              name: users.name,
+              displayName: users.displayName,
+              email: users.email,
+            })
+            .from(users)
+            .where(inArray(users.id, [...userIds]))
+        : [];
+      const uMap = Object.fromEntries(userList.map((u) => [u.id, u]));
+
+      const convIds = convs.map((c) => c.id);
+      const lastMsgs =
+        convIds.length > 0
+          ? await db
+              .select({
+                conversationId: communityDMMessages.conversationId,
+                body: communityDMMessages.body,
+                createdAt: communityDMMessages.createdAt,
+              })
+              .from(communityDMMessages)
+              .where(inArray(communityDMMessages.conversationId, convIds))
+              .orderBy(desc(communityDMMessages.id))
+          : [];
+      const lastMsgMap = new Map<number, { body: string; createdAt: Date }>();
+      for (const m of lastMsgs) {
+        if (!lastMsgMap.has(m.conversationId)) {
+          lastMsgMap.set(m.conversationId, { body: m.body, createdAt: m.createdAt });
+        }
+      }
+
+      let result = convs.map((c) => ({
+        ...c,
+        userA: uMap[c.userAId] ?? null,
+        userB: uMap[c.userBId] ?? null,
+        lastMessage: lastMsgMap.get(c.id) ?? null,
+      }));
+
+      if (input.search?.trim()) {
+        const q = input.search.trim().toLowerCase();
+        result = result.filter((c) => {
+          const names = [c.userA, c.userB].map((u) =>
+            `${u?.name ?? ""} ${u?.displayName ?? ""} ${u?.email ?? ""}`.toLowerCase(),
+          );
+          return names.some((n) => n.includes(q));
+        });
+      }
+
+      return result;
+    }),
+
+  /** Read DM thread for admin oversight */
+  getDMMessagesAdmin: protectedProcedure
+    .input(z.object({ conversationId: z.number(), limit: z.number().min(1).max(100).default(50) }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) return { items: [], conversation: null };
+
+      const [conv] = await db
+        .select()
+        .from(communityDMConversations)
+        .where(eq(communityDMConversations.id, input.conversationId))
+        .limit(1);
+      if (!conv) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const msgs = await db
+        .select()
+        .from(communityDMMessages)
+        .where(eq(communityDMMessages.conversationId, input.conversationId))
+        .orderBy(desc(communityDMMessages.id))
+        .limit(input.limit);
+
+      const senderIds = [...new Set(msgs.map((m) => m.senderId))];
+      const senders = senderIds.length
+        ? await db
+            .select({ id: users.id, name: users.name, displayName: users.displayName, email: users.email })
+            .from(users)
+            .where(inArray(users.id, senderIds))
+        : [];
+      const senderMap = Object.fromEntries(senders.map((u) => [u.id, u]));
+
+      return {
+        conversation: conv,
+        items: msgs.reverse().map((m) => ({
+          ...m,
+          sender: senderMap[m.senderId] ?? null,
+        })),
+      };
+    }),
 });
 
 // ─── Root community router ────────────────────────────────────────────────────
