@@ -6,6 +6,8 @@ import {
   createEmptySlide,
 } from "../shared/teachPresentation";
 import { parseSlidesData, teachFolderSlug } from "./lib/teachAccess";
+import { applyMasterToPresentation, parseMasterSlides } from "../shared/teachSlideMaster";
+import { buildMinimalTestPptx, parsePptxBuffer } from "./lib/pptxImport";
 
 describe("TEACH presentation model", () => {
   it("builds per-instructor media folder slug", () => {
@@ -52,5 +54,13 @@ describe("TEACH presentation model", () => {
     const slides = parseSlidesData(null);
     expect(slides[0]?.elements).toBeDefined();
     expect(createEmptySlide(1).elements.length).toBeGreaterThan(0);
+  });
+
+  it("imports pptx and applies slide master merge", async () => {
+    const buffer = await buildMinimalTestPptx([{ title: "Imported", body: "Content" }]);
+    const result = await parsePptxBuffer(buffer);
+    expect(result.slides[0]?.title).toBe("Imported");
+    const merged = applyMasterToPresentation(result.slides, parseMasterSlides(null));
+    expect(merged[0]?.elements.length).toBeGreaterThan(0);
   });
 });

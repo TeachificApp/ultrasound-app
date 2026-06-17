@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Presentation, Upload, Plus, FolderOpen, GraduationCap, Building2,
-  Loader2, Pencil, Play, Trash2, Copy, Lock,
+  Loader2, Pencil, Play, Trash2, Copy, Lock, LayoutTemplate,
 } from "lucide-react";
 
 export default function TeachDashboard() {
@@ -37,7 +37,24 @@ export default function TeachDashboard() {
   const { data: materials, isLoading: matsLoading, refetch } = trpc.teach.listMyMaterials.useQuery(undefined, {
     enabled: !!user && !!ctx?.canAccessTeach,
   });
+  const { data: masters, refetch: refetchMasters } = trpc.teach.listMasters.useQuery(undefined, {
+    enabled: !!user && !!ctx?.canAccessTeach,
+  });
   const { data: platformVisible } = trpc.educator.getPlatformVisible.useQuery();
+
+  const createMaster = trpc.teach.createMaster.useMutation({
+    onSuccess: (data) => {
+      toast.success("Slide master created");
+      refetchMasters();
+      navigate(`/teach/master/${data.id}/design`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteMaster = trpc.teach.deleteMaster.useMutation({
+    onSuccess: () => { toast.success("Master deleted"); refetchMasters(); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const createPresentation = trpc.teach.createPresentation.useMutation({
     onSuccess: (data) => {
@@ -51,10 +68,14 @@ export default function TeachDashboard() {
   });
 
   const uploadMaterial = trpc.teach.uploadMaterial.useMutation({
-    onSuccess: () => {
-      toast.success("File uploaded to your TEACH library");
+    onSuccess: (data) => {
+      toast.success(data.parsed ? "PowerPoint imported — slides ready to edit" : "File uploaded to your TEACH library");
       refetch();
+      refetchMasters();
       setUploading(false);
+      if (data.parsed && data.materialId) {
+        navigate(`/teach/presentation/${data.materialId}/edit`);
+      }
     },
     onError: (e) => {
       toast.error(e.message);
@@ -151,7 +172,7 @@ export default function TeachDashboard() {
               </h1>
               <p className="text-sm text-gray-500 mt-1">
                 Upload presentations and media for your courses. Files are stored in your private
-                Teach folder in the media repository.
+                Teach folder in the media repository. <strong>.pptx</strong> files are parsed into editable slides.
               </p>
             </div>
             <div className="flex gap-2 flex-shrink-0">
@@ -219,7 +240,64 @@ export default function TeachDashboard() {
               e.target.value = "";
             }}
           />
+          <Button
+            variant="outline"
+            onClick={() => createMaster.mutate({ name: "New Slide Master" })}
+            disabled={createMaster.isPending}
+          >
+            {createMaster.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <LayoutTemplate className="w-4 h-4 mr-1" />}
+            New Slide Master
+          </Button>
         </div>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <LayoutTemplate className="w-4 h-4 text-teal-600" />
+              Slide Masters
+              <span className="text-xs font-normal text-gray-400">Design layouts to apply or force on presentations</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(masters ?? []).length === 0 ? (
+              <p className="text-sm text-gray-400 py-4">No slide masters yet. Create one or import a .pptx to extract masters.</p>
+            ) : (
+              <div className="divide-y">
+                {(masters ?? []).map((m) => (
+                  <div key={m.id} className="py-3 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                      <LayoutTemplate className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-gray-900 truncate">{m.name}</p>
+                      <p className="text-xs text-gray-400">
+                        {m.isGlobal ? "Global" : m.isOwner ? "My master" : "Shared"}
+                        {m.isDefaultForced ? " · default forced" : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {m.canEdit && (
+                        <Button size="sm" variant="ghost" className="h-8" onClick={() => navigate(`/teach/master/${m.id}/design`)}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {m.isOwner && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-red-500"
+                          onClick={() => { if (confirm("Delete this slide master?")) deleteMaster.mutate({ masterId: m.id }); }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="pb-2">

@@ -8,6 +8,8 @@ import {
   type TeachSlideElement,
   animationCssClass,
   DEFAULT_TEXT_STYLE,
+  normalizeMediaFormat,
+  buildMediaWrapperStyles,
 } from "@shared/teachPresentation";
 import { cn } from "@/lib/utils";
 
@@ -88,29 +90,40 @@ function ElementContent({
   }
 
   if (el.type === "image" && el.src) {
+    const mf = normalizeMediaFormat(el.mediaFormat);
+    const { wrapper, media } = buildMediaWrapperStyles(mf);
     return (
-      <img
-        src={el.src}
-        alt=""
-        className={cn("w-full h-full object-contain", animClass)}
-        style={style}
-        draggable={false}
-      />
+      <div className={cn("w-full h-full", animClass)} style={style}>
+        <div style={wrapper as React.CSSProperties}>
+          <img
+            src={el.src}
+            alt=""
+            style={media as React.CSSProperties}
+            draggable={false}
+          />
+        </div>
+      </div>
     );
   }
 
   if (el.type === "video" && el.src) {
+    const mf = normalizeMediaFormat(el.mediaFormat);
+    const { wrapper, media } = buildMediaWrapperStyles(mf);
     return (
-      <video
-        ref={videoRef}
-        src={el.src}
-        className={cn("w-full h-full object-contain bg-black", animClass)}
-        style={style}
-        playsInline
-        muted={el.video?.muted ?? true}
-        loop={el.video?.loop ?? false}
-        controls={el.video?.controls ?? true}
-      />
+      <div className={cn("w-full h-full", animClass)} style={style}>
+        <div style={wrapper as React.CSSProperties}>
+          <video
+            ref={videoRef}
+            src={el.src}
+            className="bg-black"
+            style={media as React.CSSProperties}
+            playsInline
+            muted={el.video?.muted ?? true}
+            loop={el.video?.loop ?? false}
+            controls={el.video?.controls ?? true}
+          />
+        </div>
+      </div>
     );
   }
 

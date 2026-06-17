@@ -12,12 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-  Presentation, GraduationCap, Building2, ExternalLink, Shield, Users,
+  Presentation, GraduationCap, Building2, ExternalLink, Shield, Users, LayoutTemplate,
 } from "lucide-react";
 
 export default function TeachAdminPanel() {
   const [search, setSearch] = useState("");
   const { data: materials, isLoading } = trpc.teach.adminListAll.useQuery();
+  const { data: masters } = trpc.teach.listMasters.useQuery();
   const { data: instructors } = trpc.lmsEnrollmentAdmin.listInstructorsWithDetails.useQuery();
   const { data: educatorOrgs } = trpc.educator.adminGetAllOrgs.useQuery(undefined, {
     retry: false,
@@ -34,6 +35,11 @@ export default function TeachAdminPanel() {
 
   const setVisible = trpc.educator.setPlatformVisible.useMutation({
     onSuccess: (d) => toast.success(d.visible ? "EducatorAssist™ is now public" : "EducatorAssist™ hidden from public"),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const forceMaster = trpc.teach.adminForceMaster.useMutation({
+    onSuccess: () => toast.success("Slide master forced on presentation"),
     onError: (e) => toast.error(e.message),
   });
 
@@ -132,6 +138,27 @@ export default function TeachAdminPanel() {
         </CardContent>
       </Card>
 
+      {(masters ?? []).length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <LayoutTemplate className="w-4 h-4 text-indigo-600" /> Slide Masters
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(masters ?? []).map((m) => (
+              <div key={m.id} className="flex items-center justify-between text-sm py-1">
+                <span>{m.name}{m.isGlobal ? " (global)" : ""}{m.isDefaultForced ? " · default" : ""}</span>
+                <a href={`/teach/master/${m.id}/design`} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline">
+                  Design
+                </a>
+              </div>
+            ))}
+            <p className="text-xs text-gray-400 pt-2">Admins can force a master onto any presentation from the editor (Force button) or below.</p>
+          </CardContent>
+        </Card>
+      )}
+
       <div>
         <Input
           placeholder="Search materials by title or owner..."
@@ -159,14 +186,34 @@ export default function TeachAdminPanel() {
                     {m.ownerContext.replace("_", " ")}
                   </Badge>
                   {m.materialType === "presentation" && (
-                    <a
-                      href={`/teach/presentation/${m.id}/edit`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-teal-600 hover:underline flex-shrink-0"
-                    >
-                      Edit
-                    </a>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <a
+                        href={`/teach/presentation/${m.id}/edit`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-teal-600 hover:underline"
+                      >
+                        Edit
+                      </a>
+                      {(masters ?? []).length > 0 && (
+                        <select
+                          className="text-xs border rounded h-7 px-1"
+                          defaultValue=""
+                          onChange={(e) => {
+                            const masterId = parseInt(e.target.value, 10);
+                            if (masterId) {
+                              forceMaster.mutate({ materialId: m.id, masterId });
+                              e.target.value = "";
+                            }
+                          }}
+                        >
+                          <option value="">Force master…</option>
+                          {(masters ?? []).map((master) => (
+                            <option key={master.id} value={master.id}>{master.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   )}
                 </div>
               ))

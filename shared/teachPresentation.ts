@@ -3,6 +3,21 @@
  * Shared between client editor/presenter and server validation.
  */
 
+import {
+  DEFAULT_MEDIA_FORMAT,
+  normalizeMediaFormat,
+} from "./teachMediaFormat";
+
+export type { TeachMediaFormat } from "./teachMediaFormat";
+export {
+  DEFAULT_MEDIA_FORMAT,
+  normalizeMediaFormat,
+  buildMediaFilterCss,
+  buildMediaWrapperStyles,
+  applyFramePreset,
+  FRAME_PRESETS,
+} from "./teachMediaFormat";
+
 export type TeachElementType = "text" | "image" | "video" | "shape";
 
 export type TeachAnimationType =
@@ -52,6 +67,8 @@ export interface TeachTextStyle {
   fontFamily?: string;
 }
 
+export type TeachPlaceholderRole = "title" | "subtitle" | "body" | "body2" | "media" | "footer";
+
 export interface TeachSlideElement {
   id: string;
   type: TeachElementType;
@@ -64,9 +81,13 @@ export interface TeachSlideElement {
   style?: TeachTextStyle;
   src?: string;
   video?: TeachVideoSettings;
+  /** Picture / video formatting — corrections, color, frame, shadow */
+  mediaFormat?: import("./teachMediaFormat").TeachMediaFormat;
   shape?: "rectangle" | "ellipse";
   fill?: string;
   stroke?: string;
+  /** Slide master placeholder slot (title, body, media, etc.) */
+  placeholderRole?: TeachPlaceholderRole;
   entrance?: TeachElementAnimation;
   emphasis?: TeachElementAnimation;
   exit?: TeachElementAnimation;
@@ -77,6 +98,14 @@ export interface TeachSlideTransitionConfig {
   durationMs: number;
 }
 
+export type TeachMasterLayoutRole =
+  | "title"
+  | "titleAndContent"
+  | "sectionHeader"
+  | "twoContent"
+  | "blank"
+  | "custom";
+
 export interface TeachSlide {
   id: string;
   title: string;
@@ -86,6 +115,8 @@ export interface TeachSlide {
   transition?: TeachSlideTransitionConfig;
   /** Auto-advance to next slide after N ms (null = manual only) */
   advanceAfterMs?: number | null;
+  /** Which master layout template this slide uses */
+  masterLayoutRole?: TeachMasterLayoutRole;
   elements: TeachSlideElement[];
   /** @deprecated legacy flat fields — migrated to elements on load */
   content?: string;
@@ -171,6 +202,7 @@ export function createImageElement(src = ""): TeachSlideElement {
     height: 55,
     zIndex: 2,
     src,
+    mediaFormat: normalizeMediaFormat(undefined),
     entrance: { ...DEFAULT_ANIMATION, type: "zoomIn" },
   };
 }
@@ -186,6 +218,7 @@ export function createVideoElement(src = ""): TeachSlideElement {
     zIndex: 2,
     src,
     video: { ...DEFAULT_VIDEO },
+    mediaFormat: normalizeMediaFormat(undefined),
     entrance: { ...DEFAULT_ANIMATION, type: "fadeIn" },
   };
 }
@@ -286,6 +319,10 @@ function normalizeElement(el: TeachSlideElement): TeachSlideElement {
     ...el,
     style: el.style ? { ...DEFAULT_TEXT_STYLE, ...el.style } : el.type === "text" ? { ...DEFAULT_TEXT_STYLE } : undefined,
     video: el.type === "video" ? { ...DEFAULT_VIDEO, ...el.video } : el.video,
+    mediaFormat:
+      el.type === "image" || el.type === "video"
+        ? normalizeMediaFormat(el.mediaFormat)
+        : el.mediaFormat,
     entrance: el.entrance ? { ...DEFAULT_ANIMATION, ...el.entrance } : el.entrance,
   };
 }

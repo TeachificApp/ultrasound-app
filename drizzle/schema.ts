@@ -2506,12 +2506,33 @@ export const teachMaterials = mysqlTable("teach_materials", {
   mediaAssetId: int("media_asset_id"),
   /** JSON slide array for presentation type: { id, title, content, imageUrl, notes }[] */
   slidesData: longtext("slides_data"),
+  /** Applied slide master template */
+  slideMasterId: int("slide_master_id"),
+  /** When true, master layout is locked; content edits only */
+  masterForced: boolean("master_forced").default(false).notNull(),
   status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type TeachMaterial = typeof teachMaterials.$inferSelect;
 export type InsertTeachMaterial = typeof teachMaterials.$inferInsert;
+
+export const teachSlideMasters = mysqlTable("teach_slide_masters", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerUserId: int("owner_user_id").notNull(),
+  name: varchar("name", { length: 300 }).notNull(),
+  description: text("description"),
+  /** JSON array of master layout slides with placeholders */
+  masterSlidesData: longtext("master_slides_data").notNull(),
+  /** Available to all TEACH users when true */
+  isGlobal: boolean("is_global").default(false).notNull(),
+  /** Admin default master forced onto presentations without an explicit master */
+  isDefaultForced: boolean("is_default_forced").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type TeachSlideMaster = typeof teachSlideMasters.$inferSelect;
+export type InsertTeachSlideMaster = typeof teachSlideMasters.$inferInsert;
 
 export const teachMaterialPermissions = mysqlTable("teach_material_permissions", {
   id: int("id").autoincrement().primaryKey(),

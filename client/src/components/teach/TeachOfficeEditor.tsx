@@ -15,6 +15,7 @@ import { TeachSlideRenderer } from "./TeachSlideRenderer";
 import {
   type TeachSlide,
   type TeachSlideElement,
+  type TeachPlaceholderRole,
   createEmptySlide,
   createImageElement,
   createVideoElement,
@@ -35,6 +36,10 @@ interface TeachOfficeEditorProps {
   onSlidesChange: (slides: TeachSlide[]) => void;
   activeIdx: number;
   onActiveIdxChange: (idx: number) => void;
+  /** Master designer mode — shows placeholder role controls */
+  mode?: "presentation" | "master";
+  /** When master is forced on a presentation, lock layout/background edits */
+  masterLocked?: boolean;
 }
 
 export function TeachOfficeEditor({
@@ -42,6 +47,8 @@ export function TeachOfficeEditor({
   onSlidesChange,
   activeIdx,
   onActiveIdxChange,
+  mode = "presentation",
+  masterLocked = false,
 }: TeachOfficeEditorProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState("format");
@@ -76,7 +83,11 @@ export function TeachOfficeEditor({
   };
 
   const deleteSelected = () => {
-    if (!slide || !selectedId) return;
+    if (!slide || !selectedId || masterLocked) return;
+    if (mode === "master" && selected?.placeholderRole) {
+      toast.error("Cannot delete placeholder slots in master designer");
+      return;
+    }
     updateSlide({ elements: slide.elements.filter((e) => e.id !== selectedId) });
     setSelectedId(null);
   };
@@ -88,7 +99,7 @@ export function TeachOfficeEditor({
   };
 
   const handleCanvasPointerDown = (e: React.PointerEvent, elId: string) => {
-    if (!slide || !canvasRef.current) return;
+    if (!slide || !canvasRef.current || masterLocked) return;
     const el = slide.elements.find((x) => x.id === elId);
     if (!el) return;
     e.stopPropagation();
@@ -259,12 +270,30 @@ export function TeachOfficeEditor({
             <TabsContent value="format" className="flex-1 overflow-y-auto p-3 space-y-3 m-0">
               {selected ? (
                 <>
+                  {mode === "master" && selected.type === "text" && (
+                    <div>
+                      <Label className="text-xs">Placeholder role</Label>
+                      <Select
+                        value={selected.placeholderRole ?? "body"}
+                        onValueChange={(v) => updateElement(selected.id, { placeholderRole: v as TeachPlaceholderRole })}
+                      >
+                        <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(["title", "subtitle", "body", "body2", "media", "footer"] as const).map((r) => (
+                            <SelectItem key={r} value={r}>{r}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {!masterLocked && (
                   <div className="grid grid-cols-2 gap-2">
                     <div><Label className="text-xs">X %</Label><Input type="number" className="h-7 text-xs" value={selected.x} onChange={(e) => updateElement(selected.id, { x: +e.target.value })} /></div>
                     <div><Label className="text-xs">Y %</Label><Input type="number" className="h-7 text-xs" value={selected.y} onChange={(e) => updateElement(selected.id, { y: +e.target.value })} /></div>
                     <div><Label className="text-xs">Width %</Label><Input type="number" className="h-7 text-xs" value={selected.width} onChange={(e) => updateElement(selected.id, { width: +e.target.value })} /></div>
                     <div><Label className="text-xs">Height %</Label><Input type="number" className="h-7 text-xs" value={selected.height} onChange={(e) => updateElement(selected.id, { height: +e.target.value })} /></div>
                   </div>
+                  )}
                   {selected.type === "video" && (
                     <div className="space-y-2 border-t pt-2">
                       <p className="text-xs font-semibold text-gray-500">Video playback</p>
@@ -339,9 +368,11 @@ export function TeachOfficeEditor({
 
             <TabsContent value="slide" className="flex-1 overflow-y-auto p-3 space-y-3 m-0">
               <div>
-                <Label className="text-xs">Slide title</Label>
+                <Label className="text-xs">{mode === "master" ? "Layout name" : "Slide title"}</Label>
                 <Input className="h-8 text-xs mt-1" value={slide.title} onChange={(e) => updateSlide({ title: e.target.value })} />
               </div>
+              {!masterLocked && (
+              <>
               <div>
                 <Label className="text-xs">Background</Label>
                 <input type="color" className="h-8 w-full rounded border mt-1" value={slide.backgroundColor ?? "#ffffff"} onChange={(e) => updateSlide({ backgroundColor: e.target.value })} />
@@ -361,6 +392,13 @@ export function TeachOfficeEditor({
                 <Label className="text-xs">Auto-advance after (ms, empty = manual)</Label>
                 <Input type="number" min={0} className="h-8 text-xs mt-1" value={slide.advanceAfterMs ?? ""} placeholder="Manual" onChange={(e) => updateSlide({ advanceAfterMs: e.target.value ? +e.target.value : null })} />
               </div>
+              </>
+              )}
+              {masterLocked && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                  A slide master is forced on this presentation. Layout and background are locked; edit text and media content only.
+                </p>
+              )}
             </TabsContent>
 
             <TabsContent value="notes" className="flex-1 overflow-y-auto p-3 m-0 flex flex-col">

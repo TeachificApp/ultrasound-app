@@ -15,6 +15,7 @@ import {
   mediaVersions,
   teachMaterialPermissions,
   teachMaterials,
+  teachSlideMasters,
   users,
 } from "../../drizzle/schema";
 import {
@@ -24,6 +25,14 @@ import {
   teachFolderSlug,
 } from "../lib/teachAccess";
 import { parseTeachSlides } from "../../shared/teachPresentation";
+import {
+  applyMasterToPresentation,
+  createDefaultMasterSlides,
+  masterSlidesToJson,
+  parseMasterSlides,
+  type TeachMasterSlide,
+} from "../../shared/teachSlideMaster";
+import { parsePptxBuffer } from "../lib/pptxImport";
 
 const slideSchema = z.object({
   id: z.string(),
@@ -108,6 +117,41 @@ async function getMaterialOrThrow(materialId: number) {
   return material;
 }
 
+async function getMasterOrThrow(masterId: number) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+  const [master] = await db.select().from(teachSlideMasters).where(eq(teachSlideMasters.id, masterId)).limit(1);
+  if (!master) throw new TRPCError({ code: "NOT_FOUND", message: "Slide master not found" });
+  return master;
+}
+
+async function resolveSlidesForMaterial(material: typeof teachMaterials.$inferSelect) {
+  let slides = parseTeachSlides(material.slidesData);
+  if (material.slideMasterId) {
+    const db = await getDb();
+    if (db) {
+      const [master] = await db
+        .select()
+        .from(teachSlideMasters)
+        .where(eq(teachSlideMasters.id, material.slideMasterId))
+        .limit(1);
+      if (master && material.masterForced) {
+        slides = applyMasterToPresentation(slides, parseMasterSlides(master.masterSlidesData));
+      }
+    }
+  }
+  return slides;
+}
+
+async function uploadPptxImage(userId: number, folder: string) {
+  return async (fileName: string, data: Buffer, mimeType: string) => {
+    const slug = generateSlug(fileName);
+    const s3Key = `media-repo/${slug}/pptx-${fileName}`;
+    const { url } = await storagePut(s3Key, data, mimeType);
+    return url;
+  };
+}
+
 export const teachRouter = router({
   getMyContext: protectedProcedure.query(async ({ ctx }) => {
     const teachCtx = await getTeachUserContext(ctx.user.id);
@@ -186,9 +230,11 @@ export const teachRouter = router({
       }
       return {
         ...material,
-        slides: parseTeachSlides(material.slidesData),
+        slides: await resolveSlidesForMaterial(material),
         mediaUrl,
         isOwner: material.ownerUserId === ctx.user.id,
+        masterForced: material.masterForced ?? false,
+        slideMasterId: material.slideMasterId ?? null,
       };
     }),
 
@@ -309,6 +355,32 @@ export const teachRouter = router({
       const isPresentation =
         input.mimeType.includes("presentation") || input.fileName.match(/\.(ppt|pptx)$/i);
 
+      let slidesData: string | null = null;
+      let slideMasterId: number | null = null;
+      const isPptx = input.fileName.match(/\.pptx$/i) || input.mimeType.includes("presentationml");
+
+      if (isPptx) {
+        try {
+          const parsed = await parsePptxBuffer(buffer, await uploadPptxImage(ctx.user.id, folder));
+          slidesData = JSON.stringify(parsed.slides);
+          if (parsed.masterSlides.length > 0) {
+            const [masterResult] = await db.insert(teachSlideMasters).values({
+              ownerUserId: ctx.user.id,
+              name: `${input.title} Master`,
+              description: `Imported from ${input.fileName}`,
+              masterSlidesData: masterSlidesToJson(parsed.masterSlides),
+              isGlobal: false,
+            });
+            slideMasterId = (masterResult as { insertId: number }).insertId;
+          }
+        } catch (err) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err instanceof Error ? err.message : "Failed to parse PowerPoint file",
+          });
+        }
+      }
+
       const [matResult] = await db.insert(teachMaterials).values({
         ownerUserId: ctx.user.id,
         ownerContext: input.ownerContext,
@@ -318,10 +390,18 @@ export const teachRouter = router({
         title: input.title,
         description: input.description ?? null,
         mediaAssetId: assetId,
+        slidesData,
+        slideMasterId,
         status: "draft",
       });
 
-      return { materialId: (matResult as { insertId: number }).insertId, mediaAssetId: assetId, folder };
+      return {
+        materialId: (matResult as { insertId: number }).insertId,
+        mediaAssetId: assetId,
+        folder,
+        parsed: isPptx,
+        slideMasterId,
+      };
     }),
 
   deleteMaterial: protectedProcedure
@@ -456,5 +536,305 @@ export const teachRouter = router({
         status: "draft",
       });
       return { id: (result as { insertId: number }).insertId };
+    }),
+
+  importPptx: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(300),
+        description: z.string().optional(),
+        fileData: z.string().min(1),
+        fileName: z.string().min(1).max(255),
+        fileSize: z.number().int().positive(),
+        ownerContext: z.enum(["lms_instructor", "educator_assist"]).default("lms_instructor"),
+        educatorOrgId: z.number().optional(),
+        saveImportedMaster: z.boolean().default(true),
+        applyMaster: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await requireTeachAccess(ctx.user.id);
+      if (!input.fileName.match(/\.pptx$/i)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Only .pptx files are supported for import" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const buffer = Buffer.from(input.fileData, "base64");
+      const folder = teachFolderSlug(ctx.user.id);
+      const parsed = await parsePptxBuffer(buffer, await uploadPptxImage(ctx.user.id, folder));
+
+      let slideMasterId: number | null = null;
+      if (input.saveImportedMaster && parsed.masterSlides.length > 0) {
+        const [masterResult] = await db.insert(teachSlideMasters).values({
+          ownerUserId: ctx.user.id,
+          name: `${input.title} Master`,
+          description: `Imported from ${input.fileName}`,
+          masterSlidesData: masterSlidesToJson(parsed.masterSlides),
+          isGlobal: false,
+        });
+        slideMasterId = (masterResult as { insertId: number }).insertId;
+      }
+
+      let slides = parsed.slides;
+      if (input.applyMaster && slideMasterId) {
+        slides = applyMasterToPresentation(slides, parsed.masterSlides);
+      }
+
+      const slug = generateSlug(input.title);
+      const s3Key = `media-repo/${slug}/v1-${input.fileName}`;
+      const { url: s3Url } = await storagePut(s3Key, buffer, "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+
+      const [assetResult] = await db.insert(mediaAssets).values({
+        slug,
+        title: input.title,
+        description: input.description ?? null,
+        mediaType: "document",
+        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        access: "private",
+        folder,
+        createdByUserId: ctx.user.id,
+      });
+      const assetId = (assetResult as { insertId: number }).insertId;
+
+      await db.insert(mediaVersions).values({
+        assetId,
+        versionNumber: 1,
+        s3Key,
+        s3Url,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
+        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        uploadedByUserId: ctx.user.id,
+      });
+
+      const [matResult] = await db.insert(teachMaterials).values({
+        ownerUserId: ctx.user.id,
+        ownerContext: input.ownerContext,
+        lmsInstructorId: teachCtx.lmsInstructor?.id ?? null,
+        educatorOrgId: input.educatorOrgId ?? null,
+        materialType: "presentation",
+        title: input.title,
+        description: input.description ?? null,
+        mediaAssetId: assetId,
+        slidesData: JSON.stringify(slides),
+        slideMasterId,
+        masterForced: false,
+        status: "draft",
+      });
+
+      return {
+        materialId: (matResult as { insertId: number }).insertId,
+        slideCount: slides.length,
+        slideMasterId,
+        warnings: parsed.warnings,
+      };
+    }),
+
+  listMasters: protectedProcedure.query(async ({ ctx }) => {
+    await requireTeachAccess(ctx.user.id);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const teachCtx = await getTeachUserContext(ctx.user.id);
+    const { or } = await import("drizzle-orm");
+    const rows = await db
+      .select()
+      .from(teachSlideMasters)
+      .where(
+        or(
+          eq(teachSlideMasters.ownerUserId, ctx.user.id),
+          eq(teachSlideMasters.isGlobal, true),
+        ),
+      )
+      .orderBy(desc(teachSlideMasters.updatedAt));
+    return rows.map((m) => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      isGlobal: m.isGlobal,
+      isDefaultForced: m.isDefaultForced,
+      isOwner: m.ownerUserId === ctx.user.id,
+      canEdit:
+        m.ownerUserId === ctx.user.id ||
+        teachCtx.isPlatformAdmin ||
+        teachCtx.isEducationManager,
+      updatedAt: m.updatedAt,
+    }));
+  }),
+
+  getMaster: protectedProcedure
+    .input(z.object({ masterId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireTeachAccess(ctx.user.id);
+      const master = await getMasterOrThrow(input.masterId);
+      const teachCtx = await getTeachUserContext(ctx.user.id);
+      if (!master.isGlobal && master.ownerUserId !== ctx.user.id && !teachCtx.isPlatformAdmin) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      return {
+        ...master,
+        masterSlides: parseMasterSlides(master.masterSlidesData),
+        isOwner: master.ownerUserId === ctx.user.id,
+      };
+    }),
+
+  createMaster: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(300),
+        description: z.string().optional(),
+        isGlobal: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await requireTeachAccess(ctx.user.id);
+      if (input.isGlobal && !teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Admin required for global masters" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [result] = await db.insert(teachSlideMasters).values({
+        ownerUserId: ctx.user.id,
+        name: input.name,
+        description: input.description ?? null,
+        masterSlidesData: masterSlidesToJson(createDefaultMasterSlides()),
+        isGlobal: input.isGlobal,
+      });
+      return { id: (result as { insertId: number }).insertId };
+    }),
+
+  updateMaster: protectedProcedure
+    .input(
+      z.object({
+        masterId: z.number(),
+        name: z.string().min(1).max(300).optional(),
+        description: z.string().optional(),
+        masterSlides: z.array(slideSchema.extend({
+          layoutRole: z.string().optional(),
+          name: z.string().optional(),
+        })).optional(),
+        isGlobal: z.boolean().optional(),
+        isDefaultForced: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const master = await getMasterOrThrow(input.masterId);
+      const teachCtx = await getTeachUserContext(ctx.user.id);
+      const canEdit =
+        master.ownerUserId === ctx.user.id ||
+        teachCtx.isPlatformAdmin ||
+        teachCtx.isEducationManager;
+      if (!canEdit) throw new TRPCError({ code: "FORBIDDEN" });
+
+      if (input.isGlobal && !teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      if (input.isDefaultForced) {
+        await db.update(teachSlideMasters).set({ isDefaultForced: false });
+      }
+
+      const updates: Record<string, unknown> = {};
+      if (input.name !== undefined) updates.name = input.name;
+      if (input.description !== undefined) updates.description = input.description;
+      if (input.masterSlides !== undefined) updates.masterSlidesData = JSON.stringify(input.masterSlides);
+      if (input.isGlobal !== undefined) updates.isGlobal = input.isGlobal;
+      if (input.isDefaultForced !== undefined) updates.isDefaultForced = input.isDefaultForced;
+
+      await db.update(teachSlideMasters).set(updates).where(eq(teachSlideMasters.id, input.masterId));
+      return { ok: true };
+    }),
+
+  deleteMaster: protectedProcedure
+    .input(z.object({ masterId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const master = await getMasterOrThrow(input.masterId);
+      const teachCtx = await getTeachUserContext(ctx.user.id);
+      if (
+        master.ownerUserId !== ctx.user.id &&
+        !teachCtx.isPlatformAdmin &&
+        !teachCtx.isEducationManager
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(teachMaterials).set({ slideMasterId: null, masterForced: false }).where(eq(teachMaterials.slideMasterId, input.masterId));
+      await db.delete(teachSlideMasters).where(eq(teachSlideMasters.id, input.masterId));
+      return { ok: true };
+    }),
+
+  applyMasterToPresentation: protectedProcedure
+    .input(
+      z.object({
+        materialId: z.number(),
+        masterId: z.number(),
+        forced: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const material = await getMaterialOrThrow(input.materialId);
+      const allowed = await canPerformTeachAction(ctx.user.id, material, "edit");
+      if (!allowed) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const teachCtx = await getTeachUserContext(ctx.user.id);
+      if (input.forced && !teachCtx.isPlatformAdmin && !teachCtx.isEducationManager && material.ownerUserId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot force master without manage access" });
+      }
+
+      const master = await getMasterOrThrow(input.masterId);
+      if (!master.isGlobal && master.ownerUserId !== ctx.user.id && !teachCtx.isPlatformAdmin) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Master not accessible" });
+      }
+
+      const masterSlides = parseMasterSlides(master.masterSlidesData);
+      const slides = applyMasterToPresentation(parseTeachSlides(material.slidesData), masterSlides);
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db
+        .update(teachMaterials)
+        .set({
+          slidesData: JSON.stringify(slides),
+          slideMasterId: input.masterId,
+          masterForced: input.forced,
+        })
+        .where(eq(teachMaterials.id, input.materialId));
+
+      return { ok: true, slideCount: slides.length };
+    }),
+
+  adminForceMaster: protectedProcedure
+    .input(
+      z.object({
+        materialId: z.number(),
+        masterId: z.number(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await getTeachUserContext(ctx.user.id);
+      if (!teachCtx.isPlatformAdmin && !teachCtx.isEducationManager) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+      }
+      const material = await getMaterialOrThrow(input.materialId);
+      const master = await getMasterOrThrow(input.masterId);
+      const slides = applyMasterToPresentation(
+        parseTeachSlides(material.slidesData),
+        parseMasterSlides(master.masterSlidesData),
+      );
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db
+        .update(teachMaterials)
+        .set({
+          slidesData: JSON.stringify(slides),
+          slideMasterId: input.masterId,
+          masterForced: true,
+        })
+        .where(eq(teachMaterials.id, input.materialId));
+      return { ok: true };
     }),
 });

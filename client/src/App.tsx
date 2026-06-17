@@ -106,6 +106,7 @@ const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
 const InstructorPortal = lazy(() => import("./pages/InstructorPortal"));
 const TeachDashboard = lazy(() => import("./pages/teach/TeachDashboard"));
 const TeachPresentationEditor = lazy(() => import("./pages/teach/TeachPresentationEditor"));
+const TeachMasterDesigner = lazy(() => import("./pages/teach/TeachMasterDesigner"));
 const TeachPresenter = lazy(() => import("./pages/teach/TeachPresenter"));
 const TeachPresenterNotes = lazy(() => import("./pages/teach/TeachPresenterNotes"));
 const AffiliateRedirect = lazy(() => import("./pages/AffiliateRedirect"));
@@ -709,6 +710,7 @@ function MembersRouter() {
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/teach" component={TeachDashboard} />
+        <Route path="/teach/master/:id/design" component={TeachMasterDesigner} />
         <Route path="/teach/presentation/:id/edit" component={TeachPresentationEditor} />
         <Route path="/teach/presentation/:id/present" component={TeachPresenter} />
         <Route path="/teach/presentation/:id/notes" component={TeachPresenterNotes} />
@@ -868,6 +870,7 @@ function LMSRouter() {
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/teach" component={TeachDashboard} />
+        <Route path="/teach/master/:id/design" component={TeachMasterDesigner} />
         <Route path="/teach/presentation/:id/edit" component={TeachPresentationEditor} />
         <Route path="/teach/presentation/:id/present" component={TeachPresenter} />
         <Route path="/teach/presentation/:id/notes" component={TeachPresenterNotes} />
