@@ -21,16 +21,51 @@ import {
   canPerformTeachAction,
   getTeachUserContext,
   listAccessibleMaterials,
-  parseSlidesData,
   teachFolderSlug,
 } from "../lib/teachAccess";
+import { parseTeachSlides } from "../../shared/teachPresentation";
 
 const slideSchema = z.object({
   id: z.string(),
   title: z.string(),
-  content: z.string(),
-  imageUrl: z.string().optional(),
   notes: z.string().optional(),
+  backgroundColor: z.string().optional(),
+  backgroundImage: z.string().optional(),
+  transition: z.object({
+    type: z.string(),
+    durationMs: z.number(),
+  }).optional(),
+  advanceAfterMs: z.number().nullable().optional(),
+  elements: z.array(z.object({
+    id: z.string(),
+    type: z.enum(["text", "image", "video", "shape"]),
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+    zIndex: z.number(),
+    content: z.string().optional(),
+    src: z.string().optional(),
+    style: z.record(z.unknown()).optional(),
+    video: z.object({
+      autoplay: z.boolean(),
+      loop: z.boolean(),
+      muted: z.boolean(),
+      controls: z.boolean(),
+      startAtSec: z.number().optional(),
+    }).optional(),
+    shape: z.enum(["rectangle", "ellipse"]).optional(),
+    fill: z.string().optional(),
+    stroke: z.string().optional(),
+    entrance: z.object({
+      type: z.string(),
+      durationMs: z.number(),
+      delayMs: z.number(),
+      trigger: z.enum(["onClick", "withPrevious", "afterPrevious", "auto"]),
+    }).optional(),
+  })).optional(),
+  content: z.string().optional(),
+  imageUrl: z.string().optional(),
 });
 
 function generateSlug(title: string): string {
@@ -151,7 +186,7 @@ export const teachRouter = router({
       }
       return {
         ...material,
-        slides: parseSlidesData(material.slidesData),
+        slides: parseTeachSlides(material.slidesData),
         mediaUrl,
         isOwner: material.ownerUserId === ctx.user.id,
       };

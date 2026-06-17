@@ -1,20 +1,18 @@
 /**
- * TeachPresenterNotes.tsx — presenter notes window (second screen in present mode).
+ * TeachPresenterNotes.tsx — presenter notes window (syncs slide index from audience window).
  */
 
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
-
-function storageKey(materialId: number) {
-  return `teach-present-${materialId}-slide`;
-}
+import { presenterSlideKey, presenterStepKey, presenterTickKey } from "@shared/teachPresentation";
 
 export default function TeachPresenterNotes() {
   const { id } = useParams<{ id: string }>();
   const materialId = Number(id);
   const [slideIdx, setSlideIdx] = useState(0);
+  const [stepIdx, setStepIdx] = useState(0);
 
   const { data, isLoading } = trpc.teach.getMaterial.useQuery(
     { materialId },
@@ -23,26 +21,35 @@ export default function TeachPresenterNotes() {
 
   const slides = data?.slides ?? [];
 
-  const goTo = (idx: number) => {
-    const next = Math.max(0, Math.min(slides.length - 1, idx));
-    setSlideIdx(next);
-    localStorage.setItem(storageKey(materialId), String(next));
-  };
-
   useEffect(() => {
-    const stored = localStorage.getItem(storageKey(materialId));
-    if (stored) setSlideIdx(parseInt(stored, 10) || 0);
-  }, [materialId]);
-
-  useEffect(() => {
+    const read = () => {
+      const s = localStorage.getItem(presenterSlideKey(materialId));
+      const st = localStorage.getItem(presenterStepKey(materialId));
+      if (s) setSlideIdx(parseInt(s, 10) || 0);
+      if (st) setStepIdx(parseInt(st, 10) || 0);
+    };
+    read();
+    const iv = setInterval(read, 400);
     const onStorage = (e: StorageEvent) => {
-      if (e.key === storageKey(materialId) && e.newValue) {
-        setSlideIdx(parseInt(e.newValue, 10) || 0);
+      if (e.key === presenterSlideKey(materialId) || e.key === presenterStepKey(materialId) || e.key === presenterTickKey(materialId)) {
+        read();
       }
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return () => {
+      clearInterval(iv);
+      window.removeEventListener("storage", onStorage);
+    };
   }, [materialId]);
+
+  const goTo = (idx: number) => {
+    const next = Math.max(0, Math.min(slides.length - 1, idx));
+    localStorage.setItem(presenterSlideKey(materialId), String(next));
+    localStorage.setItem(presenterStepKey(materialId), "0");
+    localStorage.setItem(presenterTickKey(materialId), String(Date.now()));
+    setSlideIdx(next);
+    setStepIdx(0);
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -71,10 +78,19 @@ export default function TeachPresenterNotes() {
       </div>
       <div className="flex-1 p-4 space-y-4 overflow-y-auto">
         <div>
-          <p className="text-xs text-gray-400 uppercase font-semibold mb-1">Current slide ({slideIdx + 1})</p>
+          <p className="text-xs text-gray-400 uppercase font-semibold mb-1">
+            Slide {slideIdx + 1} · step {stepIdx}
+          </p>
           <h2 className="font-bold text-gray-900">{slide?.title}</h2>
-          <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{slide?.notes || "(No notes for this slide)"}</p>
+          <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">
+            {slide?.notes || "(No notes for this slide)"}
+          </p>
         </div>
+        {slide?.advanceAfterMs ? (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+            Timed slide: auto-advance after {slide.advanceAfterMs}ms
+          </p>
+        ) : null}
         {nextSlide && (
           <div className="border-t pt-4">
             <p className="text-xs text-gray-400 uppercase font-semibold mb-1">Up next</p>

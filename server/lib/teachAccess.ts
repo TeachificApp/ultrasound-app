@@ -136,21 +136,10 @@ export async function canPerformTeachAction(
   }
 }
 
-export function parseSlidesData(raw: string | null | undefined): Array<{
-  id: string;
-  title: string;
-  content: string;
-  imageUrl?: string;
-  notes?: string;
-}> {
-  if (!raw) return [{ id: "1", title: "Slide 1", content: "", notes: "" }];
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-  } catch {
-    /* ignore */
-  }
-  return [{ id: "1", title: "Slide 1", content: "", notes: "" }];
+import { parseTeachSlides, type TeachSlide } from "../../shared/teachPresentation";
+
+export function parseSlidesData(raw: string | null | undefined): TeachSlide[] {
+  return parseTeachSlides(raw);
 }
 
 export async function listAccessibleMaterials(userId: number, opts?: { ownerOnly?: boolean }) {
