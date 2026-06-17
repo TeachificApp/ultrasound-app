@@ -12,6 +12,40 @@ import viteConfig from "../../vite.config";
  */
 const SPA_CATCH_ALL_REGEX = /^\/(?!media\/|api\/|manus-storage\/).*/;
 
+/**
+ * Brand meta config keyed by hostname substring.
+ * Social crawlers don't execute JS, so OG tags must be injected server-side.
+ */
+const BRAND_META: Record<string, { title: string; description: string; ogTitle: string; ogDescription: string; ogImage: string; themeColor: string; appTitle: string }> = {
+  iheartecho: {
+    title: "iHeartEcho — Echocardiography Clinical Intelligence",
+    description: "iHeartEcho — Echocardiography clinical intelligence for cardiac ultrasound students, sonographers, echocardiographers, and cardiologists.",
+    ogTitle: "iHeartEcho — Echocardiography Clinical Intelligence",
+    ogDescription: "Real-time echo interpretation and measurement assistant for cardiac ultrasound professionals.",
+    ogImage: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-512_79ee0572.png",
+    themeColor: "#0e1e2e",
+    appTitle: "iHeartEcho",
+  },
+};
+
+/**
+ * Inject brand-specific OG/meta tags into HTML based on the Host header.
+ * This runs server-side so social crawlers (which don't execute JS) see the correct tags.
+ */
+function injectBrandMeta(html: string, host: string): string {
+  const brandKey = Object.keys(BRAND_META).find(k => host.includes(k));
+  if (!brandKey) return html;
+  const m = BRAND_META[brandKey];
+  return html
+    .replace(/<title>[^<]*<\/title>/, `<title>${m.title}</title>`)
+    .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, `$1${m.description}$2`)
+    .replace(/(<meta\s+property="og:title"\s+content=")[^"]*(")/, `$1${m.ogTitle}$2`)
+    .replace(/(<meta\s+property="og:description"\s+content=")[^"]*(")/, `$1${m.ogDescription}$2`)
+    .replace(/(<meta\s+property="og:image"\s+content=")[^"]*(")/, `$1${m.ogImage}$2`)
+    .replace(/(<meta\s+name="theme-color"\s+content=")[^"]*(")/, `$1${m.themeColor}$2`)
+    .replace(/(<meta\s+name="apple-mobile-web-app-title"\s+content=")[^"]*(")/, `$1${m.appTitle}$2`);
+}
+
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
@@ -46,6 +80,9 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`
       );
+      // Inject brand-specific OG tags server-side (crawlers don't run JS)
+      const host = req.hostname || req.headers.host || "";
+      template = injectBrandMeta(template, host);
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
@@ -70,7 +107,18 @@ export function serveStatic(app: Express) {
 
   // Use regex route so /media/* paths are structurally excluded — they can NEVER
   // be caught by this fallback, regardless of route registration order.
-  app.get(SPA_CATCH_ALL_REGEX, (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // Read and inject brand-specific OG tags server-side (crawlers don't run JS).
+  const indexHtmlPath = path.resolve(distPath, "index.html");
+  app.get(SPA_CATCH_ALL_REGEX, (req, res) => {
+    const host = req.hostname || req.headers.host || "";
+    if (!host || !Object.keys(BRAND_META).some(k => host.includes(k))) {
+      // No brand override needed — serve file directly for performance
+      return res.sendFile(indexHtmlPath);
+    }
+    fs.readFile(indexHtmlPath, "utf-8", (err, html) => {
+      if (err) return res.sendFile(indexHtmlPath);
+      const branded = injectBrandMeta(html, host);
+      res.status(200).set({ "Content-Type": "text/html" }).end(branded);
+    });
   });
 }
