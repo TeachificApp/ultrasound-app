@@ -1582,40 +1582,6 @@ async function handleInvoicePaid(invoice: Record<string, unknown>) {
   }
 }
 
-/**
- * LMS course subscription lifecycle — sync access_expires_at with Stripe period end.
- */
-async function handleLmsSubscriptionLifecycle(subscription: Record<string, unknown>, eventType: string) {
-  const subscriptionId = subscription.id as string;
-  if (!subscriptionId) return;
-  const db = await getDb();
-  if (!db) return;
-
-  const [enrollment] = await db.select({ id: lmsEnrollments.id })
-    .from(lmsEnrollments)
-    .where(eq(lmsEnrollments.stripeSubscriptionId, subscriptionId))
-    .limit(1);
-  if (!enrollment) return;
-
-  const status = subscription.status as string;
-  const periodEnd = subscription.current_period_end as number | undefined;
-  const accessExpiresAt = periodEnd ? new Date(periodEnd * 1000) : null;
-
-  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
-    await db.update(lmsEnrollments)
-      .set({ accessExpiresAt: accessExpiresAt ?? new Date() })
-      .where(eq(lmsEnrollments.id, enrollment.id));
-    console.log(`[Stripe] LMS enrollment ${enrollment.id} access ended (sub ${subscriptionId}, status ${status})`);
-  } else if (status === "active" || status === "trialing") {
-    if (accessExpiresAt) {
-      await db.update(lmsEnrollments)
-        .set({ accessExpiresAt })
-        .where(eq(lmsEnrollments.id, enrollment.id));
-      console.log(`[Stripe] LMS enrollment ${enrollment.id} period end synced to ${accessExpiresAt.toISOString()}`);
-    }
-  }
-}
-
 // DIY plan config (mirrors diyRouter.ts DIY_PLANS)
 const DIY_PLAN_CONFIG: Record<string, { totalSeats: number; labAdminSeats: number; memberSeats: number; isUnlimitedMembers: boolean; thinkificProductId: number }> = {
   starter:      { totalSeats: 5,    labAdminSeats: 1,  memberSeats: 4,    isUnlimitedMembers: false, thinkificProductId: 3706401 },

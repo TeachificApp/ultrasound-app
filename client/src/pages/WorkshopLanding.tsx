@@ -19,14 +19,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Briefcase, Calendar, MapPin, Clock, Users, Edit2, ArrowLeft, ExternalLink, CheckCircle, Bell } from "lucide-react";
+import { Briefcase, Calendar, MapPin, Clock, Users, Edit2, ArrowLeft, ExternalLink, CheckCircle, Bell, ChevronRight, X } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
+import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -244,6 +245,7 @@ export default function WorkshopLanding() {
   const { user } = useAuth();
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
   const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<number | null>(null);
 
   const { data, isLoading, error } = trpc.workshop.getBySlug.useQuery(
     { slug: slug! },
@@ -257,18 +259,22 @@ export default function WorkshopLanding() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  // checkoutMutation kept for free-enrollment path via handleCta (pricingOptions flow)
+  // For instance-specific paid checkout, we navigate to /checkout/workshop/:slug?instance=<id>
   const checkoutMutation = trpc.workshopLearner.createEmbeddedCheckoutSession.useMutation({
     onSuccess: (res: any) => {
-      if (res.checkoutUrl) {
-        window.open(res.checkoutUrl, "_blank");
-        toast.info("Redirecting to checkout…");
+      if (res.free) {
+        toast.success("You're registered! Check your email for details.");
+        return;
       }
+      // Should not reach here — paid checkout navigates to WorkshopCheckout page
     },
     onError: (e: any) => toast.error(e.message),
   });
 
   const workshop = data?.workshop;
   const availableInstances = data?.availableInstances ?? [];
+  const allInstances = data?.allInstances ?? [];
   const pricingOptions = data?.pricingOptions ?? [];
 
   // Determine waitlist mode: enabled flag + no active enrolling instances
@@ -368,11 +374,8 @@ export default function WorkshopLanding() {
     if (isFree) {
       enrollMutation.mutate({ workshopId: workshop!.id });
     } else {
-      checkoutMutation.mutate({
-        workshopSlug: workshop!.slug,
-        instanceId,
-        origin: window.location.origin,
-      });
+      // Navigate to dedicated workshop checkout page — handles embedded Stripe checkout
+      window.location.href = `/checkout/workshop/${workshop!.slug}?instance=${instanceId}`;
     }
   }
 
@@ -416,12 +419,210 @@ export default function WorkshopLanding() {
             )
           }
         >
-          {landingBlocks.map((block: Block) => (
-            <BlockPreview
-              key={block.id}
-              block={block}
-            />
-          ))}
+          {landingBlocks.map((block: Block) => {
+            // cohort_sessions_auto in groups mode — render workshop instances as stacked cards
+            if (block.type === "cohort_sessions_auto" && (block.data?.displayMode ?? "sessions") === "groups") {
+              const d = block.data ?? {};
+              const accentColor = d.accentColor ?? "#179ca3";
+              const enrollNowText = d.enrollNowText ?? "Register";
+              const showEnrollNow = d.showEnrollNow !== false;
+              const groupSelectionMode = d.groupSelectionMode ?? "all";
+              const selectedGroupIds: number[] = d.selectedGroupIds ?? [];
+              const sourceInstances: any[] = allInstances;
+              const visibleInstances = groupSelectionMode === "manual" && selectedGroupIds.length > 0
+                ? sourceInstances.filter((inst: any) => selectedGroupIds.includes(inst.id))
+                : sourceInstances;
+              if (visibleInstances.length === 0) return null;
+              const fmtInstDate = (dt: Date | string | null | undefined) => {
+                if (!dt) return null;
+                try { return new Date(dt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return String(dt); }
+              };
+              const locationStr = (inst: any) => {
+                if (inst.locationType === "virtual") return "Virtual / Online";
+                const parts = [inst.venueName, inst.venueCity, inst.venueState].filter(Boolean);
+                return parts.join(", ") || null;
+              };
+              return (
+                <div key={block.id} className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+                  <div className="max-w-4xl mx-auto px-4">
+                    {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+                    <div className="space-y-4">
+                      {visibleInstances.map((inst: any) => (
+                        <div
+                          key={inst.id}
+                          className="rounded-2xl border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                          style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}
+                          onClick={() => setSelectedInstanceId(inst.id)}
+                        >
+                          <div className="p-5">
+                            <div className="flex items-start justify-between gap-4 flex-wrap">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-gray-900 text-base mb-1">{inst.title}</h3>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                                  {inst.startDate && (
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-teal-500" />
+                                      {fmtInstDate(inst.startDate)}{inst.endDate ? ` – ${fmtInstDate(inst.endDate)}` : ""}
+                                    </span>
+                                  )}
+                                  {d.showLocation !== false && locationStr(inst) && (
+                                    <span className="flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 text-teal-500" />
+                                      {locationStr(inst)}
+                                    </span>
+                                  )}
+                                  {d.showDuration !== false && inst.durationMinutes && (
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3 text-teal-500" />
+                                      {inst.durationMinutes >= 60 ? `${Math.round(inst.durationMinutes / 60)}h` : `${inst.durationMinutes}min`}
+                                    </span>
+                                  )}
+                                </div>
+                                {d.showDescription !== false && inst.description && (
+                                  <p className="text-sm text-gray-600 mt-2 line-clamp-2">{inst.description}</p>
+                                )}
+                              </div>
+                              {showEnrollNow && (
+                                <Button
+                                  size="sm"
+                                  className="flex-shrink-0 text-white"
+                                  style={{ backgroundColor: accentColor }}
+                                  onClick={e => { e.stopPropagation(); handleInstanceRegister(inst.id); }}
+                                >
+                                  {enrollNowText}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="px-5 pb-3 flex items-center gap-1 text-[11px]" style={{ color: accentColor }}>
+                            <ChevronRight className="w-3 h-3" />
+                            View details for this date
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            // cohort_instance_cards_auto — stacked cards or embed mode
+            if (block.type === "cohort_instance_cards_auto") {
+              const d = block.data ?? {};
+              const cardDisplayMode = d.cardDisplayMode ?? "stacked";
+              const accentColor = d.accentColor ?? "#179ca3";
+              const enrollNowText = d.enrollNowText ?? "Register";
+              const showEnrollNow = d.showEnrollNow !== false;
+              const groupSelectionMode = d.groupSelectionMode ?? "all";
+              const selectedGroupIds: number[] = d.selectedGroupIds ?? [];
+              const visibleInstances = (groupSelectionMode === "manual" && selectedGroupIds.length > 0
+                ? allInstances.filter((inst: any) => selectedGroupIds.includes(inst.id))
+                : allInstances);
+              if (visibleInstances.length === 0) return null;
+              if (cardDisplayMode === "embed") {
+                return (
+                  <div key={block.id} className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+                    <div className="max-w-4xl mx-auto px-4">
+                      {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+                      <div className="space-y-10">
+                        {visibleInstances.map((inst: any) => (
+                          <WorkshopInstanceEmbedSection
+                            key={inst.id}
+                            instanceId={inst.id}
+                            accentColor={accentColor}
+                            onRegister={() => handleInstanceRegister(inst.id)}
+                            enrollNowText={enrollNowText}
+                            showEnrollNow={showEnrollNow}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              // Stacked cards mode
+              const fmtInstDate = (dt: Date | string | null | undefined) => {
+                if (!dt) return null;
+                try { return new Date(dt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return String(dt); }
+              };
+              const locationStr = (inst: any) => {
+                if (inst.locationType === "virtual") return "Virtual / Online";
+                const parts = [inst.venueName, inst.venueCity, inst.venueState].filter(Boolean);
+                return parts.join(", ") || null;
+              };
+              return (
+                <div key={block.id} className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+                  <div className="max-w-4xl mx-auto px-4">
+                    {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+                    <div className="space-y-4">
+                      {visibleInstances.map((inst: any) => (
+                        <div
+                          key={inst.id}
+                          className="rounded-2xl border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                          style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}
+                          onClick={() => setSelectedInstanceId(inst.id)}
+                        >
+                          <div className="p-5">
+                            <div className="flex items-start justify-between gap-4 flex-wrap">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-gray-900 text-base mb-1">{inst.title}</h3>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                                  {inst.startDate && (
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-teal-500" />
+                                      {fmtInstDate(inst.startDate)}{inst.endDate ? ` – ${fmtInstDate(inst.endDate)}` : ""}
+                                    </span>
+                                  )}
+                                  {d.showLocation !== false && locationStr(inst) && (
+                                    <span className="flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 text-teal-500" />
+                                      {locationStr(inst)}
+                                    </span>
+                                  )}
+                                  {d.showDuration !== false && inst.durationMinutes && (
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3 text-teal-500" />
+                                      {inst.durationMinutes >= 60 ? `${Math.round(inst.durationMinutes / 60)}h` : `${inst.durationMinutes}min`}
+                                    </span>
+                                  )}
+                                </div>
+                                {d.showDescription !== false && inst.description && (
+                                  <p className="text-sm text-gray-600 mt-2 line-clamp-2">{inst.description}</p>
+                                )}
+                              </div>
+                              {showEnrollNow && (
+                                <Button
+                                  size="sm"
+                                  className="flex-shrink-0 text-white"
+                                  style={{ backgroundColor: accentColor }}
+                                  onClick={e => { e.stopPropagation(); handleInstanceRegister(inst.id); }}
+                                >
+                                  {enrollNowText}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="px-5 pb-3 flex items-center gap-1 text-[11px]" style={{ color: accentColor }}>
+                            <ChevronRight className="w-3 h-3" />
+                            View details for this date
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            // remaining_seats — live seat availability block
+            if (block.type === "remaining_seats") {
+              return <RemainingSeatsBlock key={block.id} data={block.data} />;
+            }
+            return (
+              <BlockPreview
+                key={block.id}
+                block={block}
+              />
+            );
+          })}
         </div>
       ) : (
         // Fallback layout
@@ -539,6 +740,299 @@ export default function WorkshopLanding() {
           onClose={() => setWaitlistOpen(false)}
           workshop={workshop}
         />
+      )}
+
+      {/* Workshop instance detail modal */}
+      <WorkshopInstanceDetailModal
+        open={selectedInstanceId !== null}
+        instanceId={selectedInstanceId}
+        onClose={() => setSelectedInstanceId(null)}
+        onRegister={() => {
+          const id = selectedInstanceId;
+          setSelectedInstanceId(null);
+          if (id !== null) handleInstanceRegister(id);
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Workshop Instance Detail Modal ──────────────────────────────────────────
+// Full-page modal that fetches and renders a workshop instance's landing blocks.
+function WorkshopInstanceDetailModal({
+  open,
+  instanceId,
+  onClose,
+  onRegister,
+}: {
+  open: boolean;
+  instanceId: number | null;
+  onClose: () => void;
+  onRegister: () => void;
+}) {
+  const { data, isLoading, error } = trpc.workshop.getInstancePage.useQuery(
+    { instanceId: instanceId! },
+    { enabled: open && instanceId !== null }
+  );
+
+  const fmtDate = (d: Date | string | null | undefined) => {
+    if (!d) return null;
+    try {
+      return new Date(d).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    } catch { return String(d); }
+  };
+
+  const locationStr = data ? (() => {
+    if (data.locationType === "virtual") return "Virtual / Online";
+    const parts = [data.venueName, data.venueCity, data.venueState].filter(Boolean);
+    return parts.join(", ") || null;
+  })() : null;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-5xl sm:max-w-5xl w-full h-[90vh] flex flex-col p-0 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
+          <div>
+            {data && <h2 className="text-lg font-bold text-gray-900">{data.title}</h2>}
+            {!data && !isLoading && <h2 className="text-lg font-bold text-gray-900">Workshop Details</h2>}
+            {isLoading && <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              onClick={onRegister}
+            >
+              Register Now
+            </Button>
+            <DialogClose asChild>
+              <button className="rounded-full p-1.5 hover:bg-gray-100 transition-colors" aria-label="Close">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </DialogClose>
+          </div>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading && (
+            <div className="p-8 space-y-4">
+              <div className="h-8 w-2/3 bg-gray-200 rounded animate-pulse" />
+              <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+              <div className="h-4 w-5/6 bg-gray-100 rounded animate-pulse" />
+              <div className="h-32 w-full bg-gray-100 rounded animate-pulse" />
+            </div>
+          )}
+          {error && (
+            <div className="p-8 text-center text-gray-500">
+              <p>Could not load instance details. Please try again.</p>
+            </div>
+          )}
+          {data && (
+            <>
+              {(!data.landingBlocks || data.landingBlocks.length === 0) ? (
+                <div className="p-8 max-w-2xl mx-auto space-y-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{data.title}</h3>
+                    {data.description && <p className="text-gray-600">{data.description}</p>}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {data.startDate && (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                        <Calendar className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">Start Date</p>
+                          <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.startDate)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {data.endDate && (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                        <Calendar className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">End Date</p>
+                          <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.endDate)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {locationStr && (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                        <MapPin className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Location</p>
+                          <p className="text-sm text-gray-800 font-medium mt-0.5">{locationStr}</p>
+                        </div>
+                      </div>
+                    )}
+                    {data.durationMinutes && (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                        <Clock className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Duration</p>
+                          <p className="text-sm text-gray-800 font-medium mt-0.5">
+                            {data.durationMinutes >= 60 ? `${Math.round(data.durationMinutes / 60)} hours` : `${data.durationMinutes} minutes`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {data.instanceContent && (
+                    <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: data.instanceContent }} />
+                  )}
+                  <div className="text-center pt-4">
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white px-8" onClick={onRegister}>
+                      Register for This Date
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  {(data.landingBlocks as any[]).map((block: any) => (
+                    <BlockPreview key={block.id} block={block} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── WorkshopInstanceEmbedSection ────────────────────────────────────────────
+// Renders a workshop instance's full detail inline (no modal) for embed mode.
+function WorkshopInstanceEmbedSection({
+  instanceId,
+  accentColor,
+  onRegister,
+  enrollNowText,
+  showEnrollNow,
+}: {
+  instanceId: number;
+  accentColor: string;
+  onRegister: () => void;
+  enrollNowText: string;
+  showEnrollNow: boolean;
+}) {
+  const { data, isLoading, error } = trpc.workshop.getInstancePage.useQuery({ instanceId });
+
+  const fmtDate = (d: Date | string | null | undefined) => {
+    if (!d) return null;
+    try {
+      return new Date(d).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    } catch { return String(d); }
+  };
+
+  const locationStr = data ? (() => {
+    if (data.locationType === "virtual") return "Virtual / Online";
+    const parts = [data.venueName, data.venueCity, data.venueState].filter(Boolean);
+    return parts.join(", ") || null;
+  })() : null;
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border p-8 space-y-4" style={{ borderColor: `${accentColor}33` }}>
+        <div className="h-8 w-2/3 bg-gray-200 rounded animate-pulse" />
+        <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+        <div className="h-4 w-5/6 bg-gray-100 rounded animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="rounded-2xl border p-8 text-center text-gray-500" style={{ borderColor: `${accentColor}33` }}>
+        <p>Could not load workshop instance details.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}22` }}>
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColor}08`, borderColor: `${accentColor}22` }}>
+        <h3 className="text-lg font-bold text-gray-900">{data.title}</h3>
+        {showEnrollNow && (
+          <Button
+            size="sm"
+            className="text-white flex-shrink-0"
+            style={{ backgroundColor: accentColor }}
+            onClick={onRegister}
+          >
+            {enrollNowText}
+          </Button>
+        )}
+      </div>
+      {/* Content */}
+      {(!data.landingBlocks || (data.landingBlocks as any[]).length === 0) ? (
+        <div className="p-8 max-w-2xl mx-auto space-y-6">
+          {data.description && <p className="text-gray-600">{data.description}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {data.startDate && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                <Calendar className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">Start Date</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.startDate)}</p>
+                </div>
+              </div>
+            )}
+            {data.endDate && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                <Calendar className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">End Date</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.endDate)}</p>
+                </div>
+              </div>
+            )}
+            {locationStr && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                <MapPin className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Location</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">{locationStr}</p>
+                </div>
+              </div>
+            )}
+            {data.durationMinutes && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                <Clock className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Duration</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">
+                    {data.durationMinutes >= 60 ? `${Math.round(data.durationMinutes / 60)} hours` : `${data.durationMinutes} minutes`}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          {data.instanceContent && (
+            <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: data.instanceContent }} />
+          )}
+          {showEnrollNow && (
+            <div className="text-center pt-2">
+              <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onRegister}>
+                {enrollNowText}
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div>
+          {(data.landingBlocks as any[]).map((block: any) => (
+            <BlockPreview key={block.id} block={block} />
+          ))}
+          {showEnrollNow && (
+            <div className="text-center py-6">
+              <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onRegister}>
+                {enrollNowText}
+              </Button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
