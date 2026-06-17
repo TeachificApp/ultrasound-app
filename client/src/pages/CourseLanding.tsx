@@ -1464,6 +1464,22 @@ export default function CourseLanding() {
     },
     onError: (e) => toast.error(`Community join failed: ${e.message}`),
   });
+  // Cohort waitlist mutation — must be declared before early returns to satisfy Rules of Hooks
+  // Use a ref so the onSuccess callback can access the latest featuredGroup at call time
+  const featuredGroupRef = useRef<any>(null);
+  const joinCohortWaitlistMutation = trpc.lms.joinCohortWaitlist.useMutation({
+    onSuccess: (res) => {
+      if (res.alreadyRegistered) {
+        toast.info("You're already on the waitlist for this course.");
+        setCohortWaitlistOpen(false);
+        return;
+      }
+      setCwSubmitted(true);
+      const redir = featuredGroupRef.current?.waitlistRedirectUrl;
+      if (redir) setTimeout(() => { window.location.href = redir; }, 1500);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   // handleFreeEnroll: dispatches free enrollment for any product type selected in the CTA builder
   const handleFreeEnroll = async (productType: string, productId: number) => {
@@ -1670,23 +1686,12 @@ export default function CourseLanding() {
   const isEnrollmentClosed = !enrollment && course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date();
   // Cohort waitlist mode: featuredGroup has waitlist enabled AND no open cohort group exists
   const featuredGroup = (course as any).featuredGroup ?? null;
+  // Keep ref in sync so the mutation callback (declared before early returns) can access featuredGroup
+  featuredGroupRef.current = featuredGroup;
   const hasOpenGroup = (course as any).hasOpenGroup ?? true;
   const isWaitlistMode = !enrollment && !!(featuredGroup?.waitlistEnabled && !hasOpenGroup);
   const waitlistCtaLabel = featuredGroup?.waitlistCtaLabel || "Join the Waitlist";
   const ctaText = enrollment ? "Continue Learning" : isWaitlistMode ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
-  const joinCohortWaitlistMutation = trpc.lms.joinCohortWaitlist.useMutation({
-    onSuccess: (res) => {
-      if (res.alreadyRegistered) {
-        toast.info("You're already on the waitlist for this course.");
-        setCohortWaitlistOpen(false);
-        return;
-      }
-      setCwSubmitted(true);
-      const redir = featuredGroup?.waitlistRedirectUrl;
-      if (redir) setTimeout(() => { window.location.href = redir; }, 1500);
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
   const handleWaitlistCta = () => {
     if (featuredGroup?.waitlistCtaUrl) { window.open(featuredGroup.waitlistCtaUrl, "_blank"); return; }
     setCwSubmitted(false); setCwName(""); setCwEmail(""); setCwPhone(""); setCwMessage("");
