@@ -1468,6 +1468,70 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </CC></div>
       );
     }
+    case "cohort_instance_cards_auto": {
+      // Admin preview — stacked cohort group/instance cards with sample data
+      const accentColorCICA = d.accentColor ?? "#179ca3";
+      const enrollNowTextCICA = d.enrollNowText ?? "Enroll Now";
+      const showEnrollNowCICA = d.showEnrollNow !== false;
+      const cardDisplayModeCICA = d.cardDisplayMode ?? "stacked";
+      const sampleGroupsCICA = [
+        { title: "Spring 2025 Cohort", dateRange: "Mar 3 – Apr 14, 2025", location: "Virtual / Online", hours: "12h", description: "6-week live cohort with weekly sessions and hands-on case reviews." },
+        { title: "Summer 2025 Cohort", dateRange: "Jun 2 – Jul 14, 2025", location: "Virtual / Online", hours: "12h", description: "Intensive summer cohort with daily check-ins and live Q&A sessions." },
+        { title: "Fall 2025 Cohort", dateRange: "Sep 8 – Oct 20, 2025", location: "New York, NY", hours: "16h", description: "In-person cohort with full-day workshops and networking events." },
+      ];
+      if (cardDisplayModeCICA === "embed") {
+        return (
+          <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            <div className="space-y-8">
+              {sampleGroupsCICA.map((g, i) => (
+                <div key={i} className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColorCICA}22` }}>
+                  <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColorCICA}08`, borderColor: `${accentColorCICA}22` }}>
+                    <h3 className="text-lg font-bold text-gray-900">{g.title}</h3>
+                    {showEnrollNowCICA && <button className="px-4 py-1.5 rounded-lg text-white text-sm font-semibold" style={{ backgroundColor: accentColorCICA }}>{enrollNowTextCICA}</button>}
+                  </div>
+                  <div className="p-6 space-y-3">
+                    <p className="text-gray-600 text-sm">{g.description}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-start gap-2 p-3 rounded-xl bg-teal-50 border border-teal-100"><span className="text-teal-600">📅</span><div><p className="text-xs text-teal-600 font-semibold uppercase">Dates</p><p className="text-sm text-gray-800">{g.dateRange}</p></div></div>
+                      <div className="flex items-start gap-2 p-3 rounded-xl bg-gray-50 border border-gray-100"><span>📍</span><div><p className="text-xs text-gray-500 font-semibold uppercase">Location</p><p className="text-sm text-gray-800">{g.location}</p></div></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CC></div>
+        );
+      }
+      return (
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="space-y-4">
+            {sampleGroupsCICA.map((g, i) => (
+              <div key={i} className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColorCICA}33`, backgroundColor: `${accentColorCICA}06` }}>
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 text-base mb-1">{g.title}</h3>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">📅 {g.dateRange}</span>
+                        <span className="flex items-center gap-1">📍 {g.location}</span>
+                        <span className="flex items-center gap-1">⏱ {g.hours}</span>
+                      </div>
+                      {d.showDescription !== false && <p className="text-sm text-gray-600 mt-2 line-clamp-2">{g.description}</p>}
+                    </div>
+                    {showEnrollNowCICA && (
+                      <button className="flex-shrink-0 px-4 py-1.5 rounded-lg text-white text-sm font-semibold" style={{ backgroundColor: accentColorCICA }}>{enrollNowTextCICA}</button>
+                    )}
+                  </div>
+                </div>
+                <div className="px-5 pb-3 flex items-center gap-1 text-[11px]" style={{ color: accentColorCICA }}>▶ View details for this cohort</div>
+              </div>
+            ))}
+          </div>
+        </CC></div>
+      );
+    }
     case "affiliate_signup": {
       const accentColor = d.accentColor ?? "#179ca3";
       const headline = d.headline ?? "Earn money by sharing what you love";

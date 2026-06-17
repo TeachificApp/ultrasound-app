@@ -4725,47 +4725,6 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
           <div className="border-t pt-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Options</p>
-            <div className="flex gap-1">
-              {(["sessions", "groups"] as const).map(m => (
-                <button key={m} onClick={() => set("displayMode", m)}
-                  className={`flex-1 py-1.5 text-xs rounded border capitalize ${displayMode === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
-                  {m === "sessions" ? "Live Sessions List" : "Cohort/Instance Cards"}
-                </button>
-              ))}
-            </div>
-            {displayMode === "groups" && (
-              <p className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-2 py-1.5 mt-2">
-                Shows stacked cards for each cohort group (or workshop instance). Each card has an Enroll Now button. Clicking a card opens the full detail page for that group/instance.
-              </p>
-            )}
-          </div>
-          {displayMode === "groups" && (
-            <div className="border-t pt-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Group Selection</p>
-              <div className="flex gap-1">
-                {(["all", "manual"] as const).map(m => (
-                  <button key={m} onClick={() => set("groupSelectionMode", m)}
-                    className={`flex-1 py-1.5 text-xs rounded border capitalize ${(d.groupSelectionMode ?? "all") === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
-                    {m === "all" ? "All Available (Dynamic)" : "Manual Selection"}
-                  </button>
-                ))}
-              </div>
-              {(d.groupSelectionMode ?? "all") === "manual" && (
-                <p className="text-[10px] text-gray-500 mt-1.5">Enter comma-separated cohort group IDs to show specific groups.</p>
-              )}
-              {(d.groupSelectionMode ?? "all") === "manual" && (
-                <input
-                  type="text"
-                  className="w-full mt-1 h-8 text-xs border rounded px-2"
-                  placeholder="e.g. 12, 15, 23"
-                  value={(d.selectedGroupIds ?? []).join(", ")}
-                  onChange={e => set("selectedGroupIds", e.target.value.split(",").map((s: string) => Number(s.trim())).filter(Boolean))}
-                />
-              )}
-            </div>
-          )}
-          <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Design</p>
             <div className="space-y-2">
               <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
@@ -4779,26 +4738,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDescription ?? true} onChange={e => set("showDescription", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show description</label></div>
               <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDuration ?? true} onChange={e => set("showDuration", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show duration / hours</label></div>
               <div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocation ?? true} onChange={e => set("showLocation", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show location</label></div>
-              {displayMode === "sessions" && (
-                <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPastSessions ?? false} onChange={e => set("showPastSessions", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show past sessions</label></div>
-              )}
-              {displayMode === "groups" && (
-                <>
-                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.showEnrollNow ?? true} onChange={e => set("showEnrollNow", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Enroll Now button on each card</label></div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Enroll Now Button Text</label>
-                    <input type="text" className="w-full h-8 text-xs border rounded px-2" value={d.enrollNowText ?? "Enroll Now"} onChange={e => set("enrollNowText", e.target.value)} placeholder="Enroll Now" />
-                  </div>
-                </>
-              )}
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPastSessions ?? false} onChange={e => set("showPastSessions", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show past sessions</label></div>
             </div>
           </div>
-          {displayMode === "sessions" && (
-            <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Sessions are auto-populated from the cohort live sessions you create in the Course → Cohort tab.</p>
-          )}
-          {displayMode === "groups" && (
-            <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Cards are auto-populated from available cohort groups. Clicking a card opens the full detail page for that group. Use <strong>Enroll in Next Available</strong> CTA action type for generalized CTAs elsewhere on the page.</p>
-          )}
+          <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Sessions are auto-populated from the cohort live sessions you create in the Course → Cohort tab. To show cohort group or workshop instance cards, use the <strong>Cohort Groups / Instances (Auto)</strong> block instead.</p>
         </div>
       );
     }
