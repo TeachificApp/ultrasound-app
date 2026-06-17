@@ -82,6 +82,7 @@ export type BlockType =
   | "data_table"
   | "file_upload"
   | "cohort_sessions_auto"
+  | "cohort_instance_cards_auto"
   | "affiliate_signup"
   | "webinar_hero"
   | "webinar_registration"
@@ -162,7 +163,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         <div
           className="relative px-4 sm:px-8 py-10 sm:py-16 overflow-hidden w-full box-border"
           style={{ ...heroBg, ...heroTopBorderStyle, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), cursor: heroClickHandler ? "pointer" : undefined, minHeight: `${heroMinHeight}px`, ...(heroMaxHeight ? { maxHeight: heroMaxHeight, overflow: "hidden" } : {}) }}
-          onClick={heroClickHandler}
+          onClick={e => { handleCtaBtnClick(e as React.MouseEvent<HTMLElement>); if (!( e.target as HTMLElement).closest('[data-cta-btn]')) heroClickHandler?.(); }}
         >
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
@@ -181,7 +182,15 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {heroButtons.map((btn, i) => (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                    <button
+                      data-cta-btn="1"
+                      data-action={(btn as any).behavior ?? "direct_checkout"}
+                      data-link={(btn as any).behavior === "url" ? ((btn as any).link ?? "") : undefined}
+                      data-anchor={(btn as any).behavior === "scroll_to_section" ? ((btn as any).scrollAnchor ?? "") : undefined}
+                      data-email={(btn as any).behavior === "send_email" ? ((btn as any).emailAddress ?? "") : undefined}
+                      data-popup={(btn as any).behavior === "open_popup" ? ((btn as any).popupUrl ?? "") : undefined}
+                      data-download={(btn as any).behavior === "download_file" ? ((btn as any).downloadUrl ?? "") : undefined}
+                      className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
                     </button>
@@ -539,19 +548,20 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           </p>
         </div>
       ) : null;
+      const pricingCtaBeh = d.ctaBehavior ?? (d.ctaUrl && d.ctaUrl.startsWith("http") ? "url" : "direct_checkout");
       const ctaBtn = (
-        <a
-          href={d.ctaUrl ?? "#"}
-          target={d.ctaUrl && d.ctaUrl.startsWith("http") ? "_blank" : undefined}
-          rel={d.ctaUrl && d.ctaUrl.startsWith("http") ? "noopener noreferrer" : undefined}
-          className={`inline-block px-10 py-4 rounded-xl font-bold text-lg shadow-lg ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+        <button
+          data-cta-btn="1"
+          data-action={pricingCtaBeh}
+          data-link={pricingCtaBeh === "url" ? (d.ctaUrl ?? "") : undefined}
+          className={`inline-block px-10 py-4 rounded-xl font-bold text-lg shadow-lg cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
           style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
         >
           {d.ctaText ?? "Get Started"}
-        </a>
+        </button>
       );
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC className="text-center">
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC className="text-center">
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {priceAbove && priceBlock}
@@ -562,16 +572,23 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </CC></div>
       );
     }
-    case "cta_standalone":
+    case "cta_standalone": {
+      const standaloneCtaBeh = d.ctaBehavior ?? (d.ctaLink && d.ctaLink.startsWith("http") ? "url" : "direct_checkout");
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}><CC style={{ textAlign: d.align ?? "center" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
             <p className="text-lg text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>
           )}
           {d.displayPrice && <p className="text-3xl font-bold mb-4" style={{ color: d.ctaColor ?? "#179ca3" }}>{d.displayPrice}</p>}
-          <a href={d.ctaLink ?? "#"} className={`inline-block px-8 py-3 rounded-lg font-semibold shadow ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Get Started"}</a>
+          <button
+            data-cta-btn="1"
+            data-action={standaloneCtaBeh}
+            data-link={standaloneCtaBeh === "url" ? (d.ctaLink ?? "") : undefined}
+            className={`inline-block px-8 py-3 rounded-lg font-semibold shadow cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+            style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
+          >{d.ctaText ?? "Get Started"}</button>
           {d.ctaBehavior === "direct_checkout" && <p className="text-[10px] text-teal-600 mt-1">→ Stripe Checkout</p>}
           <ButtonSubtext d={d} />
           {(d.showOptOut || d.optOutEnabled) && d.optOutText && (
@@ -579,6 +596,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           )}
         </CC></div>
       );
+    }
     case "lead_capture": {
       const lcBtnBg = d.btnBg ?? "#ffffff";
       const lcBtnTxt = d.btnTextColor ?? "#179ca3";
@@ -605,9 +623,10 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         </CC></div>
       );
     }
-    case "cta_optin":
+    case "cta_optin": {
+      const optinCtaBeh = d.ctaBehavior ?? "direct_checkout";
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }}><CC style={{ textAlign: d.align ?? "center" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}><CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -618,10 +637,17 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             <input type="text" placeholder={d.namePlaceholder ?? "Your name"} className="w-full px-4 py-3 rounded-lg border border-gray-200 text-gray-900 text-sm" />
             <input type="email" placeholder={d.emailPlaceholder ?? "Your email address"} className="w-full px-4 py-3 rounded-lg border border-gray-200 text-gray-900 text-sm" />
           </div>
-          <a href="#" className={`inline-block px-8 py-3 rounded-lg font-semibold shadow ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Get Access"}</a>
+          <button
+            data-cta-btn="1"
+            data-action={optinCtaBeh}
+            data-link={optinCtaBeh === "url" ? (d.ctaLink ?? "") : undefined}
+            className={`inline-block px-8 py-3 rounded-lg font-semibold shadow cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+            style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
+          >{d.ctaText ?? "Get Access"}</button>
           <ButtonSubtext d={d} />
         </CC></div>
       );
+    }
     case "funnel_workflow":
       return <FunnelWorkflowBlock data={d} />;
     case "product_offer_stack":
@@ -653,7 +679,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
               {d.finalPrice && <span className="underline decoration-4 underline-offset-4">{d.finalPrice}</span>}
             </p>
           )}
-          {d.ctaText && <button className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText}</button>}
+          {d.ctaText && <button data-cta-btn="1" data-action={d.ctaBehavior ?? "direct_checkout"} data-link={d.ctaBehavior === "url" ? (d.ctaLink ?? "") : undefined} className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg cursor-pointer" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText}</button>}
         </div>
       );
     }

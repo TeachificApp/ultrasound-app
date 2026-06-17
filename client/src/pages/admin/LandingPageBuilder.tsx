@@ -318,7 +318,9 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   { type: "pricing_options_auto", label: "Pricing Options", icon: <CreditCard size={14} />, category: "Conversion",
     defaultData: { headline: "Choose Your Plan", bgColor: "#f9fafb" } },
   { type: "cohort_sessions_auto", label: "Live Sessions (Auto)", icon: <Timer size={14} />, category: "Content",
-    defaultData: { headline: "Upcoming Live Sessions", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true, showLocation: true, displayMode: "sessions", groupSelectionMode: "all", selectedGroupIds: [], enrollNowText: "Enroll Now", showEnrollNow: true } },
+    defaultData: { headline: "Upcoming Live Sessions", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true, showLocation: true, displayMode: "sessions", showPastSessions: false } },
+  { type: "cohort_instance_cards_auto", label: "Cohort Groups / Instances (Auto)", icon: <Layers size={14} />, category: "Content",
+    defaultData: { headline: "Upcoming Cohorts", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true, showLocation: true, groupSelectionMode: "all", selectedGroupIds: [], enrollNowText: "Enroll Now", showEnrollNow: true } },
   { type: "related_products", label: "Related Products", icon: <Package size={14} />, category: "Smart",
     defaultData: {
       headline: "You Might Also Like",
@@ -4650,13 +4652,80 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
         </div>
       );
     }
-    case "cohort_sessions_auto": {
-      const displayMode = d.displayMode ?? "sessions";
+    case "cohort_instance_cards_auto": {
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
           <div className="border-t pt-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Mode</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Card Display Mode</p>
+            <div className="flex gap-1">
+              {(["stacked", "embed"] as const).map(m => (
+                <button key={m} onClick={() => set("cardDisplayMode", m)}
+                  className={`flex-1 py-1.5 text-xs rounded border capitalize ${(d.cardDisplayMode ?? "stacked") === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
+                  {m === "stacked" ? "Stacked Cards" : "Embed (Full Detail)"}
+                </button>
+              ))}
+            </div>
+            {(d.cardDisplayMode ?? "stacked") === "embed" && (
+              <p className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-2 py-1.5 mt-2">
+                Embed mode renders the full cohort/instance detail page inline on this page — no modal or navigation needed.
+              </p>
+            )}
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Group Selection</p>
+            <div className="flex gap-1">
+              {(["all", "manual"] as const).map(m => (
+                <button key={m} onClick={() => set("groupSelectionMode", m)}
+                  className={`flex-1 py-1.5 text-xs rounded border capitalize ${(d.groupSelectionMode ?? "all") === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
+                  {m === "all" ? "All Available (Dynamic)" : "Manual Selection"}
+                </button>
+              ))}
+            </div>
+            {(d.groupSelectionMode ?? "all") === "manual" && (
+              <p className="text-[10px] text-gray-500 mt-1.5">Enter comma-separated cohort group IDs to show specific groups.</p>
+            )}
+            {(d.groupSelectionMode ?? "all") === "manual" && (
+              <input
+                type="text"
+                className="w-full mt-1 h-8 text-xs border rounded px-2"
+                placeholder="e.g. 12, 15, 23"
+                value={(d.selectedGroupIds ?? []).join(", ")}
+                onChange={e => set("selectedGroupIds", e.target.value.split(",").map((s: string) => Number(s.trim())).filter(Boolean))}
+              />
+            )}
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Design</p>
+            <div className="space-y-2">
+              <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+              <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
+              <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Options</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDescription ?? true} onChange={e => set("showDescription", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show description</label></div>
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDuration ?? true} onChange={e => set("showDuration", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show duration / hours</label></div>
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocation ?? true} onChange={e => set("showLocation", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show location</label></div>
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showEnrollNow ?? true} onChange={e => set("showEnrollNow", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Enroll Now button on each card</label></div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Enroll Now Button Text</label>
+                <input type="text" className="w-full h-8 text-xs border rounded px-2" value={d.enrollNowText ?? "Enroll Now"} onChange={e => set("enrollNowText", e.target.value)} placeholder="Enroll Now" />
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Cards are auto-populated from available cohort groups (courses) or workshop instances. Clicking a card opens the full detail page. Use <strong>Enroll in Next Available</strong> CTA action type for generalized CTAs elsewhere on the page.</p>
+        </div>
+      );
+    }
+    case "cohort_sessions_auto": {
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Options</p>
             <div className="flex gap-1">
               {(["sessions", "groups"] as const).map(m => (
                 <button key={m} onClick={() => set("displayMode", m)}

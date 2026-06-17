@@ -1043,6 +1043,139 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         </div>
       );
     }
+    case "cohort_instance_cards_auto": {
+      // ── cohort_instance_cards_auto: stacked cards or embed mode ──
+      const cardDisplayMode = d.cardDisplayMode ?? "stacked";
+      const accentColorCICA = d.accentColor ?? "#179ca3";
+      const allGroupsCICA: any[] = (course as any).cohortGroups ?? [];
+      const groupSelectionModeCICA = d.groupSelectionMode ?? "all";
+      const selectedGroupIdsCICA: number[] = d.selectedGroupIds ?? [];
+      const visibleGroupsCICA = groupSelectionModeCICA === "manual" && selectedGroupIdsCICA.length > 0
+        ? allGroupsCICA.filter((g: any) => selectedGroupIdsCICA.includes(g.id))
+        : allGroupsCICA;
+      if (visibleGroupsCICA.length === 0) return null;
+      const enrollNowTextCICA = d.enrollNowText ?? "Enroll Now";
+      const showEnrollNowCICA = d.showEnrollNow !== false;
+      const fmtGroupDateCICA = (dt: Date | string | null | undefined) => {
+        if (!dt) return null;
+        try { return new Date(dt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return String(dt); }
+      };
+      const statusBadgeCICA = (status: string) => {
+        const map: Record<string, { label: string; color: string }> = {
+          open: { label: "Enrolling Now", color: "#059669" },
+          active: { label: "In Progress", color: "#2563eb" },
+          completed: { label: "Completed", color: "#6b7280" },
+        };
+        const s = map[status];
+        if (!s) return null;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: s.color }}>{s.label}</span>;
+      };
+      if (cardDisplayMode === "embed") {
+        // ── Embed mode: render each group's full detail inline ──
+        return (
+          <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+            <CC>
+              {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+              <div className="space-y-10">
+                {visibleGroupsCICA.map((g: any) => (
+                  <CohortGroupEmbedSection
+                    key={g.id}
+                    groupId={g.id}
+                    accentColor={accentColorCICA}
+                    onEnroll={() => onCheckoutPage?.()}
+                    enrollNowText={enrollNowTextCICA}
+                    showEnrollNow={showEnrollNowCICA}
+                  />
+                ))}
+              </div>
+            </CC>
+          </div>
+        );
+      }
+      // ── Stacked cards mode (default) ──
+      return (
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <CC>
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            <div className="space-y-4">
+              {visibleGroupsCICA.map((g: any) => (
+                <div
+                  key={g.id}
+                  className="rounded-2xl border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                  style={{ borderColor: `${accentColorCICA}33`, backgroundColor: `${accentColorCICA}06` }}
+                  onClick={() => onOpenGroupDetail?.(g.id)}
+                >
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <h3 className="font-bold text-gray-900 text-base">{g.name}</h3>
+                          {statusBadgeCICA(g.status)}
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1">
+                          {(g.startDate || g.endDate) && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-teal-500" />
+                              {fmtGroupDateCICA(g.startDate)}{g.endDate ? ` – ${fmtGroupDateCICA(g.endDate)}` : ""}
+                            </span>
+                          )}
+                          {d.showLocation !== false && g.location && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-teal-500" />
+                              {g.location}
+                            </span>
+                          )}
+                          {d.showDuration !== false && g.durationHours && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-teal-500" />
+                              {g.durationHours}h total
+                            </span>
+                          )}
+                        </div>
+                        {d.showDescription !== false && g.description && (
+                          <p className="text-sm text-gray-600 mt-2 line-clamp-2">{g.description}</p>
+                        )}
+                        {g.maxStudents != null && (() => {
+                          const enrolled = Number(g.enrollmentCount ?? 0);
+                          const available = Math.max(0, g.maxStudents - enrolled);
+                          const pct = g.maxStudents > 0 ? enrolled / g.maxStudents : 0;
+                          const isLow = available <= 3 && available > 0;
+                          const isFull = available === 0;
+                          return (
+                            <div className="mt-2 flex items-center gap-2">
+                              <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden" style={{ maxWidth: 120 }}>
+                                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: isFull ? '#dc2626' : isLow ? '#f59e0b' : accentColorCICA }} />
+                              </div>
+                              <span className={`text-[11px] font-medium ${isFull ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-500'}`}>
+                                {isFull ? 'Fully Booked' : `${available} seat${available === 1 ? '' : 's'} left`}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      {showEnrollNowCICA && (
+                        <Button
+                          size="sm"
+                          className="flex-shrink-0 text-white"
+                          style={{ backgroundColor: accentColorCICA }}
+                          onClick={e => { e.stopPropagation(); onCheckoutPage?.(); }}
+                        >
+                          {enrollNowTextCICA}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="px-5 pb-3 flex items-center gap-1 text-[11px]" style={{ color: accentColorCICA }}>
+                    <ChevronRight className="w-3 h-3" />
+                    View details for this cohort
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CC>
+        </div>
+      );
+    }
     case "divider":
       return <div style={{ padding: `${d.spacing ?? 32}px 32px` }}><hr style={{ borderTop: `${d.thickness ?? 1}px ${d.style ?? "solid"} ${d.color ?? "#e5e7eb"}`, borderRadius: d.borderRadius ? `${d.borderRadius}px` : undefined }} /></div>;
     case "two_column":
@@ -2193,7 +2326,7 @@ function CohortGroupDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col p-0 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
           <div>
@@ -2298,5 +2431,131 @@ function CohortGroupDetailModal({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── CohortGroupEmbedSection ──────────────────────────────────────────────────
+// Renders a cohort group's full detail inline (no modal) for embed display mode.
+function CohortGroupEmbedSection({
+  groupId,
+  accentColor,
+  onEnroll,
+  enrollNowText,
+  showEnrollNow,
+}: {
+  groupId: number;
+  accentColor: string;
+  onEnroll: () => void;
+  enrollNowText: string;
+  showEnrollNow: boolean;
+}) {
+  const { data, isLoading, error } = trpc.lms.getCohortGroupPage.useQuery({ cohortGroupId: groupId });
+
+  const fmtDate = (d: Date | string | null | undefined) => {
+    if (!d) return null;
+    try {
+      return new Date(d).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    } catch { return String(d); }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border p-8 space-y-4" style={{ borderColor: `${accentColor}33` }}>
+        <div className="h-8 w-2/3 bg-gray-200 rounded animate-pulse" />
+        <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+        <div className="h-4 w-5/6 bg-gray-100 rounded animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="rounded-2xl border p-8 text-center text-gray-500" style={{ borderColor: `${accentColor}33` }}>
+        <p>Could not load cohort details.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}22` }}>
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColor}08`, borderColor: `${accentColor}22` }}>
+        <h3 className="text-lg font-bold text-gray-900">{data.name}</h3>
+        {showEnrollNow && (
+          <Button
+            size="sm"
+            className="text-white flex-shrink-0"
+            style={{ backgroundColor: accentColor }}
+            onClick={onEnroll}
+          >
+            {enrollNowText}
+          </Button>
+        )}
+      </div>
+      {/* Content */}
+      {(!data.landingBlocks || (data.landingBlocks as any[]).length === 0) ? (
+        <div className="p-8 max-w-2xl mx-auto space-y-6">
+          {data.description && <p className="text-gray-600">{data.description}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {data.startDate && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                <Calendar className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">Start Date</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.startDate)}</p>
+                </div>
+              </div>
+            )}
+            {data.endDate && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
+                <Calendar className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide">End Date</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.endDate)}</p>
+                </div>
+              </div>
+            )}
+            {data.maxStudents && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                <Users className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Capacity</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">{data.maxStudents} students max</p>
+                </div>
+              </div>
+            )}
+            {data.enrollmentCloseDate && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-100">
+                <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Enrollment Closes</p>
+                  <p className="text-sm text-gray-800 font-medium mt-0.5">{fmtDate(data.enrollmentCloseDate)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+          {showEnrollNow && (
+            <div className="text-center pt-2">
+              <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
+                {enrollNowText}
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div>
+          {(data.landingBlocks as any[]).map((block: any) => (
+            <BlockPreview key={block.id} block={block} />
+          ))}
+          {showEnrollNow && (
+            <div className="text-center py-6">
+              <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
+                {enrollNowText}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
