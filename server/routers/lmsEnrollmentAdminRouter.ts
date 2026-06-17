@@ -3350,7 +3350,7 @@ CRITICAL REQUIREMENTS:
     .input(z.object({
       collectionId: z.number(),
       items: z.array(z.object({
-        itemType: z.enum(["course", "quiz", "webinar", "download", "bundle", "membership", "physical"]),
+        itemType: z.enum(["course", "quiz", "webinar", "download", "bundle", "membership", "physical", "workshop"]),
         itemId: z.number(),
       })),
     }))

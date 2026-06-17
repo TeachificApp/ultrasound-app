@@ -839,6 +839,9 @@ function LMSRouter() {
         <Route path="/admin/lms/:courseId/cohorts/:cohortGroupId/page-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CohortGroupLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/webinars/:webinarId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/bundles/:bundleId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><BundleLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/memberships/:planId/sales-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembershipSalesPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/memberships/:planId/member-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembershipMemberPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
                 <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/contacts">{() => { window.location.replace("/admin/funnels?tab=contacts"); return null; }}</Route>
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
