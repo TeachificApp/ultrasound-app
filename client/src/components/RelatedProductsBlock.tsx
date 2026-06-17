@@ -46,6 +46,7 @@ interface Props {
 const INTERVAL_LABEL: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
 function formatPrice(price: number, isFree: boolean, pricingType?: string | null, subscriptionInterval?: string | null): string {
   if (isFree || price === 0) return "Free";
+  if (price === -1) return "Subscription";
   const base = `$${Number(price).toFixed(2)}`;
   if (pricingType === "subscription") return base + (INTERVAL_LABEL[subscriptionInterval ?? "monthly"] ?? "/mo");
   if (pricingType === "payment_plan") return base + " (plan)";

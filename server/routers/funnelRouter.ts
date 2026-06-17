@@ -60,10 +60,10 @@ export const funnelRouter = router({
     ]);
     // Hardcoded app products (UltrasoundAssist + EchoAssist, Free + Premium)
     const APP_PRODUCTS = [
-      { id: 1001, type: "app" as const, name: "UltrasoundAssist™ — Free", price: 0, imageUrl: "", href: "/app/ultrasound-assist", isFree: true },
-      { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: 0, imageUrl: "", href: "/app/ultrasound-assist/premium", isFree: false },
-      { id: 1003, type: "app" as const, name: "EchoAssist™ — Free", price: 0, imageUrl: "", href: "/app/echo-assist", isFree: true },
-      { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: 0, imageUrl: "", href: "/app/echo-assist/premium", isFree: false },
+      { id: 1001, type: "app" as const, name: "UltrasoundAssist™ — Free", price: 0, imageUrl: "", href: "https://app.allaboutultrasound.com", isFree: true },
+      { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: -1, imageUrl: "", href: "https://app.allaboutultrasound.com", isFree: false },
+      { id: 1003, type: "app" as const, name: "EchoAssist™ — Free", price: 0, imageUrl: "", href: "https://app.iheartecho.com", isFree: true },
+      { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: -1, imageUrl: "", href: "https://app.iheartecho.com", isFree: false },
     ];
     return [
       ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
@@ -102,10 +102,10 @@ export const funnelRouter = router({
 
       // Hardcoded app products registry
       const APP_REGISTRY: Record<number, { id: number; type: string; title: string; slug: string; description: string; price: number; isFree: boolean; imageUrl: string; href: string }> = {
-        1001: { id: 1001, type: "app", title: "UltrasoundAssist™ — Free", slug: "ultrasound-assist-free", description: "AI-powered ultrasound clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: "", href: "/app/ultrasound-assist" },
-        1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: 0, isFree: false, imageUrl: "", href: "/app/ultrasound-assist/premium" },
-        1003: { id: 1003, type: "app", title: "EchoAssist™ — Free", slug: "echo-assist-free", description: "AI-powered echocardiography clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: "", href: "/app/echo-assist" },
-        1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: 0, isFree: false, imageUrl: "", href: "/app/echo-assist/premium" },
+        1001: { id: 1001, type: "app", title: "UltrasoundAssist™ — Free", slug: "ultrasound-assist-free", description: "AI-powered ultrasound clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: "", href: "https://app.allaboutultrasound.com" },
+        1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: -1, isFree: false, imageUrl: "", href: "https://app.allaboutultrasound.com" },
+        1003: { id: 1003, type: "app", title: "EchoAssist™ — Free", slug: "echo-assist-free", description: "AI-powered echocardiography clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: "", href: "https://app.iheartecho.com" },
+        1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: -1, isFree: false, imageUrl: "", href: "https://app.iheartecho.com" },
       };
 
       const [courses, downloads, bundles, physicals, webinarRows, communityRows, workshopRows] = await Promise.all([

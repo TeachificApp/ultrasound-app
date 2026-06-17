@@ -607,6 +607,12 @@ export async function fulfillMembershipPurchase(
     }
   }
 
+  // Silently ensure Free Membership is also active for this user (idempotent, no email)
+  // This guarantees that any purchaser always has the free tier as a baseline.
+  import("./ensureFreeMembership").then(({ ensureFreeMembership }) => {
+    ensureFreeMembership(userId).catch(() => {});
+  }).catch(() => {});
+
   return { success: true, userId, planId, isNewUser: resolved.isNew, notes };
 }
 

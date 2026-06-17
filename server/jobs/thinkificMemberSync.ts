@@ -9,7 +9,7 @@
  * - NO premium_user role is assigned — only base "user" role.
  * - Every synced user receives:
  *     1. Base "user" role
- *     2. Free membership plan enrollment (slug: "free-membership")
+ *     2. Free membership plan enrollment (slug: "free")
  *     3. Community membership in the AAU | iHeartEcho™ Community (slug: "all-about-ultrasound")
  * - Existing users (pending or active) are skipped for account creation but still receive
  *   the free membership + community access if they don't already have it.
@@ -26,7 +26,7 @@ let syncIntervalId: ReturnType<typeof setInterval> | null = null;
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 /** Slug of the free membership plan on this platform */
-const FREE_MEMBERSHIP_SLUG = "free-membership";
+const FREE_MEMBERSHIP_SLUG = "free";
 
 /** Slug of the AAU | iHeartEcho™ Community */
 const AAU_COMMUNITY_SLUG = "all-about-ultrasound";

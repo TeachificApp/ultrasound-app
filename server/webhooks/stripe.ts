@@ -1976,6 +1976,10 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
         const purchaseUserId = meta.user_id ? parseInt(meta.user_id) : null;
         if (purchaseUserId) {
           fireCommunityWorkflowRules(purchaseUserId, { type: "any_purchase" }).catch(() => {});
+          // Silently ensure Free Membership is active for any purchaser (idempotent, no email)
+          import("../lib/ensureFreeMembership").then(({ ensureFreeMembership }) => {
+            ensureFreeMembership(purchaseUserId).catch(() => {});
+          }).catch(() => {});
         }
       } catch (_) {}
     } else if (eventType === "payment_intent.succeeded") {

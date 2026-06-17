@@ -224,6 +224,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       import("./lib/communityAutoJoin").then(({ fireCommunityWorkflowRules }) => {
         fireCommunityWorkflowRules(newRow[0].id, { type: "any_signup" }).catch(() => {});
       }).catch(() => {});
+      import("./lib/ensureFreeMembership").then(({ ensureFreeMembership }) => {
+        ensureFreeMembership(newRow[0].id).catch(() => {});
+      }).catch(() => {});
     }
   }
 }
@@ -416,6 +419,9 @@ export async function getOrCreateUserByEmail(opts: {
   // Fire community workflow rules for brand-new email-based signups (fire-and-forget)
   import("./lib/communityAutoJoin").then(({ fireCommunityWorkflowRules }) => {
     fireCommunityWorkflowRules(newUser!.id, { type: "any_signup" }).catch(() => {});
+  }).catch(() => {});
+  import("./lib/ensureFreeMembership").then(({ ensureFreeMembership }) => {
+    ensureFreeMembership(newUser!.id).catch(() => {});
   }).catch(() => {});
   return { user: newUser as any, isNew: true, resetToken };
 }
