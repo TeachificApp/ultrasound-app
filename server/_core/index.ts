@@ -22,6 +22,7 @@ import { registerUploadDigitalFileRoute } from "../routes/uploadDigitalFile";
 import { registerUploadCohortMediaRoute } from "../routes/uploadCohortMedia";
 import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResource";
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
+import { registerUploadTeachRoute } from "../routes/uploadTeach";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
 import { registerFunnelOgMetaRoutes } from "../routes/funnelOgMeta";
 import { registerSitemapRoute } from "../routes/sitemap";
@@ -239,6 +240,8 @@ async function startServer() {
   registerUploadCohortResourceRoute(app);
   // Social content image upload (multipart, admin only)
   registerUploadSocialImageRoute(app);
+  // TEACH chunked file upload (multipart, bypasses tRPC JSON body limit for large PPTX files)
+  registerUploadTeachRoute(app);
   // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
   registerSsoAutoRoute(app);
   // Sitemap.xml and robots.txt — must be before SPA catch-all

@@ -47,6 +47,7 @@ export default function TeachDashboard() {
   const [ownerContext, setOwnerContext] = useState<"lms_instructor" | "educator_assist">("lms_instructor");
   const [educatorOrgId, setEducatorOrgId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null | "trash">(null);
   const [renamingFolderId, setRenamingFolderId] = useState<number | null>(null);
   const [renamingFolderName, setRenamingFolderName] = useState("");
@@ -85,6 +86,14 @@ export default function TeachDashboard() {
     onError: (e) => toast.error(e.message),
   });
   const uploadMaterial = trpc.teach.uploadMaterial.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.parsed ? "PowerPoint imported — slides ready to edit" : "File uploaded");
+      refetch(); refetchMasters(); setUploading(false);
+      if (data.parsed && data.materialId) navigate(`/teach/presentation/${data.materialId}/edit`);
+    },
+    onError: (e) => { toast.error(e.message); setUploading(false); },
+  });
+  const parsePptxFromUrl = trpc.teach.parsePptxFromUrl.useMutation({
     onSuccess: (data) => {
       toast.success(data.parsed ? "PowerPoint imported — slides ready to edit" : "File uploaded");
       refetch(); refetchMasters(); setUploading(false);
@@ -165,9 +174,90 @@ export default function TeachDashboard() {
   const maxFileSizeBytes = isAdmin ? Infinity : 200 * 1024 * 1024;
   const maxFileSizeLabel = isAdmin ? "unlimited" : "200 MB";
 
+  // Chunked upload threshold: files above 10 MB use the multipart endpoint
+  // to avoid the tRPC JSON body limit and Cloud Run 180s timeout.
+  const CHUNKED_THRESHOLD = 10 * 1024 * 1024; // 10 MB
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB chunks
+
   const handleFileUpload = async (file: File) => {
     if (file.size > maxFileSizeBytes) { toast.error(`File must be under ${maxFileSizeLabel}`); return; }
     setUploading(true);
+
+    // For large files, use the chunked upload endpoint
+    if (file.size > CHUNKED_THRESHOLD) {
+      try {
+        const mimeType = file.type || "application/octet-stream";
+        const title = file.name.replace(/\.[^.]+$/, "");
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+        // Step 1: Init upload session
+        const initRes = await fetch("/api/upload-teach/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: file.name,
+            mimeType,
+            fileSize: file.size,
+            totalChunks,
+            title,
+            ownerContext,
+            educatorOrgId: educatorOrgId ?? undefined,
+          }),
+          credentials: "include",
+        });
+        if (!initRes.ok) {
+          const err = await initRes.json().catch(() => ({ error: "Upload init failed" }));
+          throw new Error(err.error || "Upload init failed");
+        }
+        const { uploadId } = await initRes.json();
+
+        // Step 2: Upload chunks
+        let lastResult: any = null;
+        setUploadProgress({ current: 0, total: totalChunks });
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
+          const formData = new FormData();
+          formData.append("chunk", chunk);
+          formData.append("uploadId", uploadId);
+          formData.append("chunkIndex", String(i));
+          const chunkRes = await fetch("/api/upload-teach/chunk", {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+          });
+          if (!chunkRes.ok) {
+            const err = await chunkRes.json().catch(() => ({ error: "Chunk upload failed" }));
+            throw new Error(err.error || "Chunk upload failed");
+          }
+          lastResult = await chunkRes.json();
+          setUploadProgress({ current: i + 1, total: totalChunks });
+        }
+        setUploadProgress(null);
+
+        // Step 3: Parse PPTX from the uploaded S3 URL
+        if (!lastResult?.done) throw new Error("Upload did not complete");
+        parsePptxFromUrl.mutate({
+          assetId: lastResult.assetId,
+          s3Url: lastResult.s3Url,
+          s3Key: lastResult.s3Key,
+          fileName: lastResult.fileName,
+          mimeType: lastResult.mimeType,
+          fileSize: lastResult.fileSize,
+          title,
+          ownerContext,
+          educatorOrgId: educatorOrgId ?? undefined,
+        });
+      } catch (err: any) {
+        toast.error(err?.message || "Upload failed");
+        setUploading(false);
+        setUploadProgress(null);
+      }
+      return;
+    }
+
+    // For small files, use the existing base64 tRPC path
     const reader = new FileReader();
     const fileData = await new Promise<string>((resolve, reject) => {
       reader.onload = () => { const r = reader.result as string; resolve(r.split(",")[1] ?? ""); };
@@ -304,7 +394,7 @@ export default function TeachDashboard() {
               </Button>
               <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
-                Upload File
+                {uploadProgress ? `Uploading ${uploadProgress.current}/${uploadProgress.total}…` : "Upload File"}
               </Button>
               <Button variant="outline" size="sm" disabled={createMaster.isPending} onClick={() => createMaster.mutate({ name: "New Slide Master", isGlobal: false })}>
                 {createMaster.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <LayoutTemplate className="w-4 h-4 mr-1" />}

@@ -102,7 +102,7 @@ function detectMediaType(mimeType: string): "image" | "video" | "audio" | "docum
   return "other";
 }
 
-async function requireTeachAccess(userId: number) {
+export async function requireTeachAccess(userId: number) {
   const ctx = await getTeachUserContext(userId);
   if (!ctx.canAccessTeach) {
     throw new TRPCError({ code: "FORBIDDEN", message: "TEACH access required." });
@@ -406,6 +406,95 @@ export const teachRouter = router({
         mediaAssetId: assetId,
         folder,
         parsed: isPptx,
+        slideMasterId,
+      };
+    }),
+
+  /**
+   * parsePptxFromUrl — called after a chunked upload completes.
+   * Fetches the PPTX from S3, parses it, and creates a teachMaterial record.
+   * This is the large-file alternative to uploadMaterial (which uses base64 tRPC).
+   */
+  parsePptxFromUrl: protectedProcedure
+    .input(
+      z.object({
+        assetId: z.number(),
+        s3Url: z.string().url(),
+        s3Key: z.string(),
+        fileName: z.string(),
+        mimeType: z.string(),
+        fileSize: z.number(),
+        title: z.string().min(1).max(300),
+        description: z.string().optional(),
+        ownerContext: z.enum(["lms_instructor", "educator_assist"]).default("lms_instructor"),
+        educatorOrgId: z.number().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const teachCtx = await requireTeachAccess(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const folder = teachFolderSlug(ctx.user.id);
+      const isPptx = input.fileName.match(/\.pptx$/i) || input.mimeType.includes("presentationml");
+      const isPresentation = input.mimeType.includes("presentation") || input.fileName.match(/\.(ppt|pptx)$/i);
+
+      let slidesData: string | null = null;
+      let slideMasterId: number | null = null;
+
+      if (isPptx) {
+        // Fetch the PPTX from S3 and parse it
+        try {
+          const https = await import("https");
+          const http = await import("http");
+          const buffer = await new Promise<Buffer>((resolve, reject) => {
+            const proto = input.s3Url.startsWith("https") ? https.default : http.default;
+            proto.get(input.s3Url as any, (res: any) => {
+              const chunks: Buffer[] = [];
+              res.on("data", (c: Buffer) => chunks.push(c));
+              res.on("end", () => resolve(Buffer.concat(chunks)));
+              res.on("error", reject);
+            }).on("error", reject);
+          });
+          const parsed = await parsePptxBuffer(buffer, await uploadPptxImage(ctx.user.id, folder));
+          slidesData = JSON.stringify(parsed.slides);
+          if (parsed.masterSlides.length > 0) {
+            const [masterResult] = await db.insert(teachSlideMasters).values({
+              ownerUserId: ctx.user.id,
+              name: `${input.title} Master`,
+              description: `Imported from ${input.fileName}`,
+              masterSlidesData: masterSlidesToJson(parsed.masterSlides),
+              isGlobal: false,
+            });
+            slideMasterId = (masterResult as { insertId: number }).insertId;
+          }
+        } catch (err) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err instanceof Error ? err.message : "Failed to parse PowerPoint file",
+          });
+        }
+      }
+
+      const [matResult] = await db.insert(teachMaterials).values({
+        ownerUserId: ctx.user.id,
+        ownerContext: input.ownerContext,
+        lmsInstructorId: teachCtx.lmsInstructor?.id ?? null,
+        educatorOrgId: input.educatorOrgId ?? null,
+        materialType: isPresentation ? "presentation" : "document",
+        title: input.title,
+        description: input.description ?? null,
+        mediaAssetId: input.assetId,
+        slidesData,
+        slideMasterId,
+        status: "draft",
+      });
+
+      return {
+        materialId: (matResult as { insertId: number }).insertId,
+        mediaAssetId: input.assetId,
+        folder,
+        parsed: !!isPptx,
         slideMasterId,
       };
     }),
