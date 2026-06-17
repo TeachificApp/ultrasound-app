@@ -6,7 +6,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, sql, asc, inArray, or, isNull, ne, lt } from "drizzle-orm";
+import { and, desc, eq, sql, asc, inArray, or, lt, type SQL } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
@@ -52,6 +52,22 @@ import {
   membershipSubscriptions,
   lmsQuizzes,
 } from "../../drizzle/schema";
+import { isRichTextEmpty } from "../../shared/communityText";
+import {
+  buildNewestFeedNextCursor,
+  parseNewestFeedCursor,
+  type NewestFeedCursor,
+} from "../../shared/communityFeed";
+
+const feedCursorSchema = z.union([
+  z.object({
+    type: z.literal("unpinned"),
+    createdAt: z.string(),
+    id: z.number(),
+  }),
+  z.object({ type: z.literal("start_unpinned") }),
+  z.number(),
+]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -364,7 +380,7 @@ const communityMemberRouter = router({
   getFeed: protectedProcedure.input(z.object({
     communityId: z.number(),
     channelId: z.number().optional(),
-    cursor: z.number().optional(),
+    cursor: feedCursorSchema.optional(),
     limit: z.number().min(1).max(50).default(20),
     sort: z.enum(["newest", "trending"]).default("newest"),
   })).query(async ({ ctx, input }) => {
@@ -373,23 +389,70 @@ const communityMemberRouter = router({
     const member = await assertCommunityMember(db, input.communityId, ctx.user.id);
     if (!member && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
-    const conditions = [
+    const conditions: SQL[] = [
       eq(communityPosts.communityId, input.communityId),
       eq(communityPosts.isHidden, false),
     ];
     if (input.channelId) conditions.push(eq(communityPosts.channelId, input.channelId));
-    if (input.cursor) conditions.push(lt(communityPosts.id, input.cursor));
 
-    const orderBy = input.sort === "trending"
-      ? [desc(communityPosts.reactionCount), desc(communityPosts.commentCount), desc(communityPosts.createdAt)]
-      : [desc(communityPosts.isPinned), desc(communityPosts.createdAt)];
+    let orderBy: SQL[];
+    let offset = 0;
 
-    const posts = await db.select().from(communityPosts)
-      .where(and(...conditions)).orderBy(...orderBy).limit(input.limit + 1);
+    if (input.sort === "trending") {
+      if (typeof input.cursor === "number") offset = input.cursor;
+      orderBy = [
+        desc(communityPosts.reactionCount),
+        desc(communityPosts.commentCount),
+        desc(communityPosts.createdAt),
+        desc(communityPosts.id),
+      ];
+    } else {
+      const newestCursor = parseNewestFeedCursor(input.cursor);
+      if (newestCursor?.type === "start_unpinned") {
+        conditions.push(eq(communityPosts.isPinned, false));
+        orderBy = [desc(communityPosts.createdAt), desc(communityPosts.id)];
+      } else if (newestCursor?.type === "unpinned") {
+        conditions.push(eq(communityPosts.isPinned, false));
+        const cursorDate = new Date(newestCursor.createdAt);
+        conditions.push(
+          or(
+            lt(communityPosts.createdAt, cursorDate),
+            and(eq(communityPosts.createdAt, cursorDate), lt(communityPosts.id, newestCursor.id)),
+          )!,
+        );
+        orderBy = [desc(communityPosts.createdAt), desc(communityPosts.id)];
+      } else if (typeof input.cursor === "number") {
+        // Legacy clients passed post id — continue with unpinned-only feed older than that id's siblings
+        conditions.push(eq(communityPosts.isPinned, false));
+        conditions.push(lt(communityPosts.id, input.cursor));
+        orderBy = [desc(communityPosts.createdAt), desc(communityPosts.id)];
+      } else {
+        orderBy = [desc(communityPosts.isPinned), desc(communityPosts.createdAt), desc(communityPosts.id)];
+      }
+    }
+
+    const posts = await db
+      .select()
+      .from(communityPosts)
+      .where(and(...conditions))
+      .orderBy(...orderBy)
+      .offset(input.sort === "trending" ? offset : 0)
+      .limit(input.limit + 1);
 
     const hasMore = posts.length > input.limit;
-    const items = await enrichPosts(db, posts.slice(0, input.limit), ctx.user.id);
-    return { items, hasMore, nextCursor: hasMore ? posts[input.limit - 1]?.id : undefined };
+    const page = posts.slice(0, input.limit);
+    const items = await enrichPosts(db, page, ctx.user.id);
+
+    let nextCursor: NewestFeedCursor | number | undefined;
+    if (hasMore) {
+      if (input.sort === "trending") {
+        nextCursor = offset + input.limit;
+      } else {
+        nextCursor = buildNewestFeedNextCursor(page, true);
+      }
+    }
+
+    return { items, hasMore, nextCursor };
   }),
 
   /** Create a post */
@@ -410,6 +473,24 @@ const communityMemberRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const member = await assertCommunityMember(db, input.communityId, ctx.user.id);
     if (!member && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    if (isRichTextEmpty(input.body)) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Post body cannot be empty." });
+    }
+
+    const [channel] = await db
+      .select({ id: communityChannels.id })
+      .from(communityChannels)
+      .where(
+        and(
+          eq(communityChannels.id, input.channelId),
+          eq(communityChannels.communityId, input.communityId),
+        ),
+      )
+      .limit(1);
+    if (!channel) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid channel for this community." });
+    }
+
     // Validate admin profile belongs to this community
     if (input.adminProfileId && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     if (input.aliasId && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -421,7 +502,7 @@ const communityMemberRouter = router({
       aliasId: input.aliasId ?? null,
       title: input.title ?? null,
       body: input.body,
-      postType: input.postType as any,
+      postType: input.postType,
       attachments: input.attachments ? JSON.stringify(input.attachments) : null,
     }).$returningId();
     const postId = result.id;

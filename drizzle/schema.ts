@@ -5127,9 +5127,13 @@ export const communityPosts = mysqlTable("community_posts", {
   title: varchar("title", { length: 255 }),
   body: longtext("body").notNull(),
   attachments: longtext("attachments"),
+  postType: mysqlEnum("post_type", ["text", "image", "video", "poll", "case_study"]).default("text").notNull(),
   isPinned: boolean("is_pinned").default(false).notNull(),
   commentCount: int("comment_count").default(0).notNull(),
   reactionCount: int("reaction_count").default(0).notNull(),
+  viewCount: int("view_count").default(0).notNull(),
+  isLocked: boolean("is_locked").default(false).notNull(),
+  isHidden: boolean("is_hidden").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
