@@ -4846,6 +4846,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       );
     }
     case "cohort_sessions_auto": {
+      const displayMode = (d.displayMode ?? "sessions") as "sessions" | "groups";
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
