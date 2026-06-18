@@ -2,62 +2,34 @@
  * iSpringQuizParser.ts
  *
  * Parses iSpring QuizMaker SCORM exports (version 11.x and later).
- *
- * iSpring 11.x embeds all quiz data as a base64-encoded JSON blob in index.html,
- * passed directly to QuizPlayer.start(). This parser:
- *   1. Reads index.html from an extracted SCORM directory
- *   2. Extracts and decodes the base64 data blob
- *   3. Walks the JSON structure to extract groups, questions, answers, and feedback
- *   4. Returns a normalized ParsedQuiz object ready for DB insertion
- *
- * Supported question types:
- *   - MultipleChoice  → "mcq"
- *   - TrueFalse       → "truefalse"
- *   - MultipleResponse → "mcq" (multi-select stored as comma-separated correct answers)
- *
- * Formatting: question HTML is preserved as-is from the iSpring export so that
- * color, font, and layout are retained when rendered in the platform quiz engine.
  */
-
 import fs from "fs";
 import path from "path";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ParsedAnswer {
-  text: string;       // Plain text (for correctAnswer matching)
-  html: string;       // Full HTML (for rich rendering)
+  text: string;
+  html: string;
   isCorrect: boolean;
-  imageRef?: string;  // storage:// reference if the answer has an image
+  imageRef?: string;
 }
 
 export interface ParsedQuestion {
-  /** iSpring internal ID */
   id: string;
-  /** iSpring question type */
   ispringType: string;
-  /** Normalized platform type */
   type: "mcq" | "truefalse";
-  /** Question text as HTML (preserves iSpring styling) */
   questionHtml: string;
-  /** Question text as plain text (for search/display) */
   questionText: string;
-  /** Answer choices */
   answers: ParsedAnswer[];
-  /** Correct answer text (matches one of answers[].text) */
   correctAnswer: string;
-  /** Explanation/feedback HTML */
   explanationHtml: string;
-  /** Explanation as plain text */
   explanationText: string;
-  /** Image references (storage:// paths) used in the question */
   imageRefs: string[];
 }
 
 export interface ParsedGroup {
-  /** iSpring group ID */
   id: string;
-  /** Group name as defined in iSpring QuizMaker */
   name: string;
   questions: ParsedQuestion[];
 }
@@ -65,7 +37,6 @@ export interface ParsedGroup {
 export interface ParsedQuiz {
   title: string;
   groups: ParsedGroup[];
-  /** All unique image refs across the quiz (storage:// paths) */
   allImageRefs: string[];
 }
 
@@ -85,7 +56,6 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-/** Extract storage:// image references from iSpring HTML */
 function extractImageRefs(html: string): string[] {
   const refs: string[] = [];
   const re = /storage:\/\/[^\s"'<>)]+/g;
@@ -96,16 +66,12 @@ function extractImageRefs(html: string): string[] {
   return [...new Set(refs)];
 }
 
-/** Get the plain text from an iSpring D-block (question or answer descriptor) */
 function getTextFromDBlock(d: any): { html: string; text: string } {
   if (!d) return { html: "", text: "" };
   const html = d.h ?? "";
-  // iSpring stores plain text in d.d[0] — use it as fallback
   const text = d.d?.[0] ?? stripHtml(html);
   return { html, text };
 }
-
-// ─── Question parsers ─────────────────────────────────────────────────────────
 
 function parseChoices(chs: any[]): ParsedAnswer[] {
   if (!Array.isArray(chs)) return [];
@@ -121,13 +87,9 @@ function parseChoices(chs: any[]): ParsedAnswer[] {
   });
 }
 
-/** Extract feedback HTML from iSpring question settings */
 function getFeedback(q: any): { html: string; text: string } {
-  // Correct feedback is in q.s.F.c.v.h
   const correctHtml = q?.s?.F?.c?.v?.h ?? "";
-  // Incorrect feedback is in q.s.F.ic.v.h
   const incorrectHtml = q?.s?.F?.ic?.v?.h ?? "";
-  // Prefer correct feedback; fall back to incorrect; strip HTML for text
   const html = correctHtml || incorrectHtml;
   return { html, text: stripHtml(html) };
 }
@@ -140,10 +102,9 @@ function parseQuestion(q: any): ParsedQuestion | null {
   const feedback = getFeedback(q);
   const imageRefs = extractImageRefs(questionHtml);
 
-  // MultipleChoice and MultipleResponse use q.C.chs[]
   if (tp === "MultipleChoice" || tp === "MultipleResponse") {
     const answers = parseChoices(q.C?.chs ?? []);
-    const correctAnswers = answers.filter(a => a.isCorrect);
+    const correctAnswers = answers.filter((a) => a.isCorrect);
     if (answers.length === 0) return null;
 
     return {
@@ -153,17 +114,15 @@ function parseQuestion(q: any): ParsedQuestion | null {
       questionHtml,
       questionText,
       answers,
-      correctAnswer: correctAnswers.map(a => a.text).join("|"),
+      correctAnswer: correctAnswers.map((a) => a.text).join("|"),
       explanationHtml: feedback.html,
       explanationText: feedback.text,
       imageRefs,
     };
   }
 
-  // TrueFalse uses q.C.chs[] with "True" and "False" choices
   if (tp === "TrueFalse") {
     const answers = parseChoices(q.C?.chs ?? []);
-    // iSpring TrueFalse may not have explicit chs — derive from q.C.ca (correct answer index)
     if (answers.length === 0) {
       const correctIndex = q.C?.ca ?? 0;
       const trueFirst: ParsedAnswer[] = [
@@ -177,13 +136,13 @@ function parseQuestion(q: any): ParsedQuestion | null {
         questionHtml,
         questionText,
         answers: trueFirst,
-        correctAnswer: trueFirst.find(a => a.isCorrect)?.text ?? "True",
+        correctAnswer: trueFirst.find((a) => a.isCorrect)?.text ?? "True",
         explanationHtml: feedback.html,
         explanationText: feedback.text,
         imageRefs,
       };
     }
-    const correctAnswer = answers.find(a => a.isCorrect)?.text ?? answers[0]?.text ?? "True";
+    const correctAnswer = answers.find((a) => a.isCorrect)?.text ?? answers[0]?.text ?? "True";
     return {
       id: q.i ?? "",
       ispringType: tp,
@@ -198,57 +157,43 @@ function parseQuestion(q: any): ParsedQuestion | null {
     };
   }
 
-  // Unsupported types (Sequence, Matching, WordBank, etc.) — skip
   return null;
 }
 
-// ─── Main parser ──────────────────────────────────────────────────────────────
+// ─── Base64 / JSON extraction ─────────────────────────────────────────────────
 
-/**
- * Parse an iSpring SCORM quiz from an extracted directory.
- * The directory should contain index.html (and data/ subfolder).
- *
- * @param extractedDir  Path to the extracted SCORM directory (contains index.html)
- * @returns ParsedQuiz or throws if not a valid iSpring quiz
- */
-export function parseISpringQuiz(extractedDir: string): ParsedQuiz {
-  // Find index.html — may be in a subdirectory
-  let indexPath = path.join(extractedDir, "index.html");
-  if (!fs.existsSync(indexPath)) {
-    // Try one level deep
-    const entries = fs.readdirSync(extractedDir);
-    for (const entry of entries) {
-      const candidate = path.join(extractedDir, entry, "index.html");
-      if (fs.existsSync(candidate)) {
-        indexPath = candidate;
-        break;
-      }
-    }
-  }
-  if (!fs.existsSync(indexPath)) {
-    throw new Error("index.html not found in SCORM package");
+/** Extract the iSpring base64 quiz payload from index.html (handles split string literals). */
+export function extractISpringBase64FromHtml(html: string): string | null {
+  const varAssign = html.match(/var\s+data\s*=\s*([\s\S]*?);/);
+  if (varAssign) {
+    const parts = [...varAssign[1].matchAll(/"([A-Za-z0-9+/=\s]*)"/g)].map((m) =>
+      m[1].replace(/\s+/g, "")
+    );
+    const joined = parts.join("");
+    if (joined.length >= 100) return joined;
   }
 
-  const html = fs.readFileSync(indexPath, "utf8");
+  const startMatch = html.match(/QuizPlayer\.start\s*\(\s*"([A-Za-z0-9+/=]{100,})"/);
+  if (startMatch) return startMatch[1];
 
-  // Validate it's an iSpring export
-  if (!html.includes("iSpring") && !html.includes("QuizPlayer")) {
-    throw new Error("Not an iSpring SCORM package");
+  const legacyMatch = html.match(/"([A-Za-z0-9+/=]{500,})";\s*document\.addEventListener/);
+  if (legacyMatch) return legacyMatch[1];
+
+  let longest = "";
+  for (const m of html.matchAll(/"([A-Za-z0-9+/=]{200,})"/g)) {
+    if (m[1].length > longest.length) longest = m[1];
   }
-
-  // Extract the base64 data blob - it's assigned to `var data = "..."` or passed inline
-  const b64Match =
-    html.match(/var\s+data\s*=\s*"([A-Za-z0-9+/=]{100,})"/) ??
-    html.match(/"([A-Za-z0-9+/=]{500,})";\s*document\.addEventListener/);
-  if (!b64Match) {
-    throw new Error("Could not find iSpring data blob in index.html");
-  }
-
-  const decoded = Buffer.from(b64Match[1], "base64").toString("utf8");
-  return parseISpringDataBlob(decoded);
+  return longest.length >= 100 ? longest : null;
 }
 
-function parseISpringDataBlob(jsonStr: string): ParsedQuiz {
+function decodeISpringBase64(b64: string): string {
+  const normalized = b64.replace(/\s+/g, "");
+  const decoded = Buffer.from(normalized, "base64").toString("utf8").trim();
+  if (!decoded) throw new Error("iSpring data blob decoded to empty string");
+  return decoded;
+}
+
+export function parseISpringDataBlob(jsonStr: string): ParsedQuiz {
   let data: any;
   try {
     data = JSON.parse(jsonStr);
@@ -277,6 +222,9 @@ function parseISpringDataBlob(jsonStr: string): ParsedQuiz {
       if (parsed) {
         questions.push(parsed);
         allImageRefs.push(...parsed.imageRefs);
+        for (const a of parsed.answers) {
+          if (a.imageRef) allImageRefs.push(a.imageRef);
+        }
       }
     }
 
@@ -292,33 +240,95 @@ function parseISpringDataBlob(jsonStr: string): ParsedQuiz {
   };
 }
 
-/**
- * Parse an iSpring SCORM quiz from a ZIP buffer (in-memory).
- * Useful when the ZIP has already been downloaded to a Buffer.
- */
+function parseQuizFromHtml(html: string): ParsedQuiz {
+  if (!html.includes("iSpring") && !html.includes("QuizPlayer")) {
+    throw new Error("Not an iSpring SCORM package");
+  }
+  const b64 = extractISpringBase64FromHtml(html);
+  if (!b64) throw new Error("Could not find iSpring data blob in index.html");
+  return parseISpringDataBlob(decodeISpringBase64(b64));
+}
+
+type ZipEntry = { entryName: string; getData: () => Buffer };
+
+function pickBestIndexHtml(entries: ZipEntry[]): ZipEntry | null {
+  const candidates = entries.filter(
+    (e) =>
+      e.entryName.toLowerCase().endsWith("index.html") &&
+      !e.entryName.includes("__MACOSX")
+  );
+  if (candidates.length === 0) return null;
+
+  let best = candidates[0];
+  let bestScore = -1;
+  for (const entry of candidates) {
+    const html = entry.getData().toString("utf8");
+    const b64 = extractISpringBase64FromHtml(html);
+    const score = (b64?.length ?? 0) + (html.includes("QuizPlayer") ? 1000 : 0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = entry;
+    }
+  }
+  return best;
+}
+
+function tryParseJsonEntries(entries: ZipEntry[]): ParsedQuiz | null {
+  for (const entry of entries) {
+    const name = entry.entryName.toLowerCase();
+    if (!name.endsWith(".json") && !name.endsWith(".js")) continue;
+    const raw = entry.getData().toString("utf8").trim();
+    const attempts = [raw];
+    const jsonMatch = raw.match(/(\{[\s\S]*"d"[\s\S]*\})/);
+    if (jsonMatch) attempts.push(jsonMatch[1]);
+    for (const attempt of attempts) {
+      try {
+        const parsed = parseISpringDataBlob(attempt);
+        if (parsed.groups.length > 0) return parsed;
+      } catch {
+        // try next
+      }
+    }
+  }
+  return null;
+}
+
+export function parseISpringQuiz(extractedDir: string): ParsedQuiz {
+  let indexPath = path.join(extractedDir, "index.html");
+  if (!fs.existsSync(indexPath)) {
+    const entries = fs.readdirSync(extractedDir);
+    for (const entry of entries) {
+      const candidate = path.join(extractedDir, entry, "index.html");
+      if (fs.existsSync(candidate)) {
+        indexPath = candidate;
+        break;
+      }
+    }
+  }
+  if (!fs.existsSync(indexPath)) {
+    throw new Error("index.html not found in SCORM package");
+  }
+  return parseQuizFromHtml(fs.readFileSync(indexPath, "utf8"));
+}
+
 export async function parseISpringQuizFromBuffer(zipBuffer: Buffer): Promise<ParsedQuiz> {
   const AdmZip = (await import("adm-zip")).default;
   const zip = new AdmZip(zipBuffer);
   const entries = zip.getEntries();
 
-  // Find index.html
-  const indexEntry = entries.find(e =>
-    e.entryName.toLowerCase().endsWith("index.html") &&
-    !e.entryName.includes("__MACOSX")
-  );
-  if (!indexEntry) throw new Error("index.html not found in SCORM ZIP");
-
-  const html = indexEntry.getData().toString("utf8");
-
-  if (!html.includes("iSpring") && !html.includes("QuizPlayer")) {
-    throw new Error("Not an iSpring SCORM package");
+  const indexEntry = pickBestIndexHtml(entries);
+  if (indexEntry) {
+    try {
+      return parseQuizFromHtml(indexEntry.getData().toString("utf8"));
+    } catch (e) {
+      const fromJson = tryParseJsonEntries(entries);
+      if (fromJson) return fromJson;
+      throw e;
+    }
   }
 
-  const b64Match = html.match(/var\s+data\s*=\s*"([A-Za-z0-9+/=]{100,})"/) ??
-    html.match(/"([A-Za-z0-9+/=]{500,})";\s*document\.addEventListener/);
+  const fromJson = tryParseJsonEntries(entries);
+  if (fromJson) return fromJson;
 
-  if (!b64Match) throw new Error("Could not find iSpring data blob in index.html");
-
-  const decoded = Buffer.from(b64Match[1], "base64").toString("utf8");
-  return parseISpringDataBlob(decoded);
+  throw new Error("index.html not found in SCORM ZIP");
 }

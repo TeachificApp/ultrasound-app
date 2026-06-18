@@ -92,7 +92,7 @@ export default function CommunitySalesPageBuilder() {
   useEffect(() => {
     if (!lpData || hasLoaded) return;
     setHasLoaded(true);
-    setPageInfo({ title: lpData.name, slug: lpData.slug });
+    setPageInfo({ title: lpData.title, slug: lpData.slug });
     if (lpData.landingPageBlocks) {
       try { setBlocks(JSON.parse(lpData.landingPageBlocks) as Block[]); } catch {}
     }
@@ -100,7 +100,7 @@ export default function CommunitySalesPageBuilder() {
   }, [lpData]);
 
   // ── Save blocks ──
-  const saveBlocks = trpc.community.admin.saveLandingPageBlocks.useMutation({
+  const saveBlocks = trpc.community.admin.saveCommunityPageBlocks.useMutation({
     onSuccess: () => toast.success("Sales landing page saved!"),
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
   });
@@ -115,7 +115,7 @@ export default function CommunitySalesPageBuilder() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await saveBlocks.mutateAsync({ communityId: numericId, blocks: JSON.stringify(blocks) });
+      await saveBlocks.mutateAsync({ communityId: numericId, pageType: "landing", blocks: JSON.stringify(blocks) });
     } finally {
       setIsSaving(false);
     }

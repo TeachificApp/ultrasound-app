@@ -246,7 +246,16 @@ function AccessGatingTab({ community }: { community: any }) {
   const linkedCourseIds = new Set((courseLinkages ?? []).map((l: any) => l.lmsCourseId));
   const availableCourses = (allCourses ?? []).filter((c: any) => !linkedCourseIds.has(c.id));
   const PRODUCT_TYPE_LABELS: Record<string, string> = {
-    quiz: "Quiz", webinar: "Webinar", download: "Download", membership: "Membership",
+    course: "Course",
+    cohort: "Cohort",
+    quiz: "LMS Quiz",
+    standalone_quiz: "Standalone Quiz",
+    webinar: "Webinar",
+    download: "Download",
+    membership: "Membership",
+    workshop: "Workshop",
+    physical: "Physical Product",
+    bundle: "Bundle",
   };
   const filteredProducts = (allProducts ?? []).filter((p: any) => p.type === selectedProductType && !linkedItems.some(i => i.type === p.type && i.id === p.id));
 

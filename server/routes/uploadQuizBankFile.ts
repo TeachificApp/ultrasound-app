@@ -87,8 +87,6 @@ router.post(
               })),
             })),
             totalQuestions: parsed.groups.reduce((sum, g) => sum + g.questions.length, 0),
-            // Store the raw buffer as base64 so the client can pass it back for confirmation
-            bufferBase64: buffer.toString("base64"),
           },
         });
         return;

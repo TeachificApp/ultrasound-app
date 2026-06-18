@@ -52,6 +52,10 @@ import {
   membershipPlans,
   membershipSubscriptions,
   lmsQuizzes,
+  workshops,
+  standaloneQuizzes,
+  physicalProducts,
+  digitalBundles,
 } from "../../drizzle/schema";
 import { isRichTextEmpty } from "../../shared/communityText";
 import {
@@ -1325,19 +1329,29 @@ const communityAdminRouter = router({
     await assertAdmin(ctx);
     const db = await getDb();
     if (!db) return [];
-    const [courses, quizzes, webinarList, downloads, memberships] = await Promise.all([
+    const [courses, quizzes, standaloneQuizList, webinarList, downloads, memberships, workshopList, physicalList, bundles, cohortCourses] = await Promise.all([
       db.select({ id: lmsCourses.id, title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.status, "public")).orderBy(asc(lmsCourses.title)),
       db.select({ id: lmsQuizzes.id, title: lmsQuizzes.title }).from(lmsQuizzes).where(eq(lmsQuizzes.status, "published")).orderBy(asc(lmsQuizzes.title)),
+      db.select({ id: standaloneQuizzes.id, title: standaloneQuizzes.title }).from(standaloneQuizzes).where(eq(standaloneQuizzes.status, "published")).orderBy(asc(standaloneQuizzes.title)),
       db.select({ id: webinars.id, title: webinars.title }).from(webinars).where(eq(webinars.status, "published")).orderBy(asc(webinars.title)),
       db.select({ id: digitalProducts.id, title: digitalProducts.title }).from(digitalProducts).where(eq(digitalProducts.status, "published")).orderBy(asc(digitalProducts.title)),
       db.select({ id: membershipPlans.id, title: membershipPlans.title }).from(membershipPlans).where(eq(membershipPlans.status, "active")).orderBy(asc(membershipPlans.title)),
+      db.select({ id: workshops.id, title: workshops.title }).from(workshops).where(eq(workshops.status, "published")).orderBy(asc(workshops.title)),
+      db.select({ id: physicalProducts.id, title: physicalProducts.title }).from(physicalProducts).where(eq(physicalProducts.status, "published")).orderBy(asc(physicalProducts.title)),
+      db.select({ id: digitalBundles.id, title: digitalBundles.title }).from(digitalBundles).where(eq(digitalBundles.status, "published")).orderBy(asc(digitalBundles.title)),
+      db.select({ id: lmsCourses.id, title: lmsCourses.title }).from(lmsCourses).where(and(eq(lmsCourses.status, "public"), eq(lmsCourses.type, "cohort"))).orderBy(asc(lmsCourses.title)),
     ]);
     return [
       ...courses.map((c: any) => ({ type: "course" as const, id: c.id, title: c.title })),
+      ...cohortCourses.map((c: any) => ({ type: "cohort" as const, id: c.id, title: c.title })),
       ...quizzes.map((q: any) => ({ type: "quiz" as const, id: q.id, title: q.title })),
+      ...standaloneQuizList.map((q: any) => ({ type: "standalone_quiz" as const, id: q.id, title: q.title })),
       ...webinarList.map((w: any) => ({ type: "webinar" as const, id: w.id, title: w.title })),
       ...downloads.map((d: any) => ({ type: "download" as const, id: d.id, title: d.title })),
       ...memberships.map((m: any) => ({ type: "membership" as const, id: m.id, title: m.title })),
+      ...workshopList.map((w: any) => ({ type: "workshop" as const, id: w.id, title: w.title })),
+      ...physicalList.map((p: any) => ({ type: "physical" as const, id: p.id, title: p.title })),
+      ...bundles.map((b: any) => ({ type: "bundle" as const, id: b.id, title: b.title })),
     ];
   }),
 
@@ -1953,6 +1967,22 @@ const communityAdminRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const field = input.pageType === "landing" ? { landingPageBlocks: input.blocks } : { pageBlocks: input.blocks };
     await db.update(communities).set(field).where(eq(communities.id, input.communityId));
+    return { success: true };
+  }),
+
+  /** Aliases used by full-screen community page builders */
+  saveLandingPageBlocks: protectedProcedure.input(z.object({ communityId: z.number(), blocks: z.string() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.update(communities).set({ landingPageBlocks: input.blocks }).where(eq(communities.id, input.communityId));
+    return { success: true };
+  }),
+  saveMemberPageBlocks: protectedProcedure.input(z.object({ communityId: z.number(), blocks: z.string() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.update(communities).set({ pageBlocks: input.blocks }).where(eq(communities.id, input.communityId));
     return { success: true };
   }),
 

@@ -92,15 +92,15 @@ export default function CommunityExperiencePageBuilder() {
   useEffect(() => {
     if (!lpData || hasLoaded) return;
     setHasLoaded(true);
-    setPageInfo({ title: lpData.name + " — Experience Page", slug: lpData.slug });
-    if (lpData.memberPageBlocks) {
-      try { setBlocks(JSON.parse(lpData.memberPageBlocks) as Block[]); } catch {}
+    setPageInfo({ title: `${lpData.title} — Experience Page`, slug: lpData.slug });
+    if (lpData.pageBlocks) {
+      try { setBlocks(JSON.parse(lpData.pageBlocks) as Block[]); } catch {}
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lpData]);
 
   // ── Save blocks ──
-  const saveBlocks = trpc.community.admin.saveMemberPageBlocks.useMutation({
+  const saveBlocks = trpc.community.admin.saveCommunityPageBlocks.useMutation({
     onSuccess: () => toast.success("Experience page saved!"),
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
   });
@@ -115,7 +115,7 @@ export default function CommunityExperiencePageBuilder() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await saveBlocks.mutateAsync({ communityId: numericId, blocks: JSON.stringify(blocks) });
+      await saveBlocks.mutateAsync({ communityId: numericId, pageType: "page", blocks: JSON.stringify(blocks) });
     } finally {
       setIsSaving(false);
     }

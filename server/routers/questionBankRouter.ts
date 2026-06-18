@@ -21,6 +21,7 @@ import {
   mediaVersions,
 } from "../../drizzle/schema";
 import { parseISpringQuizFromBuffer } from "../lib/iSpringQuizParser";
+import { rewriteStorageRefs, uploadISpringImagesFromZip } from "../lib/iSpringImageImporter";
 import { storagePut, storageGet } from "../storage";
 import * as XLSX from "xlsx";
 import fs from "fs";
@@ -672,33 +673,24 @@ export const questionBankRouter = router({
    */
   confirmScormImport: protectedProcedure
     .input(z.object({
-      mediaAssetId: z.number().int(),
-      /** Optional: override which groups to import (all if omitted) */
+      mediaAssetId: z.number().int().optional(),
+      /** Direct upload from Quiz Creator — base64-encoded .quiz/.zip bytes */
+      bufferBase64: z.string().optional(),
       groupIds: z.array(z.string()).optional(),
-      /** Optional: additional tag IDs to attach to all imported questions */
       extraTagIds: z.array(z.number().int()).optional(),
-      /** Optional: prefix to prepend to each group tag name, e.g. "OB-GYN" → "OB-GYN_TRUE-FALSE" */
       groupPrefix: z.string().optional(),
-      /** Optional: save to existing folder */
       folderId: z.number().int().optional(),
-      /** Optional: create a new folder with this name and save questions there */
       newFolderName: z.string().max(200).optional(),
-    }))
+    }).refine(
+      (v) => (v.mediaAssetId != null && v.mediaAssetId > 0) || !!v.bufferBase64?.length,
+      { message: "Provide mediaAssetId or bufferBase64 for SCORM import" }
+    ))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // Get the latest version URL
-      const [version] = await db
-        .select({ s3Url: mediaVersions.s3Url })
-        .from(mediaVersions)
-        .where(eq(mediaVersions.assetId, input.mediaAssetId))
-        .orderBy(sql`${mediaVersions.versionNumber} DESC`)
-        .limit(1);
-      if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found for this asset" });
-
-      const zipBuffer = await downloadToBuffer(version.s3Url);
+      const zipBuffer = await resolveScormZipBuffer(input);
       let parsed;
       try {
         parsed = await parseISpringQuizFromBuffer(zipBuffer);
@@ -706,7 +698,10 @@ export const questionBankRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
       }
 
-      // Resolve or create folder
+      const AdmZip = (await import("adm-zip")).default;
+      const zipEntries = new AdmZip(zipBuffer).getEntries();
+      const imageMap = await uploadISpringImagesFromZip(zipEntries, parsed.allImageRefs);
+
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {
         const [newFolder] = await db.insert(questionBankFolders).values({
@@ -719,15 +714,14 @@ export const questionBankRouter = router({
         resolvedFolderId = input.folderId;
       }
 
-      // Filter groups if requested
       const groups = input.groupIds && input.groupIds.length > 0
         ? parsed.groups.filter(g => input.groupIds!.includes(g.id))
         : parsed.groups;
 
       const results: { groupName: string; inserted: number; tagId: number }[] = [];
+      const questionBankIds: number[] = [];
 
       for (const group of groups) {
-        // Find or create a tag for this group — apply prefix if provided
         const rawName = group.name.trim();
         const tagName = input.groupPrefix ? `${input.groupPrefix.trim()}_${rawName}` : rawName;
         let tagId: number;
@@ -746,38 +740,32 @@ export const questionBankRouter = router({
           tagId = newTag.id;
         }
 
-        // All tag IDs for this group's questions
         const allTagIds = [tagId, ...(input.extraTagIds ?? [])];
-
         let inserted = 0;
+
         for (const q of group.questions) {
-          // Use HTML for question text to preserve iSpring formatting
-          const questionText = q.questionHtml || q.questionText;
-
-          // Build options array — use HTML for rich rendering
+          const questionText = rewriteStorageRefs(q.questionHtml || q.questionText, imageMap);
           const options = q.answers.map(a => ({
-            text: a.html || a.text,
-            ...(a.imageRef ? { imageUrl: a.imageRef } : {}),
+            text: rewriteStorageRefs(a.html || a.text, imageMap),
+            ...(a.imageRef ? { imageUrl: imageMap.get(a.imageRef) ?? a.imageRef } : {}),
           }));
-
-          // correctAnswer: use plain text for matching
-          const correctAnswer = q.correctAnswer;
+          const explanation = rewriteStorageRefs(q.explanationHtml || q.explanationText || "", imageMap) || null;
 
           const [result] = await db.insert(questionBank).values({
             question: questionText,
             type: q.type,
             options: JSON.stringify(options),
-            correctAnswer,
-            explanation: q.explanationHtml || q.explanationText || null,
+            correctAnswer: q.correctAnswer,
+            explanation,
             folderId: resolvedFolderId,
             createdByAdminId: ctx.user.id,
           }).$returningId();
 
-          // Attach all tags
           await db.insert(questionBankTagMap).values(
             allTagIds.map(tid => ({ questionId: result.id, tagId: tid }))
           );
 
+          questionBankIds.push(result.id);
           inserted++;
         }
 
@@ -785,7 +773,7 @@ export const questionBankRouter = router({
       }
 
       const totalInserted = results.reduce((sum, r) => sum + r.inserted, 0);
-      return { results, totalInserted };
+      return { results, totalInserted, questionBankIds };
     }),
 
   // ─── Folder CRUD ─────────────────────────────────────────────────────────────
@@ -873,6 +861,36 @@ export const questionBankRouter = router({
 });
 
 // ─── Download helper ──────────────────────────────────────────────────────────
+
+async function resolveScormZipBuffer(input: {
+  mediaAssetId?: number;
+  bufferBase64?: string;
+}): Promise<Buffer> {
+  if (input.bufferBase64) {
+    const buf = Buffer.from(input.bufferBase64, "base64");
+    if (!buf.length) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "SCORM file data is empty" });
+    }
+    return buf;
+  }
+
+  if (!input.mediaAssetId) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "No SCORM source provided" });
+  }
+
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+  const [version] = await db
+    .select({ s3Url: mediaVersions.s3Url })
+    .from(mediaVersions)
+    .where(eq(mediaVersions.assetId, input.mediaAssetId))
+    .orderBy(sql`${mediaVersions.versionNumber} DESC`)
+    .limit(1);
+  if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found for this asset" });
+
+  return downloadToBuffer(version.s3Url);
+}
 
 async function downloadToBuffer(storedUrl: string): Promise<Buffer> {
   // storedUrl may be a storage-proxy URL that requires auth.

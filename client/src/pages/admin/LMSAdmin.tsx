@@ -7422,9 +7422,13 @@ function CommunitiesTab() {
                 "flex items-center gap-4 bg-white rounded-xl border px-4 py-3 transition-all",
                 activeCommunityId === c.id ? "ring-2 ring-teal-400 border-teal-200" : "border-gray-200 hover:border-teal-200"
               )}>
-                <div className="w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-bold text-lg"
+                <div className="w-11 h-11 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-bold text-lg"
                   style={{ backgroundColor: c.accentColor || "#189aa1" }}>
-                  {c.title.charAt(0)}
+                  {c.iconImage || c.logoImage ? (
+                    <img src={c.iconImage || c.logoImage} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    c.title.charAt(0)
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -7437,6 +7441,11 @@ function CommunitiesTab() {
                   <p className="text-xs text-gray-400 mt-0.5">/{c.slug} · {(c.memberCount ?? 0).toLocaleString()} members</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`/admin/community?editCommunity=${c.id}&tab=page-editor`}>
+                      <ExternalLink className="w-3.5 h-3.5 mr-1" /> Page Editor
+                    </a>
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => { setActiveCommunityId(c.id); setActiveSubTab("channels"); }}>
                     <Hash className="w-3.5 h-3.5 mr-1" /> Channels
                   </Button>
