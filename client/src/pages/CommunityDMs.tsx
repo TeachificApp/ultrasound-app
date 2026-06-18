@@ -14,7 +14,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Send, MessageSquare, ChevronLeft, ArrowLeft } from "lucide-react";
+import { Send, MessageSquare, ChevronLeft, Flag } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function timeAgo(dateStr: string | Date) {
   const d = new Date(dateStr);
@@ -27,42 +30,57 @@ function timeAgo(dateStr: string | Date) {
 }
 
 export default function CommunityDMs() {
-  const { conversationId, userId } = useParams<{ conversationId?: string; userId?: string }>();
+  const params = useParams<{ conversationId?: string; userId?: string }>();
+  const conversationId = params.conversationId;
+  const userId = params.userId;
   const { isAuthenticated, user } = useAuth();
   const [, navigate] = useLocation();
   const [messageBody, setMessageBody] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const startedDmRef = useRef(false);
   const utils = trpc.useUtils();
 
-  // If userId param is present, get-or-create a conversation and redirect
   const getOrCreate = trpc.community.member.getOrCreateConversation.useMutation({
-    onSuccess: (conv) => { navigate(`/community/dms/c/${conv.id}`, { replace: true }); },
+    onSuccess: (conv) => {
+      navigate(`/community/dms/c/${conv.id}`, { replace: true });
+    },
     onError: (e) => toast.error(e.message),
   });
+
   useEffect(() => {
-    if (userId && isAuthenticated && !conversationId) {
-      getOrCreate.mutate({ otherUserId: parseInt(userId) });
+    if (userId && isAuthenticated && !conversationId && !startedDmRef.current) {
+      const otherId = parseInt(userId, 10);
+      if (!isNaN(otherId)) {
+        startedDmRef.current = true;
+        getOrCreate.mutate({ otherUserId: otherId });
+      }
     }
-  }, [userId, isAuthenticated]);
+  }, [userId, isAuthenticated, conversationId]);
 
   const { data: conversations, isLoading: convsLoading } = trpc.community.member.myConversations.useQuery(
     undefined,
-    { enabled: isAuthenticated, refetchInterval: 15000 }
+    { enabled: isAuthenticated, refetchInterval: 15000 },
   );
 
-  const activeConvId = conversationId ? parseInt(conversationId) : null;
-  const activeConv = conversations?.find((c: any) => c.id === activeConvId);
+  const activeConvId = conversationId ? parseInt(conversationId, 10) : null;
+  const activeConv = conversations?.find((c: { id: number }) => c.id === activeConvId);
 
   const { data: messages, isLoading: msgsLoading } = trpc.community.member.getMessages.useQuery(
     { conversationId: activeConvId! },
-    { enabled: !!activeConvId && isAuthenticated, refetchInterval: 5000 }
+    { enabled: !!activeConvId && isAuthenticated, refetchInterval: 5000 },
   );
 
+  const reportMessage = trpc.community.member.reportContent.useMutation({
+    onSuccess: () => toast.success("Message reported to admins"),
+    onError: (e) => toast.error(e.message),
+  });
+
   const sendMessage = trpc.community.member.sendMessage.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       setMessageBody("");
-      utils.community.member.getMessages.invalidate({ conversationId: activeConvId! });
-      utils.community.member.myConversations.invalidate();
+      await utils.community.member.getMessages.reset();
+      await utils.community.member.getMessages.invalidate({ conversationId: activeConvId! });
+      await utils.community.member.myConversations.invalidate();
     },
     onError: (e) => toast.error(e.message),
   });
@@ -73,7 +91,9 @@ export default function CommunityDMs() {
 
   useEffect(() => {
     document.title = "Messages | Community | All About Ultrasound™";
-    return () => { document.title = "All About Ultrasound™"; };
+    return () => {
+      document.title = "All About Ultrasound™";
+    };
   }, []);
 
   if (!isAuthenticated) {
@@ -82,7 +102,7 @@ export default function CommunityDMs() {
         <div className="text-center">
           <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Sign in to view messages</h2>
-                    <a href={getLoginUrl("/community/dms")}>
+          <a href={getLoginUrl("/community/dms")}>
             <Button className="bg-teal-600 hover:bg-teal-700 text-white">Sign In</Button>
           </a>
         </div>
@@ -95,7 +115,7 @@ export default function CommunityDMs() {
       <div className="max-w-5xl mx-auto px-4 py-6">
         <div className="flex items-center gap-3 mb-6">
           <Link href="/community">
-            <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-teal-600">
+            <button type="button" className="flex items-center gap-1 text-sm text-gray-500 hover:text-teal-600">
               <ChevronLeft className="w-4 h-4" />Community
             </button>
           </Link>
@@ -103,7 +123,6 @@ export default function CommunityDMs() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-180px)]">
-          {/* Conversation list */}
           <Card className="md:col-span-1 overflow-hidden flex flex-col">
             <div className="p-4 border-b">
               <h2 className="font-semibold text-gray-900 text-sm">Conversations</h2>
@@ -111,20 +130,28 @@ export default function CommunityDMs() {
             <div className="flex-1 overflow-y-auto">
               {convsLoading ? (
                 <div className="p-4 space-y-3">
-                  {[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 rounded-lg" />
+                  ))}
                 </div>
               ) : !conversations?.length ? (
                 <div className="p-6 text-center text-gray-400 text-sm">
                   <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  No conversations yet
+                  No conversations yet. Message a member from the community sidebar.
                 </div>
               ) : (
-                conversations.map((conv: any) => {
+                conversations.map((conv: {
+                  id: number;
+                  otherUser?: { displayName?: string; name?: string; avatarUrl?: string | null };
+                  lastMessageAt: string | Date;
+                  unreadCount: number;
+                }) => {
                   const other = conv.otherUser;
                   const isActive = conv.id === activeConvId;
                   return (
                     <button
                       key={conv.id}
+                      type="button"
                       onClick={() => navigate(`/community/dms/c/${conv.id}`)}
                       className={`w-full text-left p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b ${isActive ? "bg-teal-50 border-l-2 border-l-teal-500" : ""}`}
                     >
@@ -136,11 +163,17 @@ export default function CommunityDMs() {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className="font-medium text-gray-900 text-sm truncate">{other?.displayName || other?.name}</p>
-                          <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{timeAgo(conv.lastMessageAt)}</span>
+                          <p className="font-medium text-gray-900 text-sm truncate">
+                            {other?.displayName || other?.name}
+                          </p>
+                          <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                            {timeAgo(conv.lastMessageAt)}
+                          </span>
                         </div>
                         {conv.unreadCount > 0 && (
-                          <Badge className="text-xs bg-teal-600 text-white mt-0.5">{conv.unreadCount} new</Badge>
+                          <Badge className="text-xs bg-teal-600 text-white mt-0.5">
+                            {conv.unreadCount} new
+                          </Badge>
                         )}
                       </div>
                     </button>
@@ -150,7 +183,6 @@ export default function CommunityDMs() {
             </div>
           </Card>
 
-          {/* Message thread */}
           <Card className="md:col-span-2 overflow-hidden flex flex-col">
             {!activeConvId ? (
               <div className="flex-1 flex items-center justify-center text-gray-400">
@@ -161,41 +193,79 @@ export default function CommunityDMs() {
               </div>
             ) : (
               <>
-                {/* Thread header */}
                 <div className="p-4 border-b flex items-center gap-3">
                   {activeConv?.otherUser && (
                     <>
                       <Avatar className="w-9 h-9">
                         <AvatarImage src={activeConv.otherUser.avatarUrl ?? undefined} />
                         <AvatarFallback className="text-sm bg-teal-100 text-teal-700">
-                          {(activeConv.otherUser.displayName || activeConv.otherUser.name || "?").charAt(0).toUpperCase()}
+                          {(activeConv.otherUser.displayName || activeConv.otherUser.name || "?")
+                            .charAt(0)
+                            .toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-semibold text-gray-900 text-sm">{activeConv.otherUser.displayName || activeConv.otherUser.name}</p>
+                        <p className="font-semibold text-gray-900 text-sm">
+                          {activeConv.otherUser.displayName || activeConv.otherUser.name}
+                        </p>
                       </div>
                     </>
                   )}
                 </div>
 
-                {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {msgsLoading ? (
                     <div className="space-y-3">
-                      {[1,2,3].map(i => <Skeleton key={i} className="h-12 rounded-lg" />)}
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-12 rounded-lg" />
+                      ))}
                     </div>
                   ) : !messages?.items?.length ? (
                     <div className="text-center text-gray-400 text-sm py-8">No messages yet. Say hello!</div>
                   ) : (
-                    messages.items.map((msg: any) => {
+                    messages.items.map((msg: { id: number; senderId: number; body: string; createdAt: string | Date }) => {
                       const isMe = msg.senderId === user?.id;
                       return (
-                        <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
-                            isMe ? "bg-teal-600 text-white rounded-br-sm" : "bg-gray-100 text-gray-900 rounded-bl-sm"
-                          }`}>
-                            <p className="whitespace-pre-wrap">{msg.body}</p>
-                            <p className={`text-xs mt-1 ${isMe ? "text-teal-200" : "text-gray-400"}`}>{timeAgo(msg.createdAt)}</p>
+                        <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"} group`}>
+                          <div className="flex items-end gap-1 max-w-[80%]">
+                            {!isMe && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500"
+                                    title="Report message"
+                                  >
+                                    <Flag className="w-3.5 h-3.5" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start">
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      reportMessage.mutate({
+                                        targetType: "dm_message",
+                                        targetId: msg.id,
+                                        reason: "Inappropriate direct message",
+                                      })
+                                    }
+                                  >
+                                    Report to admins
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                            <div
+                              className={`rounded-2xl px-4 py-2.5 text-sm ${
+                                isMe
+                                  ? "bg-teal-600 text-white rounded-br-sm"
+                                  : "bg-gray-100 text-gray-900 rounded-bl-sm"
+                              }`}
+                            >
+                              <p className="whitespace-pre-wrap">{msg.body}</p>
+                              <p className={`text-xs mt-1 ${isMe ? "text-teal-200" : "text-gray-400"}`}>
+                                {timeAgo(msg.createdAt)}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       );
@@ -204,14 +274,13 @@ export default function CommunityDMs() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input */}
                 <div className="p-4 border-t flex gap-2">
                   <Input
                     value={messageBody}
-                    onChange={e => setMessageBody(e.target.value)}
+                    onChange={(e) => setMessageBody(e.target.value)}
                     placeholder="Type a message…"
                     className="flex-1"
-                    onKeyDown={e => {
+                    onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         if (messageBody.trim() && activeConvId) {

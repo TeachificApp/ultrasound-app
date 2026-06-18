@@ -49,6 +49,7 @@ export default function TeachDashboard() {
   const [educatorOrgId, setEducatorOrgId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+  const [processing, setProcessing] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null | "trash">(null);
   const [renamingFolderId, setRenamingFolderId] = useState<number | null>(null);
   const [renamingFolderName, setRenamingFolderName] = useState("");
@@ -97,10 +98,10 @@ export default function TeachDashboard() {
   const parsePptxFromUrl = trpc.teach.parsePptxFromUrl.useMutation({
     onSuccess: (data) => {
       toast.success(data.parsed ? "PowerPoint imported — slides ready to edit" : "File uploaded");
-      refetch(); refetchMasters(); setUploading(false);
+      refetch(); refetchMasters(); setUploading(false); setProcessing(false);
       if (data.parsed && data.materialId) navigate(`/teach/presentation/${data.materialId}/edit`);
     },
-    onError: (e) => { toast.error(e.message); setUploading(false); },
+    onError: (e) => { toast.error(e.message); setUploading(false); setProcessing(false); },
   });
   const deleteMaterial = trpc.teach.deleteMaterial.useMutation({
     onSuccess: () => { toast.success("Permanently deleted"); refetch(); refetchTrash(); },
@@ -235,10 +236,10 @@ export default function TeachDashboard() {
           lastResult = await chunkRes.json();
           setUploadProgress({ current: i + 1, total: totalChunks });
         }
-        setUploadProgress(null);
-
         // Step 3: Parse PPTX from the uploaded S3 URL
         if (!lastResult?.done) throw new Error("Upload did not complete");
+        setUploadProgress(null);
+        setProcessing(true);
         parsePptxFromUrl.mutate({
           assetId: lastResult.assetId,
           s3Url: lastResult.s3Url,
@@ -394,13 +395,14 @@ export default function TeachDashboard() {
                 <Plus className="w-4 h-4 mr-1" /> New Presentation
               </Button>
               <div className="flex flex-col gap-1">
-                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                  {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
-                  {uploading ? "Uploading…" : "Upload File"}
+                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading || processing}>
+                  {(uploading || processing) ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
+                  {processing ? "Processing File…" : uploading ? "Uploading…" : "Upload File"}
                 </Button>
                 {uploadProgress && (
                   <div className="w-36">
                     <Progress value={Math.round((uploadProgress.current / uploadProgress.total) * 100)} className="h-1.5" />
+                    <p className="text-xs text-gray-400 mt-0.5">{uploadProgress.current}/{uploadProgress.total} chunks</p>
                   </div>
                 )}
               </div>

@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { isRichTextEmpty, appendHashtagsToBody } from "@shared/communityText";
 import {
   MessageSquare, Heart, Bookmark, BookmarkCheck, MoreHorizontal,
   Image as ImageIcon, BarChart2, Send, ChevronDown, ChevronUp,
@@ -278,7 +279,7 @@ function PostCard({ post, isAdmin, communityId }: { post: any; isAdmin: boolean;
                 </DropdownMenuItem>
               </>}
               {user?.id !== post.userId && (
-                <DropdownMenuItem onClick={() => reportMutation.mutate({ targetType: "post", targetId: post.id, reason: "Inappropriate content" })}>
+                <DropdownMenuItem onClick={() => reportMutation.mutate({ targetType: "post", targetId: post.id, reason: "Inappropriate content", communityId })}>
                   <Flag className="w-4 h-4 mr-2" />Report
                 </DropdownMenuItem>
               )}
@@ -348,14 +349,36 @@ function CreatePostBox({ communityId, channelId, onPosted }: { communityId: numb
   const utils = trpc.useUtils();
   const { data: aliases } = trpc.admin.listPostingAliases.useQuery(undefined, { enabled: user?.role === "admin" });
   const createPost = trpc.community.member.createPost.useMutation({
-    onSuccess: () => {
-      setTitle(""); setBody(""); setHashtags(""); setExpanded(false); setSelectedAliasId(null);
-      utils.community.member.getFeed.invalidate({ communityId });
+    onSuccess: async () => {
+      setTitle("");
+      setBody("");
+      setHashtags("");
+      setExpanded(false);
+      setSelectedAliasId(null);
+      await utils.community.member.getFeed.reset();
+      await utils.community.member.getFeed.invalidate({ communityId, channelId });
+      toast.success("Your post was published");
       onPosted();
     },
     onError: (e) => toast.error(e.message),
   });
   if (!user) return null;
+
+  const submitPost = () => {
+    const finalBody = appendHashtagsToBody(body, hashtags);
+    if (isRichTextEmpty(finalBody)) {
+      toast.error("Please write something before posting");
+      return;
+    }
+    createPost.mutate({
+      communityId,
+      channelId,
+      title: title.trim() || undefined,
+      body: finalBody,
+      aliasId: selectedAliasId ?? undefined,
+    });
+  };
+
   return (
     <Card className="mb-4">
       <CardContent className="p-4">
@@ -409,14 +432,8 @@ function CreatePostBox({ communityId, channelId, onPosted }: { communityId: numb
               <Button
                 size="sm"
                 className="bg-teal-600 hover:bg-teal-700 text-white"
-                disabled={!body.trim() || createPost.isPending}
-                onClick={() => createPost.mutate({
-                  communityId, channelId,
-                  title: title.trim() || undefined,
-                  body,
-                  hashtags: hashtags.trim() || undefined,
-                  aliasId: selectedAliasId ?? undefined,
-                })}
+                disabled={isRichTextEmpty(body) || createPost.isPending}
+                onClick={submitPost}
               >
                 <Send className="w-4 h-4 mr-1" />Post
               </Button>
@@ -621,9 +638,8 @@ export default function CommunityFeed() {
   const { data: feed, isLoading: feedLoading, fetchNextPage, hasNextPage } = trpc.community.member.getFeed.useInfiniteQuery(
     { communityId: community?.id ?? 0, channelId: activeChannelId ?? undefined, sort, limit: 15 },
     {
-      enabled: !!community?.id && isMember,
-      getNextPageParam: (last: any) => last.nextCursor,
-      initialCursor: undefined,
+      enabled: !!community?.id && isMember && !!activeChannelId,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     }
   );
 
