@@ -840,6 +840,56 @@ export const lmsPublicRouter = router({
         isFull: capacity !== null && enrolled >= capacity,
       };
     }),
+
+  /** Public: get published live sessions for a specific cohort group (for calendar embed) */
+  getCohortGroupSessions: publicProcedure
+    .input(z.object({ cohortGroupId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [group] = await db
+        .select({
+          id: lmsCohortGroups.id,
+          name: lmsCohortGroups.name,
+          courseId: lmsCohortGroups.courseId,
+          startDate: lmsCohortGroups.startDate,
+          endDate: lmsCohortGroups.endDate,
+        })
+        .from(lmsCohortGroups)
+        .where(eq(lmsCohortGroups.id, input.cohortGroupId))
+        .limit(1);
+      if (!group) throw new TRPCError({ code: "NOT_FOUND" });
+      // Fetch published sessions for this group OR shared sessions (no group assignment)
+      const sessions = await db
+        .select({
+          id: lmsCohortSessions.id,
+          title: lmsCohortSessions.title,
+          description: lmsCohortSessions.description,
+          sessionDate: lmsCohortSessions.sessionDate,
+          durationMinutes: lmsCohortSessions.durationMinutes,
+          timezone: lmsCohortSessions.timezone,
+          meetingUrl: lmsCohortSessions.meetingUrl,
+          recordingUrl: lmsCohortSessions.recordingUrl,
+          status: lmsCohortSessions.status,
+          cohortGroupId: lmsCohortSessions.cohortGroupId,
+        })
+        .from(lmsCohortSessions)
+        .where(
+          and(
+            eq(lmsCohortSessions.courseId, group.courseId),
+            eq(lmsCohortSessions.status, "published"),
+            sql`(${lmsCohortSessions.cohortGroupId} = ${input.cohortGroupId} OR ${lmsCohortSessions.cohortGroupId} IS NULL)`,
+          )
+        )
+        .orderBy(asc(lmsCohortSessions.sessionDate));
+      return {
+        groupId: group.id,
+        groupName: group.name,
+        groupStartDate: group.startDate,
+        groupEndDate: group.endDate,
+        sessions,
+      };
+    }),
 });
 
 // ─── Learner Router ───────────────────────────────────────────────────────────

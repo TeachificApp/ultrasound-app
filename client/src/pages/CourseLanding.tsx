@@ -26,6 +26,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
+import { CohortSessionsCalendar } from "@/components/CohortSessionsCalendar";
 import type { Block } from "@/components/BlockPreview";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
 import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
@@ -2569,6 +2570,7 @@ function CohortGroupEmbedSection({
   enrollNowText: string;
   showEnrollNow: boolean;
 }) {
+  const [activeTab, setActiveTab] = useState<"details" | "sessions">("details");
   const { data, isLoading, error } = trpc.lms.getCohortGroupPage.useQuery({ cohortGroupId: groupId });
 
   const fmtDate = (d: Date | string | null | undefined) => {
@@ -2612,8 +2614,34 @@ function CohortGroupEmbedSection({
           </Button>
         )}
       </div>
+      {/* Tab bar */}
+      <div className="flex border-b" style={{ borderColor: `${accentColor}22` }}>
+        {(["details", "sessions"] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === tab
+                ? "border-current"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+            style={activeTab === tab ? { color: accentColor, borderColor: accentColor } : undefined}
+          >
+            {tab === "details" ? "Details" : "Live Sessions"}
+          </button>
+        ))}
+      </div>
       {/* Content */}
-      {(!data.landingBlocks || (data.landingBlocks as any[]).length === 0) ? (
+      {activeTab === "sessions" ? (
+        <div className="p-4">
+          <CohortSessionsCalendar
+            cohortGroupId={groupId}
+            accentColor={accentColor}
+            defaultView="list"
+            showHeader={false}
+          />
+        </div>
+      ) : (!data.landingBlocks || (data.landingBlocks as any[]).length === 0) ? (
         <div className="p-8 max-w-2xl mx-auto space-y-6">
           {data.description && <p className="text-gray-600">{data.description}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
