@@ -28,6 +28,7 @@ import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import type { Block } from "@/components/BlockPreview";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
+import { PublicLandingBlocks } from "@/components/PublicLandingBlock";
 import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
@@ -2482,11 +2483,11 @@ function CohortGroupDetailModal({
                   </div>
                 </div>
               ) : (
-                /* Render landing blocks via BlockPreview */
                 <div>
-                  {(data.landingBlocks as any[]).map((block: any) => (
-                    <BlockPreview key={block.id} block={block} />
-                  ))}
+                  <PublicLandingBlocks
+                    blocks={data.landingBlocks as Block[]}
+                    context={cohortGroupId ? { cohortGroupId } : undefined}
+                  />
                 </div>
               )}
             </>
@@ -2607,9 +2608,10 @@ function CohortGroupEmbedSection({
         </div>
       ) : (
         <div>
-          {(data.landingBlocks as any[]).map((block: any) => (
-            <BlockPreview key={block.id} block={block} />
-          ))}
+          <PublicLandingBlocks
+            blocks={data.landingBlocks as Block[]}
+            context={{ cohortGroupId: groupId }}
+          />
           {showEnrollNow && (
             <div className="text-center py-6">
               <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
@@ -2694,9 +2696,10 @@ function WorkshopInstanceEmbedSection({
         {data.description && <p className="text-gray-600 text-sm">{data.description}</p>}
         {(data.landingBlocks as any[])?.length > 0 && (
           <div>
-            {(data.landingBlocks as any[]).map((block: any) => (
-              <BlockPreview key={block.id} block={block} />
-            ))}
+            <PublicLandingBlocks
+              blocks={data.landingBlocks as Block[]}
+              context={{ workshopInstanceId: instanceId }}
+            />
           </div>
         )}
         {showEnrollNow && (
