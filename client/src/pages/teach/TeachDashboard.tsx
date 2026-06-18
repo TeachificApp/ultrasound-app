@@ -301,7 +301,11 @@ export default function TeachDashboard() {
                   <Button variant="outline" size="sm"><GraduationCap className="w-4 h-4 mr-1" /> Instructor Portal</Button>
                 </Link>
               )}
-
+              {ctx.educatorAssistPreview && (
+                <Link href="/educator-admin">
+                  <Button variant="outline" size="sm"><Building2 className="w-4 h-4 mr-1" /> EducatorAssist™</Button>
+                </Link>
+              )}
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -311,6 +315,11 @@ export default function TeachDashboard() {
               </Badge>
             )}
 
+            {ctx.educatorOrgs.map((o) => (
+              <Badge key={o.orgId} variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                EducatorAssist™: {o.orgName}
+              </Badge>
+            ))}
             {isAdmin && (
               <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Admin · Unlimited uploads</Badge>
             )}
