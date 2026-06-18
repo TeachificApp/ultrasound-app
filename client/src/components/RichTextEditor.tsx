@@ -36,7 +36,24 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 
-// Extended TableCell with backgroundColor attribute
+// Extended Table with borderless attribute
+const CustomTable = Table.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      borderless: {
+        default: false,
+        parseHTML: (el) => el.classList.contains("table-borderless"),
+        renderHTML: (attrs) => {
+          if (!attrs.borderless) return {};
+          return { class: "table-borderless" };
+        },
+      },
+    };
+  },
+});
+
+// Extended TableCell with backgroundColor and borderColor attributes
 const CustomTableCell = TableCell.extend({
   addAttributes() {
     return {
@@ -47,6 +64,14 @@ const CustomTableCell = TableCell.extend({
         renderHTML: (attrs) => {
           if (!attrs.backgroundColor) return {};
           return { style: `background-color: ${attrs.backgroundColor}` };
+        },
+      },
+      borderColor: {
+        default: null,
+        parseHTML: (el) => el.style.borderColor || null,
+        renderHTML: (attrs) => {
+          if (!attrs.borderColor) return {};
+          return { style: `border-color: ${attrs.borderColor}` };
         },
       },
     };
@@ -63,6 +88,14 @@ const CustomTableHeader = TableHeader.extend({
         renderHTML: (attrs) => {
           if (!attrs.backgroundColor) return {};
           return { style: `background-color: ${attrs.backgroundColor}` };
+        },
+      },
+      borderColor: {
+        default: null,
+        parseHTML: (el) => el.style.borderColor || null,
+        renderHTML: (attrs) => {
+          if (!attrs.borderColor) return {};
+          return { style: `border-color: ${attrs.borderColor}` };
         },
       },
     };
@@ -119,6 +152,9 @@ import {
   Split,
   Trash2 as TrashIcon,
   ChevronDown,
+  EyeOff,
+  Eye,
+  Pipette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
@@ -611,6 +647,7 @@ export default function RichTextEditor({
   const [tableCols, setTableCols] = useState(3);
   const [tableInsertOpen, setTableInsertOpen] = useState(false);
   const [cellBgColor, setCellBgColor] = useState("#ffffff");
+  const [cellBorderColor, setCellBorderColor] = useState("#d1d5db");
   const [mediaStyleOpen, setMediaStyleOpen] = useState(false);
 
   const editor = useEditor({
@@ -630,7 +667,7 @@ export default function RichTextEditor({
       }),
       Youtube.configure({ controls: true, nocookie: true }),
       Placeholder.configure({ placeholder }),
-      Table.configure({ resizable: true }),
+      CustomTable.configure({ resizable: true }),
       TableRow,
       CustomTableHeader,
       CustomTableCell,
@@ -1092,7 +1129,7 @@ export default function RichTextEditor({
               <TableIcon className="w-3.5 h-3.5" />
             </ToolbarBtn>
             {tableMenuOpen && (
-              <div className="absolute top-9 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-64" onMouseLeave={() => setTableMenuOpen(false)}>
+              <div className="absolute top-9 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-72" onMouseLeave={() => setTableMenuOpen(false)}>
                 {!editor.isActive("table") ? (
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-gray-600 mb-2">Insert Table</p>
@@ -1123,6 +1160,109 @@ export default function RichTextEditor({
                 ) : (
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-gray-600 mb-2">Table Actions</p>
+
+                    {/* ── Border visibility toggle ── */}
+                    {(() => {
+                      const isBorderless = editor.isActive("table") &&
+                        (editor.getAttributes("table") as any)?.borderless === true;
+                      return (
+                        <button type="button"
+                          className={`w-full text-left px-2 py-1.5 text-xs rounded flex items-center gap-2 ${
+                            isBorderless
+                              ? "bg-teal-50 text-teal-700 hover:bg-teal-100"
+                              : "hover:bg-gray-50 text-gray-700"
+                          }`}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            editor.chain().focus().updateAttributes("table", { borderless: !isBorderless }).run();
+                          }}>
+                          {isBorderless
+                            ? <><Eye className="w-3.5 h-3.5" /> Show borders</>
+                            : <><EyeOff className="w-3.5 h-3.5" /> Hide borders</>}
+                        </button>
+                      );
+                    })()}
+
+                    <div className="border-t border-gray-100 my-1" />
+
+                    {/* ── Cell shading ── */}
+                    <div className="px-2 py-1.5 space-y-2">
+                      <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                        <Pipette className="w-3.5 h-3.5" /> Cell shading
+                      </p>
+                      {/* Quick shading presets */}
+                      <div className="flex flex-wrap gap-1">
+                        {[
+                          { label: "None", bg: null },
+                          { label: "Light gray", bg: "#f3f4f6" },
+                          { label: "Teal tint", bg: "#f0fdfa" },
+                          { label: "Blue tint", bg: "#eff6ff" },
+                          { label: "Yellow tint", bg: "#fefce8" },
+                          { label: "Pink tint", bg: "#fdf2f8" },
+                        ].map(({ label, bg }) => (
+                          <button
+                            key={label}
+                            type="button"
+                            title={label}
+                            className="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform"
+                            style={{ background: bg ?? "#ffffff", outline: bg === null ? "2px dashed #d1d5db" : undefined }}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              editor.chain().focus().setCellAttribute("backgroundColor", bg).run();
+                            }}
+                          />
+                        ))}
+                      </div>
+                      {/* Custom color picker */}
+                      <div className="flex items-center gap-2">
+                        <input type="color" value={cellBgColor} onChange={e => setCellBgColor(e.target.value)}
+                          className="w-7 h-7 rounded border border-gray-200 cursor-pointer p-0" title="Custom cell background" />
+                        <button type="button" className="flex-1 h-7 text-xs font-medium text-white rounded bg-teal-600 hover:bg-teal-700"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            editor.chain().focus().setCellAttribute("backgroundColor", cellBgColor).run();
+                          }}>Apply custom</button>
+                      </div>
+                    </div>
+
+                    {/* ── Cell border color ── */}
+                    <div className="px-2 py-1.5 space-y-1.5">
+                      <p className="text-xs font-semibold text-gray-600">Cell border color</p>
+                      <div className="flex flex-wrap gap-1">
+                        {[
+                          { label: "Default", color: "#d1d5db" },
+                          { label: "Dark", color: "#374151" },
+                          { label: "Teal", color: "#0d9488" },
+                          { label: "Blue", color: "#3b82f6" },
+                          { label: "None", color: "transparent" },
+                        ].map(({ label, color }) => (
+                          <button
+                            key={label}
+                            type="button"
+                            title={label}
+                            className="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform"
+                            style={{ background: color === "transparent" ? "#ffffff" : color, outline: color === "transparent" ? "2px dashed #d1d5db" : undefined }}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              const val = color === "transparent" ? null : color;
+                              editor.chain().focus().setCellAttribute("borderColor", val).run();
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input type="color" value={cellBorderColor} onChange={e => setCellBorderColor(e.target.value)}
+                          className="w-7 h-7 rounded border border-gray-200 cursor-pointer p-0" title="Custom border color" />
+                        <button type="button" className="flex-1 h-7 text-xs font-medium text-white rounded bg-teal-600 hover:bg-teal-700"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            editor.chain().focus().setCellAttribute("borderColor", cellBorderColor).run();
+                          }}>Apply</button>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 my-1" />
+
                     <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
                       onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().addRowAfter().run(); setTableMenuOpen(false); }}>
                       <Rows3 className="w-3.5 h-3.5 text-gray-500" /> Add row below
@@ -1165,26 +1305,6 @@ export default function RichTextEditor({
                       onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleHeaderColumn().run(); setTableMenuOpen(false); }}>
                       <Columns3 className="w-3.5 h-3.5 text-gray-500" /> Toggle header column
                     </button>
-                    <div className="border-t border-gray-100 my-1" />
-                    <div className="px-2 py-1">
-                      <label className="text-xs text-gray-500 block mb-1">Cell background color</label>
-                      <div className="flex items-center gap-2">
-                        <input type="color" value={cellBgColor} onChange={e => setCellBgColor(e.target.value)}
-                          className="w-7 h-7 rounded border border-gray-200 cursor-pointer p-0" />
-                        <button type="button" className="flex-1 h-7 text-xs font-medium text-white rounded bg-teal-600 hover:bg-teal-700"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            editor.chain().focus().setCellAttribute("backgroundColor", cellBgColor).run();
-                            setTableMenuOpen(false);
-                          }}>Apply</button>
-                        <button type="button" className="h-7 px-2 text-xs text-gray-500 rounded border border-gray-200 hover:bg-gray-50"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            editor.chain().focus().setCellAttribute("backgroundColor", null).run();
-                            setTableMenuOpen(false);
-                          }}>Clear</button>
-                      </div>
-                    </div>
                     <div className="border-t border-gray-100 my-1" />
                     <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-red-50 text-red-500 flex items-center gap-2"
                       onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().deleteTable().run(); setTableMenuOpen(false); }}>
@@ -1281,6 +1401,12 @@ export default function RichTextEditor({
         .rte-content .tiptap table tr:nth-child(even) td { background-color: #f9fafb; }
         .rte-content .tiptap table .selectedCell:after { z-index: 2; position: absolute; content: ""; left: 0; right: 0; top: 0; bottom: 0; background: rgba(20,144,150,0.12); pointer-events: none; }
         .rte-content .tiptap table .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: -2px; width: 4px; background-color: #149096; pointer-events: none; }
+        /* Borderless table: hide all cell borders */
+        .rte-content .tiptap table.table-borderless,
+        .rte-content .tiptap table.table-borderless td,
+        .rte-content .tiptap table.table-borderless th { border: none !important; }
+        .rte-content .tiptap table.table-borderless th { background-color: transparent; color: inherit; }
+        .rte-content .tiptap table.table-borderless tr:nth-child(even) td { background-color: transparent; }
         .rte-content .tableWrapper { overflow-x: auto; }
         .rte-content .resize-cursor { cursor: col-resize; }
       `}</style>
@@ -1687,5 +1813,6 @@ export function RichTextDisplay({
     />
   );
 }
+
 
 

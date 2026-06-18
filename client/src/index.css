@@ -442,6 +442,19 @@ textarea,
 .prose tr:nth-child(even) {
   background-color: #fafafa;
 }
+/* Borderless table — hide all borders when table-borderless class is present */
+.prose table.table-borderless,
+.prose table.table-borderless td,
+.prose table.table-borderless th {
+  border: none !important;
+}
+.prose table.table-borderless th {
+  background-color: transparent;
+  font-weight: 600;
+}
+.prose table.table-borderless tr:nth-child(even) {
+  background-color: transparent;
+}
 
 /* Page Builder Editor Drawer animation */
 @keyframes slideInRight {
