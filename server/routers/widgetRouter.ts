@@ -1,12 +1,12 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { eq, desc, and, inArray, or } from "drizzle-orm";
+import { eq, desc, and, inArray, or, gte } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   embedWidgets, lmsCourses, digitalProducts, digitalBundles, webinars,
-  membershipPlans, physicalProducts, workshops, communities, workshopInstances,
+  membershipPlans, physicalProducts, workshops, communities, workshopInstances, lmsCohortGroups,
 } from "../../drizzle/schema";
 
 function assertAdmin(ctx: any) {
@@ -220,7 +220,7 @@ export const widgetPublicRouter = router({
 
       const allCards: Map<string, any> = new Map(); // key = `${type}:${id}`
 
-      // Courses & quizzes (include enrollmentCloseDate for cohorts when showCourseDetails is on)
+      // Courses & quizzes (include cohort group info when showCourseDetails is on)
       if (courseIds.length > 0) {
         const rows = await db.select({
           id: lmsCourses.id, slug: lmsCourses.slug, title: lmsCourses.title,
@@ -230,9 +230,34 @@ export const widgetPublicRouter = router({
           currency: lmsCourses.currency, brand: lmsCourses.brand,
           enrollmentCloseDate: lmsCourses.enrollmentCloseDate,
         }).from(lmsCourses).where(and(inArray(lmsCourses.id, courseIds), eq(lmsCourses.status, "public")));
-        rows.forEach(r => allCards.set(`${r.type}:${r.id}`, toCard(r, r.type, {
-          enrollmentCloseDate: widget.showCourseDetails ? (r.enrollmentCloseDate ?? null) : undefined,
-        })));
+        // Enrich cohort rows with primary cohort group data
+        const cohortIds = rows.filter(r => r.type === "cohort").map(r => r.id);
+        const cohortGroupMap = new Map<number, { name: string | null; startDate: Date | null; endDate: Date | null }>();
+        if (cohortIds.length > 0 && widget.showCourseDetails) {
+          const groups = await db.select({
+            courseId: lmsCohortGroups.courseId,
+            name: lmsCohortGroups.name,
+            startDate: lmsCohortGroups.startDate,
+            endDate: lmsCohortGroups.endDate,
+          }).from(lmsCohortGroups)
+            .where(and(
+              inArray(lmsCohortGroups.courseId, cohortIds),
+              or(eq(lmsCohortGroups.status, "open"), eq(lmsCohortGroups.status, "active")),
+            ))
+            .orderBy(lmsCohortGroups.sortOrder);
+          groups.forEach(g => {
+            if (!cohortGroupMap.has(g.courseId)) cohortGroupMap.set(g.courseId, g);
+          });
+        }
+        rows.forEach(r => {
+          const group = cohortGroupMap.get(r.id);
+          allCards.set(`${r.type}:${r.id}`, toCard(r, r.type, {
+            enrollmentCloseDate: widget.showCourseDetails ? (r.enrollmentCloseDate ?? null) : undefined,
+            cohortGroupName: group?.name ?? null,
+            cohortGroupStartDate: group?.startDate ?? null,
+            cohortGroupEndDate: group?.endDate ?? null,
+          }));
+        });
       }
 
       // Digital downloads

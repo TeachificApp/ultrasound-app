@@ -135,7 +135,38 @@ export const workshopPublicRouter = router({
         .orderBy(asc(workshops.libraryOrder), desc(workshops.createdAt))
         .limit(input.limit)
         .offset(input.offset);
-      return rows;
+
+      // Attach next upcoming published instance for each workshop
+      if (rows.length === 0) return rows;
+      const now = new Date();
+      const workshopIds = rows.map(r => r.id);
+      const instances = await db
+        .select({
+          workshopId: workshopInstances.workshopId,
+          startDate: workshopInstances.startDate,
+          endDate: workshopInstances.endDate,
+          locationType: workshopInstances.locationType,
+          venueName: workshopInstances.venueName,
+          venueCity: workshopInstances.venueCity,
+          venueState: workshopInstances.venueState,
+        })
+        .from(workshopInstances)
+        .where(
+          and(
+            sql`${workshopInstances.workshopId} IN (${sql.join(workshopIds.map(id => sql`${id}`), sql`, `)})`,
+            eq(workshopInstances.status, "published"),
+            gte(workshopInstances.startDate, now),
+          )
+        )
+        .orderBy(asc(workshopInstances.startDate));
+
+      // Map: workshopId -> first upcoming instance
+      const instanceMap = new Map<number, typeof instances[0]>();
+      for (const inst of instances) {
+        if (!instanceMap.has(inst.workshopId)) instanceMap.set(inst.workshopId, inst);
+      }
+
+      return rows.map(r => ({ ...r, nextInstance: instanceMap.get(r.id) ?? null }));
     }),
 
   /** Public: get live seat availability for a workshop instance (no cache — real-time) */

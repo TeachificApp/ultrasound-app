@@ -7,8 +7,8 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getOrCreateUserByEmail } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users, webinarRegistrations, bundleEnrollments, webinars, communities, workshops } from "../../drizzle/schema";
-import { eq, and, asc, desc, sql, inArray, or, like, isNotNull } from "drizzle-orm";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users, webinarRegistrations, bundleEnrollments, webinars, communities, workshops, workshopInstances, lmsCohortGroups } from "../../drizzle/schema";
+import { eq, and, asc, desc, sql, inArray, or, like, isNotNull, gte } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 import { computeFunnelCheckoutTotalCents } from "../lib/checkoutPricing";
 import { getStripeClient } from "../lib/stripeClient";
@@ -63,9 +63,9 @@ export const funnelRouter = router({
     const IHE_HERO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
     const APP_PRODUCTS = [
       { id: 1001, type: "app" as const, name: "UltrasoundAssist™ — Free", price: 0, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: true, appLabel: "UltrasoundAssist" },
-      { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: -1, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "UltrasoundAssist" },
+      { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: 9.97, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "UltrasoundAssist", priceLabel: "$9.97/mo" },
       { id: 1003, type: "app" as const, name: "EchoAssist™ — Free", price: 0, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: true, appLabel: "EchoAssist" },
-      { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: -1, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: false, appLabel: "EchoAssist" },
+      { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: 9.97, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: false, appLabel: "EchoAssist", priceLabel: "$9.97/mo" },
     ];
     return [
       ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
@@ -74,7 +74,7 @@ export const funnelRouter = router({
       ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, price: p.price ?? 0, imageUrl: p.thumbnailUrl ?? "" })),
       ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, price: w.price ?? 0, imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
       ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, price: 0, imageUrl: c.coverImage ?? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp", isFree: c.accessType === "free" })),
-      ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: w.price ?? 0, imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
+      ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: (w.price ?? 0) / 100, imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
       ...APP_PRODUCTS,
     ];
   }),
@@ -107,9 +107,9 @@ export const funnelRouter = router({
       const IHE_HERO_R = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
       const APP_REGISTRY: Record<number, { id: number; type: string; title: string; slug: string; description: string; price: number; isFree: boolean; imageUrl: string; href: string; appLabel?: string }> = {
         1001: { id: 1001, type: "app", title: "UltrasoundAssist™ — Free", slug: "ultrasound-assist-free", description: "AI-powered ultrasound clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist" },
-        1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: -1, isFree: false, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist" },
+        1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: 9.97, isFree: false, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist", priceLabel: "$9.97/mo" },
         1003: { id: 1003, type: "app", title: "EchoAssist™ — Free", slug: "echo-assist-free", description: "AI-powered echocardiography clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist" },
-        1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: -1, isFree: false, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist" },
+        1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: 9.97, isFree: false, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist", priceLabel: "$9.97/mo" },
       };
 
       const [courses, downloads, bundles, physicals, webinarRows, communityRows, workshopRows] = await Promise.all([
@@ -149,11 +149,46 @@ export const funnelRouter = router({
           .where(inArray(digitalProducts.id, missingCourseIds));
       }
 
+      // Pre-fetch cohort group data before map population
+      const now = new Date();
+      const cohortCourseRows = (courses as any[]).filter((c: any) => c.courseType === "cohort");
+      const cohortGroupMap = new Map<number, { name: string; startDate: Date | null; endDate: Date | null } | null>();
+      if (cohortCourseRows.length > 0) {
+        const cohortCourseIdsArr = cohortCourseRows.map((c: any) => c.id);
+        const allGroups = await db.select({ courseId: lmsCohortGroups.courseId, name: lmsCohortGroups.name, startDate: lmsCohortGroups.startDate, endDate: lmsCohortGroups.endDate, sortOrder: lmsCohortGroups.sortOrder })
+          .from(lmsCohortGroups)
+          .where(and(inArray(lmsCohortGroups.courseId, cohortCourseIdsArr), sql`${lmsCohortGroups.status} IN ('open','active')`))
+          .orderBy(asc(lmsCohortGroups.sortOrder), asc(lmsCohortGroups.startDate));
+        for (const grp of allGroups) {
+          if (!cohortGroupMap.has(grp.courseId)) cohortGroupMap.set(grp.courseId, { name: grp.name, startDate: grp.startDate, endDate: grp.endDate });
+        }
+      }
+      // Pre-fetch workshop instance data before map population
+      const workshopIdsArr = (workshopRows as any[]).map((w: any) => w.id);
+      const workshopInstanceMap = new Map<number, { startDate: Date | null; endDate: Date | null; locationType: string | null; venueName: string | null; venueCity: string | null; venueState: string | null } | null>();
+      if (workshopIdsArr.length > 0) {
+        const allInstances = await db.select({
+          workshopId: workshopInstances.workshopId,
+          startDate: workshopInstances.startDate,
+          endDate: workshopInstances.endDate,
+          locationType: workshopInstances.locationType,
+          venueName: workshopInstances.venueName,
+          venueCity: workshopInstances.venueCity,
+          venueState: workshopInstances.venueState,
+        }).from(workshopInstances)
+          .where(and(inArray(workshopInstances.workshopId, workshopIdsArr), eq(workshopInstances.status, "published"), gte(workshopInstances.startDate, now)))
+          .orderBy(asc(workshopInstances.startDate));
+        for (const inst of allInstances) {
+          if (!workshopInstanceMap.has(inst.workshopId)) workshopInstanceMap.set(inst.workshopId, inst);
+        }
+      }
+
       // Preserve the order specified by input.items
       const map = new Map<string, object>();
       for (const c of courses as any[]) {
         const resolvedType = c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course";
-        const entry = { ...c, type: resolvedType, isFree: c.isFree ?? false, href: `/courses/${c.slug}` };
+        const primaryCohortGroup = resolvedType === "cohort" ? (cohortGroupMap.get(c.id) ?? null) : null;
+        const entry = { ...c, type: resolvedType, isFree: c.isFree ?? false, href: `/courses/${c.slug}`, primaryCohortGroup };
         map.set(`course-${c.id}`, entry);
         map.set(`${resolvedType}-${c.id}`, entry);
       }
@@ -169,7 +204,10 @@ export const funnelRouter = router({
       for (const w of webinarRows as any[]) map.set(`webinar-${w.id}`, { ...w, type: "webinar", isFree: w.accessType === "free", price: w.price ?? 0, href: `/webinars/${w.slug}` });
       const COMMUNITY_FALLBACK_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
       for (const c of communityRows as any[]) map.set(`community-${c.id}`, { ...c, type: "community", isFree: c.accessType === "free", price: 0, href: `/community/${c.slug}`, imageUrl: c.imageUrl ?? COMMUNITY_FALLBACK_IMG });
-      for (const w of workshopRows as any[]) map.set(`workshop-${w.id}`, { ...w, type: "workshop", isFree: w.isFree ?? false, price: w.price ?? 0, href: `/workshops/${w.slug}` });
+      for (const w of workshopRows as any[]) {
+        const nextInstance = workshopInstanceMap.get(w.id) ?? null;
+        map.set(`workshop-${w.id}`, { ...w, type: "workshop", isFree: w.isFree ?? false, price: (w.price ?? 0) / 100, href: `/workshops/${w.slug}`, nextInstance });
+      }
       for (const appId of appIds) {
         const app = APP_REGISTRY[appId];
         if (app) map.set(`app-${appId}`, app);

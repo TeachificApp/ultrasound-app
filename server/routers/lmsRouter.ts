@@ -23,7 +23,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or } from "drizzle-orm";
+import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or, gte } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
@@ -98,6 +98,7 @@ import {
   lmsCohortRecordingProgress,
   cohortWaitlistEntries,
   workshops,
+  workshopInstances,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
@@ -516,7 +517,18 @@ export const lmsPublicRouter = router({
         if (item.itemType === "course" || item.itemType === "quiz") {
           const [c] = await db.select().from(lmsCourses)
             .where(and(eq(lmsCourses.id, item.itemId), eq(lmsCourses.status, "public"))).limit(1);
-          return c ? { ...c, _source: "lms_course" as const, _itemType: item.itemType } : null;
+          if (!c) return null;
+          // For cohorts, attach the primary open/active group
+          let primaryCohortGroup: { name: string; startDate: Date | null; endDate: Date | null } | null = null;
+          if (c.type === "cohort") {
+            const [grp] = await db.select({ name: lmsCohortGroups.name, startDate: lmsCohortGroups.startDate, endDate: lmsCohortGroups.endDate })
+              .from(lmsCohortGroups)
+              .where(and(eq(lmsCohortGroups.courseId, c.id), sql`${lmsCohortGroups.status} IN ('open','active')`))
+              .orderBy(asc(lmsCohortGroups.sortOrder), asc(lmsCohortGroups.startDate))
+              .limit(1);
+            primaryCohortGroup = grp ?? null;
+          }
+          return { ...c, _source: "lms_course" as const, _itemType: item.itemType, primaryCohortGroup };
         } else if (item.itemType === "download") {
           const [p] = await db.select().from(digitalProducts)
             .where(and(eq(digitalProducts.id, item.itemId), eq(digitalProducts.status, "published"))).limit(1);
@@ -544,7 +556,19 @@ export const lmsPublicRouter = router({
         } else if (item.itemType === "workshop") {
           const [w] = await db.select().from(workshops)
             .where(and(eq(workshops.id, item.itemId), eq(workshops.status, "public"))).limit(1);
-          return w ? { id: w.id, slug: w.slug, title: w.title, subtitle: w.subtitle ?? null, coverImageUrl: w.coverImageUrl ?? w.thumbnailUrl ?? null, price: w.price, isFree: w.isFree, type: "workshop" as const, _source: "workshop" as const, _itemType: "workshop" } : null;
+          if (!w) return null;
+          const now = new Date();
+          const [nextInst] = await db.select({
+            startDate: workshopInstances.startDate,
+            endDate: workshopInstances.endDate,
+            locationType: workshopInstances.locationType,
+            venueName: workshopInstances.venueName,
+            venueCity: workshopInstances.venueCity,
+            venueState: workshopInstances.venueState,
+          }).from(workshopInstances)
+            .where(and(eq(workshopInstances.workshopId, w.id), eq(workshopInstances.status, "published"), gte(workshopInstances.startDate, now)))
+            .orderBy(asc(workshopInstances.startDate)).limit(1);
+          return { id: w.id, slug: w.slug, title: w.title, subtitle: w.subtitle ?? null, coverImageUrl: w.coverImageUrl ?? w.thumbnailUrl ?? null, price: w.price, isFree: w.isFree, type: "workshop" as const, _source: "workshop" as const, _itemType: "workshop", nextInstance: nextInst ?? null };
         }
         return null;
       }));
@@ -553,7 +577,17 @@ export const lmsPublicRouter = router({
       const resolvedLegacy = await Promise.all(legacyCourses.map(async ({ courseId }) => {
         const [c] = await db.select().from(lmsCourses)
           .where(and(eq(lmsCourses.id, courseId), eq(lmsCourses.status, "public"))).limit(1);
-        return c ? { ...c, _source: "lms_course" as const, _itemType: c.type } : null;
+        if (!c) return null;
+        let primaryCohortGroup: { name: string; startDate: Date | null; endDate: Date | null } | null = null;
+        if (c.type === "cohort") {
+          const [grp] = await db.select({ name: lmsCohortGroups.name, startDate: lmsCohortGroups.startDate, endDate: lmsCohortGroups.endDate })
+            .from(lmsCohortGroups)
+            .where(and(eq(lmsCohortGroups.courseId, c.id), sql`${lmsCohortGroups.status} IN ('open','active')`))
+            .orderBy(asc(lmsCohortGroups.sortOrder), asc(lmsCohortGroups.startDate))
+            .limit(1);
+          primaryCohortGroup = grp ?? null;
+        }
+        return { ...c, _source: "lms_course" as const, _itemType: c.type, primaryCohortGroup };
       }));
 
       // Merge: prefer new items if any exist, otherwise use legacy

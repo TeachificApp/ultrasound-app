@@ -27,6 +27,10 @@ interface Card {
   venueState?: string | null;
   timezone?: string | null;
   enrollmentCloseDate?: Date | string | null;
+  // Cohort group info
+  cohortGroupName?: string | null;
+  cohortGroupStartDate?: Date | string | null;
+  cohortGroupEndDate?: Date | string | null;
 }
 
 interface WidgetConfig {
@@ -138,31 +142,62 @@ function formatDate(d: Date | string | null | undefined): string {
   return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+function formatDateRange(start: Date | string | null | undefined, end: Date | string | null | undefined): string {
+  if (!start) return "";
+  const s = new Date(start);
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+  if (!end) return s.toLocaleDateString("en-US", opts);
+  const e = new Date(end);
+  if (s.getFullYear() === e.getFullYear()) {
+    if (s.getMonth() === e.getMonth()) {
+      return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${e.getDate()}, ${s.getFullYear()}`;
+    }
+    return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${e.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${s.getFullYear()}`;
+  }
+  return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", opts)}`;
+}
+
 function CourseDetailsRow({ card, theme }: { card: Card; theme: typeof THEMES.light }) {
-  const parts: string[] = [];
-  // Workshop: show next instance date + location
+  // Workshop
   if (card.type === "workshop") {
-    if (card.nextInstanceDate) parts.push(formatDate(card.nextInstanceDate));
-    if (card.locationType === "virtual") parts.push("Virtual");
-    else if (card.venueName) parts.push(card.venueName);
-    else if (card.venueCity && card.venueState) parts.push(`${card.venueCity}, ${card.venueState}`);
-    else if (card.venueCity) parts.push(card.venueCity);
+    if (!card.nextInstanceDate) {
+      return (
+        <div style={{ fontSize: 11, color: "#d97706", display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontWeight: 500 }}>
+          ⏰ Enrollment Closed — Join Waitlist
+        </div>
+      );
+    }
+    const dateStr = formatDateRange(card.nextInstanceDate, card.nextInstanceEndDate);
+    const isVirtual = card.locationType === "virtual" || card.locationType === "online";
+    const locationParts = isVirtual
+      ? ["Virtual / Online"]
+      : [card.venueName, [card.venueCity, card.venueState].filter(Boolean).join(", ")].filter(Boolean);
+    const locationStr = locationParts.join(" · ");
+    return (
+      <div style={{ fontSize: 11, color: theme.subtext, display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>
+        {dateStr && <span style={{ color: theme.accent, fontWeight: 500 }}>📅 {dateStr}</span>}
+        {locationStr && <span>📍 {locationStr}</span>}
+      </div>
+    );
   }
-  // Cohort: show enrollment close date
-  if (card.type === "cohort" && card.enrollmentCloseDate) {
-    parts.push(`Enrollment closes ${formatDate(card.enrollmentCloseDate)}`);
+  // Cohort
+  if (card.type === "cohort") {
+    if (!card.cohortGroupStartDate) {
+      return (
+        <div style={{ fontSize: 11, color: "#d97706", display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontWeight: 500 }}>
+          ⏰ Enrollment Closed — Join Waitlist
+        </div>
+      );
+    }
+    const dateStr = formatDateRange(card.cohortGroupStartDate, card.cohortGroupEndDate);
+    return (
+      <div style={{ fontSize: 11, color: theme.subtext, display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>
+        {card.cohortGroupName && <span style={{ color: theme.accent, fontWeight: 500 }}>🗓️ {card.cohortGroupName}</span>}
+        {dateStr && <span>📅 {dateStr}</span>}
+      </div>
+    );
   }
-  if (parts.length === 0) return null;
-  return (
-    <div style={{ fontSize: 11, color: theme.subtext, display: "flex", flexWrap: "wrap", gap: "2px 8px", marginTop: 4 }}>
-      {parts.map((p, i) => (
-        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-          {i === 0 && card.type === "workshop" && card.nextInstanceDate ? "📅" : i === 0 && card.type === "cohort" ? "🗓️" : "📍"}
-          {p}
-        </span>
-      ))}
-    </div>
-  );
+  return null;
 }
 
 function StandardCard({

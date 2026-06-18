@@ -1287,7 +1287,7 @@ function CTAActionPicker({
             >
               <option value="">-- Select product --</option>
               {(productCatalog ?? []).map(p => (
-                <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — ${Number(p.price).toFixed(2)}</option>
+                <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — {(p as any).priceLabel ?? `$${Number(p.price).toFixed(2)}`}</option>
               ))}
             </select>
           </div>

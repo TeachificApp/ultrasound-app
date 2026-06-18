@@ -13,6 +13,7 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookOpen, FileDown, Package, ExternalLink } from "lucide-react";
+import { CourseInstanceInfo } from "@/components/CourseInstanceInfo";
 
 interface ManualItem {
   type: string;
@@ -66,6 +67,8 @@ type ProductItem = {
   pricingType?: string | null;
   subscriptionInterval?: string | null;
   appLabel?: string;
+  nextInstance?: { startDate?: Date | string | null; endDate?: Date | string | null; locationType?: string | null; venueName?: string | null; venueCity?: string | null; venueState?: string | null } | null;
+  primaryCohortGroup?: { name?: string | null; startDate?: Date | string | null; endDate?: Date | string | null } | null;
 };
 
 export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) {
@@ -130,6 +133,8 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
       pricingType: (p as any).pricingType ?? null,
       subscriptionInterval: (p as any).subscriptionInterval ?? null,
       appLabel: (p as any).appLabel ?? undefined,
+      nextInstance: (p as any).nextInstance ?? null,
+      primaryCohortGroup: (p as any).primaryCohortGroup ?? null,
     }));
   } else {
     const courseItems: ProductItem[] = (coursesData?.courses ?? []).filter((c) => (c as any).type !== "quiz").map((c) => ({
@@ -331,6 +336,19 @@ function ProductCard({ item, accent, textColor, cardBg, showPrice, showDescripti
           <div className="flex-1" />
         )}
 
+        {/* Instance / cohort info */}
+        {(item.type === "workshop" || item.type === "cohort") && (
+          <div className="mt-2 flex-shrink-0">
+            <CourseInstanceInfo
+              type={item.type as "workshop" | "cohort"}
+              nextInstance={item.nextInstance}
+              primaryCohortGroup={item.primaryCohortGroup}
+              accentColor={accent}
+              compact
+            />
+          </div>
+        )}
+
         {/* Footer — price + button always on same row, pinned to bottom */}
         <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 flex-shrink-0">
           {showPrice ? (
@@ -392,6 +410,17 @@ function ProductListRow({ item, accent, textColor, cardBg, showPrice, showDescri
           <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
             {item.description.replace(/<[^>]+>/g, "").slice(0, 120)}
           </p>
+        )}
+        {(item.type === "workshop" || item.type === "cohort") && (
+          <div className="mt-1">
+            <CourseInstanceInfo
+              type={item.type as "workshop" | "cohort"}
+              nextInstance={item.nextInstance}
+              primaryCohortGroup={item.primaryCohortGroup}
+              accentColor={accent}
+              compact
+            />
+          </div>
         )}
       </div>
 

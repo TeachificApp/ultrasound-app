@@ -8,8 +8,8 @@ import { trpc } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Briefcase, Search, MapPin, Calendar, Clock, Users } from "lucide-react";
-import { format } from "date-fns";
+import { Briefcase, Search } from "lucide-react";
+import { CourseInstanceInfo } from "@/components/CourseInstanceInfo";
 
 function WorkshopCard({ workshop }: { workshop: any }) {
   const price =
@@ -50,6 +50,15 @@ function WorkshopCard({ workshop }: { workshop: any }) {
           {workshop.subtitle && (
             <p className="text-sm text-gray-500 mt-1 line-clamp-2">{workshop.subtitle}</p>
           )}
+
+          {/* Next instance: date + venue */}
+          <div className="mt-3">
+            <CourseInstanceInfo
+              type="workshop"
+              nextInstance={workshop.nextInstance}
+            />
+          </div>
+
           <div className="mt-auto pt-4 flex items-center justify-between">
             <span className="font-bold text-teal-700 text-lg">{price}</span>
             <Badge variant="outline" className="text-xs text-gray-500">

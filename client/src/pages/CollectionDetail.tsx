@@ -19,10 +19,11 @@ import {
   Users,
   ShoppingBag,
 } from "lucide-react";
+import { CourseInstanceInfo } from "@/components/CourseInstanceInfo";
 
 // ─── Type helpers ──────────────────────────────────────────────────────────────
 
-type ItemType = "course" | "quiz" | "download" | "physical" | "webinar" | "bundle" | "membership";
+type ItemType = "course" | "quiz" | "download" | "physical" | "webinar" | "bundle" | "membership" | "workshop" | "cohort";
 
 function getItemMeta(item: any): { icon: React.ReactNode; label: string; href: string; cta: string } {
   const type: ItemType = item._itemType ?? item.type ?? "course";
@@ -39,6 +40,10 @@ function getItemMeta(item: any): { icon: React.ReactNode; label: string; href: s
       return { icon: <Layers className="w-4 h-4" />, label: "Bundle", href: `/bundle/${item.slug}`, cta: "View Bundle" };
     case "membership":
       return { icon: <Users className="w-4 h-4" />, label: "Membership", href: `/membership/${item.slug}`, cta: "View Membership" };
+    case "workshop":
+      return { icon: <BookOpen className="w-4 h-4" />, label: "Workshop", href: `/workshops/${item.slug}`, cta: "View Workshop" };
+    case "cohort":
+      return { icon: <Users className="w-4 h-4" />, label: "Cohort", href: `/courses/${item.slug}`, cta: "View Cohort" };
     default:
       return { icon: <BookOpen className="w-4 h-4" />, label: "Course", href: `/courses/${item.slug}`, cta: "View Course" };
   }
@@ -65,6 +70,7 @@ function formatPrice(item: any): string {
 // ─── Item Card ─────────────────────────────────────────────────────────────────
 
 function ItemCard({ item }: { item: any }) {
+  const itemType: ItemType = item._itemType ?? item.type ?? "course";
   const { icon, label, href, cta } = getItemMeta(item);
   const price = formatPrice(item);
 
@@ -92,7 +98,18 @@ function ItemCard({ item }: { item: any }) {
             {item.title}
           </h3>
           {item.subtitle && (
-            <p className="text-xs text-gray-500 line-clamp-2 mb-3">{item.subtitle}</p>
+            <p className="text-xs text-gray-500 line-clamp-2 mb-2">{item.subtitle}</p>
+          )}
+
+          {/* Workshop / Cohort date + venue info */}
+          {(itemType === "workshop" || itemType === "cohort") && (
+            <div className="mb-3">
+              <CourseInstanceInfo
+                type={itemType as "workshop" | "cohort"}
+                nextInstance={item.nextInstance}
+                primaryCohortGroup={item.primaryCohortGroup}
+              />
+            </div>
           )}
 
           {/* Price + CTA */}

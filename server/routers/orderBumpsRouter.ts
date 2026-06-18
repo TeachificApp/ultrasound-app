@@ -43,11 +43,11 @@ export const orderBumpsAdminRouter = router({
   /** Create a new order bump */
   create: protectedProcedure
     .input(z.object({
-      triggerType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership"]),
+      triggerType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership", "workshop"]),
       triggerProductId: z.number(),
       // Optional: only show this bump when the user is purchasing this specific pricing option
       triggerPricingOptionId: z.number().nullable().optional(),
-      bumpType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership"]),
+      bumpType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership", "workshop"]),
       bumpProductId: z.number(),
       timing: z.enum(["before_checkout", "after_checkout"]).default("after_checkout"),
       bumpPrice: z.number().min(0),
@@ -95,10 +95,10 @@ export const orderBumpsAdminRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      triggerType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership"]).optional(),
+      triggerType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership", "workshop"]).optional(),
       triggerProductId: z.number().optional(),
       triggerPricingOptionId: z.number().nullable().optional(),
-      bumpType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership"]).optional(),
+      bumpType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership", "workshop"]).optional(),
       bumpProductId: z.number().optional(),
       timing: z.enum(["before_checkout", "after_checkout"]).optional(),
       bumpPrice: z.number().min(0).optional(),
@@ -197,7 +197,7 @@ export const orderBumpsPublicRouter = router({
    */
   getForProduct: publicProcedure
     .input(z.object({
-      triggerType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership"]),
+      triggerType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership", "workshop"]),
       triggerProductId: z.number(),
       triggerPricingOptionId: z.number().nullable().optional(),
       timing: z.enum(["before_checkout", "after_checkout"]).optional(),
@@ -245,7 +245,7 @@ export const orderBumpsPublicRouter = router({
   acceptBump: protectedProcedure
     .input(z.object({
       bumpId: z.number(),
-      triggerOrderType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership"]),
+      triggerOrderType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership", "workshop"]),
       triggerOrderId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
