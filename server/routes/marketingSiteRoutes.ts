@@ -36,7 +36,7 @@ export function registerMarketingSiteRoutes(app: Express) {
 
   /** Legacy .html aliases without extension for convenience during review */
   app.get(["/index.html", "/home.html"], (req: Request, res: Response, next) => {
-    const host = (req.get("host") ?? "";
+    const host = req.get("host") ?? "";
     if (!isMarketingStagingHost(host)) return next();
     res.redirect(301, "/");
   });
