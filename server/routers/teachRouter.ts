@@ -34,6 +34,7 @@ import {
   type TeachMasterSlide,
 } from "../../shared/teachSlideMaster";
 import { parsePptxBuffer } from "../lib/pptxImport";
+import { importTeachUploadedFileSync } from "../lib/teachPptxMaterialImport";
 
 // ── S3-backed slides storage ──────────────────────────────────────────────────
 // When slides JSON exceeds this threshold (10 MB), store it in S3 instead of
@@ -488,83 +489,26 @@ export const teachRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const teachCtx = await requireTeachAccess(ctx.user.id);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const folder = teachFolderSlug(ctx.user.id);
-      const isPptx = input.fileName.match(/\.pptx$/i) || input.mimeType.includes("presentationml");
-      const isPresentation = input.mimeType.includes("presentation") || input.fileName.match(/\.(ppt|pptx)$/i);
-
-      let slidesData: string | null = null;
-      let slidesDataUrl: string | null = null;
-      let slideMasterId: number | null = null;
-
-      if (isPptx) {
-        // Fetch the PPTX from S3 and parse it
-        try {
-          const https = await import("https");
-          const http = await import("http");
-          const buffer = await new Promise<Buffer>((resolve, reject) => {
-            const proto = input.s3Url.startsWith("https") ? https.default : http.default;
-            proto.get(input.s3Url as any, (res: any) => {
-              const chunks: Buffer[] = [];
-              res.on("data", (c: Buffer) => chunks.push(c));
-              res.on("end", () => resolve(Buffer.concat(chunks)));
-              res.on("error", reject);
-            }).on("error", reject);
-          });
-          // Parse without uploadImage so images are embedded as base64 data URLs.
-          // This avoids per-image S3 uploads during parsing, which caused Cloud Run
-          // 180s timeout failures on large PPTX files.
-          const parsed = await parsePptxBuffer(buffer);
-          // For large presentations, store slides JSON in S3 to avoid MySQL 64 MB limit
-          const persisted = await persistSlidesJson(
-            JSON.stringify(parsed.slides),
-            ctx.user.id,
-            generateSlug(input.title),
-          );
-          slidesData = persisted.slidesData;
-          slidesDataUrl = persisted.slidesDataUrl;
-          if (parsed.masterSlides.length > 0) {
-            const [masterResult] = await db.insert(teachSlideMasters).values({
-              ownerUserId: ctx.user.id,
-              name: `${input.title} Master`,
-              description: `Imported from ${input.fileName}`,
-              masterSlidesData: masterSlidesToJson(parsed.masterSlides),
-              isGlobal: false,
-            });
-            slideMasterId = (masterResult as { insertId: number }).insertId;
-          }
-        } catch (err) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: err instanceof Error ? err.message : "Failed to parse PowerPoint file",
-          });
-        }
-      }
-
-      const [matResult] = await db.insert(teachMaterials).values({
-        ownerUserId: ctx.user.id,
-        ownerContext: input.ownerContext,
-        lmsInstructorId: teachCtx.lmsInstructor?.id ?? null,
-        educatorOrgId: input.educatorOrgId ?? null,
-        materialType: isPresentation ? "presentation" : "document",
+      const result = await importTeachUploadedFileSync({
+        userId: ctx.user.id,
+        assetId: input.assetId,
+        s3Key: input.s3Key,
+        s3Url: input.s3Url,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        fileSize: input.fileSize,
         title: input.title,
-        description: input.description ?? null,
-        mediaAssetId: input.assetId,
-        slidesData,
-        slidesDataUrl,
-        slideMasterId,
-        status: "draft",
+        description: input.description,
+        ownerContext: input.ownerContext,
+        educatorOrgId: input.educatorOrgId,
       });
 
       return {
-        materialId: (matResult as { insertId: number }).insertId,
-        mediaAssetId: input.assetId,
-        folder,
-        parsed: !!isPptx,
-        slideMasterId,
+        materialId: result.materialId,
+        mediaAssetId: result.mediaAssetId,
+        folder: result.folder,
+        parsed: result.parsed,
+        slideMasterId: result.slideMasterId,
       };
     }),
 

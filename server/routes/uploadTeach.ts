@@ -29,6 +29,11 @@ import { getDb } from "../db";
 import { mediaAssets, mediaVersions, mediaUploadSessions } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 import { requireTeachAccess } from "../routers/teachRouter";
+import { teachFolderSlug } from "../lib/teachAccess";
+import {
+  importTeachUploadedFileAsync,
+  TEACH_IMPORT_FAILED_PREFIX,
+} from "../lib/teachPptxMaterialImport";
 
 // ── R2 helpers (shared with uploadMediaRepo) ──────────────────────────────────
 function getR2Client(): S3Client {
@@ -52,10 +57,6 @@ function getR2PublicUrl(): string {
 function generateSlug(title: string): string {
   const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
   return `${base}-${randomBytes(4).toString("hex")}`;
-}
-
-function teachFolderSlug(userId: number): string {
-  return `teach-user-${userId}`;
 }
 
 const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50 MB
@@ -306,6 +307,112 @@ async function finalizeTeachUpload(
     res.status(500).json({ error: err?.message || "Finalize failed" });
   }
 }
+
+// ── POST /api/upload-teach/parse ──────────────────────────────────────────────
+// Parses an uploaded PPTX after chunked upload completes. Runs parsing in the
+// background so the HTTP response returns before gateway timeouts.
+router.post("/api/upload-teach/parse", async (req: Request, res: Response) => {
+  const user = await authenticateTeachUser(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  try {
+    const body = req.body ?? {};
+    const assetId = parseInt(body.assetId, 10);
+    const fileSize = parseInt(body.fileSize, 10) || 0;
+    if (!assetId || !body.s3Key || !body.s3Url || !body.fileName || !body.title) {
+      res.status(400).json({ error: "Missing required fields" });
+      return;
+    }
+
+    const result = await importTeachUploadedFileAsync({
+      userId: user.id,
+      assetId,
+      s3Key: String(body.s3Key),
+      s3Url: String(body.s3Url),
+      fileName: String(body.fileName),
+      mimeType: String(body.mimeType || "application/octet-stream"),
+      fileSize,
+      title: String(body.title).trim(),
+      description: body.description ? String(body.description) : undefined,
+      ownerContext: body.ownerContext === "educator_assist" ? "educator_assist" : "lms_instructor",
+      educatorOrgId: body.educatorOrgId ? parseInt(body.educatorOrgId, 10) : undefined,
+    });
+
+    res.json({
+      materialId: result.materialId,
+      mediaAssetId: result.mediaAssetId,
+      folder: result.folder,
+      parsed: result.parsed,
+      slideMasterId: result.slideMasterId,
+      processing: result.processing,
+    });
+  } catch (err: any) {
+    const message = err?.message || "Parse failed";
+    if (message.includes("TEACH access")) {
+      res.status(403).json({ error: message });
+      return;
+    }
+    console.error("[upload-teach/parse] Error:", err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// ── GET /api/upload-teach/parse-status/:materialId ────────────────────────────
+router.get("/api/upload-teach/parse-status/:materialId", async (req: Request, res: Response) => {
+  const user = await authenticateTeachUser(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const materialId = parseInt(req.params.materialId, 10);
+  if (!materialId) { res.status(400).json({ error: "Invalid materialId" }); return; }
+
+  const db = await getDb();
+  if (!db) { res.status(503).json({ error: "DB unavailable" }); return; }
+
+  const { teachMaterials } = await import("../../drizzle/schema");
+  const { eq } = await import("drizzle-orm");
+  const [material] = await db
+    .select({
+      id: teachMaterials.id,
+      ownerUserId: teachMaterials.ownerUserId,
+      description: teachMaterials.description,
+      slidesData: teachMaterials.slidesData,
+      slidesDataUrl: teachMaterials.slidesDataUrl,
+      slideMasterId: teachMaterials.slideMasterId,
+      materialType: teachMaterials.materialType,
+    })
+    .from(teachMaterials)
+    .where(eq(teachMaterials.id, materialId))
+    .limit(1);
+
+  if (!material) { res.status(404).json({ error: "Material not found" }); return; }
+  if (material.ownerUserId !== user.id && user.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const desc = material.description ?? "";
+  if (desc.startsWith(TEACH_IMPORT_FAILED_PREFIX)) {
+    res.json({
+      status: "failed",
+      error: desc.slice(TEACH_IMPORT_FAILED_PREFIX.length).trim(),
+      materialId,
+    });
+    return;
+  }
+
+  const hasSlides = Boolean(material.slidesData || material.slidesDataUrl);
+  if (hasSlides || material.materialType !== "presentation") {
+    res.json({
+      status: "done",
+      materialId,
+      parsed: hasSlides,
+      slideMasterId: material.slideMasterId,
+    });
+    return;
+  }
+
+  res.json({ status: "processing", materialId });
+});
 
 export function registerUploadTeachRoute(app: any) {
   app.use(router);
