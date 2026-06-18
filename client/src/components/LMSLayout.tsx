@@ -15,6 +15,7 @@ import {
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import NameCollectionModal from "@/components/NameCollectionModal";
 
 const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
 const MEMBERS_URL = "https://members.allaboutultrasound.com";
@@ -287,6 +288,9 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1">
         {children}
       </main>
+
+      {/* Name collection gate — shown to authenticated users without a full name */}
+      <NameCollectionModal />
     </div>
   );
 }

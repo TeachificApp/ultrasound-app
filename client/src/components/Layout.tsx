@@ -4,6 +4,7 @@
   Fonts: Merriweather headings, Open Sans body
 */
 import { useState, useRef, useEffect } from "react";
+import NameCollectionModal from "@/components/NameCollectionModal";
 import { Link, Link as WouterLink, useLocation } from "wouter";
 import {
   Heart, Calculator, ClipboardList, Activity,
@@ -675,6 +676,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <GetAppBanner />
+      {/* Name collection gate */}
+      <NameCollectionModal />
     </div>
   );
 }

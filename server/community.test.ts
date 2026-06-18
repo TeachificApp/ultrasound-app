@@ -76,9 +76,23 @@ describe("community leaderboard exclusions", () => {
 });
 
 describe("publicMemberDisplayName", () => {
-  it("never returns email-like strings", () => {
-    expect(publicMemberDisplayName({ name: "user@example.com" })).toBe("Community Member");
+  it("returns username from email when no real name is set", () => {
+    expect(publicMemberDisplayName({ name: "user@example.com" })).toBe("user");
+    expect(publicMemberDisplayName({ name: "john.doe@hospital.org" })).toBe("john.doe");
+  });
+  it("returns real name when available, ignoring email fallback", () => {
     expect(publicMemberDisplayName({ displayName: "Jane Doe", name: "jane@example.com" })).toBe("Jane Doe");
+  });
+  it("strips Thinkific merge prefixes from names", () => {
+    expect(publicMemberDisplayName({ name: "[Merged into #5940650] Chris Layman" })).toBe("Chris Layman");
+    expect(publicMemberDisplayName({ displayName: "[Merged into #123] Alice" })).toBe("Alice");
+  });
+  it("falls back to Member when no name or email is provided", () => {
+    expect(publicMemberDisplayName({})).toBe("Member");
+    expect(publicMemberDisplayName({ name: null })).toBe("Member");
+  });
+  it("isEmailLike correctly identifies emails", () => {
     expect(isEmailLike("test@foo.com")).toBe(true);
+    expect(isEmailLike("not-an-email")).toBe(false);
   });
 });

@@ -270,7 +270,16 @@ export async function updateUserProfile(userId: number, data: {
 }) {
   const db = await getDb();
   if (!db) return;
-  await db.update(users).set(data).where(eq(users.id, userId));
+  // When firstName or lastName are updated, also rebuild the name field
+  const updates: typeof data & { name?: string } = { ...data };
+  if (data.firstName !== undefined || data.lastName !== undefined) {
+    const [existing] = await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, userId)).limit(1);
+    const fn = data.firstName ?? existing?.firstName ?? "";
+    const ln = data.lastName ?? existing?.lastName ?? "";
+    const fullName = [fn, ln].filter(Boolean).join(" ");
+    if (fullName) updates.name = fullName;
+  }
+  await db.update(users).set(updates).where(eq(users.id, userId));
 }
 
 export async function getUserPasswordHash(userId: number): Promise<string | null> {

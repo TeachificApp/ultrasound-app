@@ -6,7 +6,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, sql, asc, inArray, or, lt, notInArray, type SQL } from "drizzle-orm";
+import { and, desc, eq, sql, asc, inArray, or, lt, notInArray, notLike, type SQL } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
@@ -373,20 +373,20 @@ const communityPublicRouter = router({
         credentials: users.credentials,
       })
       .from(users)
-      .where(inArray(users.id, userIds));
+      .where(and(inArray(users.id, userIds), notLike(users.name, "[Merged into #%")));
 
     const uMap = Object.fromEntries(us.map((u) => [u.id, u]));
-    return rows.map((r, i) => ({
-      rank: i + 1,
-      ...r,
-      user: uMap[r.userId]
-        ? {
-            ...uMap[r.userId],
-            name: publicMemberDisplayName(uMap[r.userId]),
-            displayName: publicMemberDisplayName(uMap[r.userId]),
-          }
-        : null,
-    }));
+    return rows
+      .filter((r) => !!uMap[r.userId]) // exclude merged accounts
+      .map((r, i) => ({
+        rank: i + 1,
+        ...r,
+        user: {
+          ...uMap[r.userId],
+          name: publicMemberDisplayName(uMap[r.userId]),
+          displayName: publicMemberDisplayName(uMap[r.userId]),
+        },
+      }));
   }),
 });
 
@@ -1068,7 +1068,7 @@ const communityMemberRouter = router({
       yearsExperience: users.yearsExperience, location: users.location, website: users.website,
       followersCount: users.followersCount, followingCount: users.followingCount,
       createdAt: users.createdAt, communityRole: users.communityRole,
-    }).from(users).where(eq(users.id, input.userId)).limit(1);
+    }).from(users).where(and(eq(users.id, input.userId), notLike(users.name, "[Merged into #%"))).limit(1);
     if (!u) throw new TRPCError({ code: "NOT_FOUND" });
 
     const [xp] = await db.select().from(communityUserXP).where(eq(communityUserXP.userId, input.userId)).limit(1);
@@ -1108,7 +1108,7 @@ const communityMemberRouter = router({
       credentials: users.credentials,
     }).from(communityMembers)
       .innerJoin(users, eq(users.id, communityMembers.userId))
-      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.memberStatus, "approved")))
+      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.memberStatus, "approved"), notLike(users.name, "[Merged into #%")))
       .orderBy(desc(communityMembers.joinedAt))
       .limit(input.limit);
     return rows.map((r) => ({
@@ -1792,11 +1792,11 @@ const communityAdminRouter = router({
       })
       .from(communityMembers)
       .innerJoin(users, eq(users.id, communityMembers.userId))
-      .where(baseWhere)
+      .where(and(baseWhere, notLike(users.name, "[Merged into #%")))
       .orderBy(desc(communityMembers.joinedAt))
       .limit(input.pageSize)
       .offset(offset);
-    const [{ total }] = await db.select({ total: sql<number>`COUNT(*)` }).from(communityMembers).where(baseWhere);
+    const [{ total }] = await db.select({ total: sql<number>`COUNT(*)` }).from(communityMembers).innerJoin(users, eq(users.id, communityMembers.userId)).where(and(baseWhere, notLike(users.name, "[Merged into #%")));
     return { members: rows, total: Number(total) };
   }),
 
