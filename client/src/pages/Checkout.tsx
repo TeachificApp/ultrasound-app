@@ -45,6 +45,7 @@ import {
   PresetSealId,
 } from "@/../../shared/checkoutPageConfig";
 import { BlockPreview } from "@/pages/admin/LandingPageBuilder";
+import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import type { Block } from "@/pages/admin/LandingPageBuilder";
 
 // Initialise Stripe once outside the component to avoid re-creating on every render
@@ -346,6 +347,13 @@ function CheckoutSections({
           }
           if (section.type === "content_block") {
             const cb = section as ContentBlockSection;
+            if (cb.blockType === "related_products") {
+              return (
+                <div key={idx} className="rounded-xl overflow-hidden">
+                  <RelatedProductsBlock data={cb.blockData ?? {}} />
+                </div>
+              );
+            }
             const block: Block = { id: `checkout-cb-${idx}`, type: cb.blockType as any, data: cb.blockData };
             return (
               <div key={idx} className="rounded-xl overflow-hidden">

@@ -46,6 +46,7 @@ import RichTextEditor from "@/components/RichTextEditor";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
 import { BlockPreview } from "@/components/BlockPreview";
+import { resolveRelatedProductsSelectionMode } from "@shared/relatedProductsBlock";
 import {
   ArrowLeft, ArrowRight, Save, Eye, Plus, Trash2, GripVertical, Type, Image, Video,
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
@@ -4742,7 +4743,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       );
     }
     case "related_products": {
-      const selMode = d.selectionMode ?? "auto";
+      const selMode = resolveRelatedProductsSelectionMode(d);
       const manualItems: Array<{ type: string; id: number }> = d.manualItems ?? [];
       // Deduplicate catalog by type+id (a quiz course may appear as both "course" and "quiz" if type changed)
       const seenCatalogKeys = new Set<string>();
