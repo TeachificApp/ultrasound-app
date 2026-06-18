@@ -102,6 +102,8 @@ const ProductLandingPageBuilder = lazy(() => import("./pages/admin/ProductLandin
 const InstancePageEmbed = lazy(() => import("./pages/embed/InstancePageEmbed"));
 const CohortSessionsEmbed = lazy(() => import("./pages/embed/CohortSessionsEmbed"));
 const LessonScheduleEmbed = lazy(() => import("./pages/embed/LessonScheduleEmbed"));
+const PublicMarketingSitePage = lazy(() => import("./pages/PublicMarketingSitePage"));
+const MarketingSiteAdmin = lazy(() => import("./pages/admin/MarketingSiteAdmin"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));

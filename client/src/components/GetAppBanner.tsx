@@ -57,7 +57,7 @@ export default function GetAppBanner() {
 
     // Register service worker
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/sw.js?build=v8").catch(() => {});
     }
 
     // Show banner after 2 seconds on dashboard load
