@@ -6915,6 +6915,7 @@ function LandingPageQuickNav({ currentCourseId, navigate }: { currentCourseId: n
     { label: "Bundles", items: data?.bundles ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
     { label: "Products", items: data?.products ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
     { label: "Communities", items: data?.communities ?? [], route: (id: number) => `/admin/lms/${id}/landing-builder` },
+    { label: "Workshops", items: data?.workshops ?? [], route: (id: number) => `/admin/workshops/${id}/landing-builder` },
   ].filter(s => s.items.length > 0);
 
   const funnels = data?.funnels ?? [];

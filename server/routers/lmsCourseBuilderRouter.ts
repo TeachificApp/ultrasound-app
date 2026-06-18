@@ -1391,7 +1391,7 @@ export const lmsCourseBuilderRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-    const [courses, webinarRows, downloadRows, bundleRows, productRows, communityRows, funnelRows, funnelPageRows] =
+    const [courses, webinarRows, downloadRows, bundleRows, productRows, communityRows, workshopRows, funnelRows, funnelPageRows] =
       await Promise.all([
         db.select({ id: lmsCourses.id, title: lmsCourses.title, type: lmsCourses.type })
           .from(lmsCourses)
@@ -1413,6 +1413,10 @@ export const lmsCourseBuilderRouter = router({
         db.select({ id: communities.id, title: communities.title })
           .from(communities)
           .orderBy(asc(communities.title)),
+        db.select({ id: workshops.id, title: workshops.title })
+          .from(workshops)
+          .where(sql`${workshops.status} != 'archived'`)
+          .orderBy(asc(workshops.title)),
         db.select({ id: funnels.id, name: funnels.name })
           .from(funnels)
           .orderBy(asc(funnels.sortOrder), asc(funnels.name)),
@@ -1437,6 +1441,7 @@ export const lmsCourseBuilderRouter = router({
       bundles: bundleRows,
       products: productRows,
       communities: communityRows,
+      workshops: workshopRows,
       funnels: funnelRows.map(f => ({ id: f.id, title: f.name, pages: pagesByFunnelId.get(f.id) ?? [] })),
     };
   }),

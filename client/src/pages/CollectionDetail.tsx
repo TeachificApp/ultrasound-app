@@ -56,7 +56,10 @@ function formatPrice(item: any): string {
       : item.pricingType === "payment_plan"
       ? " (plan)"
       : "";
-  return `$${Number(item.price).toFixed(2)}${subscriptionSuffix}`;
+  // Workshops store price in cents; all other types store in dollars
+  const itemType = item._itemType ?? item.type ?? "course";
+  const displayPrice = itemType === "workshop" ? Number(item.price) / 100 : Number(item.price);
+  return `$${displayPrice.toFixed(2)}${subscriptionSuffix}`;
 }
 
 // ─── Item Card ─────────────────────────────────────────────────────────────────
