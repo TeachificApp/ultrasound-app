@@ -97,6 +97,7 @@ import {
   lmsDefaultTeamTiers,
   lmsCohortRecordingProgress,
   cohortWaitlistEntries,
+  workshops,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
@@ -469,6 +470,10 @@ export const lmsPublicRouter = router({
             const [r] = await db.select({ id: digitalProducts.id }).from(digitalProducts)
               .where(and(eq(digitalProducts.id, item.itemId), eq(digitalProducts.status, "published"))).limit(1);
             if (r) publishedCount++;
+          } else if (item.itemType === "workshop") {
+            const [r] = await db.select({ id: workshops.id }).from(workshops)
+              .where(and(eq(workshops.id, item.itemId), eq(workshops.status, "public"))).limit(1);
+            if (r) publishedCount++;
           } else {
             // For other types (webinar, bundle, membership, physical) count as published if in the table
             publishedCount++;
@@ -536,6 +541,10 @@ export const lmsPublicRouter = router({
           const [m] = await db.select().from(membershipPlans)
             .where(and(eq(membershipPlans.id, item.itemId), eq(membershipPlans.status, "published"))).limit(1);
           return m ? { id: m.id, slug: m.slug, title: m.title, subtitle: null as null, coverImageUrl: (m as any).coverImage ?? null, price: m.price ?? 0, isFree: false, type: "membership" as const, _source: "membership" as const, _itemType: "membership" } : null;
+        } else if (item.itemType === "workshop") {
+          const [w] = await db.select().from(workshops)
+            .where(and(eq(workshops.id, item.itemId), eq(workshops.status, "public"))).limit(1);
+          return w ? { id: w.id, slug: w.slug, title: w.title, subtitle: w.subtitle ?? null, coverImageUrl: w.coverImageUrl ?? w.thumbnailUrl ?? null, price: w.price, isFree: w.isFree, type: "workshop" as const, _source: "workshop" as const, _itemType: "workshop" } : null;
         }
         return null;
       }));

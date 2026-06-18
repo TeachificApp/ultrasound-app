@@ -82,7 +82,7 @@ function formatPrice(card: Card): string {
   if (card.isFree || card.pricingType === "free") return "Free";
   if (!card.price) return "Free";
   const currency = card.currency?.toUpperCase() ?? "USD";
-  const base = new Intl.NumberFormat("en-US", { style: "currency", currency }).format(card.price);
+  const base = new Intl.NumberFormat("en-US", { style: "currency", currency }).format(card.price / 100);
   if (card.pricingType === "subscription") return base + (INTERVAL_LABEL[card.subscriptionInterval ?? "monthly"] ?? "/mo");
   if (card.pricingType === "payment_plan") return base + " (plan)";
   return base;
@@ -401,7 +401,7 @@ export default function WidgetRenderer() {
           ))}
         </div>
       ) : widget.cardStyle === "compact" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 640px)", gap: 10, justifyContent: "center" }}>
           {cards.map(card => (
             <CompactCard
               key={card.id}
@@ -418,8 +418,9 @@ export default function WidgetRenderer() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+            gridTemplateColumns: `repeat(${gridCols}, minmax(0, 320px))`,
             gap: 16,
+            justifyContent: "center",
           }}
         >
           {cards.map(card => (
