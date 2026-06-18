@@ -5,7 +5,7 @@
  * Shown once per session after OAuth login. Cannot be dismissed without
  * providing at least a first name and last name.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -15,6 +15,21 @@ import { Label } from "@/components/ui/label";
 import { Loader2, User } from "lucide-react";
 
 const BRAND = "#189aa1";
+
+/** Placeholder values that should be treated as "not set" */
+const PLACEHOLDER_VALUES = new Set([
+  "last name", "lastname", "last",
+  "first name", "firstname", "first",
+  "name", "your name", "my name",
+  "full name", "fullname",
+  "enter name", "enter last name", "enter first name",
+  "type your name", "type name",
+]);
+
+function isPlaceholder(val: string | null | undefined): boolean {
+  if (!val) return true;
+  return PLACEHOLDER_VALUES.has(val.trim().toLowerCase());
+}
 
 /** Returns true if the user's name looks like a real full name (has at least two words,
  *  neither of which is an email username pattern). */
@@ -35,6 +50,17 @@ export default function NameCollectionModal() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [error, setError] = useState("");
+  const [initialized, setInitialized] = useState(false);
+
+  // Pre-fill inputs once user data is available
+  useEffect(() => {
+    if (!user || initialized) return;
+    const rawFirst = (user as any)?.firstName as string | null | undefined;
+    const rawLast = (user as any)?.lastName as string | null | undefined;
+    if (!isPlaceholder(rawFirst)) setFirstName(rawFirst ?? "");
+    if (!isPlaceholder(rawLast)) setLastName(rawLast ?? "");
+    setInitialized(true);
+  }, [user, initialized]);
 
   const updateProfile = trpc.auth.updateProfile.useMutation({
     onSuccess: () => {
@@ -50,6 +76,13 @@ export default function NameCollectionModal() {
 
   // Don't show if the user already has a proper full name
   const userName = (user as any).name as string | null | undefined;
+  const userFirstName = (user as any).firstName as string | null | undefined;
+  const userLastName = (user as any).lastName as string | null | undefined;
+  // If both firstName and lastName are set to real values (not placeholders), skip the modal
+  const hasRealFirstName = !isPlaceholder(userFirstName);
+  const hasRealLastName = !isPlaceholder(userLastName);
+  if (hasRealFirstName && hasRealLastName) return null;
+  // If the name field already looks like a full name (and neither part is a placeholder), skip
   if (hasFullName(userName)) return null;
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -216,6 +216,8 @@ export const appRouter = router({
         displayName: fullUser?.displayName ?? opts.ctx.user.displayName ?? null,
         avatarUrl: fullUser?.avatarUrl ?? opts.ctx.user.avatarUrl ?? null,
         name: fullUser?.name ?? opts.ctx.user.name ?? null,
+        firstName: fullUser?.firstName ?? (opts.ctx.user as any).firstName ?? null,
+        lastName: fullUser?.lastName ?? (opts.ctx.user as any).lastName ?? null,
         pendingEmail: fullUser?.pendingEmail ?? null,
         appRoles: roles,
         isPremium: isPremium || brandPremium,
