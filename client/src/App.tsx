@@ -102,6 +102,7 @@ const ProductsListing = lazy(() => import("./pages/ProductsListing"));
 const ProductLandingPageBuilder = lazy(() => import("./pages/admin/ProductLandingPageBuilder"));
 const InstancePageEmbed = lazy(() => import("./pages/embed/InstancePageEmbed"));
 const CohortSessionsEmbed = lazy(() => import("./pages/embed/CohortSessionsEmbed"));
+const LessonScheduleEmbed = lazy(() => import("./pages/embed/LessonScheduleEmbed"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
@@ -551,6 +552,7 @@ function Router() {
         <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
         <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
         <Route path="/embed/cohort-sessions/:groupId">{() => <Suspense fallback={pageFallback}><CohortSessionsEmbed /></Suspense>}</Route>
+        <Route path="/embed/lesson-schedule/:groupId">{() => <Suspense fallback={pageFallback}><LessonScheduleEmbed /></Suspense>}</Route>
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
@@ -703,6 +705,7 @@ function MembersRouter() {
       <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><InstancePageEmbed /></Suspense>}</Route>
       <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><InstancePageEmbed /></Suspense>}</Route>
       <Route path="/embed/cohort-sessions/:groupId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><CohortSessionsEmbed /></Suspense>}</Route>
+      <Route path="/embed/lesson-schedule/:groupId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><LessonScheduleEmbed /></Suspense>}</Route>
       <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
@@ -792,6 +795,7 @@ function LMSRouter() {
       <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><InstancePageEmbed /></Suspense>}</Route>
       <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><InstancePageEmbed /></Suspense>}</Route>
       <Route path="/embed/cohort-sessions/:groupId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><CohortSessionsEmbed /></Suspense>}</Route>
+      <Route path="/embed/lesson-schedule/:groupId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><LessonScheduleEmbed /></Suspense>}</Route>
       <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
@@ -1058,6 +1062,7 @@ function IHeartEchoRouter() {
         <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
         <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
         <Route path="/embed/cohort-sessions/:groupId">{() => <Suspense fallback={pageFallback}><CohortSessionsEmbed /></Suspense>}</Route>
+        <Route path="/embed/lesson-schedule/:groupId">{() => <Suspense fallback={pageFallback}><LessonScheduleEmbed /></Suspense>}</Route>
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
@@ -1286,6 +1291,7 @@ function AccreditationDivisionRouter() {
         <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
         <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
         <Route path="/embed/cohort-sessions/:groupId">{() => <Suspense fallback={pageFallback}><CohortSessionsEmbed /></Suspense>}</Route>
+        <Route path="/embed/lesson-schedule/:groupId">{() => <Suspense fallback={pageFallback}><LessonScheduleEmbed /></Suspense>}</Route>
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>

@@ -51,11 +51,12 @@ export default function CohortGroupLandingPageBuilder() {
   const [embedColor, setEmbedColor] = useState("#149096");
   const [embedHeight, setEmbedHeight] = useState(600);
   const [embedCopied, setEmbedCopied] = useState(false);
+  const [embedType, setEmbedType] = useState<"cohort-sessions" | "lesson-schedule">("cohort-sessions");
 
   const getEmbedUrl = (view: string, color: string) => {
     const base = window.location.origin;
     const params = new URLSearchParams({ view, color: color.replace("#", "") });
-    return `${base}/embed/cohort-sessions/${numericCohortGroupId}?${params.toString()}`;
+    return `${base}/embed/${embedType}/${numericCohortGroupId}?${params.toString()}`;
   };
   const getEmbedCode = () => {
     const url = getEmbedUrl(embedView, embedColor);
@@ -720,6 +721,25 @@ export default function CohortGroupLandingPageBuilder() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-gray-500">Embed the live sessions calendar for this cohort group on any external website or landing page.</p>
+
+            {/* Embed type */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Widget Type</label>
+              <div className="flex gap-2">
+                <button onClick={() => setEmbedType("cohort-sessions")}
+                  className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                    embedType === "cohort-sessions" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:border-teal-300"
+                  }`}>
+                  Sessions Calendar
+                </button>
+                <button onClick={() => setEmbedType("lesson-schedule")}
+                  className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                    embedType === "lesson-schedule" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:border-teal-300"
+                  }`}>
+                  Lesson Schedule
+                </button>
+              </div>
+            </div>
 
             {/* View toggle */}
             <div>

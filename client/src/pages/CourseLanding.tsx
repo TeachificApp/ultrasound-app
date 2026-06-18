@@ -902,10 +902,20 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       if (displayMode === "calendar") {
         const calendarGroupId: number | null = d.calendarGroupId ?? null;
         const resolvedGroupId = calendarGroupId ?? (() => {
+          // Auto-pick: next upcoming group with open enrollment (not in-progress)
           const upcoming = allGroupsCSA
-            .filter((g: any) => g.status === "open" && g.startDate && new Date(g.startDate).getTime() > nowMsCSA)
+            .filter((g: any) => {
+              if (g.status !== "open") return false;
+              if (g.enrollmentCloseDate && new Date(g.enrollmentCloseDate).getTime() < nowMsCSA) return false;
+              return g.startDate && new Date(g.startDate).getTime() > nowMsCSA;
+            })
             .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-          return upcoming[0]?.id ?? null;
+          // Fallback: any active/open group if no future-start group found
+          if (upcoming.length > 0) return upcoming[0].id;
+          const anyOpen = allGroupsCSA
+            .filter((g: any) => g.status === "open" || g.status === "active")
+            .sort((a: any, b: any) => new Date(a.startDate ?? 0).getTime() - new Date(b.startDate ?? 0).getTime());
+          return anyOpen[0]?.id ?? null;
         })();
         if (!resolvedGroupId) return null;
         return (
@@ -970,7 +980,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       }
 
       // ── List mode (default) and legacy "groups"/"sessions" modes ──
-      // "list" and "groups" → stacked cohort group cards
+      // "list" and "groups" → stacked cohort group cards showing in-progress + upcoming
       if (displayMode === "list" || displayMode === "groups") {
         const allGroups = allGroupsCSA;
         const nowMs = nowMsCSA;
@@ -980,8 +990,22 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
           let groups = groupSelectionMode === "manual" && selectedGroupIds.length > 0
             ? allGroups.filter((g: any) => selectedGroupIds.includes(g.id))
             : allGroups;
-          // Hide groups whose end date has already passed
-          groups = groups.filter((g: any) => !g.endDate || new Date(g.endDate).getTime() >= nowMs);
+          // Show in-progress (active) and upcoming (open/pending) groups; hide completed and past-end-date groups
+          groups = groups.filter((g: any) => {
+            if (g.status === "completed") return false;
+            if (g.endDate && new Date(g.endDate).getTime() < nowMs) return false;
+            return true;
+          });
+          // Sort: in-progress first, then upcoming by start date
+          groups = groups.sort((a: any, b: any) => {
+            const aInProgress = a.status === "active";
+            const bInProgress = b.status === "active";
+            if (aInProgress && !bInProgress) return -1;
+            if (!aInProgress && bInProgress) return 1;
+            const aStart = a.startDate ? new Date(a.startDate).getTime() : Infinity;
+            const bStart = b.startDate ? new Date(b.startDate).getTime() : Infinity;
+            return aStart - bStart;
+          });
           return groups;
         })();
         if (visibleGroups.length === 0) return null;

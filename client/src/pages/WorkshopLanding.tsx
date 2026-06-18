@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Briefcase, Calendar, MapPin, Clock, Users, Edit2, ArrowLeft, ExternalLink, CheckCircle, Bell, ChevronRight, X } from "lucide-react";
+import { WorkshopInstancesCalendar } from "@/components/WorkshopInstancesCalendar";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
@@ -461,19 +462,29 @@ export default function WorkshopLanding() {
           }
         >
           {landingBlocks.map((block: Block) => {
-            // cohort_sessions_auto in groups mode — render workshop instances as stacked cards
-            if (block.type === "cohort_sessions_auto" && (block.data?.displayMode ?? "sessions") === "groups") {
+            // cohort_sessions_auto — list, page, calendar, or groups mode
+            if (block.type === "cohort_sessions_auto") {
               const d = block.data ?? {};
+              const displayMode = (d.displayMode ?? "list") as "list" | "page" | "calendar" | "groups" | "sessions";
               const accentColor = d.accentColor ?? "#179ca3";
               const enrollNowText = d.enrollNowText ?? "Register";
               const showEnrollNow = d.showEnrollNow !== false;
               const groupSelectionMode = d.groupSelectionMode ?? "all";
               const selectedGroupIds: number[] = d.selectedGroupIds ?? [];
-              const sourceInstances: any[] = allInstances;
-              const visibleInstances = groupSelectionMode === "manual" && selectedGroupIds.length > 0
-                ? sourceInstances.filter((inst: any) => selectedGroupIds.includes(inst.id))
-                : sourceInstances;
-              if (visibleInstances.length === 0) return null;
+              const filteredInstances = groupSelectionMode === "manual" && selectedGroupIds.length > 0
+                ? allInstances.filter((inst: any) => selectedGroupIds.includes(inst.id))
+                : allInstances;
+              const availableIdSet = new Set((availableInstances ?? []).map((inst: any) => inst.id));
+              const soldOutIdSet = new Set((soldOutInstances ?? []).map((inst: any) => inst.id));
+              const instanceEndMs = (inst: any) => {
+                if (inst.endDate) return new Date(inst.endDate).getTime();
+                return new Date(inst.startDate).getTime() + ((inst.durationMinutes ?? 60) * 60 * 1000);
+              };
+              const nowMs = Date.now();
+              const visibleInstances = (d.showPastSessions ?? false)
+                ? filteredInstances
+                : filteredInstances.filter((inst: any) => instanceEndMs(inst) >= nowMs);
+              const sortedVisibleInstances = [...visibleInstances].sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
               const fmtInstDate = (dt: Date | string | null | undefined) => {
                 if (!dt) return null;
                 try { return new Date(dt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return String(dt); }
@@ -483,12 +494,83 @@ export default function WorkshopLanding() {
                 const parts = [inst.venueName, inst.venueCity, inst.venueState].filter(Boolean);
                 return parts.join(", ") || null;
               };
+
+              // Calendar mode: show a single instance in list/calendar toggle view
+              if (displayMode === "calendar") {
+                const resolvedInstance = (() => {
+                  if (d.calendarGroupId) {
+                    return allInstances.find((inst: any) => inst.id === d.calendarGroupId) ?? null;
+                  }
+                  return filteredInstances
+                    .filter((inst: any) => new Date(inst.startDate).getTime() > nowMs)
+                    .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0] ?? null;
+                })();
+                if (!resolvedInstance) return null;
+                return (
+                  <div key={block.id} className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+                    <div className="max-w-4xl mx-auto px-4">
+                      {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+                      <WorkshopInstancesCalendar
+                        instances={[resolvedInstance]}
+                        accentColor={accentColor}
+                        defaultView={(d.calendarDefaultView ?? "list") as "list" | "calendar"}
+                        showZoomJoin={d.showZoomJoin !== false}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              // Page mode: show next upcoming instance as full-detail embed
+              if (displayMode === "page") {
+                const nextUpcoming = filteredInstances
+                  .filter((inst: any) => availableIdSet.has(inst.id) && new Date(inst.startDate).getTime() > nowMs)
+                  .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0] ?? null;
+                const soldOutNext = !nextUpcoming
+                  ? filteredInstances
+                      .filter((inst: any) => new Date(inst.startDate).getTime() > nowMs)
+                      .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0] ?? null
+                  : null;
+                if (!nextUpcoming && !soldOutNext) return null;
+                return (
+                  <div key={block.id} className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+                    <div className="max-w-4xl mx-auto px-4">
+                      {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+                      {nextUpcoming ? (
+                        <WorkshopInstanceEmbedSection
+                          instanceId={nextUpcoming.id}
+                          accentColor={accentColor}
+                          onRegister={() => handleInstanceRegister(nextUpcoming.id)}
+                          enrollNowText={enrollNowText}
+                          showEnrollNow={showEnrollNow}
+                        />
+                      ) : soldOutNext ? (
+                        <div className="rounded-2xl border p-6 text-center space-y-3" style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}>
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: "#6b7280" }}>Sold Out</span>
+                          <h3 className="font-bold text-gray-900 text-lg">{soldOutNext.title}</h3>
+                          <p className="text-sm text-gray-500">This workshop date is currently full. Join the waitlist to be notified when a spot opens or a new date is added.</p>
+                          {(workshop?.waitlistEnabled || workshop?.waitlistCtaUrl) && (
+                            <button
+                              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90"
+                              style={{ backgroundColor: accentColor }}
+                              onClick={() => { if (workshop?.waitlistCtaUrl) { window.open(workshop.waitlistCtaUrl, "_blank"); } else { setWaitlistOpen(true); } }}
+                            >Join Waitlist</button>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              }
+
+              // List / groups / sessions (default) mode: stacked cards
+              if (sortedVisibleInstances.length === 0) return null;
               return (
                 <div key={block.id} className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
                   <div className="max-w-4xl mx-auto px-4">
                     {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
                     <div className="space-y-4">
-                      {visibleInstances.map((inst: any) => (
+                      {sortedVisibleInstances.map((inst: any) => (
                         <div
                           key={inst.id}
                           className="rounded-2xl border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
@@ -498,7 +580,12 @@ export default function WorkshopLanding() {
                           <div className="p-5">
                             <div className="flex items-start justify-between gap-4 flex-wrap">
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-gray-900 text-base mb-1">{inst.title}</h3>
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <h3 className="font-bold text-gray-900 text-base">{inst.title}</h3>
+                                  {soldOutIdSet.has(inst.id) && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: "#6b7280" }}>Sold Out</span>
+                                  )}
+                                </div>
                                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                                   {inst.startDate && (
                                     <span className="flex items-center gap-1">
@@ -523,7 +610,7 @@ export default function WorkshopLanding() {
                                   <p className="text-sm text-gray-600 mt-2 line-clamp-2">{inst.description}</p>
                                 )}
                               </div>
-                              {showEnrollNow && (
+                              {showEnrollNow && availableIdSet.has(inst.id) && (
                                 <Button
                                   size="sm"
                                   className="flex-shrink-0 text-white"
@@ -546,7 +633,7 @@ export default function WorkshopLanding() {
                 </div>
               );
             }
-            // cohort_instance_cards_auto — stacked cards or embed mode
+            // cohort_instance_cards_auto — stacked cards, embed, or calendar mode
             if (block.type === "cohort_instance_cards_auto") {
               const d = block.data ?? {};
               const cardDisplayMode = d.cardDisplayMode ?? "stacked";
@@ -576,6 +663,28 @@ export default function WorkshopLanding() {
                           />
                         ))}
                       </div>
+                    </div>
+                  </div>
+                );
+              }
+              if (cardDisplayMode === "calendar") {
+                const calInstId: number | null = (() => {
+                  if (groupSelectionMode === "manual" && selectedGroupIds.length > 0) return selectedGroupIds[0];
+                  const nextOpen = allInstances.find((inst: any) => new Date(inst.startDate).getTime() > Date.now());
+                  return nextOpen?.id ?? null;
+                })();
+                const calInst = calInstId ? allInstances.find((inst: any) => inst.id === calInstId) ?? null : null;
+                if (!calInst) return null;
+                return (
+                  <div key={block.id} className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+                    <div className="max-w-4xl mx-auto px-4">
+                      {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+                      <WorkshopInstancesCalendar
+                        instances={[calInst]}
+                        accentColor={accentColor}
+                        defaultView={(d.calendarDefaultView ?? "list") as "list" | "calendar"}
+                        showZoomJoin={d.showZoomJoin !== false}
+                      />
                     </div>
                   </div>
                 );
