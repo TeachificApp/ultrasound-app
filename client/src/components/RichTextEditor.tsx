@@ -652,7 +652,13 @@ export default function RichTextEditor({
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+        hardBreak: {
+          // Shift+Enter inserts a <br> (hard break); Enter creates a new paragraph
+          keepMarks: true,
+        },
+      }),
       Underline,
       TextStyle,
       Color,
@@ -1374,7 +1380,12 @@ export default function RichTextEditor({
         .rte-content .tiptap em { font-style: italic; }
         .rte-content .tiptap u { text-decoration: underline; }
         .rte-content .tiptap s { text-decoration: line-through; }
-        .rte-content .tiptap p { margin: 0.3em 0; }
+        .rte-content .tiptap p { margin: 0.3em 0; min-height: 1em; }
+        /* Hard breaks (Shift+Enter) must be visible */
+        .rte-content .tiptap br { display: block; content: ""; }
+        /* Empty paragraphs used as spacers must show as a blank line */
+        .rte-content .tiptap p:empty::after,
+        .rte-content .tiptap p:has(br:only-child)::after { content: "\00a0"; }
         .rte-content .tiptap a { color: #149096; text-decoration: underline; cursor: pointer; }
         /* CTA buttons inserted via Insert CTA Button dialog — rendered as styled spans, not links */
         .rte-content .tiptap [data-cta-btn] { display: inline-block; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.12); text-decoration: none !important; color: inherit; }

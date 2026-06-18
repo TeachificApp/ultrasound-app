@@ -379,6 +379,18 @@ textarea,
 .prose p {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
+  min-height: 1em;
+}
+/* Hard breaks (Shift+Enter → <br>) must render as visible line breaks */
+.prose br {
+  display: block;
+  content: "";
+  margin-top: 0;
+}
+/* Empty paragraphs (blank lines) must occupy vertical space */
+.prose p:empty,
+.prose p:has(br:only-child) {
+  min-height: 1.25em;
 }
 .prose a {
   color: #189aa1;
