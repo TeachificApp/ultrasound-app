@@ -197,6 +197,71 @@ export const workshopPublicRouter = router({
       return rows.map(r => ({ ...r, nextInstance: instanceMap.get(r.id) ?? null }));
     }),
 
+  /** Public: get workshop instances by their IDs — used by cohort_instance_cards_auto block on course landing pages */
+  getInstancesByIds: publicProcedure
+    .input(z.object({ ids: z.array(z.number()) }))
+    .query(async ({ input }) => {
+      if (input.ids.length === 0) return [];
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db
+        .select({
+          id: workshopInstances.id,
+          workshopId: workshopInstances.workshopId,
+          title: workshopInstances.title,
+          status: workshopInstances.status,
+          startDate: workshopInstances.startDate,
+          endDate: workshopInstances.endDate,
+          timezone: workshopInstances.timezone,
+          durationMinutes: workshopInstances.durationMinutes,
+          locationType: workshopInstances.locationType,
+          venueName: workshopInstances.venueName,
+          venueCity: workshopInstances.venueCity,
+          venueState: workshopInstances.venueState,
+          description: workshopInstances.description,
+          capacity: workshopInstances.capacity,
+          enrolledCount: workshopInstances.enrolledCount,
+          workshopTitle: workshops.title,
+        })
+        .from(workshopInstances)
+        .innerJoin(workshops, eq(workshopInstances.workshopId, workshops.id))
+        .where(sql`${workshopInstances.id} IN (${sql.join(input.ids.map(id => sql`${id}`), sql`, `)})`);
+      return rows;
+    }),
+
+  /** Public: get all upcoming published instances for a specific workshop (used by CICA block when no specific instances are selected) */
+  getInstancesByWorkshopId: publicProcedure
+    .input(z.object({ workshopId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db
+        .select({
+          id: workshopInstances.id,
+          workshopId: workshopInstances.workshopId,
+          title: workshopInstances.title,
+          status: workshopInstances.status,
+          startDate: workshopInstances.startDate,
+          endDate: workshopInstances.endDate,
+          timezone: workshopInstances.timezone,
+          durationMinutes: workshopInstances.durationMinutes,
+          locationType: workshopInstances.locationType,
+          venueName: workshopInstances.venueName,
+          venueCity: workshopInstances.venueCity,
+          venueState: workshopInstances.venueState,
+          description: workshopInstances.description,
+          capacity: workshopInstances.capacity,
+          enrolledCount: workshopInstances.enrolledCount,
+          workshopTitle: workshops.title,
+        })
+        .from(workshopInstances)
+        .innerJoin(workshops, eq(workshopInstances.workshopId, workshops.id))
+        .where(
+          sql`${workshopInstances.workshopId} = ${input.workshopId} AND ${workshopInstances.status} IN ('published', 'open', 'active')`
+        )
+        .orderBy(workshopInstances.startDate);
+      return rows;
+    }),
   /** Public: get live seat availability for a workshop instance (no cache — real-time) */
   getSeatAvailability: publicProcedure
     .input(z.object({ instanceId: z.number() }))

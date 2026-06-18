@@ -1142,6 +1142,17 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     }
     case "cohort_instance_cards_auto": {
       // ── cohort_instance_cards_auto: stacked cards or embed mode ──
+      // If the block is configured to pull from a workshop (not the course's own cohort groups),
+      // delegate to a sub-component that can call hooks to fetch workshop instances.
+      const selectedParentKindCICA = d.selectedParentKind ?? null;
+      if (selectedParentKindCICA === "workshop") {
+        return (
+          <CICAWorkshopBlock
+            data={d}
+            onCheckoutPage={onCheckoutPage}
+          />
+        );
+      }
       const cardDisplayMode = d.cardDisplayMode ?? "stacked";
       const accentColorCICA = d.accentColor ?? "#179ca3";
       const allGroupsCICA: any[] = (course as any).cohortGroups ?? [];
@@ -2778,6 +2789,129 @@ function CohortGroupEmbedSection({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── CICAWorkshopBlock ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// Renders a cohort_instance_cards_auto block when selectedParentKind === "workshop".
+// Must be a proper React component (not inline in switch) because it calls hooks.
+function CICAWorkshopBlock({ data: d, onCheckoutPage }: { data: any; onCheckoutPage?: (pricingOptionId?: number) => void }) {
+  const selectedGroupIds: number[] = d.selectedGroupIds ?? [];
+  const selectedParentId: number | null = d.selectedParentId ?? null;
+  const groupSelectionMode = d.groupSelectionMode ?? "all";
+  const accentColor = d.accentColor ?? "#179ca3";
+  const enrollNowText = d.enrollNowText ?? "Enroll Now";
+  const showEnrollNow = d.showEnrollNow !== false;
+  const cardDisplayMode = d.cardDisplayMode ?? "stacked";
+  // If specific instances are checked, fetch by IDs; otherwise fetch all instances for the workshop
+  const useByIds = groupSelectionMode === "manual" && selectedGroupIds.length > 0;
+  const useByWorkshop = !useByIds && selectedParentId != null;
+  const { data: fetchedByIds, isLoading: loadingByIds } = trpc.workshop.getInstancesByIds.useQuery(
+    { ids: selectedGroupIds },
+    { enabled: useByIds, staleTime: 60_000 }
+  );
+  const { data: fetchedByWorkshop, isLoading: loadingByWorkshop } = trpc.workshop.getInstancesByWorkshopId.useQuery(
+    { workshopId: selectedParentId ?? 0 },
+    { enabled: useByWorkshop, staleTime: 60_000 }
+  );
+  const fetchedInstances = useByIds ? fetchedByIds : fetchedByWorkshop;
+  const isLoading = useByIds ? loadingByIds : loadingByWorkshop;
+  if (isLoading) {
+    return (
+      <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="max-w-4xl mx-auto px-4 space-y-4">
+          {d.headline && <div className="h-8 w-1/2 bg-gray-200 rounded animate-pulse mx-auto" />}
+          <div className="h-24 bg-gray-100 rounded-2xl animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+  const instances: any[] = fetchedInstances ?? [];
+  if (instances.length === 0) return null;
+  const fmtDate = (dt: Date | string | null | undefined) => {
+    if (!dt) return null;
+    try { return new Date(dt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return String(dt); }
+  };
+  const locationStr = (inst: any) => {
+    if (inst.locationType === "virtual") return "Virtual / Online";
+    const parts = [inst.venueName, inst.venueCity, inst.venueState].filter(Boolean);
+    return parts.join(", ") || null;
+  };
+  if (cardDisplayMode === "embed") {
+    return (
+      <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="max-w-4xl mx-auto px-4">
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="space-y-10">
+            {instances.map((inst: any) => (
+              <WorkshopInstanceEmbedSection
+                key={inst.id}
+                instanceId={inst.id}
+                accentColor={accentColor}
+                onEnroll={() => onCheckoutPage?.()}
+                enrollNowText={enrollNowText}
+                showEnrollNow={showEnrollNow}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+      <div className="max-w-4xl mx-auto px-4">
+        {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+        <div className="space-y-4">
+          {instances.map((inst: any) => {
+            const loc = locationStr(inst);
+            const isFull = inst.capacity != null && Number(inst.enrolledCount ?? 0) >= inst.capacity;
+            return (
+              <div key={inst.id} className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}>
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 text-base mb-1">{inst.title ?? inst.workshopTitle}</h3>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1">
+                        {(inst.startDate || inst.endDate) && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-teal-500" />
+                            {fmtDate(inst.startDate)}{inst.endDate ? ` – ${fmtDate(inst.endDate)}` : ""}
+                          </span>
+                        )}
+                        {loc && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-teal-500" />
+                            {loc}
+                          </span>
+                        )}
+                        {inst.durationMinutes && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-teal-500" />
+                            {Math.round(inst.durationMinutes / 60)}h total
+                          </span>
+                        )}
+                      </div>
+                      {d.showDescription !== false && inst.description && (
+                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">{inst.description}</p>
+                      )}
+                    </div>
+                    {showEnrollNow && !isFull && (
+                      <Button size="sm" className="flex-shrink-0 text-white" style={{ backgroundColor: accentColor }} onClick={() => onCheckoutPage?.()}>
+                        {enrollNowText}
+                      </Button>
+                    )}
+                    {showEnrollNow && isFull && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">Sold Out</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
