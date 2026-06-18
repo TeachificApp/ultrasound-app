@@ -74,6 +74,7 @@ import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle"
 import { CourseWaitlistTab } from "@/components/CourseWaitlistTab";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
 import TeachAdminPanel from "@/pages/admin/TeachAdminPanel";
+import { QuizQuestionGroups } from "@/components/QuizQuestionGroups";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -4787,7 +4788,20 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
         </div>
       )}
 
+      {/* Question Groups */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+          <Layers className="w-4 h-4 text-teal-600" /> Question Groups
+        </h3>
+        <QuizQuestionGroups
+          quizId={quiz.id}
+          lessonId={lesson.id}
+          useQuestionGroups={!!(quiz as any).useQuestionGroups}
+          onModeChange={() => refetch()}
+        />
+      </div>
       {/* Questions list */}
+      {!(quiz as any).useQuestionGroups && (
       <div className="space-y-3">
         {(quiz.questions ?? []).map((q: any, qi: number) => {
           const options = q.options ? JSON.parse(q.options) : [];
@@ -4813,9 +4827,10 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
           );
         })}
       </div>
+      )}
 
-      {/* Add question */}
-      {addingQuestion ? (
+      {/* Add question — only shown when not using question groups */}
+      {!(quiz as any).useQuestionGroups && (addingQuestion ? (
         <div className="border border-teal-200 rounded-lg p-4 space-y-3 bg-teal-50">
           <div>
             <Label className="text-sm">Question *</Label>
@@ -4874,7 +4889,7 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
         <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
           <Plus className="w-4 h-4 mr-1" /> Add Question
         </Button>
-      )}
+      ))}
     </div>
   );
 }
@@ -4963,7 +4978,20 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
               </div>
             </div>
 
+            {/* Question Groups */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-teal-600" /> Question Groups
+              </h3>
+              <QuizQuestionGroups
+                quizId={quiz.id}
+                lessonId={lesson.id}
+                useQuestionGroups={!!(quiz as any).useQuestionGroups}
+                onModeChange={() => refetch()}
+              />
+            </div>
             {/* Questions */}
+            {!(quiz as any).useQuestionGroups && (
             <div className="space-y-3">
               {(quiz.questions ?? []).map((q: any, qi: number) => {
                 const options = q.options ? JSON.parse(q.options) : [];
@@ -5050,6 +5078,7 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
               <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
                 <Plus className="w-4 h-4 mr-1" /> Add Question
               </Button>
+            )}
             )}
           </div>
         )}

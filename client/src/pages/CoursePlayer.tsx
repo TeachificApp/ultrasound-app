@@ -6,7 +6,7 @@
  *         progress bar, Mark Complete button (bottom-right). Matches the All About Ultrasound mockup.
  * Admin extras: WYSIWYG lesson content block editor + student preview toggle.
  */
-import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -74,11 +74,25 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
         </div>
       )}
       <div className="space-y-6">
-        {questions.map((q: any, qi: number) => {
-          const options: string[] = q.options ? JSON.parse(q.options) : q.type === "truefalse" ? ["True", "False"] : [];
-          const resultItem = result?.results?.find((r: any) => r.questionId === q.id);
-          return (
-            <div key={q.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+        {(() => {
+          // Group-based quiz: show group headers when questions have groupId
+          const isGroupBased = !!(quiz as any)._isGroupBased || questions.some((q: any) => q.groupId);
+          let lastGroupId: number | null = null;
+          return questions.map((q: any, qi: number) => {
+            const options: string[] = q.options ? JSON.parse(q.options) : q.type === "truefalse" ? ["True", "False"] : [];
+            const resultItem = result?.results?.find((r: any) => r.questionId === q.id);
+            const showGroupHeader = isGroupBased && q.groupId && q.groupId !== lastGroupId;
+            if (showGroupHeader) lastGroupId = q.groupId;
+            return (
+              <React.Fragment key={q.id}>
+                {showGroupHeader && (
+                  <div className="flex items-center gap-2 pt-2">
+                    <div className="h-px flex-1 bg-gray-200" />
+                    <span className="text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">{q.groupName}</span>
+                    <div className="h-px flex-1 bg-gray-200" />
+                  </div>
+                )}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
               <p className="font-medium text-gray-900 mb-3">{qi + 1}. {q.question}</p>
               <div className="space-y-2">
                 {options.map((opt: string) => {
@@ -106,8 +120,10 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
                 <p className="mt-3 text-xs text-gray-500 bg-gray-50 rounded p-2 border border-gray-100">{resultItem.explanation}</p>
               )}
             </div>
+              </React.Fragment>
           );
-        })}
+          });
+        })()}
       </div>
       {!submitted && (
         <Button

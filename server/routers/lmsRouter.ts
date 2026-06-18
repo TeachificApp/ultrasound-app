@@ -100,6 +100,9 @@ import {
   workshops,
   workshopInstances,
   lmsQuizAttempts,
+  lmsQuizQuestionGroups,
+  lmsQuizGroupQuestions,
+  questionBank,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
@@ -1068,8 +1071,44 @@ export const lmsLearnerRouter = router({
       if (lesson.type === "quiz") {
         const [q] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, lesson.id)).limit(1);
         if (q) {
-          const questions = await db.select().from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, q.id)).orderBy(asc(lmsQuizQuestions.position));
-          quiz = { ...q, questions };
+          if (q.useQuestionGroups) {
+            // Group-based quiz: randomly select displayCount questions per group
+            const groups = await db.select().from(lmsQuizQuestionGroups)
+              .where(eq(lmsQuizQuestionGroups.quizId, q.id))
+              .orderBy(asc(lmsQuizQuestionGroups.sortOrder));
+            const selectedQuestions: any[] = [];
+            for (const group of groups) {
+              const poolRows = await db.select({
+                id: questionBank.id,
+                question: questionBank.question,
+                type: questionBank.type,
+                options: questionBank.options,
+                correctAnswer: questionBank.correctAnswer,
+                explanation: questionBank.explanation,
+                questionImageUrl: questionBank.questionImageUrl,
+              })
+                .from(lmsQuizGroupQuestions)
+                .innerJoin(questionBank, eq(lmsQuizGroupQuestions.questionBankId, questionBank.id))
+                .where(eq(lmsQuizGroupQuestions.groupId, group.id));
+              // Fisher-Yates shuffle then take displayCount
+              const pool = [...poolRows];
+              for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+              }
+              const picked = pool.slice(0, group.displayCount).map(qb => ({
+                ...qb,
+                groupId: group.id,
+                groupName: group.name,
+                _source: 'bank' as const,
+              }));
+              selectedQuestions.push(...picked);
+            }
+            quiz = { ...q, questions: selectedQuestions, _isGroupBased: true };
+          } else {
+            const questions = await db.select().from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, q.id)).orderBy(asc(lmsQuizQuestions.position));
+            quiz = { ...q, questions };
+          }
         }
       }
 
@@ -1134,13 +1173,27 @@ export const lmsLearnerRouter = router({
 
       const [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, input.lessonId)).limit(1);
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
-      const questions = await db.select().from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, quiz.id));
 
+      // Determine question source: group-based (question bank) or standard (lms_quiz_questions)
+      let gradeQuestions: Array<{ id: number; correctAnswer: string | null; explanation: string | null; type?: string | null }>;
+      let selectedBankIds: number[] | null = null;
+      if (quiz.useQuestionGroups) {
+        const bankIds = Object.keys(input.answers).map(Number).filter(n => !isNaN(n));
+        selectedBankIds = bankIds;
+        gradeQuestions = bankIds.length > 0
+          ? await db.select({ id: questionBank.id, correctAnswer: questionBank.correctAnswer, explanation: questionBank.explanation, type: questionBank.type })
+              .from(questionBank).where(inArray(questionBank.id, bankIds))
+          : [];
+      } else {
+        gradeQuestions = await db.select().from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, quiz.id));
+      }
+
+      const questions = gradeQuestions;
       let correct = 0;
       const results = questions.map(q => {
         const given = input.answers[String(q.id)] ?? "";
         let isCorrect = false;
-        const qType = (q as any).questionType ?? "mcq";
+        const qType = (q as any).questionType ?? (q as any).type ?? "mcq";
         if (qType === "multiselect") {
           // given is a JSON array of selected option indices
           try {

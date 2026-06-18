@@ -72,6 +72,9 @@ import {
   lmsCohortSubmissions,
   mediaUploadFolders,
   mediaUploadResponses,
+  lmsQuizQuestionGroups,
+  lmsQuizGroupQuestions,
+  questionBank,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -735,5 +738,138 @@ Make ALL content specific and compelling based on the course title, description,
       return { success: true };
     }),
 
+  // ── Question Groups ──────────────────────────────────────────────────────────
+  /** Enable/disable question groups mode on a quiz */
+  setQuizGroupMode: protectedProcedure
+    .input(z.object({ quizId: z.number(), useQuestionGroups: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsQuizzes).set({ useQuestionGroups: input.useQuestionGroups }).where(eq(lmsQuizzes.id, input.quizId));
+      return { success: true };
+    }),
+  /** Get all question groups for a quiz */
+  getQuizGroups: protectedProcedure
+    .input(z.object({ quizId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const groups = await db.select().from(lmsQuizQuestionGroups)
+        .where(eq(lmsQuizQuestionGroups.quizId, input.quizId))
+        .orderBy(asc(lmsQuizQuestionGroups.sortOrder));
+      const groupsWithCounts = await Promise.all(groups.map(async (g) => {
+        const [{ count }] = await db.select({ count: sql<number>`count(*)` })
+          .from(lmsQuizGroupQuestions).where(eq(lmsQuizGroupQuestions.groupId, g.id));
+        return { ...g, questionCount: Number(count) };
+      }));
+      return groupsWithCounts;
+    }),
+  /** Create a question group */
+  createQuizGroup: protectedProcedure
+    .input(z.object({
+      quizId: z.number(),
+      name: z.string().min(1),
+      description: z.string().optional(),
+      displayCount: z.number().int().min(1).default(1),
+      sortOrder: z.number().int().default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const result = await db.insert(lmsQuizQuestionGroups).values({
+        quizId: input.quizId,
+        name: input.name,
+        description: input.description ?? null,
+        displayCount: input.displayCount,
+        sortOrder: input.sortOrder,
+      });
+      return { id: (result as any).insertId };
+    }),
+  /** Update a question group */
+  updateQuizGroup: protectedProcedure
+    .input(z.object({
+      groupId: z.number(),
+      name: z.string().min(1).optional(),
+      description: z.string().optional(),
+      displayCount: z.number().int().min(1).optional(),
+      sortOrder: z.number().int().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { groupId, ...updates } = input;
+      await db.update(lmsQuizQuestionGroups).set(updates).where(eq(lmsQuizQuestionGroups.id, groupId));
+      return { success: true };
+    }),
+  /** Delete a question group (also removes all group-question mappings) */
+  deleteQuizGroup: protectedProcedure
+    .input(z.object({ groupId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsQuizGroupQuestions).where(eq(lmsQuizGroupQuestions.groupId, input.groupId));
+      await db.delete(lmsQuizQuestionGroups).where(eq(lmsQuizQuestionGroups.id, input.groupId));
+      return { success: true };
+    }),
+  /** Get questions in a group */
+  getGroupQuestions: protectedProcedure
+    .input(z.object({ groupId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select({
+        id: questionBank.id,
+        question: questionBank.question,
+        type: questionBank.type,
+        correctAnswer: questionBank.correctAnswer,
+        explanation: questionBank.explanation,
+        questionImageUrl: questionBank.questionImageUrl,
+        sortOrder: lmsQuizGroupQuestions.sortOrder,
+        mappingId: lmsQuizGroupQuestions.id,
+      })
+        .from(lmsQuizGroupQuestions)
+        .innerJoin(questionBank, eq(lmsQuizGroupQuestions.questionBankId, questionBank.id))
+        .where(eq(lmsQuizGroupQuestions.groupId, input.groupId))
+        .orderBy(asc(lmsQuizGroupQuestions.sortOrder));
+    }),
+  /** Add question bank items to a group */
+  addQuestionsToGroup: protectedProcedure
+    .input(z.object({ groupId: z.number(), questionBankIds: z.array(z.number()) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (input.questionBankIds.length === 0) return { added: 0 };
+      const existing = await db.select({ questionBankId: lmsQuizGroupQuestions.questionBankId })
+        .from(lmsQuizGroupQuestions).where(eq(lmsQuizGroupQuestions.groupId, input.groupId));
+      const existingIds = new Set(existing.map(e => e.questionBankId));
+      const toAdd = input.questionBankIds.filter(id => !existingIds.has(id));
+      if (toAdd.length === 0) return { added: 0 };
+      const [{ maxOrder }] = await db.select({ maxOrder: max(lmsQuizGroupQuestions.sortOrder) })
+        .from(lmsQuizGroupQuestions).where(eq(lmsQuizGroupQuestions.groupId, input.groupId));
+      let nextOrder = (maxOrder ?? 0) + 1;
+      await db.insert(lmsQuizGroupQuestions).values(toAdd.map(qbId => ({
+        groupId: input.groupId,
+        questionBankId: qbId,
+        sortOrder: nextOrder++,
+      })));
+      return { added: toAdd.length };
+    }),
+  /** Remove a question from a group */
+  removeQuestionFromGroup: protectedProcedure
+    .input(z.object({ mappingId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsQuizGroupQuestions).where(eq(lmsQuizGroupQuestions.id, input.mappingId));
+      return { success: true };
+    }),
   // ── Enrollments ──
 });

@@ -3120,6 +3120,8 @@ export const lmsQuizzes = mysqlTable("lms_quizzes", {
   requirePassingToProgress: boolean("require_passing_to_progress").default(false).notNull(),
   randomizeQuestions: boolean("randomize_questions").default(false).notNull(),
   randomizeAnswers: boolean("randomize_answers").default(false).notNull(),
+  useQuestionGroups: boolean("use_question_groups").default(false).notNull(),
+  questionBankFolderId: int("question_bank_folder_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsQuiz = typeof lmsQuizzes.$inferSelect;
@@ -3873,6 +3875,7 @@ export const lmsQuizAttempts = mysqlTable("lms_quiz_attempts", {
   correctAnswers: int("correct_answers").notNull(),
   timeTakenSec: int("time_taken_sec"),
   answersJson: longtext("answers_json"),  // JSON array of {questionId, selectedAnswer, correct}
+  selectedQuestionIds: text("selected_question_ids"), // JSON array of question bank IDs used in this attempt
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsQuizAttempt = typeof lmsQuizAttempts.$inferSelect;
@@ -7111,3 +7114,27 @@ export const printfulSyncProducts = mysqlTable("printful_sync_products", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type PrintfulSyncProductRow = typeof printfulSyncProducts.$inferSelect;
+
+// ─── Quiz Question Groups ─────────────────────────────────────────────────────
+// A quiz can have multiple question groups. Each group draws `displayCount`
+// random questions from its pool on each attempt.
+export const lmsQuizQuestionGroups = mysqlTable("lms_quiz_question_groups", {
+  id: int("id").autoincrement().primaryKey(),
+  quizId: int("quiz_id").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  displayCount: int("display_count").default(1).notNull(), // how many to show per attempt
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsQuizQuestionGroup = typeof lmsQuizQuestionGroups.$inferSelect;
+
+// Maps question bank items to a question group
+export const lmsQuizGroupQuestions = mysqlTable("lms_quiz_group_questions", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  questionBankId: int("question_bank_id").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsQuizGroupQuestion = typeof lmsQuizGroupQuestions.$inferSelect;
