@@ -995,9 +995,9 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
         {hasInlineMedia && (
           <div className={isHorizontal ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}>
             {d.inlineMediaType === "video" ? (
-              <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+              <video autoPlay muted loop playsInline className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`}><source src={d.inlineMediaUrl} /></video>
             ) : (
-              <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+              <img src={d.inlineMediaUrl} alt="" className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`} />
             )}
           </div>
         )}

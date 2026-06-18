@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package, Link2 } from "lucide-react";
+import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package } from "lucide-react";
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-4 h-4" />,
@@ -275,8 +275,8 @@ export default function EducationLibrary() {
                 All Content
               </button>
               {collections.map((col: any) => (
-                <div key={col.id} className="flex items-center gap-0.5">
                 <button
+                  key={col.id}
                   onClick={() => {
                     setActiveCollection(col.id); setPage(1);
                     const autoSlug = col.slug ?? col.title?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -292,23 +292,6 @@ export default function EducationLibrary() {
                   {col.title}
                   <span className="ml-1.5 text-xs opacity-70">({col.courseCount})</span>
                 </button>
-                <button
-                  title="Copy direct link to this collection"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const autoSlug = col.slug ?? col.title?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                    const url = `${window.location.origin}/education-library?collection=${encodeURIComponent(autoSlug)}`;
-                    navigator.clipboard.writeText(url).then(() => {
-                      const btn = e.currentTarget;
-                      btn.classList.add("text-teal-600");
-                      setTimeout(() => btn.classList.remove("text-teal-600"), 1500);
-                    });
-                  }}
-                  className="-ml-1 p-1 rounded-full text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
-                >
-                  <Link2 className="w-3 h-3" />
-                </button>
-                </div>
               ))}
             </div>
           </div>

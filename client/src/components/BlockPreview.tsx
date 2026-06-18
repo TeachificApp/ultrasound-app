@@ -210,9 +210,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             {hasInlineMedia && (
               <div className={isHorizontal ? "w-full sm:flex-1 sm:max-w-xs mt-6 sm:mt-0" : "mt-6 max-w-sm mx-auto w-full"}>
                 {d.inlineMediaType === "video" ? (
-                  <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+                  <video autoPlay muted loop playsInline className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`}><source src={d.inlineMediaUrl} /></video>
                 ) : (
-                  <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+                  <img src={d.inlineMediaUrl} alt="" className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`} />
                 )}
               </div>
             )}

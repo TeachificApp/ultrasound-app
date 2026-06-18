@@ -793,16 +793,16 @@ function LMSRouter() {
           <Switch>
             {/* LMS Home */}
             <Route path="/" component={LMSHome} />
-            {/* Community — must be before /:slug catch-all */}
+            {/* Community — specific routes MUST come before /community/:slug wildcard */}
             <Route path="/community" component={CommunityHub} />
-            <Route path="/community/:slug" component={CommunityFeed} />
-            <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
             <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
+            <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
             <Route path="/community/members/:userId" component={CommunityProfile} />
-            <Route path="/community/dms" component={CommunityDMs} />
             <Route path="/community/dms/c/:conversationId" component={CommunityDMs} />
             <Route path="/community/dms/:userId" component={CommunityDMs} />
+            <Route path="/community/dms" component={CommunityDMs} />
             <Route path="/community/leaderboard" component={CommunityLeaderboard} />
+            <Route path="/community/:slug" component={CommunityFeed} />
             <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityAdmin /></RoleGuard>}</Route>
             <Route path="/education-library" component={EducationLibrary} />
             <Route path="/collections/:id" component={CollectionDetail} />
@@ -1108,14 +1108,14 @@ function IHeartEchoRouter() {
         <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
         <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
         <Route path="/community" component={CommunityHub} />
-        <Route path="/community/:slug" component={CommunityFeed} />
-        <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
         <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
+        <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
         <Route path="/community/members/:userId" component={CommunityProfile} />
-        <Route path="/community/dms" component={CommunityDMs} />
         <Route path="/community/dms/c/:conversationId" component={CommunityDMs} />
         <Route path="/community/dms/:userId" component={CommunityDMs} />
+        <Route path="/community/dms" component={CommunityDMs} />
         <Route path="/community/leaderboard" component={CommunityLeaderboard} />
+        <Route path="/community/:slug" component={CommunityFeed} />
         <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
         <Route path="/:slug/:pageSlug">{() => <PublicFunnelPageRoute />}</Route>
         <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>

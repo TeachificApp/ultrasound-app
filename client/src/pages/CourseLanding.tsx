@@ -343,9 +343,9 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
             {hasInlineMedia && (
               <div className={`animate-fade-slide-up-delay-1 ${isHorizontal ? "w-full sm:flex-1 sm:max-w-md mt-6 sm:mt-0" : "mt-6 max-w-lg mx-auto w-full"}`}>
                 {d.inlineMediaType === "video" ? (
-                  <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+                  <video autoPlay muted loop playsInline className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`}><source src={d.inlineMediaUrl} /></video>
                 ) : (
-                  <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+                  <img src={d.inlineMediaUrl} alt="" className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`} />
                 )}
               </div>
             )}
