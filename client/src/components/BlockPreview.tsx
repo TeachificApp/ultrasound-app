@@ -1408,15 +1408,16 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       return <FileUploadBlockPreview d={d} />;
     case "cohort_sessions_auto": {
       const accentColor = d.accentColor ?? "#179ca3";
-      const displayMode = d.displayMode ?? "sessions";
-      if (displayMode === "groups") {
-        const enrollNowText = d.enrollNowText ?? "Enroll Now";
-        const showEnrollNow = d.showEnrollNow !== false;
-        const sampleGroups = [
-          { title: "Spring 2025 Cohort", dateRange: "Mar 3 – Apr 14, 2025", location: "Virtual / Online", hours: "12h", description: "6-week live cohort with weekly sessions and hands-on case reviews." },
-          { title: "Summer 2025 Cohort", dateRange: "Jun 2 – Jul 14, 2025", location: "Virtual / Online", hours: "12h", description: "Intensive summer cohort with daily check-ins and live Q&A sessions." },
-          { title: "Fall 2025 Cohort", dateRange: "Sep 8 – Oct 20, 2025", location: "New York, NY", hours: "16h", description: "In-person cohort with full-day workshops and networking events." },
-        ];
+      const displayMode = (d.displayMode ?? "list") as "list" | "page" | "calendar" | "groups" | "sessions";
+      const enrollNowText = d.enrollNowText ?? "Enroll Now";
+      const showEnrollNow = d.showEnrollNow !== false;
+      const sampleGroups = [
+        { title: "Spring 2025 Cohort", dateRange: "Mar 3 – Apr 14, 2025", location: "Virtual / Online", hours: "12h", description: "6-week live cohort with weekly sessions and hands-on case reviews.", status: "Enrolling Now", statusColor: "#059669", seats: "4 seats left" },
+        { title: "Summer 2025 Cohort", dateRange: "Jun 2 – Jul 14, 2025", location: "Virtual / Online", hours: "12h", description: "Intensive summer cohort with daily check-ins and live Q&A sessions.", status: "In Progress", statusColor: "#2563eb", seats: null },
+        { title: "Fall 2025 Cohort", dateRange: "Sep 8 – Oct 20, 2025", location: "New York, NY", hours: "16h", description: "In-person cohort with full-day workshops and networking events.", status: "Enrolling Now", statusColor: "#059669", seats: "12 seats left" },
+      ];
+      // List mode: stacked cohort group cards showing in-progress + upcoming
+      if (displayMode === "list" || displayMode === "groups") {
         return (
           <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
             {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
@@ -1426,16 +1427,23 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-gray-900 text-base mb-1">{g.title}</h3>
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <h3 className="font-bold text-gray-900 text-base">{g.title}</h3>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: g.statusColor }}>{g.status}</span>
+                        </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                           <span className="flex items-center gap-1">📅 {g.dateRange}</span>
                           <span className="flex items-center gap-1">📍 {g.location}</span>
                           <span className="flex items-center gap-1">⏱ {g.hours}</span>
                         </div>
                         {d.showDescription !== false && <p className="text-sm text-gray-600 mt-2 line-clamp-2">{g.description}</p>}
+                        {g.seats && <p className="text-[11px] font-medium text-amber-600 mt-1">{g.seats}</p>}
                       </div>
-                      {showEnrollNow && (
+                      {showEnrollNow && g.status === "Enrolling Now" && (
                         <button className="flex-shrink-0 px-4 py-1.5 rounded-lg text-white text-sm font-semibold" style={{ backgroundColor: accentColor }}>{enrollNowText}</button>
+                      )}
+                      {showEnrollNow && g.status === "In Progress" && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 flex-shrink-0">Enrollment Closed</span>
                       )}
                     </div>
                   </div>
@@ -1443,30 +1451,93 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                 </div>
               ))}
             </div>
-
           </CC></div>
         );
       }
-      const sampleSessions = [
-        { title: "Session 1: Introduction", date: "Mon, Jun 2 · 10:00 AM" },
-        { title: "Session 2: Core Concepts", date: "Mon, Jun 9 · 10:00 AM" },
-        { title: "Session 3: Advanced Topics", date: "Mon, Jun 16 · 10:00 AM" },
-      ];
+      // Page mode: next upcoming cohort as full-detail embed preview
+      if (displayMode === "page") {
+        const nextGroup = sampleGroups[0];
+        return (
+          <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}>
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: nextGroup.statusColor }}>{nextGroup.status}</span>
+                </div>
+                <h3 className="font-bold text-gray-900 text-xl mb-2">{nextGroup.title}</h3>
+                <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-gray-500 mb-3">
+                  <span className="flex items-center gap-1.5">📅 {nextGroup.dateRange}</span>
+                  <span className="flex items-center gap-1.5">📍 {nextGroup.location}</span>
+                  <span className="flex items-center gap-1.5">⏱ {nextGroup.hours} total</span>
+                </div>
+                {d.showDescription !== false && <p className="text-sm text-gray-600 mb-4">{nextGroup.description}</p>}
+                {nextGroup.seats && <p className="text-sm font-medium text-amber-600 mb-4">{nextGroup.seats}</p>}
+                {showEnrollNow && (
+                  <button className="px-6 py-2.5 rounded-xl text-white font-semibold text-sm" style={{ backgroundColor: accentColor }}>{enrollNowText}</button>
+                )}
+              </div>
+            </div>
+          </CC></div>
+        );
+      }
+      // Calendar mode: lesson schedule calendar preview
+      if (displayMode === "calendar") {
+        const sampleDays = [6, 9, 16, 23, 30];
+        return (
+          <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}33` }}>
+              <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: `${accentColor}22`, backgroundColor: `${accentColor}08` }}>
+                <span className="font-semibold text-gray-800 text-sm">June 2025 — Live Sessions</span>
+                <div className="flex gap-1">
+                  <button className="px-2.5 py-1 text-xs rounded border font-medium" style={{ backgroundColor: accentColor, color: "#fff", borderColor: accentColor }}>List</button>
+                  <button className="px-2.5 py-1 text-xs rounded border font-medium text-gray-500 border-gray-200">Calendar</button>
+                </div>
+              </div>
+              <div className="divide-y" style={{ borderColor: `${accentColor}15` }}>
+                {sampleDays.map((day, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <div className="w-9 h-9 rounded-full flex flex-col items-center justify-center shrink-0 text-white" style={{ backgroundColor: accentColor }}>
+                      <span className="text-[10px] font-bold leading-none">JUN</span>
+                      <span className="text-sm font-bold leading-none">{day}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">Session {i + 1}: {["Introduction", "Core Concepts", "Advanced Topics", "Case Studies", "Final Review"][i]}</p>
+                      <p className="text-xs text-gray-400">Mon · 10:00 AM – 11:30 AM</p>
+                    </div>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold text-white" style={{ backgroundColor: accentColor }}>Zoom</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CC></div>
+        );
+      }
+      // Legacy "sessions" mode fallback — show list preview
       return (
         <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="space-y-3">
-            {sampleSessions.map((s, i) => (
-              <div key={i} className="flex items-center gap-4 p-4 rounded-xl border" style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}08` }}>
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={{ backgroundColor: accentColor }}>{i + 1}</div>
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{s.title}</p>
-                  <p className="text-xs text-gray-500">{s.date}</p>
+          <div className="space-y-4">
+            {sampleGroups.slice(0, 2).map((g, i) => (
+              <div key={i} className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}>
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold text-gray-900 text-base">{g.title}</h3>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: g.statusColor }}>{g.status}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                        <span>📅 {g.dateRange}</span><span>📍 {g.location}</span>
+                      </div>
+                    </div>
+                    {showEnrollNow && <button className="flex-shrink-0 px-4 py-1.5 rounded-lg text-white text-sm font-semibold" style={{ backgroundColor: accentColor }}>{enrollNowText}</button>}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-
         </CC></div>
       );
     }

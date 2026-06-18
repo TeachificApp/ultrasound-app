@@ -21,7 +21,7 @@ import {
   Presentation, Upload, Plus, FolderOpen, GraduationCap, Building2,
   Loader2, Pencil, Play, Trash2, Copy, Lock, LayoutTemplate,
   FolderPlus, Folder, MoreVertical, RotateCcw, ChevronRight,
-  Home, FileText, Film, FileIcon,
+  Home, FileText, Film, FileIcon, Radio,
 } from "lucide-react";
 
 type FolderItem = { id: number; name: string; parentId: number | null; ownerUserId: number };
@@ -339,7 +339,7 @@ export default function TeachDashboard() {
                 Upload presentations and media for your courses. <strong>.pptx</strong> files are parsed into editable slides.
               </p>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
+            <div className="flex gap-2 flex-shrink-0 flex-wrap">
               {ctx.lmsInstructor && (
                 <Link href="/instructor-portal">
                   <Button variant="outline" size="sm"><GraduationCap className="w-4 h-4 mr-1" /> Instructor Portal</Button>
@@ -348,6 +348,13 @@ export default function TeachDashboard() {
               {ctx.educatorAssistPreview && (
                 <Link href="/educator-admin">
                   <Button variant="outline" size="sm"><Building2 className="w-4 h-4 mr-1" /> EducatorAssist™</Button>
+                </Link>
+              )}
+              {(user?.role === "admin" || ctx.lmsInstructor) && (
+                <Link href="/admin/sonoquiz">
+                  <Button variant="outline" size="sm" className="border-purple-200 text-purple-700 hover:bg-purple-50">
+                    <Radio className="w-4 h-4 mr-1" /> SonoQuiz
+                  </Button>
                 </Link>
               )}
             </div>

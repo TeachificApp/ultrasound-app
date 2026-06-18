@@ -940,11 +940,21 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         let candidatesP = groupSelectionModeP === "manual" && selectedGroupIdsP.length > 0
           ? allGroupsCSA.filter((g: any) => selectedGroupIdsP.includes(g.id))
           : allGroupsCSA;
+        // Page mode: show only the next upcoming group with open enrollment (not in-progress).
+        // Auto-advance: if enrollment has closed for the current group, skip to the next one.
+        const isEnrollmentOpenP = (g: any) => {
+          if (g.status !== "open") return false;
+          if (g.enrollmentCloseDate && new Date(g.enrollmentCloseDate).getTime() < nowMsCSA) return false;
+          return true;
+        };
         const nextUpcoming = candidatesP
-          .filter((g: any) => g.status === "open" && g.startDate && new Date(g.startDate).getTime() > nowMsCSA)
+          .filter((g: any) => isEnrollmentOpenP(g) && g.startDate && new Date(g.startDate).getTime() > nowMsCSA)
           .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0];
+        // Sold-out fallback: most recent non-completed group when no open enrollment exists
         const soldOut = !nextUpcoming
-          ? candidatesP.filter((g: any) => g.status !== "completed").sort((a: any, b: any) => new Date(b.startDate ?? 0).getTime() - new Date(a.startDate ?? 0).getTime())[0]
+          ? candidatesP
+              .filter((g: any) => g.status !== "completed" && (!g.endDate || new Date(g.endDate).getTime() >= nowMsCSA))
+              .sort((a: any, b: any) => new Date(b.startDate ?? 0).getTime() - new Date(a.startDate ?? 0).getTime())[0]
           : null;
         const embedGroupIdP = nextUpcoming?.id ?? null;
         if (!embedGroupIdP && !soldOut) return null;

@@ -24,6 +24,7 @@ import {
   Lock, PlayCircle, User, FileText, HelpCircle, Download, Monitor,
   ArrowRight, ListChecks, ExternalLink, Video, Film, Upload, Link2,
   CheckCircle2, Calendar, AlertCircle, ChevronLeft, CalendarDays, FolderOpen,
+  BarChart2, Trophy, XCircle, History,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -109,6 +110,12 @@ export default function CourseOverview() {
   const { data: cohortData, isLoading: cohortLoading } = trpc.lmsLearner.getCohortSchedule.useQuery(
     { courseId: courseId! },
     { enabled: !!courseId && isCohortCourse && !!user }
+  );
+
+  // Quiz attempts query — runs after course data is loaded, for any course with quiz lessons
+  const { data: quizAttemptsData } = trpc.lmsLearner.getMyQuizAttempts.useQuery(
+    { courseId: courseId! },
+    { enabled: !!courseId && !!user }
   );
 
   // Expand all sections by default
@@ -645,6 +652,11 @@ export default function CourseOverview() {
           </DialogContent>
         </Dialog>
 
+        {/* Quiz Attempts Section — shown when course has quiz lessons and user has attempts */}
+        {quizAttemptsData && quizAttemptsData.byLesson.length > 0 && (
+          <QuizAttemptsSection byLesson={quizAttemptsData.byLesson} primaryColor={primaryColor} />
+        )}
+
         {/* Certificate badge */}
         {course.hasCertificate && (
           <div className="rounded-xl p-5 flex items-center gap-4 border" style={{ backgroundColor: `${primaryColor}10`, borderColor: `${primaryColor}40` }}>
@@ -666,6 +678,139 @@ export default function CourseOverview() {
           onSaved={() => refetch()}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Quiz Attempts Section ───────────────────────────────────────────────────
+
+type QuizAttemptRecord = {
+  id: number;
+  score: number;
+  passed: boolean;
+  totalQuestions: number;
+  correctAnswers: number;
+  timeTakenSec: number | null;
+  createdAt: Date;
+};
+
+type LessonAttemptGroup = {
+  lessonId: number;
+  lessonTitle: string;
+  lessonType: string;
+  attemptCount: number;
+  bestScore: number;
+  bestPassed: boolean;
+  latestScore: number;
+  latestPassed: boolean;
+  latestAt: Date;
+  attempts: QuizAttemptRecord[];
+};
+
+function QuizAttemptsSection({ byLesson, primaryColor }: { byLesson: LessonAttemptGroup[]; primaryColor: string }) {
+  const [expandedLesson, setExpandedLesson] = useState<number | null>(null);
+
+  const fmtTime = (secs: number | null) => {
+    if (!secs) return null;
+    const m = Math.floor(secs / 60), s = secs % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  };
+
+  return (
+    <div className="mt-8">
+      <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
+        <BarChart2 className="w-4 h-4" style={{ color: primaryColor }} /> My Quiz Results
+      </h3>
+      <div className="space-y-3">
+        {byLesson.map((group) => (
+          <div key={group.lessonId} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            {/* Quiz header row */}
+            <button
+              className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 transition-colors"
+              onClick={() => setExpandedLesson(expandedLesson === group.lessonId ? null : group.lessonId)}
+            >
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: `${primaryColor}15` }}
+              >
+                <HelpCircle className="w-4 h-4" style={{ color: primaryColor }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm truncate">{group.lessonTitle}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {group.attemptCount} attempt{group.attemptCount !== 1 ? "s" : ""} &middot; Last: {new Date(group.latestAt).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Best score badge */}
+                <div className="text-right">
+                  <p className="text-xs text-gray-400 leading-none mb-0.5">Best</p>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold",
+                      group.bestPassed
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-red-100 text-red-600"
+                    )}
+                  >
+                    {group.bestPassed ? <Trophy className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                    {group.bestScore}%
+                  </span>
+                </div>
+                {/* Latest score badge */}
+                {group.attemptCount > 1 && (
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400 leading-none mb-0.5">Latest</p>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold",
+                        group.latestPassed
+                          ? "bg-teal-50 text-teal-700"
+                          : "bg-orange-50 text-orange-600"
+                      )}
+                    >
+                      {group.latestScore}%
+                    </span>
+                  </div>
+                )}
+                <ChevronDown
+                  className={cn("w-4 h-4 text-gray-400 transition-transform", expandedLesson === group.lessonId && "rotate-180")}
+                />
+              </div>
+            </button>
+
+            {/* Attempt history (expandable) */}
+            {expandedLesson === group.lessonId && (
+              <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1">
+                  <History className="w-3.5 h-3.5" /> Attempt History
+                </p>
+                <div className="space-y-1.5">
+                  {group.attempts.map((attempt, idx) => (
+                    <div key={attempt.id} className="flex items-center gap-3 text-xs">
+                      <span className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 flex-shrink-0">
+                        {group.attempts.length - idx}
+                      </span>
+                      <span className={cn("font-semibold", attempt.passed ? "text-emerald-600" : "text-red-500")}>
+                        {attempt.score}% &mdash; {attempt.passed ? "Passed" : "Failed"}
+                      </span>
+                      <span className="text-gray-400">
+                        {attempt.correctAnswers}/{attempt.totalQuestions} correct
+                      </span>
+                      {attempt.timeTakenSec && (
+                        <span className="text-gray-400">&middot; {fmtTime(attempt.timeTakenSec)}</span>
+                      )}
+                      <span className="ml-auto text-gray-400">
+                        {new Date(attempt.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
