@@ -18,6 +18,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { isRichTextEmpty, appendHashtagsToBody } from "@shared/communityText";
+import { publicMemberDisplayName } from "@shared/communityMember";
+import { isCommunityPlatformAdmin } from "@/lib/communityAccess";
 import {
   MessageSquare, Heart, Bookmark, BookmarkCheck, MoreHorizontal,
   Image as ImageIcon, BarChart2, Send, ChevronDown, ChevronUp,
@@ -50,7 +52,7 @@ function timeAgo(dateStr: string | Date) {
 
 function AuthorAvatar({ author, size = "sm" }: { author: any; size?: "sm" | "md" }) {
   const sz = size === "sm" ? "w-8 h-8" : "w-10 h-10";
-  const name = author?.displayName || author?.name || "?";
+  const name = publicMemberDisplayName(author ?? {});
   return (
     <Avatar className={sz}>
       <AvatarImage src={author?.avatarUrl ?? undefined} />
@@ -121,7 +123,7 @@ function CommentThread({ postId, isOpen, onClose }: { postId: number; isOpen: bo
       ) : (
         <div className="space-y-3">
           {post?.comments?.map((c: any) => {
-            const displayName = c.aliasName || c.author?.displayName || c.author?.name || "Unknown";
+            const displayName = c.aliasName || publicMemberDisplayName(c.author ?? {});
             const displayAvatar = c.aliasAvatarUrl || c.author?.avatarUrl;
             return (
               <div key={c.id} className={`flex gap-3 ${c.parentId ? "ml-8" : ""}`}>
@@ -237,7 +239,7 @@ function PostCard({ post, isAdmin, communityId }: { post: any; isAdmin: boolean;
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <Link href={post.author?.id ? `/community/members/${post.author.id}` : "#"}>
-                <span className="font-semibold text-gray-900 text-sm hover:text-teal-600 cursor-pointer transition-colors">{post.author?.displayName || post.author?.name || "Unknown"}</span>
+                <span className="font-semibold text-gray-900 text-sm hover:text-teal-600 cursor-pointer transition-colors">{publicMemberDisplayName(post.author ?? {})}</span>
               </Link>
               {post.author?.communityRole === "admin" && (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-600 text-white">Admin</span>
@@ -455,32 +457,32 @@ function MembersSidebar({ communityId, currentUserId }: { communityId: number; c
 
   const filtered = (members ?? []).filter((m: any) => {
     if (!search) return true;
-    const name = (m.displayName || m.name || "").toLowerCase();
+    const name = publicMemberDisplayName(m).toLowerCase();
     return name.includes(search.toLowerCase());
   });
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Members</h3>
-        <span className="text-xs text-gray-400">{members?.length ?? 0}</span>
+    <div className="h-full flex flex-col min-h-[320px]">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-gray-700">Members</h3>
+        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{members?.length ?? 0}</span>
       </div>
 
       {/* Avatar strip — top 8 members */}
       {!search && (members?.length ?? 0) > 0 && (
-        <div className="flex -space-x-2 mb-3">
+        <div className="flex -space-x-2 mb-4">
           {(members ?? []).slice(0, 8).map((m: any) => (
             <Link key={m.userId} href={`/community/members/${m.userId}`}>
-              <Avatar className="w-7 h-7 border-2 border-white cursor-pointer hover:z-10 hover:scale-110 transition-transform">
+              <Avatar className="w-9 h-9 border-2 border-white cursor-pointer hover:z-10 hover:scale-110 transition-transform">
                 <AvatarImage src={m.avatarUrl ?? undefined} />
-                <AvatarFallback className="text-[10px] bg-teal-100 text-teal-700 font-bold">
-                  {(m.displayName || m.name || "?").charAt(0).toUpperCase()}
+                <AvatarFallback className="text-xs bg-teal-100 text-teal-700 font-bold">
+                  {publicMemberDisplayName(m).charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </Link>
           ))}
           {(members?.length ?? 0) > 8 && (
-            <div className="w-7 h-7 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 font-semibold">
+            <div className="w-9 h-9 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-xs text-gray-500 font-semibold">
               +{(members?.length ?? 0) - 8}
             </div>
           )}
@@ -488,55 +490,56 @@ function MembersSidebar({ communityId, currentUserId }: { communityId: number; c
       )}
 
       {/* Search */}
-      <div className="relative mb-3">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <Input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search members..."
-          className="pl-8 h-8 text-xs"
+          className="pl-9 h-9 text-sm"
         />
       </div>
 
       {/* Member list */}
-      <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+      <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0 pr-1">
         {isLoading ? (
           <div className="space-y-2">
-            {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 rounded-lg" />)}
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-12 rounded-lg" />)}
           </div>
         ) : filtered.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-4">{search ? "No members found" : "No members yet"}</p>
+          <p className="text-sm text-gray-400 text-center py-6">{search ? "No members found" : "No members yet"}</p>
         ) : (
-          filtered.map((m: any) => (
-            <div key={m.userId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 group">
-              <Link href={`/community/members/${m.userId}`} className="flex items-center gap-2 flex-1 min-w-0">
-                <Avatar className="w-7 h-7 flex-shrink-0">
+          filtered.map((m: any) => {
+            const label = publicMemberDisplayName(m);
+            return (
+            <div key={m.userId} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-gray-50 group">
+              <Link href={`/community/members/${m.userId}`} className="flex items-center gap-2.5 flex-1 min-w-0">
+                <Avatar className="w-9 h-9 flex-shrink-0">
                   <AvatarImage src={m.avatarUrl ?? undefined} />
-                  <AvatarFallback className="text-[10px] bg-teal-100 text-teal-700 font-semibold">
-                    {(m.displayName || m.name || "?").charAt(0).toUpperCase()}
+                  <AvatarFallback className="text-xs bg-teal-100 text-teal-700 font-semibold">
+                    {label.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-gray-800 truncate">{m.displayName || m.name}</p>
-                  {m.credentials && <p className="text-[10px] text-teal-600 truncate">{m.credentials}</p>}
+                  <p className="text-sm font-medium text-gray-800 truncate">{label}</p>
+                  {m.credentials && <p className="text-xs text-teal-600 truncate">{m.credentials}</p>}
                 </div>
               </Link>
-              {/* DM button — only show for other members */}
               {currentUserId && m.userId !== currentUserId && (
                 <Link href={`/community/dms/${m.userId}`}>
-                  <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-teal-50 text-teal-600" title={`Message ${m.displayName || m.name}`}>
-                    <Mail className="w-3.5 h-3.5" />
+                  <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-teal-50 text-teal-600" title={`Message ${label}`}>
+                    <Mail className="w-4 h-4" />
                   </button>
                 </Link>
               )}
               {m.role === "admin" && (
-                <span className="text-[9px] font-bold bg-teal-600 text-white px-1.5 py-0.5 rounded-full flex-shrink-0">A</span>
+                <span className="text-[10px] font-bold bg-teal-600 text-white px-1.5 py-0.5 rounded-full flex-shrink-0">A</span>
               )}
               {m.role === "moderator" && (
-                <span className="text-[9px] font-bold bg-purple-600 text-white px-1.5 py-0.5 rounded-full flex-shrink-0">M</span>
+                <span className="text-[10px] font-bold bg-purple-600 text-white px-1.5 py-0.5 rounded-full flex-shrink-0">M</span>
               )}
             </div>
-          ))
+          );})
         )}
       </div>
     </div>
@@ -567,7 +570,7 @@ function ChannelHeader({
               <Avatar key={m.userId} className="w-6 h-6 border-2 border-white">
                 <AvatarImage src={m.avatarUrl ?? undefined} />
                 <AvatarFallback className="text-[9px] bg-teal-100 text-teal-700 font-bold">
-                  {(m.displayName || m.name || "?").charAt(0).toUpperCase()}
+                  {publicMemberDisplayName(m).charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             ))}
@@ -618,7 +621,7 @@ export default function CommunityFeed() {
   });
 
   const utils = trpc.useUtils();
-  const isAdmin = (user as any)?.role === "admin";
+  const isAdmin = isCommunityPlatformAdmin(user);
   const isMember = !!membership || isAdmin;
 
   // Recent members for sidebar and avatar strip
@@ -731,7 +734,7 @@ export default function CommunityFeed() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className={`grid gap-6 ${showMembersSidebar && isMember ? "grid-cols-1 lg:grid-cols-[200px_1fr_220px]" : "grid-cols-1 lg:grid-cols-[200px_1fr]"}`}>
+        <div className={`grid gap-6 ${showMembersSidebar && isMember ? "grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_minmax(300px,360px)]" : "grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)]"}`}>
           {/* Channels sidebar */}
           <div className="lg:col-span-1">
             <Card className="sticky top-4">
@@ -853,8 +856,8 @@ export default function CommunityFeed() {
           {/* Members sidebar (collapsible) */}
           {showMembersSidebar && isMember && (
             <div className="hidden lg:block">
-              <Card className="sticky top-4 max-h-[calc(100vh-6rem)] overflow-hidden flex flex-col">
-                <CardContent className="p-3 flex-1 flex flex-col min-h-0">
+              <Card className="sticky top-4 max-h-[calc(100vh-5rem)] overflow-hidden flex flex-col min-w-0">
+                <CardContent className="p-4 flex-1 flex flex-col min-h-0">
                   <MembersSidebar communityId={community.id} currentUserId={user?.id} />
                 </CardContent>
               </Card>

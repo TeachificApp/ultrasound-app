@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, MessageSquare, TrendingUp, ChevronRight, Lock, Star, ArrowRight, BookOpen, Mail } from "lucide-react";
+import { publicMemberDisplayName } from "@shared/communityMember";
 
 export default function CommunityHub() {
   const { isAuthenticated, user } = useAuth();
@@ -169,21 +170,23 @@ export default function CommunityHub() {
                   <h3 className="font-semibold text-gray-900">Top Members</h3>
                 </div>
                 <div className="space-y-3">
-                  {leaderboard.map((entry) => (
+                  {leaderboard.map((entry) => {
+                    const label = publicMemberDisplayName(entry.user ?? {});
+                    return (
                     <div key={entry.userId} className="flex items-center gap-3">
                       <span className="text-xs font-bold text-gray-400 w-5 text-center">#{entry.rank}</span>
                       <Avatar className="w-8 h-8">
                         <AvatarImage src={entry.user?.avatarUrl ?? undefined} />
                         <AvatarFallback className="text-xs bg-teal-100 text-teal-700">
-                          {(entry.user?.displayName || entry.user?.name || "?").charAt(0).toUpperCase()}
+                          {label.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{entry.user?.displayName || entry.user?.name}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{label}</p>
                         <p className="text-xs text-gray-400">{entry.totalXP.toLocaleString()} XP · Level {entry.level}</p>
                       </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
                 <Link href="/community/leaderboard">
                   <Button variant="ghost" size="sm" className="w-full mt-3 text-teal-600 hover:text-teal-700">

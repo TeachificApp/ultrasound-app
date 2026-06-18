@@ -1083,7 +1083,7 @@ const communityMemberRouter = router({
       .where(and(eq(communityPosts.userId, input.userId), eq(communityPosts.isHidden, false)))
       .orderBy(desc(communityPosts.createdAt)).limit(5);
 
-    return { ...u, xp: xp ?? null, badges: badgeRows.map(b => b.badge), isFollowing, recentPosts };
+    return { ...u, name: publicMemberDisplayName(u), displayName: publicMemberDisplayName(u), xp: xp ?? null, badges: badgeRows.map(b => b.badge), isFollowing, recentPosts };
   }),
 
   /** Get recent/active members for the community sidebar */

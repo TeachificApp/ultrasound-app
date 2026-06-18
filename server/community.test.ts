@@ -7,6 +7,8 @@ import {
 import {
   isLeaderboardExcludedEmail,
   COMMUNITY_LEADERBOARD_EXCLUDED_EMAILS,
+  publicMemberDisplayName,
+  isEmailLike,
 } from "../shared/communityMember";
 
 describe("communityText", () => {
@@ -70,5 +72,13 @@ describe("community leaderboard exclusions", () => {
       expect(isLeaderboardExcludedEmail(email.toUpperCase())).toBe(true);
     }
     expect(isLeaderboardExcludedEmail("member@example.com")).toBe(false);
+  });
+});
+
+describe("publicMemberDisplayName", () => {
+  it("never returns email-like strings", () => {
+    expect(publicMemberDisplayName({ name: "user@example.com" })).toBe("Community Member");
+    expect(publicMemberDisplayName({ displayName: "Jane Doe", name: "jane@example.com" })).toBe("Jane Doe");
+    expect(isEmailLike("test@foo.com")).toBe(true);
   });
 });

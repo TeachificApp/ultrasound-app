@@ -841,6 +841,8 @@ function LMSRouter() {
         <Route path="/admin/bundles/:bundleId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><BundleLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/memberships/:planId/sales-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembershipSalesPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/memberships/:planId/member-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembershipMemberPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/communities/:communityId/sales-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunitySalesPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/communities/:communityId/experience-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityExperiencePageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
                 <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/contacts">{() => { window.location.replace("/admin/funnels?tab=contacts"); return null; }}</Route>
