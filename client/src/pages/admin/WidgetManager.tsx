@@ -19,7 +19,7 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ItemType = "course" | "quiz" | "download" | "bundle" | "webinar" | "membership" | "physical" | "workshop" | "community";
+type ItemType = "course" | "quiz" | "cohort" | "download" | "bundle" | "webinar" | "membership" | "physical" | "workshop" | "community";
 
 interface WidgetItem { type: ItemType; id: number }
 
@@ -32,6 +32,7 @@ interface WidgetFormData {
   cardStyle: "standard" | "compact" | "minimal";
   showPrice: boolean;
   showEnrollButton: boolean;
+  showCourseDetails: boolean;
   buttonText: string;
   buttonUrl: string;
   maxCards: number;
@@ -48,6 +49,7 @@ const DEFAULT_FORM: WidgetFormData = {
   cardStyle: "standard",
   showPrice: true,
   showEnrollButton: true,
+  showCourseDetails: false,
   buttonText: "Enroll Now",
   buttonUrl: "",
   maxCards: 6,
@@ -60,6 +62,7 @@ const DEFAULT_FORM: WidgetFormData = {
 const TYPE_META: Record<ItemType, { label: string; emoji: string; color: string }> = {
   course:     { label: "Course",      emoji: "🎓", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
   quiz:       { label: "Quiz",        emoji: "📝", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+  cohort:     { label: "Cohort",      emoji: "🗓️", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300" },
   download:   { label: "Download",    emoji: "📥", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
   bundle:     { label: "Bundle",      emoji: "📦", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
   webinar:    { label: "Webinar",     emoji: "🎙️", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" },
@@ -70,7 +73,7 @@ const TYPE_META: Record<ItemType, { label: string; emoji: string; color: string 
 };
 
 const TYPE_GROUPS: { label: string; types: ItemType[] }[] = [
-  { label: "Courses & Quizzes", types: ["course", "quiz"] },
+  { label: "Courses, Quizzes & Cohorts", types: ["course", "quiz", "cohort"] },
   { label: "Downloads & Bundles", types: ["download", "bundle"] },
   { label: "Webinars & Workshops", types: ["webinar", "workshop"] },
   { label: "Memberships", types: ["membership"] },
@@ -303,6 +306,10 @@ function WidgetForm({
           <Label htmlFor="sw-btn">Show Button</Label>
         </div>
         <div className="flex items-center gap-2">
+          <Switch checked={form.showCourseDetails} onCheckedChange={v => set("showCourseDetails", v)} id="sw-details" />
+          <Label htmlFor="sw-details">Show Course Details &amp; Dates</Label>
+        </div>
+        <div className="flex items-center gap-2">
           <Switch checked={form.isActive} onCheckedChange={v => set("isActive", v)} id="sw-active" />
           <Label htmlFor="sw-active">Active</Label>
         </div>
@@ -441,6 +448,7 @@ export default function WidgetManager() {
       cardStyle: w.cardStyle ?? "standard",
       showPrice: w.showPrice ?? true,
       showEnrollButton: w.showEnrollButton ?? true,
+      showCourseDetails: (w as any).showCourseDetails ?? false,
       buttonText: w.buttonText ?? "Enroll Now",
       buttonUrl: w.buttonUrl ?? "",
       maxCards: w.maxCards ?? 6,

@@ -80,6 +80,10 @@ import {
   funnelPages,
   curriculumEmbedVisibility,
   workshops,
+  workshopInstances,
+  workshopPricingOptions,
+  workshopResources,
+  workshopEnrollments,
   digitalBundles,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
@@ -1484,5 +1488,163 @@ export const lmsCourseBuilderRouter = router({
           .onDuplicateKeyUpdate({ set: { hidden: item.hidden } });
       }
       return { success: true, updated: input.items.length };
+    }),
+
+  /**
+   * changeCourseType — cross-table migration when the admin changes a content
+   * type that requires moving to a different table:
+   *   lms_courses (course/quiz/cohort/download) <-> workshops table
+   *
+   * Within lms_courses (e.g. course→cohort, cohort→quiz) this just updates
+   * the type field in place and returns { same: true }.
+   *
+   * When migrating to/from workshops it:
+   *   1. Creates the destination row with all matching fields
+   *   2. Copies sections & lessons (lms_courses→workshop) or just core fields
+   *   3. Archives and deletes the source row
+   *   4. Returns { newId, newType, redirectTo: "workshops" | "courses" }
+   */
+  changeCourseType: protectedProcedure
+    .input(z.object({
+      /** Source entity — either an lms_courses id or a workshops id */
+      sourceId: z.number(),
+      /** The table the source lives in */
+      sourceTable: z.enum(["lms_courses", "workshops"]),
+      /** The desired new type */
+      newType: z.enum(["course", "quiz", "download", "cohort", "workshop"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const { sourceId, sourceTable, newType } = input;
+
+      // ── Case 1: within lms_courses (no cross-table migration needed) ──────────
+      if (sourceTable === "lms_courses" && newType !== "workshop") {
+        await db.update(lmsCourses).set({ type: newType as any }).where(eq(lmsCourses.id, sourceId));
+        return { same: true, newId: sourceId, newType, redirectTo: "courses" as const };
+      }
+
+      // ── Case 2: lms_courses → workshops ──────────────────────────────────────
+      if (sourceTable === "lms_courses" && newType === "workshop") {
+        const [src] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, sourceId)).limit(1);
+        if (!src) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+
+        // Ensure unique slug in workshops table
+        const baseSlug = src.slug ?? generateSlug(src.title);
+        let slug = baseSlug;
+        let attempt = 0;
+        while (true) {
+          const [existing] = await db.select({ id: workshops.id }).from(workshops).where(eq(workshops.slug, slug)).limit(1);
+          if (!existing) break;
+          attempt++;
+          slug = `${baseSlug}-${attempt}`;
+        }
+
+        // Create workshop row
+        const [ins] = await db.insert(workshops).values({
+          slug,
+          title: src.title,
+          subtitle: src.subtitle ?? undefined,
+          description: src.description ?? undefined,
+          coverImageUrl: src.coverImageUrl ?? undefined,
+          thumbnailUrl: src.thumbnailUrl ?? undefined,
+          status: (src.status === "public" || src.status === "hidden" || src.status === "archived" ? src.status : "draft") as any,
+          brand: (src.brand ?? "aaus") as any,
+          price: Math.round((src.price ?? 0) * 100), // lms_courses stores dollars, workshops stores cents
+          isFree: src.isFree ?? false,
+          currency: src.currency ?? "usd",
+          pricingType: (src.pricingType === "free" || src.pricingType === "one_time" ? src.pricingType : "one_time") as any,
+          metaTitle: src.metaTitle ?? undefined,
+          metaDescription: src.metaDescription ?? undefined,
+          showInLibrary: src.showInLibrary ?? true,
+          libraryOrder: src.libraryOrder ?? 0,
+          isFeatured: src.isFeatured ?? false,
+          primaryColor: src.primaryColor ?? "#179ca3",
+          accentColor: src.accentColor ?? "#0d9488",
+          curriculumEnabled: true,
+          hidePricingOptions: false,
+          customThankYouEnabled: false,
+          welcomeEmailEnabled: src.sendEnrollmentEmail ?? true,
+          createdByUserId: ctx.user.id,
+        }).$returningId();
+        const newWorkshopId = ins.id;
+
+        // Archive source course
+        await db.insert(lmsArchive).values({
+          itemType: "course",
+          originalId: src.id,
+          title: src.title,
+          snapshot: JSON.stringify({ ...src, _migratedToWorkshop: newWorkshopId }),
+          deletedByUserId: ctx.user.id,
+          purgeAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        });
+
+        // Delete source (cascade: sections, lessons, enrollments handled by FK or manual)
+        await db.delete(lmsCourses).where(eq(lmsCourses.id, sourceId));
+
+        return { same: false, newId: newWorkshopId, newType: "workshop" as const, redirectTo: "workshops" as const };
+      }
+
+      // ── Case 3: workshops → lms_courses ──────────────────────────────────────
+      if (sourceTable === "workshops") {
+        const [src] = await db.select().from(workshops).where(eq(workshops.id, sourceId)).limit(1);
+        if (!src) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop not found" });
+
+        // Ensure unique slug in lms_courses
+        const baseSlug = src.slug ?? generateSlug(src.title);
+        const newSlug = await uniqueSlug(db, baseSlug);
+
+        const [ins] = await db.insert(lmsCourses).values({
+          slug: newSlug,
+          title: src.title,
+          subtitle: src.subtitle ?? undefined,
+          description: src.description ?? undefined,
+          coverImageUrl: src.coverImageUrl ?? undefined,
+          thumbnailUrl: src.thumbnailUrl ?? src.coverImageUrl ?? undefined,
+          status: (src.status === "public" || src.status === "hidden" || src.status === "archived" ? src.status : "draft") as any,
+          type: newType as any,
+          brand: (src.brand ?? "aaus") as any,
+          price: Math.round((src.price ?? 0) / 100), // workshops stores cents, lms_courses stores dollars
+          isFree: src.isFree ?? false,
+          currency: src.currency ?? "usd",
+          pricingType: (src.pricingType ?? "one_time") as any,
+          metaTitle: src.metaTitle ?? undefined,
+          metaDescription: src.metaDescription ?? undefined,
+          showInLibrary: src.showInLibrary ?? true,
+          libraryOrder: src.libraryOrder ?? 0,
+          isFeatured: src.isFeatured ?? false,
+          primaryColor: src.primaryColor ?? "#0d9488",
+          accentColor: src.accentColor ?? "#0f766e",
+          sendEnrollmentEmail: src.welcomeEmailEnabled ?? true,
+          createdByUserId: ctx.user.id,
+        }).$returningId();
+        const newCourseId = ins.id;
+
+        // Create a basic landing page
+        await db.insert(lmsLandingPages).values({ courseId: newCourseId, heroTitle: src.title, ctaText: "Enroll Now" });
+
+        // Archive workshop
+        await db.insert(lmsArchive).values({
+          itemType: "course",
+          originalId: src.id,
+          title: src.title,
+          snapshot: JSON.stringify({ ...src, _migratedFromWorkshop: true, _newCourseId: newCourseId }),
+          deletedByUserId: ctx.user.id,
+          purgeAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        });
+
+        // Delete workshop (cascade sub-tables)
+        await db.delete(workshopEnrollments).where(eq(workshopEnrollments.workshopId, sourceId));
+        await db.delete(workshopResources).where(eq(workshopResources.workshopId, sourceId));
+        await db.delete(workshopInstances).where(eq(workshopInstances.workshopId, sourceId));
+        await db.delete(workshopPricingOptions).where(eq(workshopPricingOptions.workshopId, sourceId));
+        await db.delete(workshops).where(eq(workshops.id, sourceId));
+
+        return { same: false, newId: newCourseId, newType, redirectTo: "courses" as const };
+      }
+
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid type change combination" });
     }),
 });

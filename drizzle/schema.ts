@@ -6721,6 +6721,7 @@ export const embedWidgets = mysqlTable("embed_widgets", {
   cardStyle: mysqlEnum("card_style", ["standard", "compact", "minimal"]).default("standard").notNull(),
   showPrice: boolean("show_price").default(true).notNull(),
   showEnrollButton: boolean("show_enroll_button").default(true).notNull(),
+  showCourseDetails: boolean("show_course_details").default(false).notNull(),
   buttonText: varchar("button_text", { length: 100 }).default("Enroll Now"),
   buttonUrl: varchar("button_url", { length: 500 }),
   maxCards: int("max_cards").default(6).notNull(),

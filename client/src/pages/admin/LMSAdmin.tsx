@@ -945,7 +945,7 @@ function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, 
 
 // ─── Course Editor ────────────────────────────────────────────────────────────
 
-function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => void }) {
+function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId: number; onBack: () => void; onTypeChangedToWorkshop?: (newWorkshopId: number) => void }) {
   const [, navigate] = useLocation();
   const { openLearnLink } = useLearnLink();
   
@@ -1212,7 +1212,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
 
         {/* Settings Tab */}
         <TabsContent value="settings" className="mt-4 space-y-4">
-          <CourseSettingsForm course={course} onSave={handleSaveCourseSettings} saving={updateCourse.isPending} />
+          <CourseSettingsForm course={course} onSave={handleSaveCourseSettings} saving={updateCourse.isPending} onTypeChangedToWorkshop={onTypeChangedToWorkshop} />
           <AffiliateCoursePanel courseId={courseId} />
         </TabsContent>
 
@@ -1590,7 +1590,7 @@ function CertTemplateSelector({ value, onChange }: { value: number | null; onCha
   );
 }
 
-function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (data: any) => void; saving: boolean }) {
+function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }: { course: any; onSave: (data: any) => void; saving: boolean; onTypeChangedToWorkshop?: (newWorkshopId: number) => void }) {
   const { data: settingsPricingOptions = [] } = trpc.lmsGroup.listPricingOptions.useQuery({ courseId: course.id });
   const firstActivePricingOption = (settingsPricingOptions as any[]).find((o: any) => o.isActive);
   const copyHostedCheckoutLink = () => {
@@ -1691,6 +1691,18 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
     onError: (e) => toast.error(e.message),
   });
 
+  const changeCourseType = trpc.lmsAdmin.changeCourseType.useMutation({
+    onSuccess: (result) => {
+      if (result.redirectTo === "workshops" && onTypeChangedToWorkshop) {
+        toast.success(`Converted to Workshop — opening Workshop editor…`);
+        onTypeChangedToWorkshop(result.newId);
+      } else if (result.same) {
+        toast.success("Content type updated");
+      }
+    },
+    onError: (e) => toast.error(`Type change failed: ${e.message}`),
+  });
+
   // Thinkific resync
   const { data: syncInfo } = trpc.lmsAdmin.getThinkificSyncInfo.useQuery({ courseId: course.id });
   const [resyncContent, setResyncContent] = useState(true);
@@ -1720,40 +1732,47 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         {/* Top Save Button */}
         <Button
           className="bg-teal-600 hover:bg-teal-700 text-white"
-          disabled={saving}
-          onClick={() => onSave({
-            title: title.trim(), subtitle: subtitle.trim() || undefined,
-            description: description || undefined, status, brand, type: courseType,
-            enrollmentCloseDate: courseType === "cohort" ? (enrollmentCloseDate || null) : null,
-            pricingType,
-            isFree: pricingType === "free",
-            hasCertificate,
-            isFeatured,
-            isDrip,
-            hideProgress,
-            showInstructor,
-            showInLibrary,
-            price: pricingType === "free" ? 0 : parseFloat(price || "0"),
-            subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
-            downPayment: pricingType === "payment_plan" ? parseFloat(downPayment || "0") : null,
-            installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
-            installmentAmount: pricingType === "payment_plan" ? parseFloat(installmentAmount || "0") : null,
-            installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
-            trialDays: pricingType === "trial_then_subscription" ? (trialDays ? parseInt(trialDays) : null) : null,
-            accessDurationDays: accessDurationDays ? parseInt(accessDurationDays) : null,
-            coverImageUrl: coverImageUrl.trim() || undefined,
-            primaryColor: primaryColor || null,
-            accentColor: accentColor || null,
-            gradientFrom: useGradient ? (gradientStart || null) : null,
-            gradientTo: useGradient ? (gradientEnd || null) : null,
-            gradientDirection: gradientDirection || null,
-            sendEnrollmentEmail,
-            defaultMarkComplete,
-            playerTheme,
-            customLabels: buildCustomLabels(),
-          })}
+          disabled={saving || changeCourseType.isPending}
+          onClick={() => {
+            // If type changed to workshop, use cross-table migration
+            if (courseType === "workshop" && course.type !== "workshop") {
+              changeCourseType.mutate({ sourceId: course.id, sourceTable: "lms_courses", newType: "workshop" });
+              return;
+            }
+            onSave({
+              title: title.trim(), subtitle: subtitle.trim() || undefined,
+              description: description || undefined, status, brand, type: courseType,
+              enrollmentCloseDate: courseType === "cohort" ? (enrollmentCloseDate || null) : null,
+              pricingType,
+              isFree: pricingType === "free",
+              hasCertificate,
+              isFeatured,
+              isDrip,
+              hideProgress,
+              showInstructor,
+              showInLibrary,
+              price: pricingType === "free" ? 0 : parseFloat(price || "0"),
+              subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
+              downPayment: pricingType === "payment_plan" ? parseFloat(downPayment || "0") : null,
+              installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
+              installmentAmount: pricingType === "payment_plan" ? parseFloat(installmentAmount || "0") : null,
+              installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
+              trialDays: pricingType === "trial_then_subscription" ? (trialDays ? parseInt(trialDays) : null) : null,
+              accessDurationDays: accessDurationDays ? parseInt(accessDurationDays) : null,
+              coverImageUrl: coverImageUrl.trim() || undefined,
+              primaryColor: primaryColor || null,
+              accentColor: accentColor || null,
+              gradientFrom: useGradient ? (gradientStart || null) : null,
+              gradientTo: useGradient ? (gradientEnd || null) : null,
+              gradientDirection: gradientDirection || null,
+              sendEnrollmentEmail,
+              defaultMarkComplete,
+              playerTheme,
+              customLabels: buildCustomLabels(),
+            });
+          }}
         >
-          {saving ? "Saving..." : "Save Settings"}
+          {changeCourseType.isPending ? "Converting…" : saving ? "Saving..." : courseType === "workshop" && course.type !== "workshop" ? "Convert to Workshop" : "Save Settings"}
         </Button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -6950,6 +6969,20 @@ export default function LMSAdmin() {
   const urlEditWorkshop = urlParams?.get("editWorkshop") ?? null;
   const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : urlEditProduct ? "products" : urlEditWebinar ? "webinars" : urlEditWorkshop ? "workshops" : urlEditBundle ? "bundles" : urlEditMembership ? "memberships" : "courses"));
   const [editingCourseId, setEditingCourseId] = useState<number | null>(urlEditCourse ? Number(urlEditCourse) : null);
+  const [workshopsInitialEditId, setWorkshopsInitialEditId] = useState<number | undefined>(urlEditWorkshop ? Number(urlEditWorkshop) : undefined);
+  const handleTypeChangedToWorkshop = (newWorkshopId: number) => {
+    setEditingCourseId(null);
+    setWorkshopsInitialEditId(newWorkshopId);
+    setActiveTab("workshops");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const handleTypeChangedFromWorkshop = (newCourseId: number, newType: string) => {
+    const tab = newType === "cohort" ? "cohorts" : newType === "quiz" ? "quizzes" : "courses";
+    setWorkshopsInitialEditId(undefined);
+    setActiveTab(tab);
+    setEditingCourseId(newCourseId);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Flatten all tabs to find active group color
   const allItems = LMS_NAV_GROUPS.flatMap(g => g.items.map(i => ({ ...i, groupColor: g.color })));
@@ -6987,7 +7020,7 @@ export default function LMSAdmin() {
 
       <div className="max-w-7xl mx-auto px-6 py-5">
         {editingCourseId ? (
-          <CourseEditor courseId={editingCourseId} onBack={() => setEditingCourseId(null)} />
+          <CourseEditor courseId={editingCourseId} onBack={() => setEditingCourseId(null)} onTypeChangedToWorkshop={handleTypeChangedToWorkshop} />
         ) : (
           <div className="flex gap-5">
             {/* Sidebar Nav */}
@@ -7041,7 +7074,7 @@ export default function LMSAdmin() {
               {activeTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
               {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
               {activeTab === "webinars"    && <WebinarsAdmin initialEditId={urlEditWebinar ? Number(urlEditWebinar) : undefined} />}
-              {activeTab === "workshops"   && <WorkshopsAdmin initialEditId={urlEditWorkshop ? Number(urlEditWorkshop) : undefined} />}
+              {activeTab === "workshops"   && <WorkshopsAdmin initialEditId={workshopsInitialEditId} onTypeChangedFromWorkshop={handleTypeChangedFromWorkshop} />}
               {activeTab === "bundles"     && <BundlesAdmin initialEditId={urlEditBundle ? Number(urlEditBundle) : undefined} />}
               {activeTab === "memberships" && <MembershipsAdmin initialEditId={urlEditMembership ? Number(urlEditMembership) : undefined} />}
               {activeTab === "communities" && <CommunitiesTab />}

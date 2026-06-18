@@ -729,6 +729,49 @@ export const workshopAdminRouter = router({
       return { success: true };
     }),
 
+  /** Duplicate a workshop (creates a draft copy with all settings but no instances) */
+  duplicate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [src] = await db.select().from(workshops).where(eq(workshops.id, input.id)).limit(1);
+      if (!src) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop not found" });
+
+      // Generate a unique slug for the copy
+      const newTitle = `${src.title} [Copy]`;
+      const baseSlug = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+      let slug = baseSlug;
+      let attempt = 0;
+      while (true) {
+        const [existing] = await db.select({ id: workshops.id }).from(workshops).where(eq(workshops.slug, slug)).limit(1);
+        if (!existing) break;
+        attempt++;
+        slug = `${baseSlug}-${attempt}`;
+      }
+
+      const { id: _id, createdAt: _ca, updatedAt: _ua, ...rest } = src as any;
+      const [ins] = await db.insert(workshops).values({
+        ...rest,
+        slug,
+        title: newTitle,
+        status: "draft",
+        createdByUserId: ctx.user.id,
+      }).$returningId();
+
+      // Copy pricing options (but not instances — those are time-specific)
+      const pricingOptions = await db.select().from(workshopPricingOptions)
+        .where(eq(workshopPricingOptions.workshopId, input.id))
+        .orderBy(asc(workshopPricingOptions.sortOrder));
+      for (const opt of pricingOptions) {
+        const { id: _oid, workshopId: _wid, createdAt: _oca, updatedAt: _oua, ...optRest } = opt as any;
+        await db.insert(workshopPricingOptions).values({ ...optRest, workshopId: ins.id });
+      }
+
+      return { id: ins.id, slug, title: newTitle };
+    }),
+
   // ── Instances ──────────────────────────────────────────────────────────────
 
   /** Create a workshop instance */

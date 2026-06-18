@@ -84,6 +84,15 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
     onError: (e) => toast.error(e.message),
   });
 
+  const duplicateMutation = trpc.workshopAdmin.duplicate.useMutation({
+    onSuccess: (res) => {
+      utils.workshopAdmin.list.invalidate();
+      toast.success("Workshop duplicated");
+      onEdit(res.id);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const workshops = data?.workshops ?? [];
   const total = data?.total ?? 0;
 
@@ -166,8 +175,18 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onEdit(w.id)}>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onEdit(w.id)} title="Edit">
                         <Edit2 className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700"
+                        title="Duplicate"
+                        disabled={duplicateMutation.isPending}
+                        onClick={() => duplicateMutation.mutate({ id: w.id })}
+                      >
+                        <Copy className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         size="sm"
@@ -210,7 +229,7 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
 }
 
 // ── WorkshopEditor ─────────────────────────────────────────────────────────────
-function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: () => void }) {
+function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { workshopId: number; onBack: () => void; onTypeChangedFromWorkshop?: (newCourseId: number, newType: string) => void }) {
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.workshopAdmin.getById.useQuery({ id: workshopId });
   const { data: enrollmentsData } = trpc.workshopAdmin.listEnrollments.useQuery({ workshopId });
@@ -300,6 +319,17 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
   const updateMutation = trpc.workshopAdmin.update.useMutation({
     onSuccess: () => { utils.workshopAdmin.getById.invalidate({ id: workshopId }); toast.success("Saved"); },
     onError: (e) => toast.error(e.message),
+  });
+
+  const [changeToType, setChangeToType] = useState<"course" | "quiz" | "cohort">("course");
+  const changeTypeMutation = trpc.lmsAdmin.changeCourseType.useMutation({
+    onSuccess: (result) => {
+      if (result.redirectTo === "courses" && onTypeChangedFromWorkshop) {
+        toast.success(`Converted to ${result.newType} — opening editor…`);
+        onTypeChangedFromWorkshop(result.newId, result.newType);
+      }
+    },
+    onError: (e) => toast.error(`Type change failed: ${e.message}`),
   });
 
   const createInstanceMutation = trpc.workshopAdmin.createInstance.useMutation({
@@ -870,6 +900,42 @@ function WorkshopEditor({ workshopId, onBack }: { workshopId: number; onBack: ()
               </div>
             </CardContent>
           </Card>
+          {/* ── Change Type Section ── */}
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <h3 className="font-semibold text-sm text-orange-800">Convert to a Different Type</h3>
+                <p className="text-xs text-orange-600 mt-1">
+                  This will migrate the workshop to the Courses section as a course, cohort, or quiz.
+                  All workshop-specific data (instances, resources) will be archived.
+                  The content, pricing, and settings will be preserved.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Select value={changeToType} onValueChange={v => setChangeToType(v as any)}>
+                  <SelectTrigger className="w-48 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="course">Course</SelectItem>
+                    <SelectItem value="cohort">Cohort</SelectItem>
+                    <SelectItem value="quiz">Quiz</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  className="border-orange-300 text-orange-700 hover:bg-orange-100 bg-white"
+                  disabled={changeTypeMutation.isPending}
+                  onClick={() => {
+                    if (!confirm(`Convert this workshop to a ${changeToType}? Workshop-specific data (instances, resources) will be archived. This cannot be undone.`)) return;
+                    changeTypeMutation.mutate({ sourceId: workshopId, sourceTable: "workshops", newType: changeToType });
+                  }}
+                >
+                  {changeTypeMutation.isPending ? "Converting…" : `Convert to ${changeToType.charAt(0).toUpperCase() + changeToType.slice(1)}`}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ── Landing Page Tab ── */}
@@ -1313,11 +1379,11 @@ function WorkshopAfterPurchaseSection({ workshopId }: { workshopId: number }) {
 }
 
 // ── Main Export ────────────────────────────────────────────────────────────────
-export function WorkshopsAdmin({ initialEditId }: { initialEditId?: number }) {
+export function WorkshopsAdmin({ initialEditId, onTypeChangedFromWorkshop }: { initialEditId?: number; onTypeChangedFromWorkshop?: (newCourseId: number, newType: string) => void }) {
   const [editingId, setEditingId] = useState<number | null>(initialEditId ?? null);
 
   if (editingId !== null) {
-    return <WorkshopEditor workshopId={editingId} onBack={() => setEditingId(null)} />;
+    return <WorkshopEditor workshopId={editingId} onBack={() => setEditingId(null)} onTypeChangedFromWorkshop={onTypeChangedFromWorkshop} />;
   }
   return <WorkshopsList onEdit={setEditingId} />;
 }

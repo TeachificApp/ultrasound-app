@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 
@@ -18,6 +18,15 @@ interface Card {
   currency: string | null;
   brand: string | null;
   itemType: string;
+  // Course details (workshops/cohorts) — present when showCourseDetails is enabled
+  nextInstanceDate?: Date | string | null;
+  nextInstanceEndDate?: Date | string | null;
+  locationType?: string | null;
+  venueName?: string | null;
+  venueCity?: string | null;
+  venueState?: string | null;
+  timezone?: string | null;
+  enrollmentCloseDate?: Date | string | null;
 }
 
 interface WidgetConfig {
@@ -30,6 +39,7 @@ interface WidgetConfig {
   cardStyle: "standard" | "compact" | "minimal";
   showPrice: boolean;
   showEnrollButton: boolean;
+  showCourseDetails: boolean;
   buttonText: string | null;
   buttonUrl: string | null;
 }
@@ -91,11 +101,11 @@ function formatPrice(card: Card): string {
 // ─── Product type metadata ───────────────────────────────────────────────────
 
 const TYPE_EMOJI: Record<string, string> = {
-  course: "🎓", quiz: "📝", download: "📥", bundle: "📦",
-  webinar: "🎙️", membership: "⭐", physical: "🛒", workshop: "🛠️", community: "👥",
+  course: "🎓", quiz: "📝", cohort: "🗓️", download: "📥", bundle: "📦",
+  webinar: "🎤️", membership: "⭐", physical: "🛒", workshop: "🛠️", community: "👥",
 };
 const TYPE_LABEL: Record<string, string> = {
-  course: "Course", quiz: "Quiz", download: "Download", bundle: "Bundle",
+  course: "Course", quiz: "Quiz", cohort: "Cohort", download: "Download", bundle: "Bundle",
   webinar: "Webinar", membership: "Membership", physical: "Product", workshop: "Workshop", community: "Community",
 };
 function typeEmoji(t: string) { return TYPE_EMOJI[t] ?? "📄"; }
@@ -109,6 +119,7 @@ function courseUrl(card: Card): string {
   switch (card.type) {
     case "course": return `${base}/courses/${card.slug}`;
     case "quiz": return `${base}/quizzes/${card.slug}`;
+    case "cohort": return `${base}/cohorts/${card.slug}`;
     case "download": return `${base}/downloads/${card.slug}`;
     case "bundle": return `${base}/bundles/${card.slug}`;
     case "webinar": return `${base}/webinars/${card.slug}`;
@@ -122,11 +133,44 @@ function courseUrl(card: Card): string {
 
 // ─── Card components ──────────────────────────────────────────────────────────
 
+function formatDate(d: Date | string | null | undefined): string {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function CourseDetailsRow({ card, theme }: { card: Card; theme: typeof THEMES.light }) {
+  const parts: string[] = [];
+  // Workshop: show next instance date + location
+  if (card.type === "workshop") {
+    if (card.nextInstanceDate) parts.push(formatDate(card.nextInstanceDate));
+    if (card.locationType === "virtual") parts.push("Virtual");
+    else if (card.venueName) parts.push(card.venueName);
+    else if (card.venueCity && card.venueState) parts.push(`${card.venueCity}, ${card.venueState}`);
+    else if (card.venueCity) parts.push(card.venueCity);
+  }
+  // Cohort: show enrollment close date
+  if (card.type === "cohort" && card.enrollmentCloseDate) {
+    parts.push(`Enrollment closes ${formatDate(card.enrollmentCloseDate)}`);
+  }
+  if (parts.length === 0) return null;
+  return (
+    <div style={{ fontSize: 11, color: theme.subtext, display: "flex", flexWrap: "wrap", gap: "2px 8px", marginTop: 4 }}>
+      {parts.map((p, i) => (
+        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+          {i === 0 && card.type === "workshop" && card.nextInstanceDate ? "📅" : i === 0 && card.type === "cohort" ? "🗓️" : "📍"}
+          {p}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function StandardCard({
   card,
   theme,
   showPrice,
   showEnrollButton,
+  showCourseDetails,
   buttonText,
   buttonUrl,
 }: {
@@ -134,6 +178,7 @@ function StandardCard({
   theme: typeof THEMES.light;
   showPrice: boolean;
   showEnrollButton: boolean;
+  showCourseDetails: boolean;
   buttonText: string | null;
   buttonUrl: string | null;
 }) {
@@ -193,6 +238,7 @@ function StandardCard({
             {card.subtitle}
           </div>
         )}
+        {showCourseDetails && <CourseDetailsRow card={card} theme={theme} />}
         <div style={{ flex: 1 }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
           {showPrice && (
@@ -232,6 +278,7 @@ function CompactCard({
   theme,
   showPrice,
   showEnrollButton,
+  showCourseDetails,
   buttonText,
   buttonUrl,
 }: {
@@ -239,6 +286,7 @@ function CompactCard({
   theme: typeof THEMES.light;
   showPrice: boolean;
   showEnrollButton: boolean;
+  showCourseDetails: boolean;
   buttonText: string | null;
   buttonUrl: string | null;
 }) {
@@ -269,6 +317,7 @@ function CompactCard({
       </div>
       <div style={{ padding: "10px 12px", flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, lineHeight: 1.3 }}>{card.title}</div>
+        {showCourseDetails && <CourseDetailsRow card={card} theme={theme} />}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {showPrice && <span style={{ fontSize: 12, fontWeight: 700, color: theme.priceColor }}>{formatPrice(card)}</span>}
           {showEnrollButton && (
@@ -288,6 +337,7 @@ function MinimalCard({
   theme,
   showPrice,
   showEnrollButton,
+  showCourseDetails,
   buttonText,
   buttonUrl,
 }: {
@@ -295,6 +345,7 @@ function MinimalCard({
   theme: typeof THEMES.light;
   showPrice: boolean;
   showEnrollButton: boolean;
+  showCourseDetails: boolean;
   buttonText: string | null;
   buttonUrl: string | null;
 }) {
@@ -304,6 +355,7 @@ function MinimalCard({
       <div style={{ fontSize: 20 }}>{typeEmoji(card.type)}</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{card.title}</div>
+        {showCourseDetails && <CourseDetailsRow card={card} theme={theme} />}
         {showPrice && <div style={{ fontSize: 12, color: theme.priceColor, fontWeight: 600 }}>{formatPrice(card)}</div>}
       </div>
       {showEnrollButton && (
@@ -395,6 +447,7 @@ export default function WidgetRenderer() {
               theme={theme}
               showPrice={widget.showPrice}
               showEnrollButton={widget.showEnrollButton}
+              showCourseDetails={widget.showCourseDetails}
               buttonText={widget.buttonText}
               buttonUrl={widget.buttonUrl}
             />
@@ -409,6 +462,7 @@ export default function WidgetRenderer() {
               theme={theme}
               showPrice={widget.showPrice}
               showEnrollButton={widget.showEnrollButton}
+              showCourseDetails={widget.showCourseDetails}
               buttonText={widget.buttonText}
               buttonUrl={widget.buttonUrl}
             />
@@ -430,6 +484,7 @@ export default function WidgetRenderer() {
               theme={theme}
               showPrice={widget.showPrice}
               showEnrollButton={widget.showEnrollButton}
+              showCourseDetails={widget.showCourseDetails}
               buttonText={widget.buttonText}
               buttonUrl={widget.buttonUrl}
             />

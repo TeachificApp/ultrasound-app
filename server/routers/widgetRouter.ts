@@ -6,7 +6,7 @@ import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   embedWidgets, lmsCourses, digitalProducts, digitalBundles, webinars,
-  membershipPlans, physicalProducts, workshops, communities,
+  membershipPlans, physicalProducts, workshops, communities, workshopInstances,
 } from "../../drizzle/schema";
 
 function assertAdmin(ctx: any) {
@@ -18,7 +18,7 @@ function generateToken(): string {
 }
 
 const widgetItemSchema = z.object({
-  type: z.enum(["course", "quiz", "download", "bundle", "webinar", "membership", "physical", "workshop", "community"]),
+  type: z.enum(["course", "quiz", "cohort", "download", "bundle", "webinar", "membership", "physical", "workshop", "community"]),
   id: z.number().int().positive(),
 });
 
@@ -31,6 +31,7 @@ const widgetInputSchema = z.object({
   cardStyle: z.enum(["standard", "compact", "minimal"]).default("standard"),
   showPrice: z.boolean().default(true),
   showEnrollButton: z.boolean().default(true),
+  showCourseDetails: z.boolean().default(false),
   buttonText: z.string().max(100).default("Enroll Now"),
   buttonUrl: z.string().max(500).optional(),
   maxCards: z.number().int().min(1).max(50).default(6),
@@ -74,6 +75,7 @@ export const widgetAdminRouter = router({
         cardStyle: input.cardStyle,
         showPrice: input.showPrice,
         showEnrollButton: input.showEnrollButton,
+        showCourseDetails: input.showCourseDetails,
         buttonText: input.buttonText,
         buttonUrl: input.buttonUrl ?? null,
         maxCards: input.maxCards,
@@ -207,7 +209,7 @@ export const widgetPublicRouter = router({
 
       // Bucket item IDs by type
       const byType = (t: string) => items.filter(i => i.type === t).map(i => i.id);
-      const courseIds    = [...byType("course"), ...byType("quiz")];
+      const courseIds    = [...byType("course"), ...byType("quiz"), ...byType("cohort")];
       const downloadIds  = byType("download");
       const bundleIds    = byType("bundle");
       const webinarIds   = byType("webinar");
@@ -218,7 +220,7 @@ export const widgetPublicRouter = router({
 
       const allCards: Map<string, any> = new Map(); // key = `${type}:${id}`
 
-      // Courses & quizzes
+      // Courses & quizzes (include enrollmentCloseDate for cohorts when showCourseDetails is on)
       if (courseIds.length > 0) {
         const rows = await db.select({
           id: lmsCourses.id, slug: lmsCourses.slug, title: lmsCourses.title,
@@ -226,8 +228,11 @@ export const widgetPublicRouter = router({
           type: lmsCourses.type, price: lmsCourses.price, isFree: lmsCourses.isFree,
           pricingType: lmsCourses.pricingType, subscriptionInterval: lmsCourses.subscriptionInterval,
           currency: lmsCourses.currency, brand: lmsCourses.brand,
+          enrollmentCloseDate: lmsCourses.enrollmentCloseDate,
         }).from(lmsCourses).where(and(inArray(lmsCourses.id, courseIds), eq(lmsCourses.status, "public")));
-        rows.forEach(r => allCards.set(`${r.type}:${r.id}`, toCard(r, r.type)));
+        rows.forEach(r => allCards.set(`${r.type}:${r.id}`, toCard(r, r.type, {
+          enrollmentCloseDate: widget.showCourseDetails ? (r.enrollmentCloseDate ?? null) : undefined,
+        })));
       }
 
       // Digital downloads
@@ -283,7 +288,7 @@ export const widgetPublicRouter = router({
         rows.forEach(r => allCards.set(`physical:${r.id}`, toCard(r, "physical")));
       }
 
-      // Workshops
+      // Workshops — include next upcoming instance for date/location details
       if (workshopIds.length > 0) {
         const rows = await db.select({
           id: workshops.id, slug: workshops.slug, title: workshops.title,
@@ -291,7 +296,45 @@ export const widgetPublicRouter = router({
           price: workshops.price, isFree: workshops.isFree,
           currency: workshops.currency, brand: workshops.brand,
         }).from(workshops).where(and(inArray(workshops.id, workshopIds), eq(workshops.status, "public")));
-        rows.forEach(r => allCards.set(`workshop:${r.id}`, toCard(r, "workshop")));
+        // Fetch upcoming instances for date/location display
+        if (rows.length > 0 && widget.showCourseDetails) {
+          const now = new Date();
+          const instances = await db.select({
+            workshopId: workshopInstances.workshopId,
+            startDate: workshopInstances.startDate,
+            endDate: workshopInstances.endDate,
+            locationType: workshopInstances.locationType,
+            venueName: workshopInstances.venueName,
+            venueCity: workshopInstances.venueCity,
+            venueState: workshopInstances.venueState,
+            timezone: workshopInstances.timezone,
+          }).from(workshopInstances)
+            .where(and(
+              inArray(workshopInstances.workshopId, rows.map(r => r.id)),
+              eq(workshopInstances.status, "published"),
+            ))
+            .orderBy(workshopInstances.startDate);
+          const instanceMap = new Map<number, any>();
+          instances.forEach(inst => {
+            if (!instanceMap.has(inst.workshopId) && inst.startDate && new Date(inst.startDate) >= now) {
+              instanceMap.set(inst.workshopId, inst);
+            }
+          });
+          rows.forEach(r => {
+            const inst = instanceMap.get(r.id);
+            allCards.set(`workshop:${r.id}`, toCard(r, "workshop", {
+              nextInstanceDate: inst?.startDate ?? null,
+              nextInstanceEndDate: inst?.endDate ?? null,
+              locationType: inst?.locationType ?? null,
+              venueName: inst?.venueName ?? null,
+              venueCity: inst?.venueCity ?? null,
+              venueState: inst?.venueState ?? null,
+              timezone: inst?.timezone ?? null,
+            }));
+          });
+        } else {
+          rows.forEach(r => allCards.set(`workshop:${r.id}`, toCard(r, "workshop")));
+        }
       }
 
       // Communities
@@ -321,6 +364,7 @@ export const widgetPublicRouter = router({
           cardStyle: widget.cardStyle,
           showPrice: widget.showPrice,
           showEnrollButton: widget.showEnrollButton,
+          showCourseDetails: widget.showCourseDetails,
           buttonText: widget.buttonText,
           buttonUrl: widget.buttonUrl,
         },
