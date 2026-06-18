@@ -402,7 +402,6 @@ export default function TeachDashboard() {
                 {uploadProgress && (
                   <div className="w-36">
                     <Progress value={Math.round((uploadProgress.current / uploadProgress.total) * 100)} className="h-1.5" />
-                    <p className="text-xs text-gray-400 mt-0.5">{uploadProgress.current}/{uploadProgress.total} chunks</p>
                   </div>
                 )}
               </div>

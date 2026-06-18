@@ -3205,12 +3205,22 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 <input ref={inlineMediaRef} type="file" accept={d.inlineMediaType === "video" ? "video/*" : "image/*"} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "inlineMediaUrl", "hero-inline"); e.target.value = ""; }} />
               </div>
               {d.inlineMediaUrl && (
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Placement</label>
-                  <div className="flex gap-1">
-                    {(["left", "center", "right"] as const).map(pos => (
-                      <button key={pos} onClick={() => set("inlineMediaPlacement", pos)} className={`flex-1 py-1 text-xs rounded border capitalize ${d.inlineMediaPlacement === pos ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{pos}</button>
-                    ))}
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Placement</label>
+                    <div className="flex gap-1">
+                      {(["left", "center", "right"] as const).map(pos => (
+                        <button key={pos} onClick={() => set("inlineMediaPlacement", pos)} className={`flex-1 py-1 text-xs rounded border capitalize ${d.inlineMediaPlacement === pos ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{pos}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Image Frame Style</label>
+                    <div className="flex gap-1">
+                      {(["shadow", "circle", "none"] as const).map(style => (
+                        <button key={style} onClick={() => set("inlineMediaStyle", style)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.inlineMediaStyle ?? "shadow") === style ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{style === "shadow" ? "Square" : style === "circle" ? "Circle" : "None"}</button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
