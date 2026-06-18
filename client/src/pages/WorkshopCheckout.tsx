@@ -20,10 +20,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
-  Lock, ArrowLeft, AlertCircle, CheckCircle2, MapPin, Calendar, Clock,
-  Briefcase, Users,
+  Lock, ArrowLeft, AlertCircle, CheckCircle2, ShieldCheck,
 } from "lucide-react";
-import { format } from "date-fns";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "");
 
@@ -228,55 +226,77 @@ export default function WorkshopCheckout() {
             </div>
           </div>
 
-          {/* Terms acceptance */}
+        </div>
+
+        {/* Right — Terms agreement + Stripe embedded checkout */}
+        <div className="space-y-4">
+          {/* Terms agreement card — above Stripe embed */}
           {sessionMeta && !sessionMeta.free && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Before you continue</p>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-gray-800">
+                <ShieldCheck className="h-4 w-4" style={{ color: primary }} />
+                Before you proceed
+              </h3>
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="terms"
                   checked={termsAccepted}
                   onCheckedChange={(v) => setTermsAccepted(!!v)}
                   className="mt-0.5"
+                  style={termsAccepted ? { backgroundColor: primary, borderColor: primary } : {}}
                 />
-                <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
-                  I agree to the{" "}
-                  {sessionMeta.termsUrl ? (
-                    <a href={sessionMeta.termsUrl} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: primary }}>
-                      Terms of Service
-                    </a>
-                  ) : "Terms of Service"}{" "}
+                <Label htmlFor="terms" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
+                  I have reviewed and agree to the{" "}
+                  <a
+                    href={sessionMeta.termsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium hover:underline"
+                    style={{ color: primary }}
+                  >
+                    Terms of Service
+                  </a>{" "}
                   and{" "}
-                  {sessionMeta.privacyUrl ? (
-                    <a href={sessionMeta.privacyUrl} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: primary }}>
-                      Privacy Policy
-                    </a>
-                  ) : "Privacy Policy"}.
+                  <a
+                    href={sessionMeta.privacyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium hover:underline"
+                    style={{ color: primary }}
+                  >
+                    Privacy Policy
+                  </a>
+                  .
                 </Label>
               </div>
+              {!termsAccepted && (
+                <p className="text-xs pt-1 text-gray-400">
+                  Please agree to the Terms of Service and Privacy Policy to continue.
+                </p>
+              )}
             </div>
           )}
-        </div>
 
-        {/* Right — Stripe embedded checkout */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          {createSession.isPending && !clientSecret ? (
-            <div className="p-8 flex flex-col items-center justify-center min-h-[300px] gap-4">
-              <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: primary, borderTopColor: "transparent" }} />
-              <p className="text-sm text-gray-400">Preparing secure checkout…</p>
-            </div>
-          ) : clientSecret && termsAccepted ? (
-            <EmbeddedCheckoutProvider stripe={stripePromise} options={stripeOptions!}>
-              <EmbeddedCheckout />
-            </EmbeddedCheckoutProvider>
-          ) : clientSecret && !termsAccepted ? (
-            <div className="p-8 flex flex-col items-center justify-center min-h-[300px] gap-4 text-center">
-              <Lock className="w-10 h-10 text-gray-300" />
-              <p className="text-sm text-gray-500 max-w-xs">
-                Please accept the Terms of Service and Privacy Policy on the left to proceed to payment.
-              </p>
-            </div>
-          ) : null}
+          {/* Stripe embedded checkout */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[400px]">
+            {createSession.isPending && !clientSecret ? (
+              <div className="p-8 flex flex-col items-center justify-center min-h-[300px] gap-4">
+                <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: primary, borderTopColor: "transparent" }} />
+                <p className="text-sm text-gray-400">Preparing secure checkout…</p>
+              </div>
+            ) : clientSecret && termsAccepted ? (
+              <EmbeddedCheckoutProvider stripe={stripePromise} options={stripeOptions!}>
+                <EmbeddedCheckout />
+              </EmbeddedCheckoutProvider>
+            ) : clientSecret && !termsAccepted ? (
+              <div className="p-8 flex flex-col items-center justify-center min-h-[300px] gap-4 text-center">
+                <Lock className="w-10 h-10 text-gray-300" />
+                <p className="text-sm text-gray-500 max-w-xs">
+                  Please agree to the Terms of Service and Privacy Policy above to proceed to payment.
+                </p>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

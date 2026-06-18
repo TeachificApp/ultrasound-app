@@ -614,7 +614,14 @@ export default function WorkshopLanding() {
             }
             // remaining_seats — live seat availability block
             if (block.type === "remaining_seats") {
-              return <RemainingSeatsBlock key={block.id} data={block.data} />;
+              // Auto-detect instance from page context when sourceId not explicitly set
+              const rsData = { ...block.data };
+              const firstInstance = availableInstances[0] ?? allInstances[0];
+              if (firstInstance?.id) {
+                rsData.sourceId = firstInstance.id;
+                rsData.sourceType = "workshop_instance";
+              }
+              return <RemainingSeatsBlock key={block.id} data={rsData} />;
             }
             return (
               <BlockPreview

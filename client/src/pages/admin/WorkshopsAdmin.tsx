@@ -513,7 +513,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
           </Button>
         </a>
         <Button size="sm" variant="outline" className="gap-1 text-xs"
-          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout/${workshop.slug}?type=workshop`); toast.success("Checkout link copied!"); }}>
+          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout/workshop/${workshop.slug}`); toast.success("Checkout link copied!"); }}>
           <Copy className="w-3.5 h-3.5" /> Copy Checkout Link
         </Button>
       </div>
@@ -1063,13 +1063,13 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
                 <h3 className="text-base font-semibold text-gray-900">Checkout Page Editor</h3>
                 <p className="text-sm text-gray-500 mt-1">
                   Customise the sections shown on the hosted checkout page at{" "}
-                  <a href={`${window.location.origin}/checkout/${workshop.slug}?type=workshop`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
-                    /checkout/{workshop.slug}
+                  <a href={`${window.location.origin}/checkout/workshop/${workshop.slug}`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+                    /checkout/workshop/{workshop.slug}
                   </a>.
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
-                <a href={`${window.location.origin}/checkout/${workshop.slug}?type=workshop`} target="_blank" rel="noopener noreferrer"
+                <a href={`${window.location.origin}/checkout/workshop/${workshop.slug}`} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
                   <ExternalLink className="w-3.5 h-3.5" /> Preview
                 </a>
