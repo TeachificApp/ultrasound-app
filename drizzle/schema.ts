@@ -3620,6 +3620,8 @@ export const orderBumps = mysqlTable("order_bumps", {
   // The bump offer — what product is being offered as the bump
   bumpType: mysqlEnum("bump_type", ["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership", "workshop"]).notNull().default("download"),
   bumpProductId: int("bump_product_id").default(0).notNull(),
+  // Bump mode: addon = add bump to existing order; upgrade = replace trigger product with bump (no charge for original)
+  bumpMode: mysqlEnum("bump_mode", ["addon", "upgrade"]).default("addon").notNull(),
   // When to show the bump
   timing: mysqlEnum("timing", ["before_checkout", "after_checkout", "direct_link"]).default("after_checkout").notNull(),
   // Pricing

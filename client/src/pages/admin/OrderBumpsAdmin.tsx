@@ -389,7 +389,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
   const { data: bundlesData, isLoading: bundlesLoading } = trpc.downloadsAdmin.listBundles.useQuery();
   const { data: webinarsData, isLoading: webinarsLoading } = trpc.webinarAdmin.list.useQuery({ pageSize: 200 });
   const { data: membershipsData, isLoading: membershipsLoading } = trpc.membership.listAll.useQuery();
-  const { data: workshopsData, isLoading: workshopsLoading } = trpc.workshop.list.useQuery();
+  const { data: workshopsData, isLoading: workshopsLoading } = trpc.workshopAdmin.list.useQuery({ pageSize: 200 });
   const allCourses = coursesResult?.courses ?? [];
   const courses = (allCourses as any[]).filter((c: any) => c.type === "course");
   const quizzes = (allCourses as any[]).filter((c: any) => c.type === "quiz");
@@ -398,7 +398,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
   const bundles = bundlesData ?? [];
   const webinarList = webinarsData?.webinars ?? [];
   const membershipList = (membershipsData as any[]) ?? [];
-  const workshopList = (workshopsData as any[]) ?? [];
+  const workshopList = (workshopsData as any)?.workshops ?? [];
   const isLoadingProducts = coursesLoading || downloadsLoading || physLoading || bundlesLoading || webinarsLoading || membershipsLoading || workshopsLoading;
 
   const [form, setForm] = useState({
@@ -406,6 +406,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
     triggerProductId: bump?.triggerProductId ?? 0,
     bumpType: bump?.bumpType ?? "download" as "course" | "quiz" | "download" | "bundle" | "physical" | "cohort" | "webinar" | "membership" | "workshop",
     bumpProductId: bump?.bumpProductId ?? 0,
+    bumpMode: (bump as any)?.bumpMode ?? "addon" as "addon" | "upgrade",
     timing: bump?.timing ?? "after_checkout" as "before_checkout" | "after_checkout",
     bumpPrice: bump?.bumpPrice ?? 0,
     discountLabel: bump?.discountLabel ?? "",
@@ -460,6 +461,13 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
     onError: (e) => toast.error(e.message),
   });
 
+  function getProductImage(type: string, id: number): string {
+    const products = getProductsForType(type);
+    const p = products.find((x: any) => x.id === id);
+    if (!p) return "";
+    // Each product type uses a different image field
+    return p.thumbnailUrl ?? p.coverImageUrl ?? p.coverImage ?? p.iconImage ?? "";
+  }
   function getProductsForType(type: string): any[] {
     if (type === "course") return courses;
     if (type === "quiz") return quizzes;
@@ -480,6 +488,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
     }
     const payload = {
       ...form,
+      bumpMode: form.bumpMode,
       discountLabel: form.discountLabel || undefined,
       bodyHtml: form.bodyHtml || undefined,
       imageUrl: form.imageUrl || undefined,
@@ -571,11 +580,38 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
             <option value="membership">Membership</option>
             <option value="workshop">Workshop</option>
           </select>
-          <select value={form.bumpProductId} onChange={e => setForm({ ...form, bumpProductId: Number(e.target.value) })}
+          <select value={form.bumpProductId} onChange={e => {
+            const id = Number(e.target.value);
+            const autoImg = id ? getProductImage(form.bumpType, id) : "";
+            setForm(f => ({ ...f, bumpProductId: id, imageUrl: f.imageUrl || autoImg }));
+          }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
             <option value={0}>— Select product —</option>
             {bumpProducts.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
+        </div>
+      </div>
+
+      {/* Bump Mode */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+        <h4 className="text-sm font-semibold text-gray-700">Bump Behaviour</h4>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setForm(f => ({ ...f, bumpMode: "addon" }))}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-lg border-2 text-sm font-medium transition-all ${form.bumpMode === "addon" ? "border-teal-600 bg-teal-50 text-teal-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
+          >
+            <span className="text-base">➕</span>
+            <span>Add-on</span>
+            <span className="text-[10px] font-normal text-gray-400 text-center">Charged in addition to original item</span>
+          </button>
+          <button
+            onClick={() => setForm(f => ({ ...f, bumpMode: "upgrade" }))}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-lg border-2 text-sm font-medium transition-all ${form.bumpMode === "upgrade" ? "border-teal-600 bg-teal-50 text-teal-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
+          >
+            <span className="text-base">⬆️</span>
+            <span>Upgrade / Replace</span>
+            <span className="text-[10px] font-normal text-gray-400 text-center">Replaces original item — only bump price charged</span>
+          </button>
         </div>
       </div>
 
@@ -616,8 +652,20 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
             <RichTextEditor value={form.bodyHtml} onChange={(html) => setForm({ ...form, bodyHtml: html })} minHeight={120} maxHeight={300} placeholder="Describe the offer..." />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Image URL</label>
-            <Input value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://..." />
+            <label className="text-xs font-medium text-gray-600 block mb-1">Image URL <span className="text-gray-400 font-normal">(auto-filled from product; override here)</span></label>
+            <div className="flex gap-2 items-center">
+              <Input value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://..." className="flex-1" />
+              {form.imageUrl && (
+                <img src={form.imageUrl} alt="" className="w-12 h-16 object-cover rounded border border-gray-200 flex-shrink-0" />
+              )}
+            </div>
+            {!form.imageUrl && form.bumpProductId > 0 && (
+              <button type="button" onClick={() => {
+                const img = getProductImage(form.bumpType, form.bumpProductId);
+                if (img) setForm(f => ({ ...f, imageUrl: img }));
+                else toast.info("No image found for this product");
+              }} className="mt-1 text-xs text-teal-600 underline">Auto-fill from product</button>
+            )}
           </div>
         </div>
       ) : (
@@ -698,15 +746,19 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Preview</p>
           <div className="max-w-md mx-auto border border-gray-200 rounded-xl p-6 bg-white shadow-sm">
             {form.discountLabel && <span className="inline-block px-2 py-0.5 rounded text-xs font-bold text-white bg-red-500 mb-2">{form.discountLabel}</span>}
+            <div className="flex gap-4">
+              {form.imageUrl && <img src={form.imageUrl} className="w-24 h-32 object-cover rounded-lg flex-shrink-0" alt="" />}
+              <div className="flex-1">
             {form.headline && <h3 className="text-lg font-bold text-gray-900 mb-1">{form.headline}</h3>}
             {form.subheadline && <p className="text-sm text-gray-600 mb-3">{form.subheadline}</p>}
-            {form.imageUrl && <img src={form.imageUrl} className="w-full h-32 object-cover rounded-lg mb-3" alt="" />}
             {form.bodyHtml && <div className="prose text-sm mb-4" dangerouslySetInnerHTML={{ __html: form.bodyHtml }} />}
             <div className="flex flex-col gap-2">
               <button className="w-full py-3 rounded-lg text-white font-semibold text-sm" style={{ backgroundColor: form.ctaColor }}>
                 {form.ctaText} — ${Number(form.bumpPrice).toFixed(2)}
               </button>
               <button className="text-xs text-gray-400 hover:text-gray-600 underline">{form.skipText}</button>
+            </div>
+              </div>
             </div>
           </div>
         </div>

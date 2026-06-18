@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gt, gte, like, lte, or, sql, isNull } from "drizzle
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { syncStripeProduct } from "../stripeSync";
+import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import {
   workshops,
   workshopInstances,
@@ -379,6 +380,7 @@ export const workshopLearnerRouter = router({
         workshopSlug: z.string(),
         instanceId: z.number(),
         origin: z.string(),
+        orderBumpId: z.number().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -466,33 +468,45 @@ export const workshopLearnerRouter = router({
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
+      // Build order bump line item if provided
+      const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
+        orderBumpId: input.orderBumpId,
+        triggerType: "workshop",
+        triggerProductId: workshop.id,
+        currency: workshop.currency,
+      });
+
       const instanceTitle = instance.title || workshop.title;
+      const primaryLineItem = {
+        price_data: {
+          currency: workshop.currency,
+          product_data: {
+            name: `${workshop.title} — ${instanceTitle}`,
+            description: instance.description ?? workshop.subtitle ?? undefined,
+            images: workshop.thumbnailUrl ? [workshop.thumbnailUrl] : undefined,
+          },
+          unit_amount: priceInCents,
+        },
+        quantity: 1,
+      };
+      const isUpgradeBump = orderBumpCheckout?.bumpMode === "upgrade";
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,
         client_reference_id: ctx.user.id.toString(),
         allow_promotion_codes: true,
-        line_items: [
-          {
-            price_data: {
-              currency: workshop.currency,
-              product_data: {
-                name: `${workshop.title} — ${instanceTitle}`,
-                description: instance.description ?? workshop.subtitle ?? undefined,
-                images: workshop.thumbnailUrl ? [workshop.thumbnailUrl] : undefined,
-              },
-              unit_amount: priceInCents,
-            },
-            quantity: 1,
-          },
-        ],
+        line_items: isUpgradeBump
+          ? [orderBumpCheckout!.lineItem]
+          : [primaryLineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
         metadata: {
           type: "workshop",
           workshop_id: workshop.id.toString(),
           instance_id: instance.id.toString(),
           user_id: ctx.user.id.toString(),
           customer_email: ctx.user.email ?? "",
+          ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}),
+          ...orderBumpCheckout?.metadata,
         },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=workshop`,
       });

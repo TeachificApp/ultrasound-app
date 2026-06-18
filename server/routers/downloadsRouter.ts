@@ -305,12 +305,15 @@ export const downloadsLearnerRouter = router({
         } catch { /* ignore */ }
       }
 
+      const isUpgradeBumpDl = orderBumpCheckout?.bumpMode === "upgrade";
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,
         client_reference_id: ctx.user.id.toString(),
         ...(discounts ? { discounts } : { allow_promotion_codes: true }),
-        line_items: [...primaryLineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
+        line_items: isUpgradeBumpDl
+          ? [orderBumpCheckout!.lineItem]
+          : [...primaryLineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
         metadata: {
           type: "digital_download",
           product_id: product.id.toString(),
@@ -318,6 +321,7 @@ export const downloadsLearnerRouter = router({
           customer_email: ctx.user.email ?? "",
           trigger_order_type: "download",
           affiliate_code: input.affiliateCode ?? "",
+          ...(isUpgradeBumpDl ? { bump_mode: "upgrade" } : {}),
           ...orderBumpCheckout?.metadata,
         },
         success_url: `${origin}/downloads/${product.slug}/files?success=1`,

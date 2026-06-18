@@ -596,7 +596,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
                         <img
                           src={bump.imageUrl}
                           alt=""
-                          className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                          className="w-20 h-28 rounded-lg object-cover flex-shrink-0"
                         />
                       )}
 

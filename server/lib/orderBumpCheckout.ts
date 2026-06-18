@@ -30,6 +30,8 @@ export type OrderBumpCheckoutLine = {
   metadata: Record<string, string>;
   amount: number;
   requiresShipping: boolean;
+  /** "addon" = charged in addition to original; "upgrade" = replaces original item */
+  bumpMode: "addon" | "upgrade";
 };
 
 export async function buildOrderBumpCheckoutLine(
@@ -112,6 +114,7 @@ export async function buildOrderBumpCheckoutLine(
   return {
     amount,
     requiresShipping: bumpType === "physical",
+    bumpMode: (bump.bumpMode as "addon" | "upgrade") ?? "addon",
     lineItem: {
       price_data: {
         currency: input.currency,

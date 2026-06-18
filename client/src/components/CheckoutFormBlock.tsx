@@ -522,7 +522,7 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
               style={{ borderColor: accent }}
             >
               {bump.imageUrl && (
-                <img src={bump.imageUrl} alt="" className="w-16 h-20 rounded object-cover flex-shrink-0" />
+                <img src={bump.imageUrl} alt="" className="w-24 h-32 rounded-lg object-cover flex-shrink-0" />
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold leading-tight">{bump.headline}</p>

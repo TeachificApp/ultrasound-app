@@ -787,7 +787,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           {/* Order Bumps */}
           {cfBumps.length > 0 && cfBumps.map((bump, i) => (
             <div key={i} className="border-2 rounded-lg p-4 mb-4 flex items-start gap-4" style={{ borderColor: d.accentColor ?? "#179ca3" }}>
-              {bump.imageUrl && <img src={bump.imageUrl} alt="" className="w-16 h-16 rounded object-cover flex-shrink-0" />}
+              {bump.imageUrl && <img src={bump.imageUrl} alt="" className="w-20 h-28 rounded-lg object-cover flex-shrink-0" />}
               <div className="flex-1">
                 <div className="text-sm font-bold">{bump.headline}</div>
                 <div className="text-sm font-semibold">{bump.title}</div>

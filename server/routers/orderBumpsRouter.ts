@@ -6,6 +6,10 @@
  *   - triggerPricingOptionId (nullable) — when set, the bump is ONLY shown when the
  *     user is purchasing that specific pricing option.  null means "show for all
  *     pricing options of the trigger product".
+ *
+ * bumpMode:
+ *   - "addon"   — add the bump product to the existing order (default)
+ *   - "upgrade" — replace the trigger product with the bump product (no charge for original)
  */
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -49,6 +53,7 @@ export const orderBumpsAdminRouter = router({
       triggerPricingOptionId: z.number().nullable().optional(),
       bumpType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership", "workshop"]),
       bumpProductId: z.number(),
+      bumpMode: z.enum(["addon", "upgrade"]).default("addon"),
       timing: z.enum(["before_checkout", "after_checkout"]).default("after_checkout"),
       bumpPrice: z.number().min(0),
       discountLabel: z.string().optional(),
@@ -73,6 +78,7 @@ export const orderBumpsAdminRouter = router({
         triggerPricingOptionId: input.triggerPricingOptionId ?? null,
         bumpType: input.bumpType,
         bumpProductId: input.bumpProductId,
+        bumpMode: input.bumpMode,
         timing: input.timing,
         bumpPrice: input.bumpPrice,
         discountLabel: input.discountLabel ?? null,
@@ -100,6 +106,7 @@ export const orderBumpsAdminRouter = router({
       triggerPricingOptionId: z.number().nullable().optional(),
       bumpType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort", "webinar", "membership", "workshop"]).optional(),
       bumpProductId: z.number().optional(),
+      bumpMode: z.enum(["addon", "upgrade"]).optional(),
       timing: z.enum(["before_checkout", "after_checkout"]).optional(),
       bumpPrice: z.number().min(0).optional(),
       discountLabel: z.string().nullable().optional(),
@@ -273,6 +280,7 @@ export const orderBumpsPublicRouter = router({
         bumpPrice: bump.bumpPrice,
         bumpType: bump.bumpType,
         bumpProductId: bump.bumpProductId,
+        bumpMode: bump.bumpMode,
         headline: bump.headline,
       };
     }),

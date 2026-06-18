@@ -66,6 +66,7 @@ export const funnelRouter = router({
       { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: 9.97, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "UltrasoundAssist", priceLabel: "$9.97/mo" },
       { id: 1003, type: "app" as const, name: "EchoAssist™ — Free", price: 0, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: true, appLabel: "EchoAssist" },
       { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: 9.97, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: false, appLabel: "EchoAssist", priceLabel: "$9.97/mo" },
+      { id: 1005, type: "app" as const, name: "UltrasoundAssist™ + EchoAssist™ — Bundle", price: 12.99, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "Bundle", priceLabel: "$12.99/mo" },
     ];
     return [
       ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
@@ -110,6 +111,7 @@ export const funnelRouter = router({
         1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: 9.97, isFree: false, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist", priceLabel: "$9.97/mo" },
         1003: { id: 1003, type: "app", title: "EchoAssist™ — Free", slug: "echo-assist-free", description: "AI-powered echocardiography clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist" },
         1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: 9.97, isFree: false, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist", priceLabel: "$9.97/mo" },
+        1005: { id: 1005, type: "app", title: "UltrasoundAssist™ + EchoAssist™ — Bundle", slug: "ultrasound-echo-bundle", description: "Full access to both UltrasoundAssist™ and EchoAssist™ premium apps.", price: 12.99, isFree: false, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "Bundle", priceLabel: "$12.99/mo" },
       };
 
       const [courses, downloads, bundles, physicals, webinarRows, communityRows, workshopRows] = await Promise.all([

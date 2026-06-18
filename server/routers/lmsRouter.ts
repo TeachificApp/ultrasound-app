@@ -1303,14 +1303,17 @@ export const lmsLearnerRouter = router({
               },
               quantity: input.seats,
             };
+        const isUpgradeBump = orderBumpCheckout?.bumpMode === "upgrade";
         session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
           ...promoOpts,
-          line_items: [lineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
+          line_items: isUpgradeBump
+            ? [orderBumpCheckout!.lineItem]
+            : [lineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
-          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
+          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}) },
           ...shippingOptions,
         });
 
@@ -1341,6 +1344,7 @@ export const lmsLearnerRouter = router({
 
           }
         }
+        // Upgrade/replace mode is not supported for subscriptions — treat as addon
         session = await stripe.checkout.sessions.create({
           mode: "subscription",
           customer_email: ctx.user.email ?? undefined,
@@ -1566,14 +1570,17 @@ export const lmsLearnerRouter = router({
         const lineItem = effectiveStripePriceId
           ? { price: effectiveStripePriceId, quantity: 1 }
           : { price_data: { currency: course.currency, product_data: { name: productName, description: course.subtitle ?? undefined }, unit_amount: Math.round(Number(effectivePrice) * 100) }, quantity: 1 };
+        const isUpgradeBump2 = orderBumpCheckout?.bumpMode === "upgrade";
         session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: input.email,
           ...promoOpts,
-          line_items: [lineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
+          line_items: isUpgradeBump2
+            ? [orderBumpCheckout!.lineItem]
+            : [lineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: user.id.toString(),
-          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
+          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump2 ? { bump_mode: "upgrade" } : {}) },
           ...shippingOptions,
         });
       } else if (pricingType === "subscription") {
