@@ -11,7 +11,7 @@ import { trpc } from "@/lib/trpc";
 interface RemainingSeatsBlockProps {
   data: {
     sourceType?: "workshop_instance" | "cohort_group";
-    sourceId?: number | null;
+    sourceId?: number | string | null;
     sourceName?: string;
     headline?: string;
     subtext?: string;
@@ -30,7 +30,7 @@ interface RemainingSeatsBlockProps {
 export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlockProps) {
   const {
     sourceType = "workshop_instance",
-    sourceId = null,
+    sourceId: rawSourceId = null,
     sourceName = "",
     headline = "Limited Seats Available",
     subtext = "Seats are filling up fast — secure yours today.",
@@ -43,13 +43,17 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
     fullMessage = "This session is fully booked.",
   } = data;
 
+  // Coerce sourceId to a valid positive number (JSON may serialize it as a string)
+  const sourceId = rawSourceId != null && rawSourceId !== "" ? Number(rawSourceId) : null;
+  const hasValidSourceId = sourceId != null && !isNaN(sourceId) && sourceId > 0;
+
   const isWorkshop = sourceType === "workshop_instance";
 
   // Workshop instance seat availability
   const workshopQuery = trpc.workshop.getSeatAvailability.useQuery(
-    { instanceId: sourceId! },
+    { instanceId: sourceId ?? 0 },
     {
-      enabled: !preview && isWorkshop && !!sourceId,
+      enabled: !preview && isWorkshop && hasValidSourceId,
       refetchInterval: 30_000, // poll every 30s for real-time updates
       staleTime: 0,            // always treat as stale — fetch fresh on mount
     }
@@ -57,9 +61,9 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
 
   // Cohort group seat availability
   const cohortQuery = trpc.lms.getCohortSeatAvailability.useQuery(
-    { cohortGroupId: sourceId! },
+    { cohortGroupId: sourceId ?? 0 },
     {
-      enabled: !preview && !isWorkshop && !!sourceId,
+      enabled: !preview && !isWorkshop && hasValidSourceId,
       refetchInterval: 30_000,
       staleTime: 0,
     }
@@ -80,8 +84,11 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
         <div className="max-w-2xl mx-auto text-center space-y-3">
           {headline && <h3 className="text-xl font-bold">{headline}</h3>}
           {subtext && <p className="text-sm opacity-70">{subtext}</p>}
-          {!sourceId && (
+          {!hasValidSourceId && (
             <p className="text-xs opacity-40 mt-2">Select a source in the settings panel to show live seat availability.</p>
+          )}
+          {hasValidSourceId && (
+            <p className="text-xs opacity-40 mt-2">Live data will appear on the public page.</p>
           )}
         </div>
       </div>
@@ -89,7 +96,7 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
   }
 
   // No sourceId selected
-  if (!sourceId) {
+  if (!hasValidSourceId) {
     return (
       <div style={{ backgroundColor: bgColor, color: textColor }} className="py-8 px-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
@@ -118,7 +125,15 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
   }
 
   if (query.isError || !seatData) {
-    return null; // Fail silently on public pages
+    // Show a subtle error state rather than returning null silently
+    return (
+      <div style={{ backgroundColor: bgColor, color: textColor }} className="py-6 px-4">
+        <div className="max-w-2xl mx-auto text-center">
+          {headline && <h3 className="text-xl font-bold mb-1">{headline}</h3>}
+          <p className="text-sm opacity-40">Seat availability temporarily unavailable.</p>
+        </div>
+      </div>
+    );
   }
 
   const { capacity, enrolled, remaining, isFull } = seatData;
@@ -130,8 +145,28 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
   const barColor = isFull ? "#ef4444" : isUrgent ? "#f97316" : accentColor;
 
   if (isUnlimited) {
-    // No capacity set — don't render the block (nothing meaningful to show)
-    return null;
+    // Capacity not set — show enrolled count only (no remaining seats to display)
+    return (
+      <div style={{ backgroundColor: bgColor, color: textColor }} className="py-8 px-4">
+        <div className="max-w-2xl mx-auto text-center space-y-2">
+          {headline && <h3 className="text-xl font-bold">{headline}</h3>}
+          {subtext && <p className="text-sm" style={{ opacity: 0.7 }}>{subtext}</p>}
+          <div className="mt-4">
+            <span
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold"
+              style={{
+                backgroundColor: "#f0fdf4",
+                color: "#166534",
+                border: `1.5px solid #bbf7d0`,
+              }}
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              {enrolled} enrolled
+            </span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -147,7 +182,7 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
         )}
 
         {!isFull && (
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-3">
             {showCount && remaining !== null && (
               <div className="flex items-center justify-center gap-2">
                 <span
@@ -171,7 +206,17 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
               </div>
             )}
 
-{/* Progress bar + total count: admin preview only */}
+            {showProgressBar && capacity != null && capacity > 0 && (
+              <div className="mt-2 space-y-1">
+                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="h-2.5 rounded-full transition-all duration-700"
+                    style={{ width: `${pct}%`, backgroundColor: barColor }}
+                  />
+                </div>
+                <p className="text-xs opacity-50">{enrolled} of {capacity} seats filled</p>
+              </div>
+            )}
           </div>
         )}
 

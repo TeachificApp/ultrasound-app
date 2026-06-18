@@ -1051,9 +1051,16 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const allGroupsCICA: any[] = (course as any).cohortGroups ?? [];
       const groupSelectionModeCICA = d.groupSelectionMode ?? "all";
       const selectedGroupIdsCICA: number[] = d.selectedGroupIds ?? [];
-      const visibleGroupsCICA = groupSelectionModeCICA === "manual" && selectedGroupIdsCICA.length > 0
-        ? allGroupsCICA.filter((g: any) => selectedGroupIdsCICA.includes(g.id))
-        : allGroupsCICA;
+      const showCompletedGroupsCICA = d.showCompletedGroups === true;
+      const visibleGroupsCICA = (() => {
+        let groups = groupSelectionModeCICA === "manual" && selectedGroupIdsCICA.length > 0
+          ? allGroupsCICA.filter((g: any) => selectedGroupIdsCICA.includes(g.id))
+          : allGroupsCICA;
+        if (!showCompletedGroupsCICA) {
+          groups = groups.filter((g: any) => g.status !== "completed");
+        }
+        return groups;
+      })();
       const enrollNowTextCICA = d.enrollNowText ?? "Enroll Now";
       const showEnrollNowCICA = d.showEnrollNow !== false;
       const fmtGroupDateCICA = (dt: Date | string | null | undefined) => {

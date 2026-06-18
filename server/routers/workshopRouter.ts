@@ -1381,8 +1381,21 @@ export const workshopAdminRouter = router({
         .where(eq(workshopInstances.id, input.instanceId));
       return { success: true };
     }),
-});
 
+  /** List pricing options for a workshop (for CTA action pickers) */
+  listPricingOptions: protectedProcedure
+    .input(z.object({ workshopId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db
+        .select()
+        .from(workshopPricingOptions)
+        .where(eq(workshopPricingOptions.workshopId, input.workshopId))
+        .orderBy(asc(workshopPricingOptions.sortOrder));
+    }),
+});
 // ── Public waitlist router ────────────────────────────────────────────────────
 export const workshopWaitlistRouter = router({
   join: publicProcedure
