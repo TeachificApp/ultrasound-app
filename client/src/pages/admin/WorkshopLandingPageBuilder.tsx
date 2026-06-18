@@ -539,7 +539,7 @@ export default function WorkshopLandingPageBuilder() {
                   >
                     <option value="">— select course —</option>
                     {coursesWithBlocks?.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.title}</option>
+                      <option key={c.id} value={c.id} title={c.title}>{c.title}</option>
                     ))}
                   </select>
                 </div>

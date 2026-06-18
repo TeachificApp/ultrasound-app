@@ -583,7 +583,7 @@ export default function ProductLandingPageBuilder() {
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Course Page</label>
                 <select className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" value={selectedSourceCourseId ?? ""} onChange={e => { setSelectedSourceCourseId(e.target.value ? Number(e.target.value) : null); setSelectedSourceProductId(null); setSelectedSourceDownloadId(null); setSelectedSourceFunnelId(null); setSelectedSourceFunnelPageId(null); setBlockSearch(""); }}>
                   <option value="">— select course —</option>
-                  {coursesWithBlocks?.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                  {coursesWithBlocks?.map((c: any) => <option key={c.id} value={c.id} title={c.title}>{c.title}</option>)}
                 </select>
               </div>
               <div className="border-t border-gray-100 pt-2">

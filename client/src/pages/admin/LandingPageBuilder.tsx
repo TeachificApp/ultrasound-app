@@ -1342,7 +1342,7 @@ function CTAActionPicker({
             >
               <option value="">-- Select course --</option>
               {gfeCourseItems.map(c => (
-                <option key={c.id} value={c.id}>{c.title} ({c.type})</option>
+                <option key={c.id} value={c.id} title={`${c.title} (${c.type})`}>{c.title} ({c.type})</option>
               ))}
             </select>
           </div>
@@ -1457,7 +1457,7 @@ function CTAActionPicker({
             >
               <option value="">-- Select course --</option>
               {poCourses.map(c => (
-                <option key={c.id} value={c.id}>{c.title} ({c.type})</option>
+                <option key={c.id} value={c.id} title={`${c.title} (${c.type})`}>{c.title} ({c.type})</option>
               ))}
             </select>
           </div>
@@ -1493,7 +1493,7 @@ function CTAActionPicker({
             >
               <option value="">-- Select course --</option>
               {courseLandingPages.map(c => (
-                <option key={c.id} value={c.slug}>{c.title} ({c.type})</option>
+                <option key={c.id} value={c.slug} title={`${c.title} (${c.type})`}>{c.title} ({c.type})</option>
               ))}
             </select>
           </div>
@@ -7854,7 +7854,7 @@ export default function LandingPageBuilder() {
                 >
                   <option value="">— select course —</option>
                   {coursesWithBlocks?.map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
+                    <option key={c.id} value={c.id} title={c.title}>{c.title}</option>
                   ))}
                 </select>
               </div>

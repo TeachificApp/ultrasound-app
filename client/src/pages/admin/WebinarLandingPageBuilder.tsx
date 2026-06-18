@@ -345,7 +345,7 @@ export default function WebinarLandingPageBuilder() {
                       <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Courses</p>
                       <select value={selectedSourceCourseId ?? ""} onChange={e => setSelectedSourceCourseId(e.target.value ? Number(e.target.value) : null)} className="w-full text-sm border rounded-lg p-2 mb-2">
                         <option value="">Select a course…</option>
-                        {coursesWithBlocks.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                        {coursesWithBlocks.map((c: any) => <option key={c.id} value={c.id} title={c.title}>{c.title}</option>)}
                       </select>
                       {selectedSourceCourseId && (() => {
                         const course = coursesWithBlocks.find((c: any) => c.id === selectedSourceCourseId);

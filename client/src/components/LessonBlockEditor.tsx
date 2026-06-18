@@ -1007,7 +1007,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
                 >
                   <option value="">— select course —</option>
                   {coursesData?.courses.map(c => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
+                    <option key={c.id} value={c.id} title={c.title}>{c.title}</option>
                   ))}
                 </select>
               </div>

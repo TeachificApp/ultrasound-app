@@ -469,7 +469,7 @@ export default function WorkshopInstanceLandingPageBuilder() {
                     value={selectedSourceCourseId ?? ""}
                     onChange={e => { setSelectedSourceCourseId(e.target.value ? Number(e.target.value) : null); setSelectedSourceFunnelId(null); setSelectedSourceFunnelPageId(null); setBlockSearch(""); }}>
                     <option value="">— select course —</option>
-                    {coursesWithBlocks?.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                    {coursesWithBlocks?.map((c: any) => <option key={c.id} value={c.id} title={c.title}>{c.title}</option>)}
                   </select>
                 </div>
                 <div className="border-t border-gray-100 pt-2">

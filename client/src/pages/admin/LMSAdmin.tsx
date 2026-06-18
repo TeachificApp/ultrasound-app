@@ -7770,7 +7770,7 @@ function FreePreviewEnrollmentsTab() {
         >
           <option value="">All Courses</option>
           {(courses ?? []).map((c: any) => (
-            <option key={c.id} value={c.id}>{c.title}</option>
+            <option key={c.id} value={c.id} title={c.title}>{c.title}</option>
           ))}
         </select>
       </div>
