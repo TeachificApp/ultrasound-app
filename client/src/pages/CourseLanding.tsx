@@ -1365,8 +1365,18 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     // File download block — delegate to shared BlockPreview renderer
     case "file_download":
       return <BlockPreview block={block} />;
-    case "remaining_seats":
-      return <RemainingSeatsBlock data={block.data} />;
+    case "remaining_seats": {
+      // Auto-bind cohort group from course context when no sourceId is saved on the block
+      const rsData = { ...block.data };
+      if (!rsData.sourceId || Number(rsData.sourceId) === 0) {
+        const featuredGroupId = (course as any)?.featuredGroup?.id ?? null;
+        if (featuredGroupId) {
+          rsData.sourceId = featuredGroupId;
+          rsData.sourceType = "cohort_group";
+        }
+      }
+      return <RemainingSeatsBlock data={rsData} />;
+    }
     default:
       return null;
   }

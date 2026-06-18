@@ -8289,7 +8289,7 @@ function CollectionFormDialog({
     { enabled: !!initial?.id }
   );
   // Populate selectedItems once existing items are loaded (onSuccess is deprecated in React Query v5)
-  const [itemsInitialized, setItemsInitialized] = React.useRef(false);
+  const itemsInitialized = React.useRef(false);
   useEffect(() => {
     if (existingItems && !itemsInitialized.current) {
       itemsInitialized.current = true;
