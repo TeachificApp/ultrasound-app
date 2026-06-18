@@ -1381,7 +1381,7 @@ export default function PlatformAdmin() {
   });
   // ── Thinkific Community Sync ──────────────────────────────────────────────
   const [communitySyncResult, setCommunitySyncResult] = useState<{ triggeredAt: number } | null>(null);
-  const triggerCommunitySyncMutation = trpc.community.triggerFullSync.useMutation({
+  const triggerCommunitySyncMutation = trpc.community.admin.triggerFullSync.useMutation({
     onSuccess: () => {
       setCommunitySyncResult({ triggeredAt: Date.now() });
       toast.success("Community sync started in background — posts, replies, and comments will be imported from Thinkific.");

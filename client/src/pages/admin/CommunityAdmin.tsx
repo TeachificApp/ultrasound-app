@@ -32,7 +32,7 @@ import {
   UserMinus, MessageSquare, CheckSquare, X, ExternalLink,
   GripVertical, Link2, Image, UserCircle, ChevronUp, ChevronDown,
   AlertCircle, Lock, PenSquare, LayoutTemplate, Zap, ToggleLeft, ToggleRight,
-  Palette, BookOpen, ChevronLeft, Settings, Eye, Globe, Mail
+  Palette, BookOpen, ChevronLeft, Settings, Eye, Globe, Mail, RefreshCw
 } from "lucide-react";
 import CommunityPageEditor from "@/components/CommunityPageEditor";
 import { Link } from "wouter";
@@ -44,6 +44,75 @@ type CommunityEditorTab = (typeof COMMUNITY_EDITOR_TABS)[number];
 function parseEditorTab(tab: string | null): CommunityEditorTab | undefined {
   if (!tab) return undefined;
   return (COMMUNITY_EDITOR_TABS as readonly string[]).includes(tab) ? (tab as CommunityEditorTab) : undefined;
+}
+
+function ThinkificSyncControls({
+  communityId,
+  thinkificCommunityId,
+  compact,
+}: {
+  communityId: number;
+  thinkificCommunityId?: string | null;
+  compact?: boolean;
+}) {
+  const utils = trpc.useUtils();
+  const { data: syncState, isLoading } = trpc.community.admin.getSyncState.useQuery(
+    { communityId },
+    { enabled: !!communityId && !!thinkificCommunityId },
+  );
+  const triggerSync = trpc.community.admin.triggerSync.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message ?? "Thinkific sync started");
+      utils.community.admin.getSyncState.invalidate({ communityId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const triggerFullSync = trpc.community.admin.triggerFullSync.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message ?? "Full Thinkific sync started");
+      utils.community.admin.getSyncState.invalidate({ communityId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  if (!thinkificCommunityId) return null;
+
+  return (
+    <div className={`${compact ? "" : "mt-3 pt-3 border-t border-gray-100"} flex flex-wrap items-center gap-2`}>
+      {!compact && (
+        <span className="text-xs text-gray-500 mr-1">
+          Thinkific ID {thinkificCommunityId}
+          {syncState?.lastSyncedAt
+            ? ` · Last sync ${new Date(syncState.lastSyncedAt).toLocaleString()}`
+            : isLoading ? "" : " · Never synced"}
+          {typeof syncState?.totalPostsSynced === "number"
+            ? ` · ${syncState.totalPostsSynced} posts imported`
+            : ""}
+        </span>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="text-xs h-8"
+        disabled={triggerSync.isPending}
+        onClick={() => triggerSync.mutate({ communityId })}
+      >
+        <RefreshCw className={`w-3.5 h-3.5 mr-1 ${triggerSync.isPending ? "animate-spin" : ""}`} />
+        Sync from Thinkific
+      </Button>
+      {!compact && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs h-8 text-gray-500"
+          disabled={triggerFullSync.isPending}
+          onClick={() => triggerFullSync.mutate()}
+        >
+          Full site sync
+        </Button>
+      )}
+    </div>
+  );
 }
 
 function timeAgo(dateStr: string | Date) {
@@ -637,6 +706,11 @@ function CommunityEditor({
 
         <TabsContent value="gating">
           <AccessGatingTab community={community} />
+          <ThinkificSyncControls
+            communityId={community.id}
+            thinkificCommunityId={community.thinkificCommunityId}
+            compact
+          />
         </TabsContent>
 
         <TabsContent value="page-editor">
@@ -1450,6 +1524,7 @@ export default function CommunityAdmin() {
               <p className="text-sm text-gray-600">
                 Use <strong>Edit</strong> or the quick actions on each community to customize appearance, link courses
                 (course purchase grants access), and open the full-page block editors for the member experience and public landing page.
+                Thinkific-linked communities (e.g. ACS Learning Hub) import posts from each Thinkific space and members via <strong>Sync from Thinkific</strong>.
               </p>
             </CardContent>
           </Card>
@@ -1542,6 +1617,10 @@ export default function CommunityAdmin() {
                         <ExternalLink className="w-3.5 h-3.5 mr-1" />Full Landing Editor
                       </a>
                     </div>
+                    <ThinkificSyncControls
+                      communityId={c.id}
+                      thinkificCommunityId={c.thinkificCommunityId}
+                    />
                   </CardContent>
                 </Card>
               ))}

@@ -2072,15 +2072,32 @@ const communityAdminRouter = router({
     await assertAdmin(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [community] = await db
+      .select({
+        thinkificCommunityId: communities.thinkificCommunityId,
+        thinkificSpaceId: communities.thinkificSpaceId,
+      })
+      .from(communities)
+      .where(eq(communities.id, input.communityId))
+      .limit(1);
     const [syncRow] = await db.select().from(thinkificCommunitySyncState)
       .where(eq(thinkificCommunitySyncState.communityId, input.communityId)).limit(1);
-    if (!syncRow) throw new TRPCError({ code: "NOT_FOUND", message: "No sync state found for this community." });
-    // Fire and forget — sync runs in background
+
+    const thinkificCommunityId = syncRow?.thinkificCommunityId ?? community?.thinkificCommunityId;
+    const thinkificSpaceId = syncRow?.thinkificSpaceId ?? community?.thinkificSpaceId ?? undefined;
+
+    if (!thinkificCommunityId) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "This community is not linked to Thinkific. Run a full Thinkific sync from Platform Admin first.",
+      });
+    }
+
     import("../services/thinkificCommunitySync").then(({ syncThinkificCommunity }) => {
       syncThinkificCommunity(
         input.communityId,
-        syncRow.thinkificCommunityId ?? "",
-        syncRow.thinkificSpaceId ?? undefined
+        thinkificCommunityId,
+        thinkificSpaceId ?? undefined,
       ).catch(console.error);
     }).catch(console.error);
     return { success: true, message: "Sync started in background." };

@@ -21,6 +21,7 @@ import {
   communityChannels,
   communityPosts,
   communityPostComments,
+  communityMembers,
   thinkificCommunitySyncState,
   thinkificPostImports,
   users,
@@ -35,6 +36,13 @@ const PRIVATE_SPACE_IDS = ["353050", "353052"]; // Adult Echo, Fetal Echo Learni
 
 // ─── Communities that are private / invite-only ────────────────────────────────
 const PRIVATE_COMMUNITY_IDS = ["328759"]; // ACS Learning Hub
+export const ACS_THINKIFIC_COMMUNITY_ID = "328759";
+const AAU_THINKIFIC_COMMUNITY_ID = "1200";
+
+/** Spaces synced as standalone communities under AAU — skip when importing into parent */
+export function shouldSkipStandaloneSpaceSync(thinkificCommunityId: string, spaceId: string): boolean {
+  return thinkificCommunityId === AAU_THINKIFIC_COMMUNITY_ID && PRIVATE_SPACE_IDS.includes(spaceId);
+}
 
 // ─── GraphQL helpers ───────────────────────────────────────────────────────────
 
@@ -323,6 +331,60 @@ async function fetchSpacePostsPage(spaceId: string, cursor: string | null): Prom
   return data?.space?.posts ?? { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
 }
 
+async function fetchCommunitySpaces(thinkificCommunityId: string): Promise<ThinkificSpace[]> {
+  const data = await gql<any>(
+    `
+    query GetCommunitySpaces($id: ID!) {
+      community(id: $id) {
+        spaces(first: 50) {
+          nodes { id name }
+        }
+      }
+    }
+  `,
+    { id: thinkificCommunityId },
+  );
+  return data?.community?.spaces?.nodes ?? [];
+}
+
+interface ThinkificCommunityMember {
+  id: string;
+  user: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  } | null;
+}
+
+interface MembersPage {
+  nodes: ThinkificCommunityMember[];
+  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+}
+
+async function fetchCommunityMembersPage(
+  thinkificCommunityId: string,
+  cursor: string | null,
+): Promise<MembersPage> {
+  const data = await gql<any>(
+    `
+    query GetCommunityMembers($id: ID!, $cursor: String) {
+      community(id: $id) {
+        members(first: 50, after: $cursor) {
+          nodes {
+            id
+            user { id firstName lastName email }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  `,
+    { id: thinkificCommunityId, cursor },
+  );
+  return data?.community?.members ?? { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
+}
+
 // ─── User resolution ──────────────────────────────────────────────────────────
 
 const userEmailCache = new Map<string, number | null>();
@@ -464,7 +526,10 @@ async function ensureCommunity(opts: {
     )
     .limit(1);
 
-  if (existing.length > 0) return existing[0].id;
+  if (existing.length > 0) {
+    await ensureSyncState(existing[0].id, opts.thinkificCommunityId, opts.thinkificSpaceId);
+    return existing[0].id;
+  }
 
   // Fallback: check by slug to avoid duplicate key errors on re-runs
   const normalizedSlug = opts.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
@@ -482,6 +547,7 @@ async function ensureCommunity(opts: {
         ...(opts.thinkificSpaceId ? { thinkificSpaceId: opts.thinkificSpaceId } : {}),
       })
       .where(eq(communities.id, existingBySlug[0].id));
+    await ensureSyncState(existingBySlug[0].id, opts.thinkificCommunityId, opts.thinkificSpaceId);
     console.log(`[ThinkificCommunitySync] Linked existing community (slug=${normalizedSlug}) to Thinkific ID ${opts.thinkificCommunityId}`);
     return existingBySlug[0].id;
   }
@@ -511,15 +577,34 @@ async function ensureCommunity(opts: {
   });
 
   // Create sync state record
-  await db.insert(thinkificCommunitySyncState).values({
-    communityId,
-    thinkificCommunityId: opts.thinkificCommunityId,
-    thinkificSpaceId: opts.thinkificSpaceId ?? undefined,
-    syncEnabled: true,
-  });
+  await ensureSyncState(communityId, opts.thinkificCommunityId, opts.thinkificSpaceId);
 
   console.log(`[ThinkificCommunitySync] Created community: ${opts.title} (id=${communityId})`);
   return communityId;
+}
+
+async function ensureSyncState(
+  communityId: number,
+  thinkificCommunityId: string,
+  thinkificSpaceId?: string,
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const existing = await db
+    .select({ id: thinkificCommunitySyncState.id })
+    .from(thinkificCommunitySyncState)
+    .where(eq(thinkificCommunitySyncState.communityId, communityId))
+    .limit(1);
+
+  if (existing.length > 0) return;
+
+  await db.insert(thinkificCommunitySyncState).values({
+    communityId,
+    thinkificCommunityId,
+    thinkificSpaceId: thinkificSpaceId ?? undefined,
+    syncEnabled: true,
+  });
 }
 
 async function getDefaultChannelId(communityId: number): Promise<number> {
@@ -545,20 +630,138 @@ async function getDefaultChannelId(communityId: number): Promise<number> {
   return (result as any).insertId;
 }
 
-// ─── Sync a single community ──────────────────────────────────────────────────
+async function getOrCreateChannelForSpace(communityId: number, spaceName: string): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
 
-export async function syncThinkificCommunity(
+  const [existing] = await db
+    .select({ id: communityChannels.id })
+    .from(communityChannels)
+    .where(and(eq(communityChannels.communityId, communityId), eq(communityChannels.name, spaceName)))
+    .limit(1);
+
+  if (existing) return existing.id;
+
+  const [result] = await db.insert(communityChannels).values({
+    communityId,
+    name: spaceName,
+    type: "discussion",
+    isDefault: false,
+    sortOrder: 10,
+  });
+  return (result as any).insertId;
+}
+
+async function importPostsFromPages(
+  communityId: number,
+  channelId: number,
+  fetchPage: (cursor: string | null) => Promise<PostsPage>,
+  initialCursor: string | null,
+): Promise<{ imported: number; errors: number; endCursor: string | null }> {
+  let imported = 0;
+  let errors = 0;
+  let cursor = initialCursor;
+  let hasMore = true;
+
+  while (hasMore) {
+    const page = await fetchPage(cursor);
+    for (const post of page.nodes) {
+      try {
+        await importPostTree(post, communityId, channelId, null);
+        imported++;
+      } catch (err) {
+        console.error(`[ThinkificCommunitySync] Error importing post ${post.id}:`, err);
+        errors++;
+      }
+    }
+    hasMore = page.pageInfo.hasNextPage;
+    cursor = page.pageInfo.endCursor;
+  }
+
+  return { imported, errors, endCursor: cursor };
+}
+
+async function syncThinkificCommunityMembers(
   communityId: number,
   thinkificCommunityId: string,
-  thinkificSpaceId?: string
 ): Promise<{ imported: number; errors: number }> {
   const db = await getDb();
   if (!db) return { imported: 0, errors: 1 };
 
   let imported = 0;
   let errors = 0;
+  let cursor: string | null = null;
+  let hasMore = true;
 
-  // Get sync state
+  const { getOrCreateUserByEmail, ensureUserRole } = await import("../db");
+
+  while (hasMore) {
+    try {
+      const page = await fetchCommunityMembersPage(thinkificCommunityId, cursor);
+      for (const member of page.nodes) {
+        const email = member.user?.email?.trim().toLowerCase();
+        if (!email) {
+          errors++;
+          continue;
+        }
+        try {
+          const { user } = await getOrCreateUserByEmail({
+            email,
+            firstName: member.user?.firstName ?? undefined,
+            lastName: member.user?.lastName ?? undefined,
+          });
+          await ensureUserRole(user.id);
+
+          const [existingMember] = await db
+            .select({ id: communityMembers.id })
+            .from(communityMembers)
+            .where(and(eq(communityMembers.communityId, communityId), eq(communityMembers.userId, user.id)))
+            .limit(1);
+
+          if (!existingMember) {
+            await db.insert(communityMembers).values({
+              communityId,
+              userId: user.id,
+              role: "member",
+              memberStatus: "approved",
+            });
+            imported++;
+          }
+        } catch (err) {
+          console.error(`[ThinkificCommunitySync] Error importing member ${email}:`, err);
+          errors++;
+        }
+      }
+      hasMore = page.pageInfo.hasNextPage;
+      cursor = page.pageInfo.endCursor;
+    } catch (err) {
+      console.error(`[ThinkificCommunitySync] Member page fetch error:`, err);
+      errors++;
+      break;
+    }
+  }
+
+  console.log(
+    `[ThinkificCommunitySync] Members for community ${communityId}: ${imported} new, ${errors} errors`,
+  );
+  return { imported, errors };
+}
+
+// ─── Sync a single community ──────────────────────────────────────────────────
+
+export async function syncThinkificCommunity(
+  communityId: number,
+  thinkificCommunityId: string,
+  thinkificSpaceId?: string,
+): Promise<{ imported: number; errors: number; membersImported: number }> {
+  const db = await getDb();
+  if (!db) return { imported: 0, errors: 1, membersImported: 0 };
+
+  await ensureSyncState(communityId, thinkificCommunityId, thinkificSpaceId);
+
+  let imported = 0;
+  let errors = 0;
+
   const syncRows = await db
     .select()
     .from(thinkificCommunitySyncState)
@@ -566,53 +769,78 @@ export async function syncThinkificCommunity(
     .limit(1);
 
   let cursor: string | null = syncRows[0]?.syncCursor ?? null;
-  const channelId = await getDefaultChannelId(communityId);
+  const defaultChannelId = await getDefaultChannelId(communityId);
 
   console.log(
-    `[ThinkificCommunitySync] Syncing community ${communityId} (thinkific=${thinkificCommunityId}${thinkificSpaceId ? ` space=${thinkificSpaceId}` : ""}) from cursor=${cursor}`
+    `[ThinkificCommunitySync] Syncing community ${communityId} (thinkific=${thinkificCommunityId}${thinkificSpaceId ? ` space=${thinkificSpaceId}` : ""}) from cursor=${cursor}`,
   );
 
-  let hasMore = true;
-  while (hasMore) {
-    try {
-      // Use space-scoped fetch when a spaceId is set (Adult Echo / Fetal Echo Learning Hub)
-      const page = thinkificSpaceId
-        ? await fetchSpacePostsPage(thinkificSpaceId, cursor)
-        : await fetchCommunityPostsPage(thinkificCommunityId, cursor);
+  try {
+    if (thinkificSpaceId) {
+      const result = await importPostsFromPages(
+        communityId,
+        defaultChannelId,
+        (c) => fetchSpacePostsPage(thinkificSpaceId, c),
+        cursor,
+      );
+      imported += result.imported;
+      errors += result.errors;
+      cursor = result.endCursor;
+    } else {
+      // Top-level community posts (often empty — many hubs store posts inside spaces)
+      const rootResult = await importPostsFromPages(
+        communityId,
+        defaultChannelId,
+        (c) => fetchCommunityPostsPage(thinkificCommunityId, c),
+        cursor,
+      );
+      imported += rootResult.imported;
+      errors += rootResult.errors;
+      cursor = rootResult.endCursor;
 
-      for (const post of page.nodes) {
-        try {
-          await importPostTree(post, communityId, channelId, null);
-          imported++;
-        } catch (err) {
-          console.error(`[ThinkificCommunitySync] Error importing post ${post.id}:`, err);
-          errors++;
-        }
+      // Import posts from each Thinkific space into a matching channel (ACS Learning Hub, etc.)
+      const spaces = await fetchCommunitySpaces(thinkificCommunityId);
+      for (const space of spaces) {
+        if (shouldSkipStandaloneSpaceSync(thinkificCommunityId, space.id)) continue;
+        const spaceChannelId = await getOrCreateChannelForSpace(communityId, space.name);
+        console.log(
+          `[ThinkificCommunitySync] Syncing space "${space.name}" (${space.id}) → channel ${spaceChannelId}`,
+        );
+        const spaceResult = await importPostsFromPages(
+          communityId,
+          spaceChannelId,
+          (c) => fetchSpacePostsPage(space.id, c),
+          null,
+        );
+        imported += spaceResult.imported;
+        errors += spaceResult.errors;
       }
-
-      hasMore = page.pageInfo.hasNextPage;
-      cursor = page.pageInfo.endCursor;
-
-      // Save cursor progress after each page
-      await db
-        .update(thinkificCommunitySyncState)
-        .set({
-          syncCursor: cursor ?? undefined,
-          lastSyncedAt: Date.now(),
-          totalPostsSynced: (syncRows[0]?.totalPostsSynced ?? 0) + imported,
-        })
-        .where(eq(thinkificCommunitySyncState.communityId, communityId));
-    } catch (err) {
-      console.error(`[ThinkificCommunitySync] Page fetch error:`, err);
-      errors++;
-      break;
     }
+
+    await db
+      .update(thinkificCommunitySyncState)
+      .set({
+        syncCursor: cursor ?? undefined,
+        lastSyncedAt: Date.now(),
+        totalPostsSynced: (syncRows[0]?.totalPostsSynced ?? 0) + imported,
+      })
+      .where(eq(thinkificCommunitySyncState.communityId, communityId));
+  } catch (err) {
+    console.error(`[ThinkificCommunitySync] Page fetch error:`, err);
+    errors++;
+  }
+
+  let membersImported = 0;
+  if (!thinkificSpaceId) {
+    const memberResult = await syncThinkificCommunityMembers(communityId, thinkificCommunityId);
+    membersImported = memberResult.imported;
+    errors += memberResult.errors;
   }
 
   console.log(
-    `[ThinkificCommunitySync] Done community ${communityId}: ${imported} imported, ${errors} errors`
+    `[ThinkificCommunitySync] Done community ${communityId}: ${imported} posts, ${membersImported} members, ${errors} errors`,
   );
-  return { imported, errors };
+  return { imported, errors, membersImported };
 }
 
 // ─── Full sync: discover and sync all communities ─────────────────────────────
@@ -639,7 +867,7 @@ export async function syncAllThinkificCommunities(): Promise<void> {
 
     // Determine privacy for the main community
     const mainPrivacy = isPrivateCommunity ? "invite_only" : "public";
-    const mainAccessType = isPrivateCommunity ? "invite_only" : "free";
+    const mainAccessType = isPrivateCommunity ? "course_gated" : "free";
 
     // Create/find the main community
     const mainCommunityId = await ensureCommunity({
