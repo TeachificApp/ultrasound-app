@@ -180,6 +180,8 @@ function injectSeoIntoHtml(
     pageUrl,
   });
 
+  // Mark the HTML element so the client-side brand override script skips its meta rewrites
+  html = html.replace(/(<html\b[^>]*)(>)/, '$1 data-page-seo="1"$2');
   // Replace <title> tag
   html = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(seo.title)}</title>`);
   // Replace existing og:title/og:description/og:image in-place so page values win over brand defaults
