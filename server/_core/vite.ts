@@ -1,10 +1,24 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request } from "express";
 import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
+import { getPageSeoForRequest, injectPageSeoIntoHtml } from "../routes/funnelOgMeta";
+
+/** Helper: look up per-page SEO and inject it into the HTML if found. */
+async function injectPageSeo(html: string, req: Request): Promise<string> {
+  try {
+    const seo = await getPageSeoForRequest(req);
+    console.log(`[injectPageSeo] path=${req.path} seo=${seo ? JSON.stringify({ title: seo.title?.slice(0,50) }) : 'null'}`);
+    if (!seo) return html;
+    return injectPageSeoIntoHtml(html, seo, req);
+  } catch (e: any) {
+    console.error(`[injectPageSeo] error: ${e.message}`);
+    return html;
+  }
+}
 
 /**
  * Regex that matches all paths EXCEPT those starting with /media/ or /api/.
@@ -124,6 +138,8 @@ export async function setupVite(app: Express, server: Server) {
       // Inject brand-specific OG tags server-side (crawlers don't run JS)
       const host = req.hostname || req.headers.host || "";
       template = injectBrandMeta(template, host);
+      // Inject per-page SEO (course/workshop/download landing pages)
+      template = await injectPageSeo(template, req);
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
@@ -148,18 +164,22 @@ export function serveStatic(app: Express) {
 
   // Use regex route so /media/* paths are structurally excluded — they can NEVER
   // be caught by this fallback, regardless of route registration order.
-  // Read and inject brand-specific OG tags server-side (crawlers don't run JS).
+  // Read and inject brand-specific OG tags + per-page SEO server-side (crawlers don't run JS).
   const indexHtmlPath = path.resolve(distPath, "index.html");
-  app.get(SPA_CATCH_ALL_REGEX, (req, res) => {
+  app.get(SPA_CATCH_ALL_REGEX, async (req, res) => {
     const host = req.hostname || req.headers.host || "";
-    if (!host || !Object.keys(BRAND_META).some(k => host.includes(k))) {
-      // No brand override needed — serve file directly for performance
+    const hasBrand = host && Object.keys(BRAND_META).some(k => host.includes(k));
+    // Check if this path needs per-page SEO injection
+    const pageSeo = await getPageSeoForRequest(req);
+    if (!hasBrand && !pageSeo) {
+      // No overrides needed — serve file directly for performance
       return res.sendFile(indexHtmlPath);
     }
-    fs.readFile(indexHtmlPath, "utf-8", (err, html) => {
+    fs.readFile(indexHtmlPath, "utf-8", async (err, html) => {
       if (err) return res.sendFile(indexHtmlPath);
-      const branded = injectBrandMeta(html, host);
-      res.status(200).set({ "Content-Type": "text/html" }).end(branded);
+      if (hasBrand) html = injectBrandMeta(html, host);
+      if (pageSeo) html = injectPageSeoIntoHtml(html, pageSeo, req);
+      res.status(200).set({ "Content-Type": "text/html" }).end(html);
     });
   });
 }

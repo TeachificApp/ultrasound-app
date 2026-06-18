@@ -5087,27 +5087,27 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       );
     }
     case "cohort_sessions_auto": {
-      const displayMode = (d.displayMode ?? "sessions") as "sessions" | "groups";
+      const displayMode = (d.displayMode ?? "list") as "list" | "page" | "calendar";
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Mode</p>
             <div className="flex gap-1">
-              {(["sessions", "groups"] as const).map(m => (
+              {(["list", "page", "calendar"] as const).map(m => (
                 <button key={m} onClick={() => set("displayMode", m)}
                   className={`flex-1 py-1.5 text-xs rounded border capitalize ${displayMode === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
-                  {m === "sessions" ? "Live Sessions List" : "Cohort/Instance Cards"}
+                  {m === "list" ? "List" : m === "page" ? "Page" : "Calendar"}
                 </button>
               ))}
             </div>
-            {displayMode === "groups" && (
-              <p className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-2 py-1.5 mt-2">
-                Shows stacked cards for each cohort group (or workshop instance). Each card has an Enroll Now button. Clicking a card opens the full detail page for that group/instance.
-              </p>
-            )}
+            <div className="mt-2 text-[10px] text-gray-500 bg-gray-50 rounded px-2 py-1.5">
+              {displayMode === "list" && <span><strong>List:</strong> Shows all in-progress and upcoming cohort groups/instances as stacked cards. Leave cohort blank to show all available.</span>}
+              {displayMode === "page" && <span><strong>Page:</strong> Shows the next upcoming cohort/instance as a full-detail embed. Auto-advances when enrollment closes. Shows sold-out + waitlist prompt when none are upcoming.</span>}
+              {displayMode === "calendar" && <span><strong>Calendar:</strong> Shows the lesson schedule for the selected cohort/instance. Leave blank to auto-pick the next upcoming group.</span>}
+            </div>
           </div>
-          {displayMode === "groups" && (
+          {(displayMode === "list" || displayMode === "page") && (
               <div className="border-t pt-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Group Selection</p>
                 {/* Step 1: All vs Manual */}

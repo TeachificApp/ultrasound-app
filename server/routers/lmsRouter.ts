@@ -432,8 +432,17 @@ export const lmsPublicRouter = router({
         return g.maxStudents != null && Number(g.enrollmentCount ?? 0) >= g.maxStudents;
       };
 
-      // Determine featured cohort group and waitlist mode for the landing page
-      const featuredGroup = cohortGroupsRaw.find(g => g.isFeaturedOnLanding) ?? cohortGroupsRaw[0] ?? null;
+      // Determine featured cohort group and waitlist mode for the landing page.
+      // Priority: (1) admin-pinned isFeaturedOnLanding group, (2) next upcoming open group
+      // whose startDate is still in the future (not in-progress), (3) first non-archived group.
+      // "active" (in-progress) groups are intentionally skipped for the hero/single display.
+      const nextUpcomingOpen = cohortGroupsRaw
+        .filter(g => g.status === "open" && g.startDate && new Date(g.startDate) > now)
+        .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime())[0] ?? null;
+      const featuredGroup =
+        cohortGroupsRaw.find(g => g.isFeaturedOnLanding) ??
+        nextUpcomingOpen ??
+        cohortGroupsRaw[0] ?? null;
       // hasOpenGroup: true only if at least one group is on sale (date-valid AND not at capacity)
       const hasOpenGroup = cohortGroupsRaw.some(isCohortGroupOnSale);
       // soldOutGroups: date-valid but at capacity

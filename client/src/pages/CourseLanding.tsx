@@ -893,14 +893,89 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       );
     }
     case "cohort_sessions_auto": {
-      const displayMode = d.displayMode ?? "sessions";
+      const displayMode = (d.displayMode ?? "list") as "list" | "page" | "calendar" | "sessions" | "groups";
       const accentColor = d.accentColor ?? "#179ca3";
-      if (displayMode === "groups") {
-        // ── Groups mode: stacked cohort group cards ──
-        const allGroups: any[] = (course as any).cohortGroups ?? [];
+      const allGroupsCSA: any[] = (course as any).cohortGroups ?? [];
+      const nowMsCSA = Date.now();
+
+      // ── Calendar mode: show CohortSessionsCalendar for selected or next upcoming group ──
+      if (displayMode === "calendar") {
+        const calendarGroupId: number | null = d.calendarGroupId ?? null;
+        const resolvedGroupId = calendarGroupId ?? (() => {
+          const upcoming = allGroupsCSA
+            .filter((g: any) => g.status === "open" && g.startDate && new Date(g.startDate).getTime() > nowMsCSA)
+            .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+          return upcoming[0]?.id ?? null;
+        })();
+        if (!resolvedGroupId) return null;
+        return (
+          <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+            <CC>
+              {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+              <CohortSessionsCalendar
+                cohortGroupId={resolvedGroupId}
+                accentColor={accentColor}
+                defaultView={(d.calendarDefaultView ?? "list") as "list" | "calendar"}
+                showZoomJoin={d.showZoomJoin !== false}
+              />
+            </CC>
+          </div>
+        );
+      }
+
+      // ── Page mode: show next upcoming group (not in-progress) as full-detail embed ──
+      if (displayMode === "page") {
+        const groupSelectionModeP = d.groupSelectionMode ?? "all";
+        const selectedGroupIdsP: number[] = d.selectedGroupIds ?? [];
+        let candidatesP = groupSelectionModeP === "manual" && selectedGroupIdsP.length > 0
+          ? allGroupsCSA.filter((g: any) => selectedGroupIdsP.includes(g.id))
+          : allGroupsCSA;
+        const nextUpcoming = candidatesP
+          .filter((g: any) => g.status === "open" && g.startDate && new Date(g.startDate).getTime() > nowMsCSA)
+          .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0];
+        const soldOut = !nextUpcoming
+          ? candidatesP.filter((g: any) => g.status !== "completed").sort((a: any, b: any) => new Date(b.startDate ?? 0).getTime() - new Date(a.startDate ?? 0).getTime())[0]
+          : null;
+        const embedGroupIdP = nextUpcoming?.id ?? null;
+        if (!embedGroupIdP && !soldOut) return null;
+        const enrollNowTextP = d.enrollNowText ?? "Enroll Now";
+        const showEnrollNowP = d.showEnrollNow !== false;
+        return (
+          <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+            <CC>
+              {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+              {embedGroupIdP ? (
+                <CohortGroupEmbedSection
+                  groupId={embedGroupIdP}
+                  accentColor={accentColor}
+                  onEnroll={() => onCheckoutPage?.()}
+                  enrollNowText={enrollNowTextP}
+                  showEnrollNow={showEnrollNowP}
+                />
+              ) : soldOut ? (
+                <div className="rounded-2xl border p-6 text-center space-y-3" style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: "#6b7280" }}>Sold Out</span>
+                  <h3 className="font-bold text-gray-900 text-lg">{soldOut.name}</h3>
+                  <p className="text-sm text-gray-500">This cohort is currently full. Join the waitlist to be notified when a spot opens or a new group is added.</p>
+                  <button
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: accentColor }}
+                    onClick={() => onCheckoutPage?.()}
+                  >Join Waitlist</button>
+                </div>
+              ) : null}
+            </CC>
+          </div>
+        );
+      }
+
+      // ── List mode (default) and legacy "groups"/"sessions" modes ──
+      // "list" and "groups" → stacked cohort group cards
+      if (displayMode === "list" || displayMode === "groups") {
+        const allGroups = allGroupsCSA;
+        const nowMs = nowMsCSA;
         const groupSelectionMode = d.groupSelectionMode ?? "all";
         const selectedGroupIds: number[] = d.selectedGroupIds ?? [];
-        const nowMs = Date.now();
         const visibleGroups = (() => {
           let groups = groupSelectionMode === "manual" && selectedGroupIds.length > 0
             ? allGroups.filter((g: any) => selectedGroupIds.includes(g.id))
@@ -913,9 +988,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         const enrollNowText = d.enrollNowText ?? "Enroll Now";
         const showEnrollNow = d.showEnrollNow !== false;
         const isEnrollmentClosedForGroup = (g: any) => {
-          // Explicitly closed via enrollmentCloseDate
           if (g.enrollmentCloseDate && new Date(g.enrollmentCloseDate).getTime() < nowMs) return true;
-          // Active (in-progress) cohort with no explicit enrollmentCloseDate — enrollment implicitly closed
           if (g.status === "active" && !g.enrollmentCloseDate) return true;
           return false;
         };
