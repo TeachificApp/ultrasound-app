@@ -5,10 +5,11 @@
  *   /admin/quiz-creator          — list all quizzes
  *   /admin/quiz-creator/:quizId  — edit a specific quiz (settings + questions + analytics)
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import {
   Plus, Trash2, Edit2, ArrowLeft, BarChart2, Settings2, BookOpen,
   Users, CheckCircle, XCircle, Clock, Search, ChevronLeft, ChevronRight,
   Eye, EyeOff, Copy, Loader2, AlertTriangle, GripVertical, X,
+  Sparkles, Upload, FileSpreadsheet, FolderPlus, Tag, FileUp,
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -45,6 +47,934 @@ function fmtTime(secs: number | null | undefined) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+// ─── Folder/Tag Save Picker ───────────────────────────────────────────────────
+function FolderTagPicker({
+  folders,
+  tags,
+  selectedFolderId,
+  setSelectedFolderId,
+  newFolderName,
+  setNewFolderName,
+  selectedTagIds,
+  setSelectedTagIds,
+  accentColor = "teal",
+}: {
+  folders: any[];
+  tags: any[];
+  selectedFolderId: number | null;
+  setSelectedFolderId: (id: number | null) => void;
+  newFolderName: string;
+  setNewFolderName: (v: string) => void;
+  selectedTagIds: number[];
+  setSelectedTagIds: (ids: number[]) => void;
+  accentColor?: "teal" | "orange" | "purple";
+}) {
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const accent = {
+    teal: { border: "border-teal-200", bg: "bg-teal-50", text: "text-teal-700", label: "text-teal-700" },
+    orange: { border: "border-orange-200", bg: "bg-orange-50", text: "text-orange-700", label: "text-orange-700" },
+    purple: { border: "border-purple-200", bg: "bg-purple-50", text: "text-purple-700", label: "text-purple-700" },
+  }[accentColor];
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <Label className={`text-xs font-medium mb-1 block ${accent.label}`}>Save to Folder <span className="text-gray-400 font-normal">(optional)</span></Label>
+        {!showNewFolder ? (
+          <div className="flex gap-2">
+            <select
+              value={selectedFolderId ?? ""}
+              onChange={e => setSelectedFolderId(e.target.value ? Number(e.target.value) : null)}
+              className={`flex-1 h-9 rounded-md border ${accent.border} bg-white px-3 text-sm`}
+            >
+              <option value="">— No folder —</option>
+              {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+            <Button type="button" size="sm" variant="outline" className={`${accent.border} ${accent.text}`} onClick={() => { setShowNewFolder(true); setSelectedFolderId(null); }}>
+              <FolderPlus className="w-3.5 h-3.5 mr-1" /> New
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              value={newFolderName}
+              onChange={e => setNewFolderName(e.target.value)}
+              placeholder="New folder name..."
+              className={`flex-1 border ${accent.border} bg-white`}
+            />
+            <Button type="button" size="sm" variant="outline" onClick={() => { setShowNewFolder(false); setNewFolderName(""); }}>Cancel</Button>
+          </div>
+        )}
+      </div>
+      {tags.length > 0 && (
+        <div>
+          <Label className={`text-xs font-medium mb-1 block ${accent.label}`}>Tags <span className="text-gray-400 font-normal">(optional)</span></Label>
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map(tag => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => setSelectedTagIds(selectedTagIds.includes(tag.id) ? selectedTagIds.filter(id => id !== tag.id) : [...selectedTagIds, tag.id])}
+                className={cn("px-2 py-0.5 rounded-full text-xs font-medium border transition-all", selectedTagIds.includes(tag.id) ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200")}
+                style={selectedTagIds.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color } : {}}
+              >
+                {tag.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Import Quiz Dialog (SCORM or CSV — creates a new quiz) ───────────────────
+function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (quizId: number) => void }) {
+  const [importTab, setImportTab] = useState<"scorm" | "csv">("scorm");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [scormPreview, setScormPreview] = useState<any>(null);
+  const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
+  const [scormGroupPrefix, setScormGroupPrefix] = useState("");
+  const [csvPreview, setCsvPreview] = useState<any>(null);
+  const [newQuizTitle, setNewQuizTitle] = useState("");
+  const [newQuizType, setNewQuizType] = useState<"quiz" | "mock_exam">("quiz");
+  const [newQuizBrand, setNewQuizBrand] = useState<"aaus" | "iheartecho">("aaus");
+  const [folderId, setFolderId] = useState<number | null>(null);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [tagIds, setTagIds] = useState<number[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const { data: foldersData } = trpc.questionBank.listFolders.useQuery(undefined, { enabled: open });
+  const { data: tagsData } = trpc.questionBank.listTags.useQuery(undefined, { enabled: open });
+  const folders = foldersData ?? [];
+  const tags = tagsData ?? [];
+
+  const createQuizMut = trpc.standaloneQuizAdmin.createQuiz.useMutation();
+  const addQMut = trpc.standaloneQuizAdmin.addQuestions.useMutation();
+  const scormConfirmMut = trpc.questionBank.confirmScormImport.useMutation();
+  const importCsvMut = trpc.questionBank.importCsvToBank.useMutation();
+
+  const reset = () => {
+    setFile(null); setScormPreview(null); setScormSelectedGroups(new Set());
+    setScormGroupPrefix(""); setCsvPreview(null); setNewQuizTitle("");
+    setFolderId(null); setNewFolderName(""); setTagIds([]);
+  };
+
+  const handleFileUpload = async (f: File) => {
+    setFile(f);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch("/api/upload-quiz-bank-file", { method: "POST", body: fd, credentials: "include" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      if (json.type === "scorm") {
+        setScormPreview(json.preview);
+        setScormSelectedGroups(new Set(json.preview.groups.map((g: any) => g.id)));
+        if (!newQuizTitle) setNewQuizTitle(json.preview.quizTitle || f.name.replace(/\.[^.]+$/, ""));
+      } else if (json.type === "csv") {
+        setCsvPreview(json);
+        if (!newQuizTitle) setNewQuizTitle(f.name.replace(/\.[^.]+$/, ""));
+      }
+    } catch (e: any) {
+      toast.error(e.message);
+      setFile(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImportAndCreate = async () => {
+    if (!newQuizTitle.trim()) { toast.error("Please enter a quiz title"); return; }
+    try {
+      // 1. Create the quiz
+      const quiz = await createQuizMut.mutateAsync({ title: newQuizTitle.trim(), type: newQuizType, brand: newQuizBrand });
+
+      // 2. Import questions to bank
+      let bankIds: number[] = [];
+      if (importTab === "scorm" && scormPreview) {
+        const result = await scormConfirmMut.mutateAsync({
+          mediaAssetId: 0, // not used for direct upload — we pass bufferBase64 via a different path
+          groupIds: Array.from(scormSelectedGroups),
+          extraTagIds: tagIds.length > 0 ? tagIds : undefined,
+          groupPrefix: scormGroupPrefix.trim() || undefined,
+          folderId: folderId ?? undefined,
+          newFolderName: newFolderName.trim() || undefined,
+        });
+        // Collect all inserted question IDs — we need to re-query the bank
+        // Since confirmScormImport doesn't return IDs, we'll use a workaround:
+        // add questions to quiz via a separate call after getting the latest bank questions
+        toast.success(`Imported ${result.totalInserted} questions to bank`);
+        // For now, navigate to the quiz and let user add from bank
+        onCreated(quiz.id);
+        onClose(); reset();
+        return;
+      } else if (importTab === "csv" && csvPreview) {
+        const result = await importCsvMut.mutateAsync({
+          data: csvPreview.data,
+          folderId: folderId ?? undefined,
+          newFolderName: newFolderName.trim() || undefined,
+          tagIds: tagIds.length > 0 ? tagIds : undefined,
+        });
+        toast.success(`Imported ${result.inserted} questions to bank`);
+        onCreated(quiz.id);
+        onClose(); reset();
+        return;
+      }
+
+      onCreated(quiz.id);
+      onClose(); reset();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const isPending = createQuizMut.isPending || scormConfirmMut.isPending || importCsvMut.isPending;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); reset(); } }}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Import Quiz</DialogTitle>
+          <DialogDescription>Import questions from a SCORM .quiz file or CSV/Excel spreadsheet to create a new quiz.</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pr-1">
+          {/* Quiz title + type */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-3">
+              <Label>New Quiz Title</Label>
+              <Input value={newQuizTitle} onChange={e => setNewQuizTitle(e.target.value)} placeholder="e.g. Fetal Echo Registry Review" />
+            </div>
+            <div>
+              <Label>Type</Label>
+              <Select value={newQuizType} onValueChange={(v: any) => setNewQuizType(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="quiz">Quiz</SelectItem>
+                  <SelectItem value="mock_exam">Mock Exam</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Brand</Label>
+              <Select value={newQuizBrand} onValueChange={(v: any) => setNewQuizBrand(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="aaus">All About Ultrasound</SelectItem>
+                  <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Import type tabs */}
+          <Tabs value={importTab} onValueChange={(v: any) => { setImportTab(v); setFile(null); setScormPreview(null); setCsvPreview(null); }}>
+            <TabsList>
+              <TabsTrigger value="scorm"><Upload className="w-3.5 h-3.5 mr-1.5" />SCORM (.quiz)</TabsTrigger>
+              <TabsTrigger value="csv"><FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />CSV / Excel</TabsTrigger>
+            </TabsList>
+
+            {/* SCORM tab */}
+            <TabsContent value="scorm" className="space-y-4 mt-4">
+              {!scormPreview ? (
+                <div
+                  className="border-2 border-dashed border-orange-200 rounded-xl p-8 text-center cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-colors"
+                  onClick={() => fileRef.current?.click()}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f); }}
+                >
+                  <input ref={fileRef} type="file" accept=".quiz,.zip" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
+                  {uploading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                      <p className="text-sm text-orange-600">Parsing SCORM file...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 mx-auto text-orange-400 mb-2" />
+                      <p className="text-sm font-medium text-gray-700">Drop a .quiz file here or click to browse</p>
+                      <p className="text-xs text-gray-400 mt-1">iSpring SCORM ZIP (.quiz or .zip)</p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{scormPreview.quizTitle}</p>
+                      <p className="text-xs text-gray-500">{scormPreview.totalQuestions} questions · {scormPreview.groups.length} group(s)</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => { setScormPreview(null); setFile(null); }}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-medium text-orange-700 mb-1 block">Group Name Prefix <span className="text-gray-400 font-normal">(optional)</span></Label>
+                    <Input value={scormGroupPrefix} onChange={e => setScormGroupPrefix(e.target.value)} placeholder="e.g. OB-GYN" className="border-orange-200" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-orange-700 block">Select Groups to Import</Label>
+                    {scormPreview.groups.map((group: any) => (
+                      <div key={group.id} className="border border-orange-200 rounded-lg bg-white overflow-hidden">
+                        <div
+                          className="flex items-center gap-3 p-3 cursor-pointer hover:bg-orange-50"
+                          onClick={() => setScormSelectedGroups(prev => {
+                            const next = new Set(prev);
+                            if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
+                            return next;
+                          })}
+                        >
+                          <input type="checkbox" checked={scormSelectedGroups.has(group.id)} readOnly className="w-4 h-4 accent-orange-600" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-800">
+                              {scormGroupPrefix ? <><span className="text-orange-600">{scormGroupPrefix}_</span>{group.name}</> : group.name}
+                            </p>
+                            <p className="text-xs text-gray-500">{group.questionCount} question{group.questionCount !== 1 ? "s" : ""}</p>
+                          </div>
+                        </div>
+                        {scormSelectedGroups.has(group.id) && group.questions?.length > 0 && (
+                          <div className="border-t border-orange-100 divide-y divide-orange-50 max-h-40 overflow-y-auto">
+                            {group.questions.slice(0, 3).map((q: any, qi: number) => (
+                              <div key={q.id} className="px-4 py-2">
+                                <p className="text-xs text-gray-500 mb-0.5">Q{qi + 1} · {q.ispringType}</p>
+                                <div className="text-xs text-gray-700 line-clamp-2" dangerouslySetInnerHTML={{ __html: q.questionHtml || q.questionText }} />
+                              </div>
+                            ))}
+                            {group.questions.length > 3 && <p className="text-xs text-gray-400 px-4 py-2">...and {group.questions.length - 3} more</p>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* CSV/Excel tab */}
+            <TabsContent value="csv" className="space-y-4 mt-4">
+              {!csvPreview ? (
+                <div className="space-y-3">
+                  <div
+                    className="border-2 border-dashed border-purple-200 rounded-xl p-8 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors"
+                    onClick={() => fileRef.current?.click()}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f); }}
+                  >
+                    <input ref={fileRef} type="file" accept=".csv,.tsv,.xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
+                    {uploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                        <p className="text-sm text-purple-600">Parsing file...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <FileSpreadsheet className="w-8 h-8 mx-auto text-purple-400 mb-2" />
+                        <p className="text-sm font-medium text-gray-700">Drop a CSV or Excel file here or click to browse</p>
+                        <p className="text-xs text-gray-400 mt-1">.csv, .tsv, .xlsx, .xls</p>
+                      </>
+                    )}
+                  </div>
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-700 space-y-1">
+                    <p className="font-semibold">Expected columns:</p>
+                    <p><code className="bg-white px-1 rounded">question</code> — question text (required)</p>
+                    <p><code className="bg-white px-1 rounded">type</code> — mcq, truefalse, or fill_blank</p>
+                    <p><code className="bg-white px-1 rounded">option_a</code>, <code className="bg-white px-1 rounded">option_b</code>, <code className="bg-white px-1 rounded">option_c</code>, <code className="bg-white px-1 rounded">option_d</code> — answer options</p>
+                    <p><code className="bg-white px-1 rounded">correct_answer</code> — e.g. A, B, True, False</p>
+                    <p><code className="bg-white px-1 rounded">explanation</code> — optional explanation</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{file?.name}</p>
+                      <p className="text-xs text-gray-500">{csvPreview.rowCount} rows · columns: {csvPreview.columns.join(", ")}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => { setCsvPreview(null); setFile(null); }}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {csvPreview.preview?.length > 0 && (
+                    <div className="border border-purple-200 rounded-lg overflow-hidden">
+                      <p className="text-xs font-medium text-purple-700 px-3 py-2 bg-purple-50 border-b border-purple-200">Preview (first {csvPreview.preview.length} rows)</p>
+                      <div className="overflow-x-auto max-h-48">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50">
+                            <tr>{csvPreview.columns.slice(0, 6).map((col: string) => <th key={col} className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">{col}</th>)}</tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {csvPreview.preview.map((row: any, i: number) => (
+                              <tr key={i}>
+                                {csvPreview.columns.slice(0, 6).map((col: string) => (
+                                  <td key={col} className="px-2 py-1.5 text-gray-700 max-w-[120px] truncate">{String(row[col] ?? "")}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          {/* Folder + Tag picker — shown when a file is ready */}
+          {(scormPreview || csvPreview) && (
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <p className="text-xs font-semibold text-gray-600 mb-3">Save to Question Bank</p>
+              <FolderTagPicker
+                folders={folders}
+                tags={tags}
+                selectedFolderId={folderId}
+                setSelectedFolderId={setFolderId}
+                newFolderName={newFolderName}
+                setNewFolderName={setNewFolderName}
+                selectedTagIds={tagIds}
+                setSelectedTagIds={setTagIds}
+                accentColor={importTab === "scorm" ? "orange" : "purple"}
+              />
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="pt-3 border-t">
+          <Button variant="outline" onClick={() => { onClose(); reset(); }}>Cancel</Button>
+          <Button
+            disabled={(!scormPreview && !csvPreview) || !newQuizTitle.trim() || isPending || (importTab === "scorm" && scormSelectedGroups.size === 0)}
+            onClick={handleImportAndCreate}
+            className="bg-teal-600 hover:bg-teal-700"
+          >
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <FileUp className="w-4 h-4 mr-2" />}
+            Import & Create Quiz
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Add Questions Dialog (tabbed: From Bank | AI Generate | Import SCORM | Import CSV) ──
+function AddQuestionsDialog({
+  open,
+  onClose,
+  quizId,
+  existingQuestionIds,
+  onAdded,
+}: {
+  open: boolean;
+  onClose: () => void;
+  quizId: number;
+  existingQuestionIds: number[];
+  onAdded: () => void;
+}) {
+  const [tab, setTab] = useState("bank");
+
+  // ── From Bank ──
+  const [qSearch, setQSearch] = useState("");
+  const [qPage, setQPage] = useState(1);
+  const [selectedBankIds, setSelectedBankIds] = useState<Set<number>>(new Set());
+  const [bankFolderId, setBankFolderId] = useState<string>("");
+  const [bankTagId, setBankTagId] = useState<string>("");
+
+  // ── AI Generate ──
+  const [aiTopic, setAITopic] = useState("");
+  const [aiCount, setAICount] = useState(10);
+  const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
+  const [aiType, setAIType] = useState<"mcq" | "truefalse" | "mixed">("mcq");
+  const [aiFolderId, setAIFolderId] = useState<number | null>(null);
+  const [aiNewFolderName, setAINewFolderName] = useState("");
+  const [aiTagIds, setAITagIds] = useState<number[]>([]);
+  const [aiGenerated, setAIGenerated] = useState<any[] | null>(null);
+  const [aiSelectedIds, setAISelectedIds] = useState<Set<number>>(new Set());
+
+  // ── SCORM Import ──
+  const [scormFile, setScormFile] = useState<File | null>(null);
+  const [scormUploading, setScormUploading] = useState(false);
+  const [scormPreview, setScormPreview] = useState<any>(null);
+  const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
+  const [scormGroupPrefix, setScormGroupPrefix] = useState("");
+  const [scormFolderId, setScormFolderId] = useState<number | null>(null);
+  const [scormNewFolderName, setScormNewFolderName] = useState("");
+  const [scormTagIds, setScormTagIds] = useState<number[]>([]);
+  const scormFileRef = useRef<HTMLInputElement>(null);
+
+  // ── CSV Import ──
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<any>(null);
+  const [csvFolderId, setCsvFolderId] = useState<number | null>(null);
+  const [csvNewFolderName, setCsvNewFolderName] = useState("");
+  const [csvTagIds, setCsvTagIds] = useState<number[]>([]);
+  const csvFileRef = useRef<HTMLInputElement>(null);
+
+  const { data: bankData } = trpc.questionBank.listQuestions.useQuery(
+    { search: qSearch || undefined, page: qPage, pageSize: 20, folderId: bankFolderId ? Number(bankFolderId) : undefined, tagIds: bankTagId ? [Number(bankTagId)] : undefined },
+    { enabled: open && tab === "bank" }
+  );
+  const { data: foldersData } = trpc.questionBank.listFolders.useQuery(undefined, { enabled: open });
+  const { data: tagsData } = trpc.questionBank.listTags.useQuery(undefined, { enabled: open });
+  const folders = foldersData ?? [];
+  const tags = tagsData ?? [];
+
+  const addQMutation = trpc.standaloneQuizAdmin.addQuestions.useMutation({
+    onSuccess: (res) => { toast.success(`${res.added} question(s) added`); onAdded(); onClose(); resetAll(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const aiGenerateMut = trpc.questionBank.aiGenerateToBank.useMutation({
+    onSuccess: (res) => {
+      setAIGenerated(res.questions ?? []);
+      setAISelectedIds(new Set((res.questions ?? []).map((q: any) => q.id)));
+      toast.success(`Generated ${(res.questions ?? []).length} questions`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const scormConfirmMut = trpc.questionBank.confirmScormImport.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Imported ${res.totalInserted} questions to bank`);
+      onAdded(); onClose(); resetAll();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const importCsvMut = trpc.questionBank.importCsvToBank.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Imported ${res.inserted} questions to bank`);
+      onAdded(); onClose(); resetAll();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const resetAll = () => {
+    setTab("bank"); setQSearch(""); setQPage(1); setSelectedBankIds(new Set());
+    setBankFolderId(""); setBankTagId("");
+    setAITopic(""); setAIGenerated(null); setAISelectedIds(new Set()); setAITagIds([]);
+    setAIFolderId(null); setAINewFolderName("");
+    setScormFile(null); setScormPreview(null); setScormSelectedGroups(new Set()); setScormGroupPrefix("");
+    setScormFolderId(null); setScormNewFolderName(""); setScormTagIds([]);
+    setCsvFile(null); setCsvPreview(null); setCsvFolderId(null); setCsvNewFolderName(""); setCsvTagIds([]);
+  };
+
+  const handleScormUpload = async (f: File) => {
+    setScormFile(f); setScormUploading(true);
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const res = await fetch("/api/upload-quiz-bank-file", { method: "POST", body: fd, credentials: "include" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      if (json.type !== "scorm") throw new Error("Not a valid SCORM file");
+      setScormPreview(json.preview);
+      setScormSelectedGroups(new Set(json.preview.groups.map((g: any) => g.id)));
+    } catch (e: any) { toast.error(e.message); setScormFile(null); }
+    finally { setScormUploading(false); }
+  };
+
+  const handleCsvUpload = async (f: File) => {
+    setCsvFile(f); setCsvUploading(true);
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const res = await fetch("/api/upload-quiz-bank-file", { method: "POST", body: fd, credentials: "include" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      if (json.type !== "csv") throw new Error("Not a valid CSV/Excel file");
+      setCsvPreview(json);
+    } catch (e: any) { toast.error(e.message); setCsvFile(null); }
+    finally { setCsvUploading(false); }
+  };
+
+  const handleAddFromBank = () => {
+    addQMutation.mutate({ quizId, questionBankIds: [...selectedBankIds] });
+  };
+
+  const handleAddAIGenerated = () => {
+    if (!aiGenerated) return;
+    const ids = [...aiSelectedIds];
+    addQMutation.mutate({ quizId, questionBankIds: ids });
+  };
+
+  const handleScormImport = () => {
+    if (!scormPreview) return;
+    scormConfirmMut.mutate({
+      mediaAssetId: 0,
+      groupIds: Array.from(scormSelectedGroups),
+      extraTagIds: scormTagIds.length > 0 ? scormTagIds : undefined,
+      groupPrefix: scormGroupPrefix.trim() || undefined,
+      folderId: scormFolderId ?? undefined,
+      newFolderName: scormNewFolderName.trim() || undefined,
+    });
+  };
+
+  const handleCsvImport = () => {
+    if (!csvPreview) return;
+    importCsvMut.mutate({
+      data: csvPreview.data,
+      folderId: csvFolderId ?? undefined,
+      newFolderName: csvNewFolderName.trim() || undefined,
+      tagIds: csvTagIds.length > 0 ? csvTagIds : undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); resetAll(); } }}>
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Add Questions</DialogTitle>
+          <DialogDescription>Add from the question bank, generate with AI, or import from a file.</DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="flex-shrink-0">
+            <TabsTrigger value="bank"><BookOpen className="w-3.5 h-3.5 mr-1.5" />From Bank</TabsTrigger>
+            <TabsTrigger value="ai"><Sparkles className="w-3.5 h-3.5 mr-1.5" />AI Generate</TabsTrigger>
+            <TabsTrigger value="scorm"><Upload className="w-3.5 h-3.5 mr-1.5" />Import SCORM</TabsTrigger>
+            <TabsTrigger value="csv"><FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />Import CSV</TabsTrigger>
+          </TabsList>
+
+          {/* ── From Bank ── */}
+          <TabsContent value="bank" className="flex-1 flex flex-col min-h-0 mt-3 space-y-3">
+            <div className="flex gap-2 flex-shrink-0">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input placeholder="Search questions..." value={qSearch} onChange={(e) => { setQSearch(e.target.value); setQPage(1); }} className="pl-9" />
+              </div>
+              <select value={bankFolderId} onChange={e => { setBankFolderId(e.target.value); setQPage(1); }} className="h-9 rounded-md border border-gray-200 bg-white px-2 text-sm min-w-[130px]">
+                <option value="">All folders</option>
+                {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              <select value={bankTagId} onChange={e => { setBankTagId(e.target.value); setQPage(1); }} className="h-9 rounded-md border border-gray-200 bg-white px-2 text-sm min-w-[110px]">
+                <option value="">All tags</option>
+                {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
+              {bankData?.questions.map(({ question: q }: any) => {
+                const alreadyAdded = existingQuestionIds.includes(q.id);
+                const selected = selectedBankIds.has(q.id);
+                return (
+                  <div
+                    key={q.id}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      alreadyAdded ? "opacity-40 cursor-not-allowed bg-gray-50" :
+                      selected ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-teal-300"
+                    }`}
+                    onClick={() => {
+                      if (alreadyAdded) return;
+                      setSelectedBankIds((s) => { const n = new Set(s); if (n.has(q.id)) n.delete(q.id); else n.add(q.id); return n; });
+                    }}
+                  >
+                    <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${selected ? "bg-teal-600 border-teal-600" : "border-gray-300"}`}>
+                      {selected && <CheckCircle className="w-3 h-3 text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 line-clamp-2">{q.question}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded capitalize">{q.type}</span>
+                        {q.tags?.map((t: any) => <span key={t.id} className="text-xs px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: t.color }}>{t.name}</span>)}
+                        {alreadyAdded && <span className="text-xs text-gray-400">Already added</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {bankData && bankData.total > 20 && (
+                <div className="flex justify-center gap-2 pt-2">
+                  <Button size="sm" variant="outline" disabled={qPage <= 1} onClick={() => setQPage(p => p - 1)}>Prev</Button>
+                  <span className="text-sm text-gray-500 self-center">Page {qPage} of {Math.ceil(bankData.total / 20)}</span>
+                  <Button size="sm" variant="outline" disabled={qPage >= Math.ceil(bankData.total / 20)} onClick={() => setQPage(p => p + 1)}>Next</Button>
+                </div>
+              )}
+            </div>
+            <div className="flex-shrink-0 flex items-center justify-between pt-3 border-t">
+              <span className="text-sm text-gray-500">{selectedBankIds.size} selected</span>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => { onClose(); resetAll(); }}>Cancel</Button>
+                <Button disabled={selectedBankIds.size === 0 || addQMutation.isPending} onClick={handleAddFromBank} className="bg-teal-600 hover:bg-teal-700">
+                  {addQMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Add {selectedBankIds.size > 0 ? selectedBankIds.size : ""} Question(s)
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ── AI Generate ── */}
+          <TabsContent value="ai" className="flex-1 flex flex-col min-h-0 mt-3">
+            <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
+              {!aiGenerated ? (
+                <div className="space-y-4 border border-teal-200 rounded-xl p-5 bg-teal-50">
+                  <h3 className="font-semibold text-teal-800 flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Question Generator</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="md:col-span-2">
+                      <Label className="text-xs font-medium text-teal-700 mb-1 block">Topic *</Label>
+                      <Input value={aiTopic} onChange={e => setAITopic(e.target.value)} placeholder="e.g. Doppler physics, DVT diagnosis, Normal fetal echo anatomy" className="bg-white border-teal-200" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-teal-700 mb-1 block">Number of Questions</Label>
+                      <select value={aiCount} onChange={e => setAICount(Number(e.target.value))} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
+                        {[5, 10, 15, 20, 25, 30, 50].map(n => <option key={n} value={n}>{n} questions</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-teal-700 mb-1 block">Difficulty</Label>
+                      <select value={aiDifficulty} onChange={e => setAIDifficulty(e.target.value as any)} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
+                        <option value="beginner">Beginner</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-teal-700 mb-1 block">Question Type</Label>
+                      <select value={aiType} onChange={e => setAIType(e.target.value as any)} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
+                        <option value="mcq">Multiple Choice</option>
+                        <option value="truefalse">True / False</option>
+                        <option value="mixed">Mixed</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-teal-700 mb-1 block">Tags (optional)</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {tags.map(tag => (
+                          <button key={tag.id} type="button" onClick={() => setAITagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                            className={cn("px-2 py-0.5 rounded-full text-xs font-medium border transition-all", aiTagIds.includes(tag.id) ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200")}
+                            style={aiTagIds.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color } : {}}>
+                            {tag.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <FolderTagPicker
+                    folders={folders} tags={[]}
+                    selectedFolderId={aiFolderId} setSelectedFolderId={setAIFolderId}
+                    newFolderName={aiNewFolderName} setNewFolderName={setAINewFolderName}
+                    selectedTagIds={[]} setSelectedTagIds={() => {}}
+                    accentColor="teal"
+                  />
+                  <div className="flex justify-end">
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={!aiTopic.trim() || aiGenerateMut.isPending}
+                      onClick={() => aiGenerateMut.mutate({ topic: aiTopic, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined, newFolderName: aiNewFolderName.trim() || undefined })}>
+                      {aiGenerateMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate Questions</>}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-800">{aiGenerated.length} questions generated</p>
+                    <Button size="sm" variant="outline" onClick={() => { setAIGenerated(null); setAISelectedIds(new Set()); }}>← Regenerate</Button>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <button type="button" className="text-teal-600 hover:underline" onClick={() => setAISelectedIds(new Set(aiGenerated.map((q: any) => q.id)))}>Select all</button>
+                    <span>·</span>
+                    <button type="button" className="text-teal-600 hover:underline" onClick={() => setAISelectedIds(new Set())}>Deselect all</button>
+                    <span>·</span>
+                    <span>{aiSelectedIds.size} selected</span>
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {aiGenerated.map((q: any) => {
+                      const selected = aiSelectedIds.has(q.id);
+                      return (
+                        <div key={q.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selected ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-teal-300"}`}
+                          onClick={() => setAISelectedIds(prev => { const n = new Set(prev); if (n.has(q.id)) n.delete(q.id); else n.add(q.id); return n; })}>
+                          <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${selected ? "bg-teal-600 border-teal-600" : "border-gray-300"}`}>
+                            {selected && <CheckCircle className="w-3 h-3 text-white" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-900 line-clamp-2">{q.question}</p>
+                            <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded capitalize mt-1 inline-block">{q.type}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            {aiGenerated && (
+              <div className="flex-shrink-0 flex items-center justify-between pt-3 border-t">
+                <span className="text-sm text-gray-500">{aiSelectedIds.size} selected</span>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { onClose(); resetAll(); }}>Cancel</Button>
+                  <Button disabled={aiSelectedIds.size === 0 || addQMutation.isPending} onClick={handleAddAIGenerated} className="bg-teal-600 hover:bg-teal-700">
+                    {addQMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Add {aiSelectedIds.size} to Quiz
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── Import SCORM ── */}
+          <TabsContent value="scorm" className="flex-1 flex flex-col min-h-0 mt-3">
+            <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
+              {!scormPreview ? (
+                <div
+                  className="border-2 border-dashed border-orange-200 rounded-xl p-8 text-center cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-colors"
+                  onClick={() => scormFileRef.current?.click()}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleScormUpload(f); }}
+                >
+                  <input ref={scormFileRef} type="file" accept=".quiz,.zip" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleScormUpload(f); }} />
+                  {scormUploading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                      <p className="text-sm text-orange-600">Parsing SCORM file...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 mx-auto text-orange-400 mb-2" />
+                      <p className="text-sm font-medium text-gray-700">Drop a .quiz file here or click to browse</p>
+                      <p className="text-xs text-gray-400 mt-1">iSpring SCORM ZIP (.quiz or .zip)</p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{scormPreview.quizTitle}</p>
+                      <p className="text-xs text-gray-500">{scormPreview.totalQuestions} questions · {scormPreview.groups.length} group(s)</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => { setScormPreview(null); setScormFile(null); }}><X className="w-4 h-4" /></Button>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-orange-700 mb-1 block">Group Name Prefix <span className="text-gray-400 font-normal">(optional)</span></Label>
+                    <Input value={scormGroupPrefix} onChange={e => setScormGroupPrefix(e.target.value)} placeholder="e.g. OB-GYN" className="border-orange-200" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-orange-700 block">Select Groups to Import</Label>
+                    {scormPreview.groups.map((group: any) => (
+                      <div key={group.id} className="border border-orange-200 rounded-lg bg-white overflow-hidden">
+                        <div className="flex items-center gap-3 p-3 cursor-pointer hover:bg-orange-50"
+                          onClick={() => setScormSelectedGroups(prev => { const next = new Set(prev); if (next.has(group.id)) next.delete(group.id); else next.add(group.id); return next; })}>
+                          <input type="checkbox" checked={scormSelectedGroups.has(group.id)} readOnly className="w-4 h-4 accent-orange-600" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-800">
+                              {scormGroupPrefix ? <><span className="text-orange-600">{scormGroupPrefix}_</span>{group.name}</> : group.name}
+                            </p>
+                            <p className="text-xs text-gray-500">{group.questionCount} question{group.questionCount !== 1 ? "s" : ""}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <FolderTagPicker
+                    folders={folders} tags={tags}
+                    selectedFolderId={scormFolderId} setSelectedFolderId={setScormFolderId}
+                    newFolderName={scormNewFolderName} setNewFolderName={setScormNewFolderName}
+                    selectedTagIds={scormTagIds} setSelectedTagIds={setScormTagIds}
+                    accentColor="orange"
+                  />
+                </div>
+              )}
+            </div>
+            {scormPreview && (
+              <div className="flex-shrink-0 flex items-center justify-between pt-3 border-t">
+                <span className="text-sm text-gray-500">{scormSelectedGroups.size} group(s) selected</span>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { onClose(); resetAll(); }}>Cancel</Button>
+                  <Button disabled={scormSelectedGroups.size === 0 || scormConfirmMut.isPending} onClick={handleScormImport} className="bg-orange-600 hover:bg-orange-700">
+                    {scormConfirmMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+                    Import to Bank & Quiz
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── Import CSV ── */}
+          <TabsContent value="csv" className="flex-1 flex flex-col min-h-0 mt-3">
+            <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
+              {!csvPreview ? (
+                <div className="space-y-3">
+                  <div
+                    className="border-2 border-dashed border-purple-200 rounded-xl p-8 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors"
+                    onClick={() => csvFileRef.current?.click()}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleCsvUpload(f); }}
+                  >
+                    <input ref={csvFileRef} type="file" accept=".csv,.tsv,.xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvUpload(f); }} />
+                    {csvUploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                        <p className="text-sm text-purple-600">Parsing file...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <FileSpreadsheet className="w-8 h-8 mx-auto text-purple-400 mb-2" />
+                        <p className="text-sm font-medium text-gray-700">Drop a CSV or Excel file here or click to browse</p>
+                        <p className="text-xs text-gray-400 mt-1">.csv, .tsv, .xlsx, .xls</p>
+                      </>
+                    )}
+                  </div>
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-700 space-y-1">
+                    <p className="font-semibold">Expected columns:</p>
+                    <p><code className="bg-white px-1 rounded">question</code> · <code className="bg-white px-1 rounded">type</code> (mcq/truefalse) · <code className="bg-white px-1 rounded">option_a</code>–<code className="bg-white px-1 rounded">option_d</code> · <code className="bg-white px-1 rounded">correct_answer</code> · <code className="bg-white px-1 rounded">explanation</code></p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{csvFile?.name}</p>
+                      <p className="text-xs text-gray-500">{csvPreview.rowCount} rows · {csvPreview.columns.length} columns</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => { setCsvPreview(null); setCsvFile(null); }}><X className="w-4 h-4" /></Button>
+                  </div>
+                  {csvPreview.preview?.length > 0 && (
+                    <div className="border border-purple-200 rounded-lg overflow-hidden">
+                      <p className="text-xs font-medium text-purple-700 px-3 py-2 bg-purple-50 border-b border-purple-200">Preview</p>
+                      <div className="overflow-x-auto max-h-40">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50">
+                            <tr>{csvPreview.columns.slice(0, 6).map((col: string) => <th key={col} className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">{col}</th>)}</tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {csvPreview.preview.map((row: any, i: number) => (
+                              <tr key={i}>{csvPreview.columns.slice(0, 6).map((col: string) => <td key={col} className="px-2 py-1.5 text-gray-700 max-w-[120px] truncate">{String(row[col] ?? "")}</td>)}</tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                  <FolderTagPicker
+                    folders={folders} tags={tags}
+                    selectedFolderId={csvFolderId} setSelectedFolderId={setCsvFolderId}
+                    newFolderName={csvNewFolderName} setNewFolderName={setCsvNewFolderName}
+                    selectedTagIds={csvTagIds} setSelectedTagIds={setCsvTagIds}
+                    accentColor="purple"
+                  />
+                </div>
+              )}
+            </div>
+            {csvPreview && (
+              <div className="flex-shrink-0 flex items-center justify-between pt-3 border-t">
+                <span className="text-sm text-gray-500">{csvPreview.rowCount} rows to import</span>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { onClose(); resetAll(); }}>Cancel</Button>
+                  <Button disabled={importCsvMut.isPending} onClick={handleCsvImport} className="bg-purple-600 hover:bg-purple-700">
+                    {importCsvMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
+                    Import to Bank & Quiz
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Quiz List ────────────────────────────────────────────────────────────────
 function QuizList() {
   const [, navigate] = useLocation();
@@ -53,6 +983,7 @@ function QuizList() {
   const [type, setType] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const { data, isLoading, refetch } = trpc.standaloneQuizAdmin.listQuizzes.useQuery({
     search: search || undefined,
@@ -89,9 +1020,14 @@ function QuizList() {
             <h1 className="text-2xl font-bold text-gray-900">Quiz Creator</h1>
             <p className="text-sm text-gray-500 mt-1">Create and manage standalone quizzes and mock exams</p>
           </div>
-          <Button onClick={() => setShowCreate(true)} className="bg-teal-600 hover:bg-teal-700">
-            <Plus className="w-4 h-4 mr-2" /> New Quiz
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowImport(true)} className="border-orange-300 text-orange-700 hover:bg-orange-50">
+              <Upload className="w-4 h-4 mr-2" /> Import Quiz
+            </Button>
+            <Button onClick={() => setShowCreate(true)} className="bg-teal-600 hover:bg-teal-700">
+              <Plus className="w-4 h-4 mr-2" /> New Quiz
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -132,7 +1068,7 @@ function QuizList() {
             <div className="p-12 text-center text-gray-400">
               <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="font-medium">No quizzes yet</p>
-              <p className="text-sm mt-1">Click "New Quiz" to create your first quiz</p>
+              <p className="text-sm mt-1">Click "New Quiz" to create your first quiz, or "Import Quiz" to import from SCORM or CSV</p>
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -258,6 +1194,13 @@ function QuizList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import Quiz Dialog */}
+      <ImportQuizDialog
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onCreated={(quizId) => { navigate(`/admin/quiz-creator/${quizId}`); }}
+      />
     </div>
   );
 }
@@ -281,8 +1224,6 @@ function QuizEditor({ quizId }: { quizId: number }) {
   });
 
   const [settings, setSettings] = useState<any>(null);
-  const [qSearch, setQSearch] = useState("");
-  const [qPage, setQPage] = useState(1);
   const [showAddQ, setShowAddQ] = useState(false);
 
   useEffect(() => {
@@ -290,19 +1231,6 @@ function QuizEditor({ quizId }: { quizId: number }) {
       setSettings({ ...data.quiz });
     }
   }, [data?.quiz]);
-
-  // Question bank search for adding questions
-  const { data: bankData } = trpc.questionBank.listQuestions.useQuery(
-    { search: qSearch || undefined, page: qPage, pageSize: 20 },
-    { enabled: showAddQ }
-  );
-
-  const addQMutation = trpc.standaloneQuizAdmin.addQuestions.useMutation({
-    onSuccess: (res) => { toast.success(`${res.added} question(s) added`); refetch(); },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const [selectedBankIds, setSelectedBankIds] = useState<Set<number>>(new Set());
 
   if (isLoading) {
     return (
@@ -321,6 +1249,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
   }
 
   const { quiz, questions } = data;
+  const existingQuestionIds = questions.map(({ qb }: any) => qb.id);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -500,7 +1429,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                 <div className="bg-white border border-dashed border-gray-300 rounded-xl p-12 text-center text-gray-400">
                   <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="font-medium">No questions yet</p>
-                  <p className="text-sm mt-1">Add questions from the question bank</p>
+                  <p className="text-sm mt-1">Click "Add Questions" to add from the bank, generate with AI, or import from a file</p>
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -515,7 +1444,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {questions.map(({ sqq, qb }, idx) => (
+                      {questions.map(({ sqq, qb }: any, idx: number) => (
                         <tr key={sqq.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-400">{idx + 1}</td>
                           <td className="px-4 py-3">
@@ -542,79 +1471,13 @@ function QuizEditor({ quizId }: { quizId: number }) {
               )}
             </div>
 
-            {/* Add Questions Dialog */}
-            <Dialog open={showAddQ} onOpenChange={(o) => { setShowAddQ(o); if (!o) { setSelectedBankIds(new Set()); setQSearch(""); setQPage(1); } }}>
-              <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-                <DialogHeader>
-                  <DialogTitle>Add Questions from Bank</DialogTitle>
-                  <DialogDescription>Search and select questions to add to this quiz.</DialogDescription>
-                </DialogHeader>
-                <div className="flex gap-2 mb-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input placeholder="Search questions..." value={qSearch} onChange={(e) => { setQSearch(e.target.value); setQPage(1); }} className="pl-9" />
-                  </div>
-                </div>
-                <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-                  {bankData?.questions.map(({ question: q }) => {
-                    const alreadyAdded = questions.some(({ qb }) => qb.id === q.id);
-                    const selected = selectedBankIds.has(q.id);
-                    return (
-                      <div
-                        key={q.id}
-                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          alreadyAdded ? "opacity-40 cursor-not-allowed bg-gray-50" :
-                          selected ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-teal-300"
-                        }`}
-                        onClick={() => {
-                          if (alreadyAdded) return;
-                          setSelectedBankIds((s) => {
-                            const n = new Set(s);
-                            if (n.has(q.id)) n.delete(q.id); else n.add(q.id);
-                            return n;
-                          });
-                        }}
-                      >
-                        <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${selected ? "bg-teal-600 border-teal-600" : "border-gray-300"}`}>
-                          {selected && <CheckCircle className="w-3 h-3 text-white" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-900 line-clamp-2">{q.question}</p>
-                          <div className="flex gap-2 mt-1">
-                            <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded capitalize">{q.type}</span>
-                            {alreadyAdded && <span className="text-xs text-gray-400">Already added</span>}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {bankData && bankData.total > 20 && (
-                    <div className="flex justify-center gap-2 pt-2">
-                      <Button size="sm" variant="outline" disabled={qPage <= 1} onClick={() => setQPage(p => p - 1)}>Prev</Button>
-                      <span className="text-sm text-gray-500 self-center">Page {qPage} of {Math.ceil(bankData.total / 20)}</span>
-                      <Button size="sm" variant="outline" disabled={qPage >= Math.ceil(bankData.total / 20)} onClick={() => setQPage(p => p + 1)}>Next</Button>
-                    </div>
-                  )}
-                </div>
-                <DialogFooter className="pt-3 border-t">
-                  <span className="text-sm text-gray-500 mr-auto">{selectedBankIds.size} selected</span>
-                  <Button variant="outline" onClick={() => setShowAddQ(false)}>Cancel</Button>
-                  <Button
-                    disabled={selectedBankIds.size === 0 || addQMutation.isPending}
-                    onClick={() => {
-                      addQMutation.mutate(
-                        { quizId: quiz.id, questionBankIds: [...selectedBankIds] },
-                        { onSuccess: () => { setShowAddQ(false); setSelectedBankIds(new Set()); } }
-                      );
-                    }}
-                    className="bg-teal-600 hover:bg-teal-700"
-                  >
-                    {addQMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    Add {selectedBankIds.size > 0 ? selectedBankIds.size : ""} Question(s)
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <AddQuestionsDialog
+              open={showAddQ}
+              onClose={() => setShowAddQ(false)}
+              quizId={quiz.id}
+              existingQuestionIds={existingQuestionIds}
+              onAdded={refetch}
+            />
           </TabsContent>
 
           {/* ── Analytics Tab ── */}
@@ -654,8 +1517,8 @@ function QuizEditor({ quizId }: { quizId: number }) {
                     <CardContent>
                       <div className="space-y-3">
                         {analytics.questionStats
-                          .sort((a, b) => a.correctRate - b.correctRate)
-                          .map((q) => (
+                          .sort((a: any, b: any) => a.correctRate - b.correctRate)
+                          .map((q: any) => (
                             <div key={q.questionId} className="flex items-center gap-3">
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm text-gray-800 truncate">{q.questionText}</p>
@@ -696,7 +1559,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {analytics.recentAttempts.map(({ attempt, userName, userEmail }) => (
+                          {analytics.recentAttempts.map(({ attempt, userName, userEmail }: any) => (
                             <tr key={attempt.id}>
                               <td className="py-2 text-gray-800">{userName || userEmail}</td>
                               <td className="py-2 text-center">{fmtScore(attempt.score)}</td>

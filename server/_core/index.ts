@@ -18,6 +18,7 @@ import { registerAuthLoginRoute } from "../routes/authLogin";
 import { registerMediaServeRoutes } from "../routes/mediaServe";
 import { registerUploadMediaRepoRoute } from "../routes/uploadMediaRepo";
 import { registerUploadCourseImageRoute } from "../routes/uploadCourseImage";
+import { registerUploadQuizBankFileRoute } from "../routes/uploadQuizBankFile";
 import { registerUploadDigitalFileRoute } from "../routes/uploadDigitalFile";
 import { registerUploadCohortMediaRoute } from "../routes/uploadCohortMedia";
 import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResource";
@@ -233,6 +234,8 @@ async function startServer() {
   registerUploadMediaRepoRoute(app);
   // Course/landing-page image upload (multipart, bypasses JSON body limit)
   registerUploadCourseImageRoute(app);
+  // Quiz bank direct file upload (SCORM .quiz, CSV, XLSX — bypasses media library)
+  registerUploadQuizBankFileRoute(app);
   // Digital download file upload (multipart, bypasses JSON body limit)
   registerUploadDigitalFileRoute(app);
   // Cohort group discussion media upload (images + videos, admin only)

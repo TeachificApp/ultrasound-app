@@ -22,6 +22,7 @@ import {
 } from "../../drizzle/schema";
 import { parseISpringQuizFromBuffer } from "../lib/iSpringQuizParser";
 import { storagePut, storageGet } from "../storage";
+import * as XLSX from "xlsx";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -305,6 +306,8 @@ export const questionBankRouter = router({
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
       questionType: z.enum(["mcq", "truefalse", "mixed"]).default("mcq"),
       tagIds: z.array(z.number().int()).optional(),
+      folderId: z.number().int().optional(),
+      newFolderName: z.string().max(200).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -363,6 +366,19 @@ export const questionBankRouter = router({
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       const questions: any[] = (parsed.questions ?? []).slice(0, input.count);
 
+      // Resolve or create folder
+      let resolvedFolderId: number | null = null;
+      if (input.newFolderName?.trim()) {
+        const [newFolder] = await db.insert(questionBankFolders).values({
+          name: input.newFolderName.trim(),
+          color: "#179ca3",
+          createdByAdminId: ctx.user.id,
+        }).$returningId();
+        resolvedFolderId = newFolder.id;
+      } else if (input.folderId) {
+        resolvedFolderId = input.folderId;
+      }
+
       const inserted: number[] = [];
       for (const q of questions) {
         const opts = Array.isArray(q.options) ? q.options.map((o: string) => ({ text: o })) : [];
@@ -372,6 +388,7 @@ export const questionBankRouter = router({
           options: opts.length > 0 ? JSON.stringify(opts) : null,
           correctAnswer: q.correctAnswer,
           explanation: q.explanation ?? null,
+          folderId: resolvedFolderId,
           createdByAdminId: ctx.user.id,
         }).$returningId();
         inserted.push(result.id);
@@ -380,7 +397,100 @@ export const questionBankRouter = router({
         }
       }
 
-      return { inserted: inserted.length, ids: inserted };
+      return { inserted: inserted.length, ids: inserted, folderId: resolvedFolderId };
+    }),
+
+  // ─── Import CSV/Excel into Bank ────────────────────────────────────────────
+  /**
+   * importCsvToBank — parse a CSV/TSV/XLSX data string and insert questions.
+   * Expected columns (case-insensitive):
+   *   question | type (mcq/truefalse) | option_a..option_d | correct_answer | explanation
+   * Returns { inserted, folderId }
+   */
+  importCsvToBank: protectedProcedure
+    .input(z.object({
+      /** Raw CSV/TSV string OR base64-encoded XLSX bytes prefixed with "base64:" */
+      data: z.string().min(1),
+      tagIds: z.array(z.number().int()).optional(),
+      folderId: z.number().int().optional(),
+      newFolderName: z.string().max(200).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Resolve or create folder
+      let resolvedFolderId: number | null = null;
+      if (input.newFolderName?.trim()) {
+        const [newFolder] = await db.insert(questionBankFolders).values({
+          name: input.newFolderName.trim(),
+          color: "#179ca3",
+          createdByAdminId: ctx.user.id,
+        }).$returningId();
+        resolvedFolderId = newFolder.id;
+      } else if (input.folderId) {
+        resolvedFolderId = input.folderId;
+      }
+
+      // Parse the data into rows
+      let rows: Record<string, string>[] = [];
+      if (input.data.startsWith("base64:")) {
+        const buf = Buffer.from(input.data.slice(7), "base64");
+        const wb = XLSX.read(buf, { type: "buffer" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, string>[];
+      } else {
+        // CSV/TSV — use XLSX to parse
+        const wb = XLSX.read(input.data, { type: "string" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, string>[];
+      }
+
+      // Normalize column names to lowercase with underscores
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      const normalizedRows = rows.map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [norm(k), String(v ?? "").trim()])));
+
+      const inserted: number[] = [];
+      for (const row of normalizedRows) {
+        const questionText = row["question"] || row["question_text"] || row["stem"] || "";
+        if (!questionText) continue;
+
+        const rawType = (row["type"] || row["question_type"] || "mcq").toLowerCase();
+        const qType: "mcq" | "truefalse" = rawType.includes("true") || rawType.includes("tf") ? "truefalse" : "mcq";
+
+        // Build options array from option_a..option_d or a..d columns
+        const optKeys = ["option_a","option_b","option_c","option_d","a","b","c","d","choice_1","choice_2","choice_3","choice_4"];
+        const optPairs = [
+          ["option_a","a","choice_1"], ["option_b","b","choice_2"],
+          ["option_c","c","choice_3"], ["option_d","d","choice_4"],
+        ];
+        const opts: { text: string }[] = [];
+        for (const keys of optPairs) {
+          const val = keys.map(k => row[k]).find(v => v);
+          if (val) opts.push({ text: val });
+        }
+
+        const correctAnswer = row["correct_answer"] || row["answer"] || row["correct"] || "";
+        const explanation = row["explanation"] || row["rationale"] || row["feedback"] || "";
+
+        const [result] = await db.insert(questionBank).values({
+          question: questionText,
+          type: qType,
+          options: opts.length > 0 ? JSON.stringify(opts) : null,
+          correctAnswer,
+          explanation: explanation || null,
+          folderId: resolvedFolderId,
+          createdByAdminId: ctx.user.id,
+        }).$returningId();
+        inserted.push(result.id);
+
+        if (input.tagIds && input.tagIds.length > 0) {
+          await db.insert(questionBankTagMap).values(input.tagIds.map(tagId => ({ questionId: result.id, tagId })));
+        }
+      }
+
+      return { inserted: inserted.length, ids: inserted, folderId: resolvedFolderId };
     }),
 
   // ─── Import bank questions into a quiz ────────────────────────────────────
@@ -569,6 +679,10 @@ export const questionBankRouter = router({
       extraTagIds: z.array(z.number().int()).optional(),
       /** Optional: prefix to prepend to each group tag name, e.g. "OB-GYN" → "OB-GYN_TRUE-FALSE" */
       groupPrefix: z.string().optional(),
+      /** Optional: save to existing folder */
+      folderId: z.number().int().optional(),
+      /** Optional: create a new folder with this name and save questions there */
+      newFolderName: z.string().max(200).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -590,6 +704,19 @@ export const questionBankRouter = router({
         parsed = await parseISpringQuizFromBuffer(zipBuffer);
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
+      }
+
+      // Resolve or create folder
+      let resolvedFolderId: number | null = null;
+      if (input.newFolderName?.trim()) {
+        const [newFolder] = await db.insert(questionBankFolders).values({
+          name: input.newFolderName.trim(),
+          color: "#179ca3",
+          createdByAdminId: ctx.user.id,
+        }).$returningId();
+        resolvedFolderId = newFolder.id;
+      } else if (input.folderId) {
+        resolvedFolderId = input.folderId;
       }
 
       // Filter groups if requested
@@ -642,6 +769,7 @@ export const questionBankRouter = router({
             options: JSON.stringify(options),
             correctAnswer,
             explanation: q.explanationHtml || q.explanationText || null,
+            folderId: resolvedFolderId,
             createdByAdminId: ctx.user.id,
           }).$returningId();
 
