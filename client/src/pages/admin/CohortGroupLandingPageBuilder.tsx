@@ -27,7 +27,7 @@ import {
   uid, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, LandingBlockTemplatesTab,
 } from "./LandingPageBuilder";
 import {
-  ArrowLeft, Save, Eye, Plus, X, Layers, Copy, Search, Bookmark, BookOpen, Globe, FolderOpen, Trash2,
+  ArrowLeft, Save, Eye, Plus, X, Layers, Copy, Search, Bookmark, BookOpen, Globe, FolderOpen, Trash2, CalendarDays,
 } from "lucide-react";
 
 export default function CohortGroupLandingPageBuilder() {
@@ -46,6 +46,27 @@ export default function CohortGroupLandingPageBuilder() {
   const [pageInfo, setPageInfo] = useState<{ name: string; courseSlug?: string } | null>(null);
 
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
+  const [embedView, setEmbedView] = useState<"calendar" | "list">("calendar");
+  const [embedColor, setEmbedColor] = useState("#149096");
+  const [embedHeight, setEmbedHeight] = useState(600);
+  const [embedCopied, setEmbedCopied] = useState(false);
+
+  const getEmbedUrl = (view: string, color: string) => {
+    const base = window.location.origin;
+    const params = new URLSearchParams({ view, color: color.replace("#", "") });
+    return `${base}/embed/cohort-sessions/${numericCohortGroupId}?${params.toString()}`;
+  };
+  const getEmbedCode = () => {
+    const url = getEmbedUrl(embedView, embedColor);
+    return `<iframe src="${url}" width="100%" height="${embedHeight}" frameborder="0" style="border:none;border-radius:12px;" allowtransparency="true"></iframe>`;
+  };
+  const copyEmbed = () => {
+    navigator.clipboard.writeText(getEmbedCode()).then(() => {
+      setEmbedCopied(true);
+      setTimeout(() => setEmbedCopied(false), 2000);
+    });
+  };
   const [pickerTab, setPickerTab] = useState<"catalog" | "from_pages" | "templates" | "import_url">("catalog");
   const [activeCat, setActiveCat] = useState<string>("Layout");
   const [blockSearch, setBlockSearch] = useState("");
@@ -319,6 +340,10 @@ export default function CohortGroupLandingPageBuilder() {
               <Eye className="w-4 h-4" /> Preview Course
             </Button>
           )}
+          <Button variant="outline" size="sm" className="gap-1 border-teal-300 text-teal-700 hover:bg-teal-50"
+            onClick={() => setEmbedDialogOpen(true)}>
+            <CalendarDays className="w-4 h-4" /> Sessions Calendar Embed
+          </Button>
           <Button variant="outline" size="sm" className="gap-1 border-teal-300 text-teal-700 hover:bg-teal-50"
             onClick={() => setPageTemplateOpen(true)}>
             <FolderOpen className="w-4 h-4" /> Page Templates
@@ -681,6 +706,91 @@ export default function CohortGroupLandingPageBuilder() {
               }}
               className="bg-teal-600 hover:bg-teal-700 text-white text-sm">
               {saveBlockTemplateMutation.isPending ? "Saving..." : "Save Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Sessions Calendar Embed Dialog */}
+      <Dialog open={embedDialogOpen} onOpenChange={setEmbedDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-teal-700">
+              <CalendarDays className="w-5 h-5" /> Sessions Calendar Embed
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-gray-500">Embed the live sessions calendar for this cohort group on any external website or landing page.</p>
+
+            {/* View toggle */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Default View</label>
+              <div className="flex gap-2">
+                {(["calendar", "list"] as const).map(v => (
+                  <button key={v} onClick={() => setEmbedView(v)}
+                    className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      embedView === v ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:border-teal-300"
+                    }`}>
+                    {v === "calendar" ? "📅 Calendar Grid" : "📋 List View"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Accent color */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Accent Color</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={embedColor} onChange={e => setEmbedColor(e.target.value)}
+                  className="w-9 h-9 rounded cursor-pointer border border-gray-200" />
+                <Input value={embedColor} onChange={e => setEmbedColor(e.target.value)}
+                  className="text-sm font-mono w-32" placeholder="#149096" />
+                <div className="flex gap-1 ml-1">
+                  {["#149096", "#1d4ed8", "#7c3aed", "#dc2626", "#16a34a", "#d97706"].map(c => (
+                    <button key={c} onClick={() => setEmbedColor(c)}
+                      className="w-6 h-6 rounded-full border-2 transition-all"
+                      style={{ backgroundColor: c, borderColor: embedColor === c ? "#111" : "transparent" }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Height */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Height (px)</label>
+              <div className="flex items-center gap-2">
+                <input type="range" min={300} max={1200} step={50} value={embedHeight}
+                  onChange={e => setEmbedHeight(Number(e.target.value))}
+                  className="flex-1 accent-teal-600" />
+                <span className="text-sm font-mono w-14 text-right">{embedHeight}px</span>
+              </div>
+            </div>
+
+            {/* Preview link */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Preview URL</label>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={getEmbedUrl(embedView, embedColor)} className="text-xs font-mono flex-1" />
+                <Button size="sm" variant="outline" className="shrink-0"
+                  onClick={() => window.open(getEmbedUrl(embedView, embedColor), "_blank")}>
+                  <Eye className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Embed code */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Embed Code</label>
+              <div className="relative">
+                <textarea readOnly value={getEmbedCode()}
+                  className="w-full text-xs font-mono bg-gray-50 border border-gray-200 rounded-lg p-3 resize-none h-20 focus:outline-none" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmbedDialogOpen(false)}>Close</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1" onClick={copyEmbed}>
+              <Copy className="w-4 h-4" />
+              {embedCopied ? "Copied!" : "Copy Embed Code"}
             </Button>
           </DialogFooter>
         </DialogContent>

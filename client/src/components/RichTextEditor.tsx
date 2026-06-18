@@ -1385,7 +1385,7 @@ export default function RichTextEditor({
         .rte-content .tiptap br { display: block; content: ""; }
         /* Empty paragraphs used as spacers must show as a blank line */
         .rte-content .tiptap p:empty::after,
-        .rte-content .tiptap p:has(br:only-child)::after { content: "\00a0"; }
+        .rte-content .tiptap p:has(br:only-child)::after { content: "\u00a0"; }
         .rte-content .tiptap a { color: #149096; text-decoration: underline; cursor: pointer; }
         /* CTA buttons inserted via Insert CTA Button dialog — rendered as styled spans, not links */
         .rte-content .tiptap [data-cta-btn] { display: inline-block; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.12); text-decoration: none !important; color: inherit; }
