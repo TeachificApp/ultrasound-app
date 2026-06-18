@@ -27,6 +27,7 @@ import {
   Eye, EyeOff, Copy, Loader2, AlertTriangle, GripVertical, X,
   Sparkles, Upload, FileSpreadsheet, FolderPlus, Tag, FileUp,
 } from "lucide-react";
+import { getAdminUrl } from "@/hooks/useSubdomain";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -1014,6 +1015,12 @@ function QuizList() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Breadcrumb */}
+        <div className="mb-4">
+          <a href={getAdminUrl("/platform-admin")} className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+            <ChevronLeft className="w-3 h-3" /> Platform Admin
+          </a>
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -1254,8 +1261,16 @@ function QuizEditor({ quizId }: { quizId: number }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Breadcrumb */}
+        <div className="mb-4 flex items-center gap-2 text-xs text-gray-400">
+          <a href={getAdminUrl("/platform-admin")} className="hover:text-gray-600 transition-colors">Platform Admin</a>
+          <ChevronRight className="w-3 h-3" />
+          <button onClick={() => navigate("/admin/quiz-creator")} className="hover:text-gray-600 transition-colors">Quiz Creator</button>
+          <ChevronRight className="w-3 h-3" />
+          <span className="text-gray-600 truncate max-w-[200px]">{quiz?.title ?? "..."}</span>
+        </div>
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="sm" onClick={() => navigate("/admin/quiz-creator")}>
             <ArrowLeft className="w-4 h-4 mr-1" /> Back
           </Button>
