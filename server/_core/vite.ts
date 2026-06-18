@@ -159,6 +159,16 @@ export function serveStatic(app: Express) {
     );
   }
 
+  // Service worker MUST be served with no-cache headers so browsers always
+  // get the latest version and CDNs (Cloudflare) never cache a stale copy.
+  // Without this, a broken SW can be cached for hours (Cloudflare default: 4h).
+  app.get(["/sw.js", "/sw-clear.html"], (req, res, next) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    next();
+  });
+
   app.use(express.static(distPath));
 
   // Use regex route so /media/* paths are structurally excluded — they can NEVER
