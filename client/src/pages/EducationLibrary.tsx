@@ -31,17 +31,23 @@ function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { cour
     ? (course.subscriptionInterval === "annual" ? "/yr" : course.subscriptionInterval === "quarterly" ? "/qtr" : "/mo")
     : course.pricingType === "payment_plan" ? " (plan)"
     : "";
-  const price = (course.isFree || course.price === 0) ? "Free" : `$${Number(course.price).toFixed(2)}${subscriptionSuffix}`;
+  // Workshops store price in cents; all other types store in dollars
+  const rawPrice = (course._itemType === "workshop" || course._source === "workshop") ? Number(course.price) / 100 : Number(course.price);
+  const price = (course.isFree || course.price === 0) ? "Free" : `$${rawPrice.toFixed(2)}${subscriptionSuffix}`;
   const isOwned = course._source === "digital_product"
     ? purchasedProductSlugs.has(course.slug)
     : enrolledCourseIds.has(course.id);
-  const href = course._source === "digital_product"
+  const isWorkshop = course._itemType === "workshop" || course._source === "workshop";
+  const href = isWorkshop
+    ? `/workshops/${course.slug}`
+    : course._source === "digital_product"
     ? (isOwned ? `/downloads/${course.slug}/files` : `/downloads/${course.slug}`)
     : course._source === "sono_quiz"
     ? `/quiz/${course.id}`
     : course.type === "cohort" && isOwned ? `/cohort/${course.id}`
     : (isOwned ? `/courses/${course.slug}/player` : `/courses/${course.slug}`);
-  const ctaLabel = isOwned
+  const ctaLabel = isWorkshop ? "View Workshop"
+    : isOwned
     ? (course.type === "download" ? "Access Download" : course.type === "quiz" ? "Continue Quiz" : course.type === "cohort" ? "View Schedule" : "Continue Learning")
     : (course.type === "quiz" ? "Take Quiz" : course.type === "download" ? "Get Download" : course.type === "cohort" ? "View Cohort" : "View Course");
   return (
