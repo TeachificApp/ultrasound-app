@@ -6,12 +6,13 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, sql, asc, inArray, or, lt, type SQL } from "drizzle-orm";
+import { and, desc, eq, sql, asc, inArray, or, lt, notInArray, type SQL } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
 import { randomBytes } from "crypto";
 import { invokeLLM } from "../_core/llm";
+import { publicMemberDisplayName, COMMUNITY_LEADERBOARD_EXCLUDED_EMAILS } from "../../shared/communityMember";
 import {
   users,
   communities,
@@ -72,7 +73,63 @@ const feedCursorSchema = z.union([
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function assertAdmin(ctx: any) {
-  if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+  if (!ctx.user) throw new TRPCError({ code: "FORBIDDEN" });
+  if (ctx.user.role === "admin") return;
+  const { getUserRoles } = await import("../db");
+  const roles = await getUserRoles(ctx.user.id);
+  if (roles.includes("platform_admin") || roles.includes("platform_owner")) return;
+  throw new TRPCError({ code: "FORBIDDEN" });
+}
+
+/** Resolve community_id for a report target */
+async function resolveReportCommunityId(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  targetType: "post" | "comment" | "user" | "dm_message",
+  targetId: number,
+): Promise<number | null> {
+  if (targetType === "post") {
+    const [row] = await db
+      .select({ communityId: communityPosts.communityId })
+      .from(communityPosts)
+      .where(eq(communityPosts.id, targetId))
+      .limit(1);
+    return row?.communityId ?? null;
+  }
+  if (targetType === "comment") {
+    const [row] = await db
+      .select({ communityId: communityPosts.communityId })
+      .from(communityPostComments)
+      .innerJoin(communityPosts, eq(communityPosts.id, communityPostComments.postId))
+      .where(eq(communityPostComments.id, targetId))
+      .limit(1);
+    return row?.communityId ?? null;
+  }
+  if (targetType === "dm_message") {
+    return null;
+  }
+  return null;
+}
+
+async function applyReportRemoval(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  targetType: "post" | "comment" | "user" | "dm_message",
+  targetId: number,
+) {
+  if (targetType === "post") {
+    await db.update(communityPosts).set({ isHidden: true }).where(eq(communityPosts.id, targetId));
+    return;
+  }
+  if (targetType === "comment") {
+    await db
+      .update(communityPostComments)
+      .set({ status: "rejected" })
+      .where(eq(communityPostComments.id, targetId));
+    return;
+  }
+  if (targetType === "dm_message") {
+    await db.delete(communityDMMessages).where(eq(communityDMMessages.id, targetId));
+    return;
+  }
 }
 
 /** Resolve community_id for a report target */
@@ -264,8 +321,20 @@ async function enrichPosts(db: any, posts: any[], currentUserId?: number) {
     const baseAuthor = authorMap[p.userId] ?? null;
     // If aliasId is set, override display name and avatar with alias data
     const author = alias
-      ? { ...baseAuthor, name: alias.name, displayName: alias.name, avatarUrl: alias.avatarUrl ?? baseAuthor?.avatarUrl, isAlias: true, aliasEmail: alias.email }
-      : baseAuthor;
+      ? {
+          ...baseAuthor,
+          name: alias.name,
+          displayName: alias.name,
+          avatarUrl: alias.avatarUrl ?? baseAuthor?.avatarUrl,
+          isAlias: true,
+        }
+      : baseAuthor
+        ? {
+            ...baseAuthor,
+            name: publicMemberDisplayName(baseAuthor),
+            displayName: publicMemberDisplayName(baseAuthor),
+          }
+        : null;
     return {
       ...p,
       author,
@@ -314,21 +383,61 @@ const communityPublicRouter = router({
     return db.select().from(communityHashtags).orderBy(desc(communityHashtags.postCount)).limit(20);
   }),
 
-  /** Leaderboard */
+  /** Leaderboard — staff/system accounts are excluded (see COMMUNITY_LEADERBOARD_EXCLUDED_EMAILS) */
   leaderboard: publicProcedure.input(z.object({ limit: z.number().min(1).max(100).default(20) })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
-    const rows = await db.select({
-      userId: communityUserXP.userId, totalXP: communityUserXP.totalXP,
-      level: communityUserXP.level, streakDays: communityUserXP.streakDays,
-      postsCount: communityUserXP.postsCount, commentsCount: communityUserXP.commentsCount,
-    }).from(communityUserXP).orderBy(desc(communityUserXP.totalXP)).limit(input.limit);
-    const userIds = rows.map(r => r.userId);
+
+    const excludedUsers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(or(
+        ...COMMUNITY_LEADERBOARD_EXCLUDED_EMAILS.map((email) =>
+          sql`LOWER(${users.email}) = ${email.toLowerCase()}`,
+        ),
+      ));
+    const excludedUserIds = excludedUsers.map((u) => u.id);
+
+    const rows = await db
+      .select({
+        userId: communityUserXP.userId,
+        totalXP: communityUserXP.totalXP,
+        level: communityUserXP.level,
+        streakDays: communityUserXP.streakDays,
+        postsCount: communityUserXP.postsCount,
+        commentsCount: communityUserXP.commentsCount,
+      })
+      .from(communityUserXP)
+      .where(excludedUserIds.length ? notInArray(communityUserXP.userId, excludedUserIds) : undefined)
+      .orderBy(desc(communityUserXP.totalXP))
+      .limit(input.limit);
+
+    const userIds = rows.map((r) => r.userId);
     if (!userIds.length) return [];
-    const us = await db.select({ id: users.id, name: users.name, displayName: users.displayName, avatarUrl: users.avatarUrl, credentials: users.credentials })
-      .from(users).where(inArray(users.id, userIds));
-    const uMap = Object.fromEntries(us.map(u => [u.id, u]));
-    return rows.map((r, i) => ({ rank: i + 1, ...r, user: uMap[r.userId] ?? null }));
+
+    const us = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+        credentials: users.credentials,
+      })
+      .from(users)
+      .where(inArray(users.id, userIds));
+
+    const uMap = Object.fromEntries(us.map((u) => [u.id, u]));
+    return rows.map((r, i) => ({
+      rank: i + 1,
+      ...r,
+      user: uMap[r.userId]
+        ? {
+            ...uMap[r.userId],
+            name: publicMemberDisplayName(uMap[r.userId]),
+            displayName: publicMemberDisplayName(uMap[r.userId]),
+          }
+        : null,
+    }));
   }),
 });
 
@@ -1025,7 +1134,7 @@ const communityMemberRouter = router({
       .where(and(eq(communityPosts.userId, input.userId), eq(communityPosts.isHidden, false)))
       .orderBy(desc(communityPosts.createdAt)).limit(5);
 
-    return { ...u, xp: xp ?? null, badges: badgeRows.map(b => b.badge), isFollowing, recentPosts };
+    return { ...u, name: publicMemberDisplayName(u), displayName: publicMemberDisplayName(u), xp: xp ?? null, badges: badgeRows.map(b => b.badge), isFollowing, recentPosts };
   }),
 
   /** Get recent/active members for the community sidebar */
@@ -1049,7 +1158,11 @@ const communityMemberRouter = router({
       .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.memberStatus, "approved")))
       .orderBy(desc(communityMembers.joinedAt))
       .limit(input.limit);
-    return rows;
+    return rows.map((r) => ({
+      ...r,
+      name: publicMemberDisplayName(r),
+      displayName: publicMemberDisplayName(r),
+    }));
   }),
 });
 

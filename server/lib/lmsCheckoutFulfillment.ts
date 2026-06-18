@@ -526,5 +526,10 @@ export async function reconcileLmsCheckoutFromStripeSession(
     content: `User ${userId} (${customerEmail}) — ${course?.title ?? courseId}. ${notes.join("; ")}`,
   }).catch(() => {});
 
+  if (userId && courseId && (shouldRenew || !existingEnrollment)) {
+    const { onCourseEnrollment } = await import("./communityAutoJoin");
+    onCourseEnrollment(userId, courseId);
+  }
+
   return { success: true, userId, courseId, orderId, isNewUser, notes };
 }

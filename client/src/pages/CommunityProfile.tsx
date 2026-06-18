@@ -16,6 +16,7 @@ import {
   UserPlus, UserMinus, MapPin, Globe, Calendar, MessageSquare,
   Star, Flame, Award, Users, ChevronLeft, Shield, Mail
 } from "lucide-react";
+import { publicMemberDisplayName } from "@shared/communityMember";
 
 function XPBar({ xp }: { xp: any }) {
   if (!xp) return null;
@@ -90,7 +91,7 @@ export default function CommunityProfile() {
   }
 
   const isOwnProfile = currentUser?.id === profile.id;
-  const displayName = profile.displayName || profile.name;
+  const displayName = publicMemberDisplayName(profile);
 
   return (
     <div className="min-h-screen bg-gray-50">

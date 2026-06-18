@@ -9,7 +9,7 @@
  * contains the purchased product are auto-joined by the buyer.
  */
 import { getDb } from "../db";
-import { communityWorkflowRules, communityMembers, communities } from "../../drizzle/schema";
+import { communityWorkflowRules, communityMembers, communities, communityCourseLinkages } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 
 export type CommunityTrigger =
@@ -122,8 +122,48 @@ export async function fireCommunityWorkflowRules(
         } catch { /* skip malformed JSON */ }
       }
     }
+
+    // ── 3. Course-linked communities (community_course_linkages junction) ─────
+    if (trigger.type === "course_enrollment" && "entityId" in trigger) {
+      const courseId = (trigger as any).entityId as number;
+      const linkedRows = await db
+        .select({ communityId: communityCourseLinkages.communityId })
+        .from(communityCourseLinkages)
+        .innerJoin(communities, eq(communities.id, communityCourseLinkages.communityId))
+        .where(and(
+          eq(communityCourseLinkages.lmsCourseId, courseId),
+          eq(communities.status, "published"),
+        ));
+
+      for (const { communityId } of linkedRows) {
+        const existing = await db
+          .select({ id: communityMembers.id })
+          .from(communityMembers)
+          .where(and(
+            eq(communityMembers.communityId, communityId),
+            eq(communityMembers.userId, userId),
+          ))
+          .limit(1);
+        if (existing.length > 0) continue;
+
+        await db.insert(communityMembers).values({
+          communityId,
+          userId,
+          role: "member",
+          memberStatus: "approved",
+        }).onDuplicateKeyUpdate({ set: { memberStatus: "approved" } });
+        console.log(
+          `[CommunityAutoJoin] User ${userId} auto-joined community ${communityId} via course #${courseId} linkage`,
+        );
+      }
+    }
   } catch (err) {
     // Non-blocking — log but don't throw
     console.error("[CommunityAutoJoin] Error firing workflow rules:", err);
   }
+}
+
+/** Call after a user is enrolled in an LMS course (purchase, admin grant, free enroll, etc.). */
+export function onCourseEnrollment(userId: number, courseId: number): void {
+  fireCommunityWorkflowRules(userId, { type: "course_enrollment", entityId: courseId }).catch(() => {});
 }

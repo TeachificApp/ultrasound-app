@@ -36,6 +36,15 @@ import {
 } from "lucide-react";
 import CommunityPageEditor from "@/components/CommunityPageEditor";
 import { Link } from "wouter";
+import { isCommunityPlatformAdmin } from "@/lib/communityAccess";
+
+const COMMUNITY_EDITOR_TABS = ["settings", "appearance", "gating", "page-editor", "landing-editor"] as const;
+type CommunityEditorTab = (typeof COMMUNITY_EDITOR_TABS)[number];
+
+function parseEditorTab(tab: string | null): CommunityEditorTab | undefined {
+  if (!tab) return undefined;
+  return (COMMUNITY_EDITOR_TABS as readonly string[]).includes(tab) ? (tab as CommunityEditorTab) : undefined;
+}
 
 function timeAgo(dateStr: string | Date) {
   const d = new Date(dateStr);
@@ -192,10 +201,10 @@ function AccessGatingTab({ community }: { community: any }) {
         <p className="text-sm font-medium text-amber-800">Access Type: <span className="font-bold capitalize">{community.accessType}</span></p>
         <p className="text-xs text-amber-700 mt-1">
           {community.accessType === "course_gated"
-            ? "Users must be enrolled in at least one linked course to join this community."
+            ? "Users must be enrolled in at least one linked course to join this community. Linked courses also auto-enroll buyers when they purchase."
             : community.accessType === "linked"
             ? "Users who purchase any linked product are automatically added as members."
-            : "Change the Access Type in Settings to enable course or product gating."}
+            : "Link courses below, then set Access Type to Course Gated in Settings. Buyers are auto-added to the community when enrolled."}
         </p>
       </div>
 
@@ -554,9 +563,21 @@ function CommunitySettingsTab({ community, onSaved }: { community: any; onSaved:
 }
 
 // ─── Inline Community Editor ──────────────────────────────────────────────────
-function CommunityEditor({ community, onBack }: { community: any; onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState("settings");
+function CommunityEditor({
+  community,
+  onBack,
+  initialTab = "settings",
+}: {
+  community: any;
+  onBack: () => void;
+  initialTab?: CommunityEditorTab;
+}) {
+  const [activeTab, setActiveTab] = useState<CommunityEditorTab>(initialTab);
   const utils = trpc.useUtils();
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [community.id, initialTab]);
 
   return (
     <div>
@@ -953,7 +974,7 @@ function MembersTab({ communityId }: { communityId: number }) {
   const [bulkEmails, setBulkEmails] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const utils = trpc.useUtils();
-  const { data, isLoading } = trpc.community.admin.listMembers.useQuery({ communityId, search, page, limit: 20 });
+  const { data, isLoading } = trpc.community.admin.listMembers.useQuery({ communityId, search, page, pageSize: 20 });
   const addMember = trpc.community.admin.addMember.useMutation({
     onSuccess: () => { toast.success("Member added!"); setNewEmail(""); utils.community.admin.listMembers.invalidate({ communityId }); },
     onError: (e) => toast.error(e.message),
@@ -1235,8 +1256,9 @@ function WorkflowRulesTab({ communityId }: { communityId: number }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function CommunityAdmin() {
   const { user } = useAuth();
-  const isAdmin = (user as any)?.role === "admin";
-  const [editingCommunity, setEditingCommunity] = useState<any>(null); // null = list view, object = editor view
+  const isAdmin = isCommunityPlatformAdmin(user);
+  const [editingCommunity, setEditingCommunity] = useState<any>(null);
+  const [editorInitialTab, setEditorInitialTab] = useState<CommunityEditorTab>("settings");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [activeCommunityId, setActiveCommunityId] = useState<number | null>(null);
   const [showChannelForm, setShowChannelForm] = useState(false);
@@ -1299,6 +1321,37 @@ export default function CommunityAdmin() {
     if (communities?.length && !activeCommunityId) setActiveCommunityId(communities[0].id);
   }, [communities]);
 
+  useEffect(() => {
+    if (!communities?.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get("editCommunity");
+    if (!editId) return;
+    const community = communities.find((c: any) => c.id === parseInt(editId, 10));
+    if (!community) return;
+    setEditingCommunity(community);
+    setActiveCommunityId(community.id);
+    setEditorInitialTab(parseEditorTab(params.get("tab")) ?? "settings");
+  }, [communities]);
+
+  const openCommunityEditor = (community: any, tab: CommunityEditorTab = "settings") => {
+    setEditingCommunity(community);
+    setActiveCommunityId(community.id);
+    setEditorInitialTab(tab);
+    const url = new URL(window.location.href);
+    url.searchParams.set("editCommunity", String(community.id));
+    url.searchParams.set("tab", tab);
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+  };
+
+  const closeCommunityEditor = () => {
+    setEditingCommunity(null);
+    setEditorInitialTab("settings");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("editCommunity");
+    url.searchParams.delete("tab");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500">
@@ -1344,10 +1397,11 @@ export default function CommunityAdmin() {
   // ── Inline Editor View ──────────────────────────────────────────────────────
   if (editingCommunity) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-6 max-w-6xl mx-auto">
         <CommunityEditor
           community={editingCommunity}
-          onBack={() => setEditingCommunity(null)}
+          initialTab={editorInitialTab}
+          onBack={closeCommunityEditor}
         />
       </div>
     );
@@ -1387,6 +1441,18 @@ export default function CommunityAdmin() {
 
         {/* Communities tab */}
         <TabsContent value="communities">
+          <Card className="mb-4 border-teal-100 bg-teal-50/50">
+            <CardContent className="p-4">
+              <h3 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                <LayoutTemplate className="w-4 h-4 text-teal-600" />
+                Design, pages & course access
+              </h3>
+              <p className="text-sm text-gray-600">
+                Use <strong>Edit</strong> or the quick actions on each community to customize appearance, link courses
+                (course purchase grants access), and open the full-page block editors for the member experience and public landing page.
+              </p>
+            </CardContent>
+          </Card>
           {commLoading ? (
             <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
           ) : !communities?.length ? (
@@ -1395,7 +1461,8 @@ export default function CommunityAdmin() {
             <div className="space-y-3">
               {communities.map((c: any) => (
                 <Card key={c.id} className={activeCommunityId === c.id ? "ring-2 ring-teal-400" : ""}>
-                  <CardContent className="p-4 flex items-center gap-4">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden border">
                       {c.iconImage ? (
                         <img src={c.iconImage} alt={c.title} className="w-full h-full object-cover" />
@@ -1439,7 +1506,7 @@ export default function CommunityAdmin() {
                       <Button variant="outline" size="sm" onClick={() => setActiveCommunityId(c.id)}>
                         <Hash className="w-3.5 h-3.5 mr-1" />Select
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => setEditingCommunity(c)}
+                      <Button variant="outline" size="sm" onClick={() => openCommunityEditor(c, "settings")}
                         className="text-teal-700 border-teal-200 hover:bg-teal-50">
                         <Edit2 className="w-3.5 h-3.5 mr-1" />Edit
                       </Button>
@@ -1447,6 +1514,33 @@ export default function CommunityAdmin() {
                         onClick={() => { if (confirm(`Delete "${c.title}"? This cannot be undone.`)) deleteCommunity.mutate({ id: c.id }); }}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
+                    </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
+                      <Button variant="outline" size="sm" className="text-xs h-8"
+                        onClick={() => openCommunityEditor(c, "appearance")}>
+                        <Palette className="w-3.5 h-3.5 mr-1" />Appearance
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-xs h-8"
+                        onClick={() => openCommunityEditor(c, "gating")}>
+                        <BookOpen className="w-3.5 h-3.5 mr-1" />Link Courses
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-xs h-8"
+                        onClick={() => openCommunityEditor(c, "page-editor")}>
+                        <LayoutTemplate className="w-3.5 h-3.5 mr-1" />Member Page
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-xs h-8"
+                        onClick={() => openCommunityEditor(c, "landing-editor")}>
+                        <Globe className="w-3.5 h-3.5 mr-1" />Landing Page
+                      </Button>
+                      <a href={`/admin/communities/${c.id}/experience-builder`}
+                        className="inline-flex items-center text-xs h-8 px-3 rounded-md border border-teal-200 text-teal-700 hover:bg-teal-50 transition-colors">
+                        <ExternalLink className="w-3.5 h-3.5 mr-1" />Full Experience Editor
+                      </a>
+                      <a href={`/admin/communities/${c.id}/sales-builder`}
+                        className="inline-flex items-center text-xs h-8 px-3 rounded-md border border-teal-200 text-teal-700 hover:bg-teal-50 transition-colors">
+                        <ExternalLink className="w-3.5 h-3.5 mr-1" />Full Landing Editor
+                      </a>
                     </div>
                   </CardContent>
                 </Card>
