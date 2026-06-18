@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Send, MessageSquare, ChevronLeft, Flag } from "lucide-react";
+import { publicMemberDisplayName } from "@shared/communityMember";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -33,7 +34,7 @@ export default function CommunityDMs() {
   const params = useParams<{ conversationId?: string; userId?: string }>();
   const conversationId = params.conversationId;
   const userId = params.userId;
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [, navigate] = useLocation();
   const [messageBody, setMessageBody] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -57,17 +58,17 @@ export default function CommunityDMs() {
     }
   }, [userId, isAuthenticated, conversationId]);
 
-  const { data: conversations, isLoading: convsLoading } = trpc.community.member.myConversations.useQuery(
+  const { data: conversations, isLoading: convsLoading, isError: convsError } = trpc.community.member.myConversations.useQuery(
     undefined,
-    { enabled: isAuthenticated, refetchInterval: 15000 },
+    { enabled: isAuthenticated && !authLoading, refetchInterval: 15000 },
   );
 
   const activeConvId = conversationId ? parseInt(conversationId, 10) : null;
   const activeConv = conversations?.find((c: { id: number }) => c.id === activeConvId);
 
-  const { data: messages, isLoading: msgsLoading } = trpc.community.member.getMessages.useQuery(
+  const { data: messages, isLoading: msgsLoading, isError: msgsError } = trpc.community.member.getMessages.useQuery(
     { conversationId: activeConvId! },
-    { enabled: !!activeConvId && isAuthenticated, refetchInterval: 5000 },
+    { enabled: !!activeConvId && isAuthenticated && !authLoading, refetchInterval: 5000 },
   );
 
   const reportMessage = trpc.community.member.reportContent.useMutation({
@@ -95,6 +96,20 @@ export default function CommunityDMs() {
       document.title = "All About Ultrasound™";
     };
   }, []);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <Skeleton className="h-8 w-48 mb-6" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Skeleton className="h-96 rounded-xl" />
+            <Skeleton className="h-96 rounded-xl md:col-span-2" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -134,6 +149,10 @@ export default function CommunityDMs() {
                     <Skeleton key={i} className="h-14 rounded-lg" />
                   ))}
                 </div>
+              ) : convsError ? (
+                <div className="p-6 text-center text-red-500 text-sm">
+                  Could not load conversations. Please refresh the page.
+                </div>
               ) : !conversations?.length ? (
                 <div className="p-6 text-center text-gray-400 text-sm">
                   <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
@@ -147,6 +166,7 @@ export default function CommunityDMs() {
                   unreadCount: number;
                 }) => {
                   const other = conv.otherUser;
+                  const otherLabel = publicMemberDisplayName(other ?? {});
                   const isActive = conv.id === activeConvId;
                   return (
                     <button
@@ -158,13 +178,13 @@ export default function CommunityDMs() {
                       <Avatar className="w-10 h-10 flex-shrink-0">
                         <AvatarImage src={other?.avatarUrl ?? undefined} />
                         <AvatarFallback className="text-sm bg-teal-100 text-teal-700">
-                          {(other?.displayName || other?.name || "?").charAt(0).toUpperCase()}
+                          {otherLabel.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <p className="font-medium text-gray-900 text-sm truncate">
-                            {other?.displayName || other?.name}
+                            {otherLabel}
                           </p>
                           <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
                             {timeAgo(conv.lastMessageAt)}
@@ -194,23 +214,24 @@ export default function CommunityDMs() {
             ) : (
               <>
                 <div className="p-4 border-b flex items-center gap-3">
-                  {activeConv?.otherUser && (
+                  {activeConv?.otherUser && (() => {
+                    const headerLabel = publicMemberDisplayName(activeConv.otherUser);
+                    return (
                     <>
                       <Avatar className="w-9 h-9">
                         <AvatarImage src={activeConv.otherUser.avatarUrl ?? undefined} />
                         <AvatarFallback className="text-sm bg-teal-100 text-teal-700">
-                          {(activeConv.otherUser.displayName || activeConv.otherUser.name || "?")
-                            .charAt(0)
-                            .toUpperCase()}
+                          {headerLabel.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-semibold text-gray-900 text-sm">
-                          {activeConv.otherUser.displayName || activeConv.otherUser.name}
+                          {headerLabel}
                         </p>
                       </div>
                     </>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -220,6 +241,8 @@ export default function CommunityDMs() {
                         <Skeleton key={i} className="h-12 rounded-lg" />
                       ))}
                     </div>
+                  ) : msgsError ? (
+                    <div className="text-center text-red-500 text-sm py-8">Could not load messages. Please try again.</div>
                   ) : !messages?.items?.length ? (
                     <div className="text-center text-gray-400 text-sm py-8">No messages yet. Say hello!</div>
                   ) : (

@@ -952,7 +952,11 @@ const communityMemberRouter = router({
       ? await db.select({ id: users.id, name: users.name, displayName: users.displayName, avatarUrl: users.avatarUrl })
           .from(users).where(inArray(users.id, otherUserIds))
       : [];
-    const uMap = Object.fromEntries(otherUsers.map((u: any) => [u.id, u]));
+    const uMap = Object.fromEntries(otherUsers.map((u: any) => [u.id, {
+      ...u,
+      name: publicMemberDisplayName(u),
+      displayName: publicMemberDisplayName(u),
+    }]));
     return convs.map((c: any) => {
       const otherId = c.userAId === ctx.user.id ? c.userBId : c.userAId;
       const unread = c.userAId === ctx.user.id ? c.userAUnread : c.userBUnread;

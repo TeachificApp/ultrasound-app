@@ -18,7 +18,7 @@ const RANK_COLORS = ["text-amber-500", "text-gray-400", "text-amber-700"];
 const RANK_ICONS = ["🥇", "🥈", "🥉"];
 
 export default function CommunityLeaderboard() {
-  const { data: leaderboard, isLoading } = trpc.community.public.leaderboard.useQuery({ limit: 50 });
+  const { data: leaderboard, isLoading, isError } = trpc.community.public.leaderboard.useQuery({ limit: 50 });
   const { user } = useAuth();
 
   useEffect(() => {
@@ -95,6 +95,11 @@ export default function CommunityLeaderboard() {
             {isLoading ? (
               <div className="p-6 space-y-4">
                 {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}
+              </div>
+            ) : isError ? (
+              <div className="p-12 text-center text-red-500">
+                <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>Could not load the leaderboard. Please refresh the page.</p>
               </div>
             ) : !leaderboard?.length ? (
               <div className="p-12 text-center text-gray-400">
