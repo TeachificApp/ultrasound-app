@@ -13,6 +13,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
 } from "@dnd-kit/core";
@@ -11195,8 +11196,8 @@ function CohortTab({ courseId }: { courseId: number }) {
                 for (let day = 1; day <= daysInMonth; day++) {
                   const cellDate = new Date(calMonth.year, calMonth.month, day);
                   const daySessions = (sessions as CohortSession[]).filter(s => {
-                    const sd = new Date(s.sessionDate);
-                    return sd.getFullYear() === calMonth.year && sd.getMonth() === calMonth.month && sd.getDate() === day;
+                    const tz = s.timezone ?? "America/New_York";
+                    return isSessionOnCalendarDay(s.sessionDate, calMonth.year, calMonth.month, day, tz);
                   });
                   const isToday = new Date().toDateString() === cellDate.toDateString();
                   cells.push(

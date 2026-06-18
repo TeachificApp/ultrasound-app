@@ -20,6 +20,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or } from "drizzle-orm";
 import { enrichCohortResources } from "../lib/cohortResources";
+import { expandCohortRecurrence } from "../lib/cohortRecurrence";
 import { randomBytes } from "crypto";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
@@ -619,176 +620,22 @@ export const lmsCohortAdminRouter = router({
       await db.delete(lmsCohortSessions)
         .where(eq(lmsCohortSessions.parentSessionId, input.parentSessionId));
 
-      // Parse allowed days of week (0=Sun … 6=Sat). Empty = use same day as parent.
-      const allowedDays: number[] = parent.recurrenceDaysOfWeek
-        ? parent.recurrenceDaysOfWeek.split(",").map(Number).filter(n => !isNaN(n))
-        : [];
-
-      const weekIntervalDays = parent.recurrenceRule === "biweekly" ? 14 : 7;
-
-      const instances: typeof lmsCohortSessions.$inferInsert[] = [];
-      const parentDate = new Date(parent.sessionDate);
-      const endDate = parent.recurrenceEndDate ? new Date(parent.recurrenceEndDate) : null;
-      const maxCount = parent.recurrenceOccurrenceCount ?? 999;
-      let occurrenceNum = 1;
-
-      if (parent.recurrenceRule === "monthly") {
-        // Monthly: advance month-by-month from parent date
-        let current = new Date(parentDate);
-        while (occurrenceNum < maxCount) {
-          current = new Date(current);
-          current.setMonth(current.getMonth() + 1);
-          if (endDate && current > endDate) break;
-          occurrenceNum++;
-          instances.push({
-            courseId: parent.courseId,
-            cohortGroupId: parent.cohortGroupId,
-            title: `${parent.title} (${occurrenceNum})`,
-            description: parent.description,
-            sessionDate: new Date(current),
-            durationMinutes: parent.durationMinutes,
-            meetingUrl: parent.meetingUrl,
-            recordingUrl: null,
-            status: parent.status,
-            timezone: parent.timezone ?? "America/New_York",
-            recurrenceRule: null,
-            recurrenceDaysOfWeek: null,
-            recurrenceInterval: null,
-            recurrenceEndDate: null,
-            recurrenceOccurrenceCount: null,
-            parentSessionId: parent.id,
-          });
-        }
-      } else if (allowedDays.length >= 1) {
-        // Weekly/biweekly with one or more days selected:
-        // For each week cycle, emit one instance per selected day (sorted), preserving the
-        // parent's time-of-day. Start from the Sunday of the parent's week.
-        // IMPORTANT: Use timezone-aware day/time to avoid UTC offset bugs (e.g. 7:30 PM ET
-        // is stored as next-day UTC, causing getDay() to return the wrong weekday).
-        const tz = parent.timezone ?? "America/New_York";
-        const tzParts = new Intl.DateTimeFormat("en-US", {
-          timeZone: tz,
-          weekday: "short",
-          hour: "numeric",
-          minute: "numeric",
-          second: "numeric",
-          hour12: false,
-        }).formatToParts(parentDate);
-        const tzWeekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-        const tzWeekdayStr = tzParts.find(p => p.type === "weekday")?.value ?? "";
-        const parentDay = tzWeekdayMap[tzWeekdayStr] ?? parentDate.getDay();
-        // Get local time components in the session timezone
-        const tzTimeParts = new Intl.DateTimeFormat("en-US", {
-          timeZone: tz,
-          hour: "numeric",
-          minute: "numeric",
-          second: "numeric",
-          hour12: false,
-        }).formatToParts(parentDate);
-        const getTimePart = (type: string) => parseInt(tzTimeParts.find(p => p.type === type)?.value ?? "0", 10);
-        // hour12:false can return 24 for midnight — normalize to 0
-        const tzH = getTimePart("hour") % 24;
-        const tzM = getTimePart("minute");
-        const tzS = getTimePart("second");
-        // Build weekStart as the Sunday of the parent's local week, expressed as a
-        // UTC-midnight date (we'll set local time via toLocaleString trick below).
-        // Strategy: find the calendar date of Sunday in the parent's local week, then
-        // build ISO date strings to avoid any UTC shift.
-        const parentLocalDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(parentDate);
-        // parentLocalDateStr is "YYYY-MM-DD" in the session timezone
-        const [pyStr, pmStr, pdStr] = parentLocalDateStr.split("-");
-        const py = parseInt(pyStr, 10), pm = parseInt(pmStr, 10) - 1, pd = parseInt(pdStr, 10);
-        // weekStart = Sunday of this local week (UTC midnight of that calendar date)
-        const weekStartUTCMidnight = new Date(Date.UTC(py, pm, pd - parentDay));
-        const weekStart = weekStartUTCMidnight;
-        // Helper: build a candidate Date for a given weekday offset from weekStart,
-        // at the session's local time in the session timezone.
-        function buildCandidate(daysFromWeekStart: number): Date {
-          // Compute the target calendar date (UTC midnight)
-          const targetUTCMidnight = new Date(weekStart.getTime() + daysFromWeekStart * 24 * 60 * 60 * 1000);
-          const [tpyStr, tpmStr, tpdStr] = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(targetUTCMidnight).split("-");
-          // Build the ISO string in the target timezone and parse it
-          const isoStr = `${tpyStr}-${tpmStr}-${tpdStr}T${String(tzH).padStart(2,"0")}:${String(tzM).padStart(2,"0")}:${String(tzS).padStart(2,"0")}`;
-          // Parse as local time in the target timezone using a trick:
-          // We want the UTC instant that corresponds to isoStr in `tz`.
-          // Use Date.parse with explicit offset via Intl or just use a UTC-offset approach.
-          // Simplest reliable method: find the UTC offset for that date/time in the timezone.
-          const approxUtc = new Date(isoStr + "Z"); // treat as UTC first
-          // Get the offset by checking what local time that UTC instant gives in tz
-          const checkStr = new Intl.DateTimeFormat("en-CA", {
-            timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
-            hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-          }).format(approxUtc);
-          // checkStr is like "2027-01-07, 00:30:00" — compare with isoStr to find offset
-          const checkParts = checkStr.replace(", ", "T");
-          const diffMs = approxUtc.getTime() - new Date(checkParts + "Z").getTime();
-          return new Date(approxUtc.getTime() + diffMs);
-        }
-        const parentTime = { h: tzH, m: tzM, s: tzS }; // kept for reference, unused below
-        const sortedDays = [...allowedDays].sort((a, b) => a - b);
-        // Extend end date by 1 day to be inclusive (end date is typically set to midnight UTC
-        // but sessions are at a specific time, so we need to include the end date's day)
-        const inclusiveEndDate = endDate ? new Date(endDate.getTime() + 24 * 60 * 60 * 1000) : null;
-        let weekOffset = 0;
-        let done = false;
-        while (!done && occurrenceNum < maxCount) {
-          for (const dayOfWeek of sortedDays) {
-            const daysFromWeekStart = weekOffset * weekIntervalDays + dayOfWeek;
-            const candidate = buildCandidate(daysFromWeekStart);
-            // Skip dates on or before the parent session date
-            if (candidate <= parentDate) continue;
-            if (inclusiveEndDate && candidate >= inclusiveEndDate) { done = true; break; }
-            if (occurrenceNum >= maxCount) { done = true; break; }
-            occurrenceNum++;
-            instances.push({
-              courseId: parent.courseId,
-              cohortGroupId: parent.cohortGroupId,
-              title: `${parent.title} (${occurrenceNum})`,
-              description: parent.description,
-              sessionDate: new Date(candidate),
-              durationMinutes: parent.durationMinutes,
-              meetingUrl: parent.meetingUrl,
-              recordingUrl: null,
-              status: parent.status,
-              timezone: parent.timezone ?? "America/New_York",
-              recurrenceRule: null,
-              recurrenceDaysOfWeek: null,
-              recurrenceInterval: null,
-              recurrenceEndDate: null,
-              recurrenceOccurrenceCount: null,
-              parentSessionId: parent.id,
-            });
-          }
-          weekOffset++;
-          if (weekOffset > 520) break; // hard cap: 10 years of weekly
-        }
-      } else {
-        // Weekly/biweekly with no day specified — same day as parent
-        let current = new Date(parentDate);
-        while (occurrenceNum < maxCount) {
-          current = new Date(current.getTime() + weekIntervalDays * 24 * 60 * 60 * 1000);
-          if (endDate && current > endDate) break;
-          occurrenceNum++;
-          instances.push({
-            courseId: parent.courseId,
-            cohortGroupId: parent.cohortGroupId,
-            title: `${parent.title} (${occurrenceNum})`,
-            description: parent.description,
-            sessionDate: new Date(current),
-            durationMinutes: parent.durationMinutes,
-            meetingUrl: parent.meetingUrl,
-            recordingUrl: null,
-            status: parent.status,
-            timezone: parent.timezone ?? "America/New_York",
-            recurrenceRule: null,
-            recurrenceDaysOfWeek: null,
-            recurrenceInterval: null,
-            recurrenceEndDate: null,
-            recurrenceOccurrenceCount: null,
-            parentSessionId: parent.id,
-          });
-        }
-      }
+      const instances = expandCohortRecurrence({
+        id: parent.id,
+        courseId: parent.courseId,
+        cohortGroupId: parent.cohortGroupId,
+        title: parent.title,
+        description: parent.description,
+        sessionDate: new Date(parent.sessionDate),
+        durationMinutes: parent.durationMinutes,
+        meetingUrl: parent.meetingUrl,
+        status: parent.status,
+        timezone: parent.timezone,
+        recurrenceRule: parent.recurrenceRule,
+        recurrenceDaysOfWeek: parent.recurrenceDaysOfWeek,
+        recurrenceEndDate: parent.recurrenceEndDate ? new Date(parent.recurrenceEndDate) : null,
+        recurrenceOccurrenceCount: parent.recurrenceOccurrenceCount,
+      });
 
       if (instances.length === 0) return { created: 0 };
       await db.insert(lmsCohortSessions).values(instances);

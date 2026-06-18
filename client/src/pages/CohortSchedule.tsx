@@ -13,6 +13,7 @@ import {
   Plus, MessageCircle, LayoutGrid, List, FolderOpen,
 } from "lucide-react";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
+import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { Link, useParams, useLocation, useSearch } from "wouter";
 
@@ -199,7 +200,10 @@ function CohortCalendar({ sessions, courseTitle }: { sessions: any[]; courseTitl
   })();
 
   function sessionsOnDay(d: Date) {
-    return sessions.filter(s => sameDay(new Date(s.sessionDate), d));
+    return sessions.filter(s => {
+      const tz = s.timezone ?? "America/New_York";
+      return isSessionOnCalendarDay(s.sessionDate, d.getFullYear(), d.getMonth(), d.getDate(), tz);
+    });
   }
 
   return (
