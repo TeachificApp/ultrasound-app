@@ -403,8 +403,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       return (
         <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
           <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row gap-8">
-            <div className="min-w-0" style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
-            <div className="min-w-0" style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderCol("right")}</div>
+            <div className="min-w-0" style={{ flex: `${d.leftRatio ?? 50} 1 0%` }}>{renderCol("left")}</div>
+            <div className="min-w-0" style={{ flex: `${100 - (d.leftRatio ?? 50)} 1 0%` }}>{renderCol("right")}</div>
           </div>
         </div>
       );

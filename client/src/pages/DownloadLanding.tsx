@@ -405,8 +405,8 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return (
         <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <CC><div className="flex flex-col md:flex-row gap-8 items-center">
-            <div className="min-w-0" style={{ flex: d.leftRatio ?? 50 }}>{renderTwoColDL("left")}</div>
-            <div className="min-w-0" style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderTwoColDL("right")}</div>
+            <div className="min-w-0" style={{ flex: `${d.leftRatio ?? 50} 1 0%` }}>{renderTwoColDL("left")}</div>
+            <div className="min-w-0" style={{ flex: `${100 - (d.leftRatio ?? 50)} 1 0%` }}>{renderTwoColDL("right")}</div>
           </div></CC>
         </div>
       );

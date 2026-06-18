@@ -940,9 +940,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC>
-          <div className="flex gap-8">
-            <div style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
-            <div style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderCol("right")}</div>
+          <div className="flex flex-col md:flex-row gap-8 items-center">
+            <div className="min-w-0" style={{ flex: `${d.leftRatio ?? 50} 1 0%` }}>{renderCol("left")}</div>
+            <div className="min-w-0" style={{ flex: `${100 - (d.leftRatio ?? 50)} 1 0%` }}>{renderCol("right")}</div>
           </div>
         </CC></div>
       );

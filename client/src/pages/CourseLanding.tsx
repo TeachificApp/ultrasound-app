@@ -1341,8 +1341,8 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
           <CC><div className="flex flex-col md:flex-row gap-8 items-center">
-            <div className="min-w-0" style={{ flex: d.leftRatio ?? 50 }}>{renderTwoCol("left")}</div>
-            <div className="min-w-0" style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderTwoCol("right")}</div>
+            <div className="min-w-0" style={{ flex: `${d.leftRatio ?? 50} 1 0%` }}>{renderTwoCol("left")}</div>
+            <div className="min-w-0" style={{ flex: `${100 - (d.leftRatio ?? 50)} 1 0%` }}>{renderTwoCol("right")}</div>
           </div></CC>
         </div>
       );

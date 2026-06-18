@@ -26,7 +26,7 @@ import {
   Users, CheckCircle, XCircle, Clock, Search, ChevronLeft, ChevronRight,
   Eye, EyeOff, Copy, Loader2, AlertTriangle, GripVertical, X,
   Sparkles, Upload, FileSpreadsheet, FolderPlus, Tag, FileUp,
-  Database, Zap, Radio, TrendingUp, ExternalLink,
+  Database, Radio, TrendingUp, ExternalLink,
 } from "lucide-react";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 
@@ -1048,30 +1048,18 @@ function QuizList() {
             <Database className="w-3.5 h-3.5" /> Question Bank
           </a>
           <a
-            href={getAdminUrl("/admin/quickfire")}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors border border-amber-200"
-          >
-            <Zap className="w-3.5 h-3.5" /> Daily Challenge Admin
-          </a>
-          <a
             href={getAdminUrl("/admin/sonoquiz")}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 transition-colors border border-purple-200"
           >
             <Radio className="w-3.5 h-3.5" /> SonoQuiz (Live)
           </a>
           <a
-            href={getAdminUrl("/admin/engagement")}
+            href={`${IHEARTECHO_APP_URL}/admin/engagement`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-50 text-pink-700 text-xs font-medium hover:bg-pink-100 transition-colors border border-pink-200"
           >
             <TrendingUp className="w-3.5 h-3.5" /> Engagement Dashboard
-          </a>
-          <a
-            href="/my-quizzes"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-xs font-medium hover:bg-gray-100 transition-colors border border-gray-200"
-          >
-            <ExternalLink className="w-3.5 h-3.5" /> Learner Quiz Dashboard
           </a>
         </div>
 

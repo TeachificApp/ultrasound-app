@@ -26,7 +26,7 @@ import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
-import { handleCtaBtnClick } from "@/pages/CourseLanding";
+import { handleCtaBtnClick } from "@/lib/ctaUtils";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 
