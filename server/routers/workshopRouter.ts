@@ -27,6 +27,8 @@ function isInstanceOnSale(instance: {
   salesOpenDate: Date | null;
   salesCloseDate: Date | null;
   startDate: Date;
+  capacity?: number | null;
+  enrolledCount?: number | null;
 }): boolean {
   if (!instance.availableForPurchase) return false;
   if (instance.status !== "published") return false;
@@ -36,7 +38,29 @@ function isInstanceOnSale(instance: {
   // Check sales close date — if set by admin, use it; otherwise auto-close at startDate
   const closeDate = instance.salesCloseDate ?? instance.startDate;
   if (now >= closeDate) return false;
+  // Capacity check — if capacity is set and fully enrolled, not on sale
+  if (instance.capacity != null && (instance.enrolledCount ?? 0) >= instance.capacity) return false;
   return true;
+}
+
+/** Returns true when an instance is date-valid but at capacity (sold out) */
+function isInstanceSoldOut(instance: {
+  availableForPurchase: boolean;
+  status: string;
+  salesOpenDate: Date | null;
+  salesCloseDate: Date | null;
+  startDate: Date;
+  capacity?: number | null;
+  enrolledCount?: number | null;
+}): boolean {
+  if (!instance.availableForPurchase) return false;
+  if (instance.status !== "published") return false;
+  const now = new Date();
+  if (instance.salesOpenDate && now < instance.salesOpenDate) return false;
+  const closeDate = instance.salesCloseDate ?? instance.startDate;
+  if (now >= closeDate) return false;
+  // Must have capacity set and be at/over it
+  return instance.capacity != null && (instance.enrolledCount ?? 0) >= instance.capacity;
 }
 
 // ─── Public Router ────────────────────────────────────────────────────────────
@@ -74,8 +98,10 @@ export const workshopPublicRouter = router({
         )
         .orderBy(asc(workshopInstances.startDate));
 
-      // Filter to those currently on sale
+      // Filter to those currently on sale (not full)
       const availableInstances = allInstances.filter(isInstanceOnSale);
+      // Instances that are date-valid but sold out (at capacity)
+      const soldOutInstances = allInstances.filter(isInstanceSoldOut);
 
       // Get pricing options
       const pricingOptions = await db
@@ -105,6 +131,7 @@ export const workshopPublicRouter = router({
       return {
         workshop,
         availableInstances,
+        soldOutInstances,
         allInstances,
         pricingOptions,
         resources,
@@ -401,8 +428,12 @@ export const workshopLearnerRouter = router({
         .limit(1);
       if (!instance) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop instance not found" });
 
-      // Verify still on sale
+      // Verify still on sale (includes capacity check)
       if (!isInstanceOnSale(instance)) {
+        // Distinguish sold-out from date-closed for a better error message
+        if (isInstanceSoldOut(instance)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This workshop session is sold out." });
+        }
         throw new TRPCError({ code: "BAD_REQUEST", message: "This workshop is no longer available for purchase." });
       }
 

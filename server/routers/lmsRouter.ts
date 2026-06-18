@@ -415,12 +415,32 @@ export const lmsPublicRouter = router({
       }
 
       const landingPage = landingPageRow[0] ?? null;
+
+      // ── Capacity / sold-out helpers for cohort groups ──────────────────────────
+      const now = new Date();
+      const isCohortGroupOnSale = (g: typeof cohortGroupsRaw[0]) => {
+        if (g.status !== "open") return false;
+        if (g.enrollmentCloseDate && now >= new Date(g.enrollmentCloseDate)) return false;
+        // Capacity check — if capacity is set and fully enrolled, not on sale
+        if (g.maxStudents != null && Number(g.enrollmentCount ?? 0) >= g.maxStudents) return false;
+        return true;
+      };
+      const isCohortGroupSoldOut = (g: typeof cohortGroupsRaw[0]) => {
+        if (g.status !== "open") return false;
+        if (g.enrollmentCloseDate && now >= new Date(g.enrollmentCloseDate)) return false;
+        // Must have capacity set and be at/over it
+        return g.maxStudents != null && Number(g.enrollmentCount ?? 0) >= g.maxStudents;
+      };
+
       // Determine featured cohort group and waitlist mode for the landing page
-            const featuredGroup = cohortGroupsRaw.find(g => g.isFeaturedOnLanding) ?? cohortGroupsRaw[0] ?? null;
-      const hasOpenGroup = cohortGroupsRaw.some(g => g.status === "open");
+      const featuredGroup = cohortGroupsRaw.find(g => g.isFeaturedOnLanding) ?? cohortGroupsRaw[0] ?? null;
+      // hasOpenGroup: true only if at least one group is on sale (date-valid AND not at capacity)
+      const hasOpenGroup = cohortGroupsRaw.some(isCohortGroupOnSale);
+      // soldOutGroups: date-valid but at capacity
+      const soldOutGroups = cohortGroupsRaw.filter(isCohortGroupSoldOut);
       // Include all non-archived cohort groups so the Live Sessions Auto block can show them
       const cohortGroups = cohortGroupsRaw;
-      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions, featuredGroup, hasOpenGroup, cohortGroups };
+      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions, featuredGroup, hasOpenGroup, soldOutGroups, cohortGroups };
     }),
 
   /** Get instructor public profile */
@@ -768,6 +788,13 @@ export const lmsPublicRouter = router({
         .where(eq(lmsCohortGroups.id, input.cohortGroupId))
         .then(r => r[0] ?? null);
       if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      // Count current enrollments for sold-out detection
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(lmsCohortGroupEnrollments)
+        .where(eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId));
+      const enrollmentCount = Number(countRow?.count ?? 0);
+      const isSoldOut = row.maxStudents != null && enrollmentCount >= row.maxStudents;
       return {
         id: row.id,
         courseId: row.courseId,
@@ -777,6 +804,8 @@ export const lmsPublicRouter = router({
         endDate: row.endDate,
         enrollmentCloseDate: row.enrollmentCloseDate,
         maxStudents: row.maxStudents,
+        enrollmentCount,
+        isSoldOut,
         status: row.status,
         landingBlocks: row.landingBlocks ? JSON.parse(row.landingBlocks) : [],
       };

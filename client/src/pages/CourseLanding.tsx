@@ -982,16 +982,24 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                             );
                           })()}
                         </div>
-                        {showEnrollNow && (
-                          <Button
-                            size="sm"
-                            className="flex-shrink-0 text-white"
-                            style={{ backgroundColor: accentColor }}
-                            onClick={e => { e.stopPropagation(); onCheckoutPage?.(); }}
-                          >
-                            {enrollNowText}
-                          </Button>
-                        )}
+                        {showEnrollNow && (() => {
+                          const _enrolled = Number(g.enrollmentCount ?? 0);
+                          const _isFull = g.maxStudents != null && _enrolled >= g.maxStudents;
+                          return _isFull ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">
+                              Sold Out
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="flex-shrink-0 text-white"
+                              style={{ backgroundColor: accentColor }}
+                              onClick={e => { e.stopPropagation(); onCheckoutPage?.(); }}
+                            >
+                              {enrollNowText}
+                            </Button>
+                          );
+                        })()}
                       </div>
                     </div>
                     {/* Click hint */}
@@ -1192,16 +1200,24 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                           );
                         })()}
                       </div>
-                      {showEnrollNowCICA && (
-                        <Button
-                          size="sm"
-                          className="flex-shrink-0 text-white"
-                          style={{ backgroundColor: accentColorCICA }}
-                          onClick={e => { e.stopPropagation(); onCheckoutPage?.(); }}
-                        >
-                          {enrollNowTextCICA}
-                        </Button>
-                      )}
+                      {showEnrollNowCICA && (() => {
+                        const _enrolledCICA = Number(g.enrollmentCount ?? 0);
+                        const _isFullCICA = g.maxStudents != null && _enrolledCICA >= g.maxStudents;
+                        return _isFullCICA ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">
+                            Sold Out
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="flex-shrink-0 text-white"
+                            style={{ backgroundColor: accentColorCICA }}
+                            onClick={e => { e.stopPropagation(); onCheckoutPage?.(); }}
+                          >
+                            {enrollNowTextCICA}
+                          </Button>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="px-5 pb-3 flex items-center gap-1 text-[11px]" style={{ color: accentColorCICA }}>
@@ -2408,13 +2424,19 @@ function CohortGroupDetailModal({
             {isLoading && <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />}
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-              onClick={onEnroll}
-            >
-              Enroll Now
-            </Button>
+            {data?.isSoldOut ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                Sold Out
+              </span>
+            ) : (
+              <Button
+                size="sm"
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={onEnroll}
+              >
+                Enroll Now
+              </Button>
+            )}
             <DialogClose asChild>
               <button className="rounded-full p-1.5 hover:bg-gray-100 transition-colors" aria-label="Close">
                 <X className="w-4 h-4 text-gray-500" />

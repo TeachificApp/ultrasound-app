@@ -79,6 +79,46 @@ function AdminPreviewBar({ workshopId }: { workshopId: number }) {
   );
 }
 
+// ─── Sold-Out Instance Card ─────────────────────────────────────────────────
+function SoldOutInstanceCard({ instance }: { instance: any }) {
+  return (
+    <div className="border border-gray-200 rounded-xl p-5 bg-gray-50 opacity-75">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          {instance.title && (
+            <h3 className="font-semibold text-gray-700 mb-1">{instance.title}</h3>
+          )}
+          <div className="flex flex-wrap gap-3 text-sm text-gray-500">
+            {instance.startDate && (
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                {fmtDate(instance.startDate)}
+              </span>
+            )}
+            {instance.location && (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                {instance.location}
+              </span>
+            )}
+          </div>
+          {instance.description && (
+            <p className="text-sm text-gray-400 mt-2 line-clamp-2">{instance.description}</p>
+          )}
+        </div>
+        <div className="text-right shrink-0">
+          {instance.price !== null && instance.price !== undefined ? (
+            <div className="text-lg font-bold text-gray-400 mb-2 line-through">{fmtPrice(instance.price)}</div>
+          ) : null}
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+            Sold Out
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Instance Card ────────────────────────────────────────────────────────────
 function InstanceCard({
   instance,
@@ -274,6 +314,7 @@ export default function WorkshopLanding() {
 
   const workshop = data?.workshop;
   const availableInstances = data?.availableInstances ?? [];
+  const soldOutInstances = data?.soldOutInstances ?? [];
   const allInstances = data?.allInstances ?? [];
   const pricingOptions = data?.pricingOptions ?? [];
 
@@ -685,7 +726,7 @@ export default function WorkshopLanding() {
           )}
 
           {/* Available Instances (non-waitlist mode) */}
-          {!isWaitlistMode && availableInstances.length > 0 && (
+          {!isWaitlistMode && (availableInstances.length > 0 || soldOutInstances.length > 0) && (
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Dates</h2>
               <div className="space-y-3">
@@ -696,6 +737,9 @@ export default function WorkshopLanding() {
                     onRegister={handleInstanceRegister}
                     isPending={enrollMutation.isPending || checkoutMutation.isPending}
                   />
+                ))}
+                {soldOutInstances.map((inst: any) => (
+                  <SoldOutInstanceCard key={inst.id} instance={inst} />
                 ))}
               </div>
             </div>
