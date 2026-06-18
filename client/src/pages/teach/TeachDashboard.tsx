@@ -38,6 +38,36 @@ function materialIcon(type: string) {
   return <FileIcon className="w-4 h-4 text-gray-400" />;
 }
 
+async function parseTeachUploadResponse(res: Response) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    if (text.trimStart().startsWith("<!DOCTYPE") || text.trimStart().startsWith("<html")) {
+      throw new Error("Server returned an HTML error page instead of JSON. The import may have timed out — please try again.");
+    }
+    throw new Error(text.slice(0, 200) || "Invalid server response");
+  }
+}
+
+async function waitForTeachParse(materialId: number, maxWaitMs = 10 * 60 * 1000): Promise<{ parsed: boolean; slideMasterId: number | null }> {
+  const started = Date.now();
+  while (Date.now() - started < maxWaitMs) {
+    const res = await fetch(`/api/upload-teach/parse-status/${materialId}`, { credentials: "include" });
+    const json = await parseTeachUploadResponse(res);
+    if (!res.ok) throw new Error(String(json.error ?? "Failed to check import status"));
+    if (json.status === "failed") throw new Error(String(json.error ?? "PowerPoint import failed"));
+    if (json.status === "done") {
+      return {
+        parsed: Boolean(json.parsed),
+        slideMasterId: typeof json.slideMasterId === "number" ? json.slideMasterId : null,
+      };
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error("PowerPoint import is taking longer than expected. Check your library in a few minutes.");
+}
+
 export default function TeachDashboard() {
   const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
@@ -94,14 +124,6 @@ export default function TeachDashboard() {
       if (data.parsed && data.materialId) navigate(`/teach/presentation/${data.materialId}/edit`);
     },
     onError: (e) => { toast.error(e.message); setUploading(false); },
-  });
-  const parsePptxFromUrl = trpc.teach.parsePptxFromUrl.useMutation({
-    onSuccess: (data) => {
-      toast.success(data.parsed ? "PowerPoint imported — slides ready to edit" : "File uploaded");
-      refetch(); refetchMasters(); setUploading(false); setProcessing(false);
-      if (data.parsed && data.materialId) navigate(`/teach/presentation/${data.materialId}/edit`);
-    },
-    onError: (e) => { toast.error(e.message); setUploading(false); setProcessing(false); },
   });
   const deleteMaterial = trpc.teach.deleteMaterial.useMutation({
     onSuccess: () => { toast.success("Permanently deleted"); refetch(); refetchTrash(); },
@@ -207,11 +229,11 @@ export default function TeachDashboard() {
           }),
           credentials: "include",
         });
+        const initData = await parseTeachUploadResponse(initRes);
         if (!initRes.ok) {
-          const err = await initRes.json().catch(() => ({ error: "Upload init failed" }));
-          throw new Error(err.error || "Upload init failed");
+          throw new Error(String(initData.error ?? "Upload init failed"));
         }
-        const { uploadId } = await initRes.json();
+        const uploadId = initData.uploadId as string;
 
         // Step 2: Upload chunks
         let lastResult: any = null;
@@ -229,31 +251,53 @@ export default function TeachDashboard() {
             body: formData,
             credentials: "include",
           });
+          const chunkData = await parseTeachUploadResponse(chunkRes);
           if (!chunkRes.ok) {
-            const err = await chunkRes.json().catch(() => ({ error: "Chunk upload failed" }));
-            throw new Error(err.error || "Chunk upload failed");
+            throw new Error(String(chunkData.error ?? "Chunk upload failed"));
           }
-          lastResult = await chunkRes.json();
+          lastResult = chunkData;
           setUploadProgress({ current: i + 1, total: totalChunks });
         }
         // Step 3: Parse PPTX from the uploaded S3 URL
         if (!lastResult?.done) throw new Error("Upload did not complete");
         setUploadProgress(null);
         setProcessing(true);
-        parsePptxFromUrl.mutate({
-          assetId: lastResult.assetId,
-          s3Url: lastResult.s3Url,
-          s3Key: lastResult.s3Key,
-          fileName: lastResult.fileName,
-          mimeType: lastResult.mimeType,
-          fileSize: lastResult.fileSize,
-          title,
-          ownerContext,
-          educatorOrgId: educatorOrgId ?? undefined,
+        setUploading(false);
+
+        const parseRes = await fetch("/api/upload-teach/parse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            assetId: lastResult.assetId,
+            s3Url: lastResult.s3Url,
+            s3Key: lastResult.s3Key,
+            fileName: lastResult.fileName,
+            mimeType: lastResult.mimeType,
+            fileSize: lastResult.fileSize,
+            title,
+            ownerContext,
+            educatorOrgId: educatorOrgId ?? undefined,
+          }),
         });
+        const parseData = await parseTeachUploadResponse(parseRes);
+        if (!parseRes.ok) throw new Error(String(parseData.error ?? "Processing failed"));
+        const materialId = parseData.materialId as number;
+        let parsed = Boolean(parseData.parsed);
+        if (parseData.processing) {
+          const done = await waitForTeachParse(materialId);
+          parsed = done.parsed;
+        }
+
+        toast.success(parsed ? "PowerPoint imported — slides ready to edit" : "File uploaded");
+        refetch();
+        refetchMasters();
+        setProcessing(false);
+        if (parsed && materialId) navigate(`/teach/presentation/${materialId}/edit`);
       } catch (err: any) {
         toast.error(err?.message || "Upload failed");
         setUploading(false);
+        setProcessing(false);
         setUploadProgress(null);
       }
       return;
