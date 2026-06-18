@@ -12,7 +12,15 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb } from "../db";
-import { lmsCourses, lmsSections, lmsLessons, curriculumEmbedVisibility } from "../../drizzle/schema";
+import {
+  lmsCourses,
+  lmsSections,
+  lmsLessons,
+  curriculumEmbedVisibility,
+  workshops,
+  digitalProducts,
+  physicalProducts,
+} from "../../drizzle/schema";
 import { eq, asc, and } from "drizzle-orm";
 
 function setCors(res: Response) {
@@ -121,6 +129,108 @@ async function getCurriculumData(slug: string) {
     totalLessons,
     totalMinutes,
     sections: filteredSections,
+  };
+}
+
+type CtaCardData = {
+  title: string;
+  subtitle: string | null;
+  coverImageUrl: string | null;
+  price: number;
+  isFree: boolean;
+  pricingType: "free" | "one_time" | "subscription" | "payment_plan" | "trial_then_subscription";
+  totalLessons: number;
+  totalMinutes: number;
+  sections: { lessons: unknown[] }[];
+};
+
+/** CTA card data for workshops, downloads, and physical products */
+async function getContentCtaData(
+  entityType: "workshop" | "download" | "physical",
+  slug: string,
+): Promise<CtaCardData | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  if (entityType === "workshop") {
+    const [w] = await db
+      .select({
+        title: workshops.title,
+        subtitle: workshops.subtitle,
+        coverImageUrl: workshops.coverImageUrl,
+        thumbnailUrl: workshops.thumbnailUrl,
+        price: workshops.price,
+        isFree: workshops.isFree,
+        pricingType: workshops.pricingType,
+        status: workshops.status,
+      })
+      .from(workshops)
+      .where(eq(workshops.slug, slug))
+      .limit(1);
+    if (!w || !["public", "hidden"].includes(w.status)) return null;
+    return {
+      title: w.title,
+      subtitle: w.subtitle ?? null,
+      coverImageUrl: w.coverImageUrl ?? w.thumbnailUrl ?? null,
+      price: (w.price ?? 0) / 100,
+      isFree: w.isFree,
+      pricingType: w.pricingType === "free" ? "free" : "one_time",
+      totalLessons: 0,
+      totalMinutes: 0,
+      sections: [],
+    };
+  }
+
+  if (entityType === "download") {
+    const [p] = await db
+      .select({
+        title: digitalProducts.title,
+        subtitle: digitalProducts.subtitle,
+        thumbnailUrl: digitalProducts.thumbnailUrl,
+        price: digitalProducts.price,
+        isFree: digitalProducts.isFree,
+        status: digitalProducts.status,
+      })
+      .from(digitalProducts)
+      .where(eq(digitalProducts.slug, slug))
+      .limit(1);
+    if (!p || !["published", "hidden"].includes(p.status)) return null;
+    return {
+      title: p.title,
+      subtitle: p.subtitle ?? null,
+      coverImageUrl: p.thumbnailUrl ?? null,
+      price: (p.price ?? 0) / 100,
+      isFree: p.isFree,
+      pricingType: "one_time",
+      totalLessons: 0,
+      totalMinutes: 0,
+      sections: [],
+    };
+  }
+
+  const [p] = await db
+    .select({
+      title: physicalProducts.title,
+      subtitle: physicalProducts.subtitle,
+      thumbnailUrl: physicalProducts.thumbnailUrl,
+      price: physicalProducts.price,
+      isFree: physicalProducts.isFree,
+      status: physicalProducts.status,
+    })
+    .from(physicalProducts)
+    .where(eq(physicalProducts.slug, slug))
+    .limit(1);
+  if (!p || !["published", "hidden"].includes(p.status)) return null;
+  return {
+    title: p.title,
+    subtitle: p.subtitle ?? null,
+    coverImageUrl: p.thumbnailUrl ?? null,
+    price: (p.price ?? 0) / 100,
+    isFree: p.isFree,
+    pricingType: "one_time",
+    totalLessons: 0,
+    totalMinutes: 0,
+    sections: [],
   };
 }
 
@@ -294,7 +404,7 @@ window.addEventListener('load', function() {
 
 // ─── CTA Card iframe ──────────────────────────────────────────────────────────
 
-function buildCtaCardHtml(data: NonNullable<Awaited<ReturnType<typeof getCurriculumData>>>, opts: {
+function buildCtaCardHtml(data: CtaCardData, opts: {
   accentColor: string;
   ctaUrl: string;
   ctaLabel: string;
@@ -361,8 +471,8 @@ function buildCtaCardHtml(data: NonNullable<Awaited<ReturnType<typeof getCurricu
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;background:transparent;color:${text};line-height:1.5}
-body{padding:12px;overflow-x:hidden}
-.card{background:${cardBg};border:1px solid ${border};border-radius:12px;overflow:hidden;display:${isHorizontal ? "flex" : "block"};align-items:stretch;gap:0}
+body{padding:12px;overflow-x:hidden;display:flex;justify-content:flex-start}
+.card{background:${cardBg};border:1px solid ${border};border-radius:12px;overflow:hidden;display:${isHorizontal ? "flex" : "block"};align-items:stretch;gap:0;max-width:${isHorizontal ? "480" : "320"}px;width:100%}
 .img-wrap{${isHorizontal ? "width:200px;flex-shrink:0;" : "width:100%;"}overflow:hidden}
 .course-img{width:100%;height:${isHorizontal ? "100%" : "200px"};object-fit:cover;display:block}
 .body{padding:18px;flex:1;display:flex;flex-direction:column;gap:10px}
@@ -463,7 +573,8 @@ const CTA_CARD_JS_LOADER = `(function() {
       + '&subtitle=' + encodeURIComponent(customSubtitle);
     var iframe = document.createElement('iframe');
     iframe.src = src;
-    iframe.style.cssText = 'width:100%;border:none;display:block;min-height:120px;';
+    var maxW = layout === 'horizontal' ? '480px' : '320px';
+    iframe.style.cssText = 'width:100%;max-width:' + maxW + ';border:none;display:block;min-height:120px;';
     iframe.setAttribute('scrolling', 'no');
     iframe.setAttribute('frameborder', '0');
     iframe.setAttribute('allowtransparency', 'true');
@@ -476,6 +587,70 @@ const CTA_CARD_JS_LOADER = `(function() {
   });
 })();`;
 
+const CONTENT_CTA_JS_LOADER = `(function() {
+  var containers = document.querySelectorAll('[data-content-cta-embed]');
+  containers.forEach(function(el) {
+    var slug = el.getAttribute('data-content-cta-embed');
+    var entityType = el.getAttribute('data-entity-type') || 'workshop';
+    var accent = el.getAttribute('data-accent') || '#14b8a6';
+    var theme = el.getAttribute('data-theme') || 'light';
+    var ctaUrl = el.getAttribute('data-cta-url') || '';
+    var ctaLabel = el.getAttribute('data-cta-label') || 'Enroll Now';
+    var layout = el.getAttribute('data-layout') || 'vertical';
+    var showImage = el.getAttribute('data-show-image') !== '0' ? '1' : '0';
+    var showPrice = el.getAttribute('data-show-price') !== '0' ? '1' : '0';
+    var showMeta = el.getAttribute('data-show-meta') !== '0' ? '1' : '0';
+    var imageUrl = el.getAttribute('data-image-url') || '';
+    var customTitle = el.getAttribute('data-title') || '';
+    var customSubtitle = el.getAttribute('data-subtitle') || '';
+    var base = el.getAttribute('data-base-url') || 'https://app.allaboutultrasound.com';
+    var src = base + '/embed/content-cta/' + encodeURIComponent(entityType) + '/' + encodeURIComponent(slug)
+      + '?accent=' + encodeURIComponent(accent)
+      + '&theme=' + encodeURIComponent(theme)
+      + '&ctaUrl=' + encodeURIComponent(ctaUrl)
+      + '&ctaLabel=' + encodeURIComponent(ctaLabel)
+      + '&layout=' + encodeURIComponent(layout)
+      + '&showImage=' + showImage
+      + '&showPrice=' + showPrice
+      + '&showMeta=' + showMeta
+      + '&imageUrl=' + encodeURIComponent(imageUrl)
+      + '&title=' + encodeURIComponent(customTitle)
+      + '&subtitle=' + encodeURIComponent(customSubtitle);
+    var iframe = document.createElement('iframe');
+    iframe.src = src;
+    var maxW = layout === 'horizontal' ? '480px' : '320px';
+    iframe.style.cssText = 'width:100%;max-width:' + maxW + ';border:none;display:block;min-height:120px;';
+    iframe.setAttribute('scrolling', 'no');
+    iframe.setAttribute('frameborder', '0');
+    iframe.setAttribute('allowtransparency', 'true');
+    el.appendChild(iframe);
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'cta-card-resize' && e.source === iframe.contentWindow) {
+        iframe.style.height = (e.data.height + 8) + 'px';
+      }
+    });
+  });
+})();`;
+
+const INSTANCE_JS_LOADER = `(function() {
+  var containers = document.querySelectorAll('[data-instance-embed]');
+  containers.forEach(function(el) {
+    var raw = el.getAttribute('data-instance-embed') || '';
+    var parts = raw.split(':');
+    if (parts.length < 2) return;
+    var kind = parts[0];
+    var id = parts[1];
+    var base = el.getAttribute('data-base-url') || 'https://app.allaboutultrasound.com';
+    var src = base + '/embed/instance/' + kind + '/' + encodeURIComponent(id);
+    var iframe = document.createElement('iframe');
+    iframe.src = src;
+    iframe.style.cssText = 'width:100%;border:none;display:block;min-height:400px;';
+    iframe.setAttribute('scrolling', 'yes');
+    iframe.setAttribute('frameborder', '0');
+    el.appendChild(iframe);
+  });
+})();`;
+
 // ─── Route registration ───────────────────────────────────────────────────────
 
 export function registerCurriculumEmbedRoutes(app: Express) {
@@ -483,6 +658,14 @@ export function registerCurriculumEmbedRoutes(app: Express) {
   app.options("/api/curriculum-embed/data", (_req, res) => { setCors(res); res.sendStatus(204); });
   app.options("/embed/curriculum/:slug", (_req, res) => { setCors(res); res.sendStatus(204); });
   app.options("/embed/curriculum-cta/:slug", (_req, res) => { setCors(res); res.sendStatus(204); });
+  app.options("/embed/content-cta/:entityType/:slug", (_req, res) => { setCors(res); res.sendStatus(204); });
+  app.options("/embed/instance/:kind/:id", (_req, res) => { setCors(res); res.sendStatus(204); });
+
+  // Allow SPA instance embed pages to be framed
+  app.use("/embed/instance", (_req, res, next) => {
+    setFrameable(res);
+    next();
+  });
 
   // JSON data endpoint
   app.get("/api/curriculum-embed/data", async (req: Request, res: Response) => {
@@ -569,5 +752,59 @@ export function registerCurriculumEmbedRoutes(app: Express) {
     res.setHeader("Content-Type", "application/javascript; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(CTA_CARD_JS_LOADER);
+  });
+
+  // Content CTA card (workshop, download, physical)
+  app.get("/embed/content-cta/:entityType/:slug", async (req: Request, res: Response) => {
+    setCors(res);
+    setFrameable(res);
+    try {
+      const entityType = req.params.entityType;
+      if (!["workshop", "download", "physical"].includes(entityType)) {
+        res.status(400).send("<html><body>Invalid entity type.</body></html>");
+        return;
+      }
+      const slug = req.params.slug;
+      const accentColor = String(req.query.accent ?? "#14b8a6");
+      const ctaUrl = String(req.query.ctaUrl ?? "");
+      const ctaLabel = String(req.query.ctaLabel ?? "Enroll Now");
+      const theme = req.query.theme === "dark" ? "dark" : "light";
+      const layout = req.query.layout === "horizontal" ? "horizontal" : "vertical";
+      const showImage = req.query.showImage !== "0";
+      const showPrice = req.query.showPrice !== "0";
+      const showMeta = req.query.showMeta !== "0";
+      const imageUrl = String(req.query.imageUrl ?? "");
+      const customTitle = String(req.query.title ?? "");
+      const customSubtitle = String(req.query.subtitle ?? "");
+
+      const data = await getContentCtaData(entityType as "workshop" | "download" | "physical", slug);
+      if (!data) {
+        res.status(404).send("<html><body style='font-family:sans-serif;padding:20px;color:#64748b'>Content not found.</body></html>");
+        return;
+      }
+
+      const html = buildCtaCardHtml(data, {
+        accentColor, ctaUrl, ctaLabel, showImage, showPrice, showMeta,
+        customTitle, customSubtitle, theme, layout, imageUrl,
+      });
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(html);
+    } catch (e: any) {
+      res.status(500).send(`<html><body>Error: ${escHtml(e.message)}</body></html>`);
+    }
+  });
+
+  app.get("/embed/content-cta.js", (_req: Request, res: Response) => {
+    setCors(res);
+    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(CONTENT_CTA_JS_LOADER);
+  });
+
+  app.get("/embed/instance.js", (_req: Request, res: Response) => {
+    setCors(res);
+    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(INSTANCE_JS_LOADER);
   });
 }

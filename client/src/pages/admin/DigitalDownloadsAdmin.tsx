@@ -12,7 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
-import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate, BarChart3, ShoppingCart, Settings2, FolderOpen, Workflow, Search } from "lucide-react";
+import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
+import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate, BarChart3, ShoppingCart, Settings2, FolderOpen, Workflow, Search, Code2 } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
@@ -414,6 +415,9 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           <TabsTrigger value="checkout-page" className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 px-4 py-2 text-sm font-medium bg-transparent hover:text-teal-600">
             <ShoppingCart className="w-3.5 h-3.5 mr-1.5" /> Checkout Page
           </TabsTrigger>
+          <TabsTrigger value="embed" className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 px-4 py-2 text-sm font-medium bg-transparent hover:text-teal-600">
+            <Code2 className="w-3.5 h-3.5 mr-1.5" /> Embed
+          </TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -685,6 +689,19 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               </div>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="embed" className="mt-4">
+          {product.slug && (
+            <ContentEmbedTab
+              entityType="download"
+              slug={product.slug}
+              title={product.title}
+              subtitle={product.subtitle}
+              thumbnailUrl={product.thumbnailUrl}
+              defaultCheckoutUrl={`${window.location.origin}/checkout/${product.slug}?type=download`}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>

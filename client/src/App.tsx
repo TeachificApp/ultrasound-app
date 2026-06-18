@@ -100,6 +100,7 @@ const BundleLanding = lazy(() => import("./pages/BundleLanding"));
 const ProductLanding = lazy(() => import("./pages/ProductLanding"));
 const ProductsListing = lazy(() => import("./pages/ProductsListing"));
 const ProductLandingPageBuilder = lazy(() => import("./pages/admin/ProductLandingPageBuilder"));
+const InstancePageEmbed = lazy(() => import("./pages/embed/InstancePageEmbed"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
@@ -546,6 +547,8 @@ function Router() {
         {/* ── Public Form Renderer (no auth required) ──────────────────────── */}
         <Route path="/forms/:slug">{() => <PublicFormRenderer />}</Route>
         <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
+        <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
+        <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
@@ -695,6 +698,8 @@ function MembersRouter() {
       {/* ── Public Form Renderer — outside MembersLayout (full-screen, no nav) ── */}
       <Route path="/forms/:slug">{() => <PublicFormRenderer />}</Route>
       <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
+      <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><InstancePageEmbed /></Suspense>}</Route>
+      <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><InstancePageEmbed /></Suspense>}</Route>
       <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
@@ -781,6 +786,8 @@ function LMSRouter() {
       {/* ── Public Form Renderer — outside LMSLayout (full-screen, no nav) ── */}
       <Route path="/forms/:slug">{() => <PublicFormRenderer />}</Route>
       <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
+      <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><InstancePageEmbed /></Suspense>}</Route>
+      <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><InstancePageEmbed /></Suspense>}</Route>
       <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
@@ -1044,6 +1051,8 @@ function IHeartEchoRouter() {
         {/* ── Public Form Renderer (no auth required) ──────────────────────── */}
         <Route path="/forms/:slug">{() => <PublicFormRenderer />}</Route>
         <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
+        <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
+        <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
@@ -1269,6 +1278,8 @@ function AccreditationDivisionRouter() {
         {/* ── Public Form Renderer ─────────────────────────────────────────── */}
         <Route path="/forms/:slug">{() => <PublicFormRenderer />}</Route>
         <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
+        <Route path="/embed/instance/workshop/:instanceId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
+        <Route path="/embed/instance/cohort/:groupId">{() => <Suspense fallback={pageFallback}><InstancePageEmbed /></Suspense>}</Route>
         <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       <Route path="/reports/analytics/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsReport /></Suspense>}</Route>
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
