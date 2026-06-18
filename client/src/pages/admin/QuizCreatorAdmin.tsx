@@ -130,6 +130,35 @@ function FolderTagPicker({
   );
 }
 
+// ─── File upload helpers ──────────────────────────────────────────────────────
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function parseUploadQuizFileResponse(res: Response) {
+  const text = await res.text();
+  if (!text.trim()) {
+    throw new Error("Empty response from server — the upload route may be unavailable");
+  }
+  let json: any;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error("Invalid server response while uploading file");
+  }
+  if (!res.ok) throw new Error(json.error ?? "Upload failed");
+  return json;
+}
+
 // ─── Import Quiz Dialog (SCORM or CSV — creates a new quiz) ───────────────────
 function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (quizId: number) => void }) {
   const [importTab, setImportTab] = useState<"scorm" | "csv">("scorm");
@@ -170,8 +199,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
       const fd = new FormData();
       fd.append("file", f);
       const res = await fetch("/api/upload-quiz-bank-file", { method: "POST", body: fd, credentials: "include" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      const json = await parseUploadQuizFileResponse(res);
       if (json.type === "scorm") {
         setScormPreview(json.preview);
         setScormSelectedGroups(new Set(json.preview.groups.map((g: any) => g.id)));
@@ -191,25 +219,21 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
   const handleImportAndCreate = async () => {
     if (!newQuizTitle.trim()) { toast.error("Please enter a quiz title"); return; }
     try {
-      // 1. Create the quiz
       const quiz = await createQuizMut.mutateAsync({ title: newQuizTitle.trim(), type: newQuizType, brand: newQuizBrand });
 
-      // 2. Import questions to bank
-      let bankIds: number[] = [];
-      if (importTab === "scorm" && scormPreview) {
+      if (importTab === "scorm" && scormPreview && file) {
         const result = await scormConfirmMut.mutateAsync({
-          mediaAssetId: 0, // not used for direct upload — we pass bufferBase64 via a different path
+          bufferBase64: await fileToBase64(file),
           groupIds: Array.from(scormSelectedGroups),
           extraTagIds: tagIds.length > 0 ? tagIds : undefined,
           groupPrefix: scormGroupPrefix.trim() || undefined,
           folderId: folderId ?? undefined,
           newFolderName: newFolderName.trim() || undefined,
         });
-        // Collect all inserted question IDs — we need to re-query the bank
-        // Since confirmScormImport doesn't return IDs, we'll use a workaround:
-        // add questions to quiz via a separate call after getting the latest bank questions
-        toast.success(`Imported ${result.totalInserted} questions to bank`);
-        // For now, navigate to the quiz and let user add from bank
+        if (result.questionBankIds.length > 0) {
+          await addQMut.mutateAsync({ quizId: quiz.id, questionBankIds: result.questionBankIds });
+        }
+        toast.success(`Created quiz with ${result.totalInserted} imported question(s)`);
         onCreated(quiz.id);
         onClose(); reset();
         return;
@@ -220,7 +244,10 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
           newFolderName: newFolderName.trim() || undefined,
           tagIds: tagIds.length > 0 ? tagIds : undefined,
         });
-        toast.success(`Imported ${result.inserted} questions to bank`);
+        if (result.ids?.length > 0) {
+          await addQMut.mutateAsync({ quizId: quiz.id, questionBankIds: result.ids });
+        }
+        toast.success(`Created quiz with ${result.inserted} imported question(s)`);
         onCreated(quiz.id);
         onClose(); reset();
         return;
@@ -449,7 +476,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
         <DialogFooter className="pt-3 border-t">
           <Button variant="outline" onClick={() => { onClose(); reset(); }}>Cancel</Button>
           <Button
-            disabled={(!scormPreview && !csvPreview) || !newQuizTitle.trim() || isPending || (importTab === "scorm" && scormSelectedGroups.size === 0)}
+            disabled={(!scormPreview && !csvPreview) || !newQuizTitle.trim() || isPending || (importTab === "scorm" && (scormSelectedGroups.size === 0 || !file))}
             onClick={handleImportAndCreate}
             className="bg-teal-600 hover:bg-teal-700"
           >
@@ -540,8 +567,11 @@ function AddQuestionsDialog({
   });
 
   const scormConfirmMut = trpc.questionBank.confirmScormImport.useMutation({
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       toast.success(`Imported ${res.totalInserted} questions to bank`);
+      if (res.questionBankIds.length > 0) {
+        await addQMutation.mutateAsync({ quizId, questionBankIds: res.questionBankIds });
+      }
       onAdded(); onClose(); resetAll();
     },
     onError: (e) => toast.error(e.message),
@@ -570,8 +600,7 @@ function AddQuestionsDialog({
     try {
       const fd = new FormData(); fd.append("file", f);
       const res = await fetch("/api/upload-quiz-bank-file", { method: "POST", body: fd, credentials: "include" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      const json = await parseUploadQuizFileResponse(res);
       if (json.type !== "scorm") throw new Error("Not a valid SCORM file");
       setScormPreview(json.preview);
       setScormSelectedGroups(new Set(json.preview.groups.map((g: any) => g.id)));
@@ -584,8 +613,7 @@ function AddQuestionsDialog({
     try {
       const fd = new FormData(); fd.append("file", f);
       const res = await fetch("/api/upload-quiz-bank-file", { method: "POST", body: fd, credentials: "include" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      const json = await parseUploadQuizFileResponse(res);
       if (json.type !== "csv") throw new Error("Not a valid CSV/Excel file");
       setCsvPreview(json);
     } catch (e: any) { toast.error(e.message); setCsvFile(null); }
@@ -602,10 +630,10 @@ function AddQuestionsDialog({
     addQMutation.mutate({ quizId, questionBankIds: ids });
   };
 
-  const handleScormImport = () => {
-    if (!scormPreview) return;
+  const handleScormImport = async () => {
+    if (!scormPreview || !scormFile) return;
     scormConfirmMut.mutate({
-      mediaAssetId: 0,
+      bufferBase64: await fileToBase64(scormFile),
       groupIds: Array.from(scormSelectedGroups),
       extraTagIds: scormTagIds.length > 0 ? scormTagIds : undefined,
       groupPrefix: scormGroupPrefix.trim() || undefined,
@@ -883,7 +911,7 @@ function AddQuestionsDialog({
                 <span className="text-sm text-gray-500">{scormSelectedGroups.size} group(s) selected</span>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => { onClose(); resetAll(); }}>Cancel</Button>
-                  <Button disabled={scormSelectedGroups.size === 0 || scormConfirmMut.isPending} onClick={handleScormImport} className="bg-orange-600 hover:bg-orange-700">
+                  <Button disabled={scormSelectedGroups.size === 0 || scormConfirmMut.isPending || !scormFile} onClick={() => { void handleScormImport(); }} className="bg-orange-600 hover:bg-orange-700">
                     {scormConfirmMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
                     Import to Bank & Quiz
                   </Button>

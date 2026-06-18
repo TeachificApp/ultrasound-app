@@ -3,7 +3,7 @@
  * The main community space view: channel sidebar, post feed, post creation,
  * reactions, comments, and a collapsible members sidebar with DM buttons.
  */
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -36,6 +36,8 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
+import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 
 const REACTIONS = ["❤️", "👍", "🔥", "⭐", "🎉", "🤔", "💡", "👏"];
 
@@ -600,6 +602,31 @@ const RESERVED_COMMUNITY_SLUGS: Record<string, string> = {
   dms: "/community/dms",
 };
 
+function CommunityPageBlocks({ blocksJson }: { blocksJson?: string | null }) {
+  const blocks: Block[] = useMemo(() => {
+    if (!blocksJson) return [];
+    try {
+      const parsed = JSON.parse(blocksJson);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [blocksJson]);
+
+  if (!blocks.length) return null;
+
+  return (
+    <div className="mb-6 space-y-0">
+      {blocks.map((block: any) => {
+        if (block.type === "related_products") {
+          return <RelatedProductsBlock key={block.id} data={block.data ?? {}} />;
+        }
+        return <BlockPreview key={block.id} block={block} />;
+      })}
+    </div>
+  );
+}
+
 export default function CommunityFeed() {
   const { slug } = useParams<{ slug: string }>();
   const { isAuthenticated, user } = useAuth();
@@ -710,8 +737,8 @@ export default function CommunityFeed() {
         ) : null}
         <div className="relative max-w-6xl mx-auto px-4 py-8">
           <div className="flex items-start gap-4">
-            {community.logoImage ? (
-              <img src={community.logoImage} alt={community.title} className="w-16 h-16 rounded-xl object-cover shadow-md" />
+            {community.iconImage || community.logoImage ? (
+              <img src={community.iconImage || community.logoImage} alt={community.title} className="w-16 h-16 rounded-xl object-cover shadow-md" />
             ) : (
               <div className="w-16 h-16 rounded-xl bg-white/20 flex items-center justify-center text-white font-bold text-2xl shadow-md">
                 {community.title.charAt(0)}
@@ -719,6 +746,9 @@ export default function CommunityFeed() {
             )}
             <div className="flex-1 text-white">
               <h1 className="text-2xl font-bold">{community.title}</h1>
+              {community.welcomeMessage && isMember && (
+                <p className="text-white/90 text-sm mt-1 max-w-xl">{community.welcomeMessage}</p>
+              )}
               {community.description && <p className="text-white/80 text-sm mt-1 max-w-xl">{community.description}</p>}
               <div className="flex items-center gap-4 mt-2 text-white/70 text-sm">
                 <span><Users className="w-3.5 h-3.5 inline mr-1" />{community.memberCount?.toLocaleString()} members</span>
@@ -745,7 +775,14 @@ export default function CommunityFeed() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className={`grid gap-6 ${showMembersSidebar && isMember ? "grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_minmax(300px,360px)]" : "grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)]"}`}>
+        {!isMember && community.landingPageBlocks && (
+          <CommunityPageBlocks blocksJson={community.landingPageBlocks} />
+        )}
+        {isMember && community.pageBlocks && (
+          <CommunityPageBlocks blocksJson={community.pageBlocks} />
+        )}
+
+        <div className={`grid gap-6 ${showMembersSidebar && isMember ? "grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_minmax(300px,360px)]" : community.layoutStyle === "full-width" ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)]"}`}>
           {/* Channels sidebar */}
           <div className="lg:col-span-1">
             <Card className="sticky top-4">
