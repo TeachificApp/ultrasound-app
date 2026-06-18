@@ -14,18 +14,19 @@ import { trpc } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookOpen, FileDown, Package, ExternalLink } from "lucide-react";
 import { CourseInstanceInfo } from "@/components/CourseInstanceInfo";
-
-interface ManualItem {
-  type: string;
-  id: number;
-}
+import {
+  pickManualRelatedProducts,
+  resolveRelatedProductsSelectionMode,
+  type RelatedProductFeedItem,
+  type RelatedProductManualRef,
+} from "@shared/relatedProductsBlock";
 
 interface RelatedProductsBlockData {
   headline?: string;
   subtext?: string;
   productType?: "course" | "cohort" | "quiz" | "download" | "both" | "bundle" | "physical" | "all" | "webinar" | "community" | "workshop" | "app";
   selectionMode?: "auto" | "manual";
-  manualItems?: ManualItem[];
+  manualItems?: RelatedProductManualRef[];
   maxItems?: number;
   layout?: "grid" | "list";
   showPrice?: boolean;
@@ -71,15 +72,35 @@ type ProductItem = {
   primaryCohortGroup?: { name?: string | null; startDate?: Date | string | null; endDate?: Date | string | null } | null;
 };
 
+function toProductItem(p: RelatedProductFeedItem): ProductItem {
+  return {
+    id: `${p.type}-${p.id}`,
+    slug: p.slug,
+    title: p.title,
+    description: p.description ?? "",
+    price: p.price,
+    isFree: p.isFree ?? false,
+    imageUrl: p.imageUrl ?? "",
+    type: p.type,
+    href: p.href,
+    pricingType: p.pricingType ?? null,
+    subscriptionInterval: p.subscriptionInterval ?? null,
+    appLabel: p.appLabel,
+    nextInstance: (p as any).nextInstance ?? null,
+    primaryCohortGroup: (p as any).primaryCohortGroup ?? null,
+  };
+}
+
 export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) {
   const d = data;
-  const selectionMode = d.selectionMode ?? "auto";
+  const selectionMode = resolveRelatedProductsSelectionMode(d);
   const productType = d.productType ?? "both";
   const maxItems = Math.max(1, Math.min(12, Number(d.maxItems ?? 3) || 3));
   const layout = d.layout ?? "grid";
   const accent = d.accentColor ?? "#179ca3";
   const textColor = d.textColor ?? "#111827";
   const cardBg = d.cardBgColor ?? "#ffffff";
+  const manualRefs = d.manualItems ?? [];
 
   // ── AUTO mode queries ──────────────────────────────────────────────────────
   const needsCourses =
@@ -99,7 +120,6 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
   );
 
   // ── MANUAL mode query ──────────────────────────────────────────────────────
-  const manualRefs = d.manualItems ?? [];
   const { data: manualData, isLoading: manualLoading } = trpc.funnel.getProductsByIds.useQuery(
     { items: manualRefs },
     { enabled: selectionMode === "manual" && manualRefs.length > 0 }
@@ -114,28 +134,7 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
   let items: ProductItem[] = [];
 
   if (selectionMode === "manual") {
-    // Deduplicate by numeric id (same lmsCourse may appear under both "course" and "quiz" type if type changed)
-    const seenIds = new Set<number>();
-    items = (manualData ?? []).filter(p => {
-      if (seenIds.has(p.id)) return false;
-      seenIds.add(p.id);
-      return true;
-    }).map((p) => ({
-      id: `${p.type}-${p.id}`,
-      slug: p.slug,
-      title: p.title,
-      description: p.description ?? "",
-      price: p.price,
-      isFree: p.isFree ?? false,
-      imageUrl: p.imageUrl ?? "",
-      type: p.type as ProductItem["type"],
-      href: p.href,
-      pricingType: (p as any).pricingType ?? null,
-      subscriptionInterval: (p as any).subscriptionInterval ?? null,
-      appLabel: (p as any).appLabel ?? undefined,
-      nextInstance: (p as any).nextInstance ?? null,
-      primaryCohortGroup: (p as any).primaryCohortGroup ?? null,
-    }));
+    items = pickManualRelatedProducts(manualRefs, manualData ?? [], maxItems).map(toProductItem);
   } else {
     const courseItems: ProductItem[] = (coursesData?.courses ?? []).filter((c) => (c as any).type !== "quiz").map((c) => ({
       id: `course-${c.id}`,
