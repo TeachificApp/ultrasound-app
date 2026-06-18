@@ -23,11 +23,12 @@ import {
   Calendar, Globe, Link2, RefreshCw, CheckCircle, Clock,
   DollarSign, ChevronLeft, Copy, ExternalLink, MapPin,
   BookOpen, FileText, Package, ChevronRight, Workflow,
-  Download, Mail, UserCheck, Loader2,
+  Download, Mail, UserCheck, Loader2, Code2,
 } from "lucide-react";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
+import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 
@@ -530,6 +531,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
           <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3.5 h-3.5 mr-1" />After Purchase</TabsTrigger>
           <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
           <TabsTrigger value="waitlist" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Waitlist</TabsTrigger>
+          <TabsTrigger value="embed" className="text-xs"><Code2 className="w-3.5 h-3.5 mr-1" />Embed</TabsTrigger>
         </TabsList>
 
         {/* ── Settings Tab ── */}
@@ -1092,6 +1094,23 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
         {/* ── Waitlist Tab ── */}
         <TabsContent value="waitlist" className="space-y-4 mt-4">
           <WaitlistSettingsTab workshopId={workshopId} />
+        </TabsContent>
+
+        <TabsContent value="embed" className="space-y-4 mt-4">
+          <ContentEmbedTab
+            entityType="workshop"
+            slug={workshop.slug}
+            title={workshop.title}
+            subtitle={workshop.subtitle}
+            coverImageUrl={workshop.coverImageUrl}
+            thumbnailUrl={workshop.thumbnailUrl}
+            defaultCheckoutUrl={`${window.location.origin}/checkout/workshop/${workshop.slug}`}
+            instanceEmbedKind="workshop"
+            instanceItems={instances.map((inst: any) => ({
+              id: inst.id,
+              label: `${inst.title} — ${fmtDateShort(inst.startDate)}`,
+            }))}
+          />
         </TabsContent>
       </Tabs>
 

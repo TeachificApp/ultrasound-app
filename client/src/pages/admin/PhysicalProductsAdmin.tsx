@@ -13,11 +13,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
+import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
 import {
   Plus, Pencil, Trash2, Copy, Upload, ShoppingBag, ArrowLeft,
   ExternalLink, Eye, Image as ImageIcon, Link as LinkIcon,
   Users, UserPlus, Loader2, Package, BarChart2, Settings,
-  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow, Search,
+  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow, Search, Code2,
 } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
@@ -633,6 +634,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           <TabsTrigger value="analytics" className="text-xs"><BarChart2 className="w-3 h-3 mr-1" />Analytics</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3 h-3 mr-1" />After Purchase</TabsTrigger>
           <TabsTrigger value="checkout-page" className="text-xs"><ShoppingBag className="w-3 h-3 mr-1" />Checkout Page</TabsTrigger>
+          <TabsTrigger value="embed" className="text-xs"><Code2 className="w-3 h-3 mr-1" />Embed</TabsTrigger>
         </TabsList>
 
         {/* ── Details Tab ── */}
@@ -973,6 +975,19 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               </div>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="embed" className="mt-4">
+          {product.slug && (
+            <ContentEmbedTab
+              entityType="physical"
+              slug={product.slug}
+              title={product.title}
+              subtitle={product.subtitle}
+              thumbnailUrl={product.thumbnailUrl}
+              defaultCheckoutUrl={`${window.location.origin}/checkout/${product.slug}?type=physical`}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
