@@ -4866,19 +4866,47 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Card Display Mode</p>
             <div className="flex gap-1">
-              {(["stacked", "embed"] as const).map(m => (
+              {(["stacked", "embed", "calendar"] as const).map(m => (
                 <button key={m} onClick={() => set("cardDisplayMode", m)}
                   className={`flex-1 py-1.5 text-xs rounded border capitalize ${(d.cardDisplayMode ?? "stacked") === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
-                  {m === "stacked" ? "Stacked Cards" : "Embed (Full Detail)"}
+                  {m === "stacked" ? "Stacked Cards" : m === "embed" ? "Page (Full Detail)" : "Calendar"}
                 </button>
               ))}
             </div>
             {(d.cardDisplayMode ?? "stacked") === "embed" && (
               <p className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-2 py-1.5 mt-2">
-                Embed mode renders the full cohort/instance detail page inline on this page — no modal or navigation needed.
+                Page mode shows the full cohort/instance detail inline — auto-picks the next upcoming open group (not in-progress).
+              </p>
+            )}
+            {(d.cardDisplayMode ?? "stacked") === "calendar" && (
+              <p className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-2 py-1.5 mt-2">
+                Calendar mode shows the lesson schedule for the selected or next upcoming cohort group.
               </p>
             )}
           </div>
+          {(d.cardDisplayMode ?? "stacked") === "calendar" && (
+            <div className="border-t pt-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Calendar Options</p>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Default View</label>
+                  <div className="flex gap-1">
+                    {(["list", "calendar"] as const).map(v => (
+                      <button key={v} onClick={() => set("calendarDefaultView", v)}
+                        className={`flex-1 py-1.5 text-xs rounded border capitalize ${(d.calendarDefaultView ?? "list") === v ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
+                        {v === "list" ? "List" : "Calendar Grid"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={d.showZoomJoin !== false} onChange={e => set("showZoomJoin", e.target.checked)} className="rounded" />
+                  <label className="text-xs text-gray-600">Show Zoom Join button on upcoming sessions</label>
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-500 mt-2">Leave group blank to auto-show the next upcoming open cohort group.</p>
+            </div>
+          )}
           {(d.cardDisplayMode ?? "stacked") === "embed" && (
             <div className="border-t pt-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Embed Selection</p>
@@ -5231,15 +5259,30 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
             </div>
           </div>
+          {/* Calendar mode: single-group selector */}
+          {displayMode === "calendar" && (
+            <div className="border-t pt-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cohort / Instance</p>
+              <p className="text-[10px] text-gray-400 mb-2">Leave blank to auto-display the next upcoming group. Select a specific group to always show its schedule.</p>
+              <select
+                className="w-full h-8 text-xs border rounded px-2"
+                value={d.calendarGroupId ?? ""}
+                onChange={e => set("calendarGroupId", e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Auto — next upcoming group</option>
+                {/* Group options are rendered at runtime from the course data */}
+              </select>
+            </div>
+          )}
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Options</p>
             <div className="space-y-2">
-              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDescription ?? true} onChange={e => set("showDescription", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show description</label></div>
-              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDuration ?? true} onChange={e => set("showDuration", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show duration / hours</label></div>
-              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocation ?? true} onChange={e => set("showLocation", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show location</label></div>
-              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPastSessions ?? false} onChange={e => set("showPastSessions", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show past sessions</label></div>
-              {displayMode === "groups" && (
+              {(displayMode === "list" || displayMode === "page") && (
                 <>
+                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDescription ?? true} onChange={e => set("showDescription", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show description</label></div>
+                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDuration ?? true} onChange={e => set("showDuration", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show duration / hours</label></div>
+                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocation ?? true} onChange={e => set("showLocation", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show location</label></div>
+                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPastSessions ?? false} onChange={e => set("showPastSessions", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show past sessions</label></div>
                   <div className="flex items-center gap-2"><input type="checkbox" checked={d.showEnrollNow ?? true} onChange={e => set("showEnrollNow", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Enroll Now button on each card</label></div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Enroll Now Button Text</label>
@@ -5247,14 +5290,14 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   </div>
                 </>
               )}
+              {displayMode === "calendar" && (
+                <>
+                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.calendarDefaultView !== "calendar"} onChange={e => set("calendarDefaultView", e.target.checked ? "list" : "calendar")} className="rounded" /><label className="text-xs text-gray-600">Default to list view (unchecked = calendar grid)</label></div>
+                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.showZoomJoin ?? true} onChange={e => set("showZoomJoin", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Join (Zoom) button on upcoming sessions</label></div>
+                </>
+              )}
             </div>
           </div>
-          {displayMode === "sessions" && (
-            <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Sessions are auto-populated from the cohort live sessions you create in the Course → Cohort tab. To show cohort group or workshop instance cards, use the <strong>Cohort Groups / Instances (Auto)</strong> block instead.</p>
-          )}
-          {displayMode === "groups" && (
-            <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Cards are auto-populated from available cohort groups. Clicking a card opens the full detail page for that group. Use <strong>Enroll in Next Available</strong> CTA action type for generalized CTAs elsewhere on the page.</p>
-          )}
         </div>
       );
     }

@@ -1103,43 +1103,8 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
           </div>
         );
       }
-      // ── Sessions mode (default) ──
-      const sessions: any[] = course.cohortSessions ?? [];
-      if (sessions.length === 0) return null;
-      const now = new Date();
-      const futureSessions = sessions.filter((s: any) => new Date(s.sessionDate) >= now);
-      // If showPastSessions is on, show all; otherwise show future sessions.
-      // If no future sessions exist, fall back to showing all sessions so the block is never empty.
-      const visibleSessions = d.showPastSessions
-        ? sessions
-        : (futureSessions.length > 0 ? futureSessions : sessions);
-      return (
-        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <CC>
-          {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827", textAlign: "center" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="space-y-3">
-            {visibleSessions.map((s: any, i: number) => {
-              const sessionDate = new Date(s.sessionDate);
-              const tz = s.timezone ?? "America/New_York";
-              const dateStr = sessionDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: tz });
-              const timeStr = sessionDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone: tz });
-              const isPast = sessionDate < now;
-              return (
-                <div key={s.id} className="flex items-start gap-4 p-4 rounded-xl border" style={{ borderColor: `${accentColor}33`, backgroundColor: isPast ? "#f9fafb" : `${accentColor}08`, opacity: isPast ? 0.7 : 1 }}>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 mt-0.5" style={{ backgroundColor: isPast ? "#9ca3af" : accentColor }}>{i + 1}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm">{s.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{dateStr} · {timeStr}{d.showDuration !== false && s.durationMinutes ? ` · ${s.durationMinutes} min` : ""}</p>
-                    {d.showDescription !== false && s.description && <p className="text-xs text-gray-600 mt-1 line-clamp-2">{s.description}</p>}
-                  </div>
-                  {isPast && <span className="text-xs text-gray-400 flex-shrink-0 mt-1">Past</span>}
-                </div>
-              );
-            })}
-          </div>
-          </CC>
-        </div>
-      );
+      // Legacy "sessions" mode — fall through to null (use List/Page/Calendar modes instead)
+      return null;
     }
     case "cohort_instance_cards_auto": {
       // ── cohort_instance_cards_auto: stacked cards or embed mode ──
@@ -1234,6 +1199,35 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                   showEnrollNow={showEnrollNowCICA}
                 />
               )}
+            </CC>
+          </div>
+        );
+      }
+      // ── Calendar mode ──
+      if (cardDisplayMode === "calendar") {
+        // Auto-pick next upcoming open group (not in-progress) if no specific group selected
+        const nowCal = Date.now();
+        const calGroupId: number | null = (() => {
+          if (groupSelectionModeCICA === "manual" && selectedGroupIdsCICA.length > 0) {
+            return selectedGroupIdsCICA[0];
+          }
+          // Auto: next upcoming open group (status === 'open', startDate in future)
+          const nextOpen = allGroupsCICA.find((g: any) =>
+            g.status === "open" && g.startDate && new Date(g.startDate).getTime() > nowCal
+          );
+          return nextOpen?.id ?? null;
+        })();
+        if (!calGroupId) return null;
+        return (
+          <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+            <CC>
+              {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+              <CohortSessionsCalendar
+                cohortGroupId={calGroupId}
+                defaultView={(d.calendarDefaultView ?? "list") as "list" | "calendar"}
+                showZoomJoin={d.showZoomJoin !== false}
+                accentColor={accentColorCICA}
+              />
             </CC>
           </div>
         );
@@ -2643,7 +2637,6 @@ function CohortGroupEmbedSection({
   enrollNowText: string;
   showEnrollNow: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<"details" | "sessions">("details");
   const { data, isLoading, error } = trpc.lms.getCohortGroupPage.useQuery({ cohortGroupId: groupId });
 
   const fmtDate = (d: Date | string | null | undefined) => {
@@ -2687,34 +2680,8 @@ function CohortGroupEmbedSection({
           </Button>
         )}
       </div>
-      {/* Tab bar */}
-      <div className="flex border-b" style={{ borderColor: `${accentColor}22` }}>
-        {(["details", "sessions"] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === tab
-                ? "border-current"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-            style={activeTab === tab ? { color: accentColor, borderColor: accentColor } : undefined}
-          >
-            {tab === "details" ? "Details" : "Live Sessions"}
-          </button>
-        ))}
-      </div>
       {/* Content */}
-      {activeTab === "sessions" ? (
-        <div className="p-4">
-          <CohortSessionsCalendar
-            cohortGroupId={groupId}
-            accentColor={accentColor}
-            defaultView="list"
-            showHeader={false}
-          />
-        </div>
-      ) : (!data.landingBlocks || (data.landingBlocks as any[]).length === 0) ? (
+      {(!data.landingBlocks || (data.landingBlocks as any[]).length === 0) ? (
         <div className="p-8 max-w-2xl mx-auto space-y-6">
           {data.description && <p className="text-gray-600">{data.description}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

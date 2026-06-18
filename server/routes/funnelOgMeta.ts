@@ -249,6 +249,10 @@ async function getCourseLandingSeo(
       .where(eq(lmsCourses.slug, slug))
       .limit(1);
     if (!row) return null;
+<<<<<<< Updated upstream
+=======
+    console.log(`[getCourseLandingSeo] slug=${slug} row=${JSON.stringify({ lpSeoTitle: row.lpSeoTitle, courseMetaTitle: row.courseMetaTitle, courseTitle: row.courseTitle?.slice(0,40), lpSeoImage: row.lpSeoImage?.slice(0,40), courseCover: row.courseCover?.slice(0,40) })}`);
+>>>>>>> Stashed changes
     const title = row.lpSeoTitle || row.courseMetaTitle || row.courseTitle;
     if (!title) return null;
     return {

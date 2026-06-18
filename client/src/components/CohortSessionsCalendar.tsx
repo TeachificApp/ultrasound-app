@@ -55,10 +55,12 @@ function SessionCard({
   session,
   accentColor,
   compact = false,
+  showZoomJoin = true,
 }: {
   session: any;
   accentColor: string;
   compact?: boolean;
+  showZoomJoin?: boolean;
 }) {
   const date = new Date(session.sessionDate);
   const endDate = addMinutes(date, session.durationMinutes ?? 60);
@@ -67,7 +69,7 @@ function SessionCard({
 
   return (
     <div
-      className={`rounded-xl border p-3 ${compact ? "py-2" : "p-4"} ${isPast ? "opacity-60" : ""}`}
+      className={`rounded-xl border ${compact ? "py-2 px-3" : "p-4"} ${isPast ? "opacity-60" : ""}`}
       style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}
     >
       <div className="flex items-start justify-between gap-2">
@@ -103,7 +105,7 @@ function SessionCard({
             >
               <Video className="w-3 h-3" /> Recording
             </a>
-          ) : !isPast && session.meetingUrl ? (
+          ) : !isPast && session.meetingUrl && showZoomJoin ? (
             <a
               href={session.meetingUrl}
               target="_blank"
@@ -128,13 +130,14 @@ function SessionCard({
 function MonthGridView({
   sessions,
   accentColor,
+  showZoomJoin = true,
 }: {
   sessions: any[];
   accentColor: string;
+  showZoomJoin?: boolean;
 }) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(() => {
-    // Start at the month of the first upcoming session, or current month
     const upcoming = sessions.find(s => new Date(s.sessionDate) >= today);
     const d = upcoming ? new Date(upcoming.sessionDate) : today;
     return d.getFullYear();
@@ -146,7 +149,6 @@ function MonthGridView({
   });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  // Build a map: "YYYY-MM-DD" → sessions[]
   const sessionsByDay = useMemo(() => {
     const map = new Map<string, any[]>();
     for (const s of sessions) {
@@ -158,14 +160,12 @@ function MonthGridView({
     return map;
   }, [sessions]);
 
-  // Build calendar grid
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const cells: (number | null)[] = [
     ...Array(firstDay).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-  // Pad to complete last row
   while (cells.length % 7 !== 0) cells.push(null);
 
   const prevMonth = () => {
@@ -183,7 +183,6 @@ function MonthGridView({
 
   return (
     <div className="space-y-4">
-      {/* Month navigation */}
       <div className="flex items-center justify-between">
         <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
           <ChevronLeft className="w-4 h-4 text-gray-600" />
@@ -196,7 +195,6 @@ function MonthGridView({
         </button>
       </div>
 
-      {/* Day headers */}
       <div className="grid grid-cols-7 gap-0.5">
         {DAYS.map(d => (
           <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
@@ -227,24 +225,20 @@ function MonthGridView({
                 {day}
               </span>
               {hasSessions && (
-                <span
-                  className="w-1.5 h-1.5 rounded-full mt-0.5"
-                  style={{ backgroundColor: accentColor }}
-                />
+                <span className="w-1.5 h-1.5 rounded-full mt-0.5" style={{ backgroundColor: accentColor }} />
               )}
             </button>
           );
         })}
       </div>
 
-      {/* Selected day sessions */}
       {selectedDay && selectedSessions.length > 0 && (
         <div className="space-y-2 border-t pt-3 mt-1">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             {formatDate(new Date(selectedDay + "T12:00:00"))}
           </p>
           {selectedSessions.map(s => (
-            <SessionCard key={s.id} session={s} accentColor={accentColor} compact />
+            <SessionCard key={s.id} session={s} accentColor={accentColor} compact showZoomJoin={showZoomJoin} />
           ))}
         </div>
       )}
@@ -257,14 +251,15 @@ function MonthGridView({
 function ListView({
   sessions,
   accentColor,
+  showZoomJoin = true,
 }: {
   sessions: any[];
   accentColor: string;
+  showZoomJoin?: boolean;
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Group by month
   const grouped = useMemo(() => {
     const map = new Map<string, any[]>();
     for (const s of sessions) {
@@ -299,7 +294,6 @@ function ListView({
                 const d = new Date(s.sessionDate);
                 return (
                   <div key={s.id} className="flex gap-3">
-                    {/* Date badge */}
                     <div
                       className="flex-shrink-0 w-10 h-10 rounded-lg flex flex-col items-center justify-center text-white"
                       style={{ backgroundColor: d < today ? "#9ca3af" : accentColor }}
@@ -308,7 +302,7 @@ function ListView({
                       <span className="text-sm font-bold leading-none">{d.getDate()}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <SessionCard session={s} accentColor={accentColor} compact />
+                      <SessionCard session={s} accentColor={accentColor} compact showZoomJoin={showZoomJoin} />
                     </div>
                   </div>
                 );
@@ -329,12 +323,15 @@ export function CohortSessionsCalendar({
   defaultView = "list",
   showHeader = true,
   maxHeight,
+  showZoomJoin = true,
 }: {
   cohortGroupId: number;
   accentColor?: string;
   defaultView?: "calendar" | "list";
   showHeader?: boolean;
   maxHeight?: string;
+  /** Whether to show the Join (Zoom) button on upcoming sessions. Defaults to true. */
+  showZoomJoin?: boolean;
 }) {
   const [view, setView] = useState<"calendar" | "list">(defaultView);
   const { data, isLoading, error } = trpc.lms.getCohortGroupSessions.useQuery({ cohortGroupId });
@@ -399,9 +396,9 @@ export function CohortSessionsCalendar({
         style={maxHeight ? { maxHeight } : undefined}
       >
         {view === "calendar" ? (
-          <MonthGridView sessions={sessions} accentColor={accentColor} />
+          <MonthGridView sessions={sessions} accentColor={accentColor} showZoomJoin={showZoomJoin} />
         ) : (
-          <ListView sessions={sessions} accentColor={accentColor} />
+          <ListView sessions={sessions} accentColor={accentColor} showZoomJoin={showZoomJoin} />
         )}
       </div>
     </div>

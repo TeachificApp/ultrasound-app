@@ -11,7 +11,10 @@ import { getPageSeoForRequest, injectPageSeoIntoHtml } from "../routes/funnelOgM
 async function injectPageSeo(html: string, req: Request): Promise<string> {
   try {
     const seo = await getPageSeoForRequest(req);
+<<<<<<< Updated upstream
     console.log(`[injectPageSeo] path=${req.path} seo=${seo ? JSON.stringify({ title: seo.title?.slice(0,50) }) : 'null'}`);
+=======
+>>>>>>> Stashed changes
     if (!seo) return html;
     return injectPageSeoIntoHtml(html, seo, req);
   } catch (e: any) {
