@@ -25,9 +25,9 @@ import { Briefcase, Calendar, MapPin, Clock, Users, Edit2, ArrowLeft, ExternalLi
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
-import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { type Block } from "@/components/BlockPreview";
+import { PublicLandingBlock, PublicLandingBlocks } from "@/components/PublicLandingBlock";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
-import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -612,21 +612,12 @@ export default function WorkshopLanding() {
                 </div>
               );
             }
-            // remaining_seats — live seat availability block
-            if (block.type === "remaining_seats") {
-              // Auto-detect instance from page context when sourceId not explicitly set
-              const rsData = { ...block.data };
-              const firstInstance = availableInstances[0] ?? allInstances[0];
-              if (firstInstance?.id) {
-                rsData.sourceId = firstInstance.id;
-                rsData.sourceType = "workshop_instance";
-              }
-              return <RemainingSeatsBlock key={block.id} data={rsData} />;
-            }
+            const defaultInstanceId = availableInstances[0]?.id ?? allInstances[0]?.id;
             return (
-              <BlockPreview
+              <PublicLandingBlock
                 key={block.id}
                 block={block}
+                context={defaultInstanceId ? { workshopInstanceId: defaultInstanceId } : undefined}
               />
             );
           })}
@@ -895,9 +886,10 @@ function WorkshopInstanceDetailModal({
                 </div>
               ) : (
                 <div>
-                  {(data.landingBlocks as any[]).map((block: any) => (
-                    <BlockPreview key={block.id} block={block} />
-                  ))}
+                  <PublicLandingBlocks
+                    blocks={data.landingBlocks as Block[]}
+                    context={instanceId ? { workshopInstanceId: instanceId } : undefined}
+                  />
                 </div>
               )}
             </>
@@ -1029,9 +1021,10 @@ function WorkshopInstanceEmbedSection({
         </div>
       ) : (
         <div>
-          {(data.landingBlocks as any[]).map((block: any) => (
-            <BlockPreview key={block.id} block={block} />
-          ))}
+          <PublicLandingBlocks
+            blocks={data.landingBlocks as Block[]}
+            context={{ workshopInstanceId: instanceId }}
+          />
           {showEnrollNow && (
             <div className="text-center py-6">
               <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onRegister}>
