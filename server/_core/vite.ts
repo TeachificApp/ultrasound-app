@@ -159,14 +159,22 @@ export function serveStatic(app: Express) {
     );
   }
 
-  // Service worker MUST be served with no-cache headers so browsers always
-  // get the latest version and CDNs (Cloudflare) never cache a stale copy.
-  // Without this, a broken SW can be cached for hours (Cloudflare default: 4h).
-  app.get(["/sw.js", "/sw-clear.html"], (req, res, next) => {
+  const swNoCacheHeaders = (res: import("express").Response) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
-    next();
+  };
+
+  // Serve SW files explicitly (not via express.static) so CDN/browser never
+  // reuse a stale cached copy — stale sw.js caused site-wide white screens.
+  app.get("/sw.js", (_req, res) => {
+    swNoCacheHeaders(res);
+    res.type("application/javascript");
+    res.sendFile(path.resolve(distPath, "sw.js"));
+  });
+  app.get("/sw-clear.html", (_req, res) => {
+    swNoCacheHeaders(res);
+    res.sendFile(path.resolve(distPath, "sw-clear.html"));
   });
 
   app.use(express.static(distPath));

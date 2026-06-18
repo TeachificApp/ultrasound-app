@@ -101,11 +101,13 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-// Build: 2026-06-13T17:00:00Z — freeEnrollProductType fix
-// Register service worker for PWA installability
+// Bump when client/public/sw.js changes — busts CDN/browser SW script cache.
+const SW_SCRIPT_VERSION = "v8";
+
+// Register service worker for PWA installability (no fetch interception in sw.js)
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
+    navigator.serviceWorker.register(`/sw.js?build=${SW_SCRIPT_VERSION}`).catch(() => {
       // SW registration failure is non-fatal
     });
   });
