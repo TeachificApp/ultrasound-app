@@ -167,6 +167,8 @@ export async function executeFulfillment(
         });
         notes.push(`Enrolled in course #${courseId}`);
         console.log(`[FulfillmentEngine] Enrolled user ${userId} in course ${courseId}`);
+        const { onCourseEnrollment } = await import("./communityAutoJoin");
+        onCourseEnrollment(userId, courseId);
       } else if (existing.enrollmentType === "free_preview") {
         // Upgrade free preview enrollment to full access
         await db.update(lmsEnrollments)
@@ -174,6 +176,8 @@ export async function executeFulfillment(
           .where(eq(lmsEnrollments.id, existing.id));
         notes.push(`Upgraded free preview enrollment to full access for course #${courseId}`);
         console.log(`[FulfillmentEngine] Upgraded user ${userId} from free_preview to full enrollment in course ${courseId}`);
+        const { onCourseEnrollment } = await import("./communityAutoJoin");
+        onCourseEnrollment(userId, courseId);
       } else {
         notes.push(`Already enrolled in course #${courseId} (idempotent)`);
         console.log(`[FulfillmentEngine] User ${userId} already enrolled in course ${courseId} — skipping`);

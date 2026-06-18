@@ -4,6 +4,10 @@ import {
   buildNewestFeedNextCursor,
   parseNewestFeedCursor,
 } from "../shared/communityFeed";
+import {
+  isLeaderboardExcludedEmail,
+  COMMUNITY_LEADERBOARD_EXCLUDED_EMAILS,
+} from "../shared/communityMember";
 
 describe("communityText", () => {
   it("detects empty rich text", () => {
@@ -56,5 +60,15 @@ describe("communityFeed pagination", () => {
       parseNewestFeedCursor({ type: "unpinned", createdAt: "2024-01-01T00:00:00.000Z", id: 5 })?.type,
     ).toBe("unpinned");
     expect(parseNewestFeedCursor({ type: "start_unpinned" })?.type).toBe("start_unpinned");
+  });
+});
+
+describe("community leaderboard exclusions", () => {
+  it("flags staff emails as leaderboard-excluded", () => {
+    for (const email of COMMUNITY_LEADERBOARD_EXCLUDED_EMAILS) {
+      expect(isLeaderboardExcludedEmail(email)).toBe(true);
+      expect(isLeaderboardExcludedEmail(email.toUpperCase())).toBe(true);
+    }
+    expect(isLeaderboardExcludedEmail("member@example.com")).toBe(false);
   });
 });

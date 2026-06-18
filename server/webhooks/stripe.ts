@@ -23,7 +23,7 @@ import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
-import { fireCommunityWorkflowRules } from "../lib/communityAutoJoin";
+import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
 
 // Stripe webhook secret — optional but strongly recommended in production
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
@@ -1317,6 +1317,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
           affiliateCode: null,
         });
         console.log(`[Stripe] Auto-enrolled user ${resolvedUserId} in LMS course ${fulfillmentCourseId} after payment ${piId}`);
+        onCourseEnrollment(resolvedUserId, fulfillmentCourseId);
       } else {
         console.log(`[Stripe] User ${resolvedUserId} already enrolled in course ${fulfillmentCourseId} — skipping`);
       }
@@ -1422,6 +1423,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
             if (!existing) {
               await db.insert(lmsEnrollments).values({ userId: resolvedUserId!, courseId: item.productId, orderId: null, affiliateCode: null });
               console.log(`[Stripe] Additional access: enrolled user ${resolvedUserId} in course ${item.productId} (${item.label})`);
+              onCourseEnrollment(resolvedUserId!, item.productId);
             }
             additionalAccessNotes.push(`Course: ${item.label}`);
           } else if (item.type === "download" && item.productId) {
