@@ -899,19 +899,35 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         const allGroups: any[] = (course as any).cohortGroups ?? [];
         const groupSelectionMode = d.groupSelectionMode ?? "all";
         const selectedGroupIds: number[] = d.selectedGroupIds ?? [];
-        const visibleGroups = groupSelectionMode === "manual" && selectedGroupIds.length > 0
-          ? allGroups.filter((g: any) => selectedGroupIds.includes(g.id))
-          : allGroups;
+        const nowMs = Date.now();
+        const visibleGroups = (() => {
+          let groups = groupSelectionMode === "manual" && selectedGroupIds.length > 0
+            ? allGroups.filter((g: any) => selectedGroupIds.includes(g.id))
+            : allGroups;
+          // Hide groups whose end date has already passed
+          groups = groups.filter((g: any) => !g.endDate || new Date(g.endDate).getTime() >= nowMs);
+          return groups;
+        })();
         if (visibleGroups.length === 0) return null;
         const enrollNowText = d.enrollNowText ?? "Enroll Now";
         const showEnrollNow = d.showEnrollNow !== false;
-        const statusBadge = (status: string) => {
+        const isEnrollmentClosedForGroup = (g: any) => {
+          // Explicitly closed via enrollmentCloseDate
+          if (g.enrollmentCloseDate && new Date(g.enrollmentCloseDate).getTime() < nowMs) return true;
+          // Active (in-progress) cohort with no explicit enrollmentCloseDate — enrollment implicitly closed
+          if (g.status === "active" && !g.enrollmentCloseDate) return true;
+          return false;
+        };
+        const statusBadge = (g: any) => {
+          if (isEnrollmentClosedForGroup(g) && g.status !== "completed") {
+            return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: "#6b7280" }}>Enrollment Closed</span>;
+          }
           const map: Record<string, { label: string; color: string }> = {
             open: { label: "Enrolling Now", color: "#059669" },
             active: { label: "In Progress", color: "#2563eb" },
             completed: { label: "Completed", color: "#6b7280" },
           };
-          const s = map[status];
+          const s = map[g.status];
           if (!s) return null;
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: s.color }}>{s.label}</span>
@@ -938,7 +954,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <h3 className="font-bold text-gray-900 text-base">{g.name}</h3>
-                            {statusBadge(g.status)}
+                            {statusBadge(g)}
                           </div>
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1">
                             {(g.startDate || g.endDate) && (
@@ -985,11 +1001,10 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                         {showEnrollNow && (() => {
                           const _enrolled = Number(g.enrollmentCount ?? 0);
                           const _isFull = g.maxStudents != null && _enrolled >= g.maxStudents;
-                          return _isFull ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">
-                              Sold Out
-                            </span>
-                          ) : (
+                          const _enrollClosed = isEnrollmentClosedForGroup(g);
+                          if (_isFull) return <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">Sold Out</span>;
+                          if (_enrollClosed) return <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 flex-shrink-0">Enrollment Closed</span>;
+                          return (
                             <Button
                               size="sm"
                               className="flex-shrink-0 text-white"
@@ -1060,10 +1075,18 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const groupSelectionModeCICA = d.groupSelectionMode ?? "all";
       const selectedGroupIdsCICA: number[] = d.selectedGroupIds ?? [];
       const showCompletedGroupsCICA = d.showCompletedGroups === true;
+      const nowMsCICA = Date.now();
+      const isEnrollmentClosedCICA = (g: any) => {
+        if (g.enrollmentCloseDate && new Date(g.enrollmentCloseDate).getTime() < nowMsCICA) return true;
+        if (g.status === "active" && !g.enrollmentCloseDate) return true;
+        return false;
+      };
       const visibleGroupsCICA = (() => {
         let groups = groupSelectionModeCICA === "manual" && selectedGroupIdsCICA.length > 0
           ? allGroupsCICA.filter((g: any) => selectedGroupIdsCICA.includes(g.id))
           : allGroupsCICA;
+        // Hide groups whose end date has already passed
+        groups = groups.filter((g: any) => !g.endDate || new Date(g.endDate).getTime() >= nowMsCICA);
         if (!showCompletedGroupsCICA) {
           groups = groups.filter((g: any) => g.status !== "completed");
         }
@@ -1075,13 +1098,16 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         if (!dt) return null;
         try { return new Date(dt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return String(dt); }
       };
-      const statusBadgeCICA = (status: string) => {
+      const statusBadgeCICA = (g: any) => {
+        if (isEnrollmentClosedCICA(g) && g.status !== "completed") {
+          return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: "#6b7280" }}>Enrollment Closed</span>;
+        }
         const map: Record<string, { label: string; color: string }> = {
           open: { label: "Enrolling Now", color: "#059669" },
           active: { label: "In Progress", color: "#2563eb" },
           completed: { label: "Completed", color: "#6b7280" },
         };
-        const s = map[status];
+        const s = map[g.status];
         if (!s) return null;
         return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: s.color }}>{s.label}</span>;
       };
@@ -1157,7 +1183,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <h3 className="font-bold text-gray-900 text-base">{g.name}</h3>
-                          {statusBadgeCICA(g.status)}
+                          {statusBadgeCICA(g)}
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1">
                           {(g.startDate || g.endDate) && (
@@ -1203,11 +1229,10 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                       {showEnrollNowCICA && (() => {
                         const _enrolledCICA = Number(g.enrollmentCount ?? 0);
                         const _isFullCICA = g.maxStudents != null && _enrolledCICA >= g.maxStudents;
-                        return _isFullCICA ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">
-                            Sold Out
-                          </span>
-                        ) : (
+                        const _enrollClosedCICA = isEnrollmentClosedCICA(g);
+                        if (_isFullCICA) return <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">Sold Out</span>;
+                        if (_enrollClosedCICA) return <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 flex-shrink-0">Enrollment Closed</span>;
+                        return (
                           <Button
                             size="sm"
                             className="flex-shrink-0 text-white"
