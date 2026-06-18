@@ -595,6 +595,11 @@ function ChannelHeader({
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
+const RESERVED_COMMUNITY_SLUGS: Record<string, string> = {
+  leaderboard: "/community/leaderboard",
+  dms: "/community/dms",
+};
+
 export default function CommunityFeed() {
   const { slug } = useParams<{ slug: string }>();
   const { isAuthenticated, user } = useAuth();
@@ -603,9 +608,15 @@ export default function CommunityFeed() {
   const [sort, setSort] = useState<"newest" | "trending">("newest");
   const [showMembersSidebar, setShowMembersSidebar] = useState(true);
 
+  useEffect(() => {
+    if (!slug) return;
+    const redirect = RESERVED_COMMUNITY_SLUGS[slug.toLowerCase()];
+    if (redirect) navigate(redirect, { replace: true });
+  }, [slug, navigate]);
+
   const { data: community, isLoading: communityLoading } = trpc.community.public.getCommunity.useQuery(
     { slug: slug! },
-    { enabled: !!slug }
+    { enabled: !!slug && !RESERVED_COMMUNITY_SLUGS[slug.toLowerCase()] }
   );
   const { data: membership } = trpc.community.member.myMembership.useQuery(
     { communityId: community?.id ?? 0 },

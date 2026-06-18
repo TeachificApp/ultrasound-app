@@ -132,57 +132,6 @@ async function applyReportRemoval(
   }
 }
 
-/** Resolve community_id for a report target */
-async function resolveReportCommunityId(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
-  targetType: "post" | "comment" | "user" | "dm_message",
-  targetId: number,
-): Promise<number | null> {
-  if (targetType === "post") {
-    const [row] = await db
-      .select({ communityId: communityPosts.communityId })
-      .from(communityPosts)
-      .where(eq(communityPosts.id, targetId))
-      .limit(1);
-    return row?.communityId ?? null;
-  }
-  if (targetType === "comment") {
-    const [row] = await db
-      .select({ communityId: communityPosts.communityId })
-      .from(communityPostComments)
-      .innerJoin(communityPosts, eq(communityPosts.id, communityPostComments.postId))
-      .where(eq(communityPostComments.id, targetId))
-      .limit(1);
-    return row?.communityId ?? null;
-  }
-  if (targetType === "dm_message") {
-    return null;
-  }
-  return null;
-}
-
-async function applyReportRemoval(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
-  targetType: "post" | "comment" | "user" | "dm_message",
-  targetId: number,
-) {
-  if (targetType === "post") {
-    await db.update(communityPosts).set({ isHidden: true }).where(eq(communityPosts.id, targetId));
-    return;
-  }
-  if (targetType === "comment") {
-    await db
-      .update(communityPostComments)
-      .set({ status: "rejected" })
-      .where(eq(communityPostComments.id, targetId));
-    return;
-  }
-  if (targetType === "dm_message") {
-    await db.delete(communityDMMessages).where(eq(communityDMMessages.id, targetId));
-    return;
-  }
-}
-
 async function assertCommunityMember(db: any, communityId: number, userId: number) {
   const [m] = await db.select().from(communityMembers)
     .where(and(eq(communityMembers.communityId, communityId), eq(communityMembers.userId, userId)))
@@ -1003,7 +952,11 @@ const communityMemberRouter = router({
       ? await db.select({ id: users.id, name: users.name, displayName: users.displayName, avatarUrl: users.avatarUrl })
           .from(users).where(inArray(users.id, otherUserIds))
       : [];
-    const uMap = Object.fromEntries(otherUsers.map((u: any) => [u.id, u]));
+    const uMap = Object.fromEntries(otherUsers.map((u: any) => [u.id, {
+      ...u,
+      name: publicMemberDisplayName(u),
+      displayName: publicMemberDisplayName(u),
+    }]));
     return convs.map((c: any) => {
       const otherId = c.userAId === ctx.user.id ? c.userBId : c.userAId;
       const unread = c.userAId === ctx.user.id ? c.userAUnread : c.userBUnread;
@@ -2123,15 +2076,32 @@ const communityAdminRouter = router({
     await assertAdmin(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [community] = await db
+      .select({
+        thinkificCommunityId: communities.thinkificCommunityId,
+        thinkificSpaceId: communities.thinkificSpaceId,
+      })
+      .from(communities)
+      .where(eq(communities.id, input.communityId))
+      .limit(1);
     const [syncRow] = await db.select().from(thinkificCommunitySyncState)
       .where(eq(thinkificCommunitySyncState.communityId, input.communityId)).limit(1);
-    if (!syncRow) throw new TRPCError({ code: "NOT_FOUND", message: "No sync state found for this community." });
-    // Fire and forget — sync runs in background
+
+    const thinkificCommunityId = syncRow?.thinkificCommunityId ?? community?.thinkificCommunityId;
+    const thinkificSpaceId = syncRow?.thinkificSpaceId ?? community?.thinkificSpaceId ?? undefined;
+
+    if (!thinkificCommunityId) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "This community is not linked to Thinkific. Run a full Thinkific sync from Platform Admin first.",
+      });
+    }
+
     import("../services/thinkificCommunitySync").then(({ syncThinkificCommunity }) => {
       syncThinkificCommunity(
         input.communityId,
-        syncRow.thinkificCommunityId ?? "",
-        syncRow.thinkificSpaceId ?? undefined
+        thinkificCommunityId,
+        thinkificSpaceId ?? undefined,
       ).catch(console.error);
     }).catch(console.error);
     return { success: true, message: "Sync started in background." };
