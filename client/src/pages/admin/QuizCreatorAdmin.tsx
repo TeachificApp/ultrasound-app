@@ -26,6 +26,7 @@ import {
   Users, CheckCircle, XCircle, Clock, Search, ChevronLeft, ChevronRight,
   Eye, EyeOff, Copy, Loader2, AlertTriangle, GripVertical, X,
   Sparkles, Upload, FileSpreadsheet, FolderPlus, Tag, FileUp,
+  Database, Zap, Radio, TrendingUp, ExternalLink,
 } from "lucide-react";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 
@@ -1022,7 +1023,7 @@ function QuizList() {
           </a>
         </div>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quiz Creator</h1>
             <p className="text-sm text-gray-500 mt-1">Create and manage standalone quizzes and mock exams</p>
@@ -1035,6 +1036,43 @@ function QuizList() {
               <Plus className="w-4 h-4 mr-2" /> New Quiz
             </Button>
           </div>
+        </div>
+
+        {/* Quick Links bar */}
+        <div className="flex flex-wrap gap-2 mb-6 p-3 bg-white rounded-xl border border-gray-200">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide self-center mr-1">Quick Links:</span>
+          <a
+            href={getAdminUrl("/admin/lms?tab=question_bank")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 text-xs font-medium hover:bg-teal-100 transition-colors border border-teal-200"
+          >
+            <Database className="w-3.5 h-3.5" /> Question Bank
+          </a>
+          <a
+            href={getAdminUrl("/admin/quickfire")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors border border-amber-200"
+          >
+            <Zap className="w-3.5 h-3.5" /> Daily Challenge Admin
+          </a>
+          <a
+            href={getAdminUrl("/admin/sonoquiz")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 transition-colors border border-purple-200"
+          >
+            <Radio className="w-3.5 h-3.5" /> SonoQuiz (Live)
+          </a>
+          <a
+            href={getAdminUrl("/admin/engagement")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-50 text-pink-700 text-xs font-medium hover:bg-pink-100 transition-colors border border-pink-200"
+          >
+            <TrendingUp className="w-3.5 h-3.5" /> Engagement Dashboard
+          </a>
+          <a
+            href="/my-quizzes"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-xs font-medium hover:bg-gray-100 transition-colors border border-gray-200"
+          >
+            <ExternalLink className="w-3.5 h-3.5" /> Learner Quiz Dashboard
+          </a>
         </div>
 
         {/* Filters */}
@@ -1113,7 +1151,16 @@ function QuizList() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/quiz-creator/${quiz.id}`)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="View Analytics"
+                          className="text-teal-600 hover:text-teal-800 hover:bg-teal-50"
+                          onClick={() => navigate(`/admin/quiz-creator/${quiz.id}?tab=analytics`)}
+                        >
+                          <BarChart2 className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" title="Edit Quiz" onClick={() => navigate(`/admin/quiz-creator/${quiz.id}`)}>
                           <Edit2 className="w-4 h-4" />
                         </Button>
                         <Button
@@ -1215,7 +1262,8 @@ function QuizList() {
 // ─── Quiz Editor ──────────────────────────────────────────────────────────────
 function QuizEditor({ quizId }: { quizId: number }) {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState("settings");
+  const initialTab = (() => { try { return new URLSearchParams(window.location.search).get("tab") ?? "settings"; } catch { return "settings"; } })();
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   const { data, isLoading, refetch } = trpc.standaloneQuizAdmin.getQuiz.useQuery({ id: quizId });
   const { data: analytics } = trpc.standaloneQuizAdmin.getAnalytics.useQuery({ quizId }, { enabled: activeTab === "analytics" });
