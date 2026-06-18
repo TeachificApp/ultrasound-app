@@ -26,10 +26,7 @@ import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import { menuLinksRouter } from "./routers/menuLinksRouter";
 import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
 import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
-<<<<<<< HEAD
 import { bundlePublicRouter, bundleLearnerRouter, bundleAdminRouter } from "./routers/bundleRouter";
-=======
->>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
 import { careerNetworkRouter } from "./routers/careerNetworkRouter";
 import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter } from "./routers/webinarRouter";
@@ -220,11 +217,8 @@ export const appRouter = router({
         displayName: fullUser?.displayName ?? opts.ctx.user.displayName ?? null,
         avatarUrl: fullUser?.avatarUrl ?? opts.ctx.user.avatarUrl ?? null,
         name: fullUser?.name ?? opts.ctx.user.name ?? null,
-<<<<<<< HEAD
         firstName: fullUser?.firstName ?? (opts.ctx.user as any).firstName ?? null,
         lastName: fullUser?.lastName ?? (opts.ctx.user as any).lastName ?? null,
-=======
->>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
         pendingEmail: fullUser?.pendingEmail ?? null,
         appRoles: roles,
         isPremium: isPremium || brandPremium,

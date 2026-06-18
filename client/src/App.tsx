@@ -48,12 +48,9 @@ const UpgradeSuccess = lazy(() => import("./pages/UpgradeSuccess"));
 const Premium = lazy(() => import("./pages/Premium"));
 
 // ── LMS — LMS Management ─────────────────────────────────────────────────
-<<<<<<< HEAD
 const Checkout = lazy(() => import("./pages/Checkout"));
 const CheckoutComplete = lazy(() => import("./pages/CheckoutComplete"));
 const WorkshopCheckout = lazy(() => import("./pages/WorkshopCheckout"));
-=======
->>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
 const EducationLibrary = lazy(() => import("./pages/EducationLibrary"));
 const LMSHome = lazy(() => import("./pages/LMSHome"));
 const CollectionDetail = lazy(() => import("./pages/CollectionDetail"));
@@ -523,7 +520,6 @@ function Router() {
         <Route path="/employer" component={EmployerDashboard} />
 
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
-<<<<<<< HEAD
         <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><CommunityAdmin /></Suspense></RoleGuard>}</Route>
         {perBrandAdminRouteElements([
           { base: "/admin/cases", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard> },
@@ -535,12 +531,6 @@ function Router() {
           { base: "/admin/thinkific-webhook", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard> },
           { base: "/admin/soundbytes", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SoundBytesAdmin /></RoleGuard> },
         ])}
-=======
-        <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
-        <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
-        <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
-        <Route path="/admin/social-content">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard>}</Route>
->>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
         <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelPageEditor /></Suspense></RoleGuard>}</Route>
@@ -579,11 +569,8 @@ function Router() {
         <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
-<<<<<<< HEAD
         <Route path="/admin/fulfillment">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FulfillmentAdmin /></RoleGuard>}</Route>
         <Route path="/admin/sdms-cme-export">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SdmsCmeExportPage /></RoleGuard>}</Route>
-=======
->>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
         <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
         <Route path="/admin">{() => { window.location.replace("/platform-admin"); return null; }}</Route>
@@ -775,7 +762,6 @@ function LMSRouter() {
         </Suspense>
       </Route>
       <Route path="/downloads/:slug/files" component={DownloadFiles} />
-<<<<<<< HEAD
       {/* Hosted checkout pages — outside LMSLayout (full-screen, no nav) */}
       <Route path="/checkout/complete">
         <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
@@ -786,8 +772,6 @@ function LMSRouter() {
       <Route path="/checkout/:slug">
         <Suspense fallback={pageFallback}><Checkout /></Suspense>
       </Route>
-=======
->>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
       {/* Course/download landing pages render directly on learn subdomain */}
       <Route path="/cohort/:courseId/assignment/:assignmentId" component={AssignmentDetail} />
       <Route path="/cohort/:courseId/replay/:recordingId" component={CohortReplayPlayer} />
@@ -1079,7 +1063,6 @@ function IHeartEchoRouter() {
         <Route path="/admin/engagement">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard>}</Route>
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
-<<<<<<< HEAD
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/workshops/:workshopId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><WorkshopDetail /></Suspense></RoleGuard>}</Route>
@@ -1089,8 +1072,6 @@ function IHeartEchoRouter() {
         <Route path="/admin/webinars/:webinarId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/bundles/:bundleId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><BundleLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>
-=======
->>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
