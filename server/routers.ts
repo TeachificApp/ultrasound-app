@@ -578,7 +578,7 @@ export const appRouter = router({
         const { getUserByEmail } = await import('./db');
         const { sdk } = await import('./_core/sdk');
         const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
-        const { getSessionCookieOptions } = await import('./_core/cookies');
+        const { getSessionCookieOptions, resolveAuthHostname } = await import('./_core/cookies');
         const bcrypt = await import('bcryptjs');
 
         const email = input.email.trim().toLowerCase();
@@ -638,7 +638,7 @@ export const appRouter = router({
         const { getUserByEmail, getDb } = await import('./db');
         const { sdk } = await import('./_core/sdk');
         const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
-        const { getSessionCookieOptions } = await import('./_core/cookies');
+        const { getSessionCookieOptions, resolveAuthHostname } = await import('./_core/cookies');
         const { users: usersTable } = await import('../drizzle/schema');
         const { eq } = await import('drizzle-orm');
         const bcrypt = await import('bcryptjs');
@@ -665,7 +665,8 @@ export const appRouter = router({
             }
             const name = existing.displayName || existing.name || email;
             const sessionToken = await sdk.createSessionToken(openId, { name, expiresInMs: ONE_YEAR_MS });
-            const cookieOptions = getSessionCookieOptions(ctx.req);
+            const hostnameOverride = resolveAuthHostname(ctx.req);
+            const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
             return { success: true, isNew: false };
           }
@@ -699,7 +700,8 @@ export const appRouter = router({
         if (!newUser) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Account creation failed.' });
 
         const sessionToken = await sdk.createSessionToken(openId, { name: displayName, expiresInMs: ONE_YEAR_MS });
-        const cookieOptions = getSessionCookieOptions(ctx.req);
+        const hostnameOverride = resolveAuthHostname(ctx.req);
+        const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
         return { success: true, isNew: true };
@@ -713,7 +715,7 @@ export const appRouter = router({
         const { getUserByMagicLinkToken, clearMagicLinkToken } = await import('./db');
         const { sdk } = await import('./_core/sdk');
         const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
-        const { getSessionCookieOptions } = await import('./_core/cookies');
+        const { getSessionCookieOptions, resolveAuthHostname } = await import('./_core/cookies');
 
         const user = await getUserByMagicLinkToken(input.token);
         if (!user) {
@@ -746,7 +748,8 @@ export const appRouter = router({
           name,
           expiresInMs: ONE_YEAR_MS,
         });
-        const cookieOptions = getSessionCookieOptions(ctx.req);
+        const hostnameOverride = resolveAuthHostname(ctx.req);
+        const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
         return { success: true };

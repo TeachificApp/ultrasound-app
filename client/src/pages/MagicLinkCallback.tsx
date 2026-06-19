@@ -34,32 +34,16 @@ export default function MagicLinkCallback() {
       return;
     }
 
-    // Use the server-side endpoint so the cookie is set correctly through Cloudflare
-    fetch("/api/auth/magic-verify", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    })
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) {
-          setStatus("error");
-          setErrorMessage(data.error || "The magic link is invalid or has expired.");
-          return;
-        }
-        setStatus("success");
-        // Redirect to returnTo (if set) or dashboard after a short delay
-        const returnTo = params.get("returnTo");
-        setTimeout(() => {
-          window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : "/my-dashboard";
-        }, 1500);
-      })
-      .catch(() => {
-        setStatus("error");
-        setErrorMessage("An unexpected error occurred. Please try again.");
-      });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Full-page GET navigation sets the session cookie reliably (Cloudflare-safe).
+    // POST /api/auth/magic-verify via fetch can drop Set-Cookie on some domains.
+    const returnTo = params.get("returnTo");
+    const host = window.location.hostname;
+    const query = new URLSearchParams({ token, host });
+    if (returnTo && returnTo.startsWith("/")) {
+      query.set("returnTo", returnTo);
+    }
+    window.location.replace(`/api/auth/magic-verify?${query.toString()}`);
+  }, []);
 
   return (
     <div

@@ -46,6 +46,8 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 7. **Site Pages CMS**: LMS Admin → Settings → **Site Pages** (`/admin/lms/site-pages`). Requires DB tables from `drizzle/site-pages-migration.sql`. Uses `site_pages` + `site_nav_menus` tables and the native `LandingPageBuilder` block system.
 
+8. **Cross-domain SSO (AAUS ↔ iHeartEcho)**: `.allaboutultrasound.com` and `.iheartecho.com` cookies are separate TLDs — sessions sync via `useCrossDomainSso` (silent ping) and `useSsoBridge` (redirect to `app.allaboutultrasound.com/api/sso/bridge`). Canonical iHeartEcho app domain is `app.iheartecho.com` (legacy `app.iheartecho.net` still supported). Auth cookies must be scoped with `X-App-Hostname` / `host` query param — see `server/_core/cookies.ts` and `server/ssoAuthCookies.test.ts`. Magic links use GET `/api/auth/magic-verify?host=…` for reliable Set-Cookie.
+
 6. **Production build requires analytics env vars OR safe strip**: `vite.config.ts` removes the umami `<script>` when `VITE_ANALYTICS_ENDPOINT` / `VITE_ANALYTICS_WEBSITE_ID` are unset. Use `VITE_ANALYTICS_ENDPOINT=... VITE_ANALYTICS_WEBSITE_ID=... pnpm build` for production-like builds. A broken build strips `#root` and JS if the old greedy regex matched — see `transformAnalyticsIndexHtml` in `vite.config.ts`.
 
 <<<<<<< HEAD

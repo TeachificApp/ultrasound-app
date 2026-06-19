@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Loader2, Stethoscope, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft, GraduationCap, Award, Users, Eye, EyeOff, Lock, UserPlus, KeyRound } from "lucide-react";
 import { isCombinedBrandingDomain, isIHeartEchoDomain, isLearnDomain, MEMBERS_APP_URL } from "@/hooks/useSubdomain";
+import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import { toast } from "sonner";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
@@ -105,6 +106,7 @@ export default function Login() {
   // ── Register mutation ──
   const registerMutation = trpc.auth.registerWithPassword.useMutation({
     onSuccess: () => {
+      clearSsoSessionLocks();
       window.location.href = postLoginUrl;
     },
     onError: (err) => {
@@ -146,6 +148,7 @@ export default function Login() {
         toast.error(message);
         return;
       }
+      clearSsoSessionLocks();
       window.location.href = postLoginUrl;
     } catch {
       const message = "Sign-in failed. Please try again.";
