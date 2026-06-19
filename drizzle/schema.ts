@@ -2002,6 +2002,13 @@ export const accreditationFormSuccessRoutingRules = mysqlTable("accreditationFor
   logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("all"),
   conditions: longtext("conditions").notNull(),
   grantAccessActions: longtext("grantAccessActions"), // JSON: [{productType, productId}]
+  // Per-rule Stripe checkout action
+  stripeEnabled: boolean("stripeEnabled").notNull().default(false),
+  stripePriceId: varchar("stripePriceId", { length: 255 }),
+  stripeAmount: int("stripeAmount"),
+  stripeCheckoutMode: varchar("stripeCheckoutMode", { length: 20 }).default("payment"),
+  stripeSuccessUrl: varchar("stripeSuccessUrl", { length: 2000 }),
+  stripeCancelUrl: varchar("stripeCancelUrl", { length: 2000 }),
   sortOrder: int("sortOrder").notNull().default(0),
   isEnabled: boolean("isEnabled").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -4626,6 +4633,13 @@ export const generalFormSuccessRoutingRules = mysqlTable("generalFormSuccessRout
   logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("all"),
   conditions: longtext("conditions").notNull(),
   grantAccessActions: longtext("grantAccessActions"),
+  // Per-rule Stripe checkout action
+  stripeEnabled: boolean("stripeEnabled").notNull().default(false),
+  stripePriceId: varchar("stripePriceId", { length: 255 }),
+  stripeAmount: int("stripeAmount"),
+  stripeCheckoutMode: varchar("stripeCheckoutMode", { length: 20 }).default("payment"),
+  stripeSuccessUrl: varchar("stripeSuccessUrl", { length: 2000 }),
+  stripeCancelUrl: varchar("stripeCancelUrl", { length: 2000 }),
   sortOrder: int("sortOrder").notNull().default(0),
   isEnabled: boolean("isEnabled").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

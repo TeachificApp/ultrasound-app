@@ -2385,11 +2385,38 @@ ${pageText}`;
         console.error("[SuccessModules] Failed to build success outcome:", e.message);
       }
       // Create Stripe checkout session if configured
+      // Per-rule Stripe takes priority over template-level Stripe
       let checkoutUrl: string | null = null;
       try {
-        if ((template as any).stripeEnabled) {
-          const req = (ctx as any).req;
-          const origin = input.origin ?? req?.headers?.origin ?? req?.headers?.referer?.replace(/\/[^/]*$/, "") ?? "";
+        const req = (ctx as any).req;
+        const origin = input.origin ?? req?.headers?.origin ?? req?.headers?.referer?.replace(/\/[^\/]*$/, "") ?? "";
+        const ruleStripeEnabled = (matchedRule as any)?.stripeEnabled;
+        const templateStripeEnabled = (template as any).stripeEnabled;
+        if (ruleStripeEnabled) {
+          // Per-rule Stripe checkout
+          checkoutUrl = await createFormStripeCheckout({
+            config: {
+              stripeEnabled: true,
+              stripeProductId: null,
+              stripePriceId: (matchedRule as any).stripePriceId ?? null,
+              stripeAmount: (matchedRule as any).stripeAmount ?? null,
+              stripeCheckoutMode: (matchedRule as any).stripeCheckoutMode ?? "payment",
+              stripeSuccessUrl: (matchedRule as any).stripeSuccessUrl ?? null,
+              stripeCancelUrl: (matchedRule as any).stripeCancelUrl ?? null,
+              formName: (template as any).name,
+              formId: (template as any).id,
+            },
+            submissionId,
+            userId: input.userId ?? 0,
+            userEmail: input.email ?? null,
+            userName: null,
+            origin,
+          }).catch((e: any) => {
+            console.error("[FormStripe] Per-rule checkout creation failed:", e.message);
+            return null;
+          });
+        } else if (templateStripeEnabled) {
+          // Template-level Stripe checkout (fallback)
           checkoutUrl = await createFormStripeCheckout({
             config: {
               stripeEnabled: true,
@@ -2408,7 +2435,7 @@ ${pageText}`;
             userName: null,
             origin,
           }).catch((e: any) => {
-            console.error("[FormStripe] General form checkout creation failed:", e.message);
+            console.error("[FormStripe] Template-level checkout creation failed:", e.message);
             return null;
           });
         }
@@ -2757,6 +2784,13 @@ ${pageText}`;
       logicOperator: z.enum(["all", "any"]).default("all"),
       conditions: z.string(),
       grantAccessActions: z.string().optional(), // JSON array of {productType, productId}
+      // Per-rule Stripe checkout action
+      stripeEnabled: z.boolean().default(false),
+      stripePriceId: z.string().optional(),
+      stripeAmount: z.number().optional(),
+      stripeCheckoutMode: z.string().default("payment"),
+      stripeSuccessUrl: z.string().optional(),
+      stripeCancelUrl: z.string().optional(),
       sortOrder: z.number().default(0),
       isEnabled: z.boolean().default(true),
     }))

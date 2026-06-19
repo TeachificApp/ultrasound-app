@@ -77,6 +77,13 @@ type RoutingRuleDraft = {
   logicOperator: "all" | "any";
   conditions: RoutingCondition[];
   grantAccessActions?: string;
+  // Per-rule Stripe checkout action
+  stripeEnabled: boolean;
+  stripePriceId?: string;
+  stripeAmount?: number;
+  stripeCheckoutMode: string;
+  stripeSuccessUrl?: string;
+  stripeCancelUrl?: string;
   isEnabled: boolean;
   sortOrder: number;
 };
@@ -207,6 +214,8 @@ export default function FormSuccessModulesTab({
       successModuleId: modules[0].id,
       logicOperator: "all",
       conditions: [{ id: crypto.randomUUID(), fieldId: "__score_percent__", operator: "greater_or_equal", value: "80" }],
+      stripeEnabled: false,
+      stripeCheckoutMode: "payment",
       isEnabled: true,
       sortOrder: (routingRules?.length ?? 0),
     });
@@ -229,6 +238,13 @@ export default function FormSuccessModulesTab({
       successModuleId: rule.successModuleId,
       logicOperator: rule.logicOperator,
       conditions,
+      grantAccessActions: rule.grantAccessActions ?? undefined,
+      stripeEnabled: rule.stripeEnabled ?? false,
+      stripePriceId: rule.stripePriceId ?? undefined,
+      stripeAmount: rule.stripeAmount ?? undefined,
+      stripeCheckoutMode: rule.stripeCheckoutMode ?? "payment",
+      stripeSuccessUrl: rule.stripeSuccessUrl ?? undefined,
+      stripeCancelUrl: rule.stripeCancelUrl ?? undefined,
       isEnabled: rule.isEnabled ?? true,
       sortOrder: rule.sortOrder ?? 0,
     });
@@ -246,6 +262,12 @@ export default function FormSuccessModulesTab({
       logicOperator: ruleDraft.logicOperator,
       conditions: JSON.stringify(ruleDraft.conditions),
       grantAccessActions: ruleDraft.grantAccessActions || undefined,
+      stripeEnabled: ruleDraft.stripeEnabled,
+      stripePriceId: ruleDraft.stripePriceId || undefined,
+      stripeAmount: ruleDraft.stripeAmount,
+      stripeCheckoutMode: ruleDraft.stripeCheckoutMode,
+      stripeSuccessUrl: ruleDraft.stripeSuccessUrl || undefined,
+      stripeCancelUrl: ruleDraft.stripeCancelUrl || undefined,
       sortOrder: ruleDraft.sortOrder,
       isEnabled: ruleDraft.isEnabled,
     });
@@ -528,11 +550,82 @@ export default function FormSuccessModulesTab({
               } : r)}>
                 Add condition
               </Button>
-              <div className="pt-2 border-t border-gray-100">
+              <div className="pt-2 border-t border-gray-100 space-y-3">
                 <AccessGrantActionsEditor
                   value={ruleDraft?.grantAccessActions}
                   onChange={v => setRuleDraft(r => r ? { ...r, grantAccessActions: v } : r)}
                 />
+              </div>
+              <div className="pt-2 border-t border-gray-100 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="rule-stripe-enabled"
+                    checked={ruleDraft?.stripeEnabled ?? false}
+                    onChange={e => setRuleDraft(r => r ? { ...r, stripeEnabled: e.target.checked } : r)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <label htmlFor="rule-stripe-enabled" className="text-sm font-medium text-gray-700">
+                    Redirect to Stripe Checkout on match
+                  </label>
+                </div>
+                {ruleDraft?.stripeEnabled && (
+                  <div className="pl-6 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">Checkout mode</Label>
+                        <select
+                          value={ruleDraft.stripeCheckoutMode}
+                          onChange={e => setRuleDraft(r => r ? { ...r, stripeCheckoutMode: e.target.value } : r)}
+                          className="mt-1 w-full h-8 text-xs rounded-md border border-input bg-background px-2"
+                        >
+                          <option value="payment">One-time payment</option>
+                          <option value="subscription">Subscription</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Stripe Price ID</Label>
+                        <Input
+                          value={ruleDraft.stripePriceId ?? ""}
+                          onChange={e => setRuleDraft(r => r ? { ...r, stripePriceId: e.target.value } : r)}
+                          placeholder="price_xxx"
+                          className="mt-1 h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Amount (cents, optional — overrides Price ID amount)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={ruleDraft.stripeAmount ?? ""}
+                        onChange={e => setRuleDraft(r => r ? { ...r, stripeAmount: e.target.value ? Number(e.target.value) : undefined } : r)}
+                        placeholder="e.g. 4900 for $49.00"
+                        className="mt-1 h-8 text-xs"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">Success URL (optional)</Label>
+                        <Input
+                          value={ruleDraft.stripeSuccessUrl ?? ""}
+                          onChange={e => setRuleDraft(r => r ? { ...r, stripeSuccessUrl: e.target.value } : r)}
+                          placeholder="https://…/success"
+                          className="mt-1 h-8 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Cancel URL (optional)</Label>
+                        <Input
+                          value={ruleDraft.stripeCancelUrl ?? ""}
+                          onChange={e => setRuleDraft(r => r ? { ...r, stripeCancelUrl: e.target.value } : r)}
+                          placeholder="https://…/cancel"
+                          className="mt-1 h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

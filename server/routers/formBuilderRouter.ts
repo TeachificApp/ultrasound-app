@@ -870,22 +870,34 @@ export const formBuilderRouter = router({
               );
             }
 
-            // Create Stripe checkout session if configured
-            if (template.stripeEnabled) {
+            // Create Stripe checkout session — per-rule takes priority over template-level
+            const ruleStripeEnabled = (matchedRule as any)?.stripeEnabled;
+            if (ruleStripeEnabled || template.stripeEnabled) {
               const req = (ctx as any).req;
-              const origin = req?.headers?.origin ?? req?.headers?.referer?.replace(/\/[^/]*$/, "") ?? "";
+              const origin = req?.headers?.origin ?? req?.headers?.referer?.replace(/\/[^\/]*$/, "") ?? "";
+              const stripeConfig = ruleStripeEnabled ? {
+                stripeEnabled: true,
+                stripeProductId: null,
+                stripePriceId: (matchedRule as any).stripePriceId ?? null,
+                stripeAmount: (matchedRule as any).stripeAmount ?? null,
+                stripeCheckoutMode: (matchedRule as any).stripeCheckoutMode ?? "payment",
+                stripeSuccessUrl: (matchedRule as any).stripeSuccessUrl ?? null,
+                stripeCancelUrl: (matchedRule as any).stripeCancelUrl ?? null,
+                formName: template.name,
+                formId: template.id,
+              } : {
+                stripeEnabled: true,
+                stripeProductId: template.stripeProductId ?? null,
+                stripePriceId: template.stripePriceId ?? null,
+                stripeAmount: template.stripeAmount ?? null,
+                stripeCheckoutMode: template.stripeCheckoutMode ?? "payment",
+                stripeSuccessUrl: template.stripeSuccessUrl ?? null,
+                stripeCancelUrl: template.stripeCancelUrl ?? null,
+                formName: template.name,
+                formId: template.id,
+              };
               checkoutUrl = await createFormStripeCheckout({
-                config: {
-                  stripeEnabled: true,
-                  stripeProductId: template.stripeProductId ?? null,
-                  stripePriceId: template.stripePriceId ?? null,
-                  stripeAmount: template.stripeAmount ?? null,
-                  stripeCheckoutMode: template.stripeCheckoutMode ?? "payment",
-                  stripeSuccessUrl: template.stripeSuccessUrl ?? null,
-                  stripeCancelUrl: template.stripeCancelUrl ?? null,
-                  formName: template.name,
-                  formId: template.id,
-                },
+                config: stripeConfig,
                 submissionId: id,
                 userId: ctx.user.id,
                 userEmail: (ctx.user as any).email ?? null,
@@ -1441,6 +1453,13 @@ ${pageText}`;
       logicOperator: z.enum(['all', 'any']).default('all'),
       conditions: z.string(),
       grantAccessActions: z.string().optional(), // JSON array of {productType, productId}
+      // Per-rule Stripe checkout action
+      stripeEnabled: z.boolean().default(false),
+      stripePriceId: z.string().optional(),
+      stripeAmount: z.number().optional(),
+      stripeCheckoutMode: z.string().default('payment'),
+      stripeSuccessUrl: z.string().optional(),
+      stripeCancelUrl: z.string().optional(),
       sortOrder: z.number().default(0),
       isEnabled: z.boolean().default(true),
     }))
