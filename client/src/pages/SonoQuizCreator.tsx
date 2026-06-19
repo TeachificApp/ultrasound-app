@@ -115,6 +115,31 @@ export default function SonoQuizCreator() {
   const [showQuestionDialog, setShowQuestionDialog] = useState(false);
   const [mediaInputMode, setMediaInputMode] = useState<"url" | "upload">("url");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // ── Custom Set Builder state ───────────────────────────────────────────────
+  const [showCustomSetBuilder, setShowCustomSetBuilder] = useState(false);
+  const [customSetTitle, setCustomSetTitle] = useState("");
+  const [customSetDescription, setCustomSetDescription] = useState("");
+  const [customSetTimeLimitSeconds, setCustomSetTimeLimitSeconds] = useState(30);
+  const [customSetSelectedIds, setCustomSetSelectedIds] = useState<Set<number>>(new Set());
+  const [customSetSourceType, setCustomSetSourceType] = useState<"standalone_quiz" | "question_bank_folder" | null>(null);
+  const [customSetSourceId, setCustomSetSourceId] = useState<number | null>(null);
+  const { data: customSetQuestions, isLoading: customSetQuestionsLoading } = trpc.sonoQuiz.browseQuestionsForCustomSet.useQuery(
+    { sourceType: customSetSourceType!, sourceId: customSetSourceId! },
+    { enabled: !!customSetSourceType && !!customSetSourceId }
+  );
+  const saveCustomSetMutation = trpc.sonoQuiz.saveCustomSet.useMutation({
+    onSuccess: (data) => {
+      utils.sonoQuiz.listQuizzes.invalidate();
+      setShowCustomSetBuilder(false);
+      setCustomSetSelectedIds(new Set());
+      setCustomSetTitle("");
+      setCustomSetSourceType(null);
+      setCustomSetSourceId(null);
+      toast.success(`Custom set saved! ${data.questionCount} questions added.`);
+      openQuestions(data.quizId);
+    },
+    onError: (e) => toast.error(`Failed to save: ${e.message}`),
+  });
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: quizzes, isLoading: quizzesLoading } = trpc.sonoQuiz.listQuizzes.useQuery();
@@ -302,9 +327,14 @@ export default function SonoQuizCreator() {
           <div className="ml-auto flex items-center gap-2">
             <Badge variant="outline" className="border-amber-500/50 text-amber-400 text-xs">Admin Only</Badge>
             {view === "list" && (
-              <Button size="sm" onClick={openCreateQuiz} style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}>
-                <Plus className="w-4 h-4 mr-1" /> New Quiz
-              </Button>
+              <>
+                <Button size="sm" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => setShowCustomSetBuilder(true)}>
+                  <BookOpen className="w-4 h-4 mr-1" /> Build Custom Set
+                </Button>
+                <Button size="sm" onClick={openCreateQuiz} style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}>
+                  <Plus className="w-4 h-4 mr-1" /> New Quiz
+                </Button>
+              </>
             )}
             {view === "questions" && (
               <Button size="sm" onClick={openAddQuestion} style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}>
@@ -754,6 +784,153 @@ export default function SonoQuizCreator() {
                 onClick={submitQuestionForm}
                 disabled={!questionForm.question.trim() || upsertQuestion.isPending}>
                 {editingQuestionId ? "Save Question" : "Add Question"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Custom Set Builder Dialog ─────────────────────────────────────────── */}
+      <Dialog open={showCustomSetBuilder} onOpenChange={setShowCustomSetBuilder}>
+        <DialogContent className="max-w-4xl bg-slate-900 border-slate-700 text-white max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-teal-400" /> Build Custom SonoQuiz Set
+            </DialogTitle>
+            <p className="text-xs text-slate-400 mt-1">Select specific questions from shared quizzes or question bank folders, then save as a new SonoQuiz.</p>
+          </DialogHeader>
+          <div className="space-y-5 pt-2">
+            {/* Quiz metadata */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-slate-300 text-sm">Set Title *</Label>
+                <Input value={customSetTitle} onChange={e => setCustomSetTitle(e.target.value)}
+                  placeholder="e.g. Cardiac Mock Exam" className="mt-1 bg-slate-800 border-slate-600 text-white" />
+              </div>
+              <div>
+                <Label className="text-slate-300 text-sm">Time per question: {customSetTimeLimitSeconds}s</Label>
+                <div className="mt-3 px-1">
+                  <Slider min={5} max={120} step={5} value={[customSetTimeLimitSeconds]}
+                    onValueChange={([v]) => setCustomSetTimeLimitSeconds(v)} />
+                </div>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-slate-300 text-sm">Description (optional)</Label>
+                <Input value={customSetDescription} onChange={e => setCustomSetDescription(e.target.value)}
+                  placeholder="Brief description of this quiz set" className="mt-1 bg-slate-800 border-slate-600 text-white" />
+              </div>
+            </div>
+
+            {/* Source picker */}
+            <div>
+              <Label className="text-slate-300 text-sm mb-2 block">Browse questions from a shared source</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {(sharedSources?.quizzes ?? []).map((q: any) => (
+                  <button key={`sq-${q.id}`}
+                    onClick={() => { setCustomSetSourceType("standalone_quiz"); setCustomSetSourceId(q.id); }}
+                    className={`text-left p-3 rounded-lg border transition-colors ${
+                      customSetSourceType === "standalone_quiz" && customSetSourceId === q.id
+                        ? "border-teal-500 bg-teal-900/30"
+                        : "border-slate-700 bg-slate-800 hover:border-slate-500"
+                    }`}>
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-white text-sm">{q.title}</p>
+                      <span className="text-xs bg-blue-900/50 text-blue-300 border border-blue-700/50 px-1.5 py-0.5 rounded-full">Quiz</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{q.questionCount} questions</p>
+                  </button>
+                ))}
+                {(sharedSources?.folders ?? []).map((f: any) => (
+                  <button key={`qbf-${f.id}`}
+                    onClick={() => { setCustomSetSourceType("question_bank_folder"); setCustomSetSourceId(f.id); }}
+                    className={`text-left p-3 rounded-lg border transition-colors ${
+                      customSetSourceType === "question_bank_folder" && customSetSourceId === f.id
+                        ? "border-teal-500 bg-teal-900/30"
+                        : "border-slate-700 bg-slate-800 hover:border-slate-500"
+                    }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: f.color ?? "#179ca3" }} />
+                        <p className="font-medium text-white text-sm">{f.name}</p>
+                      </div>
+                      <span className="text-xs bg-teal-900/50 text-teal-300 border border-teal-700/50 px-1.5 py-0.5 rounded-full">QB Folder</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{f.questionCount} questions</p>
+                  </button>
+                ))}
+                {(sharedSources?.quizzes?.length ?? 0) === 0 && (sharedSources?.folders?.length ?? 0) === 0 && (
+                  <div className="col-span-2 text-center py-6 text-slate-500 text-sm">
+                    No shared sources available. Enable "Share in SonoQuiz" on standalone quizzes or question bank folders first.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Question picker */}
+            {customSetSourceType && customSetSourceId && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-slate-300 text-sm">Select questions ({customSetSelectedIds.size} selected)</Label>
+                  <div className="flex gap-2">
+                    <button className="text-xs text-teal-400 hover:text-teal-300" onClick={() => {
+                      if (customSetQuestions) setCustomSetSelectedIds(new Set(customSetQuestions.map((q: any) => q.id)));
+                    }}>Select all</button>
+                    <span className="text-slate-600">·</span>
+                    <button className="text-xs text-slate-400 hover:text-slate-300" onClick={() => setCustomSetSelectedIds(new Set())}>Clear</button>
+                  </div>
+                </div>
+                {customSetQuestionsLoading ? (
+                  <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-12 rounded-lg bg-slate-800 animate-pulse" />)}</div>
+                ) : !customSetQuestions?.length ? (
+                  <div className="text-center py-6 text-slate-500 text-sm">No questions found in this source.</div>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {customSetQuestions.map((q: any) => {
+                      const selected = customSetSelectedIds.has(q.id);
+                      return (
+                        <button key={q.id}
+                          onClick={() => {
+                            const next = new Set(customSetSelectedIds);
+                            if (selected) next.delete(q.id); else next.add(q.id);
+                            setCustomSetSelectedIds(next);
+                          }}
+                          className={`w-full text-left p-3 rounded-lg border transition-colors flex items-start gap-3 ${
+                            selected ? "border-teal-500 bg-teal-900/20" : "border-slate-700 bg-slate-800 hover:border-slate-600"
+                          }`}>
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                            selected ? "border-teal-500 bg-teal-500" : "border-slate-600"
+                          }`}>
+                            {selected && <CheckCircle className="w-3 h-3 text-white" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white line-clamp-2">{q.question}</p>
+                            {q.tags && <p className="text-xs text-slate-500 mt-0.5">{q.tags}</p>}
+                          </div>
+                          {q.imageUrl && <Eye className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Save button */}
+            <div className="flex gap-2 pt-2 border-t border-slate-700">
+              <Button variant="outline" className="border-slate-600 text-slate-300" onClick={() => setShowCustomSetBuilder(false)}>Cancel</Button>
+              <Button className="flex-1" style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}
+                onClick={() => {
+                  if (!customSetTitle.trim()) { toast.error("Please enter a title"); return; }
+                  if (customSetSelectedIds.size === 0) { toast.error("Select at least one question"); return; }
+                  saveCustomSetMutation.mutate({
+                    title: customSetTitle,
+                    description: customSetDescription || undefined,
+                    questionIds: Array.from(customSetSelectedIds),
+                    timeLimitSeconds: customSetTimeLimitSeconds,
+                  });
+                }}
+                disabled={saveCustomSetMutation.isPending || !customSetTitle.trim() || customSetSelectedIds.size === 0}>
+                {saveCustomSetMutation.isPending ? "Saving..." : `Save as SonoQuiz (${customSetSelectedIds.size} questions)`}
               </Button>
             </div>
           </div>

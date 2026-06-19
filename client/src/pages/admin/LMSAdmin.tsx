@@ -4646,6 +4646,18 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
           <Switch defaultChecked={!!(quiz as any).randomizeAnswers} onCheckedChange={v => updateQuiz.mutate({ lessonId: lesson.id, randomizeAnswers: v })} id="inline-rand-a" />
           <Label htmlFor="inline-rand-a" className="text-sm">Randomize answers</Label>
         </div>
+        <div className="flex items-center gap-2">
+          <Switch defaultChecked={(quiz as any).showGroupNames !== false} onCheckedChange={v => updateQuiz.mutate({ lessonId: lesson.id, showGroupNames: v })} id="inline-show-groups" />
+          <Label htmlFor="inline-show-groups" className="text-sm">Show group names in results</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch defaultChecked={(quiz as any).showPerQuestionResult !== false} onCheckedChange={v => updateQuiz.mutate({ lessonId: lesson.id, showPerQuestionResult: v })} id="inline-per-q" />
+          <Label htmlFor="inline-per-q" className="text-sm">Show per-question result</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch defaultChecked={!!(quiz as any).showOnlyPercentage} onCheckedChange={v => updateQuiz.mutate({ lessonId: lesson.id, showOnlyPercentage: v })} id="inline-pct-only" />
+          <Label htmlFor="inline-pct-only" className="text-sm">Show percentage only</Label>
+        </div>
         <div className="ml-auto">
           <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-50 gap-1.5" onClick={() => { setAIPreview(null); setShowAIPanel(p => !p); }}>
             <Sparkles className="w-3.5 h-3.5" /> AI Generate

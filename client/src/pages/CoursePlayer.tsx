@@ -63,26 +63,35 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
         <h2 className="text-lg font-semibold text-gray-900">{quiz.title}</h2>
         <Badge variant="outline" className="text-xs border-teal-400 text-teal-700">Passing: {quiz.passingScore}%</Badge>
       </div>
-      {submitted && result && (
-        <div className={cn("rounded-xl p-4 border", result.passed ? "bg-green-50 border-green-400" : "bg-red-50 border-red-400")}>
-          <p className={cn("font-semibold text-lg", result.passed ? "text-green-700" : "text-red-700")}>
-            {result.passed ? "✓ Passed!" : "✗ Not passed"} — Score: {result.score}%
-          </p>
-          {!result.passed && quiz.allowRetakes && (
-            <Button size="sm" variant="outline" className="mt-3 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={handleRetake}>Retake Quiz</Button>
-          )}
-        </div>
-      )}
+      {submitted && result && (() => {
+        const showOnlyPct = (quiz as any).showOnlyPercentage ?? false;
+        const showPerQ = (quiz as any).showPerQuestionResult ?? true;
+        return (
+          <div className={cn("rounded-xl p-4 border", result.passed ? "bg-green-50 border-green-400" : "bg-red-50 border-red-400")}>
+            <p className={cn("font-semibold text-lg", result.passed ? "text-green-700" : "text-red-700")}>
+              {result.passed ? "✓ Passed!" : "✗ Not passed"} — Score: {result.score}%
+            </p>
+            {showOnlyPct && !showPerQ && (
+              <p className="text-xs text-gray-500 mt-2">Detailed per-question results are not available for this quiz.</p>
+            )}
+            {!result.passed && quiz.allowRetakes && (
+              <Button size="sm" variant="outline" className="mt-3 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={handleRetake}>Retake Quiz</Button>
+            )}
+          </div>
+        );
+      })()}
       <div className="space-y-6">
         {(() => {
           // Group-based quiz: show group headers when questions have groupId
           const isGroupBased = !!(quiz as any)._isGroupBased || questions.some((q: any) => q.groupId);
+          const showGroupNames = (quiz as any).showGroupNames ?? true;
+          const showPerQ = (quiz as any).showPerQuestionResult ?? true;
           let lastGroupId: number | null = null;
           return questions.map((q: any, qi: number) => {
             const options: string[] = q.options ? JSON.parse(q.options) : q.type === "truefalse" ? ["True", "False"] : [];
             const resultItem = result?.results?.find((r: any) => r.questionId === q.id);
-            const showGroupHeader = isGroupBased && q.groupId && q.groupId !== lastGroupId;
-            if (showGroupHeader) lastGroupId = q.groupId;
+            const showGroupHeader = isGroupBased && showGroupNames && q.groupId && q.groupId !== lastGroupId;
+            if (q.groupId && q.groupId !== lastGroupId) lastGroupId = q.groupId;
             return (
               <React.Fragment key={q.id}>
                 {showGroupHeader && (
@@ -96,9 +105,9 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
               <p className="font-medium text-gray-900 mb-3">{qi + 1}. {q.question}</p>
               <div className="space-y-2">
                 {options.map((opt: string) => {
-                  const selected = answers[String(q.id)] === opt;
-                  const isCorrect = resultItem?.correctAnswer === opt;
-                  const isWrong = submitted && selected && !resultItem?.correct;
+                  const sel = answers[String(q.id)] === opt;
+                  const isCorrect = showPerQ && resultItem?.correctAnswer === opt;
+                  const isWrong = submitted && showPerQ && sel && !resultItem?.correct;
                   return (
                     <button
                       key={opt}
@@ -106,9 +115,10 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
                       onClick={() => !submitted && setAnswers(a => ({ ...a, [String(q.id)]: opt }))}
                       className={cn(
                         "w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-colors",
-                        selected && !submitted ? "border-teal-500 bg-teal-50 text-teal-900" : "border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-gray-700",
+                        sel && !submitted ? "border-teal-500 bg-teal-50 text-teal-900" : "border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-gray-700",
                         submitted && isCorrect ? "border-green-500 bg-green-50 text-green-800" : "",
                         submitted && isWrong ? "border-red-400 bg-red-50 text-red-800" : "",
+                        submitted && sel && !showPerQ ? "border-teal-400 bg-teal-50 text-teal-900" : "",
                       )}
                     >
                       {opt}
@@ -116,7 +126,7 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
                   );
                 })}
               </div>
-              {submitted && resultItem?.explanation && (
+              {submitted && showPerQ && resultItem?.explanation && (
                 <p className="mt-3 text-xs text-gray-500 bg-gray-50 rounded p-2 border border-gray-100">{resultItem.explanation}</p>
               )}
             </div>

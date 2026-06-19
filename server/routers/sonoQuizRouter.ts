@@ -27,6 +27,7 @@ import {
   users,
   lmsArchive,
   standaloneQuizzes,
+  standaloneQuizQuestions,
   questionBankFolders,
   questionBank,
 } from "../../drizzle/schema";
@@ -785,6 +786,110 @@ export const sonoQuizRouter = router({
         }
       })();
       return { userId, isNewUser };
+    }),
+
+  /**
+   * Browse questions from a standalone quiz or question bank folder for custom set building.
+   */
+  browseQuestionsForCustomSet: protectedProcedure
+    .input(z.object({
+      sourceType: z.enum(["standalone_quiz", "question_bank_folder"]),
+      sourceId: z.number().int(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx.user.id);
+      const db = (await getDb())!;
+      if (input.sourceType === "standalone_quiz") {
+        const rows = await db
+          .select({
+            id: questionBank.id,
+            question: questionBank.question,
+            options: questionBank.options,
+            correctAnswer: questionBank.correctAnswer,
+            explanation: questionBank.explanation,
+            imageUrl: questionBank.imageUrl,
+            tags: questionBank.tags,
+          })
+          .from(standaloneQuizQuestions)
+          .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
+          .where(eq(standaloneQuizQuestions.quizId, input.sourceId))
+          .orderBy(asc(standaloneQuizQuestions.sortOrder));
+        return rows;
+      } else {
+        const rows = await db
+          .select({
+            id: questionBank.id,
+            question: questionBank.question,
+            options: questionBank.options,
+            correctAnswer: questionBank.correctAnswer,
+            explanation: questionBank.explanation,
+            imageUrl: questionBank.imageUrl,
+            tags: questionBank.tags,
+          })
+          .from(questionBank)
+          .where(eq(questionBank.folderId, input.sourceId))
+          .orderBy(asc(questionBank.id));
+        return rows;
+      }
+    }),
+
+  /**
+   * Save a custom-built set of questions as a new SonoQuiz.
+   * Takes a list of question bank IDs and creates a new SonoQuiz with those questions copied in.
+   */
+  saveCustomSet: protectedProcedure
+    .input(z.object({
+      title: z.string().min(1).max(255),
+      description: z.string().optional(),
+      questionIds: z.array(z.number().int()).min(1).max(200),
+      timeLimitSeconds: z.number().int().min(5).max(300).default(30),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx.user.id);
+      const db = (await getDb())!;
+      // Create the SonoQuiz
+      const result = await db.insert(sonoQuizzes).values({
+        createdByUserId: ctx.user.id,
+        title: input.title,
+        description: input.description ?? null,
+        timeLimitSeconds: input.timeLimitSeconds,
+        theme: "teal",
+        category: "Custom Set" as any,
+        questionCount: 0,
+        status: "draft",
+      });
+      const quizId = Number((result as any).insertId);
+      // Fetch the question bank entries
+      const qbRows = await db
+        .select()
+        .from(questionBank)
+        .where(sql`${questionBank.id} IN (${sql.join(input.questionIds.map(id => sql`${id}`), sql`, `)})`);
+      const qbMap = new Map(qbRows.map(q => [q.id, q]));
+      // Insert questions in the order provided
+      const insertValues = input.questionIds.map((qbId, idx) => {
+        const q = qbMap.get(qbId);
+        if (!q) return null;
+        const options = (() => { try { return JSON.parse(q.options ?? "[]"); } catch { return []; } })();
+        const correctIdx = options.indexOf(q.correctAnswer);
+        return {
+          quizId,
+          question: q.question,
+          options: q.options ?? "[]",
+          correctAnswer: correctIdx >= 0 ? correctIdx : 0,
+          explanation: q.explanation ?? null,
+          mediaUrl: q.imageUrl ?? null,
+          mediaType: q.imageUrl ? ("image" as const) : undefined,
+          points: 100,
+          sortOrder: idx,
+        };
+      }).filter(Boolean) as any[];
+      if (insertValues.length > 0) {
+        await db.insert(sonoQuizQuestions).values(insertValues);
+        await db.update(sonoQuizzes)
+          .set({ questionCount: insertValues.length })
+          .where(eq(sonoQuizzes.id, quizId));
+      }
+      return { quizId, questionCount: insertValues.length };
     }),
 
   /** List standalone quizzes and question bank folders shared for SonoQuiz deployment */

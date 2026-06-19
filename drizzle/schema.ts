@@ -3122,6 +3122,10 @@ export const lmsQuizzes = mysqlTable("lms_quizzes", {
   randomizeAnswers: boolean("randomize_answers").default(false).notNull(),
   useQuestionGroups: boolean("use_question_groups").default(false).notNull(),
   questionBankFolderId: int("question_bank_folder_id"),
+  // Result visibility toggles
+  showGroupNames: boolean("show_group_names").default(true).notNull(),
+  showPerQuestionResult: boolean("show_per_question_result").default(true).notNull(),
+  showOnlyPercentage: boolean("show_only_percentage").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsQuiz = typeof lmsQuizzes.$inferSelect;
@@ -7047,6 +7051,10 @@ export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
   coverImageUrl: text("cover_image_url"),
   instructions: longtext("instructions"),
   sharedInSonoQuiz: boolean("shared_in_sono_quiz").default(false).notNull(),
+  // Result visibility toggles
+  showGroupNames: boolean("show_group_names").default(true).notNull(),
+  showPerQuestionResult: boolean("show_per_question_result").default(true).notNull(),
+  showOnlyPercentage: boolean("show_only_percentage").default(false).notNull(),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

@@ -60,6 +60,10 @@ const quizSettingsInput = z.object({
   coverImageUrl: z.string().nullable().optional(),
   instructions: z.string().nullable().optional(),
   sharedInSonoQuiz: z.boolean().optional(),
+  // Result visibility
+  showGroupNames: z.boolean().default(true).optional(),
+  showPerQuestionResult: z.boolean().default(true).optional(),
+  showOnlyPercentage: z.boolean().default(false).optional(),
 });
 
 // ─── Public Router ────────────────────────────────────────────────────────────

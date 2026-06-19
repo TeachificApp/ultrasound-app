@@ -117,6 +117,9 @@ export const lmsQuizLandingRouter = router({
       requirePassingToProgress: z.boolean().optional(),
       randomizeQuestions: z.boolean().optional(),
       randomizeAnswers: z.boolean().optional(),
+      showGroupNames: z.boolean().optional(),
+      showPerQuestionResult: z.boolean().optional(),
+      showOnlyPercentage: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

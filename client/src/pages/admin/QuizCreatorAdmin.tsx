@@ -1480,6 +1480,48 @@ function QuizEditor({ quizId }: { quizId: number }) {
                   </CardContent>
                 </Card>
 
+                {/* Result Visibility */}
+                <Card className="md:col-span-2 border-blue-200 bg-blue-50/30">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-blue-600" /> Result Visibility
+                    </CardTitle>
+                    <p className="text-xs text-gray-500 mt-1">Control what students see after completing this quiz.</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="font-medium">Show question group names</Label>
+                        <p className="text-xs text-gray-500 mt-0.5">Display group section headers in results (e.g., "Group 1: Cardiac")</p>
+                      </div>
+                      <Switch
+                        checked={settings.showGroupNames !== false}
+                        onCheckedChange={(v) => setSettings((s: any) => ({ ...s, showGroupNames: v }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="font-medium">Show per-question result</Label>
+                        <p className="text-xs text-gray-500 mt-0.5">Show correct/incorrect feedback for each individual question</p>
+                      </div>
+                      <Switch
+                        checked={settings.showPerQuestionResult !== false}
+                        onCheckedChange={(v) => setSettings((s: any) => ({ ...s, showPerQuestionResult: v }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="font-medium">Show overall percentage only</Label>
+                        <p className="text-xs text-gray-500 mt-0.5">When enabled, students only see their final score percentage — no per-question breakdown</p>
+                      </div>
+                      <Switch
+                        checked={!!settings.showOnlyPercentage}
+                        onCheckedChange={(v) => setSettings((s: any) => ({ ...s, showOnlyPercentage: v, ...(v ? { showPerQuestionResult: false } : {}) }))}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* SonoQuiz Sharing */}
                 <Card className="md:col-span-2 border-purple-200 bg-purple-50/30">
                   <CardHeader className="pb-3">
