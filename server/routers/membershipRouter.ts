@@ -423,6 +423,28 @@ const removeMembershipItem = adminProcedure
     return { success: true };
   });
 
+const reorderMembershipItems = adminProcedure
+  .input(
+    z.object({
+      /** Ordered array of access-item IDs — first element gets sortOrder 0 */
+      orderedIds: z.array(z.number()),
+    })
+  )
+  .mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    // Update each row's sort_order to match its position in the array
+    await Promise.all(
+      input.orderedIds.map((id, index) =>
+        db
+          .update(membershipPlanAccess)
+          .set({ sortOrder: index })
+          .where(eq(membershipPlanAccess.id, id))
+      )
+    );
+    return { success: true };
+  });
+
 // ─── Discount Codes ───────────────────────────────────────────────────────────
 
 const listDiscountCodes = adminProcedure
@@ -1429,6 +1451,7 @@ export const membershipRouter = router({
   setItems: setMembershipItems,
   addItem: addMembershipItem,
   removeItem: removeMembershipItem,
+  reorderItems: reorderMembershipItems,
   listDiscountCodes: listDiscountCodes,
   createDiscountCode: createDiscountCode,
   updateDiscountCode: updateDiscountCode,

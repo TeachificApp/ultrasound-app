@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-import { useState, useRef } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   Plus, Edit2, Trash2, Eye, EyeOff, Tag, Users, Package, LayoutTemplate,
   ChevronRight, GripVertical, X, Copy, RefreshCw, DollarSign, Percent,
@@ -1067,6 +1083,63 @@ function MembershipSettingsTab({
 
 // ─── Items Tab ────────────────────────────────────────────────────────────────
 
+
+// ─── Sortable Item Row ────────────────────────────────────────────────────────
+
+function SortableAccessItem({
+  item,
+  label,
+  typeLabel,
+  icon,
+  onRemove,
+}: {
+  item: AccessItem;
+  label: string;
+  typeLabel: string;
+  icon: React.ReactNode;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg group"
+    >
+      {/* Drag handle */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 shrink-0 touch-none"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <div className="text-teal-600 shrink-0">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <span className="text-sm font-medium text-gray-800">{label}</span>
+        <span className="ml-2 text-xs text-gray-400">{typeLabel}</span>
+      </div>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-gray-400 hover:text-red-600 shrink-0"
+        onClick={onRemove}
+      >
+        <X className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
 function MembershipItemsTab({
   planId,
   items,
@@ -1132,6 +1205,38 @@ function MembershipItemsTab({
       default: return `${ITEM_TYPE_LABELS[item.itemType]} #${id}`;
     }
   }
+
+  // ── Local sorted state (mirrors DB order, updated optimistically on drag) ──
+  const [localItems, setLocalItems] = useState<AccessItem[]>(() =>
+    [...items].sort((a, b) => a.sortOrder - b.sortOrder)
+  );
+  // Keep localItems in sync when parent refetches
+  const prevItemsRef = useRef(items);
+  if (prevItemsRef.current !== items) {
+    prevItemsRef.current = items;
+    setLocalItems([...items].sort((a, b) => a.sortOrder - b.sortOrder));
+  }
+
+  const reorderMutation = trpc.membership.reorderItems.useMutation({
+    onError: (e) => { toast.error("Reorder failed: " + e.message); onRefetch(); },
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setLocalItems((prev) => {
+      const oldIndex = prev.findIndex((i) => i.id === active.id);
+      const newIndex = prev.findIndex((i) => i.id === over.id);
+      const next = arrayMove(prev, oldIndex, newIndex);
+      reorderMutation.mutate({ orderedIds: next.map((i) => i.id) });
+      return next;
+    });
+  }, [reorderMutation]);
 
   const addMutation = trpc.membership.addItem.useMutation({
     onSuccess: () => { onRefetch(); setAddItemId(""); setAddItemTitle(""); setAddLabel(""); setSearch(""); toast.success("Item added"); },
@@ -1255,30 +1360,32 @@ function MembershipItemsTab({
           <CardTitle className="text-sm">Included Items ({items.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
+          {localItems.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6">No items added yet.</p>
           ) : (
-            <div className="space-y-2">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="text-teal-600">{ITEM_TYPE_ICONS[item.itemType]}</div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-gray-800">
-                      {resolveItemName(item)}
-                    </span>
-                    <span className="ml-2 text-xs text-gray-400">{ITEM_TYPE_LABELS[item.itemType]}</span>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-gray-400 hover:text-red-600 shrink-0"
-                    onClick={() => removeMutation.mutate({ id: item.id })}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={localItems.map((i) => i.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2">
+                  {localItems.map((item) => (
+                    <SortableAccessItem
+                      key={item.id}
+                      item={item}
+                      label={resolveItemName(item)}
+                      typeLabel={ITEM_TYPE_LABELS[item.itemType]}
+                      icon={ITEM_TYPE_ICONS[item.itemType]}
+                      onRemove={() => removeMutation.mutate({ id: item.id })}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
           )}
         </CardContent>
       </Card>
