@@ -467,6 +467,40 @@ export async function reconcileLmsCheckoutFromStripeSession(
     existingEnrollment.enrollmentType === "free_preview" ||
     !isEnrollmentAccessActive(existingEnrollment);
 
+  // ── Duplicate one-time payment guard ──────────────────────────────────────
+  // If the user is already actively enrolled and this is a one-time payment
+  // (not a subscription renewal), automatically refund the duplicate charge.
+  const pricingType = meta.pricing_type ?? "one_time";
+  const isDuplicateOneTimePayment =
+    !shouldRenew &&
+    !stripeSubscriptionId &&
+    (pricingType === "one_time" || pricingType === "payment_plan") &&
+    paymentIntentFromSession;
+
+  if (isDuplicateOneTimePayment) {
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      await stripe.refunds.create({
+        payment_intent: paymentIntentFromSession!,
+        reason: "duplicate",
+      });
+      notes.push(`Duplicate payment auto-refunded: ${paymentIntentFromSession}`);
+      await notifyOwner({
+        title: "⚠️ Duplicate LMS Payment Auto-Refunded",
+        content: `User ${userId} (${customerEmail}) was already enrolled in ${course?.title ?? `course #${courseId}`}. Payment ${paymentIntentFromSession} has been automatically refunded.`,
+      }).catch(() => {});
+    } catch (refundErr) {
+      console.error(`[LmsCheckoutFulfillment] Auto-refund failed for ${paymentIntentFromSession}:`, refundErr);
+      notes.push(`Auto-refund FAILED for ${paymentIntentFromSession} — manual action required`);
+      await notifyOwner({
+        title: "🚨 Duplicate LMS Payment — REFUND FAILED",
+        content: `User ${userId} (${customerEmail}) was already enrolled in ${course?.title ?? `course #${courseId}`}. Auto-refund of ${paymentIntentFromSession} FAILED. Manual refund required in Stripe Dashboard.`,
+      }).catch(() => {});
+    }
+    return { success: true, userId, courseId, orderId, isNewUser, notes };
+  }
+
   if (!existingEnrollment) {
     await db.insert(lmsEnrollments).values({
       userId,

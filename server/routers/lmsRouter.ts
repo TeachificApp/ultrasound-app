@@ -1351,6 +1351,20 @@ export const lmsLearnerRouter = router({
 
       if (pricingType === "free") throw new TRPCError({ code: "BAD_REQUEST", message: "Use enrollFree for free courses" });
 
+      // ── Already-enrolled guard ─────────────────────────────────────────────────
+      // For one_time purchases, block checkout if the user already has an active
+      // full enrollment. Subscription renewals are allowed through.
+      if (pricingType === "one_time" || pricingType === "payment_plan") {
+        const { getActiveEnrollment: checkExistingEnrollment } = await import("../lib/enrollmentAccess");
+        const activeEnrollment = await checkExistingEnrollment(db, ctx.user.id, course.id);
+        if (activeEnrollment && activeEnrollment.enrollmentType !== "free_preview") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You are already enrolled in this course. Please contact support if you believe this is an error.",
+          });
+        }
+      }
+
       // ── Zero-price intercept ───────────────────────────────────────────────────
       // If the course/option price is $0, skip Stripe and enroll directly.
       if (pricingType === "one_time" && Number(effectivePrice) === 0) {
