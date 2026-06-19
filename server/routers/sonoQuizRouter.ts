@@ -26,6 +26,9 @@ import {
   sonoQuizAnswers,
   users,
   lmsArchive,
+  standaloneQuizzes,
+  questionBankFolders,
+  questionBank,
 } from "../../drizzle/schema";
 import {
   broadcastLobbyUpdate,
@@ -782,5 +785,35 @@ export const sonoQuizRouter = router({
         }
       })();
       return { userId, isNewUser };
+    }),
+
+  /** List standalone quizzes and question bank folders shared for SonoQuiz deployment */
+  listSharedQuizSources: protectedProcedure
+    .query(async ({ ctx }) => {
+      await requireAdmin(ctx.user.id);
+      const db = (await getDb())!;
+      // Shared standalone quizzes
+      const sharedQuizzes = await db
+        .select({
+          id: standaloneQuizzes.id,
+          title: standaloneQuizzes.title,
+          description: standaloneQuizzes.description,
+          questionCount: sql<number>`(SELECT COUNT(*) FROM standalone_quiz_questions WHERE quiz_id = ${standaloneQuizzes.id})`,
+        })
+        .from(standaloneQuizzes)
+        .where(eq(standaloneQuizzes.sharedInSonoQuiz, true))
+        .orderBy(asc(standaloneQuizzes.title));
+      // Shared question bank folders
+      const sharedFolders = await db
+        .select({
+          id: questionBankFolders.id,
+          name: questionBankFolders.name,
+          color: questionBankFolders.color,
+          questionCount: sql<number>`(SELECT COUNT(*) FROM question_bank WHERE folder_id = ${questionBankFolders.id})`,
+        })
+        .from(questionBankFolders)
+        .where(eq(questionBankFolders.sharedInSonoQuiz, true))
+        .orderBy(asc(questionBankFolders.name));
+      return { quizzes: sharedQuizzes, folders: sharedFolders };
     }),
 });

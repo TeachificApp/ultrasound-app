@@ -59,6 +59,7 @@ const quizSettingsInput = z.object({
   status: z.enum(["draft", "published", "archived"]).default("draft"),
   coverImageUrl: z.string().nullable().optional(),
   instructions: z.string().nullable().optional(),
+  sharedInSonoQuiz: z.boolean().optional(),
 });
 
 // ─── Public Router ────────────────────────────────────────────────────────────

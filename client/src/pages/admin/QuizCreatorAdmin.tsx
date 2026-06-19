@@ -1480,6 +1480,33 @@ function QuizEditor({ quizId }: { quizId: number }) {
                   </CardContent>
                 </Card>
 
+                {/* SonoQuiz Sharing */}
+                <Card className="md:col-span-2 border-purple-200 bg-purple-50/30">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Radio className="w-4 h-4 text-purple-600" /> SonoQuiz Sharing
+                    </CardTitle>
+                    <p className="text-xs text-gray-500 mt-1">When enabled, this quiz will appear as an available quiz in the SonoQuiz live deployment screen. Only admins can toggle this setting.</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="font-medium">Share in SonoQuiz</Label>
+                        <p className="text-xs text-gray-500 mt-0.5">Makes this quiz available to deploy as a live SonoQuiz session</p>
+                      </div>
+                      <Switch
+                        checked={!!settings.sharedInSonoQuiz}
+                        onCheckedChange={(v) => setSettings((s: any) => ({ ...s, sharedInSonoQuiz: v }))}
+                      />
+                    </div>
+                    {settings.sharedInSonoQuiz && (
+                      <div className="mt-3 p-2.5 rounded-lg bg-purple-100 border border-purple-200 text-xs text-purple-700 flex items-center gap-2">
+                        <Radio className="w-3.5 h-3.5 flex-shrink-0" />
+                        This quiz is visible in SonoQuiz deployment. Remember to save settings.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
                 <div className="md:col-span-2 flex justify-end">
                   <Button
                     onClick={() => updateMutation.mutate({ id: quiz.id, ...settings })}

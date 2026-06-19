@@ -118,6 +118,7 @@ export default function SonoQuizCreator() {
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: quizzes, isLoading: quizzesLoading } = trpc.sonoQuiz.listQuizzes.useQuery();
+  const { data: sharedSources } = trpc.sonoQuiz.listSharedQuizSources.useQuery();
   const { data: quizDetail, isLoading: questionsLoading } = trpc.sonoQuiz.getQuiz.useQuery(
     { quizId: selectedQuizId! },
     { enabled: !!selectedQuizId && view === "questions" }
@@ -384,6 +385,52 @@ export default function SonoQuizCreator() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Shared Quiz Sources (shown in list view) ─────────────────────────── */}
+        {view === "list" && ((sharedSources?.quizzes?.length ?? 0) > 0 || (sharedSources?.folders?.length ?? 0) > 0) && (
+          <div className="mt-10">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-px flex-1 bg-slate-700" />
+              <span className="text-xs text-slate-500 font-medium uppercase tracking-wider px-2">Shared Quiz Sources</span>
+              <div className="h-px flex-1 bg-slate-700" />
+            </div>
+            <p className="text-xs text-slate-500 mb-4">Standalone quizzes and question bank folders shared for SonoQuiz deployment by an admin.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(sharedSources?.quizzes ?? []).map((q: any) => (
+                <div key={`sq-${q.id}`} className="rounded-xl border border-slate-700 bg-slate-900 p-4 flex flex-col gap-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-white text-sm">{q.title}</p>
+                      {q.description && <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{q.description}</p>}
+                    </div>
+                    <span className="text-xs bg-blue-900/50 text-blue-300 border border-blue-700/50 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">Quiz</span>
+                  </div>
+                  <p className="text-xs text-slate-500">{q.questionCount} questions</p>
+                  <Button size="sm" className="w-full bg-blue-700 hover:bg-blue-600 text-white gap-1.5"
+                    onClick={() => toast("Launch from shared quiz — import questions first via the Quiz Creator.") }>
+                    <Play className="w-3 h-3" /> Launch
+                  </Button>
+                </div>
+              ))}
+              {(sharedSources?.folders ?? []).map((f: any) => (
+                <div key={`qbf-${f.id}`} className="rounded-xl border border-slate-700 bg-slate-900 p-4 flex flex-col gap-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: f.color ?? "#179ca3" }} />
+                      <p className="font-semibold text-white text-sm">{f.name}</p>
+                    </div>
+                    <span className="text-xs bg-teal-900/50 text-teal-300 border border-teal-700/50 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">QB Folder</span>
+                  </div>
+                  <p className="text-xs text-slate-500">{f.questionCount} questions in bank</p>
+                  <Button size="sm" className="w-full bg-teal-700 hover:bg-teal-600 text-white gap-1.5"
+                    onClick={() => toast("Launch from question bank folder — coming soon.") }>
+                    <Play className="w-3 h-3" /> Launch
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

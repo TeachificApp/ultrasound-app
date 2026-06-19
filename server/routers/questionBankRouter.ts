@@ -822,6 +822,7 @@ export const questionBankRouter = router({
       description: z.string().max(500).optional(),
       color: z.string().max(32).optional(),
       parentId: z.number().int().nullable().optional(),
+      sharedInSonoQuiz: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -844,6 +845,27 @@ export const questionBankRouter = router({
       return { ok: true };
     }),
 
+  /** List folders shared into SonoQuiz (for SonoQuizCreator to use as quiz sources) */
+  listSonoQuizSharedFolders: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const folders = await db
+        .select()
+        .from(questionBankFolders)
+        .where(eq(questionBankFolders.sharedInSonoQuiz, true))
+        .orderBy(asc(questionBankFolders.name));
+      // For each folder, count questions
+      const counts = await Promise.all(folders.map(async (f) => {
+        const [{ cnt }] = await db
+          .select({ cnt: sql<number>`COUNT(*)` })
+          .from(questionBank)
+          .where(eq(questionBank.folderId, f.id));
+        return { ...f, questionCount: Number(cnt) };
+      }));
+      return counts;
+    }),
   moveToFolder: protectedProcedure
     .input(z.object({
       questionIds: z.array(z.number().int()).min(1),

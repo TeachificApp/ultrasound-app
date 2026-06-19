@@ -4653,6 +4653,44 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
         </div>
       </div>
 
+      {/* Folder Manager */}
+      {showFolderManager && (
+        <div className="border border-purple-200 rounded-xl p-4 bg-purple-50/40 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-purple-800 text-sm flex items-center gap-2"><FolderOpen className="w-4 h-4" /> Manage Question Bank Folders</h3>
+            <Button size="sm" variant="ghost" onClick={() => setShowFolderManager(false)}><X className="w-3.5 h-3.5" /></Button>
+          </div>
+          <p className="text-xs text-purple-700">Toggle "Share in SonoQuiz" to make a folder's questions available as a quiz source in the SonoQuiz live deployment screen.</p>
+          <div className="space-y-2">
+            {folders.length === 0 && <p className="text-xs text-gray-400 py-2 text-center">No folders yet. Create folders when adding questions to the bank.</p>}
+            {folders.map((f: any) => (
+              <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-white border border-purple-100">
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: f.color ?? "#179ca3" }} />
+                <span className="text-sm font-medium text-gray-800 flex-1">{f.name}</span>
+                <span className="text-xs text-gray-400">{f.questionCount ?? ""}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-purple-600 font-medium">SonoQuiz</span>
+                  <Switch
+                    checked={!!f.sharedInSonoQuiz}
+                    onCheckedChange={(v) => updateFolder.mutate({ id: f.id, sharedInSonoQuiz: v })}
+                  />
+                </div>
+                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                  onClick={() => { if (confirm(`Delete folder "${f.name}"? Questions will be unassigned.`)) deleteFolder.mutate({ id: f.id }); }}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input id="new-folder-name-qb" placeholder="New folder name..." className="h-8 text-sm flex-1 bg-white border-purple-200" />
+            <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
+              const val = (document.getElementById("new-folder-name-qb") as HTMLInputElement)?.value?.trim();
+              if (val) createFolder.mutate({ name: val });
+            }}>Add</Button>
+          </div>
+        </div>
+      )}
       {/* AI Generate Panel */}
       {showAIPanel && (
         <div className="border border-teal-200 rounded-xl p-5 bg-teal-50 space-y-4">
@@ -4991,7 +5029,7 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
               />
             </div>
             {/* Questions */}
-            {!(quiz as any).useQuestionGroups && (
+            {!(quiz as any).useQuestionGroups && (<>
             <div className="space-y-3">
               {(quiz.questions ?? []).map((q: any, qi: number) => {
                 const options = q.options ? JSON.parse(q.options) : [];
@@ -5079,7 +5117,7 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
                 <Plus className="w-4 h-4 mr-1" /> Add Question
               </Button>
             )}
-            )}
+            </>)}
           </div>
         )}
       </DialogContent>
@@ -9517,6 +9555,7 @@ function QuestionBankAdmin() {
   const [showCreate, setShowCreate] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showTagManager, setShowTagManager] = useState(false);
+  const [showFolderManager, setShowFolderManager] = useState(false);
   const [aiTopic, setAITopic] = useState("");
   const [aiCount, setAICount] = useState(10);
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
@@ -9553,6 +9592,11 @@ function QuestionBankAdmin() {
   const aiGenerate = trpc.questionBank.aiGenerateToBank.useMutation({ onSuccess: () => { refetch(); setShowAIPanel(false); setAITopic(""); } });
   const createTag = trpc.questionBank.createTag.useMutation({ onSuccess: () => refetch() });
   const deleteTag = trpc.questionBank.deleteTag.useMutation({ onSuccess: () => refetch() });
+  const { data: foldersData, refetch: refetchFolders } = trpc.questionBank.listFolders.useQuery();
+  const folders = foldersData ?? [];
+  const createFolder = trpc.questionBank.createFolder.useMutation({ onSuccess: () => refetchFolders() });
+  const updateFolder = trpc.questionBank.updateFolder.useMutation({ onSuccess: () => refetchFolders() });
+  const deleteFolder = trpc.questionBank.deleteFolder.useMutation({ onSuccess: () => refetchFolders() });
   const scormPreviewMut = trpc.questionBank.previewScormImport.useMutation({
     onSuccess: (data) => { setScormPreview(data); setScormSelectedGroups(new Set(data.groups.map((g: any) => g.id))); },
     onError: (e) => alert(`Preview failed: ${e.message}`),
@@ -9594,6 +9638,7 @@ function QuestionBankAdmin() {
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setShowTagManager(p => !p)} className="gap-1.5"><Tag className="w-3.5 h-3.5" /> Tags</Button>
+          <Button size="sm" variant="outline" onClick={() => setShowFolderManager(p => !p)} className="gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"><FolderOpen className="w-3.5 h-3.5" /> Folders</Button>
           <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1.5" onClick={() => { setShowScormImport(p => !p); setShowAIPanel(false); setScormPreview(null); }}><Upload className="w-3.5 h-3.5" /> Import from SCORM</Button>
           <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-50 gap-1.5" onClick={() => setShowAIPanel(p => !p)}><Sparkles className="w-3.5 h-3.5" /> AI Generate</Button>
           <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" onClick={() => setShowCreate(true)}><Plus className="w-3.5 h-3.5" /> Add Question</Button>
