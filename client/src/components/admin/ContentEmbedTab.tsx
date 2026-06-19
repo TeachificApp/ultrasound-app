@@ -109,6 +109,8 @@ export function ContentEmbedTab({
   );
 
   // CTA Card: optional cohort/instance override (drill-down)
+  // Use "none" as the sentinel string so Radix Select never receives an empty value.
+  const NONE_SENTINEL = "__none__";
   const [ctaInstanceId, setCtaInstanceId] = useState<number | null>(null);
 
   React.useEffect(() => {
@@ -117,22 +119,29 @@ export function ContentEmbedTab({
     }
   }, [instanceItems, selectedInstanceId]);
 
-  // When a cohort/instance is selected for the CTA card, auto-update the ctaUrl
+  // When a cohort/instance is selected for the CTA card, auto-update ctaUrl AND
+  // pre-fill customTitle/customSubtitle with the instance label so the card reflects
+  // the specific cohort/instance context.
   React.useEffect(() => {
     if (ctaInstanceId != null && instanceEmbedKind) {
       const item = instanceItems.find(i => i.id === ctaInstanceId);
       if (item) {
-        // Build the checkout/landing URL for this specific group/instance
         const path = instanceEmbedKind === "cohort"
           ? `/courses/${slug}?group=${ctaInstanceId}`
           : `/workshops/${slug}?instance=${ctaInstanceId}`;
         setCtaUrl(`${baseUrl}${path}`);
+        // Pre-fill title/subtitle with instance label so the embed card shows
+        // cohort-specific text (admin can still override manually).
+        if (!customTitle) setCustomTitle(item.label);
       }
     } else if (ctaInstanceId === null) {
-      // Reset to default checkout URL when cleared
       setCtaUrl(defaultCheckoutUrl);
+      // Clear auto-filled title only if it matches the last instance label
+      // (don't clobber manually entered text — just reset to empty).
+      setCustomTitle("");
     }
-  }, [ctaInstanceId, instanceEmbedKind, instanceItems, slug, baseUrl, defaultCheckoutUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctaInstanceId]);
 
   const ctaQuery = [
     `accent=${encodeURIComponent(accentColor)}`,
@@ -347,14 +356,14 @@ export function ContentEmbedTab({
               Select a specific {instanceEmbedKind === "cohort" ? "cohort group" : "instance"} to point the button URL directly to that {instanceEmbedKind === "cohort" ? "group" : "instance"}'s enrollment page. Leave blank to use the main course URL.
             </p>
             <Select
-              value={ctaInstanceId != null ? String(ctaInstanceId) : ""}
-              onValueChange={v => setCtaInstanceId(v ? Number(v) : null)}
+              value={ctaInstanceId != null ? String(ctaInstanceId) : NONE_SENTINEL}
+              onValueChange={v => setCtaInstanceId(v === NONE_SENTINEL ? null : Number(v))}
             >
               <SelectTrigger className="h-8 text-xs bg-white">
                 <SelectValue placeholder="Main course URL (no override)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Main course URL (no override)</SelectItem>
+                <SelectItem value={NONE_SENTINEL}>Main course URL (no override)</SelectItem>
                 {instanceItems.map(item => (
                   <SelectItem key={item.id} value={String(item.id)}>{item.label}</SelectItem>
                 ))}
