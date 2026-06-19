@@ -62,13 +62,23 @@ interface FormSection {
   items: FormItem[];
 }
 
+interface BranchCondition {
+  conditionItemId: number;
+  conditionValue: string;
+  operator: "equals" | "not_equals" | "contains" | "not_contains" | "is_empty" | "is_not_empty";
+}
+
 interface BranchRule {
   id: number;
   templateId: number;
   targetItemId: number;
   conditionItemId: number;
   conditionValue: string;
-  action: "show" | "hide";
+  operator?: string;
+  logicOperator?: "all" | "any";
+  conditions?: BranchCondition[] | string | null;
+  action: "show" | "hide" | "require" | "unrequire";
+  isEnabled?: boolean;
 }
 
 interface FormTemplate {
@@ -136,43 +146,74 @@ function computeQualityScore(
 
 // ─── Branch Rule Evaluation ───────────────────────────────────────────────────
 
+function evalBranchCondition(
+  cond: BranchCondition,
+  responses: Record<string, string | string[]>
+): boolean {
+  const response = responses[String(cond.conditionItemId)];
+  const vals = Array.isArray(response) ? response : [response ?? ""];
+  const v = cond.conditionValue;
+  switch (cond.operator ?? "equals") {
+    case "equals": return vals.includes(v);
+    case "not_equals": return !vals.includes(v);
+    case "contains": return vals.some(x => x.includes(v));
+    case "not_contains": return !vals.some(x => x.includes(v));
+    case "is_empty": return vals.every(x => !x);
+    case "is_not_empty": return vals.some(x => !!x);
+    default: return vals.includes(v);
+  }
+}
+
+function getRuleConditions(rule: BranchRule): BranchCondition[] {
+  if (rule.conditions) {
+    try {
+      const parsed = typeof rule.conditions === "string" ? JSON.parse(rule.conditions) : rule.conditions;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as BranchCondition[];
+    } catch { /* ignore */ }
+  }
+  return [{ conditionItemId: rule.conditionItemId, conditionValue: rule.conditionValue, operator: (rule.operator ?? "equals") as BranchCondition["operator"] }];
+}
+
 function evaluateBranchRules(
   rules: BranchRule[],
   responses: Record<string, string | string[]>
 ): Set<number> {
   const hiddenItemIds = new Set<number>();
-  // First pass: collect all items that have a "show" rule — they start hidden
+  const activeRules = rules.filter(r => r.isEnabled !== false);
+  // Items with any "show" rule start hidden by default
   const showRuleTargets = new Set<number>();
-  for (const rule of rules) {
+  for (const rule of activeRules) {
     if (rule.action === "show") showRuleTargets.add(rule.targetItemId);
   }
-  // Items with show rules are hidden by default unless condition is met
   Array.from(showRuleTargets).forEach(id => hiddenItemIds.add(id));
 
-  for (const rule of rules) {
-    const condVal = responses[String(rule.conditionItemId)];
-    const matches = Array.isArray(condVal)
-      ? condVal.includes(rule.conditionValue)
-      : condVal === rule.conditionValue;
+  for (const rule of activeRules) {
+    const conditions = getRuleConditions(rule);
+    const logicOp = rule.logicOperator ?? "all";
+    const matches = logicOp === "any"
+      ? conditions.some(c => evalBranchCondition(c, responses))
+      : conditions.every(c => evalBranchCondition(c, responses));
 
     if (rule.action === "show") {
       if (matches) hiddenItemIds.delete(rule.targetItemId);
     } else if (rule.action === "hide") {
       if (matches) hiddenItemIds.add(rule.targetItemId);
     }
+    // require/unrequire handled separately (not visibility)
   }
   return hiddenItemIds;
 }
 
 // ─── Field Renderers ──────────────────────────────────────────────────────────
 
-function FieldWrapper({ item, children }: { item: FormItem; children: React.ReactNode }) {
+function FieldWrapper({ item, isRequired, children }: { item: FormItem; isRequired?: boolean; children: React.ReactNode }) {
+  const showRequired = isRequired ?? item.isRequired;
   return (
     <div className="space-y-1.5">
       {item.itemType !== "heading" && item.itemType !== "info" && (
         <Label className="text-sm font-semibold text-gray-700">
           {item.label}
-          {item.isRequired && <span className="text-red-500 ml-1">*</span>}
+          {showRequired && <span className="text-red-500 ml-1">*</span>}
         </Label>
       )}
       {item.helpText && (
@@ -391,17 +432,18 @@ function InfoField({ item }: { item: FormItem }) {
 
 // ─── Item Dispatcher ──────────────────────────────────────────────────────────
 
-function FormItemField({ item, response, onChange, readOnly }: {
+function FormItemField({ item, response, onChange, readOnly, isRequired }: {
   item: FormItem;
   response: string | string[];
   onChange: (v: string | string[]) => void;
   readOnly: boolean;
+  isRequired?: boolean;
 }) {
   const strVal = Array.isArray(response) ? response[0] ?? "" : response ?? "";
   const arrVal = Array.isArray(response) ? response : response ? [response] : [];
 
   switch (item.itemType) {
-    case "text": return <TextField item={item} value={strVal} onChange={onChange as (v: string) => void} readOnly={readOnly} />;
+    case "text": return <TextField item={{ ...item, isRequired: isRequired ?? item.isRequired }} value={strVal} onChange={onChange as (v: string) => void} readOnly={readOnly} />;
     case "textarea": return <TextareaField item={item} value={strVal} onChange={onChange as (v: string) => void} readOnly={readOnly} />;
     case "email": return <EmailField item={item} value={strVal} onChange={onChange as (v: string) => void} readOnly={readOnly} />;
     case "richtext": return <RichTextField item={item} />;
@@ -518,7 +560,11 @@ export default function DynamicFormRenderer({
         targetItemId: r.targetItemId,
         conditionItemId: r.conditionItemId,
         conditionValue: r.conditionValue,
-        action: r.action as "show" | "hide",
+        operator: r.operator ?? "equals",
+        logicOperator: (r.logicOperator ?? "all") as "all" | "any",
+        conditions: r.conditions ?? null,
+        action: r.action as "show" | "hide" | "require" | "unrequire",
+        isEnabled: r.isEnabled ?? true,
       })),
     };
   }, [rawTemplateData]);
@@ -566,6 +612,25 @@ export default function DynamicFormRenderer({
     return evaluateBranchRules(templateData.branchRules ?? [], responses);
   }, [templateData, responses]);
 
+  // Dynamically required item IDs from require/unrequire branch rules
+  const dynamicRequiredItemIds = useMemo(() => {
+    if (!templateData) return new Set<number>();
+    const required = new Set<number>();
+    const activeRules = (templateData.branchRules ?? []).filter(
+      (r: BranchRule) => r.isEnabled !== false && (r.action === "require" || r.action === "unrequire")
+    );
+    for (const rule of activeRules) {
+      const conditions = getRuleConditions(rule);
+      const logicOp = rule.logicOperator ?? "all";
+      const matches = logicOp === "any"
+        ? conditions.some((c: BranchCondition) => evalBranchCondition(c, responses))
+        : conditions.every((c: BranchCondition) => evalBranchCondition(c, responses));
+      if (rule.action === "require" && matches) required.add(rule.targetItemId);
+      if (rule.action === "unrequire" && matches) required.delete(rule.targetItemId);
+    }
+    return required;
+  }, [templateData, responses]);
+
   const { score, maxScore } = useMemo(() => {
     const visibleItems = allItems.filter(i => !hiddenItemIds.has(i.id));
     return computeQualityScore(visibleItems, responses);
@@ -579,7 +644,9 @@ export default function DynamicFormRenderer({
   const validate = (): boolean => {
     if (!templateData) return false;
     for (const item of allItems) {
-      if (!item.isRequired) continue;
+      // Item is required if base isRequired OR dynamically required by a branch rule
+      const isRequired = item.isRequired || dynamicRequiredItemIds.has(item.id);
+      if (!isRequired) continue;
       if (hiddenItemIds.has(item.id)) continue;
       if (["heading", "info", "richtext"].includes(item.itemType)) continue;
       const val = responses[String(item.id)];
@@ -724,6 +791,7 @@ export default function DynamicFormRenderer({
                     response={responses[String(item.id)] ?? (item.itemType === "checkbox" ? [] : "")}
                     onChange={(v) => setResponse(item.id, v)}
                     readOnly={readOnly}
+                    isRequired={item.isRequired || dynamicRequiredItemIds.has(item.id)}
                   />
                 ))}
               </div>

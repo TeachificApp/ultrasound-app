@@ -215,7 +215,7 @@ async function requirePlatformAdmin(ctx: { user: { id: number; role: string } })
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
 const itemTypeEnum = z.enum(["text", "textarea", "email", "richtext", "radio", "checkbox", "select", "scale", "heading", "info"]);
-const branchActionEnum = z.enum(["show", "hide"]);
+const branchActionEnum = z.enum(["show", "hide", "require", "unrequire"]);
 
 const optionSchema = z.object({
   id: z.number().optional(),
@@ -225,12 +225,25 @@ const optionSchema = z.object({
   qualityScore: z.number().min(0).max(100).default(0),
 });
 
-const branchRuleSchema = z.object({
-  id: z.number().optional(),
-  targetItemId: z.number(),
+const branchConditionSchema = z.object({
   conditionItemId: z.number(),
   conditionValue: z.string(),
+  operator: z.enum(["equals", "not_equals", "contains", "not_contains", "is_empty", "is_not_empty"]).default("equals"),
+});
+
+const branchRuleSchema = z.object({
+  id: z.number().optional(),
+  ruleLabel: z.string().optional().default(""),
+  targetItemId: z.number(),
+  targetType: z.enum(["item", "section"]).default("item"),
+  // Legacy single-condition (kept for backward compat, derived from conditions[0] when saving)
+  conditionItemId: z.number(),
+  conditionValue: z.string(),
+  operator: z.enum(["equals", "not_equals", "contains", "not_contains", "is_empty", "is_not_empty"]).default("equals"),
+  logicOperator: z.enum(["all", "any"]).default("all"),
+  conditions: z.array(branchConditionSchema).optional(),
   action: branchActionEnum.default("show"),
+  isEnabled: z.boolean().default(true),
 });
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -605,12 +618,22 @@ export const formBuilderRouter = router({
         await deleteFormBranchRule(rule.id);
       }
       for (const rule of input.rules) {
+        // Derive legacy single-condition fields from conditions[0] for backward compat
+        const primaryCond = (rule.conditions && rule.conditions.length > 0)
+          ? rule.conditions[0]
+          : { conditionItemId: rule.conditionItemId, conditionValue: rule.conditionValue, operator: rule.operator ?? "equals" };
         await createFormBranchRule({
           templateId: input.templateId,
+          ruleLabel: rule.ruleLabel ?? "",
           targetItemId: rule.targetItemId,
-          conditionItemId: rule.conditionItemId,
-          conditionValue: rule.conditionValue,
+          targetType: rule.targetType ?? "item",
+          conditionItemId: primaryCond.conditionItemId,
+          conditionValue: primaryCond.conditionValue,
+          operator: primaryCond.operator ?? "equals",
+          logicOperator: rule.logicOperator ?? "all",
+          conditions: rule.conditions ? JSON.stringify(rule.conditions) : null,
           action: rule.action,
+          isEnabled: rule.isEnabled ?? true,
         });
       }
       return { success: true };

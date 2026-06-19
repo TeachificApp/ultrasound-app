@@ -64,12 +64,22 @@ interface FormOption {
   qualityScore: number;
 }
 
+interface BranchCondition {
+  conditionItemId: number;
+  conditionValue: string;
+  operator: "equals" | "not_equals" | "contains" | "not_contains" | "is_empty" | "is_not_empty";
+}
+
 interface BranchRule {
   id: number;
   targetItemId: number;
   conditionItemId: number;
   conditionValue: string;
-  action: "show" | "hide";
+  operator?: string;
+  logicOperator?: "all" | "any";
+  conditions?: BranchCondition[] | string | null;
+  action: "show" | "hide" | "require" | "unrequire";
+  isEnabled?: boolean;
 }
 
 interface OrgVisibilityRule {
@@ -92,24 +102,55 @@ interface FormPreviewProps {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function evalCondition(
+  cond: BranchCondition,
+  responses: Record<number, string | string[]>
+): boolean {
+  const response = responses[cond.conditionItemId];
+  const responseValues = Array.isArray(response) ? response : [response ?? ""];
+  const val = cond.conditionValue;
+  const op = cond.operator ?? "equals";
+  switch (op) {
+    case "equals": return responseValues.includes(val);
+    case "not_equals": return !responseValues.includes(val);
+    case "contains": return responseValues.some(v => v.includes(val));
+    case "not_contains": return !responseValues.some(v => v.includes(val));
+    case "is_empty": return responseValues.every(v => !v);
+    case "is_not_empty": return responseValues.some(v => !!v);
+    default: return responseValues.includes(val);
+  }
+}
+
+function getRuleConditions(rule: BranchRule): BranchCondition[] {
+  if (rule.conditions) {
+    try {
+      const parsed = typeof rule.conditions === "string" ? JSON.parse(rule.conditions) : rule.conditions;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as BranchCondition[];
+    } catch { /* ignore */ }
+  }
+  return [{ conditionItemId: rule.conditionItemId, conditionValue: rule.conditionValue, operator: (rule.operator ?? "equals") as BranchCondition["operator"] }];
+}
+
 function evaluateBranchVisibility(
   itemId: number,
   branchRules: BranchRule[],
   responses: Record<number, string | string[]>
 ): boolean {
-  const rulesForItem = branchRules.filter(r => r.targetItemId === itemId);
-  if (rulesForItem.length === 0) return true; // no rules = always visible
+  const rulesForItem = branchRules.filter(r => r.targetItemId === itemId && r.isEnabled !== false);
+  if (rulesForItem.length === 0) return true;
 
   for (const rule of rulesForItem) {
-    const response = responses[rule.conditionItemId];
-    const responseValues = Array.isArray(response) ? response : [response ?? ""];
-    const matches = responseValues.includes(rule.conditionValue);
+    const conditions = getRuleConditions(rule);
+    const logicOp = rule.logicOperator ?? "all";
+    const matches = logicOp === "any"
+      ? conditions.some(c => evalCondition(c, responses))
+      : conditions.every(c => evalCondition(c, responses));
 
     if (rule.action === "show" && matches) return true;
     if (rule.action === "hide" && matches) return false;
+    // require/unrequire don't affect visibility
   }
 
-  // If all rules are "show" type and none matched, hide the item
   const hasShowRules = rulesForItem.some(r => r.action === "show");
   if (hasShowRules) return false;
 

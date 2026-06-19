@@ -1900,10 +1900,16 @@ export type InsertAccreditationFormOption = typeof accreditationFormOptions.$inf
 export const accreditationFormBranchRules = mysqlTable("accreditationFormBranchRules", {
   id: int("id").autoincrement().primaryKey(),
   templateId: int("templateId").notNull(),
-  targetItemId: int("targetItemId").notNull(),   // the item to show/hide
-  conditionItemId: int("conditionItemId").notNull(), // the item whose value is checked
-  conditionValue: varchar("conditionValue", { length: 500 }).notNull(), // the value that triggers visibility
-  action: mysqlEnum("action", ["show", "hide"]).default("show").notNull(),
+  ruleLabel: varchar("ruleLabel", { length: 255 }).default(""),
+  targetItemId: int("targetItemId").notNull(),   // the item to show/hide/require
+  targetType: varchar("targetType", { length: 20 }).notNull().default("item"),
+  conditionItemId: int("conditionItemId").notNull(), // legacy single-condition field
+  conditionValue: varchar("conditionValue", { length: 500 }).notNull(), // legacy single-condition value
+  operator: varchar("operator", { length: 30 }).notNull().default("equals"),
+  logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("all"),
+  conditions: longtext("conditions"), // JSON array of {conditionItemId, conditionValue, operator}
+  action: mysqlEnum("action", ["show", "hide", "require", "unrequire"]).default("show").notNull(),
+  isEnabled: boolean("isEnabled").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type AccreditationFormBranchRule = typeof accreditationFormBranchRules.$inferSelect;

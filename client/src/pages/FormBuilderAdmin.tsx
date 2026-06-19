@@ -10,7 +10,7 @@
   - Live preview panel with org filter simulation
 */
 
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import Layout from "@/components/Layout";
@@ -64,6 +64,7 @@ import {
   FileCode,
   Palette,
   CheckCircle2,
+  Check,
 } from "lucide-react";
 import { Link } from "wouter";
 import FormPreview from "@/components/FormPreview";
@@ -75,7 +76,15 @@ import FormStripeSettingsPanel, { type FormStripeSettings } from "@/components/a
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ItemType = "text" | "textarea" | "email" | "richtext" | "radio" | "checkbox" | "select" | "scale" | "heading" | "info" | "hidden";
-type BranchAction = "show" | "hide";
+type BranchAction = "show" | "hide" | "require" | "unrequire";
+type BranchOperator = "equals" | "not_equals" | "contains" | "not_contains" | "is_empty" | "is_not_empty";
+type BranchLogicOperator = "all" | "any";
+
+interface BranchCondition {
+  conditionItemId: number;
+  conditionValue: string;
+  operator: BranchOperator;
+}
 type OrgVisAction = "show_only_for" | "hide_for";
 type OrgVisRuleType = "item" | "section";
 
@@ -122,10 +131,16 @@ interface FormSection {
 interface BranchRule {
   id: number;
   templateId: number;
+  ruleLabel?: string;
   targetItemId: number;
+  targetType?: string;
   conditionItemId: number;
   conditionValue: string;
+  operator?: BranchOperator;
+  logicOperator?: BranchLogicOperator;
+  conditions?: BranchCondition[] | null;
   action: BranchAction;
+  isEnabled?: boolean;
   createdAt: Date;
 }
 
@@ -1103,9 +1118,42 @@ function BranchRuleBuilder({ templateId, items, options, rules, onSaved }: {
   rules: BranchRule[];
   onSaved: () => void;
 }) {
-  const [localRules, setLocalRules] = useState(
-    rules.map(r => ({ templateId: r.templateId, targetItemId: r.targetItemId, conditionItemId: r.conditionItemId, conditionValue: r.conditionValue, action: r.action }))
-  );
+  type LocalRule = {
+    ruleLabel: string;
+    targetItemId: number;
+    targetType: string;
+    logicOperator: BranchLogicOperator;
+    conditions: BranchCondition[];
+    action: BranchAction;
+    isEnabled: boolean;
+  };
+
+  const buildLocalRules = (rs: BranchRule[]): LocalRule[] =>
+    rs.map(r => ({
+      ruleLabel: r.ruleLabel ?? "",
+      targetItemId: r.targetItemId,
+      targetType: r.targetType ?? "item",
+      logicOperator: r.logicOperator ?? "all",
+      conditions: (() => {
+        if (r.conditions) {
+          try {
+            const parsed = typeof r.conditions === "string" ? JSON.parse(r.conditions as unknown as string) : r.conditions;
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed as BranchCondition[];
+          } catch { /* ignore */ }
+        }
+        return [{ conditionItemId: r.conditionItemId, conditionValue: r.conditionValue, operator: (r.operator ?? "equals") as BranchOperator }];
+      })(),
+      action: r.action,
+      isEnabled: r.isEnabled ?? true,
+    }));
+
+  const [localRules, setLocalRules] = useState<LocalRule[]>(() => buildLocalRules(rules));
+
+  const prevRulesRef = React.useRef(rules);
+  if (prevRulesRef.current !== rules && rules.length !== localRules.length) {
+    prevRulesRef.current = rules;
+    setLocalRules(buildLocalRules(rules));
+  }
 
   const saveMutation = trpc.formBuilder.saveBranchRules.useMutation({
     onSuccess: () => { toast.success("Branching rules saved"); onSaved(); },
@@ -1116,11 +1164,40 @@ function BranchRuleBuilder({ templateId, items, options, rules, onSaved }: {
 
   const addRule = () => {
     if (questionItems.length < 2) { toast.error("Need at least 2 questions to create a branching rule"); return; }
-    setLocalRules([...localRules, { templateId, targetItemId: questionItems[1]?.id ?? 0, conditionItemId: questionItems[0]?.id ?? 0, conditionValue: "", action: "show" }]);
+    setLocalRules([...localRules, {
+      ruleLabel: "",
+      targetItemId: questionItems[1]?.id ?? 0,
+      targetType: "item",
+      logicOperator: "all",
+      conditions: [{ conditionItemId: questionItems[0]?.id ?? 0, conditionValue: "", operator: "equals" }],
+      action: "show",
+      isEnabled: true,
+    }]);
   };
 
-  const updateRule = (idx: number, field: string, val: string | number) => {
-    setLocalRules(localRules.map((r, i) => i === idx ? { ...r, [field]: val } : r));
+  const updateRule = (ruleIdx: number, field: keyof LocalRule, val: unknown) => {
+    setLocalRules(localRules.map((r, i) => i === ruleIdx ? { ...r, [field]: val } : r));
+  };
+
+  const updateCondition = (ruleIdx: number, condIdx: number, field: keyof BranchCondition, val: string | number) => {
+    setLocalRules(localRules.map((r, i) => {
+      if (i !== ruleIdx) return r;
+      return { ...r, conditions: r.conditions.map((c, j) => j === condIdx ? { ...c, [field]: val } : c) };
+    }));
+  };
+
+  const addCondition = (ruleIdx: number) => {
+    setLocalRules(localRules.map((r, i) => {
+      if (i !== ruleIdx) return r;
+      return { ...r, conditions: [...r.conditions, { conditionItemId: questionItems[0]?.id ?? 0, conditionValue: "", operator: "equals" as BranchOperator }] };
+    }));
+  };
+
+  const removeCondition = (ruleIdx: number, condIdx: number) => {
+    setLocalRules(localRules.map((r, i) => {
+      if (i !== ruleIdx || r.conditions.length <= 1) return r;
+      return { ...r, conditions: r.conditions.filter((_, j) => j !== condIdx) };
+    }));
   };
 
   const removeRule = (idx: number) => setLocalRules(localRules.filter((_, i) => i !== idx));
@@ -1130,6 +1207,31 @@ function BranchRuleBuilder({ templateId, items, options, rules, onSaved }: {
     return item && ["radio", "checkbox", "select"].includes(item.itemType) && (o as any).itemId === itemId;
   });
 
+  const OPERATOR_LABELS: Record<BranchOperator, string> = {
+    equals: "=",
+    not_equals: "≠",
+    contains: "contains",
+    not_contains: "doesn't contain",
+    is_empty: "is empty",
+    is_not_empty: "is not empty",
+  };
+
+  const handleSave = () => {
+    const saveRules = localRules.map(r => ({
+      ruleLabel: r.ruleLabel,
+      targetItemId: r.targetItemId,
+      targetType: r.targetType as "item" | "section",
+      logicOperator: r.logicOperator,
+      conditions: r.conditions,
+      conditionItemId: r.conditions[0]?.conditionItemId ?? 0,
+      conditionValue: r.conditions[0]?.conditionValue ?? "",
+      operator: r.conditions[0]?.operator ?? "equals",
+      action: r.action,
+      isEnabled: r.isEnabled,
+    }));
+    saveMutation.mutate({ templateId, rules: saveRules });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -1137,7 +1239,7 @@ function BranchRuleBuilder({ templateId, items, options, rules, onSaved }: {
           <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
             <GitBranch className="w-4 h-4" style={{ color: BRAND }} /> Branching Logic
           </h3>
-          <p className="text-xs text-gray-400 mt-0.5">Show or hide items based on previous answers</p>
+          <p className="text-xs text-gray-400 mt-0.5">Show, hide, or require items — supports AND/OR multi-condition rules</p>
         </div>
         <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={addRule}>
           <Plus className="w-3 h-3" /> Add Rule
@@ -1148,69 +1250,135 @@ function BranchRuleBuilder({ templateId, items, options, rules, onSaved }: {
         <div className="text-center py-8 border border-dashed border-gray-200 rounded-xl">
           <GitBranch className="w-8 h-8 text-gray-200 mx-auto mb-2" />
           <p className="text-sm text-gray-400">No branching rules yet</p>
-          <p className="text-xs text-gray-300 mt-1">Add rules to show/hide items based on responses</p>
+          <p className="text-xs text-gray-300 mt-1">Add rules to show, hide, or require items based on responses</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {localRules.map((rule, idx) => {
-            const condItemOpts = getItemOptions(rule.conditionItemId);
-            return (
-              <div key={idx} className="p-3 rounded-xl border border-gray-100 bg-gray-50 space-y-2">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-semibold text-gray-500 uppercase tracking-wide w-8">IF</span>
-                  <Select value={String(rule.conditionItemId)} onValueChange={v => updateRule(idx, "conditionItemId", parseInt(v))}>
-                    <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Select question…" /></SelectTrigger>
-                    <SelectContent>
-                      {questionItems.map(item => (
-                        <SelectItem key={item.id} value={String(item.id)} className="text-xs">
-                          {item.label.length > 50 ? item.label.slice(0, 50) + "…" : item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <span className="font-semibold text-gray-500">=</span>
-                  {condItemOpts.length > 0 ? (
-                    <Select value={rule.conditionValue} onValueChange={v => updateRule(idx, "conditionValue", v)}>
-                      <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Select value…" /></SelectTrigger>
-                      <SelectContent>
-                        {condItemOpts.map(opt => <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input className="h-7 text-xs flex-1" placeholder="Value…" value={rule.conditionValue} onChange={e => updateRule(idx, "conditionValue", e.target.value)} />
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-semibold text-gray-500 uppercase tracking-wide w-8">THEN</span>
-                  <Select value={rule.action} onValueChange={v => updateRule(idx, "action", v as BranchAction)}>
-                    <SelectTrigger className="h-7 text-xs w-24"><SelectValue /></SelectTrigger>
+          {localRules.map((rule, ruleIdx) => (
+            <div key={ruleIdx} className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+              {/* Rule header */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-gray-100">
+                <button
+                  onClick={() => updateRule(ruleIdx, "isEnabled", !rule.isEnabled)}
+                  className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+                    rule.isEnabled ? "bg-[#0891b2] border-[#0891b2]" : "border-gray-300"
+                  }`}
+                >
+                  {rule.isEnabled && <Check className="w-2.5 h-2.5 text-white" />}
+                </button>
+                <Input
+                  className="h-6 text-xs flex-1 border-0 bg-transparent p-0 focus-visible:ring-0 font-medium text-gray-600"
+                  placeholder={`Rule ${ruleIdx + 1} (optional label)`}
+                  value={rule.ruleLabel}
+                  onChange={e => updateRule(ruleIdx, "ruleLabel", e.target.value)}
+                />
+                <button onClick={() => removeRule(ruleIdx)} className="text-gray-300 hover:text-red-400 flex-shrink-0">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="p-3 space-y-2">
+                {/* Conditions */}
+                {rule.conditions.map((cond, condIdx) => {
+                  const condItemOpts = getItemOptions(cond.conditionItemId);
+                  const needsValue = !["is_empty", "is_not_empty"].includes(cond.operator);
+                  return (
+                    <div key={condIdx} className="space-y-1.5">
+                      {condIdx > 0 && (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-px bg-gray-200" />
+                          <Select value={rule.logicOperator} onValueChange={v => updateRule(ruleIdx, "logicOperator", v as BranchLogicOperator)}>
+                            <SelectTrigger className="h-6 text-xs w-16 px-2"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all" className="text-xs">AND</SelectItem>
+                              <SelectItem value="any" className="text-xs">OR</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="flex-1 h-px bg-gray-200" />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {condIdx === 0 && <span className="font-semibold text-gray-400 uppercase tracking-wide w-5 text-center">IF</span>}
+                        {condIdx > 0 && <span className="w-5" />}
+                        <Select value={String(cond.conditionItemId)} onValueChange={v => updateCondition(ruleIdx, condIdx, "conditionItemId", parseInt(v))}>
+                          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Question…" /></SelectTrigger>
+                          <SelectContent>
+                            {questionItems.map(item => (
+                              <SelectItem key={item.id} value={String(item.id)} className="text-xs">
+                                {item.label.length > 45 ? item.label.slice(0, 45) + "…" : item.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={cond.operator} onValueChange={v => updateCondition(ruleIdx, condIdx, "operator", v)}>
+                          <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(Object.entries(OPERATOR_LABELS) as [BranchOperator, string][]).map(([op, label]) => (
+                              <SelectItem key={op} value={op} className="text-xs">{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {needsValue && (
+                          condItemOpts.length > 0 ? (
+                            <Select value={cond.conditionValue} onValueChange={v => updateCondition(ruleIdx, condIdx, "conditionValue", v)}>
+                              <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Value…" /></SelectTrigger>
+                              <SelectContent>
+                                {condItemOpts.map(opt => <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input className="h-7 text-xs flex-1" placeholder="Value…" value={cond.conditionValue} onChange={e => updateCondition(ruleIdx, condIdx, "conditionValue", e.target.value)} />
+                          )
+                        )}
+                        {rule.conditions.length > 1 && (
+                          <button onClick={() => removeCondition(ruleIdx, condIdx)} className="text-gray-300 hover:text-red-400 flex-shrink-0">
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Add condition */}
+                <button
+                  onClick={() => addCondition(ruleIdx)}
+                  className="text-xs text-[#0891b2] hover:underline flex items-center gap-1 mt-1"
+                >
+                  <Plus className="w-3 h-3" /> Add condition
+                </button>
+
+                {/* THEN */}
+                <div className="flex items-center gap-2 text-xs pt-1 border-t border-gray-100">
+                  <span className="font-semibold text-gray-400 uppercase tracking-wide w-10">THEN</span>
+                  <Select value={rule.action} onValueChange={v => updateRule(ruleIdx, "action", v as BranchAction)}>
+                    <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="show" className="text-xs">Show</SelectItem>
                       <SelectItem value="hide" className="text-xs">Hide</SelectItem>
+                      <SelectItem value="require" className="text-xs">Require</SelectItem>
+                      <SelectItem value="unrequire" className="text-xs">Un-require</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={String(rule.targetItemId)} onValueChange={v => updateRule(idx, "targetItemId", parseInt(v))}>
-                    <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Select item to show/hide…" /></SelectTrigger>
+                  <Select value={String(rule.targetItemId)} onValueChange={v => updateRule(ruleIdx, "targetItemId", parseInt(v))}>
+                    <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Select item…" /></SelectTrigger>
                     <SelectContent>
-                      {questionItems.filter(i => i.id !== rule.conditionItemId).map(item => (
+                      {questionItems.map(item => (
                         <SelectItem key={item.id} value={String(item.id)} className="text-xs">
-                          {item.label.length > 50 ? item.label.slice(0, 50) + "…" : item.label}
+                          {item.label.length > 45 ? item.label.slice(0, 45) + "…" : item.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <button onClick={() => removeRule(idx)} className="text-gray-300 hover:text-red-400">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 
       <Button
-        onClick={() => saveMutation.mutate({ templateId, rules: localRules })}
+        onClick={handleSave}
         disabled={saveMutation.isPending}
         style={{ background: BRAND }} className="text-white gap-2 w-full" size="sm"
       >
