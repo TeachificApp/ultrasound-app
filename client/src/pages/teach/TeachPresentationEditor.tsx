@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Play, Save, Loader2, Trash2, LayoutTemplate, Lock } from "lucide-react";
+import { ArrowLeft, Plus, Play, Save, Loader2, Trash2, LayoutTemplate, Lock, RefreshCw, AlertTriangle } from "lucide-react";
 import { TeachOfficeEditor, createEmptySlide } from "@/components/teach/TeachOfficeEditor";
 import { type TeachSlide } from "@shared/teachPresentation";
 
@@ -29,6 +29,33 @@ export default function TeachPresentationEditor() {
   );
   const { data: masters } = trpc.teach.listMasters.useQuery(undefined, { enabled: !!data });
   const { data: ctx } = trpc.teach.getMyContext.useQuery();
+
+  const IMPORT_PENDING = "__import_pending__";
+  const IMPORT_FAILED_PREFIX = "IMPORT_FAILED:";
+  const isImportPending = data?.description === IMPORT_PENDING;
+  const isImportFailed = typeof data?.description === "string" && data.description.startsWith(IMPORT_FAILED_PREFIX);
+  const importError = isImportFailed ? (data?.description as string).slice(IMPORT_FAILED_PREFIX.length).trim() : null;
+
+  const reprocess = trpc.teach.reprocessPptx.useMutation({
+    onSuccess: () => {
+      toast.info("Re-processing started — this may take a few minutes for large files");
+      // Poll for completion
+      const interval = setInterval(async () => {
+        const res = await fetch(`/api/upload-teach/parse-status/${materialId}`, { credentials: "include" });
+        const json = await res.json();
+        if (json.status === "done") {
+          clearInterval(interval);
+          toast.success(json.parsed ? "Slides imported successfully" : "File processed");
+          refetch();
+        } else if (json.status === "failed") {
+          clearInterval(interval);
+          toast.error("Import failed: " + (json.error ?? "Unknown error"));
+          refetch();
+        }
+      }, 3000);
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const update = trpc.teach.updatePresentation.useMutation({
     onSuccess: () => {
@@ -100,6 +127,43 @@ export default function TeachPresentationEditor() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+      </div>
+    );
+  }
+
+  if (isImportPending || isImportFailed) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col">
+        <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
+          <Link href="/teach"><Button variant="ghost" size="sm"><ArrowLeft className="w-4 h-4" /></Button></Link>
+          <span className="font-semibold text-gray-700">{data.title}</span>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-sm border p-8 max-w-md w-full text-center space-y-4">
+            {isImportPending ? (
+              <>
+                <Loader2 className="w-10 h-10 animate-spin text-teal-600 mx-auto" />
+                <h2 className="text-lg font-semibold text-gray-800">Import in progress</h2>
+                <p className="text-sm text-gray-500">Your PowerPoint is being processed. This can take several minutes for large files. Refresh this page to check progress.</p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>Check status</Button>
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
+                <h2 className="text-lg font-semibold text-gray-800">Import did not complete</h2>
+                <p className="text-sm text-gray-500">{importError || "The PowerPoint import failed. You can re-process the original file."}</p>
+                <Button
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                  disabled={reprocess.isPending}
+                  onClick={() => reprocess.mutate({ materialId })}
+                >
+                  {reprocess.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                  Re-process PowerPoint
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     );
   }

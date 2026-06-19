@@ -34,8 +34,7 @@ import {
   type TeachMasterSlide,
 } from "../../shared/teachSlideMaster";
 import { parsePptxBuffer } from "../lib/pptxImport";
-import { importTeachUploadedFileSync } from "../lib/teachPptxMaterialImport";
-
+import { importTeachUploadedFileSync, parseAndUpdateTeachMaterial, TEACH_IMPORT_PENDING, TEACH_IMPORT_FAILED_PREFIX } from "../lib/teachPptxMaterialImport";
 // ── S3-backed slides storage ──────────────────────────────────────────────────
 // When slides JSON exceeds this threshold (10 MB), store it in S3 instead of
 // the MySQL slides_data column (TiDB max_allowed_packet = 64 MB).
@@ -645,6 +644,50 @@ export const teachRouter = router({
         status: "draft",
       });
       return { id: (result as { insertId: number }).insertId };
+    }),
+
+  reprocessPptx: protectedProcedure
+    .input(z.object({ materialId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const material = await getMaterialOrThrow(input.materialId);
+      const allowed = await canPerformTeachAction(ctx.user.id, material, "edit");
+      if (!allowed) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!material.mediaAssetId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No source file linked to this presentation" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Find the latest media version for the asset
+      const [ver] = await db
+        .select()
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, material.mediaAssetId))
+        .orderBy(desc(mediaVersions.versionNumber))
+        .limit(1);
+      if (!ver) throw new TRPCError({ code: "NOT_FOUND", message: "No source file found for this presentation" });
+      if (!ver.fileName.match(/\.pptx$/i)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Source file is not a .pptx" });
+      }
+      // Mark as pending so the UI shows processing state
+      await db.update(teachMaterials).set({ description: TEACH_IMPORT_PENDING, slidesData: null, slidesDataUrl: null }).where(eq(teachMaterials.id, input.materialId));
+      // Run parse in background
+      setImmediate(() => {
+        parseAndUpdateTeachMaterial(input.materialId, {
+          userId: material.ownerUserId,
+          assetId: material.mediaAssetId!,
+          s3Key: ver.s3Key,
+          s3Url: ver.s3Url,
+          fileName: ver.fileName,
+          mimeType: ver.mimeType,
+          fileSize: ver.fileSize ?? 0,
+          title: material.title,
+          description: material.description?.startsWith(TEACH_IMPORT_PENDING) || material.description?.startsWith(TEACH_IMPORT_FAILED_PREFIX) ? undefined : (material.description ?? undefined),
+          ownerContext: (material.ownerContext as "lms_instructor" | "educator_assist") ?? "lms_instructor",
+        }).catch((err) => {
+          console.error(`[reprocessPptx] Background parse failed for material ${input.materialId}:`, err);
+        });
+      });
+      return { processing: true };
     }),
 
   importPptx: protectedProcedure
