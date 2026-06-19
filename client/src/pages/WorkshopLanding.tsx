@@ -366,14 +366,19 @@ export default function WorkshopLanding() {
   }
 
   // ── CTA handler — routes to waitlist or checkout ───────────────────────────
+  function openWaitlistOrNotify() {
+    if (workshop!.waitlistCtaUrl) {
+      window.open(workshop!.waitlistCtaUrl, "_blank");
+    } else if (workshop!.waitlistEnabled) {
+      setWaitlistOpen(true);
+    } else {
+      toast.info("This workshop is currently sold out. Please check back for new dates.");
+    }
+  }
   function handleCta(pricingOptionId?: number) {
-    // Waitlist mode: CTA URL overrides the modal
-    if (isWaitlistMode) {
-      if (workshop!.waitlistCtaUrl) {
-        window.open(workshop!.waitlistCtaUrl, "_blank");
-      } else {
-        setWaitlistOpen(true);
-      }
+    // Waitlist mode or all sold out: route to waitlist
+    if (isWaitlistMode || isAllSoldOut) {
+      openWaitlistOrNotify();
       return;
     }
     if (!user) {
@@ -400,12 +405,8 @@ export default function WorkshopLanding() {
   }
 
   function handleInstanceRegister(instanceId: number) {
-    if (isWaitlistMode) {
-      if (workshop!.waitlistCtaUrl) {
-        window.open(workshop!.waitlistCtaUrl, "_blank");
-      } else {
-        setWaitlistOpen(true);
-      }
+    if (isWaitlistMode || isAllSoldOut) {
+      openWaitlistOrNotify();
       return;
     }
     if (!user) {
@@ -443,6 +444,25 @@ export default function WorkshopLanding() {
           </Button>
         </div>
       )}
+      {/* Sold-out banner (all instances at capacity, waitlist not explicitly enabled) */}
+      {isAllSoldOut && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-3 text-center">
+          <span className="text-sm text-red-800 font-medium">
+            <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2 -mb-0.5" />
+            This workshop is currently sold out.
+          </span>
+          {(workshop.waitlistEnabled || workshop.waitlistCtaUrl) && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-3 border-red-400 text-red-700 hover:bg-red-100 text-xs"
+              onClick={openWaitlistOrNotify}
+            >
+              {workshop.waitlistCtaLabel || "Join Waitlist"}
+            </Button>
+          )}
+        </div>
+      )}
 
       {landingBlocks.length > 0 ? (
         // Page builder blocks — CTA delegation intercepts all enroll/checkout clicks
@@ -450,9 +470,9 @@ export default function WorkshopLanding() {
           onClick={(e) =>
             handleCtaBtnClick(
               e as React.MouseEvent<HTMLElement>,
-              // onEnroll (free) — in waitlist mode, open waitlist instead
-              isWaitlistMode
-                ? () => { workshop.waitlistCtaUrl ? window.open(workshop.waitlistCtaUrl, "_blank") : setWaitlistOpen(true); }
+              // onEnroll (free) — in waitlist/sold-out mode, open waitlist instead
+              (isWaitlistMode || isAllSoldOut)
+                ? openWaitlistOrNotify
                 : () => enrollMutation.mutate({ workshopId: workshop!.id }),
               // onEnrollWithOption
               undefined,
@@ -854,8 +874,8 @@ export default function WorkshopLanding() {
             </div>
           )}
 
-          {/* Pricing (no instances, no waitlist mode) */}
-          {!isWaitlistMode && availableInstances.length === 0 && pricingOptions.length > 0 && (
+          {/* Pricing (no instances, no waitlist mode, not all sold out) */}
+          {!isWaitlistMode && !isAllSoldOut && availableInstances.length === 0 && pricingOptions.length > 0 && (
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Registration</h2>
               <div className="space-y-3">
@@ -882,8 +902,24 @@ export default function WorkshopLanding() {
             </div>
           )}
 
-          {/* No instances, no pricing, no waitlist */}
-          {!isWaitlistMode && availableInstances.length === 0 && pricingOptions.length === 0 && (
+          {/* All sold out — show sold-out card with optional waitlist CTA */}
+          {isAllSoldOut && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+                <span className="text-red-600 text-xl">&#128683;</span>
+              </div>
+              <p className="font-semibold text-red-800 text-lg mb-1">Sold Out</p>
+              <p className="text-sm text-red-600 mb-4">All seats for this workshop are currently filled.</p>
+              {(workshop.waitlistEnabled || workshop.waitlistCtaUrl) && (
+                <Button onClick={openWaitlistOrNotify} className="bg-red-600 hover:bg-red-700 text-white gap-2">
+                  <Bell className="w-4 h-4" />
+                  {workshop.waitlistCtaLabel || "Join Waitlist"}
+                </Button>
+              )}
+            </div>
+          )}
+          {/* No instances, no pricing, no waitlist, not sold out */}
+          {!isWaitlistMode && !isAllSoldOut && availableInstances.length === 0 && pricingOptions.length === 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
               <Clock className="w-8 h-8 text-amber-500 mx-auto mb-2" />
               <p className="font-medium text-amber-800">No upcoming dates available</p>
@@ -894,7 +930,7 @@ export default function WorkshopLanding() {
       )}
 
       {/* Waitlist sign-up modal */}
-      {isWaitlistMode && (
+      {(isWaitlistMode || isAllSoldOut) && (
         <WaitlistModal
           open={waitlistOpen}
           onClose={() => setWaitlistOpen(false)}
@@ -949,6 +985,7 @@ function WorkshopInstanceDetailModal({
     { instanceId: instanceId! },
     { enabled: open && instanceId !== null }
   );
+  const modalInstanceIsSoldOut = !!(data?.isSoldOut);
 
   const fmtDate = (d: Date | string | null | undefined) => {
     if (!d) return null;
@@ -974,13 +1011,20 @@ function WorkshopInstanceDetailModal({
             {isLoading && <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />}
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-              onClick={onRegister}
-            >
-              Register Now
-            </Button>
+            {!modalInstanceIsSoldOut && (
+              <Button
+                size="sm"
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={onRegister}
+              >
+                Register Now
+              </Button>
+            )}
+            {modalInstanceIsSoldOut && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                Sold Out
+              </span>
+            )}
             <DialogClose asChild>
               <button className="rounded-full p-1.5 hover:bg-gray-100 transition-colors" aria-label="Close">
                 <X className="w-4 h-4 text-gray-500" />
@@ -1055,11 +1099,20 @@ function WorkshopInstanceDetailModal({
                   {data.instanceContent && (
                     <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: data.instanceContent }} />
                   )}
-                  <div className="text-center pt-4">
-                    <Button className="bg-teal-600 hover:bg-teal-700 text-white px-8" onClick={onRegister}>
-                      Register for This Date
-                    </Button>
-                  </div>
+                  {!modalInstanceIsSoldOut && (
+                    <div className="text-center pt-4">
+                      <Button className="bg-teal-600 hover:bg-teal-700 text-white px-8" onClick={onRegister}>
+                        Register for This Date
+                      </Button>
+                    </div>
+                  )}
+                  {modalInstanceIsSoldOut && (
+                    <div className="text-center pt-4">
+                      <span className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold bg-gray-100 text-gray-500">
+                        Sold Out
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -1092,6 +1145,7 @@ function WorkshopInstanceEmbedSection({
   showEnrollNow: boolean;
 }) {
   const { data, isLoading, error } = trpc.workshop.getInstancePage.useQuery({ instanceId });
+  const instanceIsSoldOut = !!(data?.isSoldOut);
 
   const fmtDate = (d: Date | string | null | undefined) => {
     if (!d) return null;
@@ -1129,7 +1183,7 @@ function WorkshopInstanceEmbedSection({
       {/* Header bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColor}08`, borderColor: `${accentColor}22` }}>
         <h3 className="text-lg font-bold text-gray-900">{data.title}</h3>
-        {showEnrollNow && (
+        {showEnrollNow && !instanceIsSoldOut && (
           <Button
             size="sm"
             className="text-white flex-shrink-0"
@@ -1138,6 +1192,11 @@ function WorkshopInstanceEmbedSection({
           >
             {enrollNowText}
           </Button>
+        )}
+        {instanceIsSoldOut && (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+            Sold Out
+          </span>
         )}
       </div>
       {/* Content */}
@@ -1187,11 +1246,18 @@ function WorkshopInstanceEmbedSection({
           {data.instanceContent && (
             <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: data.instanceContent }} />
           )}
-          {showEnrollNow && (
+          {showEnrollNow && !instanceIsSoldOut && (
             <div className="text-center pt-2">
               <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onRegister}>
                 {enrollNowText}
               </Button>
+            </div>
+          )}
+          {instanceIsSoldOut && (
+            <div className="text-center pt-2">
+              <span className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold bg-gray-100 text-gray-500">
+                Sold Out
+              </span>
             </div>
           )}
         </div>
@@ -1200,11 +1266,18 @@ function WorkshopInstanceEmbedSection({
           {(data.landingBlocks as any[]).map((block: any) => (
             <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} />
           ))}
-          {showEnrollNow && (
+          {showEnrollNow && !instanceIsSoldOut && (
             <div className="text-center py-6">
               <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onRegister}>
                 {enrollNowText}
               </Button>
+            </div>
+          )}
+          {instanceIsSoldOut && (
+            <div className="text-center py-6">
+              <span className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold bg-gray-100 text-gray-500">
+                Sold Out
+              </span>
             </div>
           )}
         </div>

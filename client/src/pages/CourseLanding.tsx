@@ -1786,6 +1786,7 @@ export default function CourseLanding() {
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
     if (isEnrollmentClosed) return; // Enrollment is closed — do nothing
+    if (isAllGroupsClosed) return; // All cohort groups are sold out or enrollment-closed
     setEnrolling(true);
     try {
       // If a secondary pricing option is selected, use it; otherwise use primary course pricing
@@ -1805,6 +1806,7 @@ export default function CourseLanding() {
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
     if (isEnrollmentClosed) return;
+    if (isAllGroupsClosed) return; // All cohort groups are sold out or enrollment-closed
     setEnrolling(true);
     // Also sync the UI selection state so the checkout modal shows the right option
     if (pricingOptionId !== undefined) setSelectedPricingOptionId(pricingOptionId);
@@ -1881,14 +1883,21 @@ export default function CourseLanding() {
   featuredGroupRef.current = featuredGroup;
   const hasOpenGroup = (course as any).hasOpenGroup ?? true;
   const isWaitlistMode = !enrollment && !!(featuredGroup?.waitlistEnabled && !hasOpenGroup);
+  // isAllGroupsClosed: no open groups (all sold out or enrollment-closed) and not in explicit waitlist mode
+  // This prevents the CTA from proceeding to checkout when no group can accept new enrollments
+  const isAllGroupsClosed = !enrollment && !hasOpenGroup && !isWaitlistMode && !isEnrollmentClosed && ((course as any).cohortGroups?.length ?? 0) > 0;
   const waitlistCtaLabel = featuredGroup?.waitlistCtaLabel || "Join the Waitlist";
-  const ctaText = enrollment ? "Continue Learning" : isWaitlistMode ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
+  const ctaText = enrollment ? "Continue Learning" : isWaitlistMode ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : isAllGroupsClosed ? "Sold Out" : (lp?.ctaText ?? "Enroll Now");
   const handleWaitlistCta = () => {
     if (featuredGroup?.waitlistCtaUrl) { window.open(featuredGroup.waitlistCtaUrl, "_blank"); return; }
     setCwSubmitted(false); setCwName(""); setCwEmail(""); setCwPhone(""); setCwMessage("");
     setCohortWaitlistOpen(true);
   };
-  const handleEnrollOrWaitlist = () => { if (isWaitlistMode) { handleWaitlistCta(); } else { handleEnroll(); } };
+  const handleEnrollOrWaitlist = () => {
+    if (isWaitlistMode) { handleWaitlistCta(); return; }
+    if (isAllGroupsClosed) { toast.info("All cohort groups are currently sold out or enrollment is closed. Check back later for new dates."); return; }
+    handleEnroll();
+  };
 
   // Enrollment countdown: days remaining until close (only for cohorts, not yet closed, not enrolled)
   const enrollmentCountdownDays = (() => {
@@ -1940,6 +1949,17 @@ export default function CourseLanding() {
           />
         )}
         {EnrollmentCountdownBanner}
+        {/* Sold-out banner — shown when all cohort groups are sold out or enrollment-closed */}
+        {isAllGroupsClosed && (
+          <div className="w-full bg-red-50 border-b border-red-200 py-3 px-4">
+            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-red-800">
+                <span className="text-red-500">🔴</span>
+                All cohort groups are currently sold out or enrollment is closed. Check back for new dates.
+              </div>
+            </div>
+          </div>
+        )}
         {/* Waitlist banner — shown when no open cohort group exists but waitlist is enabled */}
         {isWaitlistMode && (
           <div className="w-full bg-teal-50 border-b border-teal-200 py-3 px-4">
