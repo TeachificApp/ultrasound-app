@@ -342,10 +342,6 @@ export default function CohortGroupLandingPageBuilder() {
             </Button>
           )}
           <Button variant="outline" size="sm" className="gap-1 border-teal-300 text-teal-700 hover:bg-teal-50"
-            onClick={() => setEmbedDialogOpen(true)}>
-            <CalendarDays className="w-4 h-4" /> Sessions Calendar Embed
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1 border-teal-300 text-teal-700 hover:bg-teal-50"
             onClick={() => setPageTemplateOpen(true)}>
             <FolderOpen className="w-4 h-4" /> Page Templates
           </Button>
