@@ -44,6 +44,8 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 6. **Service worker / white screen**: `pnpm build` runs `scripts/sync-public-assets.mjs` after Vite — it force-copies `sw.js` into `dist/public` and fails the build if `index.html` is missing the entry script or still has `%VITE_ANALYTICS_*%` placeholders. Bump `CACHE_VERSION` in `client/public/sw.js` when changing SW behavior. Production serves `/sw.js` with `Cache-Control: no-cache` via an explicit route in `server/_core/vite.ts` (not express.static). Recovery page: `/sw-clear.html`.
 
+7. **Site Pages CMS**: LMS Admin → Settings → **Site Pages** (`/admin/lms/site-pages`). Requires DB tables from `scripts/site-pages-migration.sql`. Uses `site_pages` + `site_nav_menus` tables and the native `LandingPageBuilder` block system.
+
 6. **Production build requires analytics env vars OR safe strip**: `vite.config.ts` removes the umami `<script>` when `VITE_ANALYTICS_ENDPOINT` / `VITE_ANALYTICS_WEBSITE_ID` are unset. Use `VITE_ANALYTICS_ENDPOINT=... VITE_ANALYTICS_WEBSITE_ID=... pnpm build` for production-like builds. A broken build strips `#root` and JS if the old greedy regex matched — see `transformAnalyticsIndexHtml` in `vite.config.ts`.
 
 <<<<<<< HEAD
