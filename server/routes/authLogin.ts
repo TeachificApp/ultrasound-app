@@ -200,12 +200,13 @@ export function registerAuthLoginRoute(app: Express) {
       // Ensure the user has the base "user" role (idempotent)
       await ensureUserRole(user.id);
 
-      // Issue session cookie
+      // Issue session cookie — use X-App-Hostname to scope to the correct domain
       const sessionToken = await sdk.createSessionToken(openId, {
         name: user.name ?? user.email ?? "",
         expiresInMs: ONE_YEAR_MS,
       });
-      const cookieOptions = getSessionCookieOptions(req);
+      const magicPostHostname = resolveAuthHostname(req);
+      const cookieOptions = getSessionCookieOptions(req, magicPostHostname);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       // Track login event
@@ -317,7 +318,9 @@ export function registerAuthLoginRoute(app: Express) {
         name: user.name ?? user.email ?? "",
         expiresInMs: ONE_YEAR_MS,
       });
-      const cookieOptions = getSessionCookieOptions(req);
+      // Use X-App-Hostname for cookie domain scoping on access-verify too
+      const accessHostname = resolveAuthHostname(req);
+      const cookieOptions = getSessionCookieOptions(req, accessHostname);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       // Track login event for access-link sessions
