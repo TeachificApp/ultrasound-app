@@ -786,6 +786,17 @@ export const lmsPublicRouter = router({
         phone: input.phone ?? null,
         message: input.message ?? null,
       });
+      // Notify admin of new waitlist signup
+      try {
+        await sendEmail({
+          to: "admin@allaboutultrasound.com",
+          subject: `New Waitlist Signup — Course Cohort Group #${input.cohortGroupId}`,
+          html: `<h2>New Cohort Waitlist Lead</h2><p><strong>Name:</strong> ${input.name}</p><p><strong>Email:</strong> ${input.email}</p>${input.phone ? `<p><strong>Phone:</strong> ${input.phone}</p>` : ""}<p><strong>Course ID:</strong> ${input.courseId}</p><p><strong>Cohort Group ID:</strong> ${input.cohortGroupId}</p>${input.message ? `<p><strong>Message:</strong> ${input.message}</p>` : ""}<p><em>Signed up at ${new Date().toUTCString()}</em></p>`,
+          text: `New Cohort Waitlist Lead\nName: ${input.name}\nEmail: ${input.email}${input.phone ? `\nPhone: ${input.phone}` : ""}\nCourse ID: ${input.courseId}\nCohort Group ID: ${input.cohortGroupId}${input.message ? `\nMessage: ${input.message}` : ""}`,
+        });
+      } catch (e) {
+        console.error("[waitlist] Failed to send admin notification:", e);
+      }
       return { success: true, alreadyRegistered: false };
     }),
 

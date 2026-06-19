@@ -193,6 +193,8 @@ export function TeachSlideRenderer({
   onResizePointerDown,
   className,
 }: TeachSlideRendererProps) {
+  // Compute slide background style from slide data
+  const bgStyle = buildSlideBackground(slide);
   // In preview/editor/thumbnail mode all elements are visible regardless of animation state
   const allVisible = mode === "editor" || mode === "thumbnail" || mode === "preview";
   const effectiveVisible = allVisible

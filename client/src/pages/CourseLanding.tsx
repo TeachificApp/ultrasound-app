@@ -276,6 +276,9 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
   onSoldOutOverride?: (overrideUrl: string) => void;
 }) {
   const d = block.data;
+  // When ctaText has been overridden (e.g., "Join Waitlist"), apply it to enroll/checkout action buttons
+  const enrollActions = new Set(["direct_checkout", "pricing_option", "group_purchase", "free_enrollment", "enroll_next_available"]);
+  const isCtaOverridden = ctaText !== "Enroll Now" && ctaText !== "Continue Learning" && ctaText !== "Enrollment Closed";
   switch (block.type) {
     case "hero": {
       const bgType = d.bgType ?? "color";
@@ -339,7 +342,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                     <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined, onCheckoutPage, (btn as any).freeEnrollProductType, (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null, onFreeEnroll)}
                       className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto transition-opacity hover:opacity-90 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                      {btn.text}
+                      {isCtaOverridden && enrollActions.has((btn as any).behavior ?? "") ? ctaText : btn.text}
                     </button>
                     {btn.showStrikethrough && btn.strikethroughPrice && (
                       <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
@@ -697,7 +700,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
             </div>
           )}
           <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
-            {enrolling ? "Processing…" : (d.ctaText ?? ctaText)}
+            {enrolling ? "Processing…" : (isCtaOverridden ? ctaText : (d.ctaText ?? ctaText))}
           </button>
           {/* Price below button */}
           {d.showPrice && d.priceSource !== "none" && (d.pricePosition ?? "above") === "below" && (
@@ -721,7 +724,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={enrolling}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
-            {d.ctaText ?? ctaText}
+            {isCtaOverridden ? ctaText : (d.ctaText ?? ctaText)}
           </button>
           <ButtonSubtext d={d} />
           </CC>
@@ -1514,7 +1517,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                     ))}
                   </ul>
                   <button {...tierDataAttrs(tier)} disabled={enrolling} className="block w-full text-center py-2.5 rounded-xl font-semibold text-sm cursor-pointer disabled:opacity-60" style={{ backgroundColor: tier.highlighted ? accentColor : "transparent", color: tier.highlighted ? "#fff" : accentColor, border: `2px solid ${accentColor}` }}>
-                    {enrolling ? "Processing…" : (tier.ctaText || "Get Started")}
+                    {enrolling ? "Processing…" : (isCtaOverridden && enrollActions.has(tierDataAttrs(tier)["data-action"] ?? "") ? ctaText : (tier.ctaText || "Get Started"))}
                   </button>
                 </div>
               </div>

@@ -30,6 +30,9 @@ type AnnotationMsg =
 export default function TeachPresenter() {
   const { id } = useParams<{ id: string }>();
   const materialId = Number(id);
+  // Check if we should auto-open notes window and request fullscreen
+  const searchParams = new URLSearchParams(window.location.search);
+  const shouldOpenNotes = searchParams.get("openNotes") === "1";
 
   const { data, isLoading } = trpc.teach.getMaterial.useQuery(
     { materialId },
@@ -62,6 +65,24 @@ export default function TeachPresenter() {
     showControls();
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
   }, [showControls]);
+
+  // ─── Fullscreen + notes window on mount ──────────────────────────────────
+  const notesOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!shouldOpenNotes || notesOpenedRef.current) return;
+    notesOpenedRef.current = true;
+    // Open notes window (this is a user-initiated context from the new window)
+    window.open(
+      `/teach/presentation/${materialId}/notes`,
+      `teach-notes-${materialId}`,
+      "width=520,height=760,left=0,top=0",
+    );
+    // Request fullscreen on the document element
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {/* user may deny */});
+    }
+  }, [materialId, shouldOpenNotes]);
 
   // ─── Keyboard navigation ──────────────────────────────────────────────────
   useEffect(() => {

@@ -75,8 +75,10 @@ export default function TeachPresentationEditor() {
 
   const startPresent = () => {
     const open = () => {
-      window.open(`/teach/presentation/${materialId}/notes`, `teach-notes-${materialId}`, "width=520,height=760");
-      window.open(`/teach/presentation/${materialId}/present`, "_blank");
+      // Open the main presentation window first (user-initiated = not blocked by popup blocker)
+      // Pass a flag so the presenter auto-opens the notes window and requests fullscreen
+      const presentUrl = `/teach/presentation/${materialId}/present?openNotes=1`;
+      window.open(presentUrl, `teach-present-${materialId}`);
     };
     if (dirty) {
       update.mutate({ materialId, title, slides }, { onSuccess: open });
