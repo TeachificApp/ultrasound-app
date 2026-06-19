@@ -2,10 +2,9 @@
  * MagicLinkCallback.tsx — Handles the magic link callback
  * URL: /auth/magic?token=...
  *
- * Automatically calls /api/auth/magic-verify on mount, then redirects to the app.
- *
- * NOTE: Uses /api/auth/magic-verify (server-side route) instead of the tRPC mutation.
- * Reason: Cloudflare strips Set-Cookie headers from JavaScript fetch/XHR responses.
+ * Uses a full-page GET redirect to /api/auth/magic-verify so Cloudflare cannot
+ * strip the Set-Cookie header (which it does on XHR/fetch responses).
+ * The server encodes the public hostname in the URL (?host=) for correct cookie scoping.
  */
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
@@ -34,31 +33,16 @@ export default function MagicLinkCallback() {
       return;
     }
 
-    // Use the server-side endpoint so the cookie is set correctly through Cloudflare
-    fetch("/api/auth/magic-verify", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    })
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) {
-          setStatus("error");
-          setErrorMessage(data.error || "The magic link is invalid or has expired.");
-          return;
-        }
-        setStatus("success");
-        // Redirect to returnTo (if set) or dashboard after a short delay
-        const returnTo = params.get("returnTo");
-        setTimeout(() => {
-          window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : "/my-dashboard";
-        }, 1500);
-      })
-      .catch(() => {
-        setStatus("error");
-        setErrorMessage("An unexpected error occurred. Please try again.");
-      });
+    // Use a full-page GET redirect so Cloudflare cannot strip Set-Cookie headers.
+    // The server reads ?host= to scope the cookie to the correct domain.
+    const host = window.location.hostname;
+    const returnTo = params.get("returnTo") || "/my-dashboard";
+    const verifyUrl =
+      `/api/auth/magic-verify` +
+      `?token=${encodeURIComponent(token)}` +
+      `&host=${encodeURIComponent(host)}` +
+      `&returnTo=${encodeURIComponent(returnTo)}`;
+    window.location.href = verifyUrl;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

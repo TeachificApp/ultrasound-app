@@ -34,14 +34,18 @@ import { useAuth } from "@/_core/hooks/useAuth";
 /** All known app domains that participate in cross-domain SSO */
 const ALL_DOMAINS = [
   "https://app.iheartecho.com",   // canonical .com domain (primary)
+  "https://app.iheartecho.net",   // legacy .net domain (still in use)
   "https://app.allaboutultrasound.com",
   "https://learn.allaboutultrasound.com",
   "https://members.allaboutultrasound.com",
   "https://accreditation.iheartecho.com",
 ] as const;
 
-/** Session storage key to prevent re-broadcasting on every navigation */
-const SSO_BROADCAST_KEY = "sso_broadcast_done";
+/**
+ * localStorage key prefix for per-user broadcast tracking.
+ * Stored as `sso_broadcast_<userId>` so a new login always re-broadcasts.
+ */
+const SSO_BROADCAST_KEY_PREFIX = "sso_broadcast_";
 
 /** Detect if the current domain is the accreditation domain */
 function isAccreditationDomain(): boolean {
@@ -79,15 +83,18 @@ function getTargetDomains(): string[] {
 function pingDomain(domain: string, token: string): void {
   const hostname = hostnameFromOrigin(domain);
   const url = `${domain}/api/sso/auto?token=${encodeURIComponent(token)}&domain=${encodeURIComponent(hostname)}`;
-  const img = document.createElement("img");
-  img.src = url;
-  img.style.cssText = "position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;";
-  img.setAttribute("aria-hidden", "true");
-  document.body.appendChild(img);
-  // Clean up after 15 seconds
-  setTimeout(() => {
-    try { document.body.removeChild(img); } catch { /* already removed */ }
-  }, 15_000);
+
+  // Try CORS fetch first; fall back to img-tag ping if fetch fails
+  fetch(url, { method: "GET", credentials: "include", mode: "cors" }).catch(() => {
+    const img = document.createElement("img");
+    img.src = url;
+    img.style.cssText = "position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;";
+    img.setAttribute("aria-hidden", "true");
+    document.body.appendChild(img);
+    setTimeout(() => {
+      try { document.body.removeChild(img); } catch { /* already removed */ }
+    }, 15_000);
+  });
 }
 
 export function useCrossDomainSso() {
@@ -102,8 +109,10 @@ export function useCrossDomainSso() {
     if (!user) return;
     // Only run once per component mount
     if (hasRun.current) return;
-    // Only run once per browser session (avoids re-broadcasting on every page nav)
-    if (sessionStorage.getItem(SSO_BROADCAST_KEY)) return;
+    // Only broadcast once per user per browser session
+    // Keyed by userId so a new login always re-broadcasts
+    const broadcastKey = `${SSO_BROADCAST_KEY_PREFIX}${user.id}`;
+    if (sessionStorage.getItem(broadcastKey)) return;
 
     hasRun.current = true;
 
@@ -121,7 +130,7 @@ export function useCrossDomainSso() {
           if (!allowed || tokens.length === 0) return;
 
           // Mark as done so we don't re-broadcast on next navigation within this session
-          sessionStorage.setItem(SSO_BROADCAST_KEY, "1");
+          sessionStorage.setItem(broadcastKey, "1");
 
           // Ping each target domain with its own unique token + explicit domain param
           targets.forEach((domain, i) => {
