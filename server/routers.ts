@@ -715,7 +715,7 @@ export const appRouter = router({
         const { getUserByMagicLinkToken, clearMagicLinkToken } = await import('./db');
         const { sdk } = await import('./_core/sdk');
         const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
-        const { getSessionCookieOptions } = await import('./_core/cookies');
+        const { getSessionCookieOptions, resolveAuthHostname: resolveMLHostname } = await import('./_core/cookies');
 
         const user = await getUserByMagicLinkToken(input.token);
         if (!user) {
@@ -748,7 +748,9 @@ export const appRouter = router({
           name,
           expiresInMs: ONE_YEAR_MS,
         });
-        const cookieOptions = getSessionCookieOptions(ctx.req);
+        const mlHostname = resolveMLHostname(ctx.req);
+        const cookieOptions = getSessionCookieOptions(ctx.req, mlHostname);
+        console.log(`[magic-verify POST] origin=${ctx.req.headers?.origin} hostnameOverride=${mlHostname} domain=${cookieOptions.domain} secure=${cookieOptions.secure}`);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
         return { success: true };
