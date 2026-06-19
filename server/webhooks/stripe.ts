@@ -21,7 +21,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
-import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail } from "../_core/email";
+import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail, emailWrapper } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
 
@@ -823,6 +823,36 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
     } catch (emailErr) {
       console.error(`[Stripe] Brand membership: failed to send welcome email to ${customerEmail}:`, emailErr);
     }
+  } else if (customerEmail) {
+    // Existing user — send a purchase confirmation email with access link
+    try {
+      const baseUrl = "https://app.allaboutultrasound.com";
+      const firstName = (customerName || customerEmail).split(" ")[0] || "there";
+      let accessToken: string | null = null;
+      try { accessToken = await getOrCreateAccessToken(userId); } catch { /* non-fatal */ }
+      const accessUrl = accessToken ? `${baseUrl}/api/auth/auto-login?token=${accessToken}` : `${baseUrl}/dashboard`;
+      const brandLabel = brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
+      const planLabel = isLifetime ? `${brandLabel} Lifetime Premium Membership` : `${brandLabel} Premium Membership`;
+      const htmlBody = emailWrapper(`
+        <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>
+        <p style="margin:0 0 16px;color:#334155;">Hi ${firstName}, your ${planLabel} is now active and ready to use.</p>
+        <div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
+          <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Access your membership</p>
+          <p style="margin:0 0 8px;font-size:13px;color:#475569;">Click below to access your content \u2014 no password needed:</p>
+          <p style="margin:0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
+        </div>
+        <p style="margin:16px 0 0;font-size:13px;color:#64748b;">If you have any questions, reply to this email or contact support.</p>
+      `, brand === "iheartecho" ? "iheartecho" : "aaus");
+      await sendEmail({
+        to: { name: customerName || firstName, email: customerEmail },
+        subject: `Your ${planLabel} is ready`,
+        htmlBody,
+        previewText: `Access your ${planLabel} on All About Ultrasound`,
+      });
+      console.log(`[Stripe] Brand membership: access email sent to existing user ${customerEmail} (userId=${userId})`);
+    } catch (emailErr) {
+      console.error(`[Stripe] Brand membership: failed to send access email to existing user ${customerEmail}:`, emailErr);
+    }
   }
 
   await notifyOwner({
@@ -981,6 +1011,35 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
       console.log(`[Stripe] Dual membership: welcome email sent to new user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
       console.error(`[Stripe] Dual membership: failed to send welcome email to ${customerEmail}:`, emailErr);
+    }
+  } else if (customerEmail) {
+    // Existing user — send a purchase confirmation email with access link
+    try {
+      const baseUrl = "https://app.allaboutultrasound.com";
+      const firstName = (customerName || customerEmail).split(" ")[0] || "there";
+      let accessToken: string | null = null;
+      try { accessToken = await getOrCreateAccessToken(userId); } catch { /* non-fatal */ }
+      const accessUrl = accessToken ? `${baseUrl}/api/auth/auto-login?token=${accessToken}` : `${baseUrl}/dashboard`;
+      const planLabel = isLifetime ? "All Access Dual Lifetime Membership" : "All Access Dual Membership";
+      const htmlBody = emailWrapper(`
+        <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>
+        <p style="margin:0 0 16px;color:#334155;">Hi ${firstName}, your ${planLabel} is now active. You have premium access to both UltrasoundAssist\u2122 and EchoAssist\u2122.</p>
+        <div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
+          <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Access your membership</p>
+          <p style="margin:0 0 8px;font-size:13px;color:#475569;">Click below to access your content \u2014 no password needed:</p>
+          <p style="margin:0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
+        </div>
+        <p style="margin:16px 0 0;font-size:13px;color:#64748b;">If you have any questions, reply to this email or contact support.</p>
+      `, "aaus");
+      await sendEmail({
+        to: { name: customerName || firstName, email: customerEmail },
+        subject: `Your ${planLabel} is ready`,
+        htmlBody,
+        previewText: `Access your ${planLabel} on All About Ultrasound`,
+      });
+      console.log(`[Stripe] Dual membership: access email sent to existing user ${customerEmail} (userId=${userId})`);
+    } catch (emailErr) {
+      console.error(`[Stripe] Dual membership: failed to send access email to existing user ${customerEmail}:`, emailErr);
     }
   }
 

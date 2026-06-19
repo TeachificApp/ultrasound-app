@@ -26,6 +26,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
+import { notifyOwner } from "../_core/notification";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
@@ -1611,6 +1612,7 @@ export const lmsCohortAdminRouter = router({
           await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId, enrollmentType: "full" });
         }
         await sendEnrollmentEmail({ userId, courseId: input.courseId, db });
+        notifyOwner({ title: `🎓 Admin Free Enrollment`, content: `Admin granted free access to user ${userId} (${entry.email}) for course ID ${input.courseId}.` }).catch(() => {});
         return { success: true, type: "free", message: `Free access granted and enrollment email sent to ${entry.email}` };
       } else {
         const Stripe = (await import("stripe")).default;
@@ -1625,6 +1627,7 @@ export const lmsCohortAdminRouter = router({
             await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId, enrollmentType: "full" });
           }
           await sendEnrollmentEmail({ userId, courseId: input.courseId, db });
+          notifyOwner({ title: `🎓 Admin Zero-Price Enrollment`, content: `Admin granted zero-price access to user ${userId} (${entry.email}) for course ID ${input.courseId}.` }).catch(() => {});
           return { success: true, type: "free", message: `Zero-price access granted and enrollment email sent to ${entry.email}` };
         }
         const session = await stripe.checkout.sessions.create({

@@ -1293,6 +1293,12 @@ export const lmsLearnerRouter = router({
         contentTitle: course.title,
         metadata: { courseSlug: input.courseSlug, enrollmentType: 'free', affiliateCode: input.affiliateCode ?? null },
       }).catch(() => {});
+      // Send enrollment email and admin notification (fire-and-forget)
+      sendEnrollmentEmail({ userId: ctx.user.id, courseId: course.id, db }).catch(() => {});
+      notifyOwner({
+        title: `🎓 Free Course Enrollment`,
+        content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in free course: ${course.title} (${input.courseSlug}).`,
+      }).catch(() => {});
       return { enrollmentId: result.id, alreadyEnrolled: false };
     }),
 
@@ -1373,6 +1379,12 @@ export const lmsLearnerRouter = router({
         if (!existingZero) {
           await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id, affiliateCode: input.affiliateCode ?? null, enrollmentType: "full" });
           db.insert(userActivityLogs).values({ userId: ctx.user.id, eventType: "course_enroll", description: `Enrolled in zero-price course: ${course.title}`, courseId: course.id, contentTitle: course.title, metadata: { courseSlug: input.courseSlug, enrollmentType: "free_zero_price" } }).catch(() => {});
+          // Send enrollment email and admin notification (fire-and-forget)
+          sendEnrollmentEmail({ userId: ctx.user.id, courseId: course.id, db }).catch(() => {});
+          notifyOwner({
+            title: `🎓 Zero-Price Enrollment`,
+            content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in zero-price course: ${course.title} (${input.courseSlug}).`,
+          }).catch(() => {});
         } else if (existingZero.enrollmentType === "free_preview") {
           await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existingZero.id));
         }
@@ -1446,6 +1458,12 @@ export const lmsLearnerRouter = router({
               if (!existingPromo) {
                 await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id, affiliateCode: input.affiliateCode ?? null, enrollmentType: "full" });
                 db.insert(userActivityLogs).values({ userId: ctx.user.id, eventType: "course_enroll", description: `Enrolled via 100% promo: ${course.title}`, courseId: course.id, contentTitle: course.title, metadata: { courseSlug: input.courseSlug, enrollmentType: "free_promo", promoCode: input.promoCode } }).catch(() => {});
+                // Send enrollment email and admin notification (fire-and-forget)
+                sendEnrollmentEmail({ userId: ctx.user.id, courseId: course.id, db }).catch(() => {});
+                notifyOwner({
+                  title: `🎓 100% Promo Enrollment`,
+                  content: `User ${ctx.user.id} (${ctx.user.email}) enrolled via 100% promo (${input.promoCode ?? 'unknown'}): ${course.title} (${input.courseSlug}).`,
+                }).catch(() => {});
               } else if (existingPromo.enrollmentType === "free_preview") {
                 await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existingPromo.id));
               }
@@ -1698,6 +1716,10 @@ export const lmsLearnerRouter = router({
         if (!existingFree) {
           await db.insert(lmsEnrollments).values({ userId: user.id, courseId: course.id, status: "active", progressPct: 0, enrollmentType: "full" });
           try { await sendEnrollmentEmail({ userId: user.id, courseId: course.id }); } catch {}
+          notifyOwner({
+            title: `🎓 Free Course Enrollment (Guest)`,
+            content: `User ${user.id} (${user.email}) enrolled in free course: ${course.title} (${input.courseSlug}). [Guest checkout path]`,
+          }).catch(() => {});
         } else if (existingFree.enrollmentType === "free_preview") {
           await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existingFree.id));
         }
