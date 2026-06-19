@@ -935,10 +935,13 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
 
       // ── Page mode: show next upcoming group (not in-progress) as full-detail embed ──
       if (displayMode === "page") {
-        const groupSelectionModeP = d.groupSelectionMode ?? "all";
-        const selectedGroupIdsP: number[] = d.selectedGroupIds ?? [];
-        let candidatesP = groupSelectionModeP === "manual" && selectedGroupIdsP.length > 0
-          ? allGroupsCSA.filter((g: any) => selectedGroupIdsP.includes(g.id))
+        // pageSelectedGroupId: admin-pinned single group (new field).
+        // Legacy: if selectedGroupIds has exactly one item, treat it as a pin too.
+        const pageSelectedGroupId: number | null = d.pageSelectedGroupId ?? null;
+        const legacyPin = !pageSelectedGroupId && (d.selectedGroupIds ?? []).length === 1 ? (d.selectedGroupIds as number[])[0] : null;
+        const pinnedId = pageSelectedGroupId ?? legacyPin ?? null;
+        let candidatesP = pinnedId != null
+          ? allGroupsCSA.filter((g: any) => g.id === pinnedId)
           : allGroupsCSA;
         // Page mode: show only the next upcoming group with open enrollment (not in-progress).
         // Auto-advance: if enrollment has closed for the current group, skip to the next one.

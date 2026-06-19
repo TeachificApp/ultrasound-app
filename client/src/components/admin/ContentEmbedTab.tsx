@@ -108,11 +108,31 @@ export function ContentEmbedTab({
     instanceItems[0]?.id ?? null,
   );
 
+  // CTA Card: optional cohort/instance override (drill-down)
+  const [ctaInstanceId, setCtaInstanceId] = useState<number | null>(null);
+
   React.useEffect(() => {
     if (instanceItems.length && !instanceItems.some(i => i.id === selectedInstanceId)) {
       setSelectedInstanceId(instanceItems[0]?.id ?? null);
     }
   }, [instanceItems, selectedInstanceId]);
+
+  // When a cohort/instance is selected for the CTA card, auto-update the ctaUrl
+  React.useEffect(() => {
+    if (ctaInstanceId != null && instanceEmbedKind) {
+      const item = instanceItems.find(i => i.id === ctaInstanceId);
+      if (item) {
+        // Build the checkout/landing URL for this specific group/instance
+        const path = instanceEmbedKind === "cohort"
+          ? `/courses/${slug}?group=${ctaInstanceId}`
+          : `/workshops/${slug}?instance=${ctaInstanceId}`;
+        setCtaUrl(`${baseUrl}${path}`);
+      }
+    } else if (ctaInstanceId === null) {
+      // Reset to default checkout URL when cleared
+      setCtaUrl(defaultCheckoutUrl);
+    }
+  }, [ctaInstanceId, instanceEmbedKind, instanceItems, slug, baseUrl, defaultCheckoutUrl]);
 
   const ctaQuery = [
     `accent=${encodeURIComponent(accentColor)}`,
@@ -316,6 +336,32 @@ export function ContentEmbedTab({
             <Input value={customSubtitle} onChange={e => setCustomSubtitle(e.target.value)} className="h-8 text-xs" placeholder={subtitle ?? "Short description..."} />
           </div>
         </div>
+
+        {/* Cohort/Instance drill-down for CTA card */}
+        {instanceEmbedKind && instanceItems.length > 0 && (
+          <div className="mb-4 p-3 rounded-lg border border-teal-100 bg-teal-50/40">
+            <Label className="text-xs font-semibold text-teal-800 block mb-1">
+              {instanceEmbedKind === "cohort" ? "Cohort Group" : "Workshop Instance"} Override <span className="font-normal text-teal-600">(optional)</span>
+            </Label>
+            <p className="text-[10px] text-teal-700 mb-2">
+              Select a specific {instanceEmbedKind === "cohort" ? "cohort group" : "instance"} to point the button URL directly to that {instanceEmbedKind === "cohort" ? "group" : "instance"}'s enrollment page. Leave blank to use the main course URL.
+            </p>
+            <Select
+              value={ctaInstanceId != null ? String(ctaInstanceId) : ""}
+              onValueChange={v => setCtaInstanceId(v ? Number(v) : null)}
+            >
+              <SelectTrigger className="h-8 text-xs bg-white">
+                <SelectValue placeholder="Main course URL (no override)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Main course URL (no override)</SelectItem>
+                {instanceItems.map(item => (
+                  <SelectItem key={item.id} value={String(item.id)}>{item.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-5 mb-6">
           <label className="flex items-center gap-2 cursor-pointer">

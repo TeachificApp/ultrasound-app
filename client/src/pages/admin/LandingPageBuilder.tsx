@@ -5135,7 +5135,8 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               {displayMode === "calendar" && <span><strong>Calendar:</strong> Shows the lesson schedule for the selected cohort/instance. Leave blank to auto-pick the next upcoming group.</span>}
             </div>
           </div>
-          {(displayMode === "list" || displayMode === "page") && (
+          {/* ── LIST MODE: multi-select group filter ── */}
+          {displayMode === "list" && (
               <div className="border-t pt-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Group Selection</p>
                 {/* Step 1: All vs Manual */}
@@ -5250,6 +5251,28 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   );
                 })()}
               </div>
+          )}
+          {/* ── PAGE MODE: single-group picker (auto = next upcoming, or pin one specific group) ── */}
+          {displayMode === "page" && (
+            <div className="border-t pt-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Page Group Selection</p>
+              <p className="text-[10px] text-gray-400 mb-2">
+                Leave on <strong>Auto</strong> to always show the next upcoming cohort/instance with open enrollment.
+                Select a specific group to pin that page (useful for a dedicated landing page for a single cohort).
+              </p>
+              <select
+                className="w-full h-8 text-xs border rounded px-2 bg-white"
+                value={d.pageSelectedGroupId != null ? String(d.pageSelectedGroupId) : ""}
+                onChange={e => set("pageSelectedGroupId", e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Auto — next upcoming (recommended)</option>
+                {cssAllItems.map(item => (
+                  <option key={`${item.kind}-${item.id}`} value={String(item.id)}>
+                    {item.parentLabel} · {item.label} ({item.kind === "cohort_group" ? "Cohort" : "Workshop"})
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Design</p>
