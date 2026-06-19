@@ -155,7 +155,7 @@ export function registerAuthLoginRoute(app: Express) {
    */
   app.post("/api/auth/magic-verify", async (req: Request, res: Response) => {
     try {
-      const { token } = req.body ?? {};
+      const { token, host: hostBody } = req.body ?? {};
       if (!token) {
         return res.status(400).json({ error: "Token is required." });
       }
@@ -205,7 +205,10 @@ export function registerAuthLoginRoute(app: Express) {
         name: user.name ?? user.email ?? "",
         expiresInMs: ONE_YEAR_MS,
       });
-      const magicPostHostname = resolveAuthHostname(req);
+      const magicPostHostname = resolveAuthHostname(
+        req,
+        typeof hostBody === "string" ? hostBody : undefined,
+      );
       const cookieOptions = getSessionCookieOptions(req, magicPostHostname);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 

@@ -15,7 +15,7 @@ import { TRPCError } from "@trpc/server";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { ssoTokens, users, userRoles, diyOrganizations, diySubscriptions } from "../../drizzle/schema";
-import { getSessionCookieOptions } from "../_core/cookies";
+import { getSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { sdk } from "../_core/sdk";
 
@@ -163,15 +163,8 @@ export const ssoRouter = router({
         appId: process.env.VITE_APP_ID ?? "",
         name: user.name ?? user.email ?? "User",
       });
-      // Use X-App-Hostname header for cookie domain scoping.
-      // Without this, getPublicHostname falls through to CANONICAL_ROOT_DOMAIN
-      // (app.allaboutultrasound.com) and scopes the cookie to .allaboutultrasound.com —
-      // which is never sent to app.iheartecho.com, causing the SSO bridge to silently fail.
-      const xAppHostname = ctx.req.headers["x-app-hostname"];
-      const hostnameOverride = xAppHostname
-        ? (Array.isArray(xAppHostname) ? xAppHostname[0] : xAppHostname)
-            .split(",")[0].trim().split(":")[0]
-        : undefined;
+      // Scope cookie to the requesting domain (critical for app.iheartecho.com bridge).
+      const hostnameOverride = resolveAuthHostname(ctx.req);
       const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
       ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
       console.log(`[SSO exchangeToken] User ${user.id} signed in | domain=${hostnameOverride ?? "auto"} | cookie.domain=${cookieOptions.domain ?? "none"}`);
