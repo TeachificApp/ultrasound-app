@@ -866,7 +866,7 @@ export const lmsCohortAdminRouter = router({
         .select()
         .from(lmsCohortGroups)
         .where(eq(lmsCohortGroups.courseId, input.courseId))
-        .orderBy(asc(lmsCohortGroups.sortOrder), asc(lmsCohortGroups.createdAt));
+        .orderBy(asc(lmsCohortGroups.startDate), asc(lmsCohortGroups.sortOrder), asc(lmsCohortGroups.createdAt));
       const counts = await db
         .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId, count: sql<number>`count(*)` })
         .from(lmsCohortGroupEnrollments)

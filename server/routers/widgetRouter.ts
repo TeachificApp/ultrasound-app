@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { eq, desc, and, inArray, or, gte } from "drizzle-orm";
+import { eq, desc, and, inArray, or, gte, asc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
@@ -244,7 +244,7 @@ export const widgetPublicRouter = router({
               inArray(lmsCohortGroups.courseId, cohortIds),
               or(eq(lmsCohortGroups.status, "open"), eq(lmsCohortGroups.status, "active")),
             ))
-            .orderBy(lmsCohortGroups.sortOrder);
+            .orderBy(asc(lmsCohortGroups.startDate), asc(lmsCohortGroups.sortOrder));
           groups.forEach(g => {
             if (!cohortGroupMap.has(g.courseId)) cohortGroupMap.set(g.courseId, g);
           });
