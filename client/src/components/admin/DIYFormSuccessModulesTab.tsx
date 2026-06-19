@@ -34,6 +34,7 @@ import {
   Plus, Copy, Trash2, Eye, Star, GitBranch, MessageSquare, LayoutTemplate, ExternalLink,
 } from "lucide-react";
 import AccessGrantActionsEditor from "@/components/admin/AccessGrantActionsEditor";
+import StripePriceIdPicker from "@/components/admin/StripePriceIdPicker";
 
 const BRAND = "#0891b2";
 
@@ -42,6 +43,67 @@ const MODULE_TYPE_LABELS: Record<string, string> = {
   full_page: "Full Success Page",
   redirect_url: "Redirect to URL",
 };
+
+const CHOICE_FIELD_TYPES = ["radio", "checkbox", "dropdown", "select", "multiple_choice", "likert", "yes_no"];
+const NUMBER_FIELD_TYPES = ["number", "slider", "rating", "score", "scale", "integer"];
+
+const OPERATORS_TEXT = [
+  { value: "equals", label: "equals" },
+  { value: "not_equals", label: "does not equal" },
+  { value: "contains", label: "contains" },
+  { value: "not_contains", label: "does not contain" },
+  { value: "starts_with", label: "starts with" },
+  { value: "is_empty", label: "is empty" },
+  { value: "is_not_empty", label: "is not empty" },
+];
+const OPERATORS_CHOICE = [
+  { value: "equals", label: "equals" },
+  { value: "not_equals", label: "does not equal" },
+  { value: "contains", label: "contains" },
+  { value: "is_empty", label: "is empty" },
+  { value: "is_not_empty", label: "is not empty" },
+];
+const OPERATORS_NUMBER = [
+  { value: "equals", label: "=" },
+  { value: "not_equals", label: "≠" },
+  { value: "greater_than", label: ">" },
+  { value: "less_than", label: "<" },
+  { value: "greater_or_equal", label: "≥" },
+  { value: "less_or_equal", label: "≤" },
+  { value: "is_empty", label: "is empty" },
+  { value: "is_not_empty", label: "is not empty" },
+];
+
+function getOperatorsForType(fieldType: string) {
+  if (CHOICE_FIELD_TYPES.includes(fieldType) || fieldType === "choice") return OPERATORS_CHOICE;
+  if (NUMBER_FIELD_TYPES.includes(fieldType)) return OPERATORS_NUMBER;
+  return OPERATORS_TEXT;
+}
+
+function getChoicesForField(
+  fieldId: string,
+  formItems: Array<{ id: number; label: string; itemType: string }> | undefined,
+  formOptions: Array<{ itemId: number; label: string; value: string }> | undefined,
+): { label: string; value: string }[] | null {
+  if (fieldId === "__pass_status__") return [{ label: "Pass", value: "pass" }, { label: "Fail", value: "fail" }];
+  if (fieldId === "__payment_status__") return [{ label: "Paid", value: "paid" }, { label: "Unpaid", value: "unpaid" }, { label: "Pending", value: "pending" }];
+  if (!formItems) return null;
+  const item = formItems.find((i) => String(i.id) === fieldId);
+  if (!item) return null;
+  if (!CHOICE_FIELD_TYPES.includes(item.itemType ?? "")) return null;
+  const opts = (formOptions ?? []).filter((o) => o.itemId === item.id);
+  if (opts.length) return opts.map((o) => ({ label: o.label, value: String(o.value ?? o.label) }));
+  return null;
+}
+
+function getFieldType(
+  fieldId: string,
+  formItems: Array<{ id: number; label: string; itemType: string }> | undefined,
+): string {
+  if (SPECIAL_FIELDS.find(s => s.value === fieldId)) return "number";
+  const item = (formItems ?? []).find((i) => String(i.id) === fieldId);
+  return item?.itemType ?? "text";
+}
 
 const ROUTING_OPERATORS = [
   { value: "equals", label: "equals" },
@@ -105,11 +167,13 @@ export default function DIYFormSuccessModulesTab({
   template,
   onRefetch,
   formItems,
+  formOptions,
 }: {
   templateId: number;
   template: any;
   onRefetch: () => void;
   formItems?: Array<{ id: number; label: string; itemType: string }>;
+  formOptions?: Array<{ itemId: number; label: string; value: string }>;
 }) {
   const { data, refetch: refetchModules } = trpc.formBuilder.listSuccessModules.useQuery({ templateId });
   const { data: routingRules, refetch: refetchRules } = trpc.formBuilder.listSuccessRoutingRules.useQuery({ templateId });
@@ -568,48 +632,80 @@ export default function DIYFormSuccessModulesTab({
                   </SelectContent>
                 </Select>
               </div>
-              {ruleDraft.conditions.map((cond, idx) => (
-                <div key={cond.id} className="grid grid-cols-12 gap-2 items-end border border-gray-100 rounded-lg p-2">
-                  <div className="col-span-4">
-                    <Label className="text-[10px]">Field</Label>
-                    <Select value={cond.fieldId} onValueChange={v => setRuleDraft(r => {
-                      if (!r) return r;
-                      const conditions = [...r.conditions];
-                      conditions[idx] = { ...conditions[idx], fieldId: v };
-                      return { ...r, conditions };
-                    })}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {fieldOptions.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+              {ruleDraft.conditions.map((cond, idx) => {
+                const fieldType = getFieldType(cond.fieldId, formItems);
+                const operators = getOperatorsForType(fieldType);
+                const choices = getChoicesForField(cond.fieldId, formItems, formOptions);
+                const noValue = ["is_empty", "is_not_empty"].includes(cond.operator);
+                return (
+                  <div key={cond.id} className="border border-gray-100 rounded-lg p-2 space-y-2">
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-5">
+                        <Label className="text-[10px] text-gray-500">Field</Label>
+                        <Select value={cond.fieldId} onValueChange={v => setRuleDraft(r => {
+                          if (!r) return r;
+                          const conditions = [...r.conditions];
+                          const newType = getFieldType(v, formItems);
+                          const newOps = getOperatorsForType(newType);
+                          const op = newOps.find(o => o.value === conditions[idx].operator) ? conditions[idx].operator : newOps[0].value;
+                          conditions[idx] = { ...conditions[idx], fieldId: v, operator: op, value: "" };
+                          return { ...r, conditions };
+                        })}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__special__" disabled className="text-[10px] text-gray-400 font-semibold">— Special fields —</SelectItem>
+                            {SPECIAL_FIELDS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                            {(fieldOptions.filter(f => !SPECIAL_FIELDS.find(s => s.value === f.value)).length > 0) && (
+                              <SelectItem value="__form__" disabled className="text-[10px] text-gray-400 font-semibold">— Form fields —</SelectItem>
+                            )}
+                            {fieldOptions.filter(f => !SPECIAL_FIELDS.find(s => s.value === f.value)).map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-4">
+                        <Label className="text-[10px] text-gray-500">Operator</Label>
+                        <Select value={cond.operator} onValueChange={v => setRuleDraft(r => {
+                          if (!r) return r;
+                          const conditions = [...r.conditions];
+                          conditions[idx] = { ...conditions[idx], operator: v };
+                          return { ...r, conditions };
+                        })}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {operators.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" className="col-span-3 text-red-400 h-8 mt-4" onClick={() => setRuleDraft(r => r ? { ...r, conditions: r.conditions.filter(c => c.id !== cond.id) } : r)}>Remove</Button>
+                    </div>
+                    {!noValue && (
+                      <div>
+                        <Label className="text-[10px] text-gray-500">Value</Label>
+                        {choices ? (
+                          <Select value={cond.value} onValueChange={v => setRuleDraft(r => {
+                            if (!r) return r;
+                            const conditions = [...r.conditions];
+                            conditions[idx] = { ...conditions[idx], value: v };
+                            return { ...r, conditions };
+                          })}>
+                            <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="Select a choice…" /></SelectTrigger>
+                            <SelectContent>
+                              {choices.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input value={cond.value} onChange={e => setRuleDraft(r => {
+                            if (!r) return r;
+                            const conditions = [...r.conditions];
+                            conditions[idx] = { ...conditions[idx], value: e.target.value };
+                            return { ...r, conditions };
+                          })} className="h-8 text-xs mt-0.5" placeholder={NUMBER_FIELD_TYPES.includes(fieldType) ? "e.g. 80" : "Enter value…"} />
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="col-span-3">
-                    <Label className="text-[10px]">Operator</Label>
-                    <Select value={cond.operator} onValueChange={v => setRuleDraft(r => {
-                      if (!r) return r;
-                      const conditions = [...r.conditions];
-                      conditions[idx] = { ...conditions[idx], operator: v };
-                      return { ...r, conditions };
-                    })}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {ROUTING_OPERATORS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-4">
-                    <Label className="text-[10px]">Value</Label>
-                    <Input value={cond.value} onChange={e => setRuleDraft(r => {
-                      if (!r) return r;
-                      const conditions = [...r.conditions];
-                      conditions[idx] = { ...conditions[idx], value: e.target.value };
-                      return { ...r, conditions };
-                    })} className="h-8 text-xs" />
-                  </div>
-                  <Button type="button" variant="ghost" size="sm" className="col-span-1 text-red-400 h-8" onClick={() => setRuleDraft(r => r ? { ...r, conditions: r.conditions.filter(c => c.id !== cond.id) } : r)}>×</Button>
-                </div>
-              ))}
+                );
+              })}
               <Button type="button" variant="outline" size="sm" onClick={() => setRuleDraft(r => r ? {
                 ...r,
                 conditions: [...r.conditions, { id: crypto.randomUUID(), fieldId: fieldOptions[0]?.value ?? "__score_percent__", operator: "equals", value: "" }],
@@ -650,12 +746,10 @@ export default function DIYFormSuccessModulesTab({
                         </select>
                       </div>
                       <div>
-                        <Label className="text-xs">Stripe Price ID</Label>
-                        <Input
-                          value={ruleDraft.stripePriceId ?? ""}
-                          onChange={e => setRuleDraft(r => r ? { ...r, stripePriceId: e.target.value } : r)}
-                          placeholder="price_xxx"
-                          className="mt-1 h-8 text-xs"
+                        <StripePriceIdPicker
+                          value={ruleDraft.stripePriceId ?? undefined}
+                          onChange={v => setRuleDraft(r => r ? { ...r, stripePriceId: v } : r)}
+                          checkoutMode={ruleDraft.stripeCheckoutMode ?? "payment"}
                         />
                       </div>
                     </div>

@@ -138,16 +138,30 @@ export function evaluateSuccessCondition(
   condition: FormSuccessCondition,
   ctx: FormSubmissionContext,
   merge: MergeContext,
+  /** Optional: map of itemId -> [{label, value}] for label-as-fallback matching */
+  optionsByItemId?: Record<string, Array<{ label: string; value: string }>>,
 ): boolean {
   const strVal = getFieldValue(condition.fieldId, ctx, merge);
   const numVal = parseFloat(strVal);
   const target = condition.value ?? "";
 
+  // For choice fields, also resolve the target label to its submitted value for backward compat.
+  // If the condition stores a label (old behavior) and the response stores the option value,
+  // we resolve the label to the value so the comparison works.
+  let resolvedTarget = target;
+  if (optionsByItemId && condition.fieldId && optionsByItemId[condition.fieldId]) {
+    const opts = optionsByItemId[condition.fieldId];
+    // If target matches a label but not a value, resolve it to the value
+    const byLabel = opts.find(o => o.label.toLowerCase() === target.toLowerCase());
+    const byValue = opts.find(o => o.value === target);
+    if (byLabel && !byValue) resolvedTarget = byLabel.value;
+  }
+
   switch (condition.operator) {
     case "equals":
-      return strVal === target;
+      return strVal === resolvedTarget;
     case "not_equals":
-      return strVal !== target;
+      return strVal !== resolvedTarget;
     case "contains":
       return strVal.toLowerCase().includes(target.toLowerCase());
     case "not_contains":
@@ -175,6 +189,7 @@ export function evaluateSuccessRule(
   rule: FormSuccessRoutingRuleInput,
   ctx: FormSubmissionContext,
   merge: MergeContext,
+  optionsByItemId?: Record<string, Array<{ label: string; value: string }>>,
 ): boolean {
   if (rule.isEnabled === false) return false;
   let conditions: FormSuccessCondition[] = [];
@@ -188,7 +203,7 @@ export function evaluateSuccessRule(
     conditions = rule.conditions;
   }
   if (!conditions.length) return false;
-  const results = conditions.map(c => evaluateSuccessCondition(c, ctx, merge));
+  const results = conditions.map(c => evaluateSuccessCondition(c, ctx, merge, optionsByItemId));
   return rule.logicOperator === "all" ? results.every(Boolean) : results.some(Boolean);
 }
 
@@ -197,6 +212,7 @@ export function selectSuccessModule(
   modules: GeneralFormSuccessModule[],
   defaultModuleId: number | null | undefined,
   ctx: FormSubmissionContext,
+  optionsByItemId?: Record<string, Array<{ label: string; value: string }>>,
 ): GeneralFormSuccessModule | null {
   const enabledModules = modules.filter(m => m.isEnabled);
   const moduleById = new Map(enabledModules.map(m => [m.id, m]));
@@ -207,7 +223,7 @@ export function selectSuccessModule(
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   for (const rule of sortedRules) {
-    if (!evaluateSuccessRule(rule, ctx, merge)) continue;
+    if (!evaluateSuccessRule(rule, ctx, merge, optionsByItemId)) continue;
     const mod = moduleById.get(rule.successModuleId);
     if (mod) return mod;
   }
@@ -228,6 +244,7 @@ export function selectSuccessModuleWithRule(
   modules: GeneralFormSuccessModule[],
   defaultModuleId: number | null | undefined,
   ctx: FormSubmissionContext,
+  optionsByItemId?: Record<string, Array<{ label: string; value: string }>>,
 ): { module: GeneralFormSuccessModule | null; matchedRule: FormSuccessRoutingRuleInput | null } {
   const enabledModules = modules.filter(m => m.isEnabled);
   const moduleById = new Map(enabledModules.map(m => [m.id, m]));
@@ -238,7 +255,7 @@ export function selectSuccessModuleWithRule(
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   for (const rule of sortedRules) {
-    if (!evaluateSuccessRule(rule, ctx, merge)) continue;
+    if (!evaluateSuccessRule(rule, ctx, merge, optionsByItemId)) continue;
     const mod = moduleById.get(rule.successModuleId);
     if (mod) return { module: mod, matchedRule: rule };
   }

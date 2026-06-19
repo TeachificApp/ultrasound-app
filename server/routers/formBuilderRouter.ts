@@ -64,7 +64,12 @@ import {
   accreditationFormSubmissions,
   accreditationFormSuccessModules,
   accreditationFormSuccessRoutingRules,
+  lmsCourses,
+  digitalProducts,
+  digitalBundles,
+  physicalProducts,
 } from "../../drizzle/schema";
+import { getStripeClient } from "../lib/stripeClient";
 import {
   ensureLegacyAccreditationSuccessModules,
   fetchAccreditationSuccessModules,
@@ -860,7 +865,20 @@ export const formBuilderRouter = router({
               submitterName,
               submitterEmail,
             };
-            const { module: selectedModule, matchedRule } = selectSuccessModuleWithRule(rules, modules as any, template.defaultSuccessModuleId ?? null, ctx2);
+            // Build optionsByItemId map for label-as-fallback matching in routing conditions
+            const responseItemIds = Object.keys(finalResponses).map(k => parseInt(k)).filter(n => !isNaN(n));
+            let optionsByItemId2: Record<string, Array<{ label: string; value: string }>> = {};
+            if (responseItemIds.length > 0) {
+              const allOpts2 = await db2.select({ itemId: accreditationFormOptions.itemId, label: accreditationFormOptions.label, value: accreditationFormOptions.value })
+                .from(accreditationFormOptions)
+                .where(inArray(accreditationFormOptions.itemId, responseItemIds));
+              for (const opt of allOpts2) {
+                const key = String(opt.itemId);
+                if (!optionsByItemId2[key]) optionsByItemId2[key] = [];
+                optionsByItemId2[key].push({ label: opt.label, value: opt.value });
+              }
+            }
+            const { module: selectedModule, matchedRule } = selectSuccessModuleWithRule(rules, modules as any, template.defaultSuccessModuleId ?? null, ctx2, optionsByItemId2);
             successOutcome = buildSuccessOutcome(selectedModule as any, template, ctx2);
 
             // Grant access if matched rule has grantAccessActions
@@ -1595,5 +1613,70 @@ ${pageText}`;
       const { computeMultiCrossTab, parseSubmissions } = await import('../../shared/formAnalyticsUtils');
       const submissions = parseSubmissions(rawSubs.map(s => ({ ...s, score: s.score ?? null })));
       return computeMultiCrossTab(items as any, options as any, submissions, input.rowFieldId, input.colFieldIds);
+    }),
+
+  /** List all grantable products (courses, downloads, bundles, physical) for the AccessGrantActionsEditor */
+  listGrantableProducts: protectedProcedure.query(async ({ ctx }) => {
+    await requirePlatformAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+    const [courses, downloads, bundles, physical] = await Promise.all([
+      db.select({ id: lmsCourses.id, title: lmsCourses.title, status: lmsCourses.status })
+        .from(lmsCourses)
+        .where(sql`${lmsCourses.status} != 'archived'`)
+        .orderBy(asc(lmsCourses.title)),
+      db.select({ id: digitalProducts.id, title: digitalProducts.title, status: digitalProducts.status })
+        .from(digitalProducts)
+        .where(sql`${digitalProducts.status} != 'archived'`)
+        .orderBy(asc(digitalProducts.title)),
+      db.select({ id: digitalBundles.id, title: digitalBundles.title })
+        .from(digitalBundles)
+        .orderBy(asc(digitalBundles.title)),
+      db.select({ id: physicalProducts.id, title: physicalProducts.title, status: physicalProducts.status })
+        .from(physicalProducts)
+        .where(sql`${physicalProducts.status} != 'archived'`)
+        .orderBy(asc(physicalProducts.title)),
+    ]);
+    return {
+      courses: courses.map(c => ({ id: c.id, title: c.title, status: c.status })),
+      downloads: downloads.map(d => ({ id: d.id, title: d.title, status: d.status })),
+      bundles: bundles.map(b => ({ id: b.id, title: b.title })),
+      physical: physical.map(p => ({ id: p.id, title: p.title, status: p.status })),
+    };
+  }),
+
+  /** Create a Stripe product + one-time price and return the price ID */
+  createStripeProduct: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(255),
+      description: z.string().optional(),
+      amountCents: z.number().int().min(50), // Stripe minimum $0.50
+      currency: z.string().default('usd'),
+      mode: z.enum(['payment', 'subscription']).default('payment'),
+      interval: z.enum(['month', 'year']).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const stripe = getStripeClient();
+      const product = await stripe.products.create({
+        name: input.name,
+        description: input.description ?? undefined,
+      });
+      let price;
+      if (input.mode === 'subscription' && input.interval) {
+        price = await stripe.prices.create({
+          product: product.id,
+          unit_amount: input.amountCents,
+          currency: input.currency,
+          recurring: { interval: input.interval },
+        });
+      } else {
+        price = await stripe.prices.create({
+          product: product.id,
+          unit_amount: input.amountCents,
+          currency: input.currency,
+        });
+      }
+      return { productId: product.id, priceId: price.id };
     }),
 });

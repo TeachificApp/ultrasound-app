@@ -2306,6 +2306,7 @@ function FormEditor({ templateId }: { templateId: number }) {
           template={template}
           onRefetch={refetch}
           formItems={items.map(i => ({ id: i.id, label: i.label, itemType: i.itemType }))}
+          formOptions={options.map((o: any) => ({ itemId: o.itemId, label: o.label, value: o.value }))}
         />
       )}
 

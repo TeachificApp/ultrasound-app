@@ -33,6 +33,7 @@ import {
   Plus, Copy, Trash2, Eye, Star, GitBranch, MessageSquare, LayoutTemplate, ExternalLink,
 } from "lucide-react";
 import AccessGrantActionsEditor from "@/components/admin/AccessGrantActionsEditor";
+import StripePriceIdPicker from "@/components/admin/StripePriceIdPicker";
 
 const BRAND = "#0e7490";
 
@@ -738,12 +739,10 @@ export default function FormSuccessModulesTab({
                         </select>
                       </div>
                       <div>
-                        <Label className="text-xs">Stripe Price ID</Label>
-                        <Input
-                          value={ruleDraft.stripePriceId ?? ""}
-                          onChange={e => setRuleDraft(r => r ? { ...r, stripePriceId: e.target.value } : r)}
-                          placeholder="price_xxx"
-                          className="mt-1 h-8 text-xs"
+                        <StripePriceIdPicker
+                          value={ruleDraft.stripePriceId ?? undefined}
+                          onChange={v => setRuleDraft(r => r ? { ...r, stripePriceId: v } : r)}
+                          checkoutMode={ruleDraft.stripeCheckoutMode ?? "payment"}
                         />
                       </div>
                     </div>
