@@ -15,10 +15,10 @@
   ],
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663401463434/UrcfdRVE8J6mpMNR48QuFe",
-    "access_key_id": "ASIAZV3A2ECZKN7FDWRB",
-    "secret_access_key": "7ijOAchuJuZuKMhvRgdL8s8JHFCntEiW3b1Q4xqW",
-    "session_token": "IQoJb3JpZ2luX2VjEO7//////////wEaCXVzLWVhc3QtMSJHMEUCIG+V3SG3v/PYQJZOiemEakw/twc+l0x+s5gcpiZyUO20AiEAg6Y2IrTc9m66lNjzAk3ayH7HYGJUHIB10Rs52vZXqg0q/gMItv//////////ARAEGgw2NjUzODYwOTg4NjYiDGesz6nNJfPi33eM9SrSA+lmP0citGq/kLHKXpl/bQqrxXfVwdJ9GXD61PF+pQRGZWNnT7/+WypqBgPDsVjMT20JzL4jsOdbJ0XYFpT+sS+o00eGMBdbOputwV2sASdzUGceDPUmfq3Rl5kzSRI9m3vERLo1gXIZVL6Q/7QJCFuzDhwViqs3TJ8ftweGwBRCv24lJitbx8MMSDKwFa42lDaRBgD5UeSK8/TgjxcsKEiCjmIb1thYFekH/Dz+wq7TxtivSQBRPGMZBCEW0GvZ4IauJ8p6dQO4r5zCvTDVs5PVyspSOZaHhpNBgtRCRolinMkAJj1bW/fEAxs+eCduBn99rPEIkWI0Bqg35YmAt3Tu8FDY2aCJ5mVQKDLZuL1Dx5tNGpJNuDyJZhW402NIWjiIqmJ5W/Z5ewtn+vLwvwzu77uV8jhh4eagHbGsdor/vBH251GSWEdkwrgFM9YCmRmmfSdK86fJ3sTya9MBP/acL7aan3rozcYqG0CpspXpRyNEyThOWW6FFtb0bOqlrhs5Ddw/BgQzSXEBrYjnbp9hVjsGnxek2dPdQOCOfWtNdPnn/jNuII55d9vQjtusRCC0ZH8qq1rFdVaTfO6M4unOg9S2WlVClt/DnRMzHjQ5QgwwtaDT0QY6nQHZxn6RpgIqmnCrL6ZShoQ7P/O6Ub5r79oFjAOkFJJ0SpojVsMQq+Hdi94iRIrwTzR9Vuygveb27h8xT/4UEt9nZwlyfu/QKW8LxxgeILIURISjGeisiPRtiHuuaRdVDTtpjR/dLNU/0geeWcAhIVVfInb3IJHFs9kTw4EWR9Xz0tU3VNCg48jVjKUiWNv3XXJpMjRC2Yq+hybed8WA",
-    "expiration": "2026-06-19T17:14:29.000Z",
+    "access_key_id": "ASIAZV3A2ECZI2X7PC6E",
+    "secret_access_key": "zKGPoHSN2zRrSiSA+t3DTh5L5gr98YCanqc8kgHZ",
+    "session_token": "IQoJb3JpZ2luX2VjEPr//////////wEaCXVzLWVhc3QtMSJHMEUCIGewm93xJXXnlvn8/nffCXhGFWB/0/YK9ZkvQmCmFzbCAiEAh8t7lSL7vSQCYvEvGmm86IbsdlySpgBFseqWzR5snWcq/gMIw///////////ARAEGgw2NjUzODYwOTg4NjYiDEncxTYwDGbZhyIn3yrSA4Xa0z7sCTNcNI7BfGlOhWYO/OToCSLblqEfM46D3fcnrE3U17ZulqodholBdqXHFymeulRm0N5o6C+J9cZqeuBIzeBuzVn9+rJ8zi5RAe0/MvrVN1cUUPJgJ/yNP0KRTzkc2hWhxo2gZ9GdlxqaOd5h7oN9QDGYolt8VIn7cTrSqBui/d4hP3ZS0wJtRCvfj8mhuioVAo9VhuC+OvVgychw66wDxF21okjphGGyjLLTgtzky5gSsPjS87NgMMWK4aCqFUghlpFvwTy2rC8U92/5Nm+5XehYiNHXuEEJuCnFYu+E+m8mssO++lTsccbyx/WjJSXayc6EGiFuJekHdRzOaZfA1/BEJO70NHI5ppyF/lAkD9qwjlCuEHSwIrfc5Z9t5gS7KpkU3/JaT0efCLjea2Y7mvi1oREM2gnpBwqjFR48+K2yLf8ryfkqirmDl95gIwZnfqfVO1Ul5lo4fvcSMq1EUkv207plANfan+enhMlJskluEYtdK0iet9P2Ps0fAGYcu/OywYucyhKh/aeTt3QP8w8nWqlZ+VHomRrSq0HqSJxe50i5r/0KdbyGfeqguljQqgLMm855HuSW6p7o1MPkFVsw6mooTnZ7b8o0QDEwnPzV0QY6nQE+sQ6L3eriuNGcYsMyj1zI8Au1vNNHYFvJA7aKsZkQbU4u7dOQfEAROUHm+ywAZIk6hoSek9s0WLXRZ/2ZZ/PCUcouQL/qVFlgQ/aryjg/x0KjMR1yR16uzM/vnGUsJhbtQLlnwgE8cIYn2RDUC080W5qKpe0JnQqCDqrlv3H7lrPreN49sHGca2thn3Rgzkl0LfSdWjd+mkNUtLVc",
+    "expiration": "2026-06-20T05:36:28.000Z",
     "backend": "GIT_BACKEND_S3"
   },
   "name": "ultrasound-assist",

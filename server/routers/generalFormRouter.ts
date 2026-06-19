@@ -91,6 +91,7 @@ import {
   fireConfiguredFormActions,
   sendFormNotifyEmail,
 } from "../lib/generalFormActions";
+import { createFormStripeCheckout } from "../lib/formStripeCheckout";
 
 type DbConn = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
@@ -481,6 +482,13 @@ export const generalFormRouter = router({
       welcomeImageUrl: z.string().optional(),
       submitButtonText: z.string().optional(),
       emailListId: z.number().nullable().optional(),
+      // Stripe checkout settings
+      stripeEnabled: z.boolean().optional(),
+      stripeCheckoutMode: z.enum(["payment", "subscription"]).optional(),
+      stripePriceId: z.string().nullable().optional(),
+      stripeAmount: z.number().nullable().optional(),
+      stripeSuccessUrl: z.string().nullable().optional(),
+      stripeCancelUrl: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireAdmin(ctx);
@@ -2144,6 +2152,8 @@ ${pageText}`;
       templateId: z.number(),
       responses: z.string(), // JSON: Record<itemId, value>
       userId: z.number().optional(),
+      email: z.string().optional(), // submitter email for Stripe checkout prefill
+      origin: z.string().optional(), // frontend origin for Stripe redirect URLs
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -2374,7 +2384,38 @@ ${pageText}`;
       } catch (e: any) {
         console.error("[SuccessModules] Failed to build success outcome:", e.message);
       }
-      return { id: submissionId, score, maxScore, successOutcome };
+      // Create Stripe checkout session if configured
+      let checkoutUrl: string | null = null;
+      try {
+        if ((template as any).stripeEnabled) {
+          const req = (ctx as any).req;
+          const origin = input.origin ?? req?.headers?.origin ?? req?.headers?.referer?.replace(/\/[^/]*$/, "") ?? "";
+          checkoutUrl = await createFormStripeCheckout({
+            config: {
+              stripeEnabled: true,
+              stripeProductId: (template as any).stripeProductId ?? null,
+              stripePriceId: (template as any).stripePriceId ?? null,
+              stripeAmount: (template as any).stripeAmount ?? null,
+              stripeCheckoutMode: (template as any).stripeCheckoutMode ?? "payment",
+              stripeSuccessUrl: (template as any).stripeSuccessUrl ?? null,
+              stripeCancelUrl: (template as any).stripeCancelUrl ?? null,
+              formName: (template as any).name,
+              formId: (template as any).id,
+            },
+            submissionId,
+            userId: input.userId ?? 0,
+            userEmail: input.email ?? null,
+            userName: null,
+            origin,
+          }).catch((e: any) => {
+            console.error("[FormStripe] General form checkout creation failed:", e.message);
+            return null;
+          });
+        }
+      } catch (e: any) {
+        console.error("[FormStripe] General form checkout error:", e.message);
+      }
+      return { id: submissionId, score, maxScore, successOutcome, checkoutUrl };
     }),
 
     // ── ADMIN: Export form results as CSV-ready data ───────────────────────────

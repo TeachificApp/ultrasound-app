@@ -70,6 +70,7 @@ import FormPreview from "@/components/FormPreview";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import DIYFormSuccessModulesTab from "@/components/admin/DIYFormSuccessModulesTab";
 import DIYFormAnalyticsDeep from "@/components/admin/DIYFormAnalyticsDeep";
+import FormStripeSettingsPanel, { type FormStripeSettings } from "@/components/admin/FormStripeSettingsPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1500,12 +1501,32 @@ function DIYSettingsPanel({ template, templateId, updateTemplateMutation }: {
   const [successMessage, setSuccessMessage] = useState<string>(template.successMessage ?? "");
   const [successRedirectUrl, setSuccessRedirectUrl] = useState<string>(template.successRedirectUrl ?? "");
   const [useRedirect, setUseRedirect] = useState<boolean>(!!template.successRedirectUrl);
+  const [stripeSettings, setStripeSettings] = useState<FormStripeSettings>({
+    stripeEnabled: template.stripeEnabled ?? false,
+    stripeCheckoutMode: template.stripeCheckoutMode ?? "payment",
+    stripePriceId: template.stripePriceId ?? "",
+    stripeAmount: template.stripeAmount ? String(template.stripeAmount / 100) : "",
+    stripeSuccessUrl: template.stripeSuccessUrl ?? "",
+    stripeCancelUrl: template.stripeCancelUrl ?? "",
+  });
 
   const savePostSubmission = () => {
     updateTemplateMutation.mutate({
       id: templateId,
       successMessage: useRedirect ? undefined : (successMessage || undefined),
       successRedirectUrl: useRedirect ? (successRedirectUrl || undefined) : undefined,
+    });
+  };
+
+  const saveStripeSettings = () => {
+    updateTemplateMutation.mutate({
+      id: templateId,
+      stripeEnabled: stripeSettings.stripeEnabled,
+      stripeCheckoutMode: stripeSettings.stripeCheckoutMode,
+      stripePriceId: stripeSettings.stripePriceId || null,
+      stripeAmount: stripeSettings.stripeAmount ? Math.round(parseFloat(stripeSettings.stripeAmount) * 100) : null,
+      stripeSuccessUrl: stripeSettings.stripeSuccessUrl || null,
+      stripeCancelUrl: stripeSettings.stripeCancelUrl || null,
     });
   };
 
@@ -1630,6 +1651,20 @@ function DIYSettingsPanel({ template, templateId, updateTemplateMutation }: {
             }`} />
           </button>
         </div>
+      </div>
+
+      {/* Stripe Checkout */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Stripe Checkout</h3>
+        <FormStripeSettingsPanel value={stripeSettings} onChange={setStripeSettings} />
+        <button
+          type="button"
+          onClick={saveStripeSettings}
+          disabled={updateTemplateMutation.isPending}
+          className="mt-3 px-4 py-2 rounded-md text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
+        >
+          Save Stripe Settings
+        </button>
       </div>
     </div>
   );

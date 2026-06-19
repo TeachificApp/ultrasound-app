@@ -1802,6 +1802,14 @@ export const accreditationFormTemplates = mysqlTable("accreditationFormTemplates
   successRedirectUrl: varchar("successRedirectUrl", { length: 500 }),
   defaultSuccessModuleId: int("defaultSuccessModuleId"),
   passingScorePercent: int("passingScorePercent"),
+  // Stripe checkout settings
+  stripeEnabled: boolean("stripeEnabled").default(false).notNull(),
+  stripeProductId: varchar("stripeProductId", { length: 255 }),
+  stripePriceId: varchar("stripePriceId", { length: 255 }),
+  stripeAmount: int("stripeAmount"), // in cents
+  stripeCheckoutMode: varchar("stripeCheckoutMode", { length: 20 }).default("payment"),
+  stripeSuccessUrl: varchar("stripeSuccessUrl", { length: 500 }),
+  stripeCancelUrl: varchar("stripeCancelUrl", { length: 500 }),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -1987,6 +1995,7 @@ export const accreditationFormSuccessRoutingRules = mysqlTable("accreditationFor
   successModuleId: int("successModuleId").notNull(),
   logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("all"),
   conditions: longtext("conditions").notNull(),
+  grantAccessActions: longtext("grantAccessActions"), // JSON: [{productType, productId}]
   sortOrder: int("sortOrder").notNull().default(0),
   isEnabled: boolean("isEnabled").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

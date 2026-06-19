@@ -76,10 +76,13 @@ import {
 } from "../lib/accreditationFormSuccessModulesDb";
 import {
   selectSuccessModule,
+  selectSuccessModuleWithRule,
   buildSuccessOutcome,
   extractSubmitterInfo,
   type FormSubmissionContext,
 } from "../lib/formSuccessRouting";
+import { createFormStripeCheckout } from "../lib/formStripeCheckout";
+import { applyAccessGrantActions } from "../lib/formAccessGrant";
 
 // ─── Guard helper ─────────────────────────────────────────────────────────────
 
@@ -294,17 +297,30 @@ export const formBuilderRouter = router({
       successRedirectUrl: z.string().optional(),
       defaultSuccessModuleId: z.number().nullable().optional(),
       passingScorePercent: z.number().nullable().optional(),
+      // Stripe checkout settings
+      stripeEnabled: z.boolean().optional(),
+      stripeCheckoutMode: z.enum(["payment", "subscription"]).optional(),
+      stripePriceId: z.string().nullable().optional(),
+      stripeAmount: z.number().nullable().optional(),
+      stripeSuccessUrl: z.string().nullable().optional(),
+      stripeCancelUrl: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requirePlatformAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
-      const { id, defaultSuccessModuleId, passingScorePercent, ...data } = input;
+      const { id, defaultSuccessModuleId, passingScorePercent, stripeEnabled, stripeCheckoutMode, stripePriceId, stripeAmount, stripeSuccessUrl, stripeCancelUrl, ...data } = input;
       await updateFormTemplate(id, data);
-      // Update success module fields directly via Drizzle
+      // Update success module + Stripe fields directly via Drizzle
       const successFields: Record<string, any> = {};
       if (defaultSuccessModuleId !== undefined) successFields.defaultSuccessModuleId = defaultSuccessModuleId;
       if (passingScorePercent !== undefined) successFields.passingScorePercent = passingScorePercent;
+      if (stripeEnabled !== undefined) successFields.stripeEnabled = stripeEnabled;
+      if (stripeCheckoutMode !== undefined) successFields.stripeCheckoutMode = stripeCheckoutMode;
+      if (stripePriceId !== undefined) successFields.stripePriceId = stripePriceId;
+      if (stripeAmount !== undefined) successFields.stripeAmount = stripeAmount;
+      if (stripeSuccessUrl !== undefined) successFields.stripeSuccessUrl = stripeSuccessUrl;
+      if (stripeCancelUrl !== undefined) successFields.stripeCancelUrl = stripeCancelUrl;
       if (Object.keys(successFields).length > 0) {
         await db.update(accreditationFormTemplates)
           .set({ ...successFields, updatedAt: new Date() })
@@ -799,8 +815,9 @@ export const formBuilderRouter = router({
         status: 'submitted',
       });
 
-      // ── Compute successOutcome ────────────────────────────────────────────────
+      // ── Compute successOutcome + Stripe checkout + access grants ─────────────
       let successOutcome: ReturnType<typeof buildSuccessOutcome> | null = null;
+      let checkoutUrl: string | null = null;
       try {
         const db2 = await getDb();
         if (db2) {
@@ -820,15 +837,49 @@ export const formBuilderRouter = router({
               submitterName,
               submitterEmail,
             };
-            const selectedModule = selectSuccessModule(rules, modules as any, template.defaultSuccessModuleId ?? null, ctx2);
+            const { module: selectedModule, matchedRule } = selectSuccessModuleWithRule(rules, modules as any, template.defaultSuccessModuleId ?? null, ctx2);
             successOutcome = buildSuccessOutcome(selectedModule as any, template, ctx2);
+
+            // Grant access if matched rule has grantAccessActions
+            if (matchedRule?.grantAccessActions) {
+              applyAccessGrantActions(db2, matchedRule.grantAccessActions, ctx.user.id).catch((e: any) =>
+                console.error("[FormGrantAccess] DIY form access grant failed:", e.message)
+              );
+            }
+
+            // Create Stripe checkout session if configured
+            if (template.stripeEnabled) {
+              const req = (ctx as any).req;
+              const origin = req?.headers?.origin ?? req?.headers?.referer?.replace(/\/[^/]*$/, "") ?? "";
+              checkoutUrl = await createFormStripeCheckout({
+                config: {
+                  stripeEnabled: true,
+                  stripeProductId: template.stripeProductId ?? null,
+                  stripePriceId: template.stripePriceId ?? null,
+                  stripeAmount: template.stripeAmount ?? null,
+                  stripeCheckoutMode: template.stripeCheckoutMode ?? "payment",
+                  stripeSuccessUrl: template.stripeSuccessUrl ?? null,
+                  stripeCancelUrl: template.stripeCancelUrl ?? null,
+                  formName: template.name,
+                  formId: template.id,
+                },
+                submissionId: id,
+                userId: ctx.user.id,
+                userEmail: (ctx.user as any).email ?? null,
+                userName: (ctx.user as any).name ?? null,
+                origin,
+              }).catch((e: any) => {
+                console.error("[FormStripe] DIY form checkout creation failed:", e.message);
+                return null;
+              });
+            }
           }
         }
       } catch (e: any) {
         console.error("[SuccessOutcome] Failed to compute outcome:", e.message);
       }
 
-      return { id, successOutcome };
+      return { id, successOutcome, checkoutUrl };
     }),
 
   /** Get my own submissions */
@@ -1366,6 +1417,7 @@ ${pageText}`;
       successModuleId: z.number(),
       logicOperator: z.enum(['all', 'any']).default('all'),
       conditions: z.string(),
+      grantAccessActions: z.string().optional(), // JSON array of {productType, productId}
       sortOrder: z.number().default(0),
       isEnabled: z.boolean().default(true),
     }))

@@ -880,9 +880,14 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
   const submitMutation = trpc.generalForm.submitForm.useMutation({
     onSuccess: (result) => {
       setSubmitting(false);
+      postEmbedEvent("form_submitted");
+      // If a Stripe checkout URL was returned, redirect there immediately
+      if ((result as any).checkoutUrl) {
+        window.location.href = (result as any).checkoutUrl;
+        return;
+      }
       setSubmitted(true);
       if (result.successOutcome) setSuccessOutcome(result.successOutcome as SuccessOutcomePayload);
-      postEmbedEvent("form_submitted");
     },
     onError: (e) => { setSubmitting(false); setGlobalError(e.message); },
   });
@@ -893,7 +898,14 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
   const handleSubmit = (responses: Record<string, any>) => {
     setGlobalError("");
     setSubmitting(true);
-    submitMutation.mutate({ templateId: data!.template.id, responses: JSON.stringify(responses) });
+    // Extract email from responses for Stripe prefill
+    const emailVal = Object.values(responses).find(v => typeof v === "string" && v.includes("@")) as string | undefined;
+    submitMutation.mutate({
+      templateId: data!.template.id,
+      responses: JSON.stringify(responses),
+      origin: window.location.origin,
+      email: emailVal,
+    });
   };
 
   // ── Loading ──

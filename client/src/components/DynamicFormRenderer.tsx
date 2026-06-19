@@ -528,6 +528,11 @@ export default function DynamicFormRenderer({
       setSubmitting(false);
       toast.success("Form submitted successfully");
       onSubmitted?.(data.id);
+      // If a Stripe checkout URL was returned, redirect there immediately
+      if ((data as any).checkoutUrl) {
+        window.location.href = (data as any).checkoutUrl;
+        return;
+      }
       // Use successOutcome if available, fall back to legacy fields
       if (data.successOutcome) {
         if (data.successOutcome.type === "redirect_url" && data.successOutcome.redirectUrl) {

@@ -32,6 +32,7 @@ import { Block } from "@/components/BlockPreview";
 import {
   Plus, Copy, Trash2, Eye, Star, GitBranch, MessageSquare, LayoutTemplate, ExternalLink,
 } from "lucide-react";
+import AccessGrantActionsEditor from "@/components/admin/AccessGrantActionsEditor";
 
 const BRAND = "#0e7490";
 
@@ -75,6 +76,7 @@ type RoutingRuleDraft = {
   successModuleId: number;
   logicOperator: "all" | "any";
   conditions: RoutingCondition[];
+  grantAccessActions?: string;
   isEnabled: boolean;
   sortOrder: number;
 };
@@ -243,6 +245,7 @@ export default function FormSuccessModulesTab({
       successModuleId: ruleDraft.successModuleId,
       logicOperator: ruleDraft.logicOperator,
       conditions: JSON.stringify(ruleDraft.conditions),
+      grantAccessActions: ruleDraft.grantAccessActions || undefined,
       sortOrder: ruleDraft.sortOrder,
       isEnabled: ruleDraft.isEnabled,
     });
@@ -525,6 +528,12 @@ export default function FormSuccessModulesTab({
               } : r)}>
                 Add condition
               </Button>
+              <div className="pt-2 border-t border-gray-100">
+                <AccessGrantActionsEditor
+                  value={ruleDraft?.grantAccessActions}
+                  onChange={v => setRuleDraft(r => r ? { ...r, grantAccessActions: v } : r)}
+                />
+              </div>
             </div>
           )}
           <DialogFooter>

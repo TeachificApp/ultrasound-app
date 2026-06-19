@@ -87,6 +87,7 @@ import FormSuccessModulesTab from "@/components/admin/FormSuccessModulesTab";
 import FormResultsTable from "@/components/admin/FormResultsTable";
 import FormAnalyticsDeep from "@/components/admin/FormAnalyticsDeep";
 import { mergeExtraConfig, isAdminOnlyItem, type SavedResultsFilter, type FormActionConfig } from "@shared/formItemUtils";
+import FormStripeSettingsPanel, { type FormStripeSettings } from "@/components/admin/FormStripeSettingsPanel";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BRAND = "#0e7490";
@@ -1764,6 +1765,14 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
   const [welcomeImageUrl, setWelcomeImageUrl] = useState(template.welcomeImageUrl ?? "");
   const [submitButtonText, setSubmitButtonText] = useState(template.submitButtonText ?? "");
   const [emailListId, setEmailListId] = useState<number | null>(template.emailListId ?? null);
+  const [stripeSettings, setStripeSettings] = useState<FormStripeSettings>({
+    stripeEnabled: template.stripeEnabled ?? false,
+    stripeCheckoutMode: template.stripeCheckoutMode ?? "payment",
+    stripePriceId: template.stripePriceId ?? "",
+    stripeAmount: template.stripeAmount ? String(template.stripeAmount / 100) : "",
+    stripeSuccessUrl: template.stripeSuccessUrl ?? "",
+    stripeCancelUrl: template.stripeCancelUrl ?? "",
+  });
 
   const { data: emailListsData } = trpc.emailCampaign.listEmailLists.useQuery();
 
@@ -1791,6 +1800,12 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
       welcomeImageUrl: welcomeImageUrl || undefined,
       submitButtonText: submitButtonText || undefined,
       emailListId: emailListId ?? undefined,
+      stripeEnabled: stripeSettings.stripeEnabled,
+      stripeCheckoutMode: stripeSettings.stripeCheckoutMode,
+      stripePriceId: stripeSettings.stripePriceId || null,
+      stripeAmount: stripeSettings.stripeAmount ? Math.round(parseFloat(stripeSettings.stripeAmount) * 100) : null,
+      stripeSuccessUrl: stripeSettings.stripeSuccessUrl || null,
+      stripeCancelUrl: stripeSettings.stripeCancelUrl || null,
     });
   };
 
@@ -1983,6 +1998,13 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
       </Card>
 
       <ResultsSettingsPanel formId={formId} />
+
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Stripe Checkout</CardTitle></CardHeader>
+        <CardContent>
+          <FormStripeSettingsPanel value={stripeSettings} onChange={setStripeSettings} />
+        </CardContent>
+      </Card>
 
       <Button onClick={save} disabled={!name.trim() || updateForm.isPending} className="w-full text-white gap-2" style={{ background: BRAND }}>
         {updateForm.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
