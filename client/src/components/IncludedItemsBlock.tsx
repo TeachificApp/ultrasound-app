@@ -1,9 +1,16 @@
 /**
  * IncludedItemsBlock.tsx
  * Renders the "Included Items" content block for membership and bundle landing pages.
- * Items are passed in from the parent page (already fetched + ordered by sortOrder).
+ * Card layout mirrors RelatedProductsBlock.ProductCard exactly:
+ *  - Fixed h-36 thumbnail (never grows)
+ *  - Type badge with icon (10px uppercase)
+ *  - Title: max 2 lines (line-clamp-2)
+ *  - Description: max 2 lines (line-clamp-2), flex-1
+ *  - Footer: "Included" badge pinned to bottom
+ *
+ * App-type items receive a gradient overlay with the app name (same as RelatedProductsBlock).
  */
-import { BookOpen, FileDown, HelpCircle, Package, Radio, Users, Globe, Check } from "lucide-react";
+import { BookOpen, FileDown, HelpCircle, Package, Radio, Users, Globe, Check, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -16,6 +23,10 @@ export interface IncludedItem {
   itemSlug?: string | null;
   itemCoverImage?: string | null;
   label?: string | null;
+  /** For app-type items: short name shown in the gradient overlay */
+  appLabel?: string | null;
+  /** Short description shown under the title */
+  itemDescription?: string | null;
 }
 
 export interface IncludedItemsBlockData {
@@ -34,84 +45,126 @@ export interface IncludedItemsBlockData {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const TYPE_ICONS: Record<string, React.ReactNode> = {
-  course: <BookOpen className="w-5 h-5 text-teal-600" />,
-  download: <FileDown className="w-5 h-5 text-blue-600" />,
-  quiz: <HelpCircle className="w-5 h-5 text-purple-600" />,
-  webinar: <Radio className="w-5 h-5 text-rose-600" />,
-  community: <Users className="w-5 h-5 text-emerald-600" />,
-  bundle: <Package className="w-5 h-5 text-orange-600" />,
-  product: <Package className="w-5 h-5 text-orange-600" />,
-  all_courses: <BookOpen className="w-5 h-5 text-teal-600" />,
-  all_downloads: <FileDown className="w-5 h-5 text-blue-600" />,
-  ultrasoundassist_free: <Globe className="w-5 h-5 text-teal-600" />,
-  ultrasoundassist_premium: <Globe className="w-5 h-5 text-teal-600" />,
-  echoassist_free: <Globe className="w-5 h-5 text-teal-600" />,
-  echoassist_premium: <Globe className="w-5 h-5 text-teal-600" />,
-};
+type IconComponent = React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>;
 
-const TYPE_LABELS: Record<string, string> = {
-  course: "Course",
-  download: "Download",
-  quiz: "Quiz",
-  webinar: "Webinar",
-  community: "Community",
-  bundle: "Bundle",
-  product: "Product",
-  all_courses: "All Courses",
-  all_downloads: "All Downloads",
-  ultrasoundassist_free: "UltrasoundAssist™",
-  ultrasoundassist_premium: "UltrasoundAssist™",
-  echoassist_free: "EchoAssist™",
-  echoassist_premium: "EchoAssist™",
-};
+function typeInfo(type: string): { Icon: IconComponent; label: string } {
+  switch (type) {
+    case "course":                  return { Icon: BookOpen,     label: "Course" };
+    case "cohort":                  return { Icon: BookOpen,     label: "Cohort" };
+    case "quiz":                    return { Icon: HelpCircle,   label: "Quiz" };
+    case "download":                return { Icon: FileDown,     label: "Digital Download" };
+    case "bundle":                  return { Icon: Package,      label: "Bundle" };
+    case "product":                 return { Icon: Package,      label: "Product" };
+    case "webinar":                 return { Icon: Radio,        label: "Webinar" };
+    case "community":               return { Icon: Users,        label: "Community" };
+    case "workshop":                return { Icon: BookOpen,     label: "Workshop" };
+    case "all_courses":             return { Icon: BookOpen,     label: "All Courses" };
+    case "all_downloads":           return { Icon: FileDown,     label: "All Downloads" };
+    case "ultrasoundassist_free":   return { Icon: Globe,        label: "UltrasoundAssist™" };
+    case "ultrasoundassist_premium":return { Icon: Globe,        label: "UltrasoundAssist™" };
+    case "echoassist_free":         return { Icon: Globe,        label: "EchoAssist™" };
+    case "echoassist_premium":      return { Icon: Globe,        label: "EchoAssist™" };
+    default:                        return { Icon: Package,      label: type };
+  }
+}
 
 function itemHref(item: IncludedItem): string | null {
   if (!item.itemSlug) return null;
   switch (item.itemType) {
-    case "course": return `/courses/${item.itemSlug}`;
-    case "download": return `/downloads/${item.itemSlug}`;
-    case "webinar": return `/webinars/${item.itemSlug}`;
+    case "course":    return `/courses/${item.itemSlug}`;
+    case "download":  return `/downloads/${item.itemSlug}`;
+    case "webinar":   return `/webinars/${item.itemSlug}`;
     case "community": return `/community/${item.itemSlug}`;
-    default: return null;
+    default:          return null;
   }
 }
 
+/** Derive a short app name for the gradient overlay on app-type items */
+function appOverlayLabel(item: IncludedItem): string | null {
+  if (item.appLabel) return item.appLabel;
+  if (item.itemType === "ultrasoundassist_free")    return "UltrasoundAssist™";
+  if (item.itemType === "ultrasoundassist_premium") return "UltrasoundAssist™";
+  if (item.itemType === "echoassist_free")          return "EchoAssist™";
+  if (item.itemType === "echoassist_premium")       return "EchoAssist™";
+  return null;
+}
+
+const IS_APP_TYPE = new Set([
+  "ultrasoundassist_free", "ultrasoundassist_premium",
+  "echoassist_free", "echoassist_premium",
+]);
+
 // ─── Grid Card ────────────────────────────────────────────────────────────────
+// Mirrors RelatedProductsBlock.ProductCard layout exactly.
 
 function GridCard({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData }) {
-  const accent = d.accentColor ?? "#179ca3";
-  const cardBg = d.cardBgColor ?? "#ffffff";
-  const textCol = d.textColor ?? "#111827";
-  const href = itemHref(item);
-  const displayTitle = item.itemTitle ?? item.label ?? `${TYPE_LABELS[item.itemType] ?? item.itemType} #${item.itemId}`;
+  const accent   = d.accentColor  ?? "#179ca3";
+  const cardBg   = d.cardBgColor  ?? "#ffffff";
+  const textCol  = d.textColor    ?? "#111827";
+  const href     = itemHref(item);
+  const { Icon, label } = typeInfo(item.itemType);
+  const displayTitle = item.itemTitle ?? item.label ?? `${label} #${item.itemId}`;
+  const isApp    = IS_APP_TYPE.has(item.itemType);
+  const overlayLabel = isApp ? appOverlayLabel(item) : null;
 
   const inner = (
     <div
-      className="rounded-xl border border-gray-200 overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow"
+      className="rounded-xl border border-gray-200 overflow-hidden flex flex-col shadow-sm hover:shadow-md transition-shadow h-full"
       style={{ backgroundColor: cardBg }}
     >
-      {/* Cover image or placeholder */}
+      {/* Fixed-height thumbnail — never grows */}
       {d.showCoverImage !== false && (
-        item.itemCoverImage ? (
-          <img src={item.itemCoverImage} alt={displayTitle} className="w-full h-28 object-cover" />
-        ) : (
-          <div className="w-full h-28 flex items-center justify-center" style={{ backgroundColor: accent + "22" }}>
-            {TYPE_ICONS[item.itemType] ?? <Package className="w-8 h-8" style={{ color: accent }} />}
-          </div>
-        )
+        <div className="h-36 flex-shrink-0 overflow-hidden relative">
+          {item.itemCoverImage ? (
+            <img src={item.itemCoverImage} alt={displayTitle} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: accent + "22" }}>
+              <Icon size={36} style={{ color: accent, opacity: 0.6 }} />
+            </div>
+          )}
+          {/* App name overlay — same gradient treatment as RelatedProductsBlock */}
+          {overlayLabel && (
+            <div className="absolute inset-0 flex items-end justify-start p-3 bg-gradient-to-t from-black/70 via-black/20 to-transparent">
+              <span className="text-white font-bold text-sm leading-tight drop-shadow-md">{overlayLabel}</span>
+            </div>
+          )}
+        </div>
       )}
-      <div className="p-4 flex-1 flex flex-col">
+
+      {/* Body — grows to fill remaining space */}
+      <div className="p-4 flex flex-col flex-1">
+        {/* Type badge */}
         {d.showTypeLabel !== false && (
-          <span className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: accent }}>
-            {TYPE_LABELS[item.itemType] ?? item.itemType}
+          <span
+            className="text-[10px] font-semibold uppercase tracking-widest mb-1 flex items-center gap-1 flex-shrink-0"
+            style={{ color: accent }}
+          >
+            <Icon size={10} /> {label}
           </span>
         )}
-        <p className="font-semibold text-sm leading-snug flex-1" style={{ color: textCol }}>{displayTitle}</p>
+
+        {/* Title — max 2 lines */}
+        <h3
+          className="font-bold text-sm leading-snug mb-1 line-clamp-2 flex-shrink-0"
+          style={{ color: textCol }}
+        >
+          {displayTitle}
+        </h3>
+
+        {/* Description — max 2 lines, grows to fill space */}
+        {item.itemDescription ? (
+          <p className="text-xs text-gray-500 line-clamp-2 flex-1 min-h-0">
+            {item.itemDescription.replace(/<[^>]+>/g, "").slice(0, 160)}
+          </p>
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        {/* Footer — "Included" badge pinned to bottom */}
         {d.showCheckIcon !== false && (
-          <div className="mt-3 flex items-center gap-1">
-            <Check className="w-4 h-4" style={{ color: accent }} />
-            <span className="text-xs" style={{ color: accent }}>Included</span>
+          <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-gray-100 flex-shrink-0">
+            <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accent }} />
+            <span className="text-xs font-semibold" style={{ color: accent }}>Included</span>
           </div>
         )}
       </div>
@@ -125,28 +178,31 @@ function GridCard({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData }
 // ─── List Row ─────────────────────────────────────────────────────────────────
 
 function ListRow({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData }) {
-  const accent = d.accentColor ?? "#179ca3";
-  const cardBg = d.cardBgColor ?? "#ffffff";
-  const textCol = d.textColor ?? "#111827";
-  const href = itemHref(item);
-  const displayTitle = item.itemTitle ?? item.label ?? `${TYPE_LABELS[item.itemType] ?? item.itemType} #${item.itemId}`;
+  const accent   = d.accentColor  ?? "#179ca3";
+  const cardBg   = d.cardBgColor  ?? "#ffffff";
+  const textCol  = d.textColor    ?? "#111827";
+  const href     = itemHref(item);
+  const { Icon, label } = typeInfo(item.itemType);
+  const displayTitle = item.itemTitle ?? item.label ?? `${label} #${item.itemId}`;
 
   const inner = (
     <div
       className="flex items-center gap-4 rounded-xl border border-gray-200 px-4 py-3 hover:shadow-sm transition-shadow"
       style={{ backgroundColor: cardBg }}
     >
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: accent + "18" }}>
+      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden" style={{ backgroundColor: accent + "18" }}>
         {item.itemCoverImage && d.showCoverImage !== false ? (
           <img src={item.itemCoverImage} alt="" className="w-10 h-10 rounded-lg object-cover" />
         ) : (
-          TYPE_ICONS[item.itemType] ?? <Package className="w-5 h-5" style={{ color: accent }} />
+          <Icon size={20} style={{ color: accent }} />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm truncate" style={{ color: textCol }}>{displayTitle}</p>
         {d.showTypeLabel !== false && (
-          <p className="text-xs" style={{ color: accent }}>{TYPE_LABELS[item.itemType] ?? item.itemType}</p>
+          <p className="text-xs flex items-center gap-1" style={{ color: accent }}>
+            <Icon size={10} /> {label}
+          </p>
         )}
       </div>
       {d.showCheckIcon !== false && <Check className="w-5 h-5 shrink-0" style={{ color: accent }} />}
@@ -165,18 +221,18 @@ interface IncludedItemsBlockProps {
 }
 
 export default function IncludedItemsBlock({ data: d, items }: IncludedItemsBlockProps) {
-  const bgColor = d.bgColor ?? "#f9fafb";
+  const bgColor = d.bgColor  ?? "#f9fafb";
   const textCol = d.textColor ?? "#111827";
-  const layout = d.layout ?? "grid";
-  const cols = d.columns ?? 3;
+  const layout  = d.layout   ?? "grid";
+  const cols    = d.columns  ?? 3;
 
   const colClass =
     layout === "grid"
       ? cols === 4
-        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch"
         : cols === 2
-        ? "grid grid-cols-1 sm:grid-cols-2 gap-4"
-        : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+        ? "grid grid-cols-1 sm:grid-cols-2 gap-5 items-stretch"
+        : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch"
       : "space-y-3";
 
   if (items.length === 0) return null;

@@ -112,17 +112,19 @@ const getMembershipBySlug = publicProcedure
       if (item.itemType === "all_downloads") {
         return { ...item, itemTitle: item.label ?? "All Downloads", itemSlug: null, itemCoverImage: null };
       }
+      const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
+      const IHE_LOGO  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
       if (item.itemType === "ultrasoundassist_free") {
-        return { ...item, itemTitle: item.label ?? "UltrasoundAssist™ (Free Member)", itemSlug: null, itemCoverImage: null };
+        return { ...item, itemTitle: item.label ?? "UltrasoundAssist™ (Free Member)", itemSlug: null, itemCoverImage: AAUS_LOGO, appLabel: "UltrasoundAssist™" };
       }
       if (item.itemType === "ultrasoundassist_premium") {
-        return { ...item, itemTitle: item.label ?? "UltrasoundAssist™ (Premium)", itemSlug: null, itemCoverImage: null };
+        return { ...item, itemTitle: item.label ?? "UltrasoundAssist™ (Premium)", itemSlug: null, itemCoverImage: AAUS_LOGO, appLabel: "UltrasoundAssist™" };
       }
       if (item.itemType === "echoassist_free") {
-        return { ...item, itemTitle: item.label ?? "EchoAssist™ (Free Member)", itemSlug: null, itemCoverImage: null };
+        return { ...item, itemTitle: item.label ?? "EchoAssist™ (Free Member)", itemSlug: null, itemCoverImage: IHE_LOGO, appLabel: "EchoAssist™" };
       }
       if (item.itemType === "echoassist_premium") {
-        return { ...item, itemTitle: item.label ?? "EchoAssist™ (Premium)", itemSlug: null, itemCoverImage: null };
+        return { ...item, itemTitle: item.label ?? "EchoAssist™ (Premium)", itemSlug: null, itemCoverImage: IHE_LOGO, appLabel: "EchoAssist™" };
       }
 
       if (!item.itemId) return { ...item, itemTitle: item.label, itemSlug: null, itemCoverImage: null };
