@@ -5110,6 +5110,12 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               <div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocation ?? true} onChange={e => set("showLocation", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show location</label></div>
               <div className="flex items-center gap-2"><input type="checkbox" checked={d.showEnrollNow ?? true} onChange={e => set("showEnrollNow", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Enroll Now button on each card</label></div>
               <div className="flex items-center gap-2"><input type="checkbox" checked={d.showCompletedGroups ?? false} onChange={e => set("showCompletedGroups", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show completed/past cohort groups</label></div>
+              {(d.cardDisplayMode ?? "stacked") === "stacked" && (
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={d.nextUpcomingOnly ?? false} onChange={e => set("nextUpcomingOnly", e.target.checked)} className="rounded" />
+                  <label className="text-xs text-gray-600">Show next upcoming only (ignores in-progress &amp; past)</label>
+                </div>
+              )}
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Enroll Now Button Text</label>
                 <input type="text" className="w-full h-8 text-xs border rounded px-2" value={d.enrollNowText ?? "Enroll Now"} onChange={e => set("enrollNowText", e.target.value)} placeholder="Enroll Now" />
@@ -5312,6 +5318,12 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDuration ?? true} onChange={e => set("showDuration", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show duration / hours</label></div>
                   <div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocation ?? true} onChange={e => set("showLocation", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show location</label></div>
                   <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPastSessions ?? false} onChange={e => set("showPastSessions", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show past sessions</label></div>
+                  {displayMode === "list" && (
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" checked={d.nextUpcomingOnly ?? false} onChange={e => set("nextUpcomingOnly", e.target.checked)} className="rounded" />
+                      <label className="text-xs text-gray-600">Show next upcoming only (ignores in-progress &amp; past)</label>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2"><input type="checkbox" checked={d.showEnrollNow ?? true} onChange={e => set("showEnrollNow", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Enroll Now button on each card</label></div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Enroll Now Button Text</label>

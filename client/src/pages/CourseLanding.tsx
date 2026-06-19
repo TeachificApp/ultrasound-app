@@ -1012,6 +1012,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         const nowMs = nowMsCSA;
         const groupSelectionMode = d.groupSelectionMode ?? "all";
         const selectedGroupIds: number[] = d.selectedGroupIds ?? [];
+        const nextUpcomingOnlyCSA = d.nextUpcomingOnly === true;
         const visibleGroups = (() => {
           let groups = groupSelectionMode === "manual" && selectedGroupIds.length > 0
             ? allGroups.filter((g: any) => selectedGroupIds.includes(g.id))
@@ -1022,6 +1023,13 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
             if (g.endDate && new Date(g.endDate).getTime() < nowMs) return false;
             return true;
           });
+          if (nextUpcomingOnlyCSA) {
+            // Keep only the single next upcoming open group (not in-progress, not past)
+            const upcoming = groups
+              .filter((g: any) => g.status === "open" && g.startDate && new Date(g.startDate).getTime() > nowMs)
+              .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+            return upcoming.length > 0 ? [upcoming[0]] : [];
+          }
           // Sort: in-progress first, then upcoming by start date
           groups = groups.sort((a: any, b: any) => {
             const aInProgress = a.status === "active";
@@ -1181,6 +1189,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         if (g.status === "active" && !g.enrollmentCloseDate) return true;
         return false;
       };
+      const nextUpcomingOnlyCICA = d.nextUpcomingOnly === true;
       const visibleGroupsCICA = (() => {
         let groups = groupSelectionModeCICA === "manual" && selectedGroupIdsCICA.length > 0
           ? allGroupsCICA.filter((g: any) => selectedGroupIdsCICA.includes(g.id))
@@ -1189,6 +1198,14 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         groups = groups.filter((g: any) => !g.endDate || new Date(g.endDate).getTime() >= nowMsCICA);
         if (!showCompletedGroupsCICA) {
           groups = groups.filter((g: any) => g.status !== "completed");
+        }
+        if (nextUpcomingOnlyCICA) {
+          // Keep only the single next upcoming group: startDate strictly in the future,
+          // status is "open" (not in-progress / active / completed), sorted by startDate asc.
+          const upcoming = groups
+            .filter((g: any) => g.status === "open" && g.startDate && new Date(g.startDate).getTime() > nowMsCICA)
+            .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+          return upcoming.length > 0 ? [upcoming[0]] : [];
         }
         return groups;
       })();
@@ -2890,7 +2907,23 @@ function CICAWorkshopBlock({ data: d, onCheckoutPage }: { data: any; onCheckoutP
       </div>
     );
   }
-  const instances: any[] = fetchedInstances ?? [];
+  const nextUpcomingOnlyWorkshop = d.nextUpcomingOnly === true;
+  const nowWorkshop = Date.now();
+  const allInstances: any[] = fetchedInstances ?? [];
+  // Apply nextUpcomingOnly: keep only the single next upcoming instance (startDate in future, not cancelled/completed/in-progress)
+  const instances: any[] = (() => {
+    if (!nextUpcomingOnlyWorkshop || cardDisplayMode === "embed") return allInstances;
+    const upcoming = allInstances
+      .filter((inst: any) =>
+        inst.startDate &&
+        new Date(inst.startDate).getTime() > nowWorkshop &&
+        inst.status !== "cancelled" &&
+        inst.status !== "completed" &&
+        inst.status !== "active"
+      )
+      .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    return upcoming.length > 0 ? [upcoming[0]] : [];
+  })();
   if (instances.length === 0) return null;
   const fmtDate = (dt: Date | string | null | undefined) => {
     if (!dt) return null;
