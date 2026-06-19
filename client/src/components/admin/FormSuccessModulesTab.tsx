@@ -42,22 +42,82 @@ const MODULE_TYPE_LABELS: Record<string, string> = {
   redirect_url: "Redirect to URL",
 };
 
-const ROUTING_OPERATORS = [
-  { value: "equals", label: "equals" },
-  { value: "not_equals", label: "does not equal" },
+// Field-type-aware operator sets (Formsite-matching)
+const OPERATORS_CHOICE = [
+  { value: "equals", label: "is" },
+  { value: "not_equals", label: "is not" },
   { value: "contains", label: "contains" },
-  { value: "greater_or_equal", label: "≥" },
-  { value: "less_than", label: "<" },
   { value: "is_empty", label: "is empty" },
   { value: "is_not_empty", label: "is not empty" },
 ];
-
-const SPECIAL_FIELDS = [
-  { value: "__score_percent__", label: "Score (%)" },
-  { value: "__score__", label: "Score (points)" },
-  { value: "__pass_status__", label: "Pass / Fail" },
-  { value: "__payment_status__", label: "Payment status" },
+const OPERATORS_NUMBER = [
+  { value: "equals", label: "=" },
+  { value: "not_equals", label: "\u2260" },
+  { value: "greater_or_equal", label: "\u2265" },
+  { value: "less_than", label: "<" },
+  { value: "greater_than", label: ">" },
+  { value: "less_or_equal", label: "\u2264" },
+  { value: "is_empty", label: "is empty" },
+  { value: "is_not_empty", label: "is not empty" },
 ];
+const OPERATORS_TEXT = [
+  { value: "equals", label: "is" },
+  { value: "not_equals", label: "is not" },
+  { value: "contains", label: "contains" },
+  { value: "starts_with", label: "starts with" },
+  { value: "ends_with", label: "ends with" },
+  { value: "is_empty", label: "is empty" },
+  { value: "is_not_empty", label: "is not empty" },
+];
+const OPERATORS_PASS = [
+  { value: "equals", label: "is" },
+  { value: "not_equals", label: "is not" },
+];
+const CHOICE_FIELD_TYPES = ["radio", "checkbox", "dropdown", "select", "multiple_choice", "likert", "yes_no"];
+const NUMBER_FIELD_TYPES = ["number", "slider", "rating", "score", "scale", "integer"];
+
+const SPECIAL_FIELDS: { value: string; label: string; fieldType: string }[] = [
+  { value: "__score_percent__", label: "Score (%)", fieldType: "number" },
+  { value: "__score__", label: "Score (points)", fieldType: "number" },
+  { value: "__pass_status__", label: "Pass / Fail", fieldType: "pass" },
+  { value: "__payment_status__", label: "Payment status", fieldType: "choice" },
+];
+
+function getOperatorsForType(fieldType: string) {
+  if (CHOICE_FIELD_TYPES.includes(fieldType) || fieldType === "choice") return OPERATORS_CHOICE;
+  if (NUMBER_FIELD_TYPES.includes(fieldType)) return OPERATORS_NUMBER;
+  if (fieldType === "pass") return OPERATORS_PASS;
+  return OPERATORS_TEXT;
+}
+
+function getChoicesForField(
+  fieldId: string,
+  formData: any,
+): { label: string; value: string }[] | null {
+  if (fieldId === "__pass_status__") return [{ label: "Pass", value: "pass" }, { label: "Fail", value: "fail" }];
+  if (fieldId === "__payment_status__") return [{ label: "Paid", value: "paid" }, { label: "Unpaid", value: "unpaid" }, { label: "Pending", value: "pending" }];
+  if (!formData) return null;
+  const item = (formData.items ?? []).find((i: any) => String(i.id) === fieldId);
+  if (!item) return null;
+  if (!CHOICE_FIELD_TYPES.includes(item.itemType ?? "")) return null;
+  // Prefer the flat options array returned by getForm
+  const opts = (formData.options ?? []).filter((o: any) => o.itemId === item.id);
+  if (opts.length) return opts.map((o: any) => ({ label: o.label, value: String(o.value ?? o.label) }));
+  // Fallback: extraConfig choices
+  try {
+    const ec = typeof item.extraConfig === "string" ? JSON.parse(item.extraConfig) : (item.extraConfig ?? {});
+    const choices: any[] = ec?.choices ?? ec?.options ?? [];
+    if (choices.length) return choices.map((c: any) => ({ label: c.label ?? c.text ?? String(c), value: String(c.value ?? c.label ?? c) }));
+  } catch {}
+  return null;
+}
+
+function getFieldType(fieldId: string, formData: any): string {
+  const special = SPECIAL_FIELDS.find(s => s.value === fieldId);
+  if (special) return special.fieldType;
+  const item = (formData?.items ?? []).find((i: any) => String(i.id) === fieldId);
+  return item?.itemType ?? "text";
+}
 
 type ModuleDraft = {
   id?: number;
@@ -564,53 +624,85 @@ export default function FormSuccessModulesTab({
                   </SelectContent>
                 </Select>
               </div>
-              {ruleDraft.conditions.map((cond, idx) => (
-                <div key={cond.id} className="grid grid-cols-12 gap-2 items-end border border-gray-100 rounded-lg p-2">
-                  <div className="col-span-4">
-                    <Label className="text-[10px]">Field</Label>
-                    <Select value={cond.fieldId} onValueChange={v => setRuleDraft(r => {
-                      if (!r) return r;
-                      const conditions = [...r.conditions];
-                      conditions[idx] = { ...conditions[idx], fieldId: v };
-                      return { ...r, conditions };
-                    })}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {fieldOptions.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+              {ruleDraft.conditions.map((cond, idx) => {
+                const fieldType = getFieldType(cond.fieldId, formData);
+                const operators = getOperatorsForType(fieldType);
+                const choices = getChoicesForField(cond.fieldId, formData);
+                const noValue = ["is_empty", "is_not_empty"].includes(cond.operator);
+                return (
+                  <div key={cond.id} className="border border-gray-100 rounded-lg p-2 space-y-2">
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-5">
+                        <Label className="text-[10px] text-gray-500">Field</Label>
+                        <Select value={cond.fieldId} onValueChange={v => setRuleDraft(r => {
+                          if (!r) return r;
+                          const conditions = [...r.conditions];
+                          const newType = getFieldType(v, formData);
+                          const newOps = getOperatorsForType(newType);
+                          const op = newOps.find(o => o.value === conditions[idx].operator) ? conditions[idx].operator : newOps[0].value;
+                          conditions[idx] = { ...conditions[idx], fieldId: v, operator: op, value: "" };
+                          return { ...r, conditions };
+                        })}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__special__" disabled className="text-[10px] text-gray-400 font-semibold">— Special fields —</SelectItem>
+                            {SPECIAL_FIELDS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                            {fieldOptions.filter(f => !SPECIAL_FIELDS.find(s => s.value === f.value)).length > 0 && (
+                              <SelectItem value="__form__" disabled className="text-[10px] text-gray-400 font-semibold">— Form fields —</SelectItem>
+                            )}
+                            {fieldOptions.filter(f => !SPECIAL_FIELDS.find(s => s.value === f.value)).map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-4">
+                        <Label className="text-[10px] text-gray-500">Operator</Label>
+                        <Select value={cond.operator} onValueChange={v => setRuleDraft(r => {
+                          if (!r) return r;
+                          const conditions = [...r.conditions];
+                          conditions[idx] = { ...conditions[idx], operator: v };
+                          return { ...r, conditions };
+                        })}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {operators.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" className="col-span-3 text-red-400 h-8 mt-4" onClick={() => setRuleDraft(r => r ? { ...r, conditions: r.conditions.filter(c => c.id !== cond.id) } : r)}>Remove</Button>
+                    </div>
+                    {!noValue && (
+                      <div>
+                        <Label className="text-[10px] text-gray-500">Value</Label>
+                        {choices ? (
+                          <Select value={cond.value} onValueChange={v => setRuleDraft(r => {
+                            if (!r) return r;
+                            const conditions = [...r.conditions];
+                            conditions[idx] = { ...conditions[idx], value: v };
+                            return { ...r, conditions };
+                          })}>
+                            <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="Select a choice…" /></SelectTrigger>
+                            <SelectContent>
+                              {choices.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input value={cond.value} onChange={e => setRuleDraft(r => {
+                            if (!r) return r;
+                            const conditions = [...r.conditions];
+                            conditions[idx] = { ...conditions[idx], value: e.target.value };
+                            return { ...r, conditions };
+                          })} className="h-8 text-xs mt-0.5" placeholder={NUMBER_FIELD_TYPES.includes(fieldType) ? "e.g. 80" : "Enter value…"} />
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="col-span-3">
-                    <Label className="text-[10px]">Operator</Label>
-                    <Select value={cond.operator} onValueChange={v => setRuleDraft(r => {
-                      if (!r) return r;
-                      const conditions = [...r.conditions];
-                      conditions[idx] = { ...conditions[idx], operator: v };
-                      return { ...r, conditions };
-                    })}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {ROUTING_OPERATORS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-4">
-                    <Label className="text-[10px]">Value</Label>
-                    <Input value={cond.value} onChange={e => setRuleDraft(r => {
-                      if (!r) return r;
-                      const conditions = [...r.conditions];
-                      conditions[idx] = { ...conditions[idx], value: e.target.value };
-                      return { ...r, conditions };
-                    })} className="h-8 text-xs" />
-                  </div>
-                  <Button type="button" variant="ghost" size="sm" className="col-span-1 text-red-400 h-8" onClick={() => setRuleDraft(r => r ? { ...r, conditions: r.conditions.filter(c => c.id !== cond.id) } : r)}>×</Button>
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => setRuleDraft(r => r ? {
+                );
+              })}
+              <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => setRuleDraft(r => r ? {
                 ...r,
                 conditions: [...r.conditions, { id: crypto.randomUUID(), fieldId: fieldOptions[0]?.value ?? "__score_percent__", operator: "equals", value: "" }],
               } : r)}>
-                Add condition
+                <Plus className="w-3 h-3" /> Add condition
               </Button>
               <div className="pt-2 border-t border-gray-100 space-y-3">
                 <AccessGrantActionsEditor

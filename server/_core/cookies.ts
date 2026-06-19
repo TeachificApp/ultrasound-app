@@ -178,11 +178,21 @@ export function getSessionCookieOptions(
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
   const hostname = hostnameOverride || getPublicHostname(req);
   const domain = getRootDomain(hostname);
+  // In production behind Cloudflare/Cloud Run, req.protocol is always "http" (internal
+  // container-to-container traffic). Cloudflare always terminates TLS on the public edge,
+  // so we force secure:true whenever any proxy header is present or NODE_ENV=production.
+  // SameSite=None cookies are silently dropped by browsers without the Secure flag.
+  const isProduction = !!(  
+    req.headers["x-forwarded-proto"] ||
+    req.headers["x-forwarded-host"] ||
+    process.env.NODE_ENV === "production"
+  );
+  const secure = isProduction ? true : isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
     sameSite: "none",
-    secure: isSecureRequest(req),
+    secure,
     ...(domain ? { domain } : {}),
   };
 }
