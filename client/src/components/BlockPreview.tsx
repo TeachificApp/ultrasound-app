@@ -192,6 +192,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                       data-email={(btn as any).behavior === "send_email" ? ((btn as any).emailAddress ?? "") : undefined}
                       data-popup={(btn as any).behavior === "open_popup" ? ((btn as any).popupUrl ?? "") : undefined}
                       data-download={(btn as any).behavior === "download_file" ? ((btn as any).downloadUrl ?? "") : undefined}
+                      data-soldout-override={(btn as any).soldOutOverrideUrl || undefined}
                       className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
@@ -556,6 +557,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
           data-cta-btn="1"
           data-action={pricingCtaBeh}
           data-link={pricingCtaBeh === "url" ? (d.ctaUrl ?? "") : undefined}
+          data-soldout-override={d.soldOutOverrideUrl || undefined}
           className={`inline-block px-10 py-4 rounded-xl font-bold text-lg shadow-lg cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
           style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
         >
@@ -588,6 +590,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             data-cta-btn="1"
             data-action={standaloneCtaBeh}
             data-link={standaloneCtaBeh === "url" ? (d.ctaLink ?? "") : undefined}
+            data-soldout-override={d.soldOutOverrideUrl || undefined}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
           >{d.ctaText ?? "Get Started"}</button>
@@ -643,6 +646,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
             data-cta-btn="1"
             data-action={optinCtaBeh}
             data-link={optinCtaBeh === "url" ? (d.ctaLink ?? "") : undefined}
+            data-soldout-override={d.soldOutOverrideUrl || undefined}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
           >{d.ctaText ?? "Get Access"}</button>

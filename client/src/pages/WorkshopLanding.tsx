@@ -319,8 +319,10 @@ export default function WorkshopLanding() {
   const allInstances = data?.allInstances ?? [];
   const pricingOptions = data?.pricingOptions ?? [];
 
-  // Determine waitlist mode: enabled flag + no active enrolling instances
+  // Determine waitlist mode: admin explicitly enabled waitlist + no active enrolling instances
   const isWaitlistMode = !!(workshop?.waitlistEnabled && availableInstances.length === 0);
+  // isAllSoldOut: all instances are at capacity (no available instances, but sold-out ones exist)
+  const isAllSoldOut = availableInstances.length === 0 && soldOutInstances.length > 0;
 
   // Scroll to top on mount
   useEffect(() => { window.scrollTo(0, 0); }, [slug]);
@@ -369,10 +371,9 @@ export default function WorkshopLanding() {
   function openWaitlistOrNotify() {
     if (workshop!.waitlistCtaUrl) {
       window.open(workshop!.waitlistCtaUrl, "_blank");
-    } else if (workshop!.waitlistEnabled) {
-      setWaitlistOpen(true);
     } else {
-      toast.info("This workshop is currently sold out. Please check back for new dates.");
+      // Always open the waitlist lead capture modal when sold out or in waitlist mode
+      setWaitlistOpen(true);
     }
   }
   function handleCta(pricingOptionId?: number) {
@@ -444,23 +445,22 @@ export default function WorkshopLanding() {
           </Button>
         </div>
       )}
-      {/* Sold-out banner (all instances at capacity, waitlist not explicitly enabled) */}
-      {isAllSoldOut && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-3 text-center">
-          <span className="text-sm text-red-800 font-medium">
-            <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2 -mb-0.5" />
-            This workshop is currently sold out.
-          </span>
-          {(workshop.waitlistEnabled || workshop.waitlistCtaUrl) && (
+      {/* Sold-out banner (all instances at capacity) — always shows Join Waitlist */}
+      {isAllSoldOut && !isWaitlistMode && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
+          <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <span className="text-sm text-amber-800 font-medium flex items-center gap-2">
+              <Bell className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              This workshop is currently sold out — join the waitlist to be notified when new dates open.
+            </span>
             <Button
               size="sm"
-              variant="outline"
-              className="ml-3 border-red-400 text-red-700 hover:bg-red-100 text-xs"
+              className="bg-amber-600 hover:bg-amber-700 text-white flex-shrink-0"
               onClick={openWaitlistOrNotify}
             >
               {workshop.waitlistCtaLabel || "Join Waitlist"}
             </Button>
-          )}
+          </div>
         </div>
       )}
 
@@ -478,6 +478,10 @@ export default function WorkshopLanding() {
               undefined,
               // onCheckoutPage (paid)
               (pricingOptionId?: number) => handleCta(pricingOptionId),
+              // onSoldOutOverride — when sold out and button has override URL, navigate there
+              (isWaitlistMode || isAllSoldOut)
+                ? (url: string) => window.open(url, "_blank", "noopener,noreferrer")
+                : undefined,
             )
           }
         >
@@ -902,20 +906,18 @@ export default function WorkshopLanding() {
             </div>
           )}
 
-          {/* All sold out — show sold-out card with optional waitlist CTA */}
+          {/* All sold out — always show Join Waitlist CTA */}
           {isAllSoldOut && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
-                <span className="text-red-600 text-xl">&#128683;</span>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
+                <Bell className="w-5 h-5 text-amber-600" />
               </div>
-              <p className="font-semibold text-red-800 text-lg mb-1">Sold Out</p>
-              <p className="text-sm text-red-600 mb-4">All seats for this workshop are currently filled.</p>
-              {(workshop.waitlistEnabled || workshop.waitlistCtaUrl) && (
-                <Button onClick={openWaitlistOrNotify} className="bg-red-600 hover:bg-red-700 text-white gap-2">
-                  <Bell className="w-4 h-4" />
-                  {workshop.waitlistCtaLabel || "Join Waitlist"}
-                </Button>
-              )}
+              <p className="font-semibold text-amber-800 text-lg mb-1">Sold Out</p>
+              <p className="text-sm text-amber-600 mb-4">All seats for this workshop are currently filled. Join the waitlist to be notified when new dates open.</p>
+              <Button onClick={openWaitlistOrNotify} className="bg-amber-600 hover:bg-amber-700 text-white gap-2">
+                <Bell className="w-4 h-4" />
+                {workshop.waitlistCtaLabel || "Join Waitlist"}
+              </Button>
             </div>
           )}
           {/* No instances, no pricing, no waitlist, not sold out */}

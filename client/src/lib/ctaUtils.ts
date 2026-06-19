@@ -3,18 +3,35 @@
  * Extracted from CourseLanding to avoid circular static imports with
  * BlockPreview and WorkshopLanding (both need this utility but are also
  * dynamically imported by App.tsx alongside CourseLanding).
+ *
+ * soldOutOverride: when a button has `data-soldout-override="<url>"` AND the
+ * page is in sold-out/waitlist mode, the caller passes `onSoldOutOverride`.
+ * If the button has the attribute set, `onSoldOutOverride(url)` is called
+ * instead of the normal enroll/checkout path, allowing the admin to bypass
+ * the sold-out gate for specific CTAs (e.g. redirect to a new-dates page).
  */
 export function handleCtaBtnClick(
   e: React.MouseEvent<HTMLElement>,
   onEnroll?: () => void,
   onEnrollWithOption?: (pricingOptionId: number | undefined) => void,
   onCheckoutPage?: (pricingOptionId?: number) => void,
+  /** Called instead of waitlist/sold-out modal when button has data-soldout-override set */
+  onSoldOutOverride?: (overrideUrl: string) => void,
 ) {
   const target = (e.target as HTMLElement).closest("[data-cta-btn]") as HTMLElement | null;
   if (!target) return;
   e.preventDefault();
   e.stopPropagation();
   const action = target.dataset.action ?? "url";
+
+  // Sold-out override: if the button has a soldout-override URL and we're in
+  // sold-out/waitlist mode (caller provides onSoldOutOverride), use it.
+  const soldOutOverrideUrl = target.dataset.soldoutOverride;
+  if (soldOutOverrideUrl && onSoldOutOverride) {
+    onSoldOutOverride(soldOutOverrideUrl);
+    return;
+  }
+
   if (action === "url") {
     const link = target.dataset.link;
     if (link && link !== "#") window.open(link, "_blank", "noopener,noreferrer");

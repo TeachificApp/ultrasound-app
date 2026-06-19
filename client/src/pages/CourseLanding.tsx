@@ -44,12 +44,21 @@ export function handleCtaBtnClick(
   onEnroll?: () => void,
   onEnrollWithOption?: (pricingOptionId: number | undefined) => void,
   onCheckoutPage?: (pricingOptionId?: number) => void,
+  /** Called instead of waitlist/sold-out modal when button has data-soldout-override set */
+  onSoldOutOverride?: (overrideUrl: string) => void,
 ) {
   const target = (e.target as HTMLElement).closest("[data-cta-btn]") as HTMLElement | null;
   if (!target) return;
   e.preventDefault();
   e.stopPropagation();
   const action = target.dataset.action ?? "url";
+  // Sold-out override: if the button has a soldout-override URL and we're in
+  // sold-out/waitlist mode (caller provides onSoldOutOverride), use it.
+  const soldOutOverrideUrl = target.dataset.soldoutOverride;
+  if (soldOutOverrideUrl && onSoldOutOverride) {
+    onSoldOutOverride(soldOutOverrideUrl);
+    return;
+  }
   if (action === "url") {
     const link = target.dataset.link;
     if (link && link !== "#") window.open(link, "_blank", "noopener,noreferrer");
@@ -256,7 +265,7 @@ function resolveBtnAction(
   return onEnroll;
 }
 
-function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage, onFreeEnroll, onOpenGroupDetail }: {
+function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage, onFreeEnroll, onOpenGroupDetail, onSoldOutOverride }: {
   block: Block; course: any; onEnroll: () => void; onEnrollWithOption?: (pricingOptionId: number | undefined) => void; enrolling: boolean; ctaText: string; price: string;
   selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
   slug?: string; enrollment?: any; user?: UserParamSource | null;
@@ -264,6 +273,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
   onCheckoutPage?: (pricingOptionId?: number) => void;
   onFreeEnroll?: (productType: string, productId: number) => void;
   onOpenGroupDetail?: (groupId: number) => void;
+  onSoldOutOverride?: (overrideUrl: string) => void;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -357,7 +367,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
     case "text":
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage, onSoldOutOverride)}>
           <CC><div className="prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} /></CC>
         </div>
       );
@@ -1379,7 +1389,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         const colType = d[`${side}Type`] ?? "rich_text";
         switch (colType) {
           case "rich_text": return <div className="prose min-w-0" dangerouslySetInnerHTML={{ __html: d[`${side}Html`] ?? "" }} />;
-          case "cta": return <div className="flex items-center justify-center h-full"><a href={d[`${side}CtaLink`] || "#"} className="px-8 py-4 rounded-lg font-bold text-lg shadow-lg inline-block" style={{ backgroundColor: d[`${side}CtaColor`] ?? "#179ca3", color: d[`${side}CtaTextColor`] ?? "#fff" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>{d[`${side}CtaText`] ?? "Click Here"}</a></div>;
+          case "cta": return <div className="flex items-center justify-center h-full"><a href={d[`${side}CtaLink`] || "#"} className="px-8 py-4 rounded-lg font-bold text-lg shadow-lg inline-block" style={{ backgroundColor: d[`${side}CtaColor`] ?? "#179ca3", color: d[`${side}CtaTextColor`] ?? "#fff" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage, onSoldOutOverride)}>{d[`${side}CtaText`] ?? "Click Here"}</a></div>;
           case "image": return d[`${side}ImageUrl`] ? <img src={d[`${side}ImageUrl`]} alt={d[`${side}ImageAlt`] ?? ""} className="w-full rounded-lg shadow" /> : null;
           case "video": return d[`${side}VideoUrl`] ? <div className="relative w-full rounded-lg overflow-hidden shadow" style={{ paddingBottom: "56.25%" }}><iframe src={d[`${side}VideoUrl`]} className="absolute inset-0 w-full h-full" allowFullScreen /></div> : null;
           default: return <div className="prose min-w-0" dangerouslySetInnerHTML={{ __html: d[`${side}Html`] ?? "" }} />;
@@ -1387,7 +1397,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       };
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage, onSoldOutOverride)}>
           <CC><div className="flex flex-col md:flex-row gap-8 items-center">
             <div className="min-w-0" style={{ flex: `${d.leftRatio ?? 50} 1 0%` }}>{renderTwoCol("left")}</div>
             <div className="min-w-0" style={{ flex: `${100 - (d.leftRatio ?? 50)} 1 0%` }}>{renderTwoCol("right")}</div>
@@ -1399,7 +1409,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage, onSoldOutOverride)}>
           <CC><div className="grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
@@ -1412,7 +1422,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const divStyle3 = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: (d.dividerStyle ?? "solid") as any, borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
         <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage, onSoldOutOverride)}>
           <CC><div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
             <div className="prose prose-lg pr-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-lg px-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
@@ -1472,11 +1482,12 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         if (beh === "open_popup" && tier.ctaPopupUrl) attrs["data-popup"] = tier.ctaPopupUrl;
         if (beh === "download_file" && tier.ctaDownloadUrl) attrs["data-download"] = tier.ctaDownloadUrl;
         if (beh === "pricing_option" && (tier as any).ctaPricingOptionId) attrs["data-pricing-option"] = String((tier as any).ctaPricingOptionId);
+        if ((tier as any).soldOutOverrideUrl) attrs["data-soldout-override"] = (tier as any).soldOutOverrideUrl;
         return attrs;
       };
       return (
         <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage)}>
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage, onSoldOutOverride)}>
           <CC>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
@@ -1786,7 +1797,7 @@ export default function CourseLanding() {
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
     if (isEnrollmentClosed) return; // Enrollment is closed — do nothing
-    if (isAllGroupsClosed) return; // All cohort groups are sold out or enrollment-closed
+    if (showWaitlistCta) return; // All cohort groups are sold out — show waitlist instead
     setEnrolling(true);
     try {
       // If a secondary pricing option is selected, use it; otherwise use primary course pricing
@@ -1806,7 +1817,7 @@ export default function CourseLanding() {
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
     if (isEnrollmentClosed) return;
-    if (isAllGroupsClosed) return; // All cohort groups are sold out or enrollment-closed
+    if (showWaitlistCta) return; // All cohort groups are sold out — show waitlist instead
     setEnrolling(true);
     // Also sync the UI selection state so the checkout modal shows the right option
     if (pricingOptionId !== undefined) setSelectedPricingOptionId(pricingOptionId);
@@ -1882,20 +1893,21 @@ export default function CourseLanding() {
   // Keep ref in sync so the mutation callback (declared before early returns) can access featuredGroup
   featuredGroupRef.current = featuredGroup;
   const hasOpenGroup = (course as any).hasOpenGroup ?? true;
+  // isWaitlistMode: admin explicitly enabled waitlist on featuredGroup AND no open group exists
   const isWaitlistMode = !enrollment && !!(featuredGroup?.waitlistEnabled && !hasOpenGroup);
-  // isAllGroupsClosed: no open groups (all sold out or enrollment-closed) and not in explicit waitlist mode
-  // This prevents the CTA from proceeding to checkout when no group can accept new enrollments
-  const isAllGroupsClosed = !enrollment && !hasOpenGroup && !isWaitlistMode && !isEnrollmentClosed && ((course as any).cohortGroups?.length ?? 0) > 0;
+  // isAllGroupsClosed: no open groups (all sold out or enrollment-closed) — always show waitlist lead capture
+  const isAllGroupsClosed = !enrollment && !hasOpenGroup && !isEnrollmentClosed && ((course as any).cohortGroups?.length ?? 0) > 0;
+  // Either explicit waitlist mode OR all groups closed → show waitlist CTA
+  const showWaitlistCta = isWaitlistMode || isAllGroupsClosed;
   const waitlistCtaLabel = featuredGroup?.waitlistCtaLabel || "Join the Waitlist";
-  const ctaText = enrollment ? "Continue Learning" : isWaitlistMode ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : isAllGroupsClosed ? "Sold Out" : (lp?.ctaText ?? "Enroll Now");
+  const ctaText = enrollment ? "Continue Learning" : showWaitlistCta ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
   const handleWaitlistCta = () => {
     if (featuredGroup?.waitlistCtaUrl) { window.open(featuredGroup.waitlistCtaUrl, "_blank"); return; }
     setCwSubmitted(false); setCwName(""); setCwEmail(""); setCwPhone(""); setCwMessage("");
     setCohortWaitlistOpen(true);
   };
   const handleEnrollOrWaitlist = () => {
-    if (isWaitlistMode) { handleWaitlistCta(); return; }
-    if (isAllGroupsClosed) { toast.info("All cohort groups are currently sold out or enrollment is closed. Check back later for new dates."); return; }
+    if (showWaitlistCta) { handleWaitlistCta(); return; }
     handleEnroll();
   };
 
@@ -1949,14 +1961,17 @@ export default function CourseLanding() {
           />
         )}
         {EnrollmentCountdownBanner}
-        {/* Sold-out banner — shown when all cohort groups are sold out or enrollment-closed */}
-        {isAllGroupsClosed && (
-          <div className="w-full bg-red-50 border-b border-red-200 py-3 px-4">
+        {/* Sold-out / waitlist banner — shown when all cohort groups are sold out or enrollment-closed */}
+        {isAllGroupsClosed && !isWaitlistMode && (
+          <div className="w-full bg-amber-50 border-b border-amber-200 py-3 px-4">
             <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-red-800">
-                <span className="text-red-500">🔴</span>
-                All cohort groups are currently sold out or enrollment is closed. Check back for new dates.
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                <Bell className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                All cohort groups are currently sold out or enrollment is closed — join the waitlist to be notified when new dates open.
               </div>
+              <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white flex-shrink-0" onClick={handleWaitlistCta}>
+                {waitlistCtaLabel}
+              </Button>
             </div>
           </div>
         )}
@@ -1987,10 +2002,10 @@ export default function CourseLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
                 <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} />
+                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} />
                 </div>
               ) : (
-                <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} />
+                <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} />
               )}
             </div>
           );

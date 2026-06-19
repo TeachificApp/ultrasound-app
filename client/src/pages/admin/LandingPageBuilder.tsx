@@ -2179,6 +2179,12 @@ function CtaOptinSettings({ d, set }: { d: Record<string, any>; set: (key: strin
 function OptOutSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
   return (
     <div className="space-y-2 border-t border-gray-100 pt-2 mt-2">
+      {/* Sold-Out Override URL: when set, clicking this CTA while the page is sold out navigates here instead of the waitlist modal */}
+      <div className="space-y-1">
+        <label className="text-xs text-gray-500 font-medium block">Sold Out Override URL</label>
+        <p className="text-[10px] text-gray-400">When the course/workshop is sold out, clicking this button will navigate to this URL instead of showing the waitlist form. Leave blank to use the default waitlist modal.</p>
+        <DebouncedInput value={d.soldOutOverrideUrl ?? ""} onChange={v => set("soldOutOverrideUrl", v)} className="h-8 text-xs" placeholder="https://... (e.g. new dates page)" />
+      </div>
       <label className="text-xs text-gray-500 font-medium block">Opt-Out / Skip Link</label>
       <div className="flex items-center gap-2">
         <input type="checkbox" checked={d.showOptOut ?? false} onChange={e => set("showOptOut", e.target.checked)} className="rounded" />
