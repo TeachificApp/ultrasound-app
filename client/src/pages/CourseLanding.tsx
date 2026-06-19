@@ -2712,12 +2712,17 @@ function CohortGroupEmbedSection({
     );
   }
 
+  const isSoldOutCG = data.isSoldOut ?? false;
+  const enrollmentCountCG = data.enrollmentCount ?? 0;
+  const maxStudentsCG = data.maxStudents ?? null;
+  const seatsRemainingCG = maxStudentsCG !== null ? Math.max(0, maxStudentsCG - enrollmentCountCG) : null;
+  const isLowSeatsCG = seatsRemainingCG !== null && seatsRemainingCG > 0 && seatsRemainingCG <= 5;
   return (
     <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}22` }}>
       {/* Header bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColor}08`, borderColor: `${accentColor}22` }}>
         <h3 className="text-lg font-bold text-gray-900">{data.name}</h3>
-        {showEnrollNow && (
+        {showEnrollNow && !isSoldOutCG && (
           <Button
             size="sm"
             className="text-white flex-shrink-0"
@@ -2726,6 +2731,9 @@ function CohortGroupEmbedSection({
           >
             {enrollNowText}
           </Button>
+        )}
+        {showEnrollNow && isSoldOutCG && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">Sold Out</span>
         )}
       </div>
       {/* Content */}
@@ -2751,12 +2759,26 @@ function CohortGroupEmbedSection({
                 </div>
               </div>
             )}
-            {data.maxStudents && (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100">
-                <Users className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+            {maxStudentsCG != null && (
+              <div className={`flex items-start gap-3 p-4 rounded-xl border ${isSoldOutCG ? 'bg-red-50 border-red-100' : isLowSeatsCG ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
+                <Users className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isSoldOutCG ? 'text-red-500' : isLowSeatsCG ? 'text-amber-500' : 'text-gray-400'}`} />
                 <div>
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Capacity</p>
-                  <p className="text-sm text-gray-800 font-medium mt-0.5">{data.maxStudents} students max</p>
+                  <p className={`text-xs font-semibold uppercase tracking-wide ${isSoldOutCG ? 'text-red-600' : isLowSeatsCG ? 'text-amber-600' : 'text-gray-500'}`}>Availability</p>
+                  {isSoldOutCG ? (
+                    <p className="text-sm font-medium mt-0.5 text-red-700">Fully Booked ({enrollmentCountCG}/{maxStudentsCG})</p>
+                  ) : (
+                    <div className="mt-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden" style={{ maxWidth: 80 }}>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (enrollmentCountCG / maxStudentsCG) * 100)}%`, backgroundColor: isLowSeatsCG ? '#f59e0b' : accentColor }} />
+                        </div>
+                        <span className={`text-sm font-medium ${isLowSeatsCG ? 'text-amber-700' : 'text-gray-800'}`}>
+                          {seatsRemainingCG} seat{seatsRemainingCG === 1 ? '' : 's'} left
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400">{enrollmentCountCG} of {maxStudentsCG} enrolled</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -2770,7 +2792,7 @@ function CohortGroupEmbedSection({
               </div>
             )}
           </div>
-          {showEnrollNow && (
+          {showEnrollNow && !isSoldOutCG && (
             <div className="text-center pt-2">
               <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
                 {enrollNowText}
@@ -2783,7 +2805,7 @@ function CohortGroupEmbedSection({
           {(data.landingBlocks as any[]).map((block: any) => (
             <BlockPreview key={block.id} block={block} />
           ))}
-          {showEnrollNow && (
+          {showEnrollNow && !isSoldOutCG && (
             <div className="text-center py-6">
               <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
                 {enrollNowText}
@@ -2842,22 +2864,34 @@ function CICAWorkshopBlock({ data: d, onCheckoutPage }: { data: any; onCheckoutP
     return parts.join(", ") || null;
   };
   if (cardDisplayMode === "embed") {
+    // Page mode: show only the next upcoming instance (not in-progress, not past).
+    // Auto-advance: if the next upcoming is sold out or enrollment closed, still show it (with sold-out state).
+    const now = Date.now();
+    const embedSelectionMode = d.embedSelectionMode ?? "auto";
+    const embedSelectedId: number | null = d.embedSelectedId ?? null;
+    let embedInstance: any = null;
+    if (embedSelectionMode === "manual" && embedSelectedId) {
+      embedInstance = instances.find((inst: any) => inst.id === embedSelectedId) ?? null;
+    }
+    if (!embedInstance) {
+      // Auto: next upcoming (startDate in future, not cancelled/completed)
+      const upcoming = instances
+        .filter((inst: any) => inst.startDate && new Date(inst.startDate).getTime() > now && inst.status !== "cancelled" && inst.status !== "completed")
+        .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+      embedInstance = upcoming[0] ?? instances[0] ?? null;
+    }
+    if (!embedInstance) return null;
     return (
       <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
         <div className="max-w-4xl mx-auto px-4">
           {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="space-y-10">
-            {instances.map((inst: any) => (
-              <WorkshopInstanceEmbedSection
-                key={inst.id}
-                instanceId={inst.id}
-                accentColor={accentColor}
-                onEnroll={() => onCheckoutPage?.()}
-                enrollNowText={enrollNowText}
-                showEnrollNow={showEnrollNow}
-              />
-            ))}
-          </div>
+          <WorkshopInstanceEmbedSection
+            instanceId={embedInstance.id}
+            accentColor={accentColor}
+            onEnroll={() => onCheckoutPage?.()}
+            enrollNowText={enrollNowText}
+            showEnrollNow={showEnrollNow}
+          />
         </div>
       </div>
     );
@@ -2956,14 +2990,22 @@ function WorkshopInstanceEmbedSection({
       </div>
     );
   }
+  const isSoldOut = (data as any).isSoldOut ?? false;
+  const seatsRemaining: number | null = (data as any).seatsRemaining ?? null;
+  const capacity: number | null = (data as any).capacity ?? null;
+  const enrolledCount: number = (data as any).enrolledCount ?? 0;
+  const isLowSeats = seatsRemaining !== null && seatsRemaining > 0 && seatsRemaining <= 5;
   return (
     <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}22` }}>
       <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColor}08`, borderColor: `${accentColor}22` }}>
         <h3 className="text-lg font-bold text-gray-900">{data.title}</h3>
-        {showEnrollNow && (
+        {showEnrollNow && !isSoldOut && (
           <Button size="sm" className="text-white flex-shrink-0" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
             {enrollNowText}
           </Button>
+        )}
+        {showEnrollNow && isSoldOut && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">Sold Out</span>
         )}
       </div>
       <div className="p-6 space-y-4">
@@ -2985,6 +3027,29 @@ function WorkshopInstanceEmbedSection({
                 </div>
               </div>
             )}
+            {capacity != null && (
+              <div className={`flex items-start gap-3 p-4 rounded-xl border ${isSoldOut ? 'bg-red-50 border-red-100' : isLowSeats ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
+                <Users className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isSoldOut ? 'text-red-500' : isLowSeats ? 'text-amber-500' : 'text-gray-400'}`} />
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-wide ${isSoldOut ? 'text-red-600' : isLowSeats ? 'text-amber-600' : 'text-gray-500'}`}>Availability</p>
+                  {isSoldOut ? (
+                    <p className="text-sm font-medium mt-0.5 text-red-700">Fully Booked ({enrolledCount}/{capacity})</p>
+                  ) : (
+                    <div className="mt-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden" style={{ maxWidth: 80 }}>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (enrolledCount / capacity) * 100)}%`, backgroundColor: isLowSeats ? '#f59e0b' : accentColor }} />
+                        </div>
+                        <span className={`text-sm font-medium ${isLowSeats ? 'text-amber-700' : 'text-gray-800'}`}>
+                          {seatsRemaining} seat{seatsRemaining === 1 ? '' : 's'} left
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400">{enrolledCount} of {capacity} enrolled</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {data.description && <p className="text-gray-600 text-sm">{data.description}</p>}
@@ -2995,7 +3060,7 @@ function WorkshopInstanceEmbedSection({
             ))}
           </div>
         )}
-        {showEnrollNow && (
+        {showEnrollNow && !isSoldOut && (
           <div className="text-center pt-2">
             <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
               {enrollNowText}

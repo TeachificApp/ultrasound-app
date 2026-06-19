@@ -305,6 +305,18 @@ export const workshopPublicRouter = router({
         .where(eq(workshopInstances.id, input.instanceId))
         .then(r => r[0] ?? null);
       if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      // Count active enrollments for real-time seat availability
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(workshopEnrollments)
+        .where(and(
+          eq(workshopEnrollments.instanceId, input.instanceId),
+          eq(workshopEnrollments.status, "active")
+        ));
+      const enrolledCount = Number(countRow?.count ?? row.enrolledCount ?? 0);
+      const capacity = row.capacity ?? null;
+      const seatsRemaining = capacity !== null ? Math.max(0, capacity - enrolledCount) : null;
+      const isSoldOut = capacity !== null && enrolledCount >= capacity;
       return {
         id: row.id,
         title: row.title,
@@ -321,6 +333,10 @@ export const workshopPublicRouter = router({
         description: row.description,
         instanceContent: row.instanceContent,
         landingBlocks: row.landingBlocks ? JSON.parse(row.landingBlocks) : [],
+        capacity,
+        enrolledCount,
+        seatsRemaining,
+        isSoldOut,
       };
     }),
 });
