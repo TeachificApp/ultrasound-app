@@ -79,6 +79,25 @@ import {
   Save,
   Shield,
   Trophy,
+  Radio,
+  Type,
+  MinusCircle,
+  PlusCircle,
+  Hash,
+  Calendar,
+  Clock,
+  Mail,
+  Phone,
+  Upload,
+  Star,
+  SlidersHorizontal,
+  ToggleLeft,
+  CreditCard,
+  AlignLeft,
+  Minus,
+  Pen,
+  ChevronRight,
+  MousePointer,
 } from "lucide-react";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
@@ -105,24 +124,61 @@ const FORM_TYPES = [
 ];
 
 const ITEM_TYPES = [
-  { value: "short_text", label: "Short Text", icon: "T" },
-  { value: "long_text", label: "Long Text / Paragraph", icon: "¶" },
-  { value: "email", label: "Email", icon: "@" },
-  { value: "phone", label: "Phone", icon: "☎" },
+  { value: "short_text", label: "Short Answer", icon: "T" },
+  { value: "long_text", label: "Long Answer", icon: "¶" },
+  { value: "email", label: "Email Address", icon: "@" },
+  { value: "phone", label: "Phone Number", icon: "☎" },
   { value: "number", label: "Number", icon: "#" },
   { value: "date", label: "Date", icon: "📅" },
   { value: "time", label: "Time", icon: "⏰" },
   { value: "dropdown", label: "Dropdown", icon: "▼" },
-  { value: "radio", label: "Single Choice (Radio)", icon: "◉" },
-  { value: "checkbox", label: "Multiple Choice (Checkboxes)", icon: "☑" },
+  { value: "radio", label: "Radio Button", icon: "◉" },
+  { value: "checkbox", label: "Checkbox", icon: "☑" },
   { value: "rating", label: "Rating (1–5 stars)", icon: "★" },
   { value: "scale", label: "Scale / Slider", icon: "↔" },
   { value: "yes_no", label: "Yes / No", icon: "Y/N" },
   { value: "file_upload", label: "File Upload", icon: "📎" },
-  { value: "section_break", label: "Section Break / Heading", icon: "—" },
-  { value: "rich_text", label: "Rich Text (display only)", icon: "✦" },
+  { value: "section_break", label: "Section Break", icon: "—" },
+  { value: "rich_text", label: "Rich Text", icon: "✦" },
   { value: "signature", label: "Signature", icon: "✍" },
   { value: "payment", label: "Payment (Stripe)", icon: "💳" },
+];
+
+// Formsite-style field palette groups
+const FIELD_PALETTE_GROUPS = [
+  {
+    title: "Common Items",
+    items: [
+      { value: "radio", label: "Radio Button", Icon: Radio },
+      { value: "dropdown", label: "Dropdown", Icon: ChevronDown },
+      { value: "checkbox", label: "Checkbox", Icon: Check },
+      { value: "email", label: "Email Address", Icon: Mail },
+      { value: "short_text", label: "Short Answer", Icon: Type },
+      { value: "long_text", label: "Long Answer", Icon: AlignLeft },
+      { value: "file_upload", label: "File Upload", Icon: Upload },
+      { value: "number", label: "Number", Icon: Hash },
+      { value: "date", label: "Date", Icon: Calendar },
+      { value: "time", label: "Time", Icon: Clock },
+      { value: "phone", label: "Phone Number", Icon: Phone },
+      { value: "signature", label: "Signature", Icon: Pen },
+    ],
+  },
+  {
+    title: "Formatting Items",
+    items: [
+      { value: "section_break", label: "Section Break", Icon: Minus },
+      { value: "rich_text", label: "Rich Text", Icon: FileText },
+    ],
+  },
+  {
+    title: "Special Items",
+    items: [
+      { value: "rating", label: "Rating", Icon: Star },
+      { value: "scale", label: "Scale / Slider", Icon: SlidersHorizontal },
+      { value: "yes_no", label: "Yes / No", Icon: ToggleLeft },
+      { value: "payment", label: "Payment (Stripe)", Icon: CreditCard },
+    ],
+  },
 ];
 
 const DEFAULT_THEME = {
@@ -450,11 +506,11 @@ function FormEditor({ formId }: { formId: number }) {
 
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [editingSection, setEditingSection] = useState<any | null>(null);
-  const [showAddItem, setShowAddItem] = useState<number | null>(null); // sectionId
-  const [newItemType, setNewItemType] = useState("short_text");
-  const [newItemLabel, setNewItemLabel] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [showAddSection, setShowAddSection] = useState(false);
+  const [addingToSection, setAddingToSection] = useState<number | null>(null);
+  const [newItemLabel, setNewItemLabel] = useState("");
 
   const createSection = trpc.generalForm.createSection.useMutation({
     onSuccess: () => { refetch(); setShowAddSection(false); setNewSectionTitle(""); },
@@ -469,7 +525,11 @@ function FormEditor({ formId }: { formId: number }) {
     onError: (e) => toast.error(e.message),
   });
   const createItem = trpc.generalForm.createItem.useMutation({
-    onSuccess: () => { refetch(); setShowAddItem(null); setNewItemLabel(""); },
+    onSuccess: (data: any) => {
+      refetch();
+      setAddingToSection(null);
+      setNewItemLabel("");
+    },
     onError: (e) => toast.error(e.message),
   });
   const updateItem = trpc.generalForm.updateItem.useMutation({
@@ -477,6 +537,10 @@ function FormEditor({ formId }: { formId: number }) {
     onError: (e) => toast.error(e.message),
   });
   const deleteItem = trpc.generalForm.deleteItem.useMutation({
+    onSuccess: () => { refetch(); setSelectedItemId(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const duplicateItem = trpc.generalForm.createItem.useMutation({
     onSuccess: () => refetch(),
     onError: (e) => toast.error(e.message),
   });
@@ -501,150 +565,251 @@ function FormEditor({ formId }: { formId: number }) {
 
   const hasOptions = (type: string) => ["dropdown", "radio", "checkbox"].includes(type);
 
+  // Render a live preview of a form item (Formsite-style canvas)
+  const renderItemPreview = (item: any, itemOpts: any[]) => {
+    const labelEl = (
+      <div className="font-medium text-gray-800 mb-1.5">
+        {item.label}
+        {item.isRequired && <span className="text-red-500 ml-1">*</span>}
+      </div>
+    );
+    const helpEl = item.helpText ? <p className="text-xs text-gray-400 mb-1.5">{item.helpText}</p> : null;
+    switch (item.itemType) {
+      case "radio":
+        return <div>{labelEl}{helpEl}{itemOpts.map((o: any) => <div key={o.id} className="flex items-center gap-2 py-0.5"><div className="w-4 h-4 rounded-full border-2 border-gray-300 flex-shrink-0" /><span className="text-sm text-gray-700">{o.label}</span></div>)}</div>;
+      case "checkbox":
+        return <div>{labelEl}{helpEl}{itemOpts.map((o: any) => <div key={o.id} className="flex items-center gap-2 py-0.5"><div className="w-4 h-4 rounded border-2 border-gray-300 flex-shrink-0" /><span className="text-sm text-gray-700">{o.label}</span></div>)}</div>;
+      case "dropdown":
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-400 bg-white flex items-center justify-between"><span>{itemOpts[0]?.label ?? "Select…"}</span><ChevronDown className="w-3.5 h-3.5" /></div></div>;
+      case "short_text":
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-300 bg-white">{item.placeholder || "Short answer"}</div></div>;
+      case "long_text":
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-300 bg-white h-16">{item.placeholder || "Long answer"}</div></div>;
+      case "email":
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-300 bg-white">{item.placeholder || "email@example.com"}</div></div>;
+      case "phone":
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-300 bg-white">{item.placeholder || "(555) 000-0000"}</div></div>;
+      case "number":
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-300 bg-white w-32">{item.placeholder || "0"}</div></div>;
+      case "date":
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-300 bg-white w-40">MM/DD/YYYY</div></div>;
+      case "time":
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-300 bg-white w-32">HH:MM</div></div>;
+      case "file_upload":
+        return <div>{labelEl}{helpEl}<div className="border-2 border-dashed border-gray-300 rounded px-4 py-3 text-sm text-gray-400 text-center">Click to upload or drag & drop</div></div>;
+      case "signature":
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-6 text-sm text-gray-300 text-center bg-white">Sign here</div></div>;
+      case "rating":
+        return <div>{labelEl}{helpEl}<div className="flex gap-1">{[1,2,3,4,5].map(n => <Star key={n} className="w-6 h-6 text-gray-300" />)}</div></div>;
+      case "yes_no":
+        return <div>{labelEl}{helpEl}<div className="flex gap-3"><div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full border-2 border-gray-300" /><span className="text-sm">Yes</span></div><div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full border-2 border-gray-300" /><span className="text-sm">No</span></div></div></div>;
+      case "section_break":
+        return <div className="border-t-2 border-gray-200 pt-2"><span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{item.label}</span></div>;
+      case "rich_text":
+        return <div className="text-sm text-gray-600 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item.label }} />;
+      case "payment":
+        return <div>{labelEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-300 bg-white flex items-center gap-2"><CreditCard className="w-4 h-4" />Card number</div></div>;
+      default:
+        return <div>{labelEl}{helpEl}<div className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-300 bg-white">{item.itemType}</div></div>;
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      {/* Sections */}
-      {sections.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl">
-          <Layers className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-          <p className="text-gray-400 font-medium">No sections yet</p>
-          <p className="text-sm text-gray-400 mt-1">Add a section to start building your form</p>
+    <div className="flex gap-0 min-h-[600px]">
+      {/* ── Left sidebar: field palette ── */}
+      <div className="w-56 flex-shrink-0 border-r border-gray-200 bg-gray-50 overflow-y-auto">
+        <div className="p-3 space-y-4">
+          {FIELD_PALETTE_GROUPS.map(group => (
+            <div key={group.title}>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">{group.title}</p>
+              <div className="grid grid-cols-2 gap-1">
+                {group.items.map(fieldType => {
+                  const Icon = fieldType.Icon;
+                  return (
+                    <button
+                      key={fieldType.value}
+                      className="flex flex-col items-center gap-1 p-2 rounded-lg border border-gray-200 bg-white hover:border-cyan-400 hover:bg-cyan-50 text-gray-600 hover:text-cyan-700 transition-colors text-center cursor-pointer"
+                      onClick={() => {
+                        // Add to the first section, or prompt to create one
+                        const targetSection = sections[sections.length - 1];
+                        if (!targetSection) {
+                          toast.error("Add a section first");
+                          return;
+                        }
+                        const label = fieldType.label;
+                        createItem.mutate({ templateId: formId, sectionId: targetSection.id, itemType: fieldType.value, label });
+                      }}
+                      title={`Add ${fieldType.label}`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="text-[10px] leading-tight">{fieldType.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-      ) : (
-        sections.map((section: any) => (
-          <div key={section.id} className="border border-gray-200 rounded-xl overflow-hidden">
-            {/* Section header */}
-            <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
-              <Layers className="w-4 h-4 text-gray-400" />
-              <span className="font-semibold text-gray-800 flex-1">{section.title}</span>
-              <Button variant="ghost" size="sm" onClick={() => setEditingSection(section)}><Edit2 className="w-3.5 h-3.5" /></Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-red-500"
-                onClick={() => { if (confirm("Delete this section and all its items?")) deleteSection.mutate({ id: section.id, templateId: formId }); }}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
+      </div>
+
+      {/* ── Center canvas ── */}
+      <div className="flex-1 overflow-y-auto bg-white">
+        <div className="max-w-2xl mx-auto py-6 px-4 space-y-0">
+          {sections.length === 0 ? (
+            <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl">
+              <Layers className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+              <p className="text-gray-400 font-medium">No sections yet</p>
+              <p className="text-sm text-gray-400 mt-1">Add a section to start building your form</p>
+              <Button className="mt-4 text-white" style={{ background: BRAND }} onClick={() => setShowAddSection(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Add Section
               </Button>
             </div>
+          ) : (
+            sections.map((section: any) => (
+              <div key={section.id} className="mb-6">
+                {/* Section header bar */}
+                <div className="flex items-center gap-2 mb-1 group">
+                  <div className="flex-1 bg-gray-800 text-white px-4 py-2.5 rounded-t-lg font-semibold text-sm">
+                    {section.title}
+                  </div>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditingSection(section)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-400" onClick={() => { if (confirm("Delete this section and all its items?")) deleteSection.mutate({ id: section.id, templateId: formId }); }}><Trash2 className="w-3.5 h-3.5" /></Button>
+                  </div>
+                </div>
 
-            {/* Items */}
-            <div className="divide-y divide-gray-100">
-              {getItemsForSection(section.id).map((item: any, idx: number, arr: any[]) => (
-                <div key={item.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50/50 group">
-                  <GripVertical className="w-4 h-4 text-gray-300 mt-1 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
-                        {ITEM_TYPES.find(t => t.value === item.itemType)?.label ?? item.itemType}
-                      </span>
-                      {item.isRequired && <span className="text-xs text-red-500">Required</span>}
-                      {isAdminOnlyItem(item) && (
-                        <span className="text-xs text-amber-600 flex items-center gap-0.5">
-                          <Shield className="w-3 h-3" /> Admin only
-                        </span>
-                      )}
-                      {item.scoreWeight > 0 && <span className="text-xs text-amber-600">Score: {item.scoreWeight}pts</span>}
-                    </div>
-                    <p className="font-medium text-gray-800 mt-0.5">{item.label}</p>
-                    {item.helpText && <p className="text-xs text-gray-400 mt-0.5">{item.helpText}</p>}
-                    {hasOptions(item.itemType) && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {getOptionsForItem(item.id).map((opt: any) => (
-                          <span key={opt.id} className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{opt.label}</span>
-                        ))}
+                {/* Items canvas */}
+                <div className="border border-gray-200 rounded-b-lg divide-y divide-gray-100">
+                  {getItemsForSection(section.id).map((item: any, idx: number, arr: any[]) => {
+                    const isSelected = selectedItemId === item.id;
+                    const itemOpts = getOptionsForItem(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        className={`relative px-5 py-4 cursor-pointer transition-colors ${
+                          isSelected ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"
+                        }`}
+                        onClick={() => setSelectedItemId(isSelected ? null : item.id)}
+                      >
+                        {/* Live preview */}
+                        <div className="pointer-events-none select-none">
+                          {renderItemPreview(item, itemOpts)}
+                        </div>
+
+                        {/* Inline toolbar (shown when selected) */}
+                        {isSelected && (
+                          <div className="absolute bottom-2 left-5 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-sm px-2 py-1">
+                            <button
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
+                              onClick={(e) => { e.stopPropagation(); setEditingItem({ ...item, options: itemOpts }); }}
+                            >
+                              <Edit2 className="w-3 h-3" /> Edit
+                            </button>
+                            <div className="w-px h-4 bg-gray-200" />
+                            <button
+                              className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                duplicateItem.mutate({ templateId: formId, sectionId: item.sectionId, itemType: item.itemType, label: item.label + " (copy)" });
+                              }}
+                            >
+                              <Copy className="w-3 h-3" /> Copy
+                            </button>
+                            <div className="w-px h-4 bg-gray-200" />
+                            <button
+                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50"
+                              onClick={(e) => { e.stopPropagation(); if (confirm("Delete this item?")) deleteItem.mutate({ id: item.id, templateId: formId }); }}
+                            >
+                              <Trash2 className="w-3 h-3" /> Delete
+                            </button>
+                            <div className="w-px h-4 bg-gray-200" />
+                            <button
+                              className="text-xs text-gray-400 hover:text-gray-600 px-1 py-1 rounded hover:bg-gray-50 disabled:opacity-30"
+                              disabled={idx === 0}
+                              onClick={(e) => { e.stopPropagation(); const ids = arr.map((a: any) => a.id); [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]]; reorderItems.mutate({ templateId: formId, sectionId: section.id, orderedIds: ids }); }}
+                            >
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              className="text-xs text-gray-400 hover:text-gray-600 px-1 py-1 rounded hover:bg-gray-50 disabled:opacity-30"
+                              disabled={idx === arr.length - 1}
+                              onClick={(e) => { e.stopPropagation(); const ids = arr.map((a: any) => a.id); [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]]; reorderItems.mutate({ templateId: formId, sectionId: section.id, orderedIds: ids }); }}
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                        {/* Badges */}
+                        <div className="absolute top-2 right-3 flex gap-1">
+                          {isAdminOnlyItem(item) && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Admin</span>}
+                          {item.isRequired && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded">Required</span>}
+                          {item.scoreWeight > 0 && <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">{item.scoreWeight}pts</span>}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      const ids = arr.map((a: any) => a.id);
-                      [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-                      reorderItems.mutate({ templateId: formId, sectionId: section.id, orderedIds: ids });
-                    }} disabled={idx === 0}>
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      const ids = arr.map((a: any) => a.id);
-                      [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-                      reorderItems.mutate({ templateId: formId, sectionId: section.id, orderedIds: ids });
-                    }} disabled={idx === arr.length - 1}>
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEditingItem({ ...item, options: getOptionsForItem(item.id) })}><Edit2 className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="sm" className="text-red-500" onClick={() => { if (confirm("Delete this item?")) deleteItem.mutate({ id: item.id, templateId: formId }); }}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+                    );
+                  })}
+
+                  {/* Add item row */}
+                  {addingToSection === section.id ? (
+                    <div className="px-4 py-3 bg-blue-50/50">
+                      <Input
+                        value={newItemLabel}
+                        onChange={e => setNewItemLabel(e.target.value)}
+                        placeholder="Question label… (press Enter to add as Short Answer)"
+                        className="bg-white"
+                        autoFocus
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && newItemLabel.trim()) {
+                            createItem.mutate({ templateId: formId, sectionId: section.id, itemType: "short_text", label: newItemLabel.trim() });
+                          }
+                          if (e.key === "Escape") { setAddingToSection(null); setNewItemLabel(""); }
+                        }}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Or click a field type in the sidebar to add it here</p>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-2">
+                      <button
+                        className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-cyan-600 transition-colors"
+                        onClick={() => setAddingToSection(section.id)}
+                      >
+                        <Plus className="w-4 h-4" /> Add Question
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+              </div>
+            ))
+          )}
+
+          {/* Add section button */}
+          {showAddSection ? (
+            <div className="flex gap-2 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+              <Input
+                value={newSectionTitle}
+                onChange={e => setNewSectionTitle(e.target.value)}
+                placeholder="Section title…"
+                className="flex-1"
+                autoFocus
+                onKeyDown={e => e.key === "Enter" && newSectionTitle.trim() && createSection.mutate({ templateId: formId, title: newSectionTitle.trim() })}
+              />
+              <Button
+                disabled={!newSectionTitle.trim() || createSection.isPending}
+                onClick={() => createSection.mutate({ templateId: formId, title: newSectionTitle.trim() })}
+                className="text-white"
+                style={{ background: BRAND }}
+              >
+                Add Section
+              </Button>
+              <Button variant="ghost" onClick={() => { setShowAddSection(false); setNewSectionTitle(""); }}><X className="w-4 h-4" /></Button>
             </div>
-
-            {/* Add item to section */}
-            {showAddItem === section.id ? (
-              <div className="px-4 py-3 bg-blue-50/50 border-t border-blue-100 space-y-2">
-                <div className="flex gap-2">
-                  <Select value={newItemType} onValueChange={setNewItemType}>
-                    <SelectTrigger className="w-52 bg-white"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {ITEM_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    value={newItemLabel}
-                    onChange={e => setNewItemLabel(e.target.value)}
-                    placeholder="Question label…"
-                    className="flex-1 bg-white"
-                    onKeyDown={e => e.key === "Enter" && newItemLabel.trim() && createItem.mutate({ templateId: formId, sectionId: section.id, itemType: newItemType, label: newItemLabel.trim() })}
-                  />
-                  <Button
-                    disabled={!newItemLabel.trim() || createItem.isPending}
-                    onClick={() => createItem.mutate({ templateId: formId, sectionId: section.id, itemType: newItemType, label: newItemLabel.trim() })}
-                    className="text-white"
-                    style={{ background: BRAND }}
-                  >
-                    Add
-                  </Button>
-                  <Button variant="ghost" onClick={() => { setShowAddItem(null); setNewItemLabel(""); }}><X className="w-4 h-4" /></Button>
-                </div>
-              </div>
-            ) : (
-              <div className="px-4 py-2 border-t border-gray-100">
-                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-600 gap-1" onClick={() => setShowAddItem(section.id)}>
-                  <Plus className="w-3.5 h-3.5" /> Add Question
-                </Button>
-              </div>
-            )}
-          </div>
-        ))
-      )}
-
-      {/* Add section */}
-      {showAddSection ? (
-        <div className="flex gap-2 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-          <Input
-            value={newSectionTitle}
-            onChange={e => setNewSectionTitle(e.target.value)}
-            placeholder="Section title…"
-            className="flex-1"
-            autoFocus
-            onKeyDown={e => e.key === "Enter" && newSectionTitle.trim() && createSection.mutate({ templateId: formId, title: newSectionTitle.trim() })}
-          />
-          <Button
-            disabled={!newSectionTitle.trim() || createSection.isPending}
-            onClick={() => createSection.mutate({ templateId: formId, title: newSectionTitle.trim() })}
-            className="text-white"
-            style={{ background: BRAND }}
-          >
-            Add Section
-          </Button>
-          <Button variant="ghost" onClick={() => { setShowAddSection(false); setNewSectionTitle(""); }}><X className="w-4 h-4" /></Button>
+          ) : (
+            <Button variant="outline" className="w-full gap-2 border-dashed" onClick={() => setShowAddSection(true)}>
+              <Plus className="w-4 h-4" /> Add Section
+            </Button>
+          )}
         </div>
-      ) : (
-        <Button variant="outline" className="w-full gap-2 border-dashed" onClick={() => setShowAddSection(true)}>
-          <Plus className="w-4 h-4" /> Add Section
-        </Button>
-      )}
+      </div>
 
       {/* Edit Item Dialog */}
       {editingItem && (
@@ -669,20 +834,11 @@ function FormEditor({ formId }: { formId: number }) {
             <div className="space-y-3 py-2">
               <div>
                 <Label>Section Title</Label>
-                <Input
-                  defaultValue={editingSection.title}
-                  id="sec-title"
-                  className="mt-1"
-                />
+                <Input defaultValue={editingSection.title} id="sec-title" className="mt-1" />
               </div>
               <div>
                 <Label>Description (optional)</Label>
-                <Textarea
-                  defaultValue={editingSection.description ?? ""}
-                  id="sec-desc"
-                  className="mt-1"
-                  rows={2}
-                />
+                <Textarea defaultValue={editingSection.description ?? ""} id="sec-desc" className="mt-1" rows={2} />
               </div>
             </div>
             <DialogFooter>
@@ -706,24 +862,72 @@ function FormEditor({ formId }: { formId: number }) {
   );
 }
 
-// ─── Item Edit Dialog ─────────────────────────────────────────────────────────
+// ─── Item Edit Dialog (Formsite-style tabbed) ────────────────────────────────
+type ChoiceRow = { id: string; label: string; scoreValue: number };
+function genId() { return Math.random().toString(36).slice(2); }
+
 function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
   item: any;
   onSave: (updates: any, options?: any[]) => void;
   onClose: () => void;
   scoreEnabled: boolean;
 }) {
+  const [activeTab, setActiveTab] = useState<"settings" | "default" | "calculations" | "rules">("settings");
   const [label, setLabel] = useState(item.label);
   const [helpText, setHelpText] = useState(item.helpText ?? "");
   const [placeholder, setPlaceholder] = useState(item.placeholder ?? "");
   const [isRequired, setIsRequired] = useState(item.isRequired);
-  const [scoreWeight, setScoreWeight] = useState(item.scoreWeight ?? 0);
   const [adminOnly, setAdminOnly] = useState(isAdminOnlyItem(item));
-  const [optionsText, setOptionsText] = useState(
-    item.options?.map((o: any) => `${o.label}${o.scoreValue ? ` [${o.scoreValue}]` : ""}`).join("\n") ?? ""
+  const [scoreWeight, setScoreWeight] = useState(item.scoreWeight ?? 0);
+  const [scoringEnabled, setScoringEnabled] = useState(
+    scoreEnabled && (item.scoreWeight > 0 || (item.options ?? []).some((o: any) => o.scoreValue > 0))
+  );
+  const [scoreExplanation, setScoreExplanation] = useState("");
+  const [editingChoiceId, setEditingChoiceId] = useState<string | null>(null);
+  const [editingChoiceText, setEditingChoiceText] = useState("");
+
+  const [choices, setChoices] = useState<ChoiceRow[]>(() =>
+    (item.options ?? []).map((o: any) => ({ id: genId(), label: o.label, scoreValue: o.scoreValue ?? 0 }))
   );
 
   const hasOptions = ["dropdown", "radio", "checkbox"].includes(item.itemType);
+  const fieldTypeInfo = ITEM_TYPES.find(t => t.value === item.itemType);
+  const paletteItem = FIELD_PALETTE_GROUPS.flatMap(g => g.items).find(i => i.value === item.itemType);
+
+  const addChoice = () => {
+    const newId = genId();
+    setChoices(prev => [...prev, { id: newId, label: "", scoreValue: 0 }]);
+    setEditingChoiceId(newId);
+    setEditingChoiceText("");
+  };
+
+  const commitChoiceEdit = () => {
+    if (editingChoiceId) {
+      if (editingChoiceText.trim()) {
+        setChoices(prev => prev.map(c => c.id === editingChoiceId ? { ...c, label: editingChoiceText.trim() } : c));
+      } else {
+        setChoices(prev => prev.filter(c => c.id !== editingChoiceId || c.label.trim()));
+      }
+    }
+    setEditingChoiceId(null);
+    setEditingChoiceText("");
+  };
+
+  const moveChoice = (id: string, dir: -1 | 1) => {
+    setChoices(prev => {
+      const idx = prev.findIndex(c => c.id === id);
+      if (idx < 0) return prev;
+      const next = [...prev];
+      const swap = idx + dir;
+      if (swap < 0 || swap >= next.length) return prev;
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      return next;
+    });
+  };
+
+  const removeChoice = (id: string) => setChoices(prev => prev.filter(c => c.id !== id));
+  const updateChoiceScore = (id: string, val: number) =>
+    setChoices(prev => prev.map(c => c.id === id ? { ...c, scoreValue: val } : c));
 
   const handleSave = () => {
     const updates = {
@@ -731,83 +935,301 @@ function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
       helpText: helpText || undefined,
       placeholder: placeholder || undefined,
       isRequired,
-      scoreWeight,
+      scoreWeight: scoringEnabled ? scoreWeight : 0,
       extraConfig: mergeExtraConfig(item.extraConfig, { adminOnly }),
     };
     let parsedOptions: any[] | undefined = undefined;
     if (hasOptions) {
-      parsedOptions = optionsText.split("\n").filter(l => l.trim()).map((line, idx) => {
-        const match = line.match(/^(.+?)\s*\[(\d+)\]\s*$/);
-        if (match) return { label: match[1].trim(), value: match[1].trim().toLowerCase().replace(/\s+/g, "_"), sortOrder: idx, scoreValue: parseInt(match[2]) };
-        const trimmed = line.trim();
-        return { label: trimmed, value: trimmed.toLowerCase().replace(/\s+/g, "_"), sortOrder: idx, scoreValue: 0 };
-      });
+      parsedOptions = choices.filter(c => c.label.trim()).map((c, idx) => ({
+        label: c.label.trim(),
+        value: c.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""),
+        sortOrder: idx,
+        scoreValue: c.scoreValue,
+      }));
     }
     onSave(updates, parsedOptions);
     onClose();
   };
 
+  const TABS = [
+    { id: "settings" as const, label: "Settings" },
+    { id: "default" as const, label: "Default Value" },
+    ...(hasOptions ? [{ id: "calculations" as const, label: "Calculations" }] : []),
+    { id: "rules" as const, label: "Rules" },
+  ];
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Edit Question — {ITEM_TYPES.find(t => t.value === item.itemType)?.label}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 py-2 max-h-[60vh] overflow-y-auto pr-1">
-          <div>
-            <Label>Question Label *</Label>
-            <Input value={label} onChange={e => setLabel(e.target.value)} className="mt-1" />
+      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden" style={{ maxHeight: "90vh" }}>
+        {/* Header */}
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
+          <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+            {paletteItem ? <paletteItem.Icon className="w-4 h-4 text-blue-600" /> : <Type className="w-4 h-4 text-blue-600" />}
           </div>
-          <div>
-            <Label>Help Text</Label>
-            <Input value={helpText} onChange={e => setHelpText(e.target.value)} placeholder="Optional hint shown below the question" className="mt-1" />
-          </div>
-          {["short_text", "long_text", "email", "phone", "number"].includes(item.itemType) && (
-            <div>
-              <Label>Placeholder</Label>
-              <Input value={placeholder} onChange={e => setPlaceholder(e.target.value)} placeholder="Placeholder text…" className="mt-1" />
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            <Switch checked={isRequired} onCheckedChange={setIsRequired} id="req-switch" />
-            <Label htmlFor="req-switch">Required</Label>
-          </div>
-          {!["section_break", "rich_text", "payment"].includes(item.itemType) && (
-            <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50/50">
-              <Switch checked={adminOnly} onCheckedChange={setAdminOnly} id="admin-only-switch" />
+          <DialogTitle className="text-lg font-semibold text-gray-900">
+            {fieldTypeInfo?.label ?? item.itemType}
+          </DialogTitle>
+          <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-600 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 px-6 bg-white">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div className="overflow-y-auto bg-white" style={{ maxHeight: "calc(90vh - 185px)" }}>
+
+          {/* ── Settings tab ── */}
+          {activeTab === "settings" && (
+            <div className="px-6 py-5 space-y-5">
               <div>
-                <Label htmlFor="admin-only-switch" className="flex items-center gap-1">
-                  <Shield className="w-3.5 h-3.5 text-amber-600" /> Admin Only
-                </Label>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Hidden from the public form. Visible and editable only in the admin results table.
-                </p>
+                <Label className="font-semibold text-gray-700">Question</Label>
+                <Input value={label} onChange={e => setLabel(e.target.value)} className="mt-1.5" autoFocus />
+              </div>
+
+              {["short_text", "long_text", "email", "phone", "number"].includes(item.itemType) && (
+                <div>
+                  <Label className="font-semibold text-gray-700">Placeholder</Label>
+                  <Input value={placeholder} onChange={e => setPlaceholder(e.target.value)} placeholder="Placeholder text…" className="mt-1.5" />
+                </div>
+              )}
+
+              {/* Choices list */}
+              {hasOptions && (
+                <div>
+                  <Label className="font-semibold text-gray-700">Choices</Label>
+                  <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden">
+                    {choices.length === 0 && (
+                      <div className="px-4 py-3 text-sm text-gray-400 italic">No choices yet — click + to add</div>
+                    )}
+                    {choices.map((choice) => (
+                      <div
+                        key={choice.id}
+                        className={`flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-0 cursor-pointer transition-colors ${
+                          editingChoiceId === choice.id ? "bg-blue-50" : "bg-white hover:bg-gray-50"
+                        }`}
+                        onClick={() => {
+                          if (editingChoiceId !== choice.id) {
+                            commitChoiceEdit();
+                            setEditingChoiceId(choice.id);
+                            setEditingChoiceText(choice.label);
+                          }
+                        }}
+                      >
+                        <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                        {editingChoiceId === choice.id ? (
+                          <input
+                            autoFocus
+                            className="flex-1 text-sm bg-transparent outline-none text-gray-800"
+                            value={editingChoiceText}
+                            onChange={e => setEditingChoiceText(e.target.value)}
+                            onBlur={commitChoiceEdit}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") { commitChoiceEdit(); setTimeout(addChoice, 0); }
+                              if (e.key === "Escape") commitChoiceEdit();
+                            }}
+                          />
+                        ) : (
+                          <span className="flex-1 text-sm text-gray-700">
+                            {choice.label || <span className="text-gray-300 italic">Empty choice</span>}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Choice action buttons */}
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <button
+                      className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition-colors"
+                      title="Add choice"
+                      onClick={addChoice}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    {editingChoiceId && (
+                      <>
+                        <button
+                          className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 transition-colors"
+                          title="Edit selected"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          className="w-6 h-6 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-300 transition-colors"
+                          title="Move up"
+                          onClick={() => moveChoice(editingChoiceId!, -1)}
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          className="w-6 h-6 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-300 transition-colors"
+                          title="Move down"
+                          onClick={() => moveChoice(editingChoiceId!, 1)}
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                          title="Remove choice"
+                          onClick={() => { removeChoice(editingChoiceId!); setEditingChoiceId(null); }}
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Required */}
+              <div className="flex items-center gap-2.5">
+                <Checkbox
+                  id="req-check"
+                  checked={isRequired}
+                  onCheckedChange={v => setIsRequired(!!v)}
+                />
+                <Label htmlFor="req-check" className="font-medium cursor-pointer">Required</Label>
+              </div>
+
+              {/* Admin Only */}
+              {!["section_break", "rich_text", "payment"].includes(item.itemType) && (
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50/50">
+                  <Switch checked={adminOnly} onCheckedChange={setAdminOnly} id="admin-only-switch" />
+                  <div>
+                    <Label htmlFor="admin-only-switch" className="flex items-center gap-1 cursor-pointer">
+                      <Shield className="w-3.5 h-3.5 text-amber-600" /> Admin Only
+                    </Label>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Hidden from the public form. Visible and editable only in the admin results table.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Help text */}
+              <div>
+                <Label className="font-semibold text-gray-700">Help Text</Label>
+                <Input
+                  value={helpText}
+                  onChange={e => setHelpText(e.target.value)}
+                  placeholder="Optional hint shown below the question"
+                  className="mt-1.5"
+                />
               </div>
             </div>
           )}
-          {scoreEnabled && (
-            <div>
-              <Label>Score Weight (points for correct answer)</Label>
-              <Input type="number" min={0} value={scoreWeight} onChange={e => setScoreWeight(parseInt(e.target.value) || 0)} className="mt-1 w-24" />
+
+          {/* ── Default Value tab ── */}
+          {activeTab === "default" && (
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-500 mb-4">Set a pre-filled default value for this field.</p>
+              {hasOptions ? (
+                <div className="space-y-2">
+                  {choices.map(c => (
+                    <label key={c.id} className="flex items-center gap-2 cursor-pointer">
+                      <input type={item.itemType === "checkbox" ? "checkbox" : "radio"} name="default-val" className="accent-blue-600" />
+                      <span className="text-sm">{c.label || "(empty)"}</span>
+                    </label>
+                  ))}
+                  {choices.length === 0 && <p className="text-sm text-gray-400 italic">Add choices in the Settings tab first.</p>}
+                </div>
+              ) : (
+                <Input placeholder="Default value…" className="max-w-xs" />
+              )}
             </div>
           )}
-          {hasOptions && (
-            <div>
-              <Label>Options (one per line; add [score] to assign points, e.g. "Yes [5]")</Label>
-              <Textarea
-                value={optionsText}
-                onChange={e => setOptionsText(e.target.value)}
-                rows={6}
-                className="mt-1 font-mono text-sm"
-                placeholder={"Option A\nOption B [5]\nOption C [10]"}
-              />
+
+          {/* ── Calculations tab ── */}
+          {activeTab === "calculations" && hasOptions && (
+            <div className="px-6 py-5">
+              <div className="grid grid-cols-2 gap-8">
+                {/* Left: per-choice score values */}
+                <div>
+                  <p className="font-semibold text-gray-700 mb-1">Calculation Values</p>
+                  <p className="text-xs text-gray-500 mb-4">Assign a numeric value for each choice.</p>
+                  <div className="space-y-2">
+                    {choices.map(c => (
+                      <div key={c.id} className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          className="w-20 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          value={c.scoreValue}
+                          onChange={e => updateChoiceScore(c.id, parseInt(e.target.value) || 0)}
+                        />
+                        <span className="text-sm text-gray-700 flex-1 truncate">{c.label || "(empty)"}</span>
+                      </div>
+                    ))}
+                    {choices.length === 0 && <p className="text-sm text-gray-400 italic">Add choices in the Settings tab first.</p>}
+                  </div>
+                </div>
+
+                {/* Right: scoring */}
+                <div>
+                  <p className="font-semibold text-gray-700 mb-1">Scoring</p>
+                  <p className="text-xs text-gray-500 mb-4">Useful to make quizzes and tests.</p>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      id="scoring-check"
+                      checked={scoringEnabled}
+                      onCheckedChange={v => setScoringEnabled(!!v)}
+                    />
+                    <Label htmlFor="scoring-check" className="font-medium cursor-pointer">Enable Scoring</Label>
+                  </label>
+                  <p className="text-xs text-gray-400 mt-1">Include value in Scoring total.</p>
+                  {scoringEnabled && (
+                    <div className="mt-4">
+                      <Label className="text-sm font-medium">Optional explanation</Label>
+                      <Textarea
+                        value={scoreExplanation}
+                        onChange={e => setScoreExplanation(e.target.value)}
+                        rows={4}
+                        placeholder="Show an explanation for the answer in the Scoring Summary."
+                        className="mt-1.5 text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Rules tab ── */}
+          {activeTab === "rules" && (
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-500">
+                Field-level show/hide rules are configured in the <strong>Logic</strong> tab of the form editor.
+              </p>
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!label.trim()} onClick={handleSave} className="text-white" style={{ background: BRAND }}>Save</Button>
-        </DialogFooter>
+
+        {/* Sticky footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white">
+          <button className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            <Info className="w-4 h-4" /> Help
+          </button>
+          <div className="flex gap-3">
+            <Button className="text-white" style={{ background: BRAND }} disabled={!label.trim()} onClick={handleSave}>
+              Save
+            </Button>
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -2314,10 +2314,16 @@ ${pageText}`;
         successOutcome = buildSuccessOutcome(selected, template, submissionCtx);
         // Grant access to products if the matched rule has grantAccessActions and a userId is known
         const grantUserId = input.userId ?? null;
+        console.log(`[FormGrantAccess] matchedRule=${matchedRule?.id ?? 'none'} grantAccessActions=${JSON.stringify(matchedRule?.grantAccessActions)} grantUserId=${grantUserId}`);
         if (matchedRule?.grantAccessActions && grantUserId) {
+          console.log(`[FormGrantAccess] Applying access grant for user ${grantUserId}: ${matchedRule.grantAccessActions}`);
           applyAccessGrantActions(db, matchedRule.grantAccessActions, grantUserId).catch((e: any) =>
             console.error("[FormGrantAccess] General form access grant failed:", e.message)
           );
+        } else if (matchedRule && !matchedRule.grantAccessActions) {
+          console.log(`[FormGrantAccess] Rule ${matchedRule.id} matched but has no grantAccessActions — configure it in the routing rule dialog`);
+        } else if (matchedRule?.grantAccessActions && !grantUserId) {
+          console.log(`[FormGrantAccess] Rule has grantAccessActions but userId is null — user must be logged in`);
         }
       } catch (e: any) {
         console.error("[SuccessModules] Failed to build success outcome:", e.message);

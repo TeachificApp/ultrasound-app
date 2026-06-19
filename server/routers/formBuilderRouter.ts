@@ -882,10 +882,14 @@ export const formBuilderRouter = router({
             successOutcome = buildSuccessOutcome(selectedModule as any, template, ctx2);
 
             // Grant access if matched rule has grantAccessActions
+            console.log(`[FormGrantAccess] DIY matchedRule=${matchedRule?.id ?? 'none'} grantAccessActions=${JSON.stringify(matchedRule?.grantAccessActions)} userId=${ctx.user.id}`);
             if (matchedRule?.grantAccessActions) {
+              console.log(`[FormGrantAccess] DIY Applying access grant for user ${ctx.user.id}: ${matchedRule.grantAccessActions}`);
               applyAccessGrantActions(db2, matchedRule.grantAccessActions, ctx.user.id).catch((e: any) =>
                 console.error("[FormGrantAccess] DIY form access grant failed:", e.message)
               );
+            } else if (matchedRule && !matchedRule.grantAccessActions) {
+              console.log(`[FormGrantAccess] DIY Rule ${matchedRule.id} matched but has no grantAccessActions configured`);
             }
 
             // Create Stripe checkout session — per-rule takes priority over template-level
