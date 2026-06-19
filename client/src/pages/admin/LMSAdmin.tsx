@@ -7035,6 +7035,7 @@ const LMS_NAV_GROUPS = [
     label: "Settings",
     color: "gray",
     items: [
+      { value: "site_pages", label: "Site Pages ↗", icon: FileText, href: getAdminUrl("/admin/lms/site-pages") },
       { value: "lms_settings", label: "Publish Domains", icon: Globe },
     ],
   },

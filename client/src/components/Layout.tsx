@@ -22,6 +22,8 @@ import { getLoginUrl } from "@/const";
 import { useBrand } from "@/hooks/useBrand";
 import { getBrandNavConfig } from "@/config/brandNav";
 import { isLearnDomain, isMembersDomain, isAccreditationDomain } from "@/hooks/useSubdomain";
+import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
+import { SiteNavProfileLinks } from "@/components/SiteNavLinks";
 import GetAppBanner from "@/components/GetAppBanner";
 
 /** Badge showing the count of echo cases pending admin review */
@@ -261,6 +263,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       !item.path.startsWith("__") && !(item.external && !item.path)
     ),
   }));
+
+  const { items: profileNavItems } = useSiteNavMenu("profile", []);
 
   return (
     <div className={`flex min-h-screen bg-[#f0fbfc]${isDemoMode ? ' pt-10' : ''}`}>
@@ -542,6 +546,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             Submit Ultrasound Case
                           </button>
                         </WouterLink>
+                        <SiteNavProfileLinks
+                          items={profileNavItems}
+                          location={location}
+                          onNavigate={() => setAccountOpen(false)}
+                        />
                       </div>
 
                       {/* Accreditation Portal section — for any DIY user or admin */}

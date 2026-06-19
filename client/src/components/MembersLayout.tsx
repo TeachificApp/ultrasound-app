@@ -18,6 +18,8 @@ import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { getAdminUrl } from "@/hooks/useSubdomain";
+import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
+import { SiteNavHeaderLinks, SiteNavProfileLinks } from "@/components/SiteNavLinks";
 import NameCollectionModal from "@/components/NameCollectionModal";
 
 const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
@@ -26,10 +28,19 @@ const AAUS_APP_URL = "https://app.allaboutultrasound.com";
 const IHE_APP_URL = "https://app.iheartecho.com";
 const LEARN_URL = "https://learn.allaboutultrasound.com";
 
+const DEFAULT_HEADER_NAV = [
+  { label: "Learning Platform", href: LEARN_URL, external: true },
+  { label: "Community", href: `${LEARN_URL}/community`, external: true },
+  { label: "UltrasoundAssist™", href: AAUS_APP_URL, external: true },
+  { label: "EchoAssist™", href: IHE_APP_URL, external: true },
+];
+
 export default function MembersLayout({ children }: { children: React.ReactNode }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [location] = useLocation();
+  const { items: headerNavItems } = useSiteNavMenu("header", DEFAULT_HEADER_NAV);
+  const { items: profileNavItems } = useSiteNavMenu("profile", []);
 
   const { isAuthenticated, user, loading: authLoading, logout } = useAuth();
   const isAdmin = (user as any)?.role === "admin";
@@ -76,18 +87,12 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
           </div>
           <nav className="flex-1 overflow-y-auto py-3 px-2">
             <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Navigation</p>
-            <a href={LEARN_URL} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
-              <GraduationCap className="w-4 h-4 text-[#189aa1]" /> Learning Platform
-            </a>
-            <a href={`${LEARN_URL}/community`} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
-              <Users className="w-4 h-4 text-[#189aa1]" /> Community
-            </a>
-            <a href={AAUS_APP_URL} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
-              <ExternalLink className="w-4 h-4 text-[#189aa1]" /> UltrasoundAssist™
-            </a>
-            <a href={IHE_APP_URL} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
-              <ExternalLink className="w-4 h-4 text-[#189aa1]" /> EchoAssist™
-            </a>
+            <SiteNavHeaderLinks
+              items={headerNavItems}
+              location={location}
+              onNavigate={() => setMobileNavOpen(false)}
+              className="flex-col items-stretch gap-0.5 px-1"
+            />
             {isPlatformAdmin && (
               <>
                 <div className="border-t border-gray-100 my-2" />
@@ -126,34 +131,11 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
           </Link>
 
           {/* Nav links — desktop (matches LMS nav order) */}
-          <nav className="hidden md:flex items-center gap-1 ml-4">
-            <a
-              href={LEARN_URL}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            >
-              <GraduationCap className="w-3.5 h-3.5" />
-              Learning Platform
-            </a>
-            <a
-              href={`${LEARN_URL}/community`}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            >
-              <Users className="w-3.5 h-3.5" />
-              Community
-            </a>
-            <a
-              href={AAUS_APP_URL}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            >
-              UltrasoundAssist™
-            </a>
-            <a
-              href={IHE_APP_URL}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            >
-              EchoAssist™
-            </a>
-          </nav>
+          <SiteNavHeaderLinks
+            items={headerNavItems}
+            location={location}
+            className="hidden md:flex ml-4"
+          />
 
           {/* Spacer */}
           <div className="flex-1" />
@@ -201,6 +183,11 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
                           <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
                         </div>
                       </Link>
+                      <SiteNavProfileLinks
+                        items={profileNavItems}
+                        location={location}
+                        onNavigate={() => setAccountOpen(false)}
+                      />
                       {/* App return links — mobile (matches LMS nav order) */}
                       <div className="md:hidden border-t border-gray-100 mt-1 pt-1">
                         <a href={LEARN_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>

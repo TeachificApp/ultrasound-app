@@ -20,6 +20,7 @@ import { formBuilderRouter } from "./routers/formBuilderRouter";
 import { generalFormRouter } from "./routers/generalFormRouter";
 import { accreditationManagerRouter } from "./routers/accreditationManagerRouter";
 import { educatorRouter } from "./routers/educatorRouter";
+import { sitePagesRouter } from "./routers/sitePagesRouter";
 import { teachRouter } from "./routers/teachRouter";
 import { sonoQuizRouter } from "./routers/sonoQuizRouter";
 import { emailCampaignRouter } from "./routers/emailCampaignRouter";
@@ -2057,6 +2058,7 @@ export const appRouter = router({
   quickfire: quickfireRouter,
   educator: educatorRouter,
   teach: teachRouter,
+  sitePages: sitePagesRouter,
   sonoQuiz: sonoQuizRouter,
 
   // ─── Echo Case Library ────────────────────────────────────────────────────────

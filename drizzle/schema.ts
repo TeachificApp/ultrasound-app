@@ -4032,6 +4032,68 @@ export const menuLinkConfig = mysqlTable("menuLinkConfig", {
 export type MenuLinkConfig = typeof menuLinkConfig.$inferSelect;
 export type InsertMenuLinkConfig = typeof menuLinkConfig.$inferInsert;
 
+// ─── Site Pages (multi-domain CMS) ───────────────────────────────────────────
+export const sitePages = mysqlTable(
+  "site_pages",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    domain: varchar("domain", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 200 }).notNull(),
+    title: varchar("title", { length: 300 }).notNull(),
+    pageKind: mysqlEnum("page_kind", [
+      "standard",
+      "home",
+      "legal_privacy",
+      "legal_terms",
+      "error_404",
+      "login",
+      "sales",
+      "system",
+    ])
+      .notNull()
+      .default("standard"),
+    status: mysqlEnum("status", ["draft", "published"]).notNull().default("draft"),
+    blocks: longtext("blocks"),
+    seoTitle: varchar("seo_title", { length: 255 }),
+    seoDescription: text("seo_description"),
+    seoImage: varchar("seo_image", { length: 512 }),
+    parentPageId: int("parent_page_id"),
+    navSortOrder: int("nav_sort_order").default(0).notNull(),
+    showInHeaderNav: boolean("show_in_header_nav").default(false).notNull(),
+    showInSidebarNav: boolean("show_in_sidebar_nav").default(false).notNull(),
+    showInProfileNav: boolean("show_in_profile_nav").default(false).notNull(),
+    isHiddenFromNav: boolean("is_hidden_from_nav").default(true).notNull(),
+    isHomePage: boolean("is_home_page").default(false).notNull(),
+    externalUrl: varchar("external_url", { length: 512 }),
+    createdByUserId: int("created_by_user_id"),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    domainSlugUnique: uniqueIndex("site_pages_domain_slug").on(t.domain, t.slug),
+  }),
+);
+export type SitePage = typeof sitePages.$inferSelect;
+export type InsertSitePage = typeof sitePages.$inferInsert;
+
+export const siteNavMenus = mysqlTable(
+  "site_nav_menus",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    domain: varchar("domain", { length: 255 }).notNull(),
+    menuKey: mysqlEnum("menu_key", ["header", "sidebar", "profile", "footer"]).notNull(),
+    itemsJson: longtext("items_json").notNull().default("[]"),
+    updatedByUserId: int("updated_by_user_id"),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    domainMenuUnique: uniqueIndex("site_nav_menus_domain_key").on(t.domain, t.menuKey),
+  }),
+);
+export type SiteNavMenu = typeof siteNavMenus.$inferSelect;
+export type InsertSiteNavMenu = typeof siteNavMenus.$inferInsert;
+
 // ─── Navigator Protocol Overrides ─────────────────────────────────────────────
 export const navigatorProtocolOverrides = mysqlTable("navigatorProtocolOverrides", {
   id: int("id").autoincrement().primaryKey(),

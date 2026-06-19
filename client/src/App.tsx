@@ -27,6 +27,8 @@ import { useCrossDomainSso } from "./hooks/useCrossDomainSso";
 import { useSsoBridge } from "./hooks/useSsoBridge";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import { perBrandAdminRouteElements, perBrandUserRouteElements } from "./routes/perBrandRouteHelpers";
+import { getSitePageDomain } from "@/lib/sitePageDomain";
+import { RESERVED_SITE_SLUGS } from "@shared/sitePagesConstants";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
 import Home from "./pages/Home";
@@ -113,6 +115,10 @@ const TeachPresentationEditor = lazy(() => import("./pages/teach/TeachPresentati
 const TeachMasterDesigner = lazy(() => import("./pages/teach/TeachMasterDesigner"));
 const TeachPresenter = lazy(() => import("./pages/teach/TeachPresenter"));
 const TeachPresenterNotes = lazy(() => import("./pages/teach/TeachPresenterNotes"));
+const SitePagesAdmin = lazy(() => import("./pages/admin/SitePagesAdmin"));
+const SitePageBuilder = lazy(() => import("./pages/admin/SitePageBuilder"));
+const PublicSitePage = lazy(() => import("./pages/PublicSitePage"));
+const SitePageCatchRoute = lazy(() => import("./pages/PublicSitePage").then((m) => ({ default: m.SitePageCatchRoute })));
 const AffiliateRedirect = lazy(() => import("./pages/AffiliateRedirect"));
 const UltrasoundAssistHub = lazy(() => import("./pages/UltrasoundAssistHub"));
 const ObGynCalculators = lazy(() => import("./pages/ObGynCalculators"));
@@ -486,6 +492,8 @@ function Router() {
         <Route path="/downloads" component={DownloadsBrowse} />
         <Route path="/bundles/:slug" component={BundleLanding} />
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePagesAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
@@ -612,9 +620,9 @@ function Router() {
 
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
-        <Route path="/404" component={NotFound} />
-        <Route path="/terms" component={() => { window.location.replace("https://www.allaboutultrasound.com/terms-of-service.html"); return null; }} />
-        <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
+        <Route path="/404">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="404" /></Suspense>}</Route>
+        <Route path="/terms">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="terms" /></Suspense>}</Route>
+        <Route path="/privacy">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="privacy" /></Suspense>}</Route>
         <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
         {/* ── Public Funnel Pages (catch-all — must be last before NotFound) ── */}
         <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
@@ -836,6 +844,8 @@ function LMSRouter() {
 
         {/* Admin (platform_admin only) */}
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePagesAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
@@ -890,8 +900,10 @@ function LMSRouter() {
         <Route path="/ref/:slug" component={AffiliateRedirect} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
-            {/* Fallback */}
-            <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
+            {/* CMS system pages */}
+            <Route path="/404">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="404" /></Suspense>}</Route>
+            <Route path="/terms">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="terms" /></Suspense>}</Route>
+            <Route path="/privacy">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="privacy" /></Suspense>}</Route>
             <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
             {/* Funnel pages — catch-all last */}
             <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
@@ -1064,6 +1076,8 @@ function IHeartEchoRouter() {
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/admin/engagement">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard>}</Route>
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePagesAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
@@ -1131,8 +1145,9 @@ function IHeartEchoRouter() {
         <Route path="/:slug/:pageSlug">{() => <PublicFunnelPageRoute />}</Route>
         <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>
 
-        <Route path="/404" component={NotFound} />
-        <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
+        <Route path="/404">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="404" /></Suspense>}</Route>
+        <Route path="/terms">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="terms" /></Suspense>}</Route>
+        <Route path="/privacy">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="privacy" /></Suspense>}</Route>
         <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
         <Route component={NotFound} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
@@ -1177,20 +1192,40 @@ function FunnelRootRedirect() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug || "";
 
-  if (RESERVED_FUNNEL_SLUGS.has(slug)) {
+  if (RESERVED_FUNNEL_SLUGS.has(slug) || RESERVED_SITE_SLUGS.has(slug.toLowerCase())) {
     return <NotFound />;
   }
 
-  // Check if this is a physical product slug first
+  const cmsQuery = trpc.sitePages.public.getBySlug.useQuery(
+    { domain: getSitePageDomain(), slug },
+    { enabled: !!slug, retry: false },
+  );
+
   const productQuery = trpc.products.getBySlug.useQuery(
     { slug, preview: false },
-    { enabled: !!slug, retry: false }
+    { enabled: !!slug && cmsQuery.isFetched && !cmsQuery.data, retry: false },
   );
 
   const { data, error } = trpc.funnelPublic.getFirstPage.useQuery(
     { funnelSlug: slug },
-    { enabled: !!slug && productQuery.isFetched && !productQuery.data, retry: false }
+    { enabled: !!slug && cmsQuery.isFetched && !cmsQuery.data && productQuery.isFetched && !productQuery.data, retry: false },
   );
+
+  if (cmsQuery.isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (cmsQuery.data) {
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}>
+        <PublicSitePage slug={slug} />
+      </Suspense>
+    );
+  }
 
   // If it's a product slug, redirect to the canonical product URL
   if (productQuery.data) {
