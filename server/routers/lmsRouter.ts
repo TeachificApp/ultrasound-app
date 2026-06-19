@@ -1679,6 +1679,18 @@ export const lmsLearnerRouter = router({
         pricingOptionLabel = opt.label;
       }
 
+      // ── Already-enrolled guard (guest path) ─────────────────────────────────
+      if (pricingType === "one_time" || pricingType === "payment_plan") {
+        const [existingGuest] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
+          .from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+        if (existingGuest && existingGuest.enrollmentType !== "free_preview") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You are already enrolled in this course. Please contact support if you believe this is an error.",
+          });
+        }
+      }
+
       if (pricingType === "free") {
         // Free course — just enroll directly
         const [existingFree] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType }).from(lmsEnrollments)
@@ -1737,6 +1749,10 @@ export const lmsLearnerRouter = router({
       const promoOpts = discounts ? { discounts } : { allow_promotion_codes: true };
       const productName = pricingOptionLabel ? `${course.title} — ${pricingOptionLabel}` : course.title;
 
+      // Idempotency key — prevents duplicate sessions from race conditions
+      const guestIdempotencyDate = new Date().toISOString().slice(0, 10);
+      const guestIdempotencyBase = `guest-checkout-${user.id}-${course.id}-${input.pricingOptionId ?? 0}-${guestIdempotencyDate}`;
+
       let session: any;
       if (pricingType === "one_time") {
         const lineItem = effectiveStripePriceId
@@ -1754,7 +1770,7 @@ export const lmsLearnerRouter = router({
           client_reference_id: user.id.toString(),
           metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump2 ? { bump_mode: "upgrade" } : {}) },
           ...shippingOptions,
-        });
+        }, { idempotencyKey: `${guestIdempotencyBase}-one-time` });
       } else if (pricingType === "subscription") {
         let stripePriceId = await validatePriceId(effectiveStripePriceId);
         if (!stripePriceId) {
@@ -1779,7 +1795,7 @@ export const lmsLearnerRouter = router({
             metadata: { user_id: user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() },
           },
           ...shippingOptions,
-        });
+        }, { idempotencyKey: `${guestIdempotencyBase}-subscription` });
       } else {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Unsupported pricing type for guest checkout" });
       }

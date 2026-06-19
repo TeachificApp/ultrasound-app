@@ -215,7 +215,7 @@ export const bundleLearnerRouter = router({
         success_url: `${origin}/bundles/${bundle.slug}?success=1`,
         cancel_url: `${origin}/bundles/${bundle.slug}?cancelled=1`,
         ...(isSubscription ? {} : { payment_intent_data: { metadata: { user_id: ctx.user.id.toString(), bundle_id: input.bundleId.toString(), purchase_type: "bundle_purchase" } } }),
-      });
+      }, { idempotencyKey: `bundle-checkout-${ctx.user.id}-${input.bundleId}-${input.pricingOptionId ?? 0}-${new Date().toISOString().slice(0, 10)}` });
       return { alreadyEnrolled: false, checkoutUrl: session.url, enrolled: false };
     }),
 

@@ -718,7 +718,14 @@ export default function DownloadLanding() {
         toast.info("Redirecting to checkout...");
       }
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e: any) => {
+      if ((e?.data?.code === "CONFLICT" || e?.data?.code === "BAD_REQUEST") && (e.message?.toLowerCase().includes("already") || e.message?.toLowerCase().includes("own"))) {
+        toast.success("You already own this product!", { description: "Redirecting to your files..." });
+        setTimeout(() => { window.location.href = `/downloads/${slug}/files`; }, 1200);
+      } else {
+        toast.error(e.message);
+      }
+    },
   });
 
   // Full SEO — title, OG, Twitter Card, JSON-LD, canonical

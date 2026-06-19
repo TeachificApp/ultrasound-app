@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances } from "../../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -620,6 +620,70 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
     title: "🏫 New Workshop Enrollment",
     content: `User ID ${userId} (${meta.customer_email ?? "unknown"}) enrolled in workshop ID ${workshopId}, instance ID ${instanceId}. Amount: $${(amountPaid / 100).toFixed(2)}.`,
   });
+
+  // Send workshop registration confirmation email
+  try {
+    const [workshopRow] = await db
+      .select({ title: workshops.title, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
+      .from(workshops).where(eq(workshops.id, workshopId)).limit(1);
+    const [instanceRow] = await db
+      .select({ title: workshopInstances.title, startDate: workshopInstances.startDate, timezone: workshopInstances.timezone, locationType: workshopInstances.locationType, venueName: workshopInstances.venueName, venueCity: workshopInstances.venueCity, venueState: workshopInstances.venueState, meetingUrl: workshopInstances.meetingUrl })
+      .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
+
+    if (workshopRow?.welcomeEmailEnabled !== false && meta.customer_email) {
+      const customerName = meta.customer_name ?? meta.customer_email.split("@")[0];
+      const firstName = customerName.split(" ")[0];
+      const workshopTitle = workshopRow?.title ?? "Workshop";
+      const instanceTitle = instanceRow?.title ?? "";
+      const subject = workshopRow?.welcomeEmailSubject || `You're registered: ${workshopTitle}`;
+      let dateStr = "";
+      if (instanceRow?.startDate) {
+        dateStr = new Date(instanceRow.startDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: instanceRow.timezone ?? "America/New_York" });
+      }
+      let locationStr = "";
+      if (instanceRow?.locationType === "virtual") {
+        locationStr = instanceRow.meetingUrl
+          ? `Virtual — <a href="${instanceRow.meetingUrl}" style="color:#0d9488;">${instanceRow.meetingUrl}</a>`
+          : "Virtual (link will be sent before the event)";
+      } else if (instanceRow?.venueName) {
+        locationStr = [instanceRow.venueName, instanceRow.venueCity, instanceRow.venueState].filter(Boolean).join(", ");
+      }
+      const customBodyHtml = workshopRow?.welcomeEmailBody
+        ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${workshopRow.welcomeEmailBody}</div>`
+        : "";
+      const brandColor = "#0d9488";
+      const brandDark = "#0e4a50";
+      const htmlBody = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;"><tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+<tr><td style="background:linear-gradient(135deg,${brandDark} 0%,${brandDark} 60%,${brandColor} 100%);padding:28px 32px;text-align:center;">
+<img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp" alt="All About Ultrasound" width="80" height="80" style="border-radius:50%;display:block;margin:0 auto 12px;"/>
+<div style="font-size:22px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">All About Ultrasound™</div>
+</td></tr>
+<tr><td style="padding:32px;">
+<h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">You're registered, ${firstName}! 🎉</h2>
+<p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">You've successfully registered for <strong style="color:${brandDark};">${workshopTitle}${instanceTitle ? ` — ${instanceTitle}` : ""}</strong>.</p>
+${customBodyHtml}
+<div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+${dateStr ? `<p style="margin:0 0 6px;font-size:14px;color:#0e4a50;"><strong>Date:</strong> ${dateStr}</p>` : ""}
+${locationStr ? `<p style="margin:0;font-size:14px;color:#0e4a50;"><strong>Location:</strong> ${locationStr}</p>` : ""}
+</div>
+<p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">Questions? Reply to this email or contact <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};">support@allaboutultrasound.com</a>.</p>
+</td></tr>
+<tr><td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
+<p style="margin:0;font-size:12px;color:#94a3b8;">© All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:${brandColor};text-decoration:none;">www.allaboutultrasound.com</a></p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+      await sendEmail({ to: { name: customerName, email: meta.customer_email }, subject, htmlBody });
+      console.log(`[Stripe] Workshop confirmation email sent to ${meta.customer_email}`);
+    }
+  } catch (emailErr) {
+    console.error(`[Stripe] Failed to send workshop confirmation email:`, emailErr);
+  }
+
   console.log(`[Stripe] Workshop enrollment recorded: user ${userId}, workshop ${workshopId}, instance ${instanceId}`);
 }
 

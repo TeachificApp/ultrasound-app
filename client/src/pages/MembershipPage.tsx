@@ -67,7 +67,14 @@ export default function MembershipPage() {
       toast.success("Redirecting to checkout…");
       window.open(data.checkoutUrl, "_blank");
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e: any) => {
+      if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already")) {
+        toast.success("You already have access!", { description: "Redirecting to your dashboard..." });
+        setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
+      } else {
+        toast.error(e.message);
+      }
+    },
   });
 
   const guestRegisterMutation = trpc.membership.guestCheckoutRegister.useMutation({

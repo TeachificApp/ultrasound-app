@@ -327,7 +327,7 @@ export const downloadsLearnerRouter = router({
         success_url: `${origin}/downloads/${product.slug}/files?success=1`,
         cancel_url: `${origin}/downloads/${product.slug}`,
         ...shippingOptions,
-      });
+      }, { idempotencyKey: `download-checkout-${ctx.user.id}-${product.id}-${new Date().toISOString().slice(0, 10)}` });
 
       return { checkoutUrl: session.url, free: false };
     }),
@@ -623,7 +623,7 @@ export const downloadsLearnerRouter = router({
         }],
         metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=download`,
-      });
+      }, { idempotencyKey: `download-embedded-${ctx.user.id}-${product.id}-${new Date().toISOString().slice(0, 10)}` });
       return {
         clientSecret: session.client_secret!,
         free: false,
@@ -2061,7 +2061,7 @@ Make ALL content specific and compelling based on the product title and descript
         }],
         metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=download`,
-      });
+      }, { idempotencyKey: `download-embedded-${ctx.user.id}-${product.id}-${new Date().toISOString().slice(0, 10)}` });
       return {
         clientSecret: session.client_secret!,
         free: false,

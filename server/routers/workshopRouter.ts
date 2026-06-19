@@ -602,6 +602,7 @@ export const workshopLearnerRouter = router({
         quantity: 1,
       };
       const isUpgradeBump = orderBumpCheckout?.bumpMode === "upgrade";
+      const workshopIdempotencyDate = new Date().toISOString().slice(0, 10);
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
@@ -621,7 +622,7 @@ export const workshopLearnerRouter = router({
           ...orderBumpCheckout?.metadata,
         },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=workshop`,
-      });
+      }, { idempotencyKey: `workshop-checkout-${ctx.user.id}-${workshop.id}-${instance.id}-${workshopIdempotencyDate}` });
 
       return {
         clientSecret: session.client_secret!,

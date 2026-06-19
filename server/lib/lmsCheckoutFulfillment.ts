@@ -11,6 +11,7 @@ import {
   lmsEnrollments,
   lmsOrders,
   lmsPricingOptions,
+  platformSettings,
 } from "../../drizzle/schema";
 import { getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
 import { sendEnrollmentEmail } from "./enrollmentEmail";
@@ -446,7 +447,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
   }
 
   const [course] = await db
-    .select({ title: lmsCourses.title, slug: lmsCourses.slug })
+    .select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail })
     .from(lmsCourses)
     .where(eq(lmsCourses.id, courseId))
     .limit(1);
@@ -538,17 +539,29 @@ export async function reconcileLmsCheckoutFromStripeSession(
 
   if (customerEmail && course?.slug && (shouldRenew || isNewUser) && !options.linkOnly) {
     try {
-      let accessToken: string | null = null;
+      // Respect per-course and platform-level email enable flags
+      const courseEmailEnabled = course.sendEnrollmentEmail !== false;
+      let platformEmailEnabled = true;
       try {
-        accessToken = await getOrCreateAccessToken(userId);
-      } catch { /* optional */ }
-      await sendEnrollmentEmail({
-        to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
-        courseTitle: course.title,
-        courseSlug: course.slug,
-        accessToken,
-      });
-      notes.push("Enrollment email sent");
+        const [platformRow] = await db.select({ enrollmentEmailEnabled: platformSettings.enrollmentEmailEnabled }).from(platformSettings).limit(1);
+        platformEmailEnabled = platformRow?.enrollmentEmailEnabled !== false;
+      } catch { /* non-fatal */ }
+
+      if (courseEmailEnabled && platformEmailEnabled) {
+        let accessToken: string | null = null;
+        try {
+          accessToken = await getOrCreateAccessToken(userId);
+        } catch { /* optional */ }
+        await sendEnrollmentEmail({
+          to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
+          courseTitle: course.title,
+          courseSlug: course.slug,
+          accessToken,
+        });
+        notes.push("Enrollment email sent");
+      } else {
+        notes.push(`Enrollment email skipped (course=${courseEmailEnabled}, platform=${platformEmailEnabled})`);
+      }
     } catch (err) {
       console.error(`[LmsCheckoutFulfillment] Email failed for ${customerEmail}:`, err);
       notes.push("Enrollment email failed");

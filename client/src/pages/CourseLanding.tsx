@@ -1628,7 +1628,14 @@ export default function CourseLanding() {
         window.open(data.checkoutUrl, "_blank");
       }
     },
-    onError: (e) => toast.error(`Checkout failed: ${e.message}`),
+    onError: (e: any) => {
+      if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already enrolled")) {
+        toast.success("You already have access to this course!", { description: "Redirecting to your course..." });
+        setTimeout(() => navigate(`/courses/${slug}/player`), 1200);
+      } else {
+        toast.error(`Checkout failed: ${e.message}`);
+      }
+    },
   });
   const registerFreePreview = trpc.lms.registerFreePreview.useMutation();
   const utils = trpc.useUtils();
@@ -1644,7 +1651,14 @@ export default function CourseLanding() {
         window.open(data.checkoutUrl, "_blank");
       }
     },
-    onError: (e) => toast.error(`Checkout failed: ${e.message}`),
+    onError: (e: any) => {
+      if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already enrolled")) {
+        toast.success("You already have access to this course!", { description: "Redirecting to your course..." });
+        setTimeout(() => navigate(`/courses/${slug}/player`), 1200);
+      } else {
+        toast.error(`Checkout failed: ${e.message}`);
+      }
+    },
   });
 
   // Product catalog for free enrollment cross-product lookup (lazy-loaded, only used when free_enrollment CTA fires)
