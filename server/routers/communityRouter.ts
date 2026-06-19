@@ -6,7 +6,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, sql, asc, inArray, or, lt, notInArray, notLike, type SQL } from "drizzle-orm";
+import { and, desc, eq, sql, asc, inArray, or, lt, notInArray, notLike, ne, type SQL } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
@@ -1112,7 +1112,7 @@ const communityMemberRouter = router({
       credentials: users.credentials,
     }).from(communityMembers)
       .innerJoin(users, eq(users.id, communityMembers.userId))
-      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.memberStatus, "approved"), notLike(users.name, "[Merged into #%")))
+      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.memberStatus, "approved"), notLike(users.name, "[Merged into #%"), ne(users.isDemo, true), notLike(users.name, "test%"), notLike(users.email, "test%")))
       .orderBy(desc(communityMembers.joinedAt))
       .limit(input.limit);
     return rows.map((r) => ({
@@ -1806,11 +1806,11 @@ const communityAdminRouter = router({
       })
       .from(communityMembers)
       .innerJoin(users, eq(users.id, communityMembers.userId))
-      .where(and(baseWhere, notLike(users.name, "[Merged into #%")))
+      .where(and(baseWhere, notLike(users.name, "[Merged into #%"), ne(users.isDemo, true), notLike(users.name, "test%"), notLike(users.email, "test%")))
       .orderBy(desc(communityMembers.joinedAt))
       .limit(input.pageSize)
       .offset(offset);
-    const [{ total }] = await db.select({ total: sql<number>`COUNT(*)` }).from(communityMembers).innerJoin(users, eq(users.id, communityMembers.userId)).where(and(baseWhere, notLike(users.name, "[Merged into #%")));
+    const [{ total }] = await db.select({ total: sql<number>`COUNT(*)` }).from(communityMembers).innerJoin(users, eq(users.id, communityMembers.userId)).where(and(baseWhere, notLike(users.name, "[Merged into #%"), ne(users.isDemo, true), notLike(users.name, "test%"), notLike(users.email, "test%")));
     return { members: rows, total: Number(total) };
   }),
 
