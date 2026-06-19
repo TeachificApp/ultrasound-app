@@ -20,6 +20,8 @@ import NameCollectionModal from "@/components/NameCollectionModal";
 const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
 const MEMBERS_URL = "https://members.allaboutultrasound.com";
 import { getAdminUrl, APP_URL } from "@/hooks/useSubdomain";
+import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
+import { SiteNavHeaderLinks, SiteNavProfileLinks } from "@/components/SiteNavLinks";
 const AAUS_APP_URL = "https://app.allaboutultrasound.com";
 
 interface NavItem {
@@ -43,6 +45,12 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
+  const { items: headerNavItems } = useSiteNavMenu("header", NAV_ITEMS.map((item) => ({
+    label: item.label,
+    href: item.href,
+    external: item.external,
+  })));
+  const { items: profileNavItems } = useSiteNavMenu("profile", []);
 
   // Funnel pages (/:slug/:pageSlug) should render without the LMS header.
   // Detect by checking: two path segments, not starting with any known system prefix.
@@ -85,21 +93,12 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
           </Link>
 
           {/* Desktop nav links */}
-          <nav className="hidden md:flex items-center gap-1 ml-4">
-            {NAV_ITEMS.map(item => (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                    isActive(item.href, item.exact)
-                      ? "bg-[#189aa1]/10 text-[#189aa1]"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
-                >
-                  {item.icon}
-                  {item.label}
-                </div>
-              </Link>
-            ))}
+          <SiteNavHeaderLinks
+            items={headerNavItems}
+            location={location}
+            className="hidden md:flex ml-4"
+          />
+          <nav className="hidden md:flex items-center gap-1">
             {/* External brand links */}
             <a
               href={AAUS_SITE_URL}
@@ -168,6 +167,11 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                       >
                         <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
                       </a>
+                      <SiteNavProfileLinks
+                        items={profileNavItems}
+                        location={location}
+                        onNavigate={() => setAccountOpen(false)}
+                      />
                       {isPlatformAdmin && (
                         <>
                           <div className="border-t border-gray-100 my-1" />
@@ -246,20 +250,12 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile nav drawer */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white px-3 py-2 flex flex-col gap-0.5">
-            {NAV_ITEMS.map(item => (
-              <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
-                <div
-                  className={`flex items-center gap-2 px-3 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer min-h-[44px] ${
-                    isActive(item.href, item.exact)
-                      ? "bg-[#189aa1]/10 text-[#189aa1]"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {item.icon}
-                  {item.label}
-                </div>
-              </Link>
-            ))}
+            <SiteNavHeaderLinks
+              items={headerNavItems}
+              location={location}
+              onNavigate={() => setMobileMenuOpen(false)}
+              className="flex-col items-stretch gap-0.5"
+            />
             <div className="border-t border-gray-100 mt-1 pt-1 flex flex-col gap-1">
               <a
                 href={AAUS_SITE_URL}

@@ -319,7 +319,16 @@ export const sitePagesPublicRouter = router({
         .where(and(eq(siteNavMenus.domain, input.domain), eq(siteNavMenus.menuKey, input.menuKey)))
         .limit(1);
       if (!row) {
-        const headerPages = await db
+        const flagColumn =
+          input.menuKey === "header"
+            ? sitePages.showInHeaderNav
+            : input.menuKey === "sidebar"
+              ? sitePages.showInSidebarNav
+              : input.menuKey === "profile"
+                ? sitePages.showInProfileNav
+                : null;
+        if (!flagColumn) return { items: [] as SiteNavItem[] };
+        const autoPages = await db
           .select({
             id: sitePages.id,
             title: sitePages.title,
@@ -330,13 +339,13 @@ export const sitePagesPublicRouter = router({
             and(
               eq(sitePages.domain, input.domain),
               eq(sitePages.status, "published"),
-              eq(sitePages.showInHeaderNav, true),
+              eq(flagColumn, true),
               eq(sitePages.isHiddenFromNav, false),
             ),
           )
           .orderBy(asc(sitePages.navSortOrder));
         return {
-          items: headerPages.map((p) => ({
+          items: autoPages.map((p) => ({
             id: `page-${p.id}`,
             label: p.title,
             href: `/${p.slug}`,

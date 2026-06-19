@@ -22,6 +22,8 @@ import { getLoginUrl } from "@/const";
 import { useBrand } from "@/hooks/useBrand";
 import { getBrandNavConfig } from "@/config/brandNav";
 import { isLearnDomain, isMembersDomain, isAccreditationDomain } from "@/hooks/useSubdomain";
+import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
+import { SiteNavSidebarLinks, SiteNavProfileLinks } from "@/components/SiteNavLinks";
 import GetAppBanner from "@/components/GetAppBanner";
 
 /** Badge showing the count of echo cases pending admin review */
@@ -262,6 +264,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     ),
   }));
 
+  const { items: sidebarCmsItems } = useSiteNavMenu("sidebar", []);
+  const { items: profileNavItems } = useSiteNavMenu("profile", []);
+
   return (
     <div className={`flex min-h-screen bg-[#f0fbfc]${isDemoMode ? ' pt-10' : ''}`}>
       {/* Mobile overlay */}
@@ -301,6 +306,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav ref={navRef} onScroll={saveNavScroll} className="flex-1 px-3 py-4 overflow-y-auto space-y-4">
+          {sidebarCmsItems.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-white/40 uppercase tracking-wider px-3 mb-1">Site</div>
+              <SiteNavSidebarLinks
+                items={sidebarCmsItems}
+                location={location}
+                onNavigate={() => setSidebarOpen(false)}
+              />
+            </div>
+          )}
           {navGroups.map(group => (
             <div key={group.label}>
               <div className="text-xs font-semibold text-white/40 uppercase tracking-wider px-3 mb-1">{group.label}</div>
@@ -542,6 +557,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             Submit Ultrasound Case
                           </button>
                         </WouterLink>
+                        <SiteNavProfileLinks
+                          items={profileNavItems}
+                          location={location}
+                          onNavigate={() => setAccountOpen(false)}
+                        />
                       </div>
 
                       {/* Accreditation Portal section — for any DIY user or admin */}

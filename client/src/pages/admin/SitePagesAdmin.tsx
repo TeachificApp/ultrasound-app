@@ -157,37 +157,103 @@ function SortableNavItem({
   depth,
   onChange,
   onRemove,
+  onAddChild,
+  expanded,
+  onToggleExpand,
 }: {
   item: SiteNavItem;
   depth: number;
   onChange: (item: SiteNavItem) => void;
   onRemove: () => void;
+  onAddChild?: () => void;
+  expanded?: Set<string>;
+  onToggleExpand?: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
+  const children = item.children ?? [];
+  const hasChildren = children.length > 0;
+  const isOpen = expanded?.has(item.id) ?? true;
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-2 mb-1" data-depth={depth}>
-      <button type="button" className="cursor-grab text-gray-400" {...attributes} {...listeners}>
-        <GripVertical className="w-4 h-4" />
-      </button>
-      <Input
-        value={item.label}
-        onChange={(e) => onChange({ ...item, label: e.target.value })}
-        className="h-8 text-sm flex-1"
-        placeholder="Label"
-      />
-      <Input
-        value={item.href ?? ""}
-        onChange={(e) => onChange({ ...item, href: e.target.value })}
-        className="h-8 text-sm flex-[2]"
-        placeholder="/path or https://"
-      />
-      <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
-        ×
-      </Button>
+    <div ref={setNodeRef} style={style} className="mb-1">
+      <div className="flex items-center gap-2" style={{ paddingLeft: depth * 16 }}>
+        <button type="button" className="cursor-grab text-gray-400" {...attributes} {...listeners}>
+          <GripVertical className="w-4 h-4" />
+        </button>
+        {hasChildren ? (
+          <button type="button" onClick={() => onToggleExpand?.(item.id)} className="text-gray-400">
+            {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+        ) : (
+          <span className="w-4" />
+        )}
+        <Input
+          value={item.label}
+          onChange={(e) => onChange({ ...item, label: e.target.value })}
+          className="h-8 text-sm flex-1"
+          placeholder="Label"
+        />
+        <Input
+          value={item.href ?? ""}
+          onChange={(e) => onChange({ ...item, href: e.target.value })}
+          className="h-8 text-sm flex-[2]"
+          placeholder="/path or https://"
+        />
+        {onAddChild && (
+          <Button type="button" variant="ghost" size="sm" onClick={onAddChild} title="Add submenu">
+            <Plus className="w-3.5 h-3.5" />
+          </Button>
+        )}
+        <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+          ×
+        </Button>
+      </div>
+      {hasChildren && isOpen && (
+        <div className="mt-1 space-y-1">
+          {children.map((child, idx) => (
+            <SortableNavItem
+              key={child.id}
+              item={child}
+              depth={depth + 1}
+              expanded={expanded}
+              onToggleExpand={onToggleExpand}
+              onChange={(updated) =>
+                onChange({
+                  ...item,
+                  children: children.map((c, i) => (i === idx ? updated : c)),
+                })
+              }
+              onRemove={() =>
+                onChange({
+                  ...item,
+                  children: children.filter((_, i) => i !== idx),
+                })
+              }
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
+}
+
+function updateNavItemById(items: SiteNavItem[], id: string, updater: (item: SiteNavItem) => SiteNavItem): SiteNavItem[] {
+  return items.map((item) => {
+    if (item.id === id) return updater(item);
+    if (item.children?.length) {
+      return { ...item, children: updateNavItemById(item.children, id, updater) };
+    }
+    return item;
+  });
+}
+
+function removeNavItemById(items: SiteNavItem[], id: string): SiteNavItem[] {
+  return items
+    .filter((item) => item.id !== id)
+    .map((item) =>
+      item.children?.length ? { ...item, children: removeNavItemById(item.children, id) } : item,
+    );
 }
 
 export default function SitePagesAdmin() {
@@ -206,6 +272,7 @@ export default function SitePagesAdmin() {
   const [menuKey, setMenuKey] = useState<(typeof SITE_NAV_MENU_KEYS)[number]>("header");
   const [navItems, setNavItems] = useState<SiteNavItem[]>([]);
   const [navLoaded, setNavLoaded] = useState(false);
+  const [navExpanded, setNavExpanded] = useState<Set<string>>(() => new Set());
 
   const { data: domains } = trpc.sitePages.admin.listDomains.useQuery();
   const { data: tree, refetch: refetchTree } = trpc.sitePages.admin.listPageTree.useQuery({ domain });
@@ -279,6 +346,15 @@ export default function SitePagesAdmin() {
       ...prev,
       { id: `nav-${Date.now()}`, label: "New link", href: "/" },
     ]);
+  };
+
+  const toggleNavFolder = (id: string) => {
+    setNavExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   return (
@@ -416,10 +492,23 @@ export default function SitePagesAdmin() {
                     key={item.id}
                     item={item}
                     depth={0}
+                    expanded={navExpanded}
+                    onToggleExpand={toggleNavFolder}
                     onChange={(updated) =>
-                      setNavItems((prev) => prev.map((i) => (i.id === item.id ? updated : i)))
+                      setNavItems((prev) => updateNavItemById(prev, item.id, () => updated))
                     }
-                    onRemove={() => setNavItems((prev) => prev.filter((i) => i.id !== item.id))}
+                    onRemove={() => setNavItems((prev) => removeNavItemById(prev, item.id))}
+                    onAddChild={() =>
+                      setNavItems((prev) =>
+                        updateNavItemById(prev, item.id, (current) => ({
+                          ...current,
+                          children: [
+                            ...(current.children ?? []),
+                            { id: `nav-${Date.now()}`, label: "Sub link", href: "/" },
+                          ],
+                        })),
+                      )
+                    }
                   />
                 ))}
               </SortableContext>

@@ -27,6 +27,8 @@ import { useCrossDomainSso } from "./hooks/useCrossDomainSso";
 import { useSsoBridge } from "./hooks/useSsoBridge";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import { perBrandAdminRouteElements, perBrandUserRouteElements } from "./routes/perBrandRouteHelpers";
+import { getSitePageDomain } from "@/lib/sitePageDomain";
+import { RESERVED_SITE_SLUGS } from "@shared/sitePagesConstants";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
 import Home from "./pages/Home";
@@ -898,8 +900,10 @@ function LMSRouter() {
         <Route path="/ref/:slug" component={AffiliateRedirect} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
-            {/* Fallback */}
-            <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
+            {/* CMS system pages */}
+            <Route path="/404">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="404" /></Suspense>}</Route>
+            <Route path="/terms">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="terms" /></Suspense>}</Route>
+            <Route path="/privacy">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="privacy" /></Suspense>}</Route>
             <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
             {/* Funnel pages — catch-all last */}
             <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
@@ -1187,20 +1191,40 @@ function FunnelRootRedirect() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug || "";
 
-  if (RESERVED_FUNNEL_SLUGS.has(slug)) {
+  if (RESERVED_FUNNEL_SLUGS.has(slug) || RESERVED_SITE_SLUGS.has(slug.toLowerCase())) {
     return <NotFound />;
   }
 
-  // Check if this is a physical product slug first
+  const cmsQuery = trpc.sitePages.public.getBySlug.useQuery(
+    { domain: getSitePageDomain(), slug },
+    { enabled: !!slug, retry: false },
+  );
+
   const productQuery = trpc.products.getBySlug.useQuery(
     { slug, preview: false },
-    { enabled: !!slug, retry: false }
+    { enabled: !!slug && cmsQuery.isFetched && !cmsQuery.data, retry: false },
   );
 
   const { data, error } = trpc.funnelPublic.getFirstPage.useQuery(
     { funnelSlug: slug },
-    { enabled: !!slug && productQuery.isFetched && !productQuery.data, retry: false }
+    { enabled: !!slug && cmsQuery.isFetched && !cmsQuery.data && productQuery.isFetched && !productQuery.data, retry: false },
   );
+
+  if (cmsQuery.isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (cmsQuery.data) {
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}>
+        <PublicSitePage slug={slug} />
+      </Suspense>
+    );
+  }
 
   // If it's a product slug, redirect to the canonical product URL
   if (productQuery.data) {
