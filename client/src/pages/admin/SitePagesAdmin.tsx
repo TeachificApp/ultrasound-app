@@ -484,6 +484,13 @@ export default function SitePagesAdmin() {
             <p className="text-sm text-gray-500">
               Drag to reorder. Links can point to site pages ({`/`}slug) or external URLs.
               Pages with &quot;Show in header nav&quot; enabled also appear automatically when no custom menu is saved.
+              {menuKey === "sidebar" && domain === "app.allaboutultrasound.com" && (
+                <>
+                  {" "}
+                  Sidebar menus for the App domain are saved here for planning and export; the live clinical
+                  tools sidebar on app.allaboutultrasound.com is not replaced.
+                </>
+              )}
             </p>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleNavDragEnd}>
               <SortableContext items={navItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
