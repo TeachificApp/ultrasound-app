@@ -15,6 +15,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { CheckCircle2, AlertCircle, RefreshCw, Lock, ArrowRight, ArrowLeft, ChevronDown } from "lucide-react";
 import { RichTextDisplay } from "@/components/RichTextEditor";
 import { FormSuccessOutcomeView, type SuccessOutcomePayload } from "@/components/FormSuccessOutcomeView";
@@ -850,6 +851,7 @@ function ClassicRenderer({
 export default function PublicFormRenderer({ isEmbed = false, isPreview = false }: { isEmbed?: boolean; isPreview?: boolean }) {
   const params = useParams<{ slug: string }>();
   const slug = params.slug ?? "";
+  const { user } = useAuth();
 
   // ── Embed widget postMessage ──
   const widgetKey = useMemo(() => {
@@ -905,6 +907,7 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
       responses: JSON.stringify(responses),
       origin: window.location.origin,
       email: emailVal,
+      userId: user?.id ?? undefined,
     });
   };
 

@@ -674,6 +674,7 @@ export default function DynamicFormRenderer({
       responses,
       qualityScore: normalizedScore,
       maxPossibleScore: maxScore,
+      userId: user?.id ?? undefined,
     });
   };
 
