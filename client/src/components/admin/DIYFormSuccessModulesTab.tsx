@@ -165,7 +165,10 @@ export default function DIYFormSuccessModulesTab({
     ];
   }, [formItems]);
 
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
+
   const openNewModule = (type: ModuleDraft["moduleType"]) => {
+    setTypePickerOpen(false);
     setModuleDraft({
       ...emptyModule(type),
       name: type === "inline_message" ? "Thank You Message" : type === "full_page" ? "Full Success Page" : "Redirect",
@@ -328,35 +331,19 @@ export default function DIYFormSuccessModulesTab({
             <h4 className="text-sm font-semibold text-gray-800">Success Pages</h4>
             <p className="text-xs text-gray-500">Each success page is a reusable outcome shown after submission. Create one or more, then route users to the right one using rules below.</p>
           </div>
-          <div className="flex gap-2">
-            <Button type="button" size="sm" className="gap-1 text-white" style={{ background: BRAND }} onClick={() => openNewModule("inline_message")}>
-              <Plus className="w-3.5 h-3.5" /> Inline Message
-            </Button>
-            <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("full_page")}>
-              <LayoutTemplate className="w-3.5 h-3.5" /> Full Page
-            </Button>
-            <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("redirect_url")}>
-              <ExternalLink className="w-3.5 h-3.5" /> Redirect
-            </Button>
-          </div>
+          <Button type="button" size="sm" className="gap-1 text-white" style={{ background: BRAND }} onClick={() => setTypePickerOpen(true)}>
+            <Plus className="w-3.5 h-3.5" /> Add Success Page
+          </Button>
         </div>
 
       <div className="space-y-2">
         {modules.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-10 text-center">
-              <p className="text-sm text-gray-400 mb-3">No success pages yet. Create your first one:</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button type="button" size="sm" className="gap-1 text-white" style={{ background: BRAND }} onClick={() => openNewModule("inline_message")}>
-                  <Plus className="w-3.5 h-3.5" /> Inline Thank-You Message
-                </Button>
-                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("full_page")}>
-                  <LayoutTemplate className="w-3.5 h-3.5" /> Full Success Page
-                </Button>
-                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("redirect_url")}>
-                  <ExternalLink className="w-3.5 h-3.5" /> Redirect to URL
-                </Button>
-              </div>
+              <p className="text-sm text-gray-400 mb-3">No success pages yet.</p>
+              <Button type="button" size="sm" className="gap-1 text-white" style={{ background: BRAND }} onClick={() => setTypePickerOpen(true)}>
+                <Plus className="w-3.5 h-3.5" /> Add Success Page
+              </Button>
             </CardContent>
           </Card>
         ) : modules.map(mod => (
@@ -440,6 +427,51 @@ export default function DIYFormSuccessModulesTab({
           </div>
         )}
       </div>
+
+      {/* Type Picker Dialog */}
+      <Dialog open={typePickerOpen} onOpenChange={setTypePickerOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add Success Page</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-500 mb-4">Choose the type of success page to create:</p>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => openNewModule("inline_message")}
+              className="w-full flex items-start gap-3 rounded-lg border border-gray-200 p-4 text-left hover:border-cyan-600 hover:bg-cyan-50 transition-colors"
+            >
+              <MessageSquare className="w-5 h-5 mt-0.5 text-cyan-700 shrink-0" />
+              <div>
+                <div className="font-medium text-sm text-gray-900">Inline Thank-You Message</div>
+                <div className="text-xs text-gray-500 mt-0.5">A rich-text message shown directly on the form page after submission.</div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => openNewModule("full_page")}
+              className="w-full flex items-start gap-3 rounded-lg border border-gray-200 p-4 text-left hover:border-cyan-600 hover:bg-cyan-50 transition-colors"
+            >
+              <LayoutTemplate className="w-5 h-5 mt-0.5 text-cyan-700 shrink-0" />
+              <div>
+                <div className="font-medium text-sm text-gray-900">Full Success Page</div>
+                <div className="text-xs text-gray-500 mt-0.5">A full-screen page with custom blocks, images, and content.</div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => openNewModule("redirect_url")}
+              className="w-full flex items-start gap-3 rounded-lg border border-gray-200 p-4 text-left hover:border-cyan-600 hover:bg-cyan-50 transition-colors"
+            >
+              <ExternalLink className="w-5 h-5 mt-0.5 text-cyan-700 shrink-0" />
+              <div>
+                <div className="font-medium text-sm text-gray-900">Redirect to URL</div>
+                <div className="text-xs text-gray-500 mt-0.5">Automatically redirect the user to an external or internal URL.</div>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Module Editor Dialog */}
       <Dialog open={moduleDialogOpen} onOpenChange={setModuleDialogOpen}>
