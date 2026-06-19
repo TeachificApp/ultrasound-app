@@ -401,6 +401,20 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       bgColor: "#ffffff", headerBg: "#f0fafa", headerTextColor: "#0e4a50", borderColor: "#d1fae5",
       fontSize: 14, textAlign: "left",
     } },
+  { type: "included_items_auto", label: "Included Items (Auto)", icon: <Package size={14} />, category: "Smart",
+    defaultData: {
+      headline: "What's Included",
+      subtext: "",
+      layout: "grid",
+      columns: 3,
+      showTypeLabel: true,
+      showCoverImage: true,
+      showCheckIcon: true,
+      bgColor: "#f9fafb",
+      cardBgColor: "#ffffff",
+      accentColor: "#179ca3",
+      textColor: "#111827",
+    } },
   {
     type: "enrollment_counter",
     label: "Enrollment Counter",
@@ -6560,6 +6574,52 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           <BSColorField data={d} onSet={set} label="Number Color" field="accentColor" />
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
           <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+        </div>
+      );
+    }
+    case "included_items_auto": {
+      return (
+        <div className="space-y-3">
+          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Included Items Block</p>
+          <p className="text-xs text-gray-500">Items are automatically pulled from the membership or bundle admin in the order you set there. No manual selection needed.</p>
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" placeholder="What's Included" />
+          <BSTextField data={d} onSet={set} label="Subtext (optional)" field="subtext" placeholder="" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Layout</label>
+            <div className="flex gap-1">
+              {(["grid", "list"] as const).map(v => (
+                <button key={v} onClick={() => set("layout", v)} className={`flex-1 py-1 text-xs rounded border ${(d.layout ?? "grid") === v ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>{v.charAt(0).toUpperCase() + v.slice(1)}</button>
+              ))}
+            </div>
+          </div>
+          {(d.layout ?? "grid") === "grid" && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Columns</label>
+              <div className="flex gap-1">
+                {([2, 3, 4] as const).map(v => (
+                  <button key={v} onClick={() => set("columns", v)} className={`flex-1 py-1 text-xs rounded border ${(d.columns ?? 3) === v ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>{v}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="ii-type" checked={d.showTypeLabel !== false} onChange={e => set("showTypeLabel", e.target.checked)} className="w-3.5 h-3.5" />
+              <label htmlFor="ii-type" className="text-xs text-gray-600">Show type label (Course / Download / etc.)</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="ii-cover" checked={d.showCoverImage !== false} onChange={e => set("showCoverImage", e.target.checked)} className="w-3.5 h-3.5" />
+              <label htmlFor="ii-cover" className="text-xs text-gray-600">Show cover image / icon</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="ii-check" checked={d.showCheckIcon !== false} onChange={e => set("showCheckIcon", e.target.checked)} className="w-3.5 h-3.5" />
+              <label htmlFor="ii-check" className="text-xs text-gray-600">Show "Included" check icon</label>
+            </div>
+          </div>
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Card Background" field="cardBgColor" />
         </div>
       );
     }

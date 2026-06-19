@@ -8,6 +8,12 @@ import {
   membershipDiscountCodes,
   courses,
   users,
+  lmsCourses,
+  digitalProducts,
+  sonoQuizzes,
+  webinars,
+  communities,
+  physicalProducts,
 } from "../../drizzle/schema";
 import { eq, and, desc, asc, isNull, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -87,11 +93,70 @@ const getMembershipBySlug = publicProcedure
       .from(membershipPlans)
       .where(eq(membershipPlans.slug, input.slug));
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found" });
-    const items = await db
+    const rawItems = await db
       .select()
       .from(membershipPlanAccess)
       .where(eq(membershipPlanAccess.planId, plan.id))
       .orderBy(asc(membershipPlanAccess.sortOrder));
+
+    // Enrich each item with title, slug, and coverImage from the relevant table
+    const items = await Promise.all(rawItems.map(async (item) => {
+      let itemTitle: string | null = null;
+      let itemSlug: string | null = null;
+      let itemCoverImage: string | null = null;
+
+      // Special non-ID types
+      if (item.itemType === "all_courses") {
+        return { ...item, itemTitle: item.label ?? "All Courses", itemSlug: null, itemCoverImage: null };
+      }
+      if (item.itemType === "all_downloads") {
+        return { ...item, itemTitle: item.label ?? "All Downloads", itemSlug: null, itemCoverImage: null };
+      }
+      if (item.itemType === "ultrasoundassist_free") {
+        return { ...item, itemTitle: item.label ?? "UltrasoundAssist™ (Free Member)", itemSlug: null, itemCoverImage: null };
+      }
+      if (item.itemType === "ultrasoundassist_premium") {
+        return { ...item, itemTitle: item.label ?? "UltrasoundAssist™ (Premium)", itemSlug: null, itemCoverImage: null };
+      }
+      if (item.itemType === "echoassist_free") {
+        return { ...item, itemTitle: item.label ?? "EchoAssist™ (Free Member)", itemSlug: null, itemCoverImage: null };
+      }
+      if (item.itemType === "echoassist_premium") {
+        return { ...item, itemTitle: item.label ?? "EchoAssist™ (Premium)", itemSlug: null, itemCoverImage: null };
+      }
+
+      if (!item.itemId) return { ...item, itemTitle: item.label, itemSlug: null, itemCoverImage: null };
+
+      try {
+        if (item.itemType === "course") {
+          const [r] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, img: lmsCourses.coverImageUrl }).from(lmsCourses).where(eq(lmsCourses.id, item.itemId)).limit(1);
+          if (r) { itemTitle = r.title; itemSlug = r.slug; itemCoverImage = r.img ?? null; }
+        } else if (item.itemType === "download") {
+          const [r] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug, img: digitalProducts.thumbnailUrl }).from(digitalProducts).where(eq(digitalProducts.id, item.itemId)).limit(1);
+          if (r) { itemTitle = r.title; itemSlug = r.slug; itemCoverImage = r.img ?? null; }
+        } else if (item.itemType === "quiz") {
+          const [r] = await db.select({ title: sonoQuizzes.title, img: sonoQuizzes.coverImageUrl }).from(sonoQuizzes).where(eq(sonoQuizzes.id, item.itemId)).limit(1);
+          if (r) { itemTitle = r.title; itemCoverImage = r.img ?? null; }
+        } else if (item.itemType === "webinar") {
+          const [r] = await db.select({ title: webinars.title, slug: webinars.slug, img: webinars.coverImage }).from(webinars).where(eq(webinars.id, item.itemId)).limit(1);
+          if (r) { itemTitle = r.title; itemSlug = r.slug; itemCoverImage = r.img ?? null; }
+        } else if (item.itemType === "community") {
+          const [r] = await db.select({ title: communities.title, slug: communities.slug, img: communities.coverImage }).from(communities).where(eq(communities.id, item.itemId)).limit(1);
+          if (r) { itemTitle = r.title; itemSlug = r.slug; itemCoverImage = r.img ?? null; }
+        } else if (item.itemType === "product") {
+          const [r] = await db.select({ title: physicalProducts.title, slug: physicalProducts.slug }).from(physicalProducts).where(eq(physicalProducts.id, item.itemId)).limit(1);
+          if (r) { itemTitle = r.title; itemSlug = r.slug; }
+        }
+      } catch { /* non-fatal */ }
+
+      return {
+        ...item,
+        itemTitle: item.label ?? itemTitle,
+        itemSlug,
+        itemCoverImage,
+      };
+    }));
+
     return { plan, items };
   });
 

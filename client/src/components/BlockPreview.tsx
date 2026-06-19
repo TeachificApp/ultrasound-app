@@ -94,7 +94,8 @@ export type BlockType =
   | "sdms_cme_module"
   | "enrollment_counter"
   | "quiz_embed"
-  | "remaining_seats";
+  | "remaining_seats"
+  | "included_items_auto";
 
 export interface Block {
   id: string;
@@ -1863,6 +1864,42 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
         <React.Suspense fallback={<div className="flex items-center justify-center py-8 text-gray-400"><svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Loading quiz…</div>}>
           <EmbeddedQuizPlayer quizId={quizId} showHeader={d.showHeader !== false} />
         </React.Suspense>
+      );
+    }
+    case "included_items_auto": {
+      // In the block builder preview, show a static placeholder since items come from the live page context
+      const accent = d.accentColor ?? "#179ca3";
+      const mockItems = [
+        { id: 1, label: "Sample Course", type: "Course" },
+        { id: 2, label: "Sample Download", type: "Download" },
+        { id: 3, label: "Sample Community", type: "Community" },
+      ];
+      return (
+        <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+          <div className="max-w-5xl mx-auto px-4">
+            {d.headline && <h2 className="text-2xl font-bold text-center mb-2" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            {d.subtext && <p className="text-center text-sm mb-6 opacity-70" style={{ color: d.textColor ?? "#111827" }}>{d.subtext}</p>}
+            <div className={d.layout === "list" ? "space-y-3" : `grid grid-cols-1 sm:grid-cols-${Math.min(d.columns ?? 3, 3)} gap-4`}>
+              {mockItems.map((item) => (
+                <div key={item.id} className="rounded-xl border border-gray-200 overflow-hidden" style={{ backgroundColor: d.cardBgColor ?? "#ffffff" }}>
+                  {d.layout !== "list" && (
+                    <div className="h-24 flex items-center justify-center" style={{ backgroundColor: accent + "22" }}>
+                      <Package size={28} style={{ color: accent }} />
+                    </div>
+                  )}
+                  <div className={d.layout === "list" ? "flex items-center gap-3 px-4 py-3" : "p-4"}>
+                    {d.layout === "list" && <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: accent + "18" }}><Package size={18} style={{ color: accent }} /></div>}
+                    <div className="flex-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: accent }}>{item.type}</span>
+                      <p className="font-semibold text-sm" style={{ color: d.textColor ?? "#111827" }}>{item.label}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-3 text-center">Items populated from membership/bundle admin — ordered by your sort order</p>
+          </div>
+        </div>
       );
     }
     default:

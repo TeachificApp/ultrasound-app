@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { BlockPreview } from "@/components/BlockPreview";
+import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { Check, Award, Loader2, Tag } from "lucide-react";
 
@@ -37,6 +38,7 @@ export default function MembershipPage() {
 
   const { data: planData, isLoading } = trpc.membership.getBySlug.useQuery({ slug: slug ?? "" });
   const plan = planData?.plan ?? null;
+  const membershipItems = planData?.items ?? [];
 
   // validateCode is a query — we trigger it manually via refetch
   const [codeToValidate, setCodeToValidate] = useState<string | null>(null);
@@ -152,6 +154,10 @@ export default function MembershipPage() {
             // Use the real data-fetching component for related_products instead of BlockPreview's mock
             if (block.type === "related_products") {
               return <RelatedProductsBlock key={block.id} data={block.data ?? {}} currentType={undefined} />;
+            }
+            // Render included items using real membership items in admin sort order
+            if (block.type === "included_items_auto") {
+              return <IncludedItemsBlock key={block.id} data={block.data ?? {}} items={membershipItems} />;
             }
             return <BlockPreview key={block.id} block={block} onEnroll={startCheckout} onCheckoutPage={startCheckout} />;
           })}
