@@ -1109,6 +1109,10 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
             instanceItems={instances.map((inst: any) => ({
               id: inst.id,
               label: `${inst.title} — ${fmtDateShort(inst.startDate)}`,
+              startDate: inst.startDate ?? null,
+              location: inst.venueCity
+                ? [inst.venueCity, inst.venueState].filter(Boolean).join(", ")
+                : inst.locationType === "virtual" ? "Virtual" : null,
             }))}
           />
         </TabsContent>

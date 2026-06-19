@@ -16,6 +16,8 @@ export type ContentEmbedEntityType = "course" | "workshop" | "download" | "physi
 export interface InstanceEmbedItem {
   id: number;
   label: string;
+  startDate?: string | Date | null;
+  location?: string | null;
 }
 
 export interface ContentEmbedTabProps {
@@ -84,6 +86,8 @@ export function ContentEmbedTab({
       return cohortGroups.map((g: any) => ({
         id: g.id,
         label: g.name ?? `Group ${g.id}`,
+        startDate: g.startDate ?? null,
+        location: g.location ?? null,
       }));
     }
     return [];
@@ -120,8 +124,7 @@ export function ContentEmbedTab({
   }, [instanceItems, selectedInstanceId]);
 
   // When a cohort/instance is selected for the CTA card, auto-update ctaUrl AND
-  // pre-fill customTitle/customSubtitle with the instance label so the card reflects
-  // the specific cohort/instance context.
+  // pre-fill customTitle/customSubtitle with the instance label + date/location.
   React.useEffect(() => {
     if (ctaInstanceId != null && instanceEmbedKind) {
       const item = instanceItems.find(i => i.id === ctaInstanceId);
@@ -130,15 +133,21 @@ export function ContentEmbedTab({
           ? `/courses/${slug}?group=${ctaInstanceId}`
           : `/workshops/${slug}?instance=${ctaInstanceId}`;
         setCtaUrl(`${baseUrl}${path}`);
-        // Pre-fill title/subtitle with instance label so the embed card shows
-        // cohort-specific text (admin can still override manually).
-        if (!customTitle) setCustomTitle(item.label);
+        // Pre-fill title with the cohort/instance label.
+        setCustomTitle(item.label);
+        // Build a subtitle from start date + location.
+        const parts: string[] = [];
+        if (item.startDate) {
+          const d = new Date(item.startDate);
+          parts.push(d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }));
+        }
+        if (item.location) parts.push(item.location);
+        setCustomSubtitle(parts.join(" • "));
       }
     } else if (ctaInstanceId === null) {
       setCtaUrl(defaultCheckoutUrl);
-      // Clear auto-filled title only if it matches the last instance label
-      // (don't clobber manually entered text — just reset to empty).
       setCustomTitle("");
+      setCustomSubtitle("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctaInstanceId]);
@@ -364,9 +373,21 @@ export function ContentEmbedTab({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE_SENTINEL}>Main course URL (no override)</SelectItem>
-                {instanceItems.map(item => (
-                  <SelectItem key={item.id} value={String(item.id)}>{item.label}</SelectItem>
-                ))}
+                {instanceItems.map(item => {
+                  const parts: string[] = [];
+                  if (item.startDate) {
+                    const d = new Date(item.startDate);
+                    parts.push(d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }));
+                  }
+                  if (item.location) parts.push(item.location);
+                  const meta = parts.join(" • ");
+                  return (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      <span className="font-medium">{item.label}</span>
+                      {meta && <span className="text-gray-400 ml-1 text-[10px]">({meta})</span>}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
