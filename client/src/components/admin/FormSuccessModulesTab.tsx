@@ -321,21 +321,43 @@ export default function FormSuccessModulesTab({
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" className="gap-1 text-white" style={{ background: BRAND }} onClick={() => openNewModule("inline_message")}>
-          <MessageSquare className="w-3.5 h-3.5" /> Inline Thank-You
-        </Button>
-        <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("full_page")}>
-          <LayoutTemplate className="w-3.5 h-3.5" /> Full Success Page
-        </Button>
-        <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("redirect_url")}>
-          <ExternalLink className="w-3.5 h-3.5" /> Redirect URL
-        </Button>
-      </div>
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h4 className="text-sm font-semibold text-gray-800">Success Pages</h4>
+            <p className="text-xs text-gray-500">Each success page is a reusable outcome shown after submission. Create one or more, then route users to the right one using rules below.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" className="gap-1 text-white" style={{ background: BRAND }} onClick={() => openNewModule("inline_message")}>
+              <Plus className="w-3.5 h-3.5" /> Inline Message
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("full_page")}>
+              <LayoutTemplate className="w-3.5 h-3.5" /> Full Page
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("redirect_url")}>
+              <ExternalLink className="w-3.5 h-3.5" /> Redirect
+            </Button>
+          </div>
+        </div>
 
       <div className="space-y-2">
         {modules.length === 0 ? (
-          <Card className="border-dashed"><CardContent className="py-10 text-center text-sm text-gray-400">No success modules yet.</CardContent></Card>
+          <Card className="border-dashed">
+            <CardContent className="py-10 text-center">
+              <p className="text-sm text-gray-400 mb-3">No success pages yet. Create your first one:</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button type="button" size="sm" className="gap-1 text-white" style={{ background: BRAND }} onClick={() => openNewModule("inline_message")}>
+                  <Plus className="w-3.5 h-3.5" /> Inline Thank-You Message
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("full_page")}>
+                  <LayoutTemplate className="w-3.5 h-3.5" /> Full Success Page
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => openNewModule("redirect_url")}>
+                  <ExternalLink className="w-3.5 h-3.5" /> Redirect to URL
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         ) : modules.map(mod => (
           <Card key={mod.id} className={!mod.isEnabled ? "opacity-60" : ""}>
             <CardContent className="py-3 flex flex-wrap items-center gap-3">
@@ -371,6 +393,7 @@ export default function FormSuccessModulesTab({
           </Card>
         ))}
       </div>
+      </div>
 
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -383,7 +406,14 @@ export default function FormSuccessModulesTab({
           </Button>
         </div>
         {!routingRules?.length ? (
-          <Card className="border-dashed"><CardContent className="py-8 text-center text-sm text-gray-400">No routing rules — all submissions use the default module.</CardContent></Card>
+          <Card className="border-dashed">
+            <CardContent className="py-8 text-center">
+              <p className="text-sm text-gray-400 mb-3">No routing rules yet — all submissions use the default success page.</p>
+              <Button type="button" size="sm" variant="outline" className="gap-1" onClick={startNewRule}>
+                <Plus className="w-3.5 h-3.5" /> Add Your First Routing Rule
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <div className="space-y-2">
             {routingRules.map(rule => {
