@@ -414,7 +414,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
 
   await notifyOwner({
     title: "📦 New Digital Download Purchase",
-    content: `User ID ${userId} purchased digital product ID ${productId}. Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
+    content: `${meta.customer_email ?? `User #${userId}`} purchased "${productRow?.title ?? `Product #${productId}`}". Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
   });
   // Log purchase to unified activity log (fire-and-forget)
   try {
@@ -616,26 +616,30 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
     status: "active",
     accessGrantedAt: new Date(),
   });
+  // Fetch workshop/instance details for notification and email
+  const [workshopRow] = await db
+    .select({ title: workshops.title, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
+    .from(workshops).where(eq(workshops.id, workshopId)).limit(1);
+  const [instanceRow] = await db
+    .select({ title: workshopInstances.title, startDate: workshopInstances.startDate, timezone: workshopInstances.timezone, locationType: workshopInstances.locationType, venueName: workshopInstances.venueName, venueCity: workshopInstances.venueCity, venueState: workshopInstances.venueState, meetingUrl: workshopInstances.meetingUrl })
+    .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
+
+  const workshopTitle = workshopRow?.title ?? `Workshop #${workshopId}`;
+  const instanceTitle = instanceRow?.title ? ` — ${instanceRow.title}` : "";
   await notifyOwner({
     title: "🏫 New Workshop Enrollment",
-    content: `User ID ${userId} (${meta.customer_email ?? "unknown"}) enrolled in workshop ID ${workshopId}, instance ID ${instanceId}. Amount: $${(amountPaid / 100).toFixed(2)}.`,
+    content: `${meta.customer_email ?? `User #${userId}`} enrolled in "${workshopTitle}${instanceTitle}". Amount: $${(amountPaid / 100).toFixed(2)}.`,
   });
 
   // Send workshop registration confirmation email
   try {
-    const [workshopRow] = await db
-      .select({ title: workshops.title, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
-      .from(workshops).where(eq(workshops.id, workshopId)).limit(1);
-    const [instanceRow] = await db
-      .select({ title: workshopInstances.title, startDate: workshopInstances.startDate, timezone: workshopInstances.timezone, locationType: workshopInstances.locationType, venueName: workshopInstances.venueName, venueCity: workshopInstances.venueCity, venueState: workshopInstances.venueState, meetingUrl: workshopInstances.meetingUrl })
-      .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
 
     if (workshopRow?.welcomeEmailEnabled !== false && meta.customer_email) {
       const customerName = meta.customer_name ?? meta.customer_email.split("@")[0];
       const firstName = customerName.split(" ")[0];
-      const workshopTitle = workshopRow?.title ?? "Workshop";
-      const instanceTitle = instanceRow?.title ?? "";
-      const subject = workshopRow?.welcomeEmailSubject || `You're registered: ${workshopTitle}`;
+      const emailWorkshopTitle = workshopRow?.title ?? "Workshop";
+      const emailInstanceTitle = instanceRow?.title ?? "";
+      const subject = workshopRow?.welcomeEmailSubject || `You're registered: ${emailWorkshopTitle}`;
       let dateStr = "";
       if (instanceRow?.startDate) {
         dateStr = new Date(instanceRow.startDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: instanceRow.timezone ?? "America/New_York" });
@@ -663,7 +667,7 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
 </td></tr>
 <tr><td style="padding:32px;">
 <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">You're registered, ${firstName}! 🎉</h2>
-<p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">You've successfully registered for <strong style="color:${brandDark};">${workshopTitle}${instanceTitle ? ` — ${instanceTitle}` : ""}</strong>.</p>
+<p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">You've successfully registered for <strong style="color:${brandDark};">${emailWorkshopTitle}${emailInstanceTitle ? ` — ${emailInstanceTitle}` : ""}</strong>.</p>
 ${customBodyHtml}
 <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
 ${dateStr ? `<p style="margin:0 0 6px;font-size:14px;color:#0e4a50;"><strong>Date:</strong> ${dateStr}</p>` : ""}
@@ -1116,7 +1120,10 @@ async function handleEmployerCheckoutCompleted(session: Record<string, unknown>)
     console.log(`[Stripe] Employer unlimited subscription activated for userId=${userId}`);
   }
 
-  await notifyOwner({ title: "New Employer Purchase", content: `userId=${userId} purchased ${productType}` });
+  await notifyOwner({
+    title: "🏢 New Employer Purchase",
+    content: `${meta.customer_email ?? `User #${userId}`} purchased ${productType === "employer_subscription" ? "Employer Unlimited Subscription" : "Employer Job Post"}. Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
+  });
 }
 
 /**

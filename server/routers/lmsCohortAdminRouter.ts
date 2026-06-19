@@ -1612,7 +1612,7 @@ export const lmsCohortAdminRouter = router({
           await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId, enrollmentType: "full" });
         }
         await sendEnrollmentEmail({ userId, courseId: input.courseId, db });
-        notifyOwner({ title: `🎓 Admin Free Enrollment`, content: `Admin granted free access to user ${userId} (${entry.email}) for course ID ${input.courseId}.` }).catch(() => {});
+        notifyOwner({ title: `🎓 Admin Free Enrollment`, content: `Admin granted free access to ${entry.email} for "${course.title}" (Course #${input.courseId}).` }).catch(() => {});
         return { success: true, type: "free", message: `Free access granted and enrollment email sent to ${entry.email}` };
       } else {
         const Stripe = (await import("stripe")).default;
@@ -1627,7 +1627,7 @@ export const lmsCohortAdminRouter = router({
             await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId, enrollmentType: "full" });
           }
           await sendEnrollmentEmail({ userId, courseId: input.courseId, db });
-          notifyOwner({ title: `🎓 Admin Zero-Price Enrollment`, content: `Admin granted zero-price access to user ${userId} (${entry.email}) for course ID ${input.courseId}.` }).catch(() => {});
+          notifyOwner({ title: `🎓 Admin Zero-Price Enrollment`, content: `Admin granted zero-price access to ${entry.email} for "${course.title}" (Course #${input.courseId}).` }).catch(() => {});
           return { success: true, type: "free", message: `Zero-price access granted and enrollment email sent to ${entry.email}` };
         }
         const session = await stripe.checkout.sessions.create({
