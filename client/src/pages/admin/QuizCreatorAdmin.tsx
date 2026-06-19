@@ -1634,6 +1634,24 @@ function QuizEditor({ quizId }: { quizId: number }) {
               <div className="flex items-center justify-center h-40"><Loader2 className="w-6 h-6 animate-spin text-teal-600" /></div>
             ) : (
               <div className="space-y-6">
+                {/* Student Visibility Status Banner */}
+                {analytics.quiz && (() => {
+                  const q = analytics.quiz;
+                  const showOnlyPct = q.showOnlyPercentage;
+                  const showPerQ = q.showPerQuestionResult !== false;
+                  const showGroups = q.showGroupNames !== false;
+                  const items: string[] = [];
+                  if (showOnlyPct) items.push("percentage only");
+                  else if (!showPerQ) items.push("pass/fail + score (no per-question detail)");
+                  else items.push("full per-question results");
+                  if (!showGroups) items.push("group names hidden");
+                  return (
+                    <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+                      <Eye className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+                      <span><strong>Students see:</strong> {items.join(" · ")}. Change in the Settings tab.</span>
+                    </div>
+                  );
+                })()}
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
