@@ -163,6 +163,69 @@ export async function sendEnrollmentEmail(opts: {
   return deliverEmail({ to: opts.to, subject, htmlBody });
 }
 
+// ─── Convenience wrapper: send enrollment email by userId + courseId ─────────
+/**
+ * Looks up the user and course, checks the per-course `sendEnrollmentEmail` flag
+ * and the platform-level `enrollmentEmailEnabled` flag, then sends the email.
+ * This is the preferred call site for all free/admin enrollment paths so the
+ * flag is respected consistently across every code path.
+ *
+ * Returns true if the email was sent, false if skipped or failed.
+ */
+export async function sendEnrollmentEmailForUser(opts: {
+  userId: number;
+  courseId: number;
+  db?: any; // optional — will call getDb() if not provided
+}): Promise<boolean> {
+  try {
+    const { getDb, getOrCreateAccessToken } = await import("../db");
+    const { lmsCourses, platformSettings, users } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const db = opts.db ?? await getDb();
+    if (!db) return false;
+
+    // Fetch course flag
+    const [course] = await db
+      .select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail })
+      .from(lmsCourses)
+      .where(eq(lmsCourses.id, opts.courseId))
+      .limit(1);
+    if (!course) return false;
+    if (course.sendEnrollmentEmail === false) return false;
+
+    // Fetch platform flag
+    try {
+      const [platformRow] = await db
+        .select({ enrollmentEmailEnabled: platformSettings.enrollmentEmailEnabled })
+        .from(platformSettings)
+        .limit(1);
+      if (platformRow?.enrollmentEmailEnabled === false) return false;
+    } catch { /* non-fatal */ }
+
+    // Fetch user
+    const [user] = await db
+      .select({ name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, opts.userId))
+      .limit(1);
+    if (!user?.email) return false;
+
+    // Get access token
+    let accessToken: string | null = null;
+    try { accessToken = await getOrCreateAccessToken(opts.userId); } catch { /* optional */ }
+
+    return await sendEnrollmentEmail({
+      to: { name: user.name || user.email.split("@")[0], email: user.email },
+      courseTitle: course.title,
+      courseSlug: course.slug,
+      accessToken,
+    });
+  } catch (err) {
+    console.error("[sendEnrollmentEmailForUser] Failed:", err);
+    return false;
+  }
+}
+
 // ─── Digital Download Access Email ───────────────────────────────────────────
 export async function sendDownloadAccessEmail(opts: {
   to: { name: string; email: string };

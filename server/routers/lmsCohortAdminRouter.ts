@@ -29,7 +29,7 @@ import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
-import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
+import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
@@ -1611,7 +1611,7 @@ export const lmsCohortAdminRouter = router({
         if (!existing) {
           await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId, enrollmentType: "full" });
         }
-        await sendEnrollmentEmail({ userId, courseId: input.courseId, db });
+        await sendEnrollmentEmailForUser({ userId, courseId: input.courseId, db });
         notifyOwner({ title: `🎓 Admin Free Enrollment`, content: `Admin granted free access to ${entry.email} for "${course.title}" (Course #${input.courseId}).` }).catch(() => {});
         return { success: true, type: "free", message: `Free access granted and enrollment email sent to ${entry.email}` };
       } else {
@@ -1626,7 +1626,7 @@ export const lmsCohortAdminRouter = router({
           if (!existing) {
             await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId, enrollmentType: "full" });
           }
-          await sendEnrollmentEmail({ userId, courseId: input.courseId, db });
+          await sendEnrollmentEmailForUser({ userId, courseId: input.courseId, db });
           notifyOwner({ title: `🎓 Admin Zero-Price Enrollment`, content: `Admin granted zero-price access to ${entry.email} for "${course.title}" (Course #${input.courseId}).` }).catch(() => {});
           return { success: true, type: "free", message: `Zero-price access granted and enrollment email sent to ${entry.email}` };
         }
