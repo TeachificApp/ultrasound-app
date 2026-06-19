@@ -1458,6 +1458,11 @@ export const lmsLearnerRouter = router({
 
       const productName = pricingOptionLabel ? `${course.title} — ${pricingOptionLabel}` : course.title;
 
+      // ── Idempotency key: prevents duplicate sessions from race conditions (two tabs, double-click) ──
+      // Key resets daily so users can legitimately retry the next day.
+      const idempotencyDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const idempotencyBase = `checkout-${ctx.user.id}-${course.id}-${input.pricingOptionId ?? 0}-${idempotencyDate}`;
+
       if (pricingType === "one_time") {
         // If the option has a pre-created Stripe Price ID, use it directly
         const lineItem = effectiveStripePriceId
@@ -1482,7 +1487,7 @@ export const lmsLearnerRouter = router({
           client_reference_id: ctx.user.id.toString(),
           metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}) },
           ...shippingOptions,
-        });
+        }, { idempotencyKey: `${idempotencyBase}-one-time` });
 
       } else if (pricingType === "subscription") {
         // Create or reuse a Stripe Price for this subscription option
@@ -1525,7 +1530,7 @@ export const lmsLearnerRouter = router({
             metadata: { user_id: ctx.user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() },
           },
           ...shippingOptions,
-        });
+        }, { idempotencyKey: `${idempotencyBase}-subscription` });
 
       } else if (pricingType === "payment_plan") {
         // Charge down payment now; installments handled via subscription
@@ -1578,7 +1583,7 @@ export const lmsLearnerRouter = router({
           metadata: { ...commonMeta, installment_count: installmentCount.toString(), pricing_option_id: input.pricingOptionId?.toString() ?? "" },
           ...(hasInstallments ? { subscription_data: { description: productName, metadata: { user_id: ctx.user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() } } } : {}),
           ...shippingOptions,
-        });
+        }, { idempotencyKey: `${idempotencyBase}-payment-plan` });
       } else {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown pricing type" });
       }

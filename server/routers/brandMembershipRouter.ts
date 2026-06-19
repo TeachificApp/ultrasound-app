@@ -186,6 +186,21 @@ export const brandMembershipRouter = router({
         } catch { /* ignore */ }
       }
 
+      // ── Lifetime duplicate guard ─────────────────────────────────────────────
+      // Block a second lifetime purchase if the user already has lifetime or active premium.
+      if (isLifetime) {
+        const db = await getDb();
+        if (db) {
+          const [existingMembership] = await db.select({ id: brandMemberships.id, tier: brandMemberships.tier, status: brandMemberships.status })
+            .from(brandMemberships)
+            .where(and(eq(brandMemberships.userId, ctx.user.id), eq(brandMemberships.brand, brand)))
+            .limit(1);
+          if (existingMembership && existingMembership.tier === "lifetime" && existingMembership.status === "active") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "You already have lifetime access. Please contact support if you need assistance." });
+          }
+        }
+      }
+
       if (isLifetime) {
         // One-time payment for lifetime access
         // Use canonical price ID if available, otherwise fall back to price_data

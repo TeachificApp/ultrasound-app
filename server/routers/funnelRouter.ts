@@ -1809,6 +1809,16 @@ export const funnelPublicRouter = router({
           .from(lmsCourses).where(eq(lmsCourses.id, input.productId)).limit(1);
         if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
         if (course.isFree || course.pricingType === "free" || !course.price) throw new TRPCError({ code: "BAD_REQUEST", message: "Course is free — use free enrollment" });
+        // Guard: block checkout if user is already actively enrolled
+        if (ctx.user) {
+          const [existingCourseEnr] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType, accessExpiresAt: lmsEnrollments.accessExpiresAt })
+            .from(lmsEnrollments)
+            .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id)))
+            .limit(1);
+          if (existingCourseEnr && existingCourseEnr.enrollmentType !== "free_preview" && (!existingCourseEnr.accessExpiresAt || new Date(existingCourseEnr.accessExpiresAt) > new Date())) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "You are already enrolled in this course." });
+          }
+        }
         productName = course.title;
         unitAmount = course.price;
         currency = course.currency ?? "usd";
