@@ -3004,6 +3004,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   waitlistCtaUrl: varchar("waitlist_cta_url", { length: 2048 }),
   waitlistRedirectUrl: varchar("waitlist_redirect_url", { length: 2048 }),
   waitlistSuccessMessage: longtext("waitlist_success_message"),
+  // Block editor content for the Course Player right sidebar (shown below the instructor section)
+  playerSidebarBlocks: longtext("player_sidebar_blocks"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

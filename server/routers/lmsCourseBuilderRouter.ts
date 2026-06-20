@@ -205,6 +205,7 @@ export const lmsCourseBuilderRouter = router({
       courseOverviewBlocks: z.string().nullable().optional(), // JSON array of Block objects
       courseOverviewTopBlocks: z.string().nullable().optional(), // JSON array — above progress bar
       courseOverviewBottomBlocks: z.string().nullable().optional(), // JSON array — below curriculum
+      playerSidebarBlocks: z.string().nullable().optional(), // JSON array — course player right sidebar below instructor section
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),
       // Course color scheme

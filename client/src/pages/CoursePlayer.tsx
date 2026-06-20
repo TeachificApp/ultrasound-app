@@ -967,6 +967,103 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl }: {
 
 // ─── Main CoursePlayer ────────────────────────────────────────────────────────
 
+// ─── Player Sidebar Block Renderer ───────────────────────────────────────────
+// Renders a subset of block types suitable for the narrow right-panel sidebar.
+// Intentionally lightweight — only text, image, video, bullets, alert, cta_standalone, divider, embed, audio.
+function PlayerSidebarBlock({ block, primaryColor }: { block: any; primaryColor: string }) {
+  const d = block.data ?? {};
+  switch (block.type) {
+    case "text":
+      return <div className="text-[11px] text-gray-700 leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: d.html ?? d.content ?? "" }} />;
+    case "image":
+      return d.url ? (
+        <div className="rounded-lg overflow-hidden">
+          <img src={d.url} alt={d.alt ?? ""} className="w-full object-cover" style={{ borderRadius: 8 }} />
+          {d.caption && <p className="text-[10px] text-gray-400 mt-1 text-center">{d.caption}</p>}
+        </div>
+      ) : null;
+    case "video": {
+      const url: string = d.url ?? "";
+      const isYT = /youtube\.com|youtu\.be/.test(url);
+      const isVimeo = /vimeo\.com/.test(url);
+      let embedSrc = "";
+      if (isYT) {
+        const m = url.match(/(?:v=|youtu\.be\/)([\w-]+)/);
+        if (m) embedSrc = `https://www.youtube.com/embed/${m[1]}`;
+      } else if (isVimeo) {
+        const m = url.match(/vimeo\.com\/(\d+)/);
+        if (m) embedSrc = `https://player.vimeo.com/video/${m[1]}`;
+      }
+      if (!embedSrc && !url) return null;
+      return (
+        <div className="relative w-full rounded-lg overflow-hidden" style={{ paddingBottom: "56.25%" }}>
+          {embedSrc
+            ? <iframe src={embedSrc} className="absolute inset-0 w-full h-full" frameBorder="0" allowFullScreen />
+            : <video src={url} controls className="absolute inset-0 w-full h-full object-cover" />}
+        </div>
+      );
+    }
+    case "audio":
+      return d.url ? <audio src={d.url} controls className="w-full" style={{ height: 32 }} /> : null;
+    case "bullets": {
+      const items: string[] = d.items ?? [];
+      if (!items.length) return null;
+      return (
+        <ul className="space-y-1">
+          {items.map((item, i) => (
+            <li key={i} className="flex items-start gap-1.5 text-[11px] text-gray-700">
+              <span className="mt-0.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: primaryColor }} />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    case "alert": {
+      const colorMap: Record<string, string> = { info: "#3b82f6", warning: "#f59e0b", success: "#22c55e", error: "#ef4444" };
+      const color = colorMap[d.variant ?? "info"] ?? primaryColor;
+      return (
+        <div className="rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ backgroundColor: `${color}15`, borderLeft: `3px solid ${color}`, color: "#374151" }}>
+          {d.title && <p className="font-semibold mb-0.5" style={{ color }}>{d.title}</p>}
+          {d.message && <p>{d.message}</p>}
+        </div>
+      );
+    }
+    case "cta_standalone": {
+      const href = d.url ?? d.href ?? "";
+      const label = d.label ?? d.buttonText ?? "Learn More";
+      const bgColor = d.bgColor ?? primaryColor;
+      const textColor = d.textColor ?? "#ffffff";
+      return (
+        <div className="text-center">
+          {d.headline && <p className="text-[11px] font-semibold text-gray-800 mb-1.5">{d.headline}</p>}
+          {d.subtext && <p className="text-[10px] text-gray-500 mb-2">{d.subtext}</p>}
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-4 py-1.5 rounded-lg text-[11px] font-semibold transition-opacity hover:opacity-90"
+            style={{ backgroundColor: bgColor, color: textColor }}
+          >{label}</a>
+        </div>
+      );
+    }
+    case "divider":
+      return <hr className="border-gray-200" />;
+    case "embed": {
+      const src = d.url ?? "";
+      if (!src) return null;
+      return (
+        <div className="relative w-full rounded-lg overflow-hidden" style={{ paddingBottom: `${d.aspectRatio ?? 56.25}%` }}>
+          <iframe src={src} className="absolute inset-0 w-full h-full" frameBorder="0" allowFullScreen />
+        </div>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
 // ─── Mobile Sidebar Content ──────────────────────────────────────────────────
 function MobileSidebarContent({
   data, sidebarTab, setSidebarTab, selectedLessonId, setSelectedLessonId,
@@ -2454,6 +2551,22 @@ export default function CoursePlayer() {
                             </div>
                           );
                         })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Custom Player Sidebar Blocks ── */}
+                  {rightPanelTab === "info" && (() => {
+                    const rawBlocks = (course as any).playerSidebarBlocks;
+                    if (!rawBlocks) return null;
+                    let blocks: any[] = [];
+                    try { blocks = JSON.parse(rawBlocks); } catch { return null; }
+                    if (!blocks.length) return null;
+                    return (
+                      <div className="border-t border-gray-200 pt-4 space-y-3">
+                        {blocks.map((block: any) => (
+                          <PlayerSidebarBlock key={block.id} block={block} primaryColor={primaryColor} />
+                        ))}
                       </div>
                     );
                   })()}

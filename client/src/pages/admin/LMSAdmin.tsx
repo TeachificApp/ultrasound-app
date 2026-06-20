@@ -1204,6 +1204,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
           </TabsTrigger>
           <TabsTrigger value="landing" className="text-xs">Landing Page</TabsTrigger>
           <TabsTrigger value="overview" className="text-xs">Course Overview</TabsTrigger>
+          <TabsTrigger value="player-sidebar" className="text-xs">Player Sidebar</TabsTrigger>
           <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
           <TabsTrigger value="users" className="text-xs">Students</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
@@ -1349,6 +1350,20 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
             />
           ) : (
             <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading Overview editor…</div>
+          )}
+        </TabsContent>
+
+        {/* Player Sidebar Tab */}
+        <TabsContent value="player-sidebar" className="mt-4">
+          {visitedTabs.has("player-sidebar") ? (
+            <PlayerSidebarEditor
+              courseId={courseId}
+              courseSlug={course.slug}
+              initialBlocks={course.playerSidebarBlocks ? (typeof course.playerSidebarBlocks === "string" ? JSON.parse(course.playerSidebarBlocks) : course.playerSidebarBlocks) : []}
+              onSaved={() => refetch()}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading Player Sidebar editor…</div>
           )}
         </TabsContent>
 
@@ -2671,6 +2686,209 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
           <p className="text-xs text-teal-500 text-center mt-2">This may take 15–30 seconds while the AI builds your page...</p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Player Sidebar Editor ─────────────────────────────────────────────────
+// Lightweight block editor for the course player right sidebar.
+// Supports: text, image, video, audio, bullets, alert, cta_standalone, divider, embed.
+
+function PlayerSidebarEditor({
+  courseId,
+  courseSlug,
+  initialBlocks,
+  onSaved,
+}: {
+  courseId: number;
+  courseSlug: string;
+  initialBlocks: Block[];
+  onSaved: () => void;
+}) {
+  const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+
+  const updateCourse = trpc.lmsAdmin.updateCourse.useMutation();
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateCourse.mutateAsync({
+        id: courseId,
+        playerSidebarBlocks: JSON.stringify(blocks),
+      });
+      toast.success("Player Sidebar saved!");
+      onSaved();
+    } catch (e: any) {
+      toast.error(`Save failed: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Sidebar-appropriate block types only
+  const SIDEBAR_BLOCK_TYPES: { type: BlockType; label: string; icon: string }[] = [
+    { type: "text", label: "Text", icon: "T" },
+    { type: "image", label: "Image", icon: "🖼" },
+    { type: "video", label: "Video", icon: "▶" },
+    { type: "audio", label: "Audio", icon: "🔊" },
+    { type: "bullets", label: "Bullet List", icon: "•" },
+    { type: "alert", label: "Alert / Callout", icon: "⚠" },
+    { type: "cta_standalone", label: "CTA Button", icon: "🔗" },
+    { type: "divider", label: "Divider", icon: "—" },
+    { type: "embed", label: "Embed", icon: "</>"},
+  ];
+
+  const addBlock = (type: BlockType) => {
+    const catalog = BLOCK_CATALOG.find(c => c.type === type);
+    if (!catalog) return;
+    const newBlock: Block = { id: uid(), type, data: { ...catalog.defaultData } };
+    setBlocks(bs => [...bs, newBlock]);
+    setSelectedBlockId(newBlock.id);
+    setAddMenuOpen(false);
+  };
+
+  const updateBlock = (id: string, data: Record<string, any>) => {
+    setBlocks(bs => bs.map(b => b.id === id ? { ...b, data: { ...b.data, ...data } } : b));
+  };
+
+  const deleteBlock = (id: string) => {
+    setBlocks(bs => bs.filter(b => b.id !== id));
+    if (selectedBlockId === id) setSelectedBlockId(null);
+  };
+
+  const moveBlock = (id: string, dir: -1 | 1) => {
+    setBlocks(bs => {
+      const idx = bs.findIndex(b => b.id === id);
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= bs.length) return bs;
+      return arrayMove(bs, idx, newIdx);
+    });
+  };
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setBlocks(bs => {
+        const oldIdx = bs.findIndex(b => b.id === active.id);
+        const newIdx = bs.findIndex(b => b.id === over.id);
+        return arrayMove(bs, oldIdx, newIdx);
+      });
+    }
+  }, []);
+
+  const selectedBlock = blocks.find(b => b.id === selectedBlockId) ?? null;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center gap-3">
+          <span className="text-teal-700 font-bold text-sm">Player Sidebar Editor</span>
+          <span className="text-gray-400 text-xs">Shown in the course player right panel, below the instructor section</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <SsoLearnLinkButton slug={courseSlug} />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPreviewMode(p => !p)}
+            className={cn("text-xs h-7", previewMode ? "border-teal-500 text-teal-700 bg-teal-50" : "text-gray-500 hover:text-teal-700")}
+          >
+            {previewMode ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+            {previewMode ? "Edit" : "Preview"}
+          </Button>
+          {!previewMode && (
+            <Button size="sm" className="bg-teal-500 hover:bg-teal-600 text-white text-xs h-7" onClick={() => setAddMenuOpen(true)}>
+              <Plus className="w-3 h-3 mr-1" /> Add Block
+            </Button>
+          )}
+          <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7 font-semibold" onClick={handleSave} disabled={saving}>
+            <Save className="w-3 h-3 mr-1" />{saving ? "Saving..." : "Save"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex" style={{ minHeight: 400 }}>
+        {/* Canvas */}
+        <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
+          {previewMode ? (
+            <div className="max-w-xs mx-auto bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sidebar Preview</p>
+              {blocks.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">No blocks yet</p>
+              ) : (
+                blocks.map(block => (
+                  <div key={block.id}>
+                    <BlockPreview block={block} primaryColor="#189aa1" />
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                {blocks.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-gray-400">
+                    <p className="text-sm">No sidebar blocks yet</p>
+                    <p className="text-xs mt-1">Click "Add Block" to get started</p>
+                  </div>
+                ) : (
+                  blocks.map((block, idx) => (
+                    <SortableBlock
+                      key={block.id}
+                      block={block}
+                      isSelected={selectedBlockId === block.id}
+                      onSelect={() => setSelectedBlockId(block.id)}
+                      onDelete={() => deleteBlock(block.id)}
+                      onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
+                      onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
+                      primaryColor="#189aa1"
+                    />
+                  ))
+                )}
+              </SortableContext>
+            </DndContext>
+          )}
+        </div>
+
+        {/* Settings Panel */}
+        {!previewMode && selectedBlock && (
+          <div className="w-72 border-l border-gray-200 bg-white p-4 overflow-y-auto">
+            <BlockSettings
+              block={selectedBlock}
+              onChange={(data) => updateBlock(selectedBlock.id, data)}
+              onDelete={() => deleteBlock(selectedBlock.id)}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Add Block Dialog */}
+      <Dialog open={addMenuOpen} onOpenChange={setAddMenuOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add Sidebar Block</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            {SIDEBAR_BLOCK_TYPES.map(item => (
+              <button
+                key={item.type}
+                onClick={() => addBlock(item.type)}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-sm font-medium text-gray-700 transition-colors text-left"
+              >
+                <span className="text-base w-5 text-center">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
