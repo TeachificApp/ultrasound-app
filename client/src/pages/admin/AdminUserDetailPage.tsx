@@ -493,6 +493,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [enrollCardToken, setEnrollCardToken] = useState("");
   const [enrollAmountCents, setEnrollAmountCents] = useState("");
   const [enrollNote, setEnrollNote] = useState("");
+  const [enrollExpiresAt, setEnrollExpiresAt] = useState("");
   const [unenrollConfirm, setUnenrollConfirm] = useState<number | null>(null);
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
   const [cancelNativeConfirm, setCancelNativeConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
@@ -518,6 +519,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       setEnrollCardToken("");
       setEnrollAmountCents("");
       setEnrollNote("");
+      setEnrollExpiresAt("");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -1015,7 +1017,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
         setEnrollOpen(open);
         if (!open) {
           setSelectedCourseId(""); setCourseSearch(""); setEnrollPaymentMode("free");
-          setEnrollStripePI(""); setEnrollCardToken(""); setEnrollAmountCents(""); setEnrollNote("");
+          setEnrollStripePI(""); setEnrollCardToken(""); setEnrollAmountCents(""); setEnrollNote(""); setEnrollExpiresAt("");
         }
       }}>
         <DialogContent className="max-w-lg">
@@ -1150,6 +1152,20 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               </div>
             )}
 
+            {/* Optional expiry date */}
+            <div className="space-y-1.5">
+              <Label>Access Expiry Date <span className="text-gray-400 font-normal">(optional — leave blank for no expiry)</span></Label>
+              <Input
+                type="date"
+                value={enrollExpiresAt}
+                onChange={(e) => setEnrollExpiresAt(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+              />
+              {enrollExpiresAt && (
+                <p className="text-xs text-amber-600">Access will expire on {new Date(enrollExpiresAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.</p>
+              )}
+            </div>
+
             {/* Optional note */}
             <div className="space-y-1.5">
               <Label>Internal Note <span className="text-gray-400 font-normal">(optional)</span></Label>
@@ -1177,6 +1193,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                   stripeCardToken: enrollPaymentMode === "charge" ? enrollCardToken || undefined : undefined,
                   amountCents: enrollPaymentMode === "charge" ? amountCents : undefined,
                   note: enrollNote || undefined,
+                  expiresAt: enrollExpiresAt ? new Date(enrollExpiresAt).toISOString() : null,
                 });
               }}
               disabled={enroll.isPending || !selectedCourseId ||

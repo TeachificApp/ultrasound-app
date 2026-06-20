@@ -3621,6 +3621,7 @@ export const digitalBundlePurchases = mysqlTable("digital_bundle_purchases", {
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
   subscriptionStatus: varchar("subscription_status", { length: 50 }),
   subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end"),
+  accessExpiresAt: timestamp("access_expires_at"),
   purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
 });
 export type DigitalBundlePurchase = typeof digitalBundlePurchases.$inferSelect;
@@ -4961,6 +4962,7 @@ export const webinarRegistrations = mysqlTable("webinar_registrations", {
   firstName: varchar("first_name", { length: 128 }),
   lastName: varchar("last_name", { length: 128 }),
   email: varchar("email", { length: 255 }),
+  accessExpiresAt: timestamp("access_expires_at"),
 });
 export type WebinarRegistration = typeof webinarRegistrations.$inferSelect;
 
@@ -5057,6 +5059,7 @@ export const bundleEnrollments = mysqlTable("bundle_enrollments", {
   userId: int("user_id").notNull(),
   pricingOptionId: varchar("pricing_option_id", { length: 64 }),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  accessExpiresAt: timestamp("access_expires_at"),
   enrolledAt: timestamp("enrolled_at").defaultNow().notNull(),
 });
 export type BundleEnrollment = typeof bundleEnrollments.$inferSelect;

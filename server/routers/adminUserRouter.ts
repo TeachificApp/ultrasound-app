@@ -490,6 +490,8 @@ export const adminUserRouter = router({
       currency: z.string().default("usd"),
       /** Optional note for the order record */
       note: z.string().optional(),
+      /** Optional access expiry date (ISO string). Null = never expires. */
+      expiresAt: z.string().datetime().optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -503,44 +505,60 @@ export const adminUserRouter = router({
         let alreadyGranted = false;
         let grantId: number | undefined;
 
+        const expiresAtDate = input.expiresAt ? new Date(input.expiresAt) : null;
+
         if (input.productType === "digital_product") {
           const [ex] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
             .where(and(eq(digitalPurchases.userId, input.userId), eq(digitalPurchases.productId, input.courseId))).limit(1);
-          if (ex) { alreadyGranted = true; grantId = ex.id; }
-          else {
-            const [r] = await db.insert(digitalPurchases).values({ userId: input.userId, productId: input.courseId }).$returningId();
+          if (ex) {
+            alreadyGranted = true; grantId = ex.id;
+            if (expiresAtDate) await db.update(digitalPurchases).set({ accessExpiresAt: expiresAtDate }).where(eq(digitalPurchases.id, ex.id));
+          } else {
+            const [r] = await db.insert(digitalPurchases).values({ userId: input.userId, productId: input.courseId, accessExpiresAt: expiresAtDate ?? undefined }).$returningId();
             grantId = r.id;
           }
         } else if (input.productType === "digital_bundle") {
           const [ex] = await db.select({ id: digitalBundlePurchases.id }).from(digitalBundlePurchases)
             .where(and(eq(digitalBundlePurchases.userId, input.userId), eq(digitalBundlePurchases.bundleId, input.courseId))).limit(1);
-          if (ex) { alreadyGranted = true; grantId = ex.id; }
-          else {
-            const [r] = await db.insert(digitalBundlePurchases).values({ userId: input.userId, bundleId: input.courseId }).$returningId();
+          if (ex) {
+            alreadyGranted = true; grantId = ex.id;
+            if (expiresAtDate) await db.update(digitalBundlePurchases).set({ accessExpiresAt: expiresAtDate }).where(eq(digitalBundlePurchases.id, ex.id));
+          } else {
+            const [r] = await db.insert(digitalBundlePurchases).values({ userId: input.userId, bundleId: input.courseId, accessExpiresAt: expiresAtDate ?? undefined }).$returningId();
             grantId = r.id;
           }
         } else if (input.productType === "bundle") {
           const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
             .where(and(eq(bundleEnrollments.userId, input.userId), eq(bundleEnrollments.bundleId, input.courseId))).limit(1);
-          if (ex) { alreadyGranted = true; grantId = ex.id; }
-          else {
-            const [r] = await db.insert(bundleEnrollments).values({ userId: input.userId, bundleId: input.courseId }).$returningId();
+          if (ex) {
+            alreadyGranted = true; grantId = ex.id;
+            if (expiresAtDate) await db.update(bundleEnrollments).set({ accessExpiresAt: expiresAtDate }).where(eq(bundleEnrollments.id, ex.id));
+          } else {
+            const [r] = await db.insert(bundleEnrollments).values({ userId: input.userId, bundleId: input.courseId, accessExpiresAt: expiresAtDate ?? undefined }).$returningId();
             grantId = r.id;
           }
         } else if (input.productType === "membership") {
           const [ex] = await db.select({ id: membershipSubscriptions.id }).from(membershipSubscriptions)
             .where(and(eq(membershipSubscriptions.userId, input.userId), eq(membershipSubscriptions.planId, input.courseId), eq(membershipSubscriptions.status, "active"))).limit(1);
-          if (ex) { alreadyGranted = true; grantId = ex.id; }
-          else {
-            const [r] = await db.insert(membershipSubscriptions).values({ userId: input.userId, planId: input.courseId, status: "active" }).$returningId();
+          if (ex) {
+            alreadyGranted = true; grantId = ex.id;
+            // For memberships, expiresAt maps to currentPeriodEnd (unix ms)
+            if (expiresAtDate) await db.update(membershipSubscriptions).set({ currentPeriodEnd: expiresAtDate.getTime() }).where(eq(membershipSubscriptions.id, ex.id));
+          } else {
+            const [r] = await db.insert(membershipSubscriptions).values({
+              userId: input.userId, planId: input.courseId, status: "active",
+              currentPeriodEnd: expiresAtDate ? expiresAtDate.getTime() : undefined,
+            }).$returningId();
             grantId = r.id;
           }
         } else if (input.productType === "webinar") {
           const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
             .where(and(eq(webinarRegistrations.userId, input.userId), eq(webinarRegistrations.webinarId, input.courseId))).limit(1);
-          if (ex) { alreadyGranted = true; grantId = ex.id; }
-          else {
-            const [r] = await db.insert(webinarRegistrations).values({ userId: input.userId, webinarId: input.courseId }).$returningId();
+          if (ex) {
+            alreadyGranted = true; grantId = ex.id;
+            if (expiresAtDate) await db.update(webinarRegistrations).set({ accessExpiresAt: expiresAtDate }).where(eq(webinarRegistrations.id, ex.id));
+          } else {
+            const [r] = await db.insert(webinarRegistrations).values({ userId: input.userId, webinarId: input.courseId, accessExpiresAt: expiresAtDate ?? undefined }).$returningId();
             grantId = r.id;
           }
         }
@@ -558,20 +576,23 @@ export const adminUserRouter = router({
       let enrollmentId: number;
       let alreadyEnrolled = false;
 
+      const lmsExpiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
+
       if (existing) {
         if (existing.enrollmentType === "free_preview") {
           await db.update(lmsEnrollments)
-            .set({ enrollmentType: "full" })
+            .set({ enrollmentType: "full", ...(lmsExpiresAt ? { accessExpiresAt: lmsExpiresAt } : {}) })
             .where(eq(lmsEnrollments.id, existing.id));
           enrollmentId = existing.id;
         } else {
           enrollmentId = existing.id;
           alreadyEnrolled = true;
+          if (lmsExpiresAt) await db.update(lmsEnrollments).set({ accessExpiresAt: lmsExpiresAt }).where(eq(lmsEnrollments.id, existing.id));
         }
       } else {
         const [result] = await db
           .insert(lmsEnrollments)
-          .values({ userId: input.userId, courseId: input.courseId, enrollmentType: "full" })
+          .values({ userId: input.userId, courseId: input.courseId, enrollmentType: "full", ...(lmsExpiresAt ? { accessExpiresAt: lmsExpiresAt } : {}) })
           .$returningId();
         enrollmentId = result.id;
       }
