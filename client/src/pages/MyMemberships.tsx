@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BlockPreview } from "@/components/BlockPreview";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
+import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { toast } from "sonner";
 import {
   Award, BookOpen, Download, Users, Globe, Package, Tag, ChevronRight,
@@ -243,6 +244,9 @@ function MembershipDetail({ entry, onBack, onRefetch }: { entry: any; onBack: ()
           {blocks.map((block: any) => {
             if (block.type === "related_products") {
               return <RelatedProductsBlock key={block.id} data={block.data ?? {}} currentType={undefined} />;
+            }
+            if (block.type === "included_items_auto") {
+              return <IncludedItemsBlock key={block.id} data={block.data ?? {}} items={items as any[]} />;
             }
             return <BlockPreview key={block.id} block={block} />;
           })}
