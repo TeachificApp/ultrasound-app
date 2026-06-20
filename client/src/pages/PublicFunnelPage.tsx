@@ -27,6 +27,7 @@ import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import LeadCaptureModal from "@/components/LeadCaptureModal";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { LEARN_APP_URL } from "@/hooks/useSubdomain";
+import { getLoginUrl } from "@/const";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
 
@@ -878,10 +879,52 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
   const [heroPromoCode, setHeroPromoCode] = useState<string | null>(null);
   const nextPageRef = useRef(nextPage);
   nextPageRef.current = nextPage;
+  const { user } = useAuth();
   const createDirectCheckout = trpc.funnelPublic.createDirectCheckout.useMutation();
+  const { data: freeEnrollCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
+  const enrollFree = trpc.lmsLearner.enrollFree.useMutation({ onSuccess: () => toast.success("Enrolled! You now have access."), onError: (e) => toast.error(`Enrollment failed: ${e.message}`) });
+  const bundleEnroll = trpc.bundlesLearner.enroll.useMutation({ onSuccess: () => toast.success("Enrolled! You now have access."), onError: (e) => toast.error(`Enrollment failed: ${e.message}`) });
+  const webinarRegister = trpc.webinarLearner.register.useMutation({ onSuccess: () => toast.success("Registered! You now have access."), onError: (e) => toast.error(`Registration failed: ${e.message}`) });
+  const downloadsCheckout = trpc.downloadsLearner.createCheckout.useMutation({ onSuccess: (data) => { if (data.free || data.alreadyPurchased) toast.success("Access granted!"); else if (data.checkoutUrl) window.open(data.checkoutUrl, "_blank"); }, onError: (e) => toast.error(`Checkout failed: ${e.message}`) });
+  const workshopEnrollFree = trpc.workshopLearner.enrollFree.useMutation({ onSuccess: () => toast.success("Enrolled! You now have access."), onError: (e) => toast.error(`Workshop enrollment failed: ${e.message}`) });
+  const communityJoin = trpc.community.join.useMutation({ onSuccess: () => toast.success("Joined! You now have access."), onError: (e) => toast.error(`Community join failed: ${e.message}`) });
+  const membershipEnrollFree = trpc.membership.selfEnrollFree.useMutation({ onSuccess: () => toast.success("Enrolled! You now have access to this membership."), onError: (e) => toast.error(`Membership enrollment failed: ${e.message}`) });
+
+  const handleFreeEnroll = async (productType: string, productId: number) => {
+    if (!user) { window.location.href = getLoginUrl(window.location.pathname); return; }
+    try {
+      if (productType === "course" || productType === "quiz" || productType === "cohort") {
+        const target = (freeEnrollCatalog as any[])?.find((p: any) => p.type === productType && p.id === productId);
+        if (target?.slug) await enrollFree.mutateAsync({ courseSlug: target.slug });
+        else toast.error("Course not found.");
+      } else if (productType === "bundle") {
+        await bundleEnroll.mutateAsync({ bundleId: productId });
+      } else if (productType === "webinar") {
+        await webinarRegister.mutateAsync({ webinarId: productId });
+      } else if (productType === "download") {
+        await downloadsCheckout.mutateAsync({ productId });
+      } else if (productType === "workshop") {
+        await workshopEnrollFree.mutateAsync({ workshopId: productId });
+      } else if (productType === "community") {
+        await communityJoin.mutateAsync({ communityId: productId });
+      } else if (productType === "membership") {
+        await membershipEnrollFree.mutateAsync({ planId: productId });
+      } else {
+        toast.error(`Free enrollment not supported for: ${productType}`);
+      }
+    } catch (err: any) { toast.error(err?.message ?? "Enrollment failed."); }
+  };
 
   const handleBtnClick = async (e: React.MouseEvent, btn: typeof heroButtons[0], idx: number) => {
     const behavior = btn.behavior ?? "url";
+    if (behavior === "free_enrollment") {
+      e.preventDefault();
+      const productType = (btn as any).freeEnrollProductType ?? "membership";
+      const productId = (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null;
+      if (!productId) { toast.error("No product configured for this button."); return; }
+      await handleFreeEnroll(productType, productId);
+      return;
+    }
     if (behavior === "direct_checkout") {
       e.preventDefault();
       if (!btn.checkoutProductId || !btn.checkoutProductType) { toast.error("No product configured for this button."); return; }
@@ -1026,7 +1069,41 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const nextPageRef = useRef(nextPage);
   nextPageRef.current = nextPage;
+  const { user: ctaUser } = useAuth();
   const createDirectCheckout = trpc.funnelPublic.createDirectCheckout.useMutation();
+  const { data: ctaFreeEnrollCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
+  const ctaEnrollFree = trpc.lmsLearner.enrollFree.useMutation({ onSuccess: () => toast.success("Enrolled! You now have access."), onError: (e) => toast.error(`Enrollment failed: ${e.message}`) });
+  const ctaBundleEnroll = trpc.bundlesLearner.enroll.useMutation({ onSuccess: () => toast.success("Enrolled!"), onError: (e) => toast.error(`Enrollment failed: ${e.message}`) });
+  const ctaWebinarRegister = trpc.webinarLearner.register.useMutation({ onSuccess: () => toast.success("Registered!"), onError: (e) => toast.error(`Registration failed: ${e.message}`) });
+  const ctaDownloadsCheckout = trpc.downloadsLearner.createCheckout.useMutation({ onSuccess: (data) => { if (data.free || data.alreadyPurchased) toast.success("Access granted!"); else if (data.checkoutUrl) window.open(data.checkoutUrl, "_blank"); }, onError: (e) => toast.error(`Checkout failed: ${e.message}`) });
+  const ctaWorkshopEnrollFree = trpc.workshopLearner.enrollFree.useMutation({ onSuccess: () => toast.success("Enrolled!"), onError: (e) => toast.error(`Workshop enrollment failed: ${e.message}`) });
+  const ctaCommunityJoin = trpc.community.join.useMutation({ onSuccess: () => toast.success("Joined!"), onError: (e) => toast.error(`Community join failed: ${e.message}`) });
+  const ctaMembershipEnrollFree = trpc.membership.selfEnrollFree.useMutation({ onSuccess: () => toast.success("Enrolled! You now have access to this membership."), onError: (e) => toast.error(`Membership enrollment failed: ${e.message}`) });
+
+  const handleCtaFreeEnroll = async (productType: string, productId: number) => {
+    if (!ctaUser) { window.location.href = getLoginUrl(window.location.pathname); return; }
+    try {
+      if (productType === "course" || productType === "quiz" || productType === "cohort") {
+        const target = (ctaFreeEnrollCatalog as any[])?.find((p: any) => p.type === productType && p.id === productId);
+        if (target?.slug) await ctaEnrollFree.mutateAsync({ courseSlug: target.slug });
+        else toast.error("Course not found.");
+      } else if (productType === "bundle") {
+        await ctaBundleEnroll.mutateAsync({ bundleId: productId });
+      } else if (productType === "webinar") {
+        await ctaWebinarRegister.mutateAsync({ webinarId: productId });
+      } else if (productType === "download") {
+        await ctaDownloadsCheckout.mutateAsync({ productId });
+      } else if (productType === "workshop") {
+        await ctaWorkshopEnrollFree.mutateAsync({ workshopId: productId });
+      } else if (productType === "community") {
+        await ctaCommunityJoin.mutateAsync({ communityId: productId });
+      } else if (productType === "membership") {
+        await ctaMembershipEnrollFree.mutateAsync({ planId: productId });
+      } else {
+        toast.error(`Free enrollment not supported for: ${productType}`);
+      }
+    } catch (err: any) { toast.error(err?.message ?? "Enrollment failed."); }
+  };
 
   const getHref = () => {
     const behavior = d.ctaBehavior ?? "url";
@@ -1034,7 +1111,7 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
     const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/${funnelSlug}/${np.slug}`) : null;
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
-    if (behavior === "direct_checkout") return "#";
+    if (behavior === "direct_checkout" || behavior === "free_enrollment") return "#";
     if (behavior === "landing_page" && d.ctaLandingPageSlug) return `${LEARN_APP_URL}/courses/${d.ctaLandingPageSlug}`;
     if (behavior === "funnel_page" && d.ctaFunnelPageValue) {
       const [fs, ps] = (d.ctaFunnelPageValue as string).split("/");
@@ -1049,6 +1126,14 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
 
   const handleClick = async (e: React.MouseEvent) => {
     const behavior = d.ctaBehavior ?? "url";
+    if (behavior === "free_enrollment") {
+      e.preventDefault();
+      const productType = d.freeEnrollProductType ?? "membership";
+      const productId = d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null;
+      if (!productId) { toast.error("No product configured for this button."); return; }
+      await handleCtaFreeEnroll(productType, productId);
+      return;
+    }
     if (behavior === "direct_checkout") {
       e.preventDefault();
       if (!d.checkoutProductId || !d.checkoutProductType) { toast.error("No product configured for this button."); return; }
@@ -1124,7 +1209,41 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const nextPageRef = useRef(nextPage);
   nextPageRef.current = nextPage;
+  const { user: pricingUser } = useAuth();
   const createDirectCheckout = trpc.funnelPublic.createDirectCheckout.useMutation();
+  const { data: pricingFreeEnrollCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
+  const pricingEnrollFree = trpc.lmsLearner.enrollFree.useMutation({ onSuccess: () => toast.success("Enrolled! You now have access."), onError: (e) => toast.error(`Enrollment failed: ${e.message}`) });
+  const pricingBundleEnroll = trpc.bundlesLearner.enroll.useMutation({ onSuccess: () => toast.success("Enrolled!"), onError: (e) => toast.error(`Enrollment failed: ${e.message}`) });
+  const pricingWebinarRegister = trpc.webinarLearner.register.useMutation({ onSuccess: () => toast.success("Registered!"), onError: (e) => toast.error(`Registration failed: ${e.message}`) });
+  const pricingDownloadsCheckout = trpc.downloadsLearner.createCheckout.useMutation({ onSuccess: (data) => { if (data.free || data.alreadyPurchased) toast.success("Access granted!"); else if (data.checkoutUrl) window.open(data.checkoutUrl, "_blank"); }, onError: (e) => toast.error(`Checkout failed: ${e.message}`) });
+  const pricingWorkshopEnrollFree = trpc.workshopLearner.enrollFree.useMutation({ onSuccess: () => toast.success("Enrolled!"), onError: (e) => toast.error(`Workshop enrollment failed: ${e.message}`) });
+  const pricingCommunityJoin = trpc.community.join.useMutation({ onSuccess: () => toast.success("Joined!"), onError: (e) => toast.error(`Community join failed: ${e.message}`) });
+  const pricingMembershipEnrollFree = trpc.membership.selfEnrollFree.useMutation({ onSuccess: () => toast.success("Enrolled! You now have access to this membership."), onError: (e) => toast.error(`Membership enrollment failed: ${e.message}`) });
+
+  const handlePricingFreeEnroll = async (productType: string, productId: number) => {
+    if (!pricingUser) { window.location.href = getLoginUrl(window.location.pathname); return; }
+    try {
+      if (productType === "course" || productType === "quiz" || productType === "cohort") {
+        const target = (pricingFreeEnrollCatalog as any[])?.find((p: any) => p.type === productType && p.id === productId);
+        if (target?.slug) await pricingEnrollFree.mutateAsync({ courseSlug: target.slug });
+        else toast.error("Course not found.");
+      } else if (productType === "bundle") {
+        await pricingBundleEnroll.mutateAsync({ bundleId: productId });
+      } else if (productType === "webinar") {
+        await pricingWebinarRegister.mutateAsync({ webinarId: productId });
+      } else if (productType === "download") {
+        await pricingDownloadsCheckout.mutateAsync({ productId });
+      } else if (productType === "workshop") {
+        await pricingWorkshopEnrollFree.mutateAsync({ workshopId: productId });
+      } else if (productType === "community") {
+        await pricingCommunityJoin.mutateAsync({ communityId: productId });
+      } else if (productType === "membership") {
+        await pricingMembershipEnrollFree.mutateAsync({ planId: productId });
+      } else {
+        toast.error(`Free enrollment not supported for: ${productType}`);
+      }
+    } catch (err: any) { toast.error(err?.message ?? "Enrollment failed."); }
+  };
 
   const getHref = () => {
     const behavior = d.ctaBehavior ?? "url";
@@ -1132,7 +1251,7 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
     const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/${funnelSlug}/${np.slug}`) : null;
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
-    if (behavior === "direct_checkout") return "#";
+    if (behavior === "direct_checkout" || behavior === "free_enrollment") return "#";
     if (behavior === "landing_page" && d.ctaLandingPageSlug) return `${LEARN_APP_URL}/courses/${d.ctaLandingPageSlug}`;
     if (behavior === "funnel_page" && d.ctaFunnelPageValue) {
       const [fs, ps] = (d.ctaFunnelPageValue as string).split("/");
@@ -1143,6 +1262,14 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
 
   const handleClick = async (e: React.MouseEvent) => {
     const behavior = d.ctaBehavior ?? "url";
+    if (behavior === "free_enrollment") {
+      e.preventDefault();
+      const productType = d.freeEnrollProductType ?? "membership";
+      const productId = d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null;
+      if (!productId) { toast.error("No product configured for this button."); return; }
+      await handlePricingFreeEnroll(productType, productId);
+      return;
+    }
     if (behavior === "direct_checkout") {
       e.preventDefault();
       if (!d.checkoutProductId || !d.checkoutProductType) { toast.error("No product configured for this button."); return; }
