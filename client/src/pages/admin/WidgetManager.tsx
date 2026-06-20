@@ -15,7 +15,7 @@ import { getAdminUrl } from "@/hooks/useSubdomain";
 import {
   Plus, Copy, Trash2, Edit2, Eye, RefreshCw, Code2, ArrowLeft,
   LayoutGrid, List, Rows3, Sparkles, CheckCircle2, X, ChevronLeft,
-  Package, Star,
+  Package, Star, ChevronUp, ChevronDown,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -339,9 +339,34 @@ function WidgetForm({
             {form.items.map((item, idx) => {
               const content = contentMap.get(`${item.type}:${item.id}`);
               const meta = TYPE_META[item.type] ?? { label: item.type, emoji: "📄", color: "" };
+              function moveItem(from: number, to: number) {
+                const next = [...form.items];
+                const [moved] = next.splice(from, 1);
+                next.splice(to, 0, moved);
+                set("items", next);
+              }
               return (
                 <div key={`${item.type}:${item.id}`} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/30">
-                  <span className="text-muted-foreground text-xs w-5 text-right">{idx + 1}.</span>
+                  {/* Reorder buttons */}
+                  <div className="flex flex-col shrink-0">
+                    <button
+                      disabled={idx === 0}
+                      onClick={() => moveItem(idx, idx - 1)}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+                      title="Move up"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      disabled={idx === form.items.length - 1}
+                      onClick={() => moveItem(idx, idx + 1)}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+                      title="Move down"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <span className="text-muted-foreground text-xs w-5 text-right shrink-0">{idx + 1}.</span>
                   {content?.coverImageUrl ? (
                     <img src={content.coverImageUrl} alt="" className="w-10 h-6 object-cover rounded shrink-0" />
                   ) : (
@@ -352,6 +377,7 @@ function WidgetForm({
                   <button
                     onClick={() => set("items", form.items.filter(i => !(i.id === item.id && i.type === item.type)))}
                     className="text-muted-foreground hover:text-destructive transition-colors"
+                    title="Remove"
                   >
                     <X className="w-4 h-4" />
                   </button>
