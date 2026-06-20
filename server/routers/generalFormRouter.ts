@@ -2314,18 +2314,42 @@ ${pageText}`;
         );
         matchedRule = mr;
         successOutcome = buildSuccessOutcome(selected, template, submissionCtx);
-        // Grant access to products if the matched rule has grantAccessActions and a userId is known
-        const grantUserId = input.userId ?? null;
-        console.log(`[FormGrantAccess] matchedRule=${matchedRule?.id ?? 'none'} grantAccessActions=${JSON.stringify(matchedRule?.grantAccessActions)} grantUserId=${grantUserId}`);
-        if (matchedRule?.grantAccessActions && grantUserId) {
-          console.log(`[FormGrantAccess] Applying access grant for user ${grantUserId}: ${matchedRule.grantAccessActions}`);
-          applyAccessGrantActions(db, matchedRule.grantAccessActions, grantUserId).catch((e: any) =>
-            console.error("[FormGrantAccess] General form access grant failed:", e.message)
-          );
+        // Grant access to products if the matched rule has grantAccessActions.
+        // Works for both logged-in users (input.userId) and guests (resolve by email from responses).
+        if (matchedRule?.grantAccessActions) {
+          let grantUserId: number | null = input.userId ?? null;
+          // If no userId (guest submission), resolve user by email from responses
+          if (!grantUserId) {
+            const parsedForGrant: Record<string, any> = JSON.parse(sanitizedResponses);
+            let guestEmail: string | null = null;
+            for (const val of Object.values(parsedForGrant)) {
+              if (typeof val === 'string' && val.includes('@') && val.includes('.')) {
+                guestEmail = val.trim().toLowerCase();
+                break;
+              }
+            }
+            if (guestEmail) {
+              try {
+                const { getOrCreateUserByEmail } = await import('../db');
+                const { user: resolvedUser, isNew } = await getOrCreateUserByEmail({ email: guestEmail, name: submitter.name || undefined });
+                grantUserId = resolvedUser.id;
+                console.log(`[FormGrantAccess] Resolved guest email ${guestEmail} to userId=${grantUserId} (isNew=${isNew})`);
+              } catch (e: any) {
+                console.error('[FormGrantAccess] Failed to resolve guest user by email:', e.message);
+              }
+            }
+          }
+          console.log(`[FormGrantAccess] matchedRule=${matchedRule?.id ?? 'none'} grantAccessActions=${JSON.stringify(matchedRule?.grantAccessActions)} grantUserId=${grantUserId}`);
+          if (grantUserId) {
+            console.log(`[FormGrantAccess] Applying access grant for user ${grantUserId}: ${matchedRule.grantAccessActions}`);
+            applyAccessGrantActions(db, matchedRule.grantAccessActions, grantUserId).catch((e: any) =>
+              console.error("[FormGrantAccess] General form access grant failed:", e.message)
+            );
+          } else {
+            console.warn(`[FormGrantAccess] Rule has grantAccessActions but could not resolve a userId — no email found in responses`);
+          }
         } else if (matchedRule && !matchedRule.grantAccessActions) {
           console.log(`[FormGrantAccess] Rule ${matchedRule.id} matched but has no grantAccessActions — configure it in the routing rule dialog`);
-        } else if (matchedRule?.grantAccessActions && !grantUserId) {
-          console.log(`[FormGrantAccess] Rule has grantAccessActions but userId is null — user must be logged in`);
         }
       } catch (e: any) {
         console.error("[SuccessModules] Failed to build success outcome:", e.message);

@@ -597,7 +597,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
             title={`Enrollments (${courses.length})`}
             action={
               <Button size="sm" onClick={() => setEnrollOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
-                <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Enroll
+                <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant Access
               </Button>
             }
           />
@@ -713,7 +713,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
             title={`Quizzes (${quizzes.length})`}
             action={
               <Button size="sm" onClick={() => setEnrollOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
-                <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Enroll
+                <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant Access
               </Button>
             }
           />
@@ -1020,25 +1020,25 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Enroll in Course</DialogTitle>
-            <DialogDescription>Manually enroll this user in an LMS course. Choose a payment mode below.</DialogDescription>
+            <DialogTitle>Grant Access / Enroll</DialogTitle>
+            <DialogDescription>Manually grant access to any product — courses, downloads, digital products, bundles, memberships, or webinars.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {/* Course selector with search */}
+            {/* Product selector with search */}
             <div className="space-y-1.5">
-              <Label>Course</Label>
+              <Label>Product</Label>
               <Input
-                placeholder="Search courses, quizzes, cohorts..."
+                placeholder="Search courses, downloads, memberships..."
                 value={courseSearch}
                 onChange={(e) => setCourseSearch(e.target.value)}
                 className="mb-1"
               />
               <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose a course...">
+                  <SelectValue placeholder="Choose a product...">
                     {selectedCourseId
                       ? (allCourses ?? []).find((c: any) => String(c.id) === selectedCourseId)?.title ?? "Selected"
-                      : "Choose a course..."}
+                      : "Choose a product..."}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-72">
@@ -1046,20 +1046,26 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     const filtered = (allCourses ?? []).filter((c: any) =>
                       !courseSearch || c.title.toLowerCase().includes(courseSearch.toLowerCase())
                     );
-                    if (filtered.length === 0) return <div className="px-3 py-2 text-sm text-gray-400">No courses found</div>;
-                    const typeOrder = ["course", "cohort", "quiz", "download"];
+                    if (filtered.length === 0) return <div className="px-3 py-2 text-sm text-gray-400">No products found</div>;
+                    const typeOrder = ["course", "cohort", "workshop", "quiz", "download", "digital_product", "digital_bundle", "bundle", "membership", "webinar"];
+                    const typeLabels: Record<string, string> = {
+                      course: "Courses", cohort: "Live Cohorts", workshop: "Workshops",
+                      quiz: "Quizzes", download: "LMS Downloads",
+                      digital_product: "Digital Products", digital_bundle: "Digital Bundles",
+                      bundle: "Bundles", membership: "Memberships", webinar: "Webinars",
+                    };
                     const grouped: Record<string, any[]> = {};
                     for (const c of filtered) {
-                      const t = c.type ?? "course";
+                      const t = c.productType ?? c.type ?? "course";
                       if (!grouped[t]) grouped[t] = [];
                       grouped[t].push(c);
                     }
                     return typeOrder.filter(t => grouped[t]?.length).flatMap(t => [
                       <div key={`hdr-${t}`} className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">
-                        {t === "cohort" ? "Live Cohorts" : t === "quiz" ? "Quizzes" : t === "download" ? "Downloads" : "Courses"}
+                        {typeLabels[t] ?? t}
                       </div>,
                       ...grouped[t].map((c: any) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
+                        <SelectItem key={`${t}-${c.id}`} value={String(c.id)}>
                           <span className={c.status === "draft" ? "text-gray-400" : ""}>
                             {c.title}{c.status === "draft" ? " (draft)" : ""}
                           </span>
@@ -1157,9 +1163,11 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               onClick={() => {
                 if (!selectedCourseId) return;
                 const amountCents = enrollPaymentMode === "charge" ? Math.round(parseFloat(enrollAmountCents) * 100) : undefined;
+                const selectedProduct = (allCourses ?? []).find((c: any) => String(c.id) === selectedCourseId);
                 enroll.mutate({
                   userId,
                   courseId: Number(selectedCourseId),
+                  productType: (selectedProduct?.productType ?? selectedProduct?.type ?? "course") as any,
                   paymentMode: enrollPaymentMode,
                   stripePaymentIntentId: enrollPaymentMode === "link" ? enrollStripePI || undefined : undefined,
                   stripeCardToken: enrollPaymentMode === "charge" ? enrollCardToken || undefined : undefined,

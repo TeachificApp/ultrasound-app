@@ -45,6 +45,8 @@ import {
   communities,
   webinarRegistrations,
   webinars,
+  bundles,
+  bundleEnrollments,
   lmsLessonProgress,
   lmsLessons,
   platformSettings,
@@ -420,15 +422,38 @@ export const adminUserRouter = router({
       };
     }),
 
-  /** List all LMS courses for the enroll dropdown */
+  /** List all enrollable products for the admin enroll dropdown:
+   *  LMS courses/quizzes/downloads/cohorts, standalone digital products,
+   *  digital bundles, bundles, membership plans, and webinars.
+   */
   listAllCourses: protectedProcedure.query(async ({ ctx }) => {
     await assertAdmin(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    return db
-      .select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, status: lmsCourses.status })
-      .from(lmsCourses)
-      .orderBy(lmsCourses.title);
+
+    const [lmsRows, dpRows, dbRows, bundleRows, mpRows, webinarRows] = await Promise.all([
+      db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, status: lmsCourses.status })
+        .from(lmsCourses).orderBy(lmsCourses.title),
+      db.select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, status: digitalProducts.status })
+        .from(digitalProducts).orderBy(digitalProducts.title),
+      db.select({ id: digitalBundles.id, title: digitalBundles.title, slug: digitalBundles.slug, status: digitalBundles.status })
+        .from(digitalBundles).orderBy(digitalBundles.title),
+      db.select({ id: bundles.id, title: bundles.title, slug: bundles.slug, status: bundles.status })
+        .from(bundles).orderBy(bundles.title),
+      db.select({ id: membershipPlans.id, title: membershipPlans.title, slug: membershipPlans.slug, status: membershipPlans.status })
+        .from(membershipPlans).orderBy(membershipPlans.title),
+      db.select({ id: webinars.id, title: webinars.title, slug: webinars.slug, status: webinars.status })
+        .from(webinars).orderBy(webinars.title),
+    ]);
+
+    return [
+      ...lmsRows.map(r => ({ ...r, productType: r.type as string })),
+      ...dpRows.map(r => ({ ...r, type: "digital_product" as const, productType: "digital_product" })),
+      ...dbRows.map(r => ({ ...r, type: "digital_bundle" as const, productType: "digital_bundle" })),
+      ...bundleRows.map(r => ({ ...r, type: "bundle" as const, productType: "bundle" })),
+      ...mpRows.map(r => ({ ...r, type: "membership" as const, productType: "membership" })),
+      ...webinarRows.map(r => ({ ...r, type: "webinar" as const, productType: "webinar" })),
+    ];
   }),
 
   /** Update user role */
@@ -442,11 +467,13 @@ export const adminUserRouter = router({
       return { success: true };
     }),
 
-  /** Manually enroll user in an LMS course */
+  /** Manually enroll user in any product (LMS course, digital product, digital bundle, bundle, membership, webinar) */
   enrollInCourse: protectedProcedure
     .input(z.object({
       userId: z.number().int(),
       courseId: z.number().int(),
+      /** Product type — determines which table to insert into */
+      productType: z.enum(["course", "quiz", "download", "cohort", "workshop", "digital_product", "digital_bundle", "bundle", "membership", "webinar"]).default("course"),
       /** Payment mode:
        *  'free'   – no charge, just enroll
        *  'link'   – link to an existing Stripe PaymentIntent ID
@@ -469,7 +496,59 @@ export const adminUserRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // ── Handle enrollment (create or upgrade) ──────────────────────────────
+      const isLmsType = ["course", "quiz", "download", "cohort", "workshop"].includes(input.productType);
+
+      // ── Non-LMS product types ──────────────────────────────────────────────
+      if (!isLmsType) {
+        let alreadyGranted = false;
+        let grantId: number | undefined;
+
+        if (input.productType === "digital_product") {
+          const [ex] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
+            .where(and(eq(digitalPurchases.userId, input.userId), eq(digitalPurchases.productId, input.courseId))).limit(1);
+          if (ex) { alreadyGranted = true; grantId = ex.id; }
+          else {
+            const [r] = await db.insert(digitalPurchases).values({ userId: input.userId, productId: input.courseId }).$returningId();
+            grantId = r.id;
+          }
+        } else if (input.productType === "digital_bundle") {
+          const [ex] = await db.select({ id: digitalBundlePurchases.id }).from(digitalBundlePurchases)
+            .where(and(eq(digitalBundlePurchases.userId, input.userId), eq(digitalBundlePurchases.bundleId, input.courseId))).limit(1);
+          if (ex) { alreadyGranted = true; grantId = ex.id; }
+          else {
+            const [r] = await db.insert(digitalBundlePurchases).values({ userId: input.userId, bundleId: input.courseId }).$returningId();
+            grantId = r.id;
+          }
+        } else if (input.productType === "bundle") {
+          const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
+            .where(and(eq(bundleEnrollments.userId, input.userId), eq(bundleEnrollments.bundleId, input.courseId))).limit(1);
+          if (ex) { alreadyGranted = true; grantId = ex.id; }
+          else {
+            const [r] = await db.insert(bundleEnrollments).values({ userId: input.userId, bundleId: input.courseId }).$returningId();
+            grantId = r.id;
+          }
+        } else if (input.productType === "membership") {
+          const [ex] = await db.select({ id: membershipSubscriptions.id }).from(membershipSubscriptions)
+            .where(and(eq(membershipSubscriptions.userId, input.userId), eq(membershipSubscriptions.planId, input.courseId), eq(membershipSubscriptions.status, "active"))).limit(1);
+          if (ex) { alreadyGranted = true; grantId = ex.id; }
+          else {
+            const [r] = await db.insert(membershipSubscriptions).values({ userId: input.userId, planId: input.courseId, status: "active" }).$returningId();
+            grantId = r.id;
+          }
+        } else if (input.productType === "webinar") {
+          const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
+            .where(and(eq(webinarRegistrations.userId, input.userId), eq(webinarRegistrations.webinarId, input.courseId))).limit(1);
+          if (ex) { alreadyGranted = true; grantId = ex.id; }
+          else {
+            const [r] = await db.insert(webinarRegistrations).values({ userId: input.userId, webinarId: input.courseId }).$returningId();
+            grantId = r.id;
+          }
+        }
+
+        return { enrollmentId: grantId ?? 0, alreadyEnrolled: alreadyGranted, orderId: undefined, stripePaymentIntentId: undefined };
+      }
+
+      // ── LMS enrollment (create or upgrade) ────────────────────────────────
       const [existing] = await db
         .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
         .from(lmsEnrollments)
@@ -502,7 +581,6 @@ export const adminUserRouter = router({
       let resolvedPaymentIntentId: string | undefined;
 
       if (input.paymentMode === "link" && input.stripePaymentIntentId) {
-        // Link to existing Stripe PaymentIntent — verify it exists
         resolvedPaymentIntentId = input.stripePaymentIntentId;
         const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
         let amount = 0;
@@ -523,16 +601,13 @@ export const adminUserRouter = router({
           status: "paid",
         }).$returningId();
         orderId = order.id;
-        // Link order to enrollment
         await db.update(lmsEnrollments).set({ orderId }).where(eq(lmsEnrollments.id, enrollmentId));
 
       } else if (input.paymentMode === "charge" && input.stripeCardToken && input.amountCents) {
-        // Create a new Stripe charge using a card token
         const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
         if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
         const Stripe = (await import("stripe")).default;
         const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
-        // Get user email for receipt
         const [user] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, input.userId)).limit(1);
         const pi = await stripe.paymentIntents.create({
           amount: input.amountCents,
@@ -559,7 +634,6 @@ export const adminUserRouter = router({
         orderId = order.id;
         await db.update(lmsEnrollments).set({ orderId }).where(eq(lmsEnrollments.id, enrollmentId));
       }
-      // 'free' mode: no order record created
 
       return { enrollmentId, alreadyEnrolled, orderId, stripePaymentIntentId: resolvedPaymentIntentId };
     }),
