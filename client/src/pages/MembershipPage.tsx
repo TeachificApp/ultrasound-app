@@ -72,8 +72,8 @@ export default function MembershipPage() {
     },
     onError: (e: any) => {
       if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already")) {
-        toast.success("You already have access!", { description: "Redirecting to your dashboard..." });
-        setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
+        toast.success("You already have access!", { description: "Redirecting to your membership..." });
+        setTimeout(() => { window.location.href = `/my-memberships/${slug}`; }, 1200);
       } else {
         toast.error(e.message);
       }
@@ -82,13 +82,13 @@ export default function MembershipPage() {
 
   const selfEnrollFreeMutation = trpc.membership.selfEnrollFree.useMutation({
     onSuccess: () => {
-      toast.success("You're in! Redirecting to your dashboard…");
-      setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
+      toast.success("You're in! Redirecting to your membership…");
+      setTimeout(() => { window.location.href = `/my-memberships/${slug}`; }, 1200);
     },
     onError: (e: any) => {
       if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already")) {
-        toast.success("You already have access!", { description: "Redirecting to your dashboard..." });
-        setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
+        toast.success("You already have access!", { description: "Redirecting to your membership..." });
+        setTimeout(() => { window.location.href = `/my-memberships/${slug}`; }, 1200);
       } else {
         toast.error(e.message);
       }
