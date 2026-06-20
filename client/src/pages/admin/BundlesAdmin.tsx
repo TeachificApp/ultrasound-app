@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, GripVertical, BookOpen, Download, ShoppingBag, Radio, HelpCircle, X, Users, DollarSign, Eye, Workflow, Search, Copy, ExternalLink, BarChart2, Settings, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, GripVertical, BookOpen, Download, ShoppingBag, Radio, HelpCircle, X, Users, DollarSign, Eye, Workflow, Search, Copy, ExternalLink, BarChart2, Settings, RefreshCw, CheckCircle2, Code } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
@@ -350,6 +350,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
           <TabsTrigger value="enrollments" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Enrollments</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3.5 h-3.5 mr-1" />After Purchase</TabsTrigger>
           <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
+          <TabsTrigger value="widget" className="text-xs"><Code className="w-3.5 h-3.5 mr-1" />Widget Code</TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -562,6 +563,11 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
             </div>
           </div>
         </TabsContent>
+
+        {/* Widget Code Tab */}
+        <TabsContent value="widget" className="pt-2">
+          <IncludedItemsWidgetCodePanel source="bundle" id={bundle.id} title={bundle.title} />
+        </TabsContent>
       </Tabs>
 
       {/* Add Item Dialog */}
@@ -711,4 +717,184 @@ export default function BundlesAdmin({ initialEditId }: { initialEditId?: number
     return <BundleEditor bundleId={editingId} onBack={() => setEditingId(null)} />;
   }
   return <BundleList onEdit={setEditingId} />;
+}
+
+// ─── Included Items Widget Code Panel (shared with MembershipsAdmin) ──────────
+
+function IncludedItemsWidgetCodePanel({ source, id, title }: { source: "membership" | "bundle"; id: number; title: string }) {
+  const [layout, setLayout] = useState<"grid" | "list">("grid");
+  const [columns, setColumns] = useState("3");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [accent, setAccent] = useState("#14b8a6");
+  const [headline, setHeadline] = useState("");
+  const [subtext, setSubtext] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
+  const [ctaLabel, setCtaLabel] = useState("Explore");
+  const [bgColor, setBgColor] = useState("");
+  const [copied, setCopied] = useState<"script" | "iframe" | null>(null);
+
+  const base = window.location.origin;
+  const params = new URLSearchParams({
+    source,
+    id: String(id),
+    accent,
+    theme,
+    layout,
+    columns,
+    ...(headline ? { headline } : {}),
+    ...(subtext ? { subtext } : {}),
+    ...(ctaUrl ? { ctaUrl } : {}),
+    ...(ctaLabel !== "Explore" ? { ctaLabel } : {}),
+    ...(bgColor ? { bg: bgColor } : {}),
+  });
+  const iframeSrc = `${base}/embed/included-items?${params.toString()}`;
+
+  const scriptSnippet = `<!-- Included Items Widget: ${title} -->
+<div data-included-items-embed="${source}:${id}"
+     data-accent="${accent}"
+     data-theme="${theme}"
+     data-layout="${layout}"
+     data-columns="${columns}"${headline ? `\n     data-headline="${headline}"` : ""}${subtext ? `\n     data-subtext="${subtext}"` : ""}${ctaUrl ? `\n     data-cta-url="${ctaUrl}"` : ""}${ctaLabel !== "Explore" ? `\n     data-cta-label="${ctaLabel}"` : ""}${bgColor ? `\n     data-bg="${bgColor}"` : ""}
+     data-base-url="${base}"></div>
+<script src="${base}/embed/included-items.js" async></script>`;
+
+  const iframeSnippet = `<iframe
+  src="${iframeSrc}"
+  style="width:100%;border:none;display:block;min-height:200px;"
+  scrolling="no"
+  frameborder="0"
+  allowtransparency="true"
+></iframe>`;
+
+  function copySnippet(type: "script" | "iframe") {
+    navigator.clipboard.writeText(type === "script" ? scriptSnippet : iframeSnippet);
+    setCopied(type);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+        <Code className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-teal-800">Embeddable Widget</p>
+          <p className="text-xs text-teal-600 mt-0.5">
+            Embed the included items for <strong>{title}</strong> on any external website using the snippet below.
+            Paste the script tag anywhere in your page's HTML — it auto-sizes to fit its content.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Layout</Label>
+          <Select value={layout} onValueChange={(v) => setLayout(v as "grid" | "list")}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="grid">Grid</SelectItem>
+              <SelectItem value="list">List</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Columns (grid only)</Label>
+          <Select value={columns} onValueChange={setColumns}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1</SelectItem>
+              <SelectItem value="2">2</SelectItem>
+              <SelectItem value="3">3</SelectItem>
+              <SelectItem value="4">4</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Theme</Label>
+          <Select value={theme} onValueChange={(v) => setTheme(v as "light" | "dark")}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">Light</SelectItem>
+              <SelectItem value="dark">Dark</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Accent Color</Label>
+          <div className="flex gap-2 items-center">
+            <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)}
+              className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0.5" />
+            <Input value={accent} onChange={(e) => setAccent(e.target.value)} className="h-8 text-xs font-mono flex-1" />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Headline (optional)</Label>
+          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="What's Included" className="h-8 text-xs" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Subtext (optional)</Label>
+          <Input value={subtext} onChange={(e) => setSubtext(e.target.value)} placeholder="Everything in this bundle" className="h-8 text-xs" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">CTA Button URL (optional)</Label>
+          <Input value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="https://..." className="h-8 text-xs" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">CTA Button Label</Label>
+          <Input value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder="Explore" className="h-8 text-xs" />
+        </div>
+        <div className="space-y-1 col-span-2">
+          <Label className="text-xs font-medium text-gray-700">Background Color (optional)</Label>
+          <div className="flex gap-2 items-center">
+            <input type="color" value={bgColor || "#ffffff"} onChange={(e) => setBgColor(e.target.value)}
+              className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0.5" />
+            <Input value={bgColor} onChange={(e) => setBgColor(e.target.value)} placeholder="transparent / #ffffff" className="h-8 text-xs font-mono flex-1" />
+            {bgColor && <Button size="sm" variant="ghost" className="h-8 text-xs px-2" onClick={() => setBgColor("")}>Clear</Button>}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs font-medium text-gray-700">Live Preview</Label>
+        <div className="rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+          <iframe
+            key={iframeSrc}
+            src={iframeSrc}
+            style={{ width: "100%", border: "none", display: "block", minHeight: "200px" }}
+            scrolling="no"
+            frameBorder="0"
+            onLoad={(e) => {
+              const iframe = e.currentTarget;
+              const handler = (ev: MessageEvent) => {
+                if (ev.data?.type === "included-items-resize" && ev.source === iframe.contentWindow) {
+                  iframe.style.height = (ev.data.height + 8) + "px";
+                  window.removeEventListener("message", handler);
+                }
+              };
+              window.addEventListener("message", handler);
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-medium text-gray-700">Script Tag (recommended)</Label>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => copySnippet("script")}>
+            {copied === "script" ? <><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+          </Button>
+        </div>
+        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">{scriptSnippet}</pre>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-medium text-gray-700">Raw iframe (for CMS / page builders)</Label>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => copySnippet("iframe")}>
+            {copied === "iframe" ? <><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+          </Button>
+        </div>
+        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">{iframeSnippet}</pre>
+      </div>
+    </div>
+  );
 }

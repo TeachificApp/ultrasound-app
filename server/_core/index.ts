@@ -46,6 +46,7 @@ import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes
 import { healStuckScormVersions } from "../scheduled/scormHealthCheck";
 import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
 import { registerCurriculumEmbedRoutes } from "../routes/curriculumEmbedRoutes";
+import { registerIncludedItemsEmbedRoutes } from "../routes/includedItemsEmbedRoutes";
 import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
 import { sdmsCmeDailySummaryHandler } from "../routes/sdmsCmeDailySummary";
 import { clearSessionCookies, getSessionCookieOptions } from "./cookies";
@@ -257,6 +258,8 @@ async function startServer() {
   registerFormEmbedRoutes(app);
   // Curriculum embed widget routes (public iframe + JS loader for external sites)
   registerCurriculumEmbedRoutes(app);
+  // Included Items embed widget routes (membership/bundle items iframe + JS loader)
+  registerIncludedItemsEmbedRoutes(app);
   // Dedicated logout route — bypasses tRPC batching so Set-Cookie clear is never merged with other responses
   app.post("/api/auth/logout", (req, res) => {
     clearSessionCookies(res, req);

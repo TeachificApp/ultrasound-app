@@ -33,7 +33,7 @@ import {
   Plus, Edit2, Trash2, Eye, EyeOff, Tag, Users, Package, LayoutTemplate,
   ChevronRight, GripVertical, X, Copy, RefreshCw, DollarSign, Percent,
   BookOpen, Download, Globe, Lock, Settings, FileText, Award, Search,
-  Loader2, CheckCircle2, AlertTriangle, RotateCcw, Workflow
+  Loader2, CheckCircle2, AlertTriangle, RotateCcw, Workflow, Code
 } from "lucide-react";
 import MembershipPageBuilder from "@/components/MembershipPageBuilder";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
@@ -500,6 +500,9 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
           <TabsTrigger value="reconcile" className="text-xs data-[state=active]:bg-white">
             <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reconcile Stripe
           </TabsTrigger>
+          <TabsTrigger value="widget" className="text-xs data-[state=active]:bg-white">
+            <Code className="w-3.5 h-3.5 mr-1" /> Widget Code
+          </TabsTrigger>
         </TabsList>
 
         <div className="flex-1 overflow-y-auto min-h-0">
@@ -596,6 +599,10 @@ function MembershipEditor({ planId, onBack }: { planId: number; onBack: () => vo
 
           <TabsContent value="reconcile" className="m-0 p-6">
             <StripeReconcileTab planId={planId} stripePriceId={plan.stripePriceId} />
+          </TabsContent>
+
+          <TabsContent value="widget" className="m-0 p-6">
+            <IncludedItemsWidgetCodePanel source="membership" id={plan.id} title={plan.title} />
           </TabsContent>
         </div>
       </Tabs>
@@ -1732,6 +1739,190 @@ function MembershipMembersTab({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Included Items Widget Code Panel ────────────────────────────────────────
+
+function IncludedItemsWidgetCodePanel({ source, id, title }: { source: "membership" | "bundle"; id: number; title: string }) {
+  const [layout, setLayout] = useState<"grid" | "list">("grid");
+  const [columns, setColumns] = useState("3");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [accent, setAccent] = useState("#14b8a6");
+  const [headline, setHeadline] = useState("");
+  const [subtext, setSubtext] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
+  const [ctaLabel, setCtaLabel] = useState("Explore");
+  const [bgColor, setBgColor] = useState("");
+  const [copied, setCopied] = useState<"script" | "iframe" | null>(null);
+
+  const base = window.location.origin;
+  const params = new URLSearchParams({
+    source,
+    id: String(id),
+    accent,
+    theme,
+    layout,
+    columns,
+    ...(headline ? { headline } : {}),
+    ...(subtext ? { subtext } : {}),
+    ...(ctaUrl ? { ctaUrl } : {}),
+    ...(ctaLabel !== "Explore" ? { ctaLabel } : {}),
+    ...(bgColor ? { bg: bgColor } : {}),
+  });
+  const iframeSrc = `${base}/embed/included-items?${params.toString()}`;
+
+  const scriptSnippet = `<!-- Included Items Widget: ${title} -->
+<div data-included-items-embed="${source}:${id}"
+     data-accent="${accent}"
+     data-theme="${theme}"
+     data-layout="${layout}"
+     data-columns="${columns}"${headline ? `\n     data-headline="${headline}"` : ""}${subtext ? `\n     data-subtext="${subtext}"` : ""}${ctaUrl ? `\n     data-cta-url="${ctaUrl}"` : ""}${ctaLabel !== "Explore" ? `\n     data-cta-label="${ctaLabel}"` : ""}${bgColor ? `\n     data-bg="${bgColor}"` : ""}
+     data-base-url="${base}"></div>
+<script src="${base}/embed/included-items.js" async></script>`;
+
+  const iframeSnippet = `<iframe
+  src="${iframeSrc}"
+  style="width:100%;border:none;display:block;min-height:200px;"
+  scrolling="no"
+  frameborder="0"
+  allowtransparency="true"
+></iframe>`;
+
+  function copySnippet(type: "script" | "iframe") {
+    navigator.clipboard.writeText(type === "script" ? scriptSnippet : iframeSnippet);
+    setCopied(type);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+        <Code className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-teal-800">Embeddable Widget</p>
+          <p className="text-xs text-teal-600 mt-0.5">
+            Embed the included items for <strong>{title}</strong> on any external website using the snippet below.
+            Paste the script tag anywhere in your page's HTML — it auto-sizes to fit its content.
+          </p>
+        </div>
+      </div>
+
+      {/* Options */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Layout</Label>
+          <Select value={layout} onValueChange={(v) => setLayout(v as "grid" | "list")}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="grid">Grid</SelectItem>
+              <SelectItem value="list">List</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Columns (grid only)</Label>
+          <Select value={columns} onValueChange={setColumns}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1</SelectItem>
+              <SelectItem value="2">2</SelectItem>
+              <SelectItem value="3">3</SelectItem>
+              <SelectItem value="4">4</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Theme</Label>
+          <Select value={theme} onValueChange={(v) => setTheme(v as "light" | "dark")}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">Light</SelectItem>
+              <SelectItem value="dark">Dark</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Accent Color</Label>
+          <div className="flex gap-2 items-center">
+            <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)}
+              className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0.5" />
+            <Input value={accent} onChange={(e) => setAccent(e.target.value)} className="h-8 text-xs font-mono flex-1" />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Headline (optional)</Label>
+          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="What's Included" className="h-8 text-xs" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">Subtext (optional)</Label>
+          <Input value={subtext} onChange={(e) => setSubtext(e.target.value)} placeholder="Everything in this membership" className="h-8 text-xs" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">CTA Button URL (optional)</Label>
+          <Input value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="https://..." className="h-8 text-xs" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-gray-700">CTA Button Label</Label>
+          <Input value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder="Explore" className="h-8 text-xs" />
+        </div>
+        <div className="space-y-1 col-span-2">
+          <Label className="text-xs font-medium text-gray-700">Background Color (optional, leave blank for default)</Label>
+          <div className="flex gap-2 items-center">
+            <input type="color" value={bgColor || "#ffffff"} onChange={(e) => setBgColor(e.target.value)}
+              className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0.5" />
+            <Input value={bgColor} onChange={(e) => setBgColor(e.target.value)} placeholder="transparent / #ffffff" className="h-8 text-xs font-mono flex-1" />
+            {bgColor && <Button size="sm" variant="ghost" className="h-8 text-xs px-2" onClick={() => setBgColor("")}>Clear</Button>}
+          </div>
+        </div>
+      </div>
+
+      {/* Live preview */}
+      <div className="space-y-2">
+        <Label className="text-xs font-medium text-gray-700">Live Preview</Label>
+        <div className="rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+          <iframe
+            key={iframeSrc}
+            src={iframeSrc}
+            style={{ width: "100%", border: "none", display: "block", minHeight: "200px" }}
+            scrolling="no"
+            frameBorder="0"
+            onLoad={(e) => {
+              const iframe = e.currentTarget;
+              const handler = (ev: MessageEvent) => {
+                if (ev.data?.type === "included-items-resize" && ev.source === iframe.contentWindow) {
+                  iframe.style.height = (ev.data.height + 8) + "px";
+                  window.removeEventListener("message", handler);
+                }
+              };
+              window.addEventListener("message", handler);
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Script tag snippet */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-medium text-gray-700">Script Tag (recommended)</Label>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => copySnippet("script")}>
+            {copied === "script" ? <><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+          </Button>
+        </div>
+        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">{scriptSnippet}</pre>
+      </div>
+
+      {/* Raw iframe snippet */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-medium text-gray-700">Raw iframe (for CMS / page builders)</Label>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => copySnippet("iframe")}>
+            {copied === "iframe" ? <><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+          </Button>
+        </div>
+        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">{iframeSnippet}</pre>
+      </div>
     </div>
   );
 }
