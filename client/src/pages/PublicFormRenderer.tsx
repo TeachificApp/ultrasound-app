@@ -888,8 +888,9 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
         window.location.href = (result as any).checkoutUrl;
         return;
       }
-      setSubmitted(true);
+      // Set successOutcome BEFORE setSubmitted so the submitted view renders with the correct outcome
       if (result.successOutcome) setSuccessOutcome(result.successOutcome as SuccessOutcomePayload);
+      setSubmitted(true);
     },
     onError: (e) => { setSubmitting(false); setGlobalError(e.message); },
   });

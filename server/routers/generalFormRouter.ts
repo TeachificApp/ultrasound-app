@@ -2274,6 +2274,7 @@ ${pageText}`;
       })();
       // Build success outcome
       let successOutcome = null;
+      let matchedRule: any = null;
       try {
         await ensureLegacySuccessModules(db, template);
         const modules = await fetchSuccessModules(db, input.templateId);
@@ -2304,13 +2305,14 @@ ${pageText}`;
           submitterName: submitter.name,
           submitterEmail: submitter.email,
         };
-        const { module: selected, matchedRule } = selectSuccessModuleWithRule(
+        const { module: selected, matchedRule: mr } = selectSuccessModuleWithRule(
           rulesRaw,
           modules,
           (template as any).defaultSuccessModuleId ?? null,
           submissionCtx,
           optionsByItemId,
         );
+        matchedRule = mr;
         successOutcome = buildSuccessOutcome(selected, template, submissionCtx);
         // Grant access to products if the matched rule has grantAccessActions and a userId is known
         const grantUserId = input.userId ?? null;
