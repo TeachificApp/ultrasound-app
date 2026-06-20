@@ -678,7 +678,9 @@ export default function FormSuccessModulesTab({
                           <Select value={cond.value} onValueChange={v => setRuleDraft(r => {
                             if (!r) return r;
                             const conditions = [...r.conditions];
-                            conditions[idx] = { ...conditions[idx], value: v };
+                            // Store optionId (stable DB id) alongside value so evaluator can resolve by ID even after renames
+                            const selectedChoice = choices.find(c => c.value === v);
+                            conditions[idx] = { ...conditions[idx], value: v, optionId: selectedChoice?.id };
                             return { ...r, conditions };
                           })}>
                             <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="Select a choice…" /></SelectTrigger>

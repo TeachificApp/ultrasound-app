@@ -83,8 +83,8 @@ function getOperatorsForType(fieldType: string) {
 function getChoicesForField(
   fieldId: string,
   formItems: Array<{ id: number; label: string; itemType: string }> | undefined,
-  formOptions: Array<{ itemId: number; label: string; value: string }> | undefined,
-): { label: string; value: string }[] | null {
+  formOptions: Array<{ id?: number; itemId: number; label: string; value: string }> | undefined,
+): { id?: number; label: string; value: string }[] | null {
   if (fieldId === "__pass_status__") return [{ label: "Pass", value: "pass" }, { label: "Fail", value: "fail" }];
   if (fieldId === "__payment_status__") return [{ label: "Paid", value: "paid" }, { label: "Unpaid", value: "unpaid" }, { label: "Pending", value: "pending" }];
   if (!formItems) return null;
@@ -92,7 +92,7 @@ function getChoicesForField(
   if (!item) return null;
   if (!CHOICE_FIELD_TYPES.includes(item.itemType ?? "")) return null;
   const opts = (formOptions ?? []).filter((o) => o.itemId === item.id);
-  if (opts.length) return opts.map((o) => ({ label: o.label, value: String(o.value ?? o.label) }));
+  if (opts.length) return opts.map((o) => ({ id: o.id, label: o.label, value: String(o.value ?? o.label) }));
   return null;
 }
 
@@ -132,7 +132,7 @@ type ModuleDraft = {
   isEnabled: boolean;
 };
 
-type RoutingCondition = { id: string; fieldId: string; operator: string; value: string };
+type RoutingCondition = { id: string; fieldId: string; operator: string; value: string; optionId?: number };
 type RoutingRuleDraft = {
   id?: number;
   ruleLabel: string;
@@ -685,7 +685,9 @@ export default function DIYFormSuccessModulesTab({
                           <Select value={cond.value} onValueChange={v => setRuleDraft(r => {
                             if (!r) return r;
                             const conditions = [...r.conditions];
-                            conditions[idx] = { ...conditions[idx], value: v };
+                            // Store optionId (stable DB id) alongside value so evaluator can resolve by ID even after renames
+                            const selectedChoice = choices.find(c => c.value === v);
+                            conditions[idx] = { ...conditions[idx], value: v, optionId: selectedChoice?.id };
                             return { ...r, conditions };
                           })}>
                             <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="Select a choice…" /></SelectTrigger>

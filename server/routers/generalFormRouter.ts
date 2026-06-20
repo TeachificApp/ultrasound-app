@@ -2283,15 +2283,15 @@ ${pageText}`;
         const submitter = extractSubmitterInfo(parsedResponses);
         // Build optionsByItemId map for label-as-fallback matching in routing conditions
         const allItemIds = Object.keys(parsedResponses).map(k => parseInt(k)).filter(n => !isNaN(n));
-        let optionsByItemId: Record<string, Array<{ label: string; value: string }>> = {};
+        let optionsByItemId: Record<string, Array<{ id: number; label: string; value: string }>> = {};
         if (allItemIds.length > 0) {
-          const allOpts = await db.select({ itemId: generalFormOptions.itemId, label: generalFormOptions.label, value: generalFormOptions.value })
+          const allOpts = await db.select({ id: generalFormOptions.id, itemId: generalFormOptions.itemId, label: generalFormOptions.label, value: generalFormOptions.value })
             .from(generalFormOptions)
             .where(inArray(generalFormOptions.itemId, allItemIds));
           for (const opt of allOpts) {
             const key = String(opt.itemId);
             if (!optionsByItemId[key]) optionsByItemId[key] = [];
-            optionsByItemId[key].push({ label: opt.label, value: opt.value });
+            optionsByItemId[key].push({ id: opt.id, label: opt.label, value: opt.value });
           }
         }
         const submissionCtx: FormSubmissionContext = {

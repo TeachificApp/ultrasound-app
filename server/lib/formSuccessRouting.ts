@@ -20,6 +20,8 @@ export interface FormSuccessCondition {
   fieldId: string;
   operator: string;
   value: string;
+  /** Stable reference to the option row — survives label/value renames. Takes precedence over `value` for choice-field matching. */
+  optionId?: number | string;
 }
 
 export interface FormSuccessRoutingRuleInput {
@@ -138,23 +140,37 @@ export function evaluateSuccessCondition(
   condition: FormSuccessCondition,
   ctx: FormSubmissionContext,
   merge: MergeContext,
-  /** Optional: map of itemId -> [{label, value}] for label-as-fallback matching */
-  optionsByItemId?: Record<string, Array<{ label: string; value: string }>>,
+  /** Optional: map of itemId -> [{id, label, value}] for ID-stable and label-as-fallback matching */
+  optionsByItemId?: Record<string, Array<{ id: number; label: string; value: string }>>,
 ): boolean {
   const strVal = getFieldValue(condition.fieldId, ctx, merge);
   const numVal = parseFloat(strVal);
   const target = condition.value ?? "";
 
-  // For choice fields, also resolve the target label to its submitted value for backward compat.
-  // If the condition stores a label (old behavior) and the response stores the option value,
-  // we resolve the label to the value so the comparison works.
+  // Resolution priority for choice fields:
+  // 1. If condition stores optionId, resolve to the current value of that option (stable across renames)
+  // 2. If target matches a value directly, use it as-is
+  // 3. If target matches a label but not a value, resolve label -> value (backward compat)
   let resolvedTarget = target;
   if (optionsByItemId && condition.fieldId && optionsByItemId[condition.fieldId]) {
     const opts = optionsByItemId[condition.fieldId];
-    // If target matches a label but not a value, resolve it to the value
-    const byLabel = opts.find(o => o.label.toLowerCase() === target.toLowerCase());
-    const byValue = opts.find(o => o.value === target);
-    if (byLabel && !byValue) resolvedTarget = byLabel.value;
+    if (condition.optionId != null) {
+      // Priority 1: stable ID-based resolution
+      const byId = opts.find(o => String(o.id) === String(condition.optionId));
+      if (byId) {
+        resolvedTarget = byId.value;
+      } else {
+        // Option was deleted — condition cannot match
+        resolvedTarget = "__deleted_option__";
+      }
+    } else {
+      // Priority 2 & 3: value-match then label-as-fallback (backward compat for old conditions)
+      const byValue = opts.find(o => o.value === target);
+      if (!byValue) {
+        const byLabel = opts.find(o => o.label.toLowerCase() === target.toLowerCase());
+        if (byLabel) resolvedTarget = byLabel.value;
+      }
+    }
   }
 
   switch (condition.operator) {

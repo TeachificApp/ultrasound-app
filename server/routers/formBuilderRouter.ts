@@ -867,15 +867,15 @@ export const formBuilderRouter = router({
             };
             // Build optionsByItemId map for label-as-fallback matching in routing conditions
             const responseItemIds = Object.keys(finalResponses).map(k => parseInt(k)).filter(n => !isNaN(n));
-            let optionsByItemId2: Record<string, Array<{ label: string; value: string }>> = {};
+            let optionsByItemId2: Record<string, Array<{ id: number; label: string; value: string }>> = {};
             if (responseItemIds.length > 0) {
-              const allOpts2 = await db2.select({ itemId: accreditationFormOptions.itemId, label: accreditationFormOptions.label, value: accreditationFormOptions.value })
+              const allOpts2 = await db2.select({ id: accreditationFormOptions.id, itemId: accreditationFormOptions.itemId, label: accreditationFormOptions.label, value: accreditationFormOptions.value })
                 .from(accreditationFormOptions)
                 .where(inArray(accreditationFormOptions.itemId, responseItemIds));
               for (const opt of allOpts2) {
                 const key = String(opt.itemId);
                 if (!optionsByItemId2[key]) optionsByItemId2[key] = [];
-                optionsByItemId2[key].push({ label: opt.label, value: opt.value });
+                optionsByItemId2[key].push({ id: opt.id, label: opt.label, value: opt.value });
               }
             }
             const { module: selectedModule, matchedRule } = selectSuccessModuleWithRule(rules, modules as any, template.defaultSuccessModuleId ?? null, ctx2, optionsByItemId2);
