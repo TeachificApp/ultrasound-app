@@ -112,8 +112,9 @@ const getMembershipBySlug = publicProcedure
       if (item.itemType === "all_downloads") {
         return { ...item, itemTitle: item.label ?? "All Downloads", itemSlug: null, itemCoverImage: null };
       }
-      const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
-      const IHE_LOGO  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
+      // Wide hero banner images — same as used on the AAUS and iHeartEcho home pages
+      const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp";
+      const IHE_LOGO  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
       if (item.itemType === "ultrasoundassist_free") {
         return { ...item, itemTitle: item.label ?? "UltrasoundAssist™ (Free Member)", itemSlug: null, itemCoverImage: AAUS_LOGO, appLabel: "UltrasoundAssist™" };
       }

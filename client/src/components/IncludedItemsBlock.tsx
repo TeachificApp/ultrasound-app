@@ -15,8 +15,9 @@ import { BookOpen, FileDown, HelpCircle, Package, Radio, Users, Globe, Check, Ex
 import { Link } from "wouter";
 
 // ─── App hero images (same URLs as funnelRouter) ──────────────────────────────
-const AAUS_HERO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
-const IHE_HERO  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
+// Wide hero banner images — same as used on the AAUS and iHeartEcho home pages
+const AAUS_HERO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp";
+const IHE_HERO  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -304,14 +305,10 @@ export default function IncludedItemsBlock({ data: d, items }: IncludedItemsBloc
   const layout  = d.layout   ?? "grid";
   const cols    = d.columns  ?? 3;
 
-  const colClass =
-    layout === "grid"
-      ? cols === 4
-        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch"
-        : cols === 2
-        ? "grid grid-cols-1 sm:grid-cols-2 gap-5 items-stretch"
-        : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch"
-      : "space-y-3";
+  // Use inline gridTemplateColumns to exactly match RelatedProductsBlock
+  const colCount = Math.min(items.length || cols, cols);
+  const colClass = layout === "grid" ? "grid gap-5 items-stretch" : "space-y-3";
+  const gridStyle = layout === "grid" ? { gridTemplateColumns: `repeat(${colCount}, 1fr)` } : undefined;
 
   if (items.length === 0) return null;
 
@@ -330,7 +327,7 @@ export default function IncludedItemsBlock({ data: d, items }: IncludedItemsBloc
             {d.subtext}
           </p>
         )}
-        <div className={colClass}>
+        <div className={colClass} style={gridStyle}>
           {items.map((item) =>
             layout === "grid" ? (
               <GridCard key={item.id} item={item} d={d} />
