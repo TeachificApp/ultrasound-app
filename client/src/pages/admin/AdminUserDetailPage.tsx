@@ -1052,12 +1052,13 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       !courseSearch || c.title.toLowerCase().includes(courseSearch.toLowerCase())
                     );
                     if (filtered.length === 0) return <div className="px-3 py-2 text-sm text-gray-400">No products found</div>;
-                    const typeOrder = ["course", "cohort", "workshop", "quiz", "download", "digital_product", "digital_bundle", "bundle", "membership", "webinar"];
+                    const typeOrder = ["course", "cohort", "workshop", "quiz", "download", "digital_product", "digital_bundle", "bundle", "membership", "webinar", "community"];
                     const typeLabels: Record<string, string> = {
                       course: "Courses", cohort: "Live Cohorts", workshop: "Workshops",
                       quiz: "Quizzes", download: "LMS Downloads",
                       digital_product: "Digital Products", digital_bundle: "Digital Bundles",
                       bundle: "Bundles", membership: "Memberships", webinar: "Webinars",
+                      community: "Communities",
                     };
                     const grouped: Record<string, any[]> = {};
                     for (const c of filtered) {

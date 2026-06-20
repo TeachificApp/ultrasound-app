@@ -431,7 +431,7 @@ export const adminUserRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-    const [lmsRows, dpRows, dbRows, bundleRows, mpRows, webinarRows] = await Promise.all([
+    const [lmsRows, dpRows, dbRows, bundleRows, mpRows, webinarRows, communityRows] = await Promise.all([
       db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, status: lmsCourses.status })
         .from(lmsCourses).orderBy(lmsCourses.title),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, status: digitalProducts.status })
@@ -444,6 +444,8 @@ export const adminUserRouter = router({
         .from(membershipPlans).orderBy(membershipPlans.title),
       db.select({ id: webinars.id, title: webinars.title, slug: webinars.slug, status: webinars.status })
         .from(webinars).orderBy(webinars.title),
+      db.select({ id: communities.id, title: communities.title, slug: communities.slug, status: communities.status, privacy: communities.privacy })
+        .from(communities).orderBy(communities.title),
     ]);
 
     return [
@@ -453,6 +455,10 @@ export const adminUserRouter = router({
       ...bundleRows.map(r => ({ ...r, type: "bundle" as const, productType: "bundle" })),
       ...mpRows.map(r => ({ ...r, type: "membership" as const, productType: "membership" })),
       ...webinarRows.map(r => ({ ...r, type: "webinar" as const, productType: "webinar" })),
+      ...communityRows.map(r => ({ ...r, type: "community" as const, productType: "community",
+        // Append privacy hint to title so admin can see if it's gated
+        title: r.privacy && r.privacy !== "public" ? `${r.title} (${r.privacy.replace(/_/g, " ")})` : r.title,
+      })),
     ];
   }),
 
@@ -473,7 +479,7 @@ export const adminUserRouter = router({
       userId: z.number().int(),
       courseId: z.number().int(),
       /** Product type — determines which table to insert into */
-      productType: z.enum(["course", "quiz", "download", "cohort", "workshop", "digital_product", "digital_bundle", "bundle", "membership", "webinar"]).default("course"),
+      productType: z.enum(["course", "quiz", "download", "cohort", "workshop", "digital_product", "digital_bundle", "bundle", "membership", "webinar", "community"]).default("course"),
       /** Payment mode:
        *  'free'   – no charge, just enroll
        *  'link'   – link to an existing Stripe PaymentIntent ID
@@ -559,6 +565,24 @@ export const adminUserRouter = router({
             if (expiresAtDate) await db.update(webinarRegistrations).set({ accessExpiresAt: expiresAtDate }).where(eq(webinarRegistrations.id, ex.id));
           } else {
             const [r] = await db.insert(webinarRegistrations).values({ userId: input.userId, webinarId: input.courseId, accessExpiresAt: expiresAtDate ?? undefined }).$returningId();
+            grantId = r.id;
+          }
+        } else if (input.productType === "community") {
+          // Admin-granted community access bypasses all gating (course_gated, paid, invite_only, etc.)
+          const [ex] = await db.select({ id: communityMembers.id }).from(communityMembers)
+            .where(and(eq(communityMembers.userId, input.userId), eq(communityMembers.communityId, input.courseId))).limit(1);
+          if (ex) {
+            alreadyGranted = true; grantId = ex.id;
+            // Ensure they are approved even if previously rejected/pending
+            await db.update(communityMembers).set({ memberStatus: "approved" }).where(eq(communityMembers.id, ex.id));
+          } else {
+            const [r] = await db.insert(communityMembers).values({
+              userId: input.userId,
+              communityId: input.courseId,
+              role: "member",
+              memberStatus: "approved",
+              approvedToPost: true,
+            }).$returningId();
             grantId = r.id;
           }
         }
