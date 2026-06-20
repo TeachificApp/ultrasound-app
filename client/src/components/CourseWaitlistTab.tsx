@@ -120,7 +120,7 @@ export function CourseWaitlistTab({ courseId, course }: CourseWaitlistTabProps) 
     });
   };
 
-  const defaultPriceDollars = course.price ? (Number(course.price) / 100).toFixed(2) : "0.00";
+  const defaultPriceDollars = course.price ? Number(course.price).toFixed(2) : "0.00";
 
   return (
     <div className="space-y-6">

@@ -96,7 +96,7 @@ function formatPrice(card: Card): string {
   if (card.isFree || card.pricingType === "free") return "Free";
   if (!card.price) return "Free";
   const currency = card.currency?.toUpperCase() ?? "USD";
-  const base = new Intl.NumberFormat("en-US", { style: "currency", currency }).format(card.price / 100);
+  const base = new Intl.NumberFormat("en-US", { style: "currency", currency }).format(card.price);
   if (card.pricingType === "subscription") return base + (INTERVAL_LABEL[card.subscriptionInterval ?? "monthly"] ?? "/mo");
   if (card.pricingType === "payment_plan") return base + " (plan)";
   return base;

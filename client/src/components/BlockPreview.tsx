@@ -769,7 +769,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                   <div className="flex-1"><div className="font-semibold text-sm">{p.name}</div><div className="text-xs text-gray-500">{p.description}</div></div>
                   <div className="text-right">
                     {(p as any).strikethroughPrice && <div className="text-xs text-gray-400 line-through">{(p as any).strikethroughPrice}</div>}
-                    <span className="text-sm font-medium">${(p.price / 100).toFixed(2)}</span>
+                    <span className="text-sm font-medium">${Number(p.price).toFixed(2)}</span>
                   </div>
                 </div>
               ))}
@@ -802,7 +802,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
               </div>
               <div className="text-right flex-shrink-0">
                 {(bump as any).strikethroughPrice && <div className="text-xs text-gray-400 line-through">{(bump as any).strikethroughPrice}</div>}
-                <div className="text-sm font-bold" style={{ color: d.accentColor ?? "#179ca3" }}>${(bump.price / 100).toFixed(2)}</div>
+                <div className="text-sm font-bold" style={{ color: d.accentColor ?? "#179ca3" }}>${Number(bump.price).toFixed(2)}</div>
                 <button className="mt-2 px-4 py-1 border-2 rounded font-semibold text-sm" style={{ borderColor: d.accentColor ?? "#179ca3", color: d.accentColor ?? "#179ca3" }}>{bump.ctaText || "+ Add"}</button>
               </div>
             </div>
