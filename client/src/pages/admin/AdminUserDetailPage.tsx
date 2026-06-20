@@ -1037,7 +1037,10 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a product...">
                     {selectedCourseId
-                      ? (allCourses ?? []).find((c: any) => String(c.id) === selectedCourseId)?.title ?? "Selected"
+                      ? (() => {
+                          const [selType, selId] = selectedCourseId.split(":");
+                          return (allCourses ?? []).find((c: any) => String(c.id) === selId && (c.productType ?? c.type) === selType)?.title ?? "Selected";
+                        })()
                       : "Choose a product..."}
                   </SelectValue>
                 </SelectTrigger>
@@ -1065,7 +1068,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                         {typeLabels[t] ?? t}
                       </div>,
                       ...grouped[t].map((c: any) => (
-                        <SelectItem key={`${t}-${c.id}`} value={String(c.id)}>
+                        <SelectItem key={`${t}-${c.id}`} value={`${t}:${c.id}`}>
                           <span className={c.status === "draft" ? "text-gray-400" : ""}>
                             {c.title}{c.status === "draft" ? " (draft)" : ""}
                           </span>
@@ -1163,10 +1166,11 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               onClick={() => {
                 if (!selectedCourseId) return;
                 const amountCents = enrollPaymentMode === "charge" ? Math.round(parseFloat(enrollAmountCents) * 100) : undefined;
-                const selectedProduct = (allCourses ?? []).find((c: any) => String(c.id) === selectedCourseId);
+                const [selType, selId] = selectedCourseId.split(":");
+                const selectedProduct = (allCourses ?? []).find((c: any) => String(c.id) === selId && (c.productType ?? c.type) === selType);
                 enroll.mutate({
                   userId,
-                  courseId: Number(selectedCourseId),
+                  courseId: Number(selId),
                   productType: (selectedProduct?.productType ?? selectedProduct?.type ?? "course") as any,
                   paymentMode: enrollPaymentMode,
                   stripePaymentIntentId: enrollPaymentMode === "link" ? enrollStripePI || undefined : undefined,
