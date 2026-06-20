@@ -3029,4 +3029,5 @@ ${pageText}`;
 
       return { sent, failed, total: recipients.length };
     }),
+
 });
