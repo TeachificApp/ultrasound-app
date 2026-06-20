@@ -60,8 +60,8 @@ export const bundlePublicRouter = router({
             const [w] = await db.select({ title: webinars.title, slug: webinars.slug, coverImage: webinars.coverImage }).from(webinars).where(eq(webinars.id, item.itemId)).limit(1);
             itemTitle = w?.title ?? null; itemSlug = w?.slug ?? null; itemCoverImage = w?.coverImage ?? null;
           } else if (item.itemType === "community") {
-            const [cm] = await db.select({ name: communities.name, slug: communities.slug, coverImage: communities.coverImage }).from(communities).where(eq(communities.id, item.itemId)).limit(1);
-            itemTitle = cm?.name ?? null; itemSlug = cm?.slug ?? null; itemCoverImage = cm?.coverImage ?? null;
+            const [cm] = await db.select({ title: communities.title, slug: communities.slug, coverImage: communities.coverImage }).from(communities).where(eq(communities.id, item.itemId)).limit(1);
+            itemTitle = cm?.title ?? null; itemSlug = cm?.slug ?? null; itemCoverImage = cm?.coverImage ?? null;
           }
         } catch {}
         return { ...item, itemTitle, itemSlug, itemCoverImage, itemDescription };
