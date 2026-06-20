@@ -40,6 +40,35 @@ export const bundlePublicRouter = router({
       return { bundles: rows, total: cnt[0]?.count ?? 0 };
     }),
 
+  getIncludedItems: publicProcedure
+    .input(z.object({ bundleId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [bundle] = await db.select({ id: bundles.id, title: bundles.title, slug: bundles.slug }).from(bundles).where(eq(bundles.id, input.bundleId)).limit(1);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, bundle.id)).orderBy(asc(bundleItems.sortOrder));
+      const enrichedItems = await Promise.all(items.map(async (item) => {
+        let itemTitle: string | null = null, itemSlug: string | null = null, itemCoverImage: string | null = null, itemDescription: string | null = null;
+        try {
+          if (item.itemType === "course") {
+            const [c] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, coverImage: lmsCourses.coverImage, description: lmsCourses.description }).from(lmsCourses).where(eq(lmsCourses.id, item.itemId)).limit(1);
+            itemTitle = c?.title ?? null; itemSlug = c?.slug ?? null; itemCoverImage = c?.coverImage ?? null; itemDescription = c?.description ?? null;
+          } else if (item.itemType === "download") {
+            const [d] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug, coverImage: digitalProducts.coverImage, description: digitalProducts.description }).from(digitalProducts).where(eq(digitalProducts.id, item.itemId)).limit(1);
+            itemTitle = d?.title ?? null; itemSlug = d?.slug ?? null; itemCoverImage = d?.coverImage ?? null; itemDescription = d?.description ?? null;
+          } else if (item.itemType === "webinar") {
+            const [w] = await db.select({ title: webinars.title, slug: webinars.slug }).from(webinars).where(eq(webinars.id, item.itemId)).limit(1);
+            itemTitle = w?.title ?? null; itemSlug = w?.slug ?? null;
+          } else if (item.itemType === "quiz") {
+            const [q] = await db.select({ title: sonoQuizzes.title }).from(sonoQuizzes).where(eq(sonoQuizzes.id, item.itemId)).limit(1);
+            itemTitle = q?.title ?? null;
+          }
+        } catch {}
+        return { ...item, itemTitle, itemSlug, itemCoverImage, itemDescription };
+      }));
+      return { bundle, items: enrichedItems };
+    }),
+
   getBySlug: publicProcedure
     .input(z.object({ slug: z.string(), preview: z.boolean().optional() }))
     .query(async ({ input, ctx }) => {

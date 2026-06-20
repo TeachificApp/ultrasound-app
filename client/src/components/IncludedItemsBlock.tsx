@@ -11,8 +11,10 @@
  * App-type items receive a gradient overlay with the app name AND the correct hero image,
  * matching the treatment in RelatedProductsBlock exactly.
  */
+import React from "react";
 import { BookOpen, FileDown, HelpCircle, Package, Radio, Users, Globe, Check, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 // ─── App hero images (same URLs as funnelRouter) ──────────────────────────────
 // Wide hero banner images — same as used on the AAUS and iHeartEcho home pages
@@ -36,6 +38,12 @@ export interface IncludedItem {
 }
 
 export interface IncludedItemsBlockData {
+  /** Source selection — when set, items are fetched from this membership or bundle */
+  sourceType?: "membership" | "bundle";
+  /** Numeric ID of the selected membership plan or bundle */
+  sourceId?: number | string | null;
+  /** Display name of the selected source (for admin UI) */
+  sourceName?: string;
   headline?: string;
   subtext?: string;
   layout?: "grid" | "list";
@@ -296,19 +304,64 @@ function ListRow({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData })
 
 interface IncludedItemsBlockProps {
   data: IncludedItemsBlockData;
-  items: IncludedItem[];
+  /** Items injected by the parent page (membership/bundle context). Used as fallback when no sourceId is configured. */
+  items?: IncludedItem[];
 }
 
-export default function IncludedItemsBlock({ data: d, items }: IncludedItemsBlockProps) {
+export default function IncludedItemsBlock({ data: d, items: injectedItems = [] }: IncludedItemsBlockProps) {
   const bgColor = d.bgColor  ?? "#f9fafb";
   const textCol = d.textColor ?? "#111827";
   const layout  = d.layout   ?? "grid";
   const cols    = d.columns  ?? 3;
 
-  // Use inline gridTemplateColumns to exactly match RelatedProductsBlock
+  // Coerce sourceId to a valid positive number
+  const rawSourceId = d.sourceId;
+  const sourceId = rawSourceId != null && rawSourceId !== "" ? Number(rawSourceId) : null;
+  const hasSource = sourceId != null && !isNaN(sourceId) && sourceId > 0;
+  const isMembership = d.sourceType === "membership";
+  const isBundle = d.sourceType === "bundle";
+
+  // Fetch items from the configured source
+  const membershipQuery = trpc.membership.getIncludedItems.useQuery(
+    { planId: sourceId ?? 0 },
+    { enabled: hasSource && isMembership, staleTime: 60_000 }
+  );
+  const bundleQuery = trpc.bundles.getIncludedItems.useQuery(
+    { bundleId: sourceId ?? 0 },
+    { enabled: hasSource && isBundle, staleTime: 60_000 }
+  );
+
+  const isLoading = (hasSource && isMembership && membershipQuery.isLoading) || (hasSource && isBundle && bundleQuery.isLoading);
+
+  // Resolve items: source query wins over injected items
+  let items: IncludedItem[] = injectedItems;
+  if (hasSource && isMembership && membershipQuery.data) {
+    items = membershipQuery.data.items as IncludedItem[];
+  } else if (hasSource && isBundle && bundleQuery.data) {
+    items = bundleQuery.data.items as IncludedItem[];
+  }
+
   const colCount = Math.min(items.length || cols, cols);
   const colClass = layout === "grid" ? "grid gap-5 items-stretch" : "space-y-3";
   const gridStyle = layout === "grid" ? { gridTemplateColumns: `repeat(${colCount}, 1fr)` } : undefined;
+
+  if (isLoading) {
+    return (
+      <div className="py-10 sm:py-14" style={{ backgroundColor: bgColor }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          {d.headline && <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4" style={{ color: textCol }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className={layout === "grid" ? "grid gap-5" : "space-y-3"} style={layout === "grid" ? { gridTemplateColumns: `repeat(${cols}, 1fr)` } : undefined}>
+            {Array.from({ length: cols }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-gray-200 overflow-hidden animate-pulse">
+                <div className="h-36 bg-gray-200" />
+                <div className="p-4 space-y-2"><div className="h-3 bg-gray-200 rounded w-1/3" /><div className="h-4 bg-gray-200 rounded w-3/4" /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0) return null;
 

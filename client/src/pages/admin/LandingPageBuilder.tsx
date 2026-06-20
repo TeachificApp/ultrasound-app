@@ -3083,30 +3083,31 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       id: g.id,
       label: `${g.courseTitle ?? "Course"} — ${g.name ?? `Group #${g.id}`}`,
     }));
-  }, [rsCohortsData]);
+    }, [rsCohortsData]);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  // included_items_auto: source type toggle and membership/bundle pickers
+  const [iiSourceType, setIiSourceType] = useState<"membership" | "bundle">(d.sourceType ?? "membership");
+  const [iiSearch, setIiSearch] = useState("");
+  React.useEffect(() => {
+    setIiSourceType(d.sourceType ?? "membership");
+    setIiSearch("");
+  }, [block.id, d.sourceType]);
+  const { data: iiMembershipsData, isLoading: iiMembershipsLoading } = trpc.membership.listPublic.useQuery(
+    undefined,
+    { enabled: block.type === "included_items_auto", staleTime: 30_000 }
+  );
+  const { data: iiBundlesData, isLoading: iiBundlesLoading } = trpc.bundles.list.useQuery(
+    { limit: 100 },
+    { enabled: block.type === "included_items_auto", staleTime: 30_000 }
+  );
+  const iiMemberships: Array<{ id: number; label: string }> = React.useMemo(() => {
+    if (!iiMembershipsData) return [];
+    return (iiMembershipsData as any[]).map((m: any) => ({ id: m.id, label: m.title ?? `Membership #${m.id}` }));
+  }, [iiMembershipsData]);
+  const iiBundles: Array<{ id: number; label: string }> = React.useMemo(() => {
+    if (!iiBundlesData) return [];
+    return ((iiBundlesData as any)?.bundles ?? []).map((b: any) => ({ id: b.id, label: b.title ?? `Bundle #${b.id}` }));
+  }, [iiBundlesData]);
 
   const handleFileUpload = async (file: File, targetField: string, context: string) => {
     if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return; }
@@ -6578,10 +6579,96 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       );
     }
     case "included_items_auto": {
+      const iiItems = iiSourceType === "membership" ? iiMemberships : iiBundles;
+      const iiIsLoading = iiSourceType === "membership" ? iiMembershipsLoading : iiBundlesLoading;
+      const iiFiltered = iiSearch ? iiItems.filter(i => i.label.toLowerCase().includes(iiSearch.toLowerCase())) : iiItems;
+      const iiSelectedId = d.sourceId != null ? Number(d.sourceId) : null;
       return (
         <div className="space-y-3">
           <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Included Items Block</p>
-          <p className="text-xs text-gray-500">Items are automatically pulled from the membership or bundle admin in the order you set there. No manual selection needed.</p>
+          {/* Source Selection */}
+          <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50">
+            <p className="text-xs font-medium text-gray-600">Source</p>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Source Type</label>
+              <Select
+                value={iiSourceType}
+                onValueChange={(v: "membership" | "bundle") => {
+                  setIiSourceType(v);
+                  setIiSearch("");
+                  setMany({ sourceType: v, sourceId: null, sourceName: "" });
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="membership">Membership</SelectItem>
+                  <SelectItem value="bundle">Bundle</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1 flex items-center gap-2">
+                {iiSourceType === "membership" ? "Select Membership" : "Select Bundle"}
+                {iiIsLoading && <Loader2 size={12} className="animate-spin text-teal-600" />}
+              </label>
+              {iiIsLoading ? (
+                <div className="text-xs text-gray-400 p-3 text-center border rounded bg-white">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin" />
+                    Loading {iiSourceType === "membership" ? "memberships" : "bundles"}...
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      className="w-full h-8 text-xs border rounded pl-7 pr-2 bg-white"
+                      placeholder="Search..."
+                      value={iiSearch}
+                      onChange={e => setIiSearch(e.target.value)}
+                    />
+                  </div>
+                  {iiItems.length === 0 && (
+                    <p className="text-[10px] text-gray-400">No {iiSourceType === "membership" ? "published memberships" : "published bundles"} found.</p>
+                  )}
+                  {iiItems.length > 0 && iiFiltered.length === 0 && (
+                    <p className="text-[10px] text-gray-400">No matches found.</p>
+                  )}
+                  {iiFiltered.length > 0 && (
+                    <div className="max-h-40 overflow-y-auto border rounded divide-y bg-white">
+                      {iiFiltered.map(item => {
+                        const isSelected = iiSelectedId === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setMany({ sourceId: item.id, sourceName: item.label, sourceType: iiSourceType })}
+                            className={`w-full text-left px-2 py-2 text-xs flex items-center gap-2 hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
+                          >
+                            <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] ${isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"}`}>
+                              {isSelected ? "✓" : ""}
+                            </span>
+                            <span className="flex-1 truncate">{item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+              {iiSelectedId != null && (
+                <p className="text-xs text-teal-700 mt-1">
+                  ✓ Selected: <strong>{d.sourceName || `ID ${iiSelectedId}`}</strong>
+                  <button type="button" onClick={() => setMany({ sourceId: null, sourceName: "", sourceType: iiSourceType })} className="ml-2 text-gray-400 hover:text-red-500 text-[10px]">✕ Clear</button>
+                </p>
+              )}
+              {iiSelectedId == null && (
+                <p className="text-[10px] text-gray-400 mt-1">No source selected — items will be pulled from page context (membership/bundle page).</p>
+              )}
+            </div>
+          </div>
           <BSTextField data={d} onSet={set} label="Headline" field="headline" placeholder="What's Included" />
           <BSTextField data={d} onSet={set} label="Subtext (optional)" field="subtext" placeholder="" />
           <div>

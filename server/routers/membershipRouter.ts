@@ -1498,10 +1498,52 @@ const selfEnrollFree = protectedProcedure
     return { success: true, alreadyEnrolled: false };
   });
 
+const getMembershipIncludedItems = publicProcedure
+  .input(z.object({ planId: z.number() }))
+  .query(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const [plan] = await db.select({ id: membershipPlans.id, title: membershipPlans.title, slug: membershipPlans.slug })
+      .from(membershipPlans).where(eq(membershipPlans.id, input.planId)).limit(1);
+    if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found" });
+    const rawItems = await db.select().from(membershipPlanAccess)
+      .where(eq(membershipPlanAccess.planId, plan.id)).orderBy(asc(membershipPlanAccess.sortOrder));
+    const items = await Promise.all(rawItems.map(async (item) => {
+      if (item.itemType === "all_courses") return { ...item, itemTitle: item.label ?? "All Courses", itemSlug: null, itemCoverImage: null, itemDescription: null };
+      if (item.itemType === "all_downloads") return { ...item, itemTitle: item.label ?? "All Downloads", itemSlug: null, itemCoverImage: null, itemDescription: null };
+      const AAUS_HERO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp";
+      const IHE_HERO  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
+      if (item.itemType === "ultrasoundassist_free" || item.itemType === "ultrasoundassist_premium") return { ...item, itemTitle: item.label ?? "UltrasoundAssist™", itemSlug: null, itemCoverImage: AAUS_HERO, itemDescription: null };
+      if (item.itemType === "echoassist_free" || item.itemType === "echoassist_premium") return { ...item, itemTitle: item.label ?? "EchoAssist™", itemSlug: null, itemCoverImage: IHE_HERO, itemDescription: null };
+      let itemTitle: string | null = null, itemSlug: string | null = null, itemCoverImage: string | null = null, itemDescription: string | null = null;
+      try {
+        if (item.itemType === "course") {
+          const [c] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, coverImage: lmsCourses.coverImage, description: lmsCourses.description }).from(lmsCourses).where(eq(lmsCourses.id, item.itemId!)).limit(1);
+          itemTitle = c?.title ?? null; itemSlug = c?.slug ?? null; itemCoverImage = c?.coverImage ?? null; itemDescription = c?.description ?? null;
+        } else if (item.itemType === "download") {
+          const [d2] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug, coverImage: digitalProducts.coverImage, description: digitalProducts.description }).from(digitalProducts).where(eq(digitalProducts.id, item.itemId!)).limit(1);
+          itemTitle = d2?.title ?? null; itemSlug = d2?.slug ?? null; itemCoverImage = d2?.coverImage ?? null; itemDescription = d2?.description ?? null;
+        } else if (item.itemType === "webinar") {
+          const [w] = await db.select({ title: webinars.title, slug: webinars.slug, coverImage: webinars.coverImage, description: webinars.description }).from(webinars).where(eq(webinars.id, item.itemId!)).limit(1);
+          itemTitle = w?.title ?? null; itemSlug = w?.slug ?? null; itemCoverImage = (w as any)?.coverImage ?? null; itemDescription = w?.description ?? null;
+        } else if (item.itemType === "community") {
+          const [cm] = await db.select({ title: communities.name, slug: communities.slug, coverImage: communities.coverImage, description: communities.description }).from(communities).where(eq(communities.id, item.itemId!)).limit(1);
+          itemTitle = cm?.title ?? null; itemSlug = cm?.slug ?? null; itemCoverImage = cm?.coverImage ?? null; itemDescription = cm?.description ?? null;
+        } else if (item.itemType === "quiz") {
+          const [q] = await db.select({ title: sonoQuizzes.title }).from(sonoQuizzes).where(eq(sonoQuizzes.id, item.itemId!)).limit(1);
+          itemTitle = q?.title ?? null;
+        }
+      } catch {}
+      return { ...item, itemTitle, itemSlug, itemCoverImage, itemDescription };
+    }));
+    return { plan, items };
+  });
+
 export const membershipRouter = router({
   // Public
   listPublic: listPublicMemberships,
   getBySlug: getMembershipBySlug,
+  getIncludedItems: getMembershipIncludedItems,
   validateCode: validateDiscountCode,
 
   // Protected
