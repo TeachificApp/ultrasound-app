@@ -6,12 +6,17 @@
  *  - Type badge with icon (10px uppercase)
  *  - Title: max 2 lines (line-clamp-2)
  *  - Description: max 2 lines (line-clamp-2), flex-1
- *  - Footer: "Included" badge pinned to bottom
+ *  - Footer: "Included" badge + optional CTA button pinned to bottom (same row as price+button in RelatedProductsBlock)
  *
- * App-type items receive a gradient overlay with the app name (same as RelatedProductsBlock).
+ * App-type items receive a gradient overlay with the app name AND the correct hero image,
+ * matching the treatment in RelatedProductsBlock exactly.
  */
 import { BookOpen, FileDown, HelpCircle, Package, Radio, Users, Globe, Check, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
+
+// ─── App hero images (same URLs as funnelRouter) ──────────────────────────────
+const AAUS_HERO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
+const IHE_HERO  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +42,8 @@ export interface IncludedItemsBlockData {
   showTypeLabel?: boolean;
   showCoverImage?: boolean;
   showCheckIcon?: boolean;
+  /** CTA button label — defaults to "Explore" */
+  ctaText?: string;
   bgColor?: string;
   textColor?: string;
   accentColor?: string;
@@ -89,6 +96,13 @@ function appOverlayLabel(item: IncludedItem): string | null {
   return null;
 }
 
+/** Return the hero image URL for app-type items when no explicit cover is set */
+function appHeroImage(itemType: string): string | null {
+  if (itemType === "ultrasoundassist_free" || itemType === "ultrasoundassist_premium") return AAUS_HERO;
+  if (itemType === "echoassist_free"       || itemType === "echoassist_premium")       return IHE_HERO;
+  return null;
+}
+
 const IS_APP_TYPE = new Set([
   "ultrasoundassist_free", "ultrasoundassist_premium",
   "echoassist_free", "echoassist_premium",
@@ -102,10 +116,13 @@ function GridCard({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData }
   const cardBg   = d.cardBgColor  ?? "#ffffff";
   const textCol  = d.textColor    ?? "#111827";
   const href     = itemHref(item);
+  const ctaText  = d.ctaText ?? "Explore";
   const { Icon, label } = typeInfo(item.itemType);
   const displayTitle = item.itemTitle ?? item.label ?? `${label} #${item.itemId}`;
   const isApp    = IS_APP_TYPE.has(item.itemType);
   const overlayLabel = isApp ? appOverlayLabel(item) : null;
+  // Use explicit cover image, fall back to app hero, then nothing
+  const coverImage = item.itemCoverImage || (isApp ? appHeroImage(item.itemType) : null);
 
   const inner = (
     <div
@@ -115,8 +132,8 @@ function GridCard({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData }
       {/* Fixed-height thumbnail — never grows */}
       {d.showCoverImage !== false && (
         <div className="h-36 flex-shrink-0 overflow-hidden relative">
-          {item.itemCoverImage ? (
-            <img src={item.itemCoverImage} alt={displayTitle} className="w-full h-full object-cover" />
+          {coverImage ? (
+            <img src={coverImage} alt={displayTitle} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: accent + "22" }}>
               <Icon size={36} style={{ color: accent, opacity: 0.6 }} />
@@ -160,13 +177,34 @@ function GridCard({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData }
           <div className="flex-1" />
         )}
 
-        {/* Footer — "Included" badge pinned to bottom */}
-        {d.showCheckIcon !== false && (
-          <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-gray-100 flex-shrink-0">
-            <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accent }} />
-            <span className="text-xs font-semibold" style={{ color: accent }}>Included</span>
-          </div>
-        )}
+        {/* Footer — "Included" badge + CTA button, same row layout as RelatedProductsBlock price+button */}
+        <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 flex-shrink-0">
+          {d.showCheckIcon !== false ? (
+            <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: accent }}>
+              <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accent }} />
+              Included
+            </span>
+          ) : (
+            <span />
+          )}
+          {href ? (
+            <Link href={href}>
+              <button
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 hover:opacity-90 transition-opacity whitespace-nowrap flex-shrink-0"
+                style={{ backgroundColor: accent }}
+              >
+                {ctaText} <ExternalLink size={10} />
+              </button>
+            </Link>
+          ) : (
+            <span
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+              style={{ backgroundColor: accent }}
+            >
+              {ctaText} <ExternalLink size={10} />
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -182,30 +220,70 @@ function ListRow({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData })
   const cardBg   = d.cardBgColor  ?? "#ffffff";
   const textCol  = d.textColor    ?? "#111827";
   const href     = itemHref(item);
+  const ctaText  = d.ctaText ?? "Explore";
   const { Icon, label } = typeInfo(item.itemType);
   const displayTitle = item.itemTitle ?? item.label ?? `${label} #${item.itemId}`;
+  const isApp    = IS_APP_TYPE.has(item.itemType);
+  const coverImage = item.itemCoverImage || (isApp ? appHeroImage(item.itemType) : null);
+  const overlayLabel = isApp ? appOverlayLabel(item) : null;
 
   const inner = (
     <div
-      className="flex items-center gap-4 rounded-xl border border-gray-200 px-4 py-3 hover:shadow-sm transition-shadow"
+      className="rounded-xl border border-gray-200 overflow-hidden flex gap-4 p-4 shadow-sm hover:shadow-md transition-shadow items-center"
       style={{ backgroundColor: cardBg }}
     >
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden" style={{ backgroundColor: accent + "18" }}>
-        {item.itemCoverImage && d.showCoverImage !== false ? (
-          <img src={item.itemCoverImage} alt="" className="w-10 h-10 rounded-lg object-cover" />
+      {/* Fixed thumbnail */}
+      <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden relative">
+        {coverImage ? (
+          <img src={coverImage} alt={displayTitle} className="w-full h-full object-cover" />
         ) : (
-          <Icon size={20} style={{ color: accent }} />
+          <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: accent + "18" }}>
+            <Icon size={20} style={{ color: accent }} />
+          </div>
+        )}
+        {overlayLabel && (
+          <div className="absolute inset-0 flex items-end justify-start p-1 bg-gradient-to-t from-black/70 via-black/20 to-transparent rounded-lg">
+            <span className="text-white font-bold text-[9px] leading-tight drop-shadow-md">{overlayLabel}</span>
+          </div>
         )}
       </div>
+
+      {/* Content — grows, truncated */}
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate" style={{ color: textCol }}>{displayTitle}</p>
         {d.showTypeLabel !== false && (
-          <p className="text-xs flex items-center gap-1" style={{ color: accent }}>
+          <p className="text-xs flex items-center gap-1 mb-0.5" style={{ color: accent }}>
             <Icon size={10} /> {label}
           </p>
         )}
+        <p className="font-medium text-sm truncate" style={{ color: textCol }}>{displayTitle}</p>
       </div>
-      {d.showCheckIcon !== false && <Check className="w-5 h-5 shrink-0" style={{ color: accent }} />}
+
+      {/* Right side — Included badge + CTA button */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {d.showCheckIcon !== false && (
+          <span className="flex items-center gap-1 text-xs font-semibold whitespace-nowrap" style={{ color: accent }}>
+            <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accent }} />
+            Included
+          </span>
+        )}
+        {href ? (
+          <Link href={href}>
+            <button
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 hover:opacity-90 transition-opacity whitespace-nowrap"
+              style={{ backgroundColor: accent }}
+            >
+              {ctaText} <ExternalLink size={10} />
+            </button>
+          </Link>
+        ) : (
+          <span
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 whitespace-nowrap"
+            style={{ backgroundColor: accent }}
+          >
+            {ctaText} <ExternalLink size={10} />
+          </span>
+        )}
+      </div>
     </div>
   );
 
