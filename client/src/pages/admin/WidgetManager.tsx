@@ -15,6 +15,7 @@ import { getAdminUrl } from "@/hooks/useSubdomain";
 import {
   Plus, Copy, Trash2, Edit2, Eye, RefreshCw, Code2, ArrowLeft,
   LayoutGrid, List, Rows3, Sparkles, CheckCircle2, X, ChevronLeft,
+  Package, Star,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -393,6 +394,13 @@ export default function WidgetManager() {
   const [copied, setCopied] = useState(false);
   const [previewToken, setPreviewToken] = useState<string | null>(null);
 
+  const [mainTab, setMainTab] = useState<"content" | "included-items">("content");
+  const [iiCopied, setIiCopied] = useState<string | null>(null);
+  const [iiExpandedId, setIiExpandedId] = useState<string | null>(null);
+
+  const { data: memberships, isLoading: membershipsLoading } = trpc.membership.listAll.useQuery();
+  const { data: bundlesData, isLoading: bundlesLoading } = trpc.bundlesAdmin.list.useQuery({ pageSize: 500 });
+
   const { data: widgets, isLoading } = trpc.widgetAdmin.list.useQuery();
   const { data: editingWidget } = trpc.widgetAdmin.getById.useQuery(
     { id: editingId! },
@@ -502,6 +510,30 @@ export default function WidgetManager() {
     );
   }
 
+  function copyIiCode(key: string, code: string) {
+    navigator.clipboard.writeText(code);
+    setIiCopied(key);
+    setTimeout(() => setIiCopied(null), 2000);
+  }
+
+  function buildIiScriptSnippet(source: "membership" | "bundle", id: number, title: string) {
+    const base = window.location.origin;
+    return `<!-- Included Items Widget: ${title} -->
+<div data-included-items-embed="${source}:${id}"
+     data-accent="#14b8a6"
+     data-theme="light"
+     data-layout="grid"
+     data-columns="3"
+     data-base-url="${base}"></div>
+<script src="${base}/embed/included-items.js" async></script>`;
+  }
+
+  function buildIiIframeSnippet(source: "membership" | "bundle", id: number) {
+    const base = window.location.origin;
+    const src = `${base}/embed/included-items?source=${source}&id=${id}&accent=%2314b8a6&theme=light&layout=grid&columns=3`;
+    return `<iframe\n  src="${src}"\n  style="width:100%;border:none;display:block;min-height:200px;"\n  scrolling="no" frameborder="0" allowtransparency="true"\n></iframe>`;
+  }
+
   // ── List mode ──
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -521,10 +553,155 @@ export default function WidgetManager() {
             Create embeddable card grids for any external website — courses, downloads, webinars, memberships, and more
           </p>
         </div>
-        <Button onClick={() => setMode("create")} className="bg-teal-600 hover:bg-teal-700 text-white">
-          <Plus className="w-4 h-4 mr-1" /> New Widget
-        </Button>
+        {mainTab === "content" && (
+          <Button onClick={() => setMode("create")} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="w-4 h-4 mr-1" /> New Widget
+          </Button>
+        )}
       </div>
+
+      {/* Main tabs */}
+      <Tabs value={mainTab} onValueChange={v => setMainTab(v as any)} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="content"><Code2 className="w-4 h-4 mr-1.5" />Content Widgets</TabsTrigger>
+          <TabsTrigger value="included-items"><Package className="w-4 h-4 mr-1.5" />Included Items Widgets</TabsTrigger>
+        </TabsList>
+
+        {/* ── Included Items tab ── */}
+        <TabsContent value="included-items" className="mt-4">
+          <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <Package className="w-5 h-5 text-teal-600 mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <p className="font-semibold text-teal-800 dark:text-teal-200 mb-1">Included Items Widgets</p>
+                <p className="text-teal-700 dark:text-teal-300">
+                  Embed the list of included items for any membership plan or bundle on any external website.
+                  Copy the script tag or iframe snippet and paste it into your HTML. The widget auto-resizes to fit its content.
+                  For advanced options (theme, accent, headline, CTA), use the Widget Code tab inside each membership or bundle editor.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Memberships */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+              <Star className="w-4 h-4" /> Membership Plans
+            </h3>
+            {membershipsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading memberships…</p>
+            ) : !memberships || memberships.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No membership plans found.</p>
+            ) : (
+              <div className="space-y-2">
+                {memberships.map((m: any) => {
+                  const key = `membership:${m.id}`;
+                  const expanded = iiExpandedId === key;
+                  return (
+                    <div key={key} className="border rounded-xl bg-card overflow-hidden">
+                      <div className="flex items-center gap-3 p-3">
+                        <Star className="w-4 h-4 text-yellow-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{m.title}</p>
+                          <p className="text-xs text-muted-foreground">membership · id:{m.id}</p>
+                        </div>
+                        <a href={getAdminUrl(`/admin/memberships/${m.id}?tab=widget`)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-teal-600 transition-colors px-2 py-1 rounded border border-transparent hover:border-teal-200">
+                          <Edit2 className="w-3 h-3" /> Advanced
+                        </a>
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setIiExpandedId(expanded ? null : key)}>
+                          <Code2 className="w-3.5 h-3.5" /> {expanded ? "Hide" : "Get Code"}
+                        </Button>
+                      </div>
+                      {expanded && (
+                        <div className="border-t bg-muted/30 p-3 space-y-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-muted-foreground">Script Tag (recommended)</span>
+                              <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 px-2" onClick={() => copyIiCode(key + ":script", buildIiScriptSnippet("membership", m.id, m.title))}>
+                                {iiCopied === key + ":script" ? <><CheckCircle2 className="w-3 h-3 text-green-500" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy</>}
+                              </Button>
+                            </div>
+                            <pre className="bg-gray-900 text-gray-100 rounded-lg p-3 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono">{buildIiScriptSnippet("membership", m.id, m.title)}</pre>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-muted-foreground">Raw iframe</span>
+                              <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 px-2" onClick={() => copyIiCode(key + ":iframe", buildIiIframeSnippet("membership", m.id))}>
+                                {iiCopied === key + ":iframe" ? <><CheckCircle2 className="w-3 h-3 text-green-500" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy</>}
+                              </Button>
+                            </div>
+                            <pre className="bg-gray-900 text-gray-100 rounded-lg p-3 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono">{buildIiIframeSnippet("membership", m.id)}</pre>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Bundles */}
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+              <Package className="w-4 h-4" /> Bundles
+            </h3>
+            {bundlesLoading ? (
+              <p className="text-sm text-muted-foreground">Loading bundles…</p>
+            ) : !bundlesData || bundlesData.bundles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No bundles found.</p>
+            ) : (
+              <div className="space-y-2">
+                {bundlesData.bundles.map((b: any) => {
+                  const key = `bundle:${b.id}`;
+                  const expanded = iiExpandedId === key;
+                  return (
+                    <div key={key} className="border rounded-xl bg-card overflow-hidden">
+                      <div className="flex items-center gap-3 p-3">
+                        <Package className="w-4 h-4 text-orange-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{b.title}</p>
+                          <p className="text-xs text-muted-foreground">bundle · id:{b.id}</p>
+                        </div>
+                        <a href={getAdminUrl(`/admin/bundles/${b.id}?tab=widget`)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-teal-600 transition-colors px-2 py-1 rounded border border-transparent hover:border-teal-200">
+                          <Edit2 className="w-3 h-3" /> Advanced
+                        </a>
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setIiExpandedId(expanded ? null : key)}>
+                          <Code2 className="w-3.5 h-3.5" /> {expanded ? "Hide" : "Get Code"}
+                        </Button>
+                      </div>
+                      {expanded && (
+                        <div className="border-t bg-muted/30 p-3 space-y-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-muted-foreground">Script Tag (recommended)</span>
+                              <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 px-2" onClick={() => copyIiCode(key + ":script", buildIiScriptSnippet("bundle", b.id, b.title))}>
+                                {iiCopied === key + ":script" ? <><CheckCircle2 className="w-3 h-3 text-green-500" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy</>}
+                              </Button>
+                            </div>
+                            <pre className="bg-gray-900 text-gray-100 rounded-lg p-3 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono">{buildIiScriptSnippet("bundle", b.id, b.title)}</pre>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-muted-foreground">Raw iframe</span>
+                              <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 px-2" onClick={() => copyIiCode(key + ":iframe", buildIiIframeSnippet("bundle", b.id))}>
+                                {iiCopied === key + ":iframe" ? <><CheckCircle2 className="w-3 h-3 text-green-500" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy</>}
+                              </Button>
+                            </div>
+                            <pre className="bg-gray-900 text-gray-100 rounded-lg p-3 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono">{buildIiIframeSnippet("bundle", b.id)}</pre>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── Content Widgets tab ── */}
+        <TabsContent value="content" className="mt-4">
 
       {/* How it works */}
       <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4 mb-6">
@@ -672,6 +849,8 @@ export default function WidgetManager() {
           )}
         </DialogContent>
       </Dialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
