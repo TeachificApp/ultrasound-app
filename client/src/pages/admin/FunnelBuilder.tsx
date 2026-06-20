@@ -542,6 +542,12 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const { data: leadsData, refetch: refetchLeads } = trpc.funnel.listLeads.useQuery({ funnelId, page: leadPage, limit: 50, search: leadSearch || undefined }, { enabled: activeTab === "contacts" });
   const { data: csvData, refetch: fetchCSV } = trpc.funnelAdmin.exportFunnelLeadsCSV.useQuery({ funnelId }, { enabled: false });
   const { data: importablePages } = trpc.funnelAdmin.listImportablePages.useQuery({ excludeFunnelId: funnelId }, { enabled: showAddPage });
+  const { data: platformSettings } = trpc.lmsGroup.getPlatformSettings.useQuery();
+  // Default funnel base URL: per-funnel customDomain > global funnelPublishDomain > app origin
+  const funnelPublishBase = (d: { customDomain?: string | null }) =>
+    d.customDomain ? `https://${d.customDomain}` :
+    platformSettings?.funnelPublishDomain ? `https://${platformSettings.funnelPublishDomain}` :
+    window.location.origin;
   const importPage = trpc.funnelAdmin.importPageToFunnel.useMutation({ onSuccess: () => { refetch(); setShowAddPage(false); toast.success("Page imported!"); } });
   const [importTab, setImportTab] = useState<"new" | "import">("new");
   const [selectedSourceIdx, setSelectedSourceIdx] = useState<number | null>(null);
@@ -684,10 +690,11 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
           <span className="flex items-center gap-1.5"><Eye size={14} /> {funnel.totalViews} views</span>
           <span className="flex items-center gap-1.5"><BarChart3 size={14} /> {funnel.totalConversions} conversions</span>
           {funnel.status === "active" && (() => {
-            const base = funnel.customDomain ? `https://${funnel.customDomain}` : window.location.origin;
+            const base = funnelPublishBase(funnel);
+            const displayBase = funnel.customDomain ? funnel.customDomain : (platformSettings?.funnelPublishDomain ?? window.location.host);
             return (
               <a href={`${base}/${funnel.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-teal-600 hover:text-teal-700">
-                <ExternalLink size={14} /> {funnel.customDomain ? `${funnel.customDomain}/` : ""}{funnel.slug}
+                <ExternalLink size={14} /> {displayBase}/{funnel.slug}
               </a>
             );
           })()}
@@ -774,6 +781,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
                   funnelId={funnelId}
                   funnelSlug={funnel.slug}
                   funnelCustomDomain={funnel.customDomain}
+                  funnelPublishDomain={platformSettings?.funnelPublishDomain}
                   onEditPage={onEditPage}
                   onDuplicate={() => duplicatePage.mutate({ id: page.id })}
                   onCopyPage={() => setCopyPageDialog({ pageId: page.id, pageTitle: page.title })}
@@ -1233,7 +1241,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 // ─── Sortable Funnel Page Row ────────────────────────────────────────────────
 
 function SortableFunnelPageRow({
-  page, idx, meta, nextPage, isLast, funnelId, funnelSlug, funnelCustomDomain, onEditPage, onDuplicate, onCopyPage, onRename, onEditSlug, onDelete, onMoveUp, onMoveDown,
+  page, idx, meta, nextPage, isLast, funnelId, funnelSlug, funnelCustomDomain, funnelPublishDomain, onEditPage, onDuplicate, onCopyPage, onRename, onEditSlug, onDelete, onMoveUp, onMoveDown,
 }: {
   page: FunnelPage;
   idx: number;
@@ -1243,6 +1251,7 @@ function SortableFunnelPageRow({
   funnelId: number;
   funnelSlug: string;
   funnelCustomDomain?: string | null;
+  funnelPublishDomain?: string | null;
   onEditPage: (funnelId: number, pageId: number) => void;
   onDuplicate: () => void;
   onCopyPage: () => void;
@@ -1326,7 +1335,7 @@ function SortableFunnelPageRow({
           </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <a
-              href={`${funnelCustomDomain ? `https://${funnelCustomDomain}` : window.location.origin}/${funnelSlug}/${page.slug}`}
+              href={`${funnelCustomDomain ? `https://${funnelCustomDomain}` : (funnelPublishDomain ? `https://${funnelPublishDomain}` : window.location.origin)}/${funnelSlug}/${page.slug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg"
