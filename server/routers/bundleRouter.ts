@@ -10,7 +10,7 @@ import { getDb } from "../db";
 import {
   bundles, bundleItems, bundleEnrollments, users,
   lmsCourses, lmsEnrollments, lmsQuizzes, digitalBundlePurchases,
-  digitalProducts, physicalProducts, webinars, sonoQuizzes,
+  digitalProducts, physicalProducts, webinars, sonoQuizzes, communities,
 } from "../../drizzle/schema";
 
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80); }
@@ -50,18 +50,18 @@ export const bundlePublicRouter = router({
       const enrichedItems = await Promise.all(items.map(async (item) => {
         let itemTitle: string | null = null, itemSlug: string | null = null, itemCoverImage: string | null = null, itemDescription: string | null = null;
         try {
-          if (item.itemType === "course") {
-            const [c] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, coverImage: lmsCourses.coverImage, description: lmsCourses.description }).from(lmsCourses).where(eq(lmsCourses.id, item.itemId)).limit(1);
-            itemTitle = c?.title ?? null; itemSlug = c?.slug ?? null; itemCoverImage = c?.coverImage ?? null; itemDescription = c?.description ?? null;
+          if (item.itemType === "course" || item.itemType === "quiz" || item.itemType === "cohort" || item.itemType === "workshop") {
+            const [c] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, coverImageUrl: lmsCourses.coverImageUrl, description: lmsCourses.description }).from(lmsCourses).where(eq(lmsCourses.id, item.itemId)).limit(1);
+            itemTitle = c?.title ?? null; itemSlug = c?.slug ?? null; itemCoverImage = c?.coverImageUrl ?? null; itemDescription = c?.description ?? null;
           } else if (item.itemType === "download") {
-            const [d] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug, coverImage: digitalProducts.coverImage, description: digitalProducts.description }).from(digitalProducts).where(eq(digitalProducts.id, item.itemId)).limit(1);
-            itemTitle = d?.title ?? null; itemSlug = d?.slug ?? null; itemCoverImage = d?.coverImage ?? null; itemDescription = d?.description ?? null;
+            const [d] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug, thumbnailUrl: digitalProducts.thumbnailUrl, description: digitalProducts.description }).from(digitalProducts).where(eq(digitalProducts.id, item.itemId)).limit(1);
+            itemTitle = d?.title ?? null; itemSlug = d?.slug ?? null; itemCoverImage = d?.thumbnailUrl ?? null; itemDescription = d?.description ?? null;
           } else if (item.itemType === "webinar") {
-            const [w] = await db.select({ title: webinars.title, slug: webinars.slug }).from(webinars).where(eq(webinars.id, item.itemId)).limit(1);
-            itemTitle = w?.title ?? null; itemSlug = w?.slug ?? null;
-          } else if (item.itemType === "quiz") {
-            const [q] = await db.select({ title: sonoQuizzes.title }).from(sonoQuizzes).where(eq(sonoQuizzes.id, item.itemId)).limit(1);
-            itemTitle = q?.title ?? null;
+            const [w] = await db.select({ title: webinars.title, slug: webinars.slug, coverImage: webinars.coverImage }).from(webinars).where(eq(webinars.id, item.itemId)).limit(1);
+            itemTitle = w?.title ?? null; itemSlug = w?.slug ?? null; itemCoverImage = w?.coverImage ?? null;
+          } else if (item.itemType === "community") {
+            const [cm] = await db.select({ name: communities.name, slug: communities.slug, coverImage: communities.coverImage }).from(communities).where(eq(communities.id, item.itemId)).limit(1);
+            itemTitle = cm?.name ?? null; itemSlug = cm?.slug ?? null; itemCoverImage = cm?.coverImage ?? null;
           }
         } catch {}
         return { ...item, itemTitle, itemSlug, itemCoverImage, itemDescription };
