@@ -108,7 +108,7 @@ export const CC = ({ children, className = "", ...rest }: React.HTMLAttributes<H
   <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${className}`.trim()} {...rest}>{children}</div>
 );
 
-export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number }) {
+export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnroll, onCheckoutPage }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number; onEnroll?: (...args: any[]) => void; onCheckoutPage?: (...args: any[]) => void }) {
   const { user } = useAuth();
   const d = block.data ?? {};
   // Pre-compute pass-through URL for url_embed blocks (hooks must be at top level, not inside switch)
