@@ -15,6 +15,7 @@ import { BlockPreview } from "@/components/BlockPreview";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { Check, Award, Loader2, Tag } from "lucide-react";
+import { getLoginUrl } from "@/const";
 
 const BILLING_LABELS: Record<string, string> = {
   monthly: "/month",
@@ -79,6 +80,21 @@ export default function MembershipPage() {
     },
   });
 
+  const selfEnrollFreeMutation = trpc.membership.selfEnrollFree.useMutation({
+    onSuccess: () => {
+      toast.success("You're in! Redirecting to your dashboard…");
+      setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
+    },
+    onError: (e: any) => {
+      if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already")) {
+        toast.success("You already have access!", { description: "Redirecting to your dashboard..." });
+        setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
+      } else {
+        toast.error(e.message);
+      }
+    },
+  });
+
   const guestRegisterMutation = trpc.membership.guestCheckoutRegister.useMutation({
     onSuccess: (data) => {
       toast.success("Account ready — opening secure checkout…");
@@ -87,8 +103,20 @@ export default function MembershipPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  const isFree = !plan || !plan.price || Number(plan.price) === 0;
+
   const startCheckout = () => {
     if (!plan) return;
+    // Free plan: skip Stripe entirely
+    if (isFree) {
+      if (!user) {
+        // Redirect unauthenticated users to login with returnTo
+        window.location.href = getLoginUrl(window.location.pathname);
+        return;
+      }
+      selfEnrollFreeMutation.mutate({ planId: plan.id });
+      return;
+    }
     if (user) {
       checkoutMutation.mutate({
         planId: plan.id,
@@ -242,16 +270,18 @@ export default function MembershipPage() {
             <Button
               className="w-full mt-6 text-white font-semibold py-3 text-base rounded-xl"
               style={{ backgroundColor: accentColor }}
-              disabled={checkoutMutation.isPending || guestRegisterMutation.isPending}
+              disabled={checkoutMutation.isPending || guestRegisterMutation.isPending || selfEnrollFreeMutation.isPending}
               onClick={startCheckout}
             >
-              {(checkoutMutation.isPending || guestRegisterMutation.isPending) ? (
+              {(checkoutMutation.isPending || guestRegisterMutation.isPending || selfEnrollFreeMutation.isPending) ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>
+              ) : isFree ? (
+                "Join for Free"
               ) : (
                 (plan?.trialDays ?? 0) > 0 ? `Start ${plan!.trialDays}-Day Free Trial` : "Get Access Now"
               )}
             </Button>
-            {!user && (
+            {!user && !isFree && (
               <p className="text-xs text-gray-400 mt-2">
                 {showGuestForm
                   ? "Enter your name and email to continue — no separate sign-up required."
@@ -283,11 +313,13 @@ export default function MembershipPage() {
           <Button
             className="shadow-xl text-white font-semibold px-6 py-3 rounded-xl"
             style={{ backgroundColor: accentColor }}
-            disabled={checkoutMutation.isPending}
+            disabled={checkoutMutation.isPending || selfEnrollFreeMutation.isPending}
             onClick={startCheckout}
             >
-              {checkoutMutation.isPending ? (
+              {(checkoutMutation.isPending || selfEnrollFreeMutation.isPending) ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>
+              ) : isFree ? (
+                "Join for Free"
               ) : (
                 `Get ${plan?.title}`
               )}

@@ -194,6 +194,8 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId }: { bl
                       data-popup={(btn as any).behavior === "open_popup" ? ((btn as any).popupUrl ?? "") : undefined}
                       data-download={(btn as any).behavior === "download_file" ? ((btn as any).downloadUrl ?? "") : undefined}
                       data-soldout-override={(btn as any).soldOutOverrideUrl || undefined}
+                      data-product-type={(btn as any).behavior === "free_enrollment" ? ((btn as any).freeEnrollProductType ?? "membership") : undefined}
+                      data-product-id={(btn as any).behavior === "free_enrollment" ? ((btn as any).freeEnrollProductId ?? "") : undefined}
                       className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
