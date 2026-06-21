@@ -31,13 +31,17 @@ import {
   webinars,
   bundleEnrollments,
   bundles,
+  bundleItems,
   communityMembers,
   communities,
   workshopEnrollments,
   workshopInstances,
   workshops,
+  membershipSubscriptions,
+  membershipPlans,
+  membershipPlanAccess,
 } from "../../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -270,18 +274,288 @@ export const dashboardRouter = router({
     const quizzes = activeEnrollments.filter(e => e.courseType === "quiz");
     const downloads = activeEnrollments.filter(e => e.courseType === "download");
 
+    // ── 9. Items from active membership subscriptions ─────────────────────────
+    const activeMembershipSubs = await db
+      .select({
+        subId: membershipSubscriptions.id,
+        planId: membershipSubscriptions.planId,
+        planTitle: membershipPlans.title,
+        status: membershipSubscriptions.status,
+        currentPeriodEnd: membershipSubscriptions.currentPeriodEnd,
+      })
+      .from(membershipSubscriptions)
+      .innerJoin(membershipPlans, eq(membershipSubscriptions.planId, membershipPlans.id))
+      .where(and(
+        eq(membershipSubscriptions.userId, ctx.user.id),
+        inArray(membershipSubscriptions.status, ["active", "trialing"]),
+      ));
+
+    // Collect all membership-included items
+    const membershipCourses: any[] = [];
+    const membershipQuizzes: any[] = [];
+    const membershipDownloads: any[] = [];
+    const membershipWebinars: any[] = [];
+    const membershipCommunities: any[] = [];
+
+    for (const sub of activeMembershipSubs) {
+      const accessItems = await db
+        .select()
+        .from(membershipPlanAccess)
+        .where(eq(membershipPlanAccess.planId, sub.planId));
+
+      const sourceTag = `Included with ${sub.planTitle}`;
+
+      for (const item of accessItems) {
+        if (!item.itemId) continue; // skip wildcard types like all_courses
+
+        if (item.itemType === "course" || item.itemType === "quiz" || item.itemType === "download") {
+          // Check not already enrolled
+          const alreadyEnrolled = activeEnrollments.some(e => e.courseId === item.itemId);
+          if (alreadyEnrolled) continue;
+
+          const [course] = await db
+            .select({
+              id: lmsCourses.id,
+              title: lmsCourses.title,
+              slug: lmsCourses.slug,
+              type: lmsCourses.type,
+              brand: lmsCourses.brand,
+              thumbnailUrl: lmsCourses.thumbnailUrl,
+              status: lmsCourses.status,
+            })
+            .from(lmsCourses)
+            .where(and(eq(lmsCourses.id, item.itemId), eq(lmsCourses.status, "published")))
+            .limit(1);
+
+          if (!course) continue;
+
+          const entry = {
+            courseId: course.id,
+            courseTitle: course.title,
+            courseSlug: course.slug,
+            courseType: course.type,
+            courseBrand: course.brand,
+            courseThumbnail: course.thumbnailUrl,
+            accessSource: sourceTag,
+            enrollmentId: null,
+            enrolledAt: null,
+            completedAt: null,
+            progressPct: null,
+            accessExpiresAt: sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null,
+            enrollmentSource: "membership" as const,
+          };
+
+          if (course.type === "quiz") membershipQuizzes.push(entry);
+          else if (course.type === "download") membershipDownloads.push(entry);
+          else membershipCourses.push(entry);
+
+        } else if (item.itemType === "download") {
+          // digital product download
+          const alreadyPurchased = digitalPurchaseRows.some(d => d.productId === item.itemId);
+          if (alreadyPurchased) continue;
+
+          const [product] = await db
+            .select({
+              id: digitalProducts.id,
+              title: digitalProducts.title,
+              slug: digitalProducts.slug,
+              thumbnailUrl: digitalProducts.thumbnailUrl,
+            })
+            .from(digitalProducts)
+            .where(and(eq(digitalProducts.id, item.itemId), eq(digitalProducts.status, "published")))
+            .limit(1);
+
+          if (!product) continue;
+          membershipDownloads.push({
+            purchaseId: null,
+            productId: product.id,
+            purchasedAt: null,
+            productTitle: product.title,
+            productSlug: product.slug,
+            productThumbnail: product.thumbnailUrl,
+            accessSource: sourceTag,
+          });
+
+        } else if (item.itemType === "webinar") {
+          const alreadyRegistered = webinarRegs.some(w => w.webinarId === item.itemId);
+          if (alreadyRegistered) continue;
+
+          const [webinar] = await db
+            .select({
+              id: webinars.id,
+              title: webinars.title,
+              slug: webinars.slug,
+              brand: webinars.brand,
+              coverImage: webinars.coverImage,
+              type: webinars.type,
+              status: webinars.status,
+              scheduledAt: webinars.scheduledAt,
+            })
+            .from(webinars)
+            .where(eq(webinars.id, item.itemId))
+            .limit(1);
+
+          if (!webinar) continue;
+          membershipWebinars.push({
+            registrationId: null,
+            webinarId: webinar.id,
+            registeredAt: null,
+            attended: false,
+            webinarTitle: webinar.title,
+            webinarSlug: webinar.slug,
+            webinarBrand: webinar.brand,
+            webinarCover: webinar.coverImage,
+            webinarType: webinar.type,
+            webinarStatus: webinar.status,
+            scheduledAt: webinar.scheduledAt,
+            accessSource: sourceTag,
+          });
+
+        } else if (item.itemType === "community") {
+          const alreadyMember = communityRegs.some(c => c.communityId === item.itemId);
+          if (alreadyMember) continue;
+
+          const [community] = await db
+            .select({
+              id: communities.id,
+              title: communities.title,
+              slug: communities.slug,
+              brand: communities.brand,
+              coverImage: communities.coverImage,
+              status: communities.status,
+            })
+            .from(communities)
+            .where(eq(communities.id, item.itemId))
+            .limit(1);
+
+          if (!community) continue;
+          membershipCommunities.push({
+            memberId: null,
+            communityId: community.id,
+            joinedAt: null,
+            role: "member",
+            communityTitle: community.title,
+            communitySlug: community.slug,
+            communityBrand: community.brand,
+            communityCover: community.coverImage,
+            communityStatus: community.status,
+            accessSource: sourceTag,
+          });
+        }
+      }
+    }
+
+    // ── 10. Items from active bundle enrollments ──────────────────────────────
+    const bundleCourses: any[] = [];
+    const bundleQuizzes: any[] = [];
+    const bundleDownloads: any[] = [];
+    const bundleWebinars: any[] = [];
+
+    for (const bundleReg of bundleRegs) {
+      const bundleAccessItems = await db
+        .select()
+        .from(bundleItems)
+        .where(eq(bundleItems.bundleId, bundleReg.bundleId));
+
+      const sourceTag = `Included with ${bundleReg.bundleTitle}`;
+
+      for (const item of bundleAccessItems) {
+        if (item.itemType === "course" || item.itemType === "quiz" || item.itemType === "download") {
+          const alreadyEnrolled = activeEnrollments.some(e => e.courseId === item.itemId)
+            || membershipCourses.some(e => e.courseId === item.itemId)
+            || membershipQuizzes.some(e => e.courseId === item.itemId)
+            || membershipDownloads.some(e => e.courseId === item.itemId);
+          if (alreadyEnrolled) continue;
+
+          const [course] = await db
+            .select({
+              id: lmsCourses.id,
+              title: lmsCourses.title,
+              slug: lmsCourses.slug,
+              type: lmsCourses.type,
+              brand: lmsCourses.brand,
+              thumbnailUrl: lmsCourses.thumbnailUrl,
+              status: lmsCourses.status,
+            })
+            .from(lmsCourses)
+            .where(and(eq(lmsCourses.id, item.itemId), eq(lmsCourses.status, "published")))
+            .limit(1);
+
+          if (!course) continue;
+
+          const entry = {
+            courseId: course.id,
+            courseTitle: course.title,
+            courseSlug: course.slug,
+            courseType: course.type,
+            courseBrand: course.brand,
+            courseThumbnail: course.thumbnailUrl,
+            accessSource: sourceTag,
+            enrollmentId: null,
+            enrolledAt: null,
+            completedAt: null,
+            progressPct: null,
+            accessExpiresAt: null,
+            enrollmentSource: "bundle" as const,
+          };
+
+          if (course.type === "quiz") bundleQuizzes.push(entry);
+          else if (course.type === "download") bundleDownloads.push(entry);
+          else bundleCourses.push(entry);
+
+        } else if (item.itemType === "webinar") {
+          const alreadyRegistered = webinarRegs.some(w => w.webinarId === item.itemId)
+            || membershipWebinars.some(w => w.webinarId === item.itemId);
+          if (alreadyRegistered) continue;
+
+          const [webinar] = await db
+            .select({
+              id: webinars.id,
+              title: webinars.title,
+              slug: webinars.slug,
+              brand: webinars.brand,
+              coverImage: webinars.coverImage,
+              type: webinars.type,
+              status: webinars.status,
+              scheduledAt: webinars.scheduledAt,
+            })
+            .from(webinars)
+            .where(eq(webinars.id, item.itemId))
+            .limit(1);
+
+          if (!webinar) continue;
+          bundleWebinars.push({
+            registrationId: null,
+            webinarId: webinar.id,
+            registeredAt: null,
+            attended: false,
+            webinarTitle: webinar.title,
+            webinarSlug: webinar.slug,
+            webinarBrand: webinar.brand,
+            webinarCover: webinar.coverImage,
+            webinarType: webinar.type,
+            webinarStatus: webinar.status,
+            scheduledAt: webinar.scheduledAt,
+            accessSource: sourceTag,
+          });
+        }
+      }
+    }
+
     return {
-      courses,
-      quizzes,
+      courses: [...courses, ...membershipCourses, ...bundleCourses],
+      quizzes: [...quizzes, ...membershipQuizzes, ...bundleQuizzes],
       downloads: [
         ...downloads,
         ...digitalPurchaseRows,
+        ...membershipDownloads,
+        ...bundleDownloads,
       ],
-      webinars: webinarRegs,
+      webinars: [...webinarRegs, ...membershipWebinars, ...bundleWebinars],
       physicalProducts: physicalOrders,
       bundles: bundleRegs,
       workshops: workshopRegs,
-      communities: communityRegs,
+      communities: [...communityRegs, ...membershipCommunities],
       funnelPurchases: funnelPurchaseRows,
     };
   }),

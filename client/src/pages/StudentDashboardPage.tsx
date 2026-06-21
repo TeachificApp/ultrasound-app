@@ -886,17 +886,18 @@ function MyContentTab() {
             <EmptyState icon={BookOpen} title="No courses yet" description="Enroll in a course to see it here." />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.courses.map(c => (
+              {data?.courses.map((c, i) => (
                 <ContentCard
-                  key={c.enrollmentId}
+                  key={c.enrollmentId ?? `membership-course-${i}`}
                   thumbnail={c.courseThumbnail}
                   title={c.courseTitle}
                   brand={c.courseBrand}
-                  subtitle={`Enrolled ${formatDate(c.enrolledAt)}`}
-                  badge={c.completedAt ? "Completed" : "In Progress"}
-                  badgeColor={c.completedAt ? "emerald" : "teal"}
+                  subtitle={(c as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(c.enrolledAt)}`}
+                  badge={(c as any).accessSource ? "Membership" : c.completedAt ? "Completed" : "In Progress"}
+                  badgeColor={(c as any).accessSource ? "teal" : c.completedAt ? "emerald" : "teal"}
                   progressPct={c.progressPct}
                   completed={!!c.completedAt}
+                  accessSource={(c as any).accessSource ?? null}
                   expiresAt={(c as any).accessExpiresAt ?? null}
                   actions={[
                     { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${c.courseSlug}/player` },
@@ -916,17 +917,18 @@ function MyContentTab() {
             <EmptyState icon={ClipboardCheck} title="No quizzes yet" description="Purchase or enroll in a quiz to see it here." />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.quizzes.map(q => (
+              {data?.quizzes.map((q, i) => (
                 <ContentCard
-                  key={q.enrollmentId}
+                  key={q.enrollmentId ?? `membership-quiz-${i}`}
                   thumbnail={q.courseThumbnail}
                   title={q.courseTitle}
                   brand={q.courseBrand}
-                  subtitle={`Enrolled ${formatDate(q.enrolledAt)}`}
-                  badge={q.completedAt ? "Completed" : "In Progress"}
-                  badgeColor={q.completedAt ? "emerald" : "blue"}
+                  subtitle={(q as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(q.enrolledAt)}`}
+                  badge={(q as any).accessSource ? "Membership" : q.completedAt ? "Completed" : "In Progress"}
+                  badgeColor={(q as any).accessSource ? "teal" : q.completedAt ? "emerald" : "blue"}
                   progressPct={q.progressPct}
                   completed={!!q.completedAt}
+                  accessSource={(q as any).accessSource ?? null}
                   expiresAt={(q as any).accessExpiresAt ?? null}
                   actions={[
                     { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
@@ -947,13 +949,15 @@ function MyContentTab() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {(data?.downloads ?? []).map((d: any, i: number) => (
                 <ContentCard
-                  key={d.enrollmentId ?? d.purchaseId ?? i}
+                  key={d.enrollmentId ?? d.purchaseId ?? `dl-${i}`}
                   thumbnail={d.courseThumbnail ?? d.productThumbnail}
                   title={d.courseTitle ?? d.productTitle}
                   brand={d.courseBrand}
-                  subtitle={`Purchased ${formatDate(d.enrolledAt ?? d.purchasedAt)}`}
-                  badge="Digital Download"
+                  subtitle={d.accessSource ? "Included via membership or bundle" : `Purchased ${formatDate(d.enrolledAt ?? d.purchasedAt)}`}
+                  badge={d.accessSource ? "Membership" : "Digital Download"}
                   badgeColor="teal"
+                  accessSource={d.accessSource ?? null}
+                  expiresAt={d.accessExpiresAt ?? null}
                   actions={[
                     {
                       label: "Access Files",
@@ -1007,14 +1011,15 @@ function MyContentTab() {
             <EmptyState icon={Video} title="No webinar registrations" description="Register for a webinar to see it here." />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.webinars?.map(w => (
+              {data?.webinars?.map((w, i) => (
                 <ContentCard
-                  key={w.registrationId}
+                  key={w.registrationId ?? `membership-webinar-${i}`}
                   thumbnail={w.webinarCover}
                   title={w.webinarTitle}
-                  subtitle={`Registered ${formatDate(w.registeredAt)}${w.scheduledAt ? ` · Scheduled ${formatDate(new Date(w.scheduledAt))}` : ""}`}
-                  badge={w.attended ? "Attended" : w.webinarStatus === "ended" ? "Replay Available" : "Registered"}
-                  badgeColor={w.attended ? "emerald" : w.webinarStatus === "ended" ? "teal" : "blue"}
+                  subtitle={(w as any).accessSource ? "Included via membership or bundle" : `Registered ${formatDate(w.registeredAt)}${w.scheduledAt ? ` · Scheduled ${formatDate(new Date(w.scheduledAt))}` : ""}`}
+                  badge={(w as any).accessSource ? "Membership" : w.attended ? "Attended" : w.webinarStatus === "ended" ? "Replay Available" : "Registered"}
+                  badgeColor={(w as any).accessSource ? "teal" : w.attended ? "emerald" : w.webinarStatus === "ended" ? "teal" : "blue"}
+                  accessSource={(w as any).accessSource ?? null}
                   actions={[
                     { label: "View Webinar", icon: ExternalLink, href: `/webinar/${w.webinarSlug}` },
                   ]}
@@ -1090,14 +1095,15 @@ function MyContentTab() {
             <EmptyState icon={Users} title="No community memberships" description="Join a community to see it here." />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.communities?.map(c => (
+              {data?.communities?.map((c, i) => (
                 <ContentCard
-                  key={c.memberId}
+                  key={c.memberId ?? `membership-community-${i}`}
                   thumbnail={c.communityCover}
                   title={c.communityTitle}
-                  subtitle={`Joined ${formatDate(c.joinedAt)} · ${c.role}`}
-                  badge={c.role === "admin" ? "Admin" : c.role === "moderator" ? "Moderator" : "Member"}
-                  badgeColor={c.role === "admin" ? "purple" : c.role === "moderator" ? "blue" : "emerald"}
+                  subtitle={(c as any).accessSource ? "Included via membership" : `Joined ${formatDate(c.joinedAt)} · ${c.role}`}
+                  badge={(c as any).accessSource ? "Membership" : c.role === "admin" ? "Admin" : c.role === "moderator" ? "Moderator" : "Member"}
+                  badgeColor={(c as any).accessSource ? "teal" : c.role === "admin" ? "purple" : c.role === "moderator" ? "blue" : "emerald"}
+                  accessSource={(c as any).accessSource ?? null}
                   actions={[
                     { label: "View Community", icon: ExternalLink, href: `/community/${c.communitySlug}` },
                   ]}
@@ -1621,17 +1627,19 @@ function EmptyState({
 }
 
 function ContentCard({
-  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed,
+  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed, accessSource, expiresAt,
 }: {
   thumbnail?: string | null;
   title: string;
   brand?: string | null;
   subtitle: string;
   badge: string;
-  badgeColor: "emerald" | "teal" | "blue" | "amber";
+  badgeColor: "emerald" | "teal" | "blue" | "amber" | "purple";
   trackingInfo?: string;
   progressPct?: number | null;
   completed?: boolean;
+  accessSource?: string | null;
+  expiresAt?: Date | null;
   actions: { label: string; icon: React.ElementType; href: string; secondary?: boolean }[];
 }) {
   const colorMap = {
@@ -1639,6 +1647,7 @@ function ContentCard({
     teal:    "bg-teal-100 text-teal-700 border-teal-200",
     blue:    "bg-blue-100 text-blue-700 border-blue-200",
     amber:   "bg-amber-100 text-amber-700 border-amber-200",
+    purple:  "bg-purple-100 text-purple-700 border-purple-200",
   };
   const pct = Math.min(100, Math.max(0, Number(progressPct ?? 0)));
   const showProgress = progressPct != null;
@@ -1675,10 +1684,22 @@ function ContentCard({
       {/* Body */}
       <div className="p-4 flex flex-col flex-1">
         <h4 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2 mb-1">{title}</h4>
+        {accessSource && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#189aa1]/10 text-[#189aa1] border border-[#189aa1]/20 mb-1">
+            <Star className="w-2.5 h-2.5" />
+            {accessSource}
+          </span>
+        )}
         <p className="text-xs text-gray-400 mb-1">{subtitle}</p>
         {showProgress && (
           <p className="text-xs font-medium text-[#189aa1] mb-1">
             {completed ? "Completed" : `${pct}% complete`}
+          </p>
+        )}
+        {expiresAt && (
+          <p className="text-xs text-amber-600 mb-1 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Access until {new Date(expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
           </p>
         )}
         {trackingInfo && (
