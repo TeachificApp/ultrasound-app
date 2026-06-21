@@ -52,13 +52,13 @@ const STATUS_COLORS: Record<string, string> = {
   past_due: "bg-yellow-100 text-yellow-700 border-yellow-200",
 };
 
-function formatCurrency(amountCents: number | null, currency: string | null) {
-  if (amountCents == null) return null;
+function formatCurrency(amount: number | null, currency: string | null) {
+  if (amount == null) return null;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: currency ?? "USD",
     minimumFractionDigits: 0,
-  }).format(amountCents / 100);
+  }).format(amount);
 }
 
 export default function MyMemberships() {

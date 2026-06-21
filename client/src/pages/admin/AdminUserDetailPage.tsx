@@ -568,7 +568,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
     { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
     { key: "products",     label: "Products",     icon: Package,        count: physOrders.length },
     { key: "bundles",      label: "Bundles",      icon: Layers,         count: bundleEnrollments.length },
-    { key: "memberships",  label: "Memberships",  icon: Star,           count: brandMemberships.length },
+    { key: "memberships",  label: "Memberships",  icon: Star,           count: brandMemberships.length + nativeMemberships.length },
     { key: "communities",  label: "Communities",  icon: Users2,         count: communityMemberships.length },
   ];
 
@@ -922,26 +922,53 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
 
       {/* Memberships */}
       {contentTab === "memberships" && (
-        <div className="space-y-3">
-          <SectionHeader title={`Brand Memberships (${brandMemberships.length})`} />
-          {brandMemberships.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No brand memberships found.</p>
-          ) : (
-            brandMemberships.map((m: any) => (
-              <div key={m.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div>
-                    <BrandBadge brand={m.brand} />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {m.tier === "premium" ? "★ Premium" : "Free"}{m.expiresAt ? ` · Expires ${formatDate(m.expiresAt)}` : " · No expiry"}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">Granted {formatDate(m.createdAt ?? m.grantedAt)}</p>
+        <div className="space-y-6">
+          {/* Native membership plan subscriptions */}
+          <div className="space-y-3">
+            <SectionHeader title={`Membership Plan Subscriptions (${nativeMemberships.length})`} />
+            {nativeMemberships.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">No membership plan subscriptions.</p>
+            ) : (
+              nativeMemberships.map((m: any) => (
+                <div key={m.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div>
+                      <p className="font-semibold text-gray-800 text-sm">{m.planTitle ?? "Membership"}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {m.price > 0 ? `${formatCurrency(m.price, m.currency)} / ${m.billingInterval}` : "Free / Comp"}
+                        {m.currentPeriodEnd ? ` · Expires ${formatDate(new Date(m.currentPeriodEnd))}` : " · No expiry"}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">Granted {formatDate(m.createdAt)}</p>
+                    </div>
+                    <StatusBadge status={m.status ?? "active"} />
                   </div>
-                  <StatusBadge status={m.status ?? "active"} />
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
+
+          {/* Brand memberships */}
+          <div className="space-y-3">
+            <SectionHeader title={`Brand Memberships (${brandMemberships.length})`} />
+            {brandMemberships.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">No brand memberships found.</p>
+            ) : (
+              brandMemberships.map((m: any) => (
+                <div key={m.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div>
+                      <BrandBadge brand={m.brand} />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {m.tier === "premium" ? "★ Premium" : "Free"}{m.expiresAt ? ` · Expires ${formatDate(m.expiresAt)}` : " · No expiry"}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">Granted {formatDate(m.createdAt ?? m.grantedAt)}</p>
+                    </div>
+                    <StatusBadge status={m.status ?? "active"} />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 
