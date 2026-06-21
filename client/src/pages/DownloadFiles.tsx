@@ -16,6 +16,129 @@ import { getLoginUrl } from "@/const";
 import { useEffect, useState } from "react";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 
+// ─── Member Page Block Renderer ──────────────────────────────────────────────
+// Renders page-builder blocks (text, image, video, audio, bullets, alert, cta, divider, embed)
+// in the context of the download access page (full-width, readable typography).
+
+function MemberPageBlock({ block }: { block: any }) {
+  const d = block.data ?? {};
+  const primaryColor = "#0d9488"; // teal-600
+
+  switch (block.type) {
+    case "text":
+      return (
+        <div
+          className="prose prose-base max-w-none text-gray-800 leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: d.html ?? d.content ?? "" }}
+        />
+      );
+    case "image":
+      return d.url ? (
+        <div className="rounded-xl overflow-hidden">
+          <img src={d.url} alt={d.alt ?? ""} className="w-full object-cover" />
+          {d.caption && <p className="text-xs text-gray-400 mt-1.5 text-center">{d.caption}</p>}
+        </div>
+      ) : null;
+    case "video": {
+      const url: string = d.url ?? "";
+      const isYT = /youtube\.com|youtu\.be/.test(url);
+      const isVimeo = /vimeo\.com/.test(url);
+      let embedSrc = "";
+      if (isYT) {
+        const m = url.match(/(?:v=|youtu\.be\/)([\w-]+)/);
+        if (m) embedSrc = `https://www.youtube.com/embed/${m[1]}`;
+      } else if (isVimeo) {
+        const m = url.match(/vimeo\.com\/(\d+)/);
+        if (m) embedSrc = `https://player.vimeo.com/video/${m[1]}`;
+      }
+      if (!embedSrc && !url) return null;
+      return (
+        <div className="relative w-full rounded-xl overflow-hidden" style={{ paddingBottom: "56.25%" }}>
+          {embedSrc
+            ? <iframe src={embedSrc} className="absolute inset-0 w-full h-full" frameBorder="0" allowFullScreen title="Video" />
+            : <video src={url} controls className="absolute inset-0 w-full h-full object-cover" />}
+        </div>
+      );
+    }
+    case "audio":
+      return d.url ? <audio src={d.url} controls className="w-full" /> : null;
+    case "bullets": {
+      const items: string[] = d.items ?? [];
+      if (!items.length) return null;
+      return (
+        <ul className="space-y-2">
+          {items.map((item, i) => (
+            <li key={i} className="flex items-start gap-2 text-gray-700 text-sm">
+              <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: primaryColor }} />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    case "alert": {
+      const colorMap: Record<string, string> = { info: "#3b82f6", warning: "#f59e0b", success: "#22c55e", error: "#ef4444" };
+      const color = colorMap[d.variant ?? "info"] ?? primaryColor;
+      return (
+        <div className="rounded-xl px-4 py-3 text-sm leading-relaxed" style={{ backgroundColor: `${color}15`, borderLeft: `4px solid ${color}`, color: "#374151" }}>
+          {d.title && <p className="font-semibold mb-1" style={{ color }}>{d.title}</p>}
+          {d.message && <p>{d.message}</p>}
+        </div>
+      );
+    }
+    case "cta_standalone": {
+      const href = d.url ?? d.href ?? "";
+      const label = d.label ?? d.buttonText ?? "Learn More";
+      const bgColor = d.bgColor ?? primaryColor;
+      const textColor = d.textColor ?? "#ffffff";
+      return (
+        <div className="text-center py-2">
+          {d.headline && <p className="text-base font-semibold text-gray-800 mb-1">{d.headline}</p>}
+          {d.subtext && <p className="text-sm text-gray-500 mb-3">{d.subtext}</p>}
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-6 py-2.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ backgroundColor: bgColor, color: textColor }}
+          >{label}</a>
+        </div>
+      );
+    }
+    case "divider":
+      return <hr className="border-gray-200 my-2" />;
+    case "embed": {
+      const src = d.url ?? "";
+      if (!src) return null;
+      return (
+        <div className="relative w-full rounded-xl overflow-hidden" style={{ paddingBottom: `${d.aspectRatio ?? 56.25}%` }}>
+          <iframe src={src} className="absolute inset-0 w-full h-full" frameBorder="0" allowFullScreen title="Embedded content" />
+        </div>
+      );
+    }
+    case "heading":
+      return <h2 className="text-xl font-bold text-gray-900">{d.text ?? ""}</h2>;
+    default:
+      return null;
+  }
+}
+
+function MemberPageBlocksSection({ blocksJson }: { blocksJson: string | null }) {
+  if (!blocksJson) return null;
+  let blocks: any[] = [];
+  try { blocks = JSON.parse(blocksJson); } catch { return null; }
+  if (!blocks.length) return null;
+  return (
+    <div className="space-y-5">
+      {blocks.map((block: any) => (
+        <MemberPageBlock key={block.id ?? Math.random()} block={block} />
+      ))}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function DownloadFiles() {
   const { slug } = useParams<{ slug: string }>();
   const searchString = useSearch();
@@ -118,6 +241,8 @@ export default function DownloadFiles() {
   }
 
   const files = downloadData?.files ?? [];
+  const blocksAbove = (downloadData as any)?.memberPageBlocksAbove ?? null;
+  const blocksBelow = (downloadData as any)?.memberPageBlocksBelow ?? null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -137,7 +262,7 @@ export default function DownloadFiles() {
           </Link>
           <div className="flex items-center gap-3">
             {isPreviewMode && <Eye className="w-6 h-6 text-teal-300" />}
-          {isSuccess && <CheckCircle className="w-6 h-6 text-green-300" />}
+            {isSuccess && <CheckCircle className="w-6 h-6 text-green-300" />}
             <h1 className="text-2xl font-bold">{product.title}</h1>
           </div>
           {isSuccess && <p className="text-teal-100 mt-1">Thank you for your purchase! Your files are ready.</p>}
@@ -155,85 +280,103 @@ export default function DownloadFiles() {
         </div>
       )}
 
-      {/* Files */}
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        {filesLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
-          </div>
-        ) : files.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <FileDown className="w-10 h-10 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500">No files available for this product yet.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {downloadData?.purchase?.accessExpiresAt && (
-              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                Access expires {new Date(downloadData.purchase.accessExpiresAt).toLocaleString()}
-              </p>
-            )}
-            <p className="text-sm text-gray-500 mb-4">{files.length} file{files.length !== 1 ? "s" : ""} available for download</p>
-            {files.map((file: any) => (
-              <div key={file.id} className="space-y-0">
-              <Card className={`hover:border-teal-400 transition-colors ${file.downloadStats && !file.downloadStats.canDownload ? "opacity-60" : ""}`}>
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
-                    <FileDown className="w-5 h-5 text-teal-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{file.fileName}</p>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {file.fileSize > 0 && (
-                        <span className="text-xs text-gray-400">
-                          {file.fileSize < 1024 * 1024 ? `${(file.fileSize / 1024).toFixed(0)} KB` : `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`}
-                        </span>
-                      )}
-                      {file.mimeType && <Badge variant="outline" className="text-xs">{file.mimeType.split("/")[1]?.toUpperCase()}</Badge>}
-                      {file.downloadStats && (
-                        <>
-                          <Badge className="text-xs bg-blue-600">Downloaded: {file.downloadStats.downloaded}</Badge>
-                          <Badge variant="secondary" className="text-xs">
-                            Remaining: {file.downloadStats.remaining === null ? "∞" : file.downloadStats.remaining}
-                          </Badge>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {(file.mimeType === "application/pdf" || file.fileName?.toLowerCase().endsWith(".pdf")) && (
-                      <Button size="sm" variant="outline" className="gap-1 text-teal-600 border-teal-300 hover:bg-teal-50"
-                        onClick={() => setPdfViewerUrl(pdfViewerUrl === file.fileUrl ? null : file.fileUrl)}>
-                        {pdfViewerUrl === file.fileUrl ? "Close" : "View"}
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1"
-                      disabled={file.downloadStats && !file.downloadStats.canDownload}
-                      onClick={() => handleDownload(file)}
-                    >
-                      <Download className="w-4 h-4" /> Download
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-              {pdfViewerUrl === file.fileUrl && (
-                <div className="rounded-lg overflow-hidden border border-teal-200 bg-gray-50">
-                  <div className="flex items-center justify-between px-3 py-2 bg-teal-50 border-b border-teal-200">
-                    <span className="text-xs font-medium text-teal-700">{file.fileName}</span>
-                    <button className="text-xs text-teal-600 hover:text-teal-800" onClick={() => setPdfViewerUrl(null)}>✕ Close</button>
-                  </div>
-                  <iframe src={`${file.fileUrl}#toolbar=1`} className="w-full" style={{ height: "75vh" }} title={file.fileName} />
-                </div>
-              )}
-              </div>
-            ))}
-          </div>
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+
+        {/* ── Blocks Above ─────────────────────────────────────────────────── */}
+        {blocksAbove && (
+          <section>
+            <MemberPageBlocksSection blocksJson={blocksAbove} />
+          </section>
         )}
+
+        {/* ── Files ────────────────────────────────────────────────────────── */}
+        <section>
+          {filesLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
+            </div>
+          ) : files.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <FileDown className="w-10 h-10 mx-auto text-gray-300 mb-3" />
+                <p className="text-gray-500">No files available for this product yet.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {downloadData?.purchase?.accessExpiresAt && (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Access expires {new Date(downloadData.purchase.accessExpiresAt).toLocaleString()}
+                </p>
+              )}
+              <p className="text-sm text-gray-500 mb-4">{files.length} file{files.length !== 1 ? "s" : ""} available for download</p>
+              {files.map((file: any) => (
+                <div key={file.id} className="space-y-0">
+                  <Card className={`hover:border-teal-400 transition-colors ${file.downloadStats && !file.downloadStats.canDownload ? "opacity-60" : ""}`}>
+                    <CardContent className="p-4 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
+                        <FileDown className="w-5 h-5 text-teal-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{file.fileName}</p>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          {file.fileSize > 0 && (
+                            <span className="text-xs text-gray-400">
+                              {file.fileSize < 1024 * 1024 ? `${(file.fileSize / 1024).toFixed(0)} KB` : `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`}
+                            </span>
+                          )}
+                          {file.mimeType && <Badge variant="outline" className="text-xs">{file.mimeType.split("/")[1]?.toUpperCase()}</Badge>}
+                          {file.downloadStats && (
+                            <>
+                              <Badge className="text-xs bg-blue-600">Downloaded: {file.downloadStats.downloaded}</Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                Remaining: {file.downloadStats.remaining === null ? "∞" : file.downloadStats.remaining}
+                              </Badge>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {(file.mimeType === "application/pdf" || file.fileName?.toLowerCase().endsWith(".pdf")) && (
+                          <Button size="sm" variant="outline" className="gap-1 text-teal-600 border-teal-300 hover:bg-teal-50"
+                            onClick={() => setPdfViewerUrl(pdfViewerUrl === file.fileUrl ? null : file.fileUrl)}>
+                            {pdfViewerUrl === file.fileUrl ? "Close" : "View"}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1"
+                          disabled={file.downloadStats && !file.downloadStats.canDownload}
+                          onClick={() => handleDownload(file)}
+                        >
+                          <Download className="w-4 h-4" /> Download
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  {pdfViewerUrl === file.fileUrl && (
+                    <div className="rounded-lg overflow-hidden border border-teal-200 bg-gray-50">
+                      <div className="flex items-center justify-between px-3 py-2 bg-teal-50 border-b border-teal-200">
+                        <span className="text-xs font-medium text-teal-700">{file.fileName}</span>
+                        <button className="text-xs text-teal-600 hover:text-teal-800" onClick={() => setPdfViewerUrl(null)}>✕ Close</button>
+                      </div>
+                      <iframe src={`${file.fileUrl}#toolbar=1`} className="w-full" style={{ height: "75vh" }} title={file.fileName} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── Blocks Below ─────────────────────────────────────────────────── */}
+        {blocksBelow && (
+          <section>
+            <MemberPageBlocksSection blocksJson={blocksBelow} />
+          </section>
+        )}
+
       </div>
     </div>
   );

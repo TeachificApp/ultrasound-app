@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { UserSearchCombobox, type SelectedUser } from "@/components/UserSearchCombobox";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
-import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate, BarChart3, ShoppingCart, Settings2, FolderOpen, Workflow, Search, Code2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate, BarChart3, ShoppingCart, Settings2, FolderOpen, Workflow, Search, Code2, Save, FileText } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
@@ -27,6 +27,259 @@ import {
   SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
+import { BLOCK_CATALOG, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
+// ─── Member Page Block Editor ─────────────────────────────────────────────────
+function DownloadMemberPageEditor({ productId, productSlug }: { productId: number; productSlug: string }) {
+  const { data, isLoading, refetch } = trpc.downloadsAdmin.getMemberPageBlocks.useQuery({ productId });
+  const saveBlocks = trpc.downloadsAdmin.saveMemberPageBlocks.useMutation({
+    onSuccess: () => { toast.success("Member page content saved!"); refetch(); },
+    onError: (e) => toast.error(`Save failed: ${e.message}`),
+  });
+
+  const [blocksAbove, setBlocksAbove] = useState<Block[]>([]);
+  const [blocksBelow, setBlocksBelow] = useState<Block[]>([]);
+  const [selectedAboveId, setSelectedAboveId] = useState<string | null>(null);
+  const [selectedBelowId, setSelectedBelowId] = useState<string | null>(null);
+  const [addAboveOpen, setAddAboveOpen] = useState(false);
+  const [addBelowOpen, setAddBelowOpen] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (data && !initialized) {
+      setBlocksAbove(Array.isArray(data.blocksAbove) ? data.blocksAbove : []);
+      setBlocksBelow(Array.isArray(data.blocksBelow) ? data.blocksBelow : []);
+      setInitialized(true);
+    }
+  }, [data, initialized]);
+
+  const MEMBER_BLOCK_TYPES: { type: BlockType; label: string; icon: string }[] = [
+    { type: "text", label: "Rich Text", icon: "T" },
+    { type: "image", label: "Image", icon: "🖼" },
+    { type: "video", label: "Video", icon: "▶" },
+    { type: "audio", label: "Audio", icon: "🔊" },
+    { type: "bullets", label: "Bullet List", icon: "•" },
+    { type: "alert", label: "Alert / Callout", icon: "⚠" },
+    { type: "cta_standalone", label: "CTA Button", icon: "🔗" },
+    { type: "divider", label: "Divider", icon: "—" },
+    { type: "embed", label: "Embed", icon: "</>" },
+  ];
+
+  const makeAddBlock = (setter: React.Dispatch<React.SetStateAction<Block[]>>, setSelected: (id: string) => void, setOpen: (v: boolean) => void) =>
+    (type: BlockType) => {
+      const catalog = BLOCK_CATALOG.find(c => c.type === type);
+      if (!catalog) return;
+      const newBlock: Block = { id: uid(), type, data: { ...catalog.defaultData } };
+      setter(bs => [...bs, newBlock]);
+      setSelected(newBlock.id);
+      setOpen(false);
+    };
+
+  const makeUpdateBlock = (setter: React.Dispatch<React.SetStateAction<Block[]>>) =>
+    (id: string, data: Record<string, any>) =>
+      setter(bs => bs.map(b => b.id === id ? { ...b, data: { ...b.data, ...data } } : b));
+
+  const makeDeleteBlock = (setter: React.Dispatch<React.SetStateAction<Block[]>>, setSelected: (id: string | null) => void) =>
+    (id: string) => { setter(bs => bs.filter(b => b.id !== id)); setSelected(null); };
+
+  const makeMoveBlock = (setter: React.Dispatch<React.SetStateAction<Block[]>>) =>
+    (id: string, dir: -1 | 1) =>
+      setter(bs => {
+        const idx = bs.findIndex(b => b.id === id);
+        const newIdx = idx + dir;
+        if (newIdx < 0 || newIdx >= bs.length) return bs;
+        return arrayMove(bs, idx, newIdx);
+      });
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEndAbove = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setBlocksAbove(bs => {
+        const oldIdx = bs.findIndex(b => b.id === active.id);
+        const newIdx = bs.findIndex(b => b.id === over.id);
+        return arrayMove(bs, oldIdx, newIdx);
+      });
+    }
+  }, []);
+
+  const handleDragEndBelow = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setBlocksBelow(bs => {
+        const oldIdx = bs.findIndex(b => b.id === active.id);
+        const newIdx = bs.findIndex(b => b.id === over.id);
+        return arrayMove(bs, oldIdx, newIdx);
+      });
+    }
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveBlocks.mutateAsync({
+        productId,
+        blocksAbove: JSON.stringify(blocksAbove),
+        blocksBelow: JSON.stringify(blocksBelow),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedAbove = blocksAbove.find(b => b.id === selectedAboveId) ?? null;
+  const selectedBelow = blocksBelow.find(b => b.id === selectedBelowId) ?? null;
+
+  if (isLoading) return <div className="p-8 text-center text-gray-400">Loading...</div>;
+
+  const renderBlockList = (
+    blocks: Block[],
+    setter: React.Dispatch<React.SetStateAction<Block[]>>,
+    selected: Block | null,
+    setSelected: (id: string | null) => void,
+    onDelete: (id: string) => void,
+    onMove: (id: string, dir: -1 | 1) => void,
+    onUpdate: (id: string, data: Record<string, any>) => void,
+    onDragEnd: (event: DragEndEvent) => void,
+    label: string,
+    onAdd: () => void,
+  ) => (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+        <span className="text-sm font-semibold text-gray-700">{label}</span>
+        <Button size="sm" variant="outline" className="text-xs h-7 text-teal-600 border-teal-300 hover:bg-teal-50" onClick={onAdd}>
+          <Plus className="w-3 h-3 mr-1" /> Add Block
+        </Button>
+      </div>
+      <div className="flex" style={{ minHeight: 200 }}>
+        <div className="flex-1 p-3 bg-gray-50 overflow-y-auto">
+          {previewMode ? (
+            <div className="max-w-2xl mx-auto bg-white rounded-xl border border-gray-100 p-6 space-y-4">
+              {blocks.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">No blocks yet</p>
+              ) : blocks.map(block => (
+                <div key={block.id}><BlockPreview block={block} /></div>
+              ))}
+            </div>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                {blocks.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 text-gray-400">
+                    <p className="text-sm">No blocks yet — click "Add Block" to get started</p>
+                  </div>
+                ) : blocks.map((block, idx) => (
+                  <SortableBlock
+                    key={block.id}
+                    block={block}
+                    isSelected={selected?.id === block.id}
+                    onSelect={() => setSelected(block.id)}
+                    onDelete={() => onDelete(block.id)}
+                    onDuplicate={() => {
+                      const copy: Block = { ...block, id: uid() };
+                      setter((bs: Block[]) => { const i = bs.findIndex(b => b.id === block.id); const next = [...bs]; next.splice(i + 1, 0, copy); return next; });
+                    }}
+                    onMoveUp={idx > 0 ? () => onMove(block.id, -1) : undefined}
+                    onMoveDown={idx < blocks.length - 1 ? () => onMove(block.id, 1) : undefined}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
+        </div>
+        {!previewMode && selected && (
+          <div className="w-72 border-l border-gray-200 bg-white p-4 overflow-y-auto">
+            <BlockSettings
+              block={selected}
+              onChange={(data) => onUpdate(selected.id, data)}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">Member Access Page Content</h3>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Add rich content blocks that appear above and below the file download list on the member access page
+            {productSlug && <> — <a href={`/downloads/${productSlug}/files`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">Preview page ↗</a></>}.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setPreviewMode(p => !p)}
+            className={`text-xs h-8 ${previewMode ? "border-teal-500 text-teal-700 bg-teal-50" : "text-gray-500"}` }>
+            {previewMode ? <EyeOff className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}
+            {previewMode ? "Edit" : "Preview"}
+          </Button>
+          <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8 text-xs font-semibold" onClick={handleSave} disabled={saving}>
+            <Save className="w-3.5 h-3.5 mr-1" />{saving ? "Saving..." : "Save All"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Above blocks */}
+      {renderBlockList(
+        blocksAbove, setBlocksAbove, selectedAbove,
+        setSelectedAboveId,
+        makeDeleteBlock(setBlocksAbove, setSelectedAboveId),
+        makeMoveBlock(setBlocksAbove),
+        makeUpdateBlock(setBlocksAbove),
+        handleDragEndAbove,
+        "Content Above Download Files",
+        () => setAddAboveOpen(true),
+      )}
+
+      {/* Visual separator representing the download files area */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 border-t border-dashed border-gray-300" />
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 border border-teal-200 rounded-full text-xs text-teal-700 font-medium">
+          <FileText className="w-3 h-3" /> Download Files Area (not editable here)
+        </div>
+        <div className="flex-1 border-t border-dashed border-gray-300" />
+      </div>
+
+      {/* Below blocks */}
+      {renderBlockList(
+        blocksBelow, setBlocksBelow, selectedBelow,
+        setSelectedBelowId,
+        makeDeleteBlock(setBlocksBelow, setSelectedBelowId),
+        makeMoveBlock(setBlocksBelow),
+        makeUpdateBlock(setBlocksBelow),
+        handleDragEndBelow,
+        "Content Below Download Files",
+        () => setAddBelowOpen(true),
+      )}
+
+      {/* Add Block Dialogs */}
+      {[{ open: addAboveOpen, setOpen: setAddAboveOpen, add: makeAddBlock(setBlocksAbove, (id) => setSelectedAboveId(id), setAddAboveOpen) },
+        { open: addBelowOpen, setOpen: setAddBelowOpen, add: makeAddBlock(setBlocksBelow, (id) => setSelectedBelowId(id), setAddBelowOpen) }]
+        .map(({ open, setOpen, add }, i) => (
+          <Dialog key={i} open={open} onOpenChange={setOpen}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader><DialogTitle>Add Content Block</DialogTitle></DialogHeader>
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                {MEMBER_BLOCK_TYPES.map(item => (
+                  <button key={item.type} onClick={() => add(item.type)}
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-sm font-medium text-gray-700 transition-colors text-left">
+                    <span className="text-base w-5 text-center">{item.icon}</span>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+        ))}
+    </div>
+  );
+}
 
 // ─── Sortable Product Row ────────────────────────────────────────────────────
 function SortableProductRow({ product, onEdit, onDuplicate, onDelete }: { product: any; onEdit: (id: number) => void; onDuplicate: (id: number) => void; onDelete: (id: number) => void }) {
@@ -418,6 +671,9 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           <TabsTrigger value="embed" className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 px-4 py-2 text-sm font-medium bg-transparent hover:text-teal-600">
             <Code2 className="w-3.5 h-3.5 mr-1.5" /> Embed
           </TabsTrigger>
+          <TabsTrigger value="member-page" className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 px-4 py-2 text-sm font-medium bg-transparent hover:text-teal-600">
+            <LayoutTemplate className="w-3.5 h-3.5 mr-1.5" /> Member Page
+          </TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -702,6 +958,11 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               defaultCheckoutUrl={`${window.location.origin}/checkout/${product.slug}?type=download`}
             />
           )}
+        </TabsContent>
+
+        {/* Member Page Tab */}
+        <TabsContent value="member-page" className="mt-4">
+          <DownloadMemberPageEditor productId={product.id} productSlug={product.slug ?? ""} />
         </TabsContent>
       </Tabs>
     </div>

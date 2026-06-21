@@ -3503,6 +3503,9 @@ export const digitalProducts = mysqlTable("digital_products", {
   seoImage: varchar("seo_image", { length: 512 }),
   // After Purchase Workflow — JSON array of workflow action objects
   afterPurchaseWorkflow: longtext("after_purchase_workflow"),
+  // Member access page content blocks — shown above and below the file download list
+  memberPageBlocksAbove: longtext("member_page_blocks_above"), // JSON array of page-builder blocks
+  memberPageBlocksBelow: longtext("member_page_blocks_below"), // JSON array of page-builder blocks
   // Hide additional pricing options on the landing page
   hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
   // Show in Education Library — admin toggle to include/exclude from the public library

@@ -176,6 +176,8 @@ export const downloadsLearnerRouter = router({
               status: purchaseRow.status,
             }
           : null,
+        memberPageBlocksAbove: product.memberPageBlocksAbove ?? null,
+        memberPageBlocksBelow: product.memberPageBlocksBelow ?? null,
       };
     }),
 
@@ -749,6 +751,8 @@ export const downloadsAdminRouter = router({
       brand: z.enum(["aaus", "iheartecho"]).optional(),
       maxDownloadsPerFile: z.number().int().min(0).nullable().optional(),
       defaultAccessDays: z.number().int().min(0).nullable().optional(),
+      memberPageBlocksAbove: z.string().nullable().optional(),
+      memberPageBlocksBelow: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -756,6 +760,46 @@ export const downloadsAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, ...data } = input;
       await db.update(digitalProducts).set(data as any).where(eq(digitalProducts.id, id));
+      return { success: true };
+    }),
+
+  /** Get member access page blocks (above + below download area) for a digital product */
+  getMemberPageBlocks: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db.select({
+        id: digitalProducts.id,
+        title: digitalProducts.title,
+        memberPageBlocksAbove: digitalProducts.memberPageBlocksAbove,
+        memberPageBlocksBelow: digitalProducts.memberPageBlocksBelow,
+      }).from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        productId: product.id,
+        productTitle: product.title,
+        blocksAbove: product.memberPageBlocksAbove ? JSON.parse(product.memberPageBlocksAbove) : [],
+        blocksBelow: product.memberPageBlocksBelow ? JSON.parse(product.memberPageBlocksBelow) : [],
+      };
+    }),
+
+  /** Save member access page blocks for a digital product */
+  saveMemberPageBlocks: protectedProcedure
+    .input(z.object({
+      productId: z.number(),
+      blocksAbove: z.string(), // JSON stringified array
+      blocksBelow: z.string(), // JSON stringified array
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(digitalProducts).set({
+        memberPageBlocksAbove: input.blocksAbove,
+        memberPageBlocksBelow: input.blocksBelow,
+      }).where(eq(digitalProducts.id, input.productId));
       return { success: true };
     }),
 
