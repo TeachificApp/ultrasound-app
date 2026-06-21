@@ -1046,7 +1046,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       : "Choose a product..."}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent className="max-h-72">
+                <SelectContent className="max-h-[480px]">
                   {(() => {
                     const filtered = (allCourses ?? []).filter((c: any) =>
                       !courseSearch || c.title.toLowerCase().includes(courseSearch.toLowerCase())
