@@ -852,7 +852,7 @@ function MyContentTab() {
     { key: "workshops",    label: "Workshops",    icon: Briefcase,      count: (data as any)?.workshops?.length ?? 0 },
     { key: "products",     label: "Products",     icon: Package,        count: data?.physicalProducts.length ?? 0 },
     { key: "bundles",      label: "Bundles",      icon: Layers,         count: data?.bundles?.length ?? 0 },
-    { key: "memberships",  label: "Memberships",  icon: Star,           count: 0 },
+    { key: "memberships",  label: "Memberships",  icon: Star,           count: (data as any)?.memberships?.length ?? 0 },
     { key: "communities",  label: "Communities",  icon: Users,          count: data?.communities?.length ?? 0 },
   ];
 
@@ -1085,7 +1085,34 @@ function MyContentTab() {
       {/* Memberships */}
       {contentTab === "memberships" && (
         <div>
-          <EmptyState icon={Star} title="Memberships" description="Your memberships are managed in the Subscriptions tab." />
+          {((data as any)?.memberships?.length ?? 0) === 0 ? (
+            <EmptyState icon={Star} title="No memberships" description="You don't have any active memberships yet." />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(data as any)?.memberships?.map((m: any, i: number) => {
+                const isPlan = m.type === "plan";
+                const brandCfg = m.brand ? (BRAND_CONFIG[m.brand] ?? { label: m.brand, color: "#6b7280", bg: "bg-gray-50", border: "border-gray-200" }) : null;
+                const statusColor = m.status === "active" || m.status === "trialing" ? "emerald" : m.status === "cancelled" || m.status === "canceled" || m.status === "expired" ? "red" : "amber";
+                return (
+                  <ContentCard
+                    key={`membership-${m.type}-${m.id ?? i}`}
+                    thumbnail={null}
+                    title={m.title}
+                    subtitle={
+                      isPlan
+                        ? (m.currentPeriodEnd ? `Renews ${formatDate(m.currentPeriodEnd)}` : "Active")
+                        : (m.expiresAt ? `Expires ${formatDate(m.expiresAt)}` : m.grantedAt ? `Granted ${formatDate(m.grantedAt)}` : "Active")
+                    }
+                    badge={m.status === "active" ? "Active" : m.status === "trialing" ? "Trial" : m.status === "cancelled" || m.status === "canceled" ? "Cancelled" : m.status === "expired" ? "Expired" : m.status}
+                    badgeColor={statusColor}
+                    actions={[
+                      ...(isPlan ? [{ label: "View Membership", icon: ExternalLink, href: `/my-memberships/${m.planId}` }] : []),
+                    ]}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
       {/* Communities */}

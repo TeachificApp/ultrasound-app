@@ -308,8 +308,8 @@ export const dashboardRouter = router({
       for (const item of accessItems) {
         if (!item.itemId) continue; // skip wildcard types like all_courses
 
-        if (item.itemType === "course" || item.itemType === "quiz" || item.itemType === "download") {
-          // Check not already enrolled
+        if (item.itemType === "course" || item.itemType === "quiz") {
+          // Check not already enrolled (LMS courses and quizzes only — downloads are digital products handled below)
           const alreadyEnrolled = activeEnrollments.some(e => e.courseId === item.itemId);
           if (alreadyEnrolled) continue;
 
@@ -460,11 +460,11 @@ export const dashboardRouter = router({
       const sourceTag = `Included with ${bundleReg.bundleTitle}`;
 
       for (const item of bundleAccessItems) {
-        if (item.itemType === "course" || item.itemType === "quiz" || item.itemType === "download") {
+        if (item.itemType === "course" || item.itemType === "quiz") {
+          // LMS courses and quizzes only — digital product downloads handled below
           const alreadyEnrolled = activeEnrollments.some(e => e.courseId === item.itemId)
             || membershipCourses.some(e => e.courseId === item.itemId)
-            || membershipQuizzes.some(e => e.courseId === item.itemId)
-            || membershipDownloads.some(e => e.courseId === item.itemId);
+            || membershipQuizzes.some(e => e.courseId === item.itemId);
           if (alreadyEnrolled) continue;
 
           const [course] = await db
@@ -538,9 +538,74 @@ export const dashboardRouter = router({
             scheduledAt: webinar.scheduledAt,
             accessSource: sourceTag,
           });
+
+        } else if (item.itemType === "download") {
+          // Digital product download included in bundle
+          const alreadyPurchased = digitalPurchaseRows.some(d => d.productId === item.itemId)
+            || membershipDownloads.some(d => d.productId === item.itemId);
+          if (alreadyPurchased) continue;
+
+          const [product] = await db
+            .select({
+              id: digitalProducts.id,
+              title: digitalProducts.title,
+              slug: digitalProducts.slug,
+              thumbnailUrl: digitalProducts.thumbnailUrl,
+            })
+            .from(digitalProducts)
+            .where(and(eq(digitalProducts.id, item.itemId), eq(digitalProducts.status, "published")))
+            .limit(1);
+
+          if (!product) continue;
+          bundleDownloads.push({
+            purchaseId: null,
+            productId: product.id,
+            purchasedAt: null,
+            productTitle: product.title,
+            productSlug: product.slug,
+            productThumbnail: product.thumbnailUrl,
+            accessSource: sourceTag,
+          });
         }
       }
     }
+
+    // ── 11. Build memberships array for the Memberships tab ─────────────────────
+    // Include native plan subscriptions (active/trialing)
+    const membershipCards = activeMembershipSubs.map(sub => ({
+      type: "plan" as const,
+      id: sub.subId,
+      planId: sub.planId,
+      title: sub.planTitle,
+      status: sub.status,
+      currentPeriodEnd: sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null,
+    }));
+
+    // Also include brand memberships (Thinkific / legacy Stripe brand memberships)
+    const brandMembershipRows = await db
+      .select({
+        id: brandMemberships.id,
+        brand: brandMemberships.brand,
+        tier: brandMemberships.tier,
+        status: brandMemberships.status,
+        source: brandMemberships.source,
+        grantedAt: brandMemberships.grantedAt,
+        expiresAt: brandMemberships.expiresAt,
+      })
+      .from(brandMemberships)
+      .where(eq(brandMemberships.userId, ctx.user.id))
+      .orderBy(desc(brandMemberships.createdAt));
+
+    const brandMembershipCards = brandMembershipRows.map(m => ({
+      type: "brand" as const,
+      id: m.id,
+      title: `${m.tier.charAt(0).toUpperCase() + m.tier.slice(1)} Membership`,
+      brand: m.brand,
+      status: m.status,
+      source: m.source,
+      grantedAt: m.grantedAt,
+      expiresAt: m.expiresAt,
+    }));
 
     return {
       courses: [...courses, ...membershipCourses, ...bundleCourses],
@@ -557,6 +622,7 @@ export const dashboardRouter = router({
       workshops: workshopRegs,
       communities: [...communityRegs, ...membershipCommunities],
       funnelPurchases: funnelPurchaseRows,
+      memberships: [...membershipCards, ...brandMembershipCards],
     };
   }),
 
