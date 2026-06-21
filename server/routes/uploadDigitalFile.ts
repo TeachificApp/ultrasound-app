@@ -11,7 +11,7 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { randomBytes } from "crypto";
-import { storagePut } from "../storage";
+import { storagePut, storagePutLarge } from "../storage";
 import { sdk } from "../_core/sdk";
 
 const router = Router();
@@ -41,7 +41,11 @@ router.post(
       const suffix = randomBytes(8).toString("hex");
       const safeName = originalname.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
       const fileKey = `digital-files/${suffix}-${safeName}`;
-      const { url } = await storagePut(fileKey, buffer, mimetype);
+      // Use R2 multipart for files over 20 MB to avoid storage proxy timeouts
+      const LARGE_FILE_THRESHOLD = 20 * 1024 * 1024;
+      const { url } = size > LARGE_FILE_THRESHOLD
+        ? await storagePutLarge(fileKey, buffer, mimetype)
+        : await storagePut(fileKey, buffer, mimetype);
       res.json({ url, fileKey, filename: originalname, size, mimeType: mimetype });
     } catch (err: any) {
       console.error("[upload-digital-file]", err);
