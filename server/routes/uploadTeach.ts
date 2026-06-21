@@ -27,7 +27,7 @@ import {
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
 import { mediaAssets, mediaVersions, mediaUploadSessions } from "../../drizzle/schema";
-import { storagePut } from "../storage";
+import { storagePut, storagePutLarge } from "../storage";
 import { requireTeachAccess } from "../routers/teachRouter";
 import { teachFolderSlug } from "../lib/teachAccess";
 import {
@@ -259,7 +259,11 @@ router.post("/api/upload-teach/chunk", upload.single("chunk"), async (req: Reque
       const fullBuffer = Buffer.concat(chunkBuffers);
       try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
 
-      const { url: s3Url } = await storagePut(session.s3Key, fullBuffer, session.mimeType);
+      // Use R2 multipart for assembled buffers > 20 MB to avoid storage proxy timeouts
+      const DIRECT_LARGE_THRESHOLD = 20 * 1024 * 1024;
+      const { url: s3Url } = fullBuffer.length > DIRECT_LARGE_THRESHOLD
+        ? await storagePutLarge(session.s3Key, fullBuffer, session.mimeType)
+        : await storagePut(session.s3Key, fullBuffer, session.mimeType);
       return finalizeTeachUpload(res, db, session, s3Url, user.id, uploadId);
     } catch (err: any) {
       console.error("[upload-teach/chunk] Reassembly failed:", err.message);

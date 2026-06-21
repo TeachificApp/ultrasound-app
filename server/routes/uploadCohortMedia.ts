@@ -8,7 +8,7 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { randomBytes } from "crypto";
-import { storagePut } from "../storage";
+import { storagePut, storagePutLarge } from "../storage";
 import { sdk } from "../_core/sdk";
 
 const router = Router();
@@ -40,11 +40,15 @@ router.post(
         res.status(400).json({ error: "No file provided" });
         return;
       }
-      const { originalname, mimetype, buffer } = req.file;
+      const { originalname, mimetype, buffer, size } = req.file;
       const ext = originalname.split(".").pop()?.toLowerCase() ?? "bin";
       const suffix = randomBytes(6).toString("hex");
       const fileKey = `cohort-media/${user.id}/${suffix}.${ext}`;
-      const { url } = await storagePut(fileKey, buffer, mimetype);
+      // Use R2 multipart for files over 20 MB to avoid storage proxy timeouts
+      const LARGE_FILE_THRESHOLD = 20 * 1024 * 1024;
+      const { url } = size > LARGE_FILE_THRESHOLD
+        ? await storagePutLarge(fileKey, buffer, mimetype)
+        : await storagePut(fileKey, buffer, mimetype);
       res.json({ url, fileKey, mimeType: mimetype });
     } catch (err: any) {
       console.error("[upload-cohort-media]", err);

@@ -8,7 +8,7 @@
 
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import { storagePut } from "../storage";
+import { storagePut, storagePutLarge } from "../storage";
 import { sdk } from "../_core/sdk";
 
 const router = Router();
@@ -45,12 +45,16 @@ router.post(
         return;
       }
 
-      const { originalname, mimetype, buffer } = req.file;
+      const { originalname, mimetype, buffer, size } = req.file;
       const ext = originalname.split(".").pop()?.toLowerCase() ?? "bin";
       const randomSuffix = Math.random().toString(36).slice(2, 10);
       const fileKey = `case-media/${user.id}/${Date.now()}-${randomSuffix}.${ext}`;
 
-      const { url } = await storagePut(fileKey, buffer, mimetype);
+      // Use R2 multipart for files over 20 MB to avoid storage proxy timeouts
+      const LARGE_FILE_THRESHOLD = 20 * 1024 * 1024;
+      const { url } = size > LARGE_FILE_THRESHOLD
+        ? await storagePutLarge(fileKey, buffer, mimetype)
+        : await storagePut(fileKey, buffer, mimetype);
 
       res.json({ url, fileKey });
     } catch (err: any) {
