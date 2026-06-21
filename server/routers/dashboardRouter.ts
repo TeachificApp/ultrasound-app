@@ -280,6 +280,8 @@ export const dashboardRouter = router({
         subId: membershipSubscriptions.id,
         planId: membershipSubscriptions.planId,
         planTitle: membershipPlans.title,
+        planCoverImage: membershipPlans.coverImage,
+        planSlug: membershipPlans.slug,
         status: membershipSubscriptions.status,
         currentPeriodEnd: membershipSubscriptions.currentPeriodEnd,
       })
@@ -577,6 +579,8 @@ export const dashboardRouter = router({
       id: sub.subId,
       planId: sub.planId,
       title: sub.planTitle,
+      coverImage: sub.planCoverImage ?? null,
+      slug: sub.planSlug ?? null,
       status: sub.status,
       currentPeriodEnd: sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null,
     }));
@@ -596,10 +600,20 @@ export const dashboardRouter = router({
       .where(eq(brandMemberships.userId, ctx.user.id))
       .orderBy(desc(brandMemberships.createdAt));
 
+    // Map brand + tier to human-readable display names
+    const BRAND_MEMBERSHIP_NAMES: Record<string, Record<string, string>> = {
+      aaus: { premium: "UltrasoundAssist™ Premium", free: "UltrasoundAssist™ Free", basic: "UltrasoundAssist™ Basic" },
+      iheartecho: { premium: "EchoAssist™ Premium", free: "EchoAssist™ Free", basic: "EchoAssist™ Basic" },
+    };
+    const BRAND_COVER_IMAGES: Record<string, string> = {
+      aaus: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp",
+      iheartecho: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp",
+    };
     const brandMembershipCards = brandMembershipRows.map(m => ({
       type: "brand" as const,
       id: m.id,
-      title: `${m.tier.charAt(0).toUpperCase() + m.tier.slice(1)} Membership`,
+      title: BRAND_MEMBERSHIP_NAMES[m.brand]?.[m.tier] ?? `${m.tier.charAt(0).toUpperCase() + m.tier.slice(1)} Membership`,
+      coverImage: BRAND_COVER_IMAGES[m.brand] ?? null,
       brand: m.brand,
       status: m.status,
       source: m.source,

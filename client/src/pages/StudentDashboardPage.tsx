@@ -1096,7 +1096,7 @@ function MyContentTab() {
                 return (
                   <ContentCard
                     key={`membership-${m.type}-${m.id ?? i}`}
-                    thumbnail={null}
+                    thumbnail={m.coverImage ?? null}
                     title={m.title}
                     subtitle={
                       isPlan
