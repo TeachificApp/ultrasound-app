@@ -2442,7 +2442,11 @@ export default function CoursePlayer() {
                     const lessonOverride = lessonData?.showInstructor ?? "inherit";
                     const courseShow = !!(course as any).showInstructor;
                     const shouldShow = lessonOverride === "show" ? true : lessonOverride === "hide" ? false : courseShow;
-                    const instructors = (data as any).instructors ?? [];
+                    // Use lesson-level instructor overrides if set, otherwise fall back to course-level instructors
+                    const lessonInstructorsMap = (data as any).lessonInstructorsMap ?? {};
+                    const lessonSpecificInstructors: any[] = selectedLessonId ? (lessonInstructorsMap[selectedLessonId] ?? []) : [];
+                    const courseInstructors = (data as any).instructors ?? [];
+                    const instructors = lessonSpecificInstructors.length > 0 ? lessonSpecificInstructors : courseInstructors;
                     if (!shouldShow || instructors.length === 0) return null;
                     return (
                       <div className="space-y-3">
@@ -2495,7 +2499,10 @@ export default function CoursePlayer() {
                     let blocks: any[] = [];
                     try { blocks = JSON.parse(rawBlocks); } catch { return null; }
                     if (!blocks.length) return null;
-                    const instructors = (data as any).instructors ?? [];
+                    const lessonInstructorsMap2 = (data as any).lessonInstructorsMap ?? {};
+                    const lessonSpecificInstructors2: any[] = selectedLessonId ? (lessonInstructorsMap2[selectedLessonId] ?? []) : [];
+                    const courseInstructors2 = (data as any).instructors ?? [];
+                    const instructors = lessonSpecificInstructors2.length > 0 ? lessonSpecificInstructors2 : courseInstructors2;
                     const lessonOverride = lessonData?.showInstructor ?? "inherit";
                     const courseShow = !!(course as any).showInstructor;
                     const instructorShown = lessonOverride === "show" ? true : lessonOverride === "hide" ? false : courseShow;
@@ -2511,7 +2518,10 @@ export default function CoursePlayer() {
 
                   {/* Empty state when no instructor and no sidebar blocks */}
                   {rightPanelTab === "info" && (() => {
-                    const instructors = (data as any).instructors ?? [];
+                    const lessonInstructorsMap3 = (data as any).lessonInstructorsMap ?? {};
+                    const lessonSpecificInstructors3: any[] = selectedLessonId ? (lessonInstructorsMap3[selectedLessonId] ?? []) : [];
+                    const courseInstructors3 = (data as any).instructors ?? [];
+                    const instructors = lessonSpecificInstructors3.length > 0 ? lessonSpecificInstructors3 : courseInstructors3;
                     const lessonOverride = lessonData?.showInstructor ?? "inherit";
                     const courseShow = !!(course as any).showInstructor;
                     const instructorShown = lessonOverride === "show" ? true : lessonOverride === "hide" ? false : courseShow;

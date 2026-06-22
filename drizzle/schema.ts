@@ -3287,6 +3287,16 @@ export const lmsCourseInstructors = mysqlTable("lms_course_instructors", {
 });
 export type LmsCourseInstructor = typeof lmsCourseInstructors.$inferSelect;
 
+// Per-lesson instructor override — when set, these instructors are shown instead of course-level instructors
+export const lmsLessonInstructors = mysqlTable("lms_lesson_instructors", {
+  id: int("id").autoincrement().primaryKey(),
+  lessonId: int("lesson_id").notNull(),
+  instructorId: int("instructor_id").notNull(),
+  position: int("position").default(0).notNull(),
+});
+export type LmsLessonInstructor = typeof lmsLessonInstructors.$inferSelect;
+export type InsertLmsLessonInstructor = typeof lmsLessonInstructors.$inferInsert;
+
 export const lmsAffiliates = mysqlTable("lms_affiliates", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("user_id"), // optional link to app user

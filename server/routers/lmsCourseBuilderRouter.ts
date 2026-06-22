@@ -41,6 +41,7 @@ import {
   lmsGroupSeats,
   lmsInstructors,
   lmsCourseInstructors,
+  lmsLessonInstructors,
   lmsAffiliates,
   lmsAffiliateConversions,
   lmsLandingPages,
@@ -1020,6 +1021,43 @@ export const lmsCourseBuilderRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(lmsLessonProgress).where(eq(lmsLessonProgress.lessonId, input.id));
       await db.delete(lmsLessons).where(eq(lmsLessons.id, input.id));
+      return { success: true };
+    }),
+
+  /** Get lesson-level instructor overrides */
+  getLessonInstructors: protectedProcedure
+    .input(z.object({ lessonId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const links = await db.select().from(lmsLessonInstructors)
+        .where(eq(lmsLessonInstructors.lessonId, input.lessonId))
+        .orderBy(asc(lmsLessonInstructors.position));
+      if (!links.length) return [];
+      const ids = links.map(l => l.instructorId);
+      const instructors = await db.select().from(lmsInstructors)
+        .where(sql`${lmsInstructors.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+      const instMap = new Map(instructors.map(i => [i.id, i]));
+      return links.map(l => ({ ...l, instructor: instMap.get(l.instructorId) ?? null }));
+    }),
+
+  /** Set lesson-level instructor overrides (replaces all existing for this lesson) */
+  setLessonInstructors: protectedProcedure
+    .input(z.object({
+      lessonId: z.number(),
+      instructorIds: z.array(z.number()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsLessonInstructors).where(eq(lmsLessonInstructors.lessonId, input.lessonId));
+      if (input.instructorIds.length > 0) {
+        await db.insert(lmsLessonInstructors).values(
+          input.instructorIds.map((instructorId, position) => ({ lessonId: input.lessonId, instructorId, position }))
+        );
+      }
       return { success: true };
     }),
 

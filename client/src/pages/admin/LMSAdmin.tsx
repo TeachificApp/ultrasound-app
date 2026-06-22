@@ -4353,6 +4353,23 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
+  // Lesson-level instructor overrides
+  const { data: allInstructorsData } = trpc.lmsAdmin.listInstructors.useQuery();
+  const { data: lessonInstructorsData, refetch: refetchLessonInstructors } = trpc.lmsAdmin.getLessonInstructors.useQuery(
+    { lessonId: lesson.id },
+    { enabled: !!lesson.id }
+  );
+  const [selectedLessonInstructorIds, setSelectedLessonInstructorIds] = useState<number[]>([]);
+  useEffect(() => {
+    if (lessonInstructorsData) {
+      setSelectedLessonInstructorIds(lessonInstructorsData.map((l: any) => l.instructorId));
+    }
+  }, [lessonInstructorsData]);
+  const setLessonInstructors = trpc.lmsAdmin.setLessonInstructors.useMutation({
+    onSuccess: () => { toast.success("Lesson instructors saved"); refetchLessonInstructors(); },
+    onError: e => toast.error(`Error saving instructors: ${e.message}`),
+  });
+
   const handleSave = (andClose = false) => {
     update.mutate({
       id: lesson.id,
@@ -4659,6 +4676,41 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
                 <SelectItem value="hide">Always hide</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Lesson-level instructor override */}
+          <div className="border border-teal-200 rounded-lg p-4 space-y-3 bg-teal-50">
+            <p className="text-sm font-semibold text-teal-800 flex items-center gap-1.5">
+              <User className="w-4 h-4 text-teal-600" /> Lesson Instructors Override
+            </p>
+            <p className="text-xs text-teal-700">Select instructors for this specific lesson. When set, these override the course-level instructors in the sidebar. Leave empty to use course-level instructors.</p>
+            <div className="space-y-1.5">
+              {(allInstructorsData ?? []).map((inst: any) => (
+                <label key={inst.id} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedLessonInstructorIds.includes(inst.id)}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setSelectedLessonInstructorIds(prev => [...prev, inst.id]);
+                      } else {
+                        setSelectedLessonInstructorIds(prev => prev.filter(id => id !== inst.id));
+                      }
+                    }}
+                    className="rounded border-teal-300 text-teal-600"
+                  />
+                  <span className="text-xs text-teal-900">{inst.name}{inst.title ? ` — ${inst.title}` : ""}</span>
+                </label>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7"
+              disabled={setLessonInstructors.isPending}
+              onClick={() => setLessonInstructors.mutate({ lessonId: lesson.id, instructorIds: selectedLessonInstructorIds })}
+            >
+              {setLessonInstructors.isPending ? "Saving..." : "Save Lesson Instructors"}
+            </Button>
           </div>
 
           {/* Prerequisite gate */}

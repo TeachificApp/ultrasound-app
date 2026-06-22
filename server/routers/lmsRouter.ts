@@ -49,6 +49,7 @@ import {
   lmsGroupManagers,
   lmsInstructors,
   lmsCourseInstructors,
+  lmsLessonInstructors,
   lmsAffiliates,
   lmsAffiliateConversions,
   lmsLandingPages,
@@ -1036,7 +1037,37 @@ export const lmsLearnerRouter = router({
           .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
       }
 
-      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, isAdminPreview: !!isAdminPreview && !enrollment, instructors };
+      // Fetch lesson-level instructor overrides for all lessons in this course
+      const lessonIds = allCourseLessons.map(l => l.id);
+      let lessonInstructorLinks: { lessonId: number; instructorId: number; position: number }[] = [];
+      if (lessonIds.length > 0) {
+        lessonInstructorLinks = await db.select({
+          lessonId: lmsLessonInstructors.lessonId,
+          instructorId: lmsLessonInstructors.instructorId,
+          position: lmsLessonInstructors.position,
+        }).from(lmsLessonInstructors)
+          .where(sql`${lmsLessonInstructors.lessonId} IN (${sql.join(lessonIds.map(id => sql`${id}`), sql`, `)})`);
+      }
+      // Build a map of lessonId -> instructor objects (resolved from all instructors)
+      let allInstructors: typeof lmsInstructors.$inferSelect[] = instructors;
+      const extraIds = lessonInstructorLinks.map(l => l.instructorId).filter(id => !instructorIds.includes(id));
+      if (extraIds.length > 0) {
+        const extra = await db.select().from(lmsInstructors)
+          .where(sql`${lmsInstructors.id} IN (${sql.join(extraIds.map(id => sql`${id}`), sql`, `)})`);
+        allInstructors = [...instructors, ...extra];
+      }
+      const instructorMap = new Map(allInstructors.map(i => [i.id, i]));
+      // Group lesson instructor overrides by lessonId
+      const lessonInstructorsMap: Record<number, typeof lmsInstructors.$inferSelect[]> = {};
+      for (const link of lessonInstructorLinks.sort((a, b) => a.position - b.position)) {
+        const inst = instructorMap.get(link.instructorId);
+        if (inst) {
+          if (!lessonInstructorsMap[link.lessonId]) lessonInstructorsMap[link.lessonId] = [];
+          lessonInstructorsMap[link.lessonId].push(inst);
+        }
+      }
+
+      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, isAdminPreview: !!isAdminPreview && !enrollment, instructors, lessonInstructorsMap };
     }),
 
   /** Get a single lesson (must be enrolled or lesson is preview) */
