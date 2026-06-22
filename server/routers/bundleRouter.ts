@@ -274,6 +274,7 @@ export const bundleLearnerRouter = router({
         customer_email: ctx.user.email || undefined,
         client_reference_id: ctx.user.id.toString(),
         allow_promotion_codes: true,
+        ...(bundle.collectShippingAddress ? { shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "AU", "NZ", "IE"] } } : {}),
         metadata: {
           user_id: ctx.user.id.toString(),
           bundle_id: input.bundleId.toString(),
@@ -355,6 +356,7 @@ export const bundleAdminRouter = router({
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),
       publishDomain: z.string().optional(),
+      collectShippingAddress: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });

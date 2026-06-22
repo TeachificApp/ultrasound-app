@@ -5043,6 +5043,8 @@ export const bundles = mysqlTable("bundles", {
   landingPageBlocks: longtext("landing_page_blocks"),
   afterPurchaseWorkflow: longtext("after_purchase_workflow"),
   hidePricingOptions: int("hide_pricing_options").default(0).notNull(),
+  // Whether to collect a shipping address at Stripe checkout (for bundles with physical items)
+  collectShippingAddress: boolean("collect_shipping_address").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

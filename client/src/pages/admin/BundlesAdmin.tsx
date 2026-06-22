@@ -236,6 +236,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
   const [metaDescription, setMetaDescription] = useState("");
   const [publishDomain, setPublishDomain] = useState("");
   const [brand, setBrand] = useState("all_about_ultrasound");
+  const [collectShippingAddress, setCollectShippingAddress] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [showAddItem, setShowAddItem] = useState(false);
@@ -255,6 +256,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
     setMetaDescription((data.bundle as any).metaDescription ?? "");
     setPublishDomain((data.bundle as any).publishDomain ?? "");
     setBrand((data.bundle as any).brand ?? "all_about_ultrasound");
+    setCollectShippingAddress((data.bundle as any).collectShippingAddress ?? false);
     setInitialized(true);
   }
 
@@ -298,6 +300,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
       metaDescription: metaDescription || undefined,
       publishDomain: publishDomain || undefined,
       brand: brand || undefined,
+      collectShippingAddress,
     });
   };
 
@@ -420,6 +423,23 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
               {accessType === "paid" && (
                 <BundlePricingOptionsEditor bundleId={bundleId} bundleSlug={bundle.slug} />
               )}
+              {/* Shipping address collection */}
+              <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 bg-gray-50">
+                <Switch
+                  id="collect-shipping"
+                  checked={collectShippingAddress}
+                  onCheckedChange={setCollectShippingAddress}
+                  className="mt-0.5"
+                />
+                <div>
+                  <Label htmlFor="collect-shipping" className="text-sm font-medium cursor-pointer">
+                    Collect shipping address at checkout
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Enable when this bundle includes a physical product (e.g. workbook, USB drive). Stripe will prompt the buyer for a shipping address.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
