@@ -11,6 +11,7 @@
  *   - Admin: "Edit Overview" button to open the block editor
  */
 import { useState, useEffect } from "react";
+import * as React from "react";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { useParams, useLocation, useSearch, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -1273,15 +1274,76 @@ function CohortAssignmentCard({ assignment, overdue, courseId, mySubmission, onO
   );
 }
 
+// ─── Thumbnail helpers for cohort recording cards ───────────────────────────────
+function getRecordingAutoThumb(videoUrl: string | null | undefined): string | null {
+  if (!videoUrl) return null;
+  const yt = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([-\w]+)/);
+  if (yt) return `https://img.youtube.com/vi/${yt[1]}/hqdefault.jpg`;
+  const vimeo = videoUrl.match(/vimeo\.com\/(?:video\/)?([\d]+)/);
+  if (vimeo) return `__vimeo__${vimeo[1]}`;
+  const loom = videoUrl.match(/loom\.com\/(?:share|embed)\/([a-f0-9]+)/);
+  if (loom) return `__loom__${loom[1]}`;
+  const wistia = videoUrl.match(/(?:wistia\.com\/medias\/|wistia\.net\/medias\/)([a-z0-9]+)/);
+  if (wistia) return `__wistia__${wistia[1]}`;
+  if (/\.(mp4|webm|ogg|mov)([?#]|$)/i.test(videoUrl)) return `__video__${videoUrl}`;
+  return null;
+}
+function useRecordingThumb(recording: any): string | null {
+  const autoRaw = getRecordingAutoThumb(recording.videoUrl);
+  const [vimeoThumb, setVimeoThumb] = React.useState<string | null>(null);
+  const [loomThumb, setLoomThumb] = React.useState<string | null>(null);
+  const [wistiaThumb, setWistiaThumb] = React.useState<string | null>(null);
+  const vimeoId = autoRaw?.startsWith("__vimeo__") ? autoRaw.replace("__vimeo__", "") : null;
+  const loomId = autoRaw?.startsWith("__loom__") ? autoRaw.replace("__loom__", "") : null;
+  const wistiaId = autoRaw?.startsWith("__wistia__") ? autoRaw.replace("__wistia__", "") : null;
+  React.useEffect(() => {
+    if (!vimeoId) return;
+    fetch(`https://vimeo.com/api/oembed.json?url=https://vimeo.com/${vimeoId}&width=320`)
+      .then(r => r.json()).then(d => { if (d.thumbnail_url) setVimeoThumb(d.thumbnail_url); }).catch(() => {});
+  }, [vimeoId]);
+  React.useEffect(() => {
+    if (!loomId) return;
+    setLoomThumb(`https://cdn.loom.com/sessions/thumbnails/${loomId}-with-play.gif`);
+  }, [loomId]);
+  React.useEffect(() => {
+    if (!wistiaId) return;
+    fetch(`https://fast.wistia.com/oembed?url=https://home.wistia.com/medias/${wistiaId}`)
+      .then(r => r.json()).then(d => { if (d.thumbnail_url) setWistiaThumb(d.thumbnail_url); }).catch(() => {});
+  }, [wistiaId]);
+  if (recording.thumbnailUrl) return recording.thumbnailUrl;
+  if (vimeoId) return vimeoThumb;
+  if (loomId) return loomThumb;
+  if (wistiaId) return wistiaThumb;
+  if (autoRaw && !autoRaw.startsWith("__")) return autoRaw;
+  return null;
+}
+
 function CohortRecordingCard({ recording, courseId }: { recording: any; courseId: number }) {
   const durationMins = recording.durationSeconds ? Math.round(recording.durationSeconds / 60) : null;
+  const thumbSrc = useRecordingThumb(recording);
+  const isDirectVideo = getRecordingAutoThumb(recording.videoUrl)?.startsWith("__video__") ?? false;
+  const directVideoUrl = isDirectVideo ? recording.videoUrl : null;
+  const [imgErr, setImgErr] = React.useState(false);
   return (
     <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
-      <Card className="border border-gray-200 bg-white hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group">
+      <Card className="border border-gray-200 bg-white hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group overflow-hidden">
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-teal-100 group-hover:bg-teal-200 transition-colors">
-              <Film className="w-5 h-5 text-teal-600" />
+            {/* Thumbnail — 16:9 aspect box */}
+            <div className="w-24 aspect-video rounded-lg flex-shrink-0 overflow-hidden relative bg-teal-50">
+              {!imgErr && thumbSrc ? (
+                <img src={thumbSrc} alt={recording.title} className="w-full h-full object-cover" onError={() => setImgErr(true)} />
+              ) : isDirectVideo && directVideoUrl ? (
+                <video src={directVideoUrl} className="w-full h-full object-cover" preload="metadata" muted playsInline
+                  onLoadedMetadata={(e) => { (e.target as HTMLVideoElement).currentTime = 2; }} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-50 to-teal-100">
+                  <Film className="w-5 h-5 text-teal-300" />
+                </div>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors">
+                <PlayCircle className="w-5 h-5 text-white drop-shadow opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2 flex-wrap">

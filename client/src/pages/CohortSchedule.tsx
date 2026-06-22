@@ -1128,18 +1128,23 @@ function AssignmentCard({ assignment, overdue, courseId, mySubmission, onOpen }:
 
 /**
  * Derive a thumbnail URL from a video URL when no explicit thumbnail is stored.
- * Supports YouTube, Vimeo, and direct video files (via poster attribute).
- * Returns null for unsupported platforms (Loom, Wistia, etc.).
+ * Supports YouTube, Vimeo, Loom, Wistia, and direct video files.
  */
 function getAutoThumbnail(videoUrl: string | null | undefined): string | null {
   if (!videoUrl) return null;
-  // YouTube — use maxresdefault, fall back to hqdefault
+  // YouTube — use hqdefault (always available)
   const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([-\w]+)/);
   if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
   // Vimeo — thumbnail requires API call; return a placeholder signal so we can lazy-fetch
-  const vimeoMatch = videoUrl.match(/vimeo\.com\/(?:video\/)?(\.?\d+)/);
+  const vimeoMatch = videoUrl.match(/vimeo\.com\/(?:video\/)?([\d]+)/);
   if (vimeoMatch) return `__vimeo__${vimeoMatch[1]}`;
-  // Direct video file — we'll use the video element's poster via a data URL trick
+  // Loom — use their CDN thumbnail (no API key needed)
+  const loomMatch = videoUrl.match(/loom\.com\/(?:share|embed)\/([a-f0-9]+)/);
+  if (loomMatch) return `__loom__${loomMatch[1]}`;
+  // Wistia — use their oEmbed endpoint
+  const wistiaMatch = videoUrl.match(/(?:wistia\.com\/medias\/|wistia\.net\/medias\/)([a-z0-9]+)/);
+  if (wistiaMatch) return `__wistia__${wistiaMatch[1]}`;
+  // Direct video file — use the video element's poster
   if (/\.(mp4|webm|ogg|mov)([?#]|$)/i.test(videoUrl)) return `__video__${videoUrl}`;
   return null;
 }
@@ -1157,16 +1162,45 @@ function useVimeoThumbnail(videoId: string | null): string | null {
   return thumb;
 }
 
+/** Resolves Loom thumbnail — uses their CDN directly, no API key needed */
+function useLoomThumbnail(videoId: string | null): string | null {
+  const [thumb, setThumb] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!videoId) return;
+    setThumb(`https://cdn.loom.com/sessions/thumbnails/${videoId}-with-play.gif`);
+  }, [videoId]);
+  return thumb;
+}
+
+/** Resolves Wistia thumbnail via their oEmbed endpoint */
+function useWistiaThumbnail(videoId: string | null): string | null {
+  const [thumb, setThumb] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!videoId) return;
+    fetch(`https://fast.wistia.com/oembed?url=https://home.wistia.com/medias/${videoId}`)
+      .then(r => r.json())
+      .then(d => { if (d.thumbnail_url) setThumb(d.thumbnail_url); })
+      .catch(() => {});
+  }, [videoId]);
+  return thumb;
+}
+
 /**
  * Resolves the best thumbnail for a recording:
  * 1. Explicit thumbnailUrl (admin-uploaded)
- * 2. Auto-derived from videoUrl (YouTube / Vimeo / direct video)
+ * 2. Auto-derived from videoUrl (YouTube / Vimeo / Loom / Wistia / direct video)
  */
 function RecordingThumbnail({ recording, className }: { recording: any; className?: string }) {
   const autoRaw = getAutoThumbnail(recording.videoUrl);
   const isVimeo = autoRaw?.startsWith("__vimeo__") ?? false;
   const vimeoId = isVimeo ? autoRaw!.replace("__vimeo__", "") : null;
   const vimeoThumb = useVimeoThumbnail(vimeoId);
+  const isLoom = autoRaw?.startsWith("__loom__") ?? false;
+  const loomId = isLoom ? autoRaw!.replace("__loom__", "") : null;
+  const loomThumb = useLoomThumbnail(loomId);
+  const isWistia = autoRaw?.startsWith("__wistia__") ?? false;
+  const wistiaId = isWistia ? autoRaw!.replace("__wistia__", "") : null;
+  const wistiaThumb = useWistiaThumbnail(wistiaId);
   const isDirectVideo = autoRaw?.startsWith("__video__") ?? false;
   const directVideoUrl = isDirectVideo ? autoRaw!.replace("__video__", "") : null;
   const [imgError, setImgError] = React.useState(false);
@@ -1174,7 +1208,9 @@ function RecordingThumbnail({ recording, className }: { recording: any; classNam
   const thumbSrc = !imgError && (
     recording.thumbnailUrl ||
     (isVimeo ? vimeoThumb : null) ||
-    (!isVimeo && !isDirectVideo ? autoRaw : null)
+    (isLoom ? loomThumb : null) ||
+    (isWistia ? wistiaThumb : null) ||
+    (!isVimeo && !isLoom && !isWistia && !isDirectVideo ? autoRaw : null)
   );
 
   if (thumbSrc) {
