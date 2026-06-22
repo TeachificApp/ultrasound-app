@@ -2436,83 +2436,16 @@ export default function CoursePlayer() {
                       <LessonNoteEditor key={selectedLessonId} lessonId={selectedLessonId} courseSlug={slug!} initialNote={currentNote?.note ?? ""} />
                     </div>
                   )}
-                  {rightPanelTab === "info" && learningObjectives.length > 0 && (
-                    <div>
-                      <h3 className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: primaryColor }}>
-                        <ListChecks className="w-3.5 h-3.5" /> In This {lbl.lesson}:
-                      </h3>
-                      <div className="space-y-2">
-                        {learningObjectives.map((obj: string, i: number) => (
-                          <div key={i} className="flex items-start gap-2">
-                            <CheckCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: primaryColor }} />
-                            <span className="text-gray-600 text-xs leading-snug">{obj}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Section lessons checklist */}
-                  {rightPanelTab === "info" && currentSection && currentSection.lessons.length > 1 && (
-                    <div className="border-t border-gray-200 pt-4">
-                      <h3 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: primaryColor }}>In This {lbl.section}:</h3>
-                      <div className="space-y-1.5">
-                        {currentSection.lessons.map((lesson: any) => {
-                          const done = completedIds.has(lesson.id);
-                          const active = lesson.id === selectedLessonId;
-                          return (
-                            <button
-                              key={lesson.id}
-                              onClick={() => handleLessonSelect(lesson.id)}
-                              className={cn(
-                                "w-full text-left flex items-start gap-2 py-1 text-[11px] transition-colors",
-                                active ? "font-semibold" : done ? "text-gray-400 line-through" : "text-gray-600 hover:text-gray-900"
-                              )}
-                              style={active ? { color: primaryColor } : undefined}
-                            >
-                              <span className="mt-0.5 shrink-0">
-                                {done ? <CheckCircle className="w-3.5 h-3.5" style={{ color: primaryColor }} /> : active ? <PlayCircle className="w-3.5 h-3.5" style={{ color: primaryColor }} /> : <span className="w-3.5 h-3.5 rounded-full border border-gray-300 block" />}
-                              </span>
-                              <span className="leading-snug">{lesson.title}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Duration */}
-                  {rightPanelTab === "info" && lessonData.durationMinutes && (
-                    <div className="border-t border-gray-200 pt-3">
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">Estimated duration</p>
-                      <p className="text-sm font-semibold mt-0.5" style={{ color: primaryColor }}>{lessonData.durationMinutes} min</p>
-                    </div>
-                  )}
-
-                  {/* Certificate */}
-                  {rightPanelTab === "info" && certData && (
-                    <div className="border-t border-gray-200 pt-3">
-                      <button
-                        onClick={() => setShowCertDialog(true)}
-                        className="text-xs font-medium flex items-center gap-1 hover:opacity-70"
-                        style={{ color: primaryColor }}
-                      >
-                        <Award className="w-3.5 h-3.5" /> View Certificate
-                      </button>
-                    </div>
-                  )}
-
-                  {/* ── Instructor Profile Panel ── */}
+                  {/* ── Instructor Profile Panel (shown first in info tab) ── */}
                   {rightPanelTab === "info" && (() => {
-                    // Determine whether to show instructor panel:
-                    // lesson-level: 'show' always shows, 'hide' always hides, 'inherit' defers to course
                     const lessonOverride = lessonData?.showInstructor ?? "inherit";
                     const courseShow = !!(course as any).showInstructor;
                     const shouldShow = lessonOverride === "show" ? true : lessonOverride === "hide" ? false : courseShow;
                     const instructors = (data as any).instructors ?? [];
                     if (!shouldShow || instructors.length === 0) return null;
                     return (
-                      <div className="border-t border-gray-200 pt-4 space-y-3">
+                      <div className="space-y-3">
                         <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: primaryColor }}>
                           Your Instructor{instructors.length > 1 ? "s" : ""}
                         </h3>
@@ -2555,19 +2488,40 @@ export default function CoursePlayer() {
                     );
                   })()}
 
-                  {/* ── Custom Player Sidebar Blocks ── */}
+                  {/* ── Custom Player Sidebar Blocks (below instructor) ── */}
                   {rightPanelTab === "info" && (() => {
                     const rawBlocks = (course as any).playerSidebarBlocks;
                     if (!rawBlocks) return null;
                     let blocks: any[] = [];
                     try { blocks = JSON.parse(rawBlocks); } catch { return null; }
                     if (!blocks.length) return null;
+                    const instructors = (data as any).instructors ?? [];
+                    const lessonOverride = lessonData?.showInstructor ?? "inherit";
+                    const courseShow = !!(course as any).showInstructor;
+                    const instructorShown = lessonOverride === "show" ? true : lessonOverride === "hide" ? false : courseShow;
+                    const hasInstructor = instructorShown && instructors.length > 0;
                     return (
-                      <div className="border-t border-gray-200 pt-4 space-y-3">
+                      <div className={cn("space-y-3", hasInstructor && "border-t border-gray-200 pt-4")}>
                         {blocks.map((block: any) => (
                           <PlayerSidebarBlock key={block.id} block={block} primaryColor={primaryColor} />
                         ))}
                       </div>
+                    );
+                  })()}
+
+                  {/* Empty state when no instructor and no sidebar blocks */}
+                  {rightPanelTab === "info" && (() => {
+                    const instructors = (data as any).instructors ?? [];
+                    const lessonOverride = lessonData?.showInstructor ?? "inherit";
+                    const courseShow = !!(course as any).showInstructor;
+                    const instructorShown = lessonOverride === "show" ? true : lessonOverride === "hide" ? false : courseShow;
+                    const hasInstructor = instructorShown && instructors.length > 0;
+                    const rawBlocks = (course as any).playerSidebarBlocks;
+                    let blocks: any[] = [];
+                    try { if (rawBlocks) blocks = JSON.parse(rawBlocks); } catch { /* ignore */ }
+                    if (hasInstructor || blocks.length > 0) return null;
+                    return (
+                      <p className="text-[10px] text-gray-400 text-center py-6">No lesson info available.</p>
                     );
                   })()}
                   </div>

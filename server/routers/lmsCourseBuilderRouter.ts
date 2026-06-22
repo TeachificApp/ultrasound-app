@@ -985,6 +985,7 @@ export const lmsCourseBuilderRouter = router({
       liveStartAt: z.number().int().nullable().optional(),
       liveEndAt: z.number().int().nullable().optional(),
       lessonStatus: z.enum(["published", "draft"]).optional(),
+      showVideoControls: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

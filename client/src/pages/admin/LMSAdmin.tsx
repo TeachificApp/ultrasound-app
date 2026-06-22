@@ -4297,6 +4297,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
   const [lessonStatus, setLessonStatus] = useState<"published" | "draft">((lesson as any).lessonStatus ?? "published");
+  const [showVideoControls, setShowVideoControls] = useState<boolean>((lesson as any).showVideoControls ?? true);
 
   // Reset all lesson state when navigating to a different lesson
   useEffect(() => {
@@ -4319,6 +4320,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setLiveStartAt((lessonShallow as any).liveStartAt ? new Date((lessonShallow as any).liveStartAt).toISOString().slice(0, 16) : "");
     setLiveEndAt((lessonShallow as any).liveEndAt ? new Date((lessonShallow as any).liveEndAt).toISOString().slice(0, 16) : "");
     setLessonStatus((lessonShallow as any).lessonStatus ?? "published");
+    setShowVideoControls((lessonShallow as any).showVideoControls ?? true);
   }, [lessonShallow.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then)
@@ -4369,6 +4371,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       liveStartAt: liveStartAt ? new Date(liveStartAt).getTime() : null,
       liveEndAt: liveEndAt ? new Date(liveEndAt).getTime() : null,
       lessonStatus,
+      showVideoControls,
       content: (lessonType === "text" || lessonType === "video" || lessonType === "download" || lessonType === "video_text") ? (content || null) : undefined,
       videoContent: lessonType === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lessonType === "embed" ? (embedUrl || null) : undefined,
@@ -10697,14 +10700,15 @@ function CohortTab({ courseId }: { courseId: number }) {
     title: "", description: "", videoUrl: "", thumbnailUrl: "",
     durationSeconds: 0, status: "draft" as "draft" | "published",
     sessionId: null as number | null,
+    showControls: true,
   });
   const openRecordingDialog = (r?: CohortRecording) => {
     if (r) {
       setRecordingForm({ title: r.title, description: r.description ?? "", videoUrl: r.videoUrl ?? "",
         thumbnailUrl: r.thumbnailUrl ?? "", durationSeconds: r.durationSeconds ?? 0,
-        status: r.status, sessionId: r.sessionId });
+        status: r.status, sessionId: r.sessionId, showControls: r.showControls ?? true });
     } else {
-      setRecordingForm({ title: "", description: "", videoUrl: "", thumbnailUrl: "", durationSeconds: 0, status: "draft", sessionId: null });
+      setRecordingForm({ title: "", description: "", videoUrl: "", thumbnailUrl: "", durationSeconds: 0, status: "draft", sessionId: null, showControls: true });
     }
     setRecordingDialog({ open: true, recording: r });
   };
@@ -10718,6 +10722,7 @@ function CohortTab({ courseId }: { courseId: number }) {
       durationSeconds: recordingForm.durationSeconds || undefined,
       status: recordingForm.status,
       sessionId: recordingForm.sessionId,
+      showControls: recordingForm.showControls,
     };
     if (recordingDialog.recording) {
       updateRecording.mutate({ id: recordingDialog.recording.id, ...payload }, { onSuccess: () => setRecordingDialog({ open: false }) });
@@ -11322,6 +11327,17 @@ function CohortTab({ courseId }: { courseId: number }) {
                     <SelectItem value="published">Published (visible to enrolled students)</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Show video controls</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Display play, pause, volume, and seek controls to students. Disable to hide controls (e.g., for Vimeo Pro embeds that handle their own UI).</p>
+                </div>
+                <Switch
+                  checked={recordingForm.showControls}
+                  onCheckedChange={v => setRecordingForm(p => ({ ...p, showControls: v }))}
+                  className="ml-4 shrink-0"
+                />
               </div>
             </div>
             <div className="flex justify-end gap-2 p-5 border-t border-gray-100">

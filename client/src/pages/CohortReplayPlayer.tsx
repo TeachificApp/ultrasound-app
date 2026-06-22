@@ -72,10 +72,11 @@ interface PlyrVideoProps {
   primaryColor: string;
   accentColor: string;
   posterUrl?: string | null;
+  showControls?: boolean;
   onReady?: (player: Plyr) => void;
 }
 
-function PlyrVideo({ embed, primaryColor, accentColor, posterUrl, onReady }: PlyrVideoProps) {
+function PlyrVideo({ embed, primaryColor, accentColor, posterUrl, showControls = true, onReady }: PlyrVideoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Plyr | null>(null);
 
@@ -116,14 +117,12 @@ function PlyrVideo({ embed, primaryColor, accentColor, posterUrl, onReady }: Ply
     }
 
     const player = new Plyr(element, {
-      controls: [
-        "play-large", "play", "rewind", "fast-forward",
-        "progress", "current-time", "duration",
-        "mute", "volume", "captions", "settings", "pip", "fullscreen",
-      ],
+      controls: showControls
+        ? ["play-large", "play", "rewind", "fast-forward", "progress", "current-time", "duration", "mute", "volume", "captions", "settings", "pip", "fullscreen"]
+        : [],
       settings: ["quality", "speed"],
       speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
-      youtube: { noCookie: true, rel: 0 },
+      youtube: { noCookie: true, rel: 0, controls: showControls ? 1 : 0 },
       vimeo: { byline: false, portrait: false, title: false },
     });
 
@@ -339,6 +338,7 @@ export default function CohortReplayPlayer() {
   const embed = rawUrl ? getEmbedInfo(rawUrl) : null;
   const hasCustomEmbed = !!(recording as any).embedCode;
   const durationSecs = recording.durationSeconds ?? 0;
+  const showControls = recording.showControls ?? true;
 
   // Wistia videos: use iframe directly (Plyr doesn't support Wistia natively)
   const isWistia = embed?.kind === "plyr-wistia";
@@ -379,6 +379,7 @@ export default function CohortReplayPlayer() {
                 primaryColor={primaryColor}
                 accentColor={accentColor}
                 posterUrl={recording.thumbnailUrl}
+                showControls={showControls}
                 onReady={handleReady}
               />
             </div>
@@ -386,7 +387,7 @@ export default function CohortReplayPlayer() {
             // Wistia: use their native iframe embed (Plyr doesn't support Wistia)
             <div className="w-full aspect-video">
               <iframe
-                src={rawUrl}
+                src={showControls ? rawUrl : `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}controls=false`}
                 className="w-full h-full"
                 allowFullScreen
                 allow="autoplay; fullscreen"

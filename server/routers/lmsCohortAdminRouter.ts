@@ -394,6 +394,7 @@ export const lmsCohortAdminRouter = router({
       thumbnailUrl: z.string().optional(),
       durationSeconds: z.number().int().min(0).optional(),
       status: z.enum(["draft", "published"]).default("draft"),
+      showControls: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -411,6 +412,7 @@ export const lmsCohortAdminRouter = router({
         thumbnailUrl: input.thumbnailUrl ?? null,
         durationSeconds: input.durationSeconds ?? null,
         status: input.status,
+        showControls: input.showControls,
         position: Number(maxPos) + 1,
       }).$returningId();
       return { id: result.id };
@@ -426,6 +428,7 @@ export const lmsCohortAdminRouter = router({
       thumbnailUrl: z.string().nullable().optional(),
       durationSeconds: z.number().int().min(0).nullable().optional(),
       status: z.enum(["draft", "published"]).optional(),
+      showControls: z.boolean().optional(),
       position: z.number().int().optional(),
     }))
     .mutation(async ({ ctx, input }) => {

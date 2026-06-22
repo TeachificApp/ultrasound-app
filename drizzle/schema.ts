@@ -3092,6 +3092,8 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   commentsEnabled: boolean("comments_enabled").default(false).notNull(),
   // Per-lesson publish status: 'published' = visible to enrolled learners (default), 'draft' = hidden from learners even if course is published
   lessonStatus: mysqlEnum("lesson_status", ["published", "draft"]).default("published").notNull(),
+  // Show/hide native video controls (play, pause, seek, volume) for video/embed/video_text lessons. Default true.
+  showVideoControls: boolean("show_video_controls").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -5684,6 +5686,7 @@ export const lmsCohortRecordings = mysqlTable("lms_cohort_recordings", {
   thumbnailUrl: text("thumbnail_url"),
   durationSeconds: int("duration_seconds"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  showControls: boolean("show_controls").default(true).notNull(),
   position: int("position").default(0).notNull(),
   // Cohort group this recording belongs to (null = shared / single-cohort mode)
   cohortGroupId: int("cohort_group_id"),
