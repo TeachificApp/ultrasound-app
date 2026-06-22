@@ -371,6 +371,41 @@ export default function Premium() {
               {heroSubtitle}
             </p>
 
+            {/* ── Early CTA Banner (compact) ───────────────────────────── */}
+            {!status?.isPremium && (
+              <div className="inline-block bg-amber-50/10 border border-amber-400/30 rounded-2xl px-5 py-4 mb-6 w-full max-w-md mx-auto">
+                <div className="flex items-center justify-center gap-2 mb-1.5">
+                  <Flame className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                  <span className="font-black text-white text-sm" style={{ fontFamily: "Merriweather, serif" }}>
+                    Founding Member Pricing — Limited Time
+                  </span>
+                  <Flame className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                </div>
+                <p className="text-white/60 text-xs mb-3">
+                  Lock in lifetime access to {appName} before future pricing increases.
+                </p>
+                {user ? (
+                  <Button
+                    onClick={() => singleLifetime.mutate({ interval: "lifetime", origin: window.location.origin })}
+                    disabled={singleLifetime.isPending}
+                    className="font-bold px-6 py-2 text-sm rounded-xl text-white w-full sm:w-auto"
+                    style={{ background: "linear-gradient(90deg, #189aa1, #f59e0b)" }}
+                  >
+                    <Crown className="w-3.5 h-3.5 mr-1.5" />
+                    Get Lifetime Access — $99.97
+                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                  </Button>
+                ) : (
+                  <a href="/login">
+                    <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-8 py-2.5 text-sm rounded-xl w-full sm:w-auto">
+                      Sign In to Get Started
+                      <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                    </Button>
+                  </a>
+                )}
+              </div>
+            )}
+
             {/* Countdown */}
             {!countdown.expired && (
               <div className="mb-8">
@@ -392,12 +427,12 @@ export default function Premium() {
 
 
             {/* ── Pricing Cards ─────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-left">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 text-left w-full">
 
               {/* 1. Monthly — single app */}
-              <div className="bg-white rounded-2xl shadow-lg px-5 py-5 flex flex-col">
+              <div className="bg-white rounded-2xl shadow-lg px-5 py-6 flex flex-col min-h-[260px]">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Monthly</div>
-                <div className="text-4xl font-black text-[#189aa1] mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
+                <div className="text-3xl sm:text-4xl font-black text-[#189aa1] mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
                   $9.97
                 </div>
                 <div className="text-gray-400 text-xs mb-1">per month · cancel anytime</div>
@@ -424,12 +459,12 @@ export default function Premium() {
               </div>
 
               {/* 2. Lifetime — single app — FEATURED */}
-              <div className="bg-white rounded-2xl shadow-2xl px-5 py-5 flex flex-col border-2 border-amber-400 relative">
+              <div className="bg-white rounded-2xl shadow-2xl px-5 py-6 flex flex-col border-2 border-amber-400 relative min-h-[260px]">
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-amber-400 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
                   <Timer className="w-3 h-3" /> Limited Time
                 </div>
                 <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1">Lifetime Access</div>
-                <div className="text-4xl font-black text-amber-500 mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
+                <div className="text-3xl sm:text-4xl font-black text-amber-500 mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
                   $99.97
                 </div>
                 <div className="text-gray-400 text-xs mb-0.5">one-time payment</div>
@@ -457,9 +492,9 @@ export default function Premium() {
               </div>
 
               {/* 3. Dual Monthly */}
-              <div className="bg-white rounded-2xl shadow-lg px-5 py-5 flex flex-col border border-gray-100">
+              <div className="bg-white rounded-2xl shadow-lg px-5 py-6 flex flex-col border border-gray-100 min-h-[260px]">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Both Apps · Monthly</div>
-                <div className="text-4xl font-black text-[#189aa1] mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
+                <div className="text-3xl sm:text-4xl font-black text-[#189aa1] mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
                   $12.99
                 </div>
                 <div className="text-gray-400 text-xs mb-0.5">per month · cancel anytime</div>
@@ -487,13 +522,16 @@ export default function Premium() {
               </div>
 
               {/* 4. Dual Lifetime — BEST VALUE */}
-              <div className="rounded-2xl shadow-2xl px-5 py-5 flex flex-col relative overflow-hidden"
+              <div className="rounded-2xl shadow-2xl px-5 py-6 flex flex-col relative overflow-hidden min-h-[260px]"
                 style={{ background: "linear-gradient(135deg, #0e1e2e, #0e4a50)" }}>
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-gradient-to-r from-[#189aa1] to-amber-400 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
                   <Star className="w-3 h-3" /> Best Value
                 </div>
+                <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <Timer className="w-2.5 h-2.5" /> Limited-time offer
+                </div>
                 <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">Both Apps · Lifetime</div>
-                <div className="text-4xl font-black text-white mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
+                <div className="text-3xl sm:text-4xl font-black text-white mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
                   $147
                 </div>
                 <div className="text-white/50 text-xs mb-0.5">one-time payment</div>
@@ -534,7 +572,7 @@ export default function Premium() {
             </div>
 
             {/* Trust signals */}
-            <div className="flex flex-wrap items-center justify-center gap-4 text-white/50 text-xs mb-4">
+            <div className="flex flex-wrap items-center justify-center gap-3 text-white/50 text-[11px] mb-4">
               <span className="flex items-center gap-1"><Shield className="w-3 h-3" /> Secure Stripe checkout</span>
               <span className="flex items-center gap-1"><Clock  className="w-3 h-3" /> Monthly plans cancel anytime</span>
               <span className="flex items-center gap-1"><Lock   className="w-3 h-3" /> One-time payment = permanent access</span>
