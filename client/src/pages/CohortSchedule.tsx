@@ -505,7 +505,7 @@ export default function CohortSchedule() {
     onSuccess: () => refetchDisc(),
     onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
   });
-  const [replayView, setReplayView] = useState<"grid" | "list">("grid");
+  const [replayView, setReplayView] = useState<"grid" | "list">("list");
   const { data: notifPref, refetch: refetchNotifPref } = trpc.lmsLearner.getCohortNotifPref.useQuery(
     undefined,
     { enabled: activeTab === "discussions" && !!user }
