@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { type Block, type BlockType } from "@/components/BlockPreview";
 import { uid, BLOCK_CATALOG, BlockSettings, SortableBlock } from "./LandingPageBuilder";
+import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
 import {
   ArrowLeft, Save, Eye, Plus, X, Layers, Copy, Search, BookmarkPlus, Bookmark, FolderOpen, Trash2,
 } from "lucide-react";
@@ -70,6 +71,21 @@ export default function BundleLandingPageBuilder() {
   const [saveTemplateName, setSaveTemplateName] = useState("");
   const [saveTemplateDesc, setSaveTemplateDesc] = useState("");
   const utils = trpc.useUtils();
+  // Save page as template
+  const [savePageTemplateName, setSavePageTemplateName] = useState("");
+  const [savePageTemplateDesc, setSavePageTemplateDesc] = useState("");
+  const [isSavingPageTemplate, setIsSavingPageTemplate] = useState(false);
+  const savePageTemplateMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
+    onSuccess: () => { toast.success("Page template saved!"); setSavePageTemplateName(""); setSavePageTemplateDesc(""); refetchPageTemplates(); },
+    onError: (e: any) => toast.error(`Save failed: ${e.message}`),
+  });
+  const handleSavePageAsTemplate = async () => {
+    if (!savePageTemplateName.trim()) { toast.error("Please enter a template name"); return; }
+    setIsSavingPageTemplate(true);
+    try {
+      await savePageTemplateMutation.mutateAsync({ name: savePageTemplateName.trim(), description: savePageTemplateDesc.trim() || undefined, templateType: "page", blocks });
+    } finally { setIsSavingPageTemplate(false); }
+  };
   const saveBlockTemplateMutation = trpc.blockTemplates.save.useMutation({
     onSuccess: () => { toast.success("Block saved as template!"); utils.blockTemplates.list.invalidate(); setSaveTemplateDialogBlock(null); setSaveTemplateName(""); setSaveTemplateDesc(""); },
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
@@ -402,33 +418,69 @@ export default function BundleLandingPageBuilder() {
               )}
               {pickerTab === "templates" && (
                 <div className="space-y-4">
-                  {pageTemplatesLoading ? <p className="text-sm text-gray-400">Loading templates…</p> : pageTemplates.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-8">No page templates saved yet. Save a full page as a template from any builder.</p>
-                  ) : (
+                  {/* Built-in sales funnel templates */}
+                  <div className="border border-amber-200 rounded-xl p-4 bg-amber-50/70">
+                    <p className="text-xs font-semibold text-amber-700 mb-3">Built-in Sales Funnel Templates</p>
                     <div className="space-y-2">
-                      {pageTemplates.map((tpl: any) => (
-                        <div key={tpl.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                          <div>
-                            <p className="text-sm font-medium text-gray-800">{tpl.name}</p>
-                            {tpl.description && <p className="text-xs text-gray-500">{tpl.description}</p>}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
-                              const tplBlocks: Block[] = JSON.parse(tpl.blocksJson);
-                              if (blocks.length > 0 && !confirm(`Replace all ${blocks.length} block(s) with this template?`)) return;
+                      {FUNNEL_TEMPLATES.map((template, index) => (
+                        <div key={template.name} className="bg-white border border-amber-100 rounded-lg p-3">
+                          <h3 className="font-semibold text-gray-900 text-sm">{template.name}</h3>
+                          <p className="text-xs text-gray-500 mt-1">{template.description}</p>
+                          <Button
+                            onClick={() => {
+                              const tplBlocks = getFunnelTemplateBlocks(index);
                               setBlocks(tplBlocks.map(b => ({ ...b, id: uid() })));
                               setSelectedId(null);
                               setAddMenuOpen(false);
-                              toast.success("Template applied!");
-                            }}>Apply</Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs text-red-500 hover:text-red-700" onClick={() => deletePageTpl.mutate({ id: tpl.id })}>
-                              <Trash2 size={12} />
-                            </Button>
-                          </div>
+                            }}
+                            className="mt-3 h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white"
+                          >
+                            Insert funnel page
+                          </Button>
                         </div>
                       ))}
                     </div>
+                  </div>
+                  {/* Save current page as template */}
+                  <div className="border border-dashed border-teal-300 rounded-xl p-4 bg-teal-50/50">
+                    <p className="text-xs font-semibold text-teal-700 mb-3">Save Current Page as Template</p>
+                    <div className="space-y-2">
+                      <Input value={savePageTemplateName} onChange={e => setSavePageTemplateName(e.target.value)} className="h-8 text-sm" placeholder="Template name…" />
+                      <Input value={savePageTemplateDesc} onChange={e => setSavePageTemplateDesc(e.target.value)} className="h-8 text-sm" placeholder="Description (optional)" />
+                        {isSavingPageTemplate ? "Saving…" : "Save as Template"}
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Saved page templates */}
+                  {pageTemplatesLoading ? (
+                    <p className="text-sm text-gray-400">Loading templates…</p>
+                  ) : pageTemplates.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Saved Page Templates</p>
+                      <div className="space-y-2">
+                        {pageTemplates.map((tpl: any) => (
+                          <div key={tpl.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">{tpl.name}</p>
+                              {tpl.description && <p className="text-xs text-gray-500">{tpl.description}</p>}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                                const tplBlocks = JSON.parse(tpl.blocksJson);
+                                setBlocks(tplBlocks.map((b: any) => ({ ...b, id: uid() })));
+                                setSelectedId(null);
+                                setAddMenuOpen(false);
+                              }}>Apply</Button>
+                              <Button size="sm" variant="ghost" className="h-7 text-xs text-red-500 hover:text-red-700" onClick={() => deletePageTpl.mutate({ id: tpl.id })}>
+                                <Trash2 size={12} />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
+                  {/* Block templates */}
                   {blockTemplates && blockTemplates.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Block Templates</p>
@@ -442,11 +494,10 @@ export default function BundleLandingPageBuilder() {
                             </div>
                             <div className="flex gap-2">
                               <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
-                                const block: Block = { id: uid(), type: tpl.blockType as BlockType, data: JSON.parse(tpl.blockDataJson) };
+                                const block = { id: uid(), type: tpl.blockType, data: JSON.parse(tpl.blockDataJson) };
                                 setBlocks(prev => [...prev, block]);
                                 setSelectedId(block.id);
                                 setAddMenuOpen(false);
-                                toast.success("Block added!");
                               }}>Add</Button>
                               <Button size="sm" variant="ghost" className="h-7 text-xs text-red-500 hover:text-red-700" onClick={() => deleteBlockTpl.mutate({ id: tpl.id })}>
                                 <Trash2 size={12} />
