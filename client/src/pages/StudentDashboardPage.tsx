@@ -32,7 +32,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Layout from "@/components/Layout";
-import { isMembersDomain, isLearnDomain, LEARN_APP_URL } from "@/hooks/useSubdomain";
+import { isMembersDomain, isLearnDomain, LEARN_APP_URL, APP_URL, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 
@@ -1306,7 +1306,7 @@ function SubscriptionsTab() {
         icon={CreditCard}
         title="No active subscriptions"
         description="Subscribe to a premium plan to unlock full access."
-        action={{ label: "View Plans", href: "/premium" }}
+        action={{ label: "View Plans", href: `${APP_URL}/premium` }}
       />
     );
   }
@@ -1416,7 +1416,7 @@ function SubscriptionsTab() {
                                 </Button>
                               )
                             ) : !sub.stripeSubscriptionId && !isThinkific && sub.tier !== "premium" ? (
-                              <a href="/premium">
+                              <a href={brand === "iheartecho" ? `${IHEARTECHO_APP_URL}/premium` : `${APP_URL}/premium`}>
                                 <Button
                                   size="sm"
                                   className="bg-teal-600 hover:bg-teal-700 text-white"

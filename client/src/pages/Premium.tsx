@@ -354,7 +354,7 @@ export default function Premium() {
         style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
       >
         <div className="relative container py-14 md:py-20">
-          <div className="max-w-2xl mx-auto text-center">
+          <div className="max-w-5xl mx-auto text-center">
             {/* Founding Member badge */}
             <div className="inline-flex items-center gap-2 bg-amber-400/20 border border-amber-400/40 rounded-full px-4 py-1.5 mb-4">
               <Crown className="w-4 h-4 text-amber-400" />
@@ -427,7 +427,7 @@ export default function Premium() {
 
 
             {/* ── Pricing Cards ─────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 text-left w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-left w-full">
 
               {/* 1. Monthly — single app */}
               <div className="bg-white rounded-2xl shadow-lg px-5 py-6 flex flex-col min-h-[260px]">
