@@ -447,6 +447,7 @@ export default function BundleLandingPageBuilder() {
                     <div className="space-y-2">
                       <Input value={savePageTemplateName} onChange={e => setSavePageTemplateName(e.target.value)} className="h-8 text-sm" placeholder="Template name…" />
                       <Input value={savePageTemplateDesc} onChange={e => setSavePageTemplateDesc(e.target.value)} className="h-8 text-sm" placeholder="Description (optional)" />
+                      <Button onClick={handleSavePageAsTemplate} disabled={isSavingPageTemplate || !savePageTemplateName.trim()} className="w-full h-8 text-sm bg-teal-600 hover:bg-teal-700 text-white">
                         {isSavingPageTemplate ? "Saving…" : "Save as Template"}
                       </Button>
                     </div>
@@ -514,7 +515,6 @@ export default function BundleLandingPageBuilder() {
           </div>
         </div>
       )}
-
       {/* Save-as-template dialog */}
       {saveTemplateDialogBlock && (
         <Dialog open onOpenChange={() => setSaveTemplateDialogBlock(null)}>
