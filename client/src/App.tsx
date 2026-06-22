@@ -64,6 +64,7 @@ const AssignmentDetail = lazy(() => import("./pages/AssignmentDetail"));
 const CohortReplayPlayer = lazy(() => import("./pages/CohortReplayPlayer"));
 const LMSAdmin = lazy(() => import("./pages/admin/LMSAdmin"));
 const LandingPageBuilder = lazy(() => import("./pages/admin/LandingPageBuilder"));
+const CheckoutPageEditorPage = lazy(() => import("./pages/admin/CheckoutPageEditorPage"));
 const FunnelBuilder = lazy(() => import("./pages/admin/FunnelBuilder"));
 const FunnelPageEditor = lazy(() => import("./pages/admin/FunnelPageEditor"));
 const ContactsAdmin = lazy(() => import("./pages/admin/ContactsAdmin"));
@@ -857,6 +858,7 @@ function LMSRouter() {
         <Route path="/admin/lms/:courseId/cohorts/:cohortGroupId/page-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CohortGroupLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/webinars/:webinarId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><WebinarLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/bundles/:bundleId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><BundleLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/checkout-editor/:entityType/:entityId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><CheckoutPageEditorPage /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/memberships/:planId/sales-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembershipSalesPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/memberships/:planId/member-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembershipMemberPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/communities/:communityId/sales-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunitySalesPageBuilder /></RoleGuard>}</Route>

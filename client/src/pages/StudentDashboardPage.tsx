@@ -1074,7 +1074,7 @@ function MyContentTab() {
                   badge="Owned"
                   badgeColor="emerald"
                   actions={[
-                    { label: "View Bundle", icon: ExternalLink, href: `/bundle/${b.bundleSlug}` },
+                    { label: "View Bundle", icon: ExternalLink, href: `/bundles/${b.bundleSlug}` },
                   ]}
                 />
               ))}

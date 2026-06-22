@@ -507,16 +507,27 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {items.map((item) => {
+                  {items.map((item: any) => {
                     const Icon = ITEM_TYPE_ICONS[item.itemType] ?? Package;
+                    const displayName = item.itemTitle || `${ITEM_TYPE_LABELS[item.itemType] ?? item.itemType} #${item.itemId}`;
                     return (
                       <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg border bg-background">
                         <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
-                        <div className={`px-2 py-0.5 rounded text-xs font-medium ${ITEM_TYPE_COLORS[item.itemType] ?? "bg-gray-100 text-gray-700"}`}>
-                          <Icon className="w-3 h-3 inline mr-1" />
-                          {ITEM_TYPE_LABELS[item.itemType] ?? item.itemType}
+                        {/* Cover thumbnail */}
+                        {item.itemCoverImage ? (
+                          <img src={item.itemCoverImage} alt={displayName} className="w-10 h-10 rounded object-cover flex-shrink-0 border border-gray-200" />
+                        ) : (
+                          <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Icon className="w-5 h-5 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{displayName}</p>
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${ITEM_TYPE_COLORS[item.itemType] ?? "bg-gray-100 text-gray-700"}`}>
+                            <Icon className="w-3 h-3" />
+                            {ITEM_TYPE_LABELS[item.itemType] ?? item.itemType}
+                          </span>
                         </div>
-                        <span className="flex-1 text-sm font-medium truncate">ID: {item.itemId}</span>
                         <Button variant="ghost" size="sm" className="text-destructive h-7 w-7 p-0" onClick={() => removeItemMut.mutate({ itemId: item.id })}>
                           <X className="w-4 h-4" />
                         </Button>
@@ -579,7 +590,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
                   <ExternalLink className="w-3.5 h-3.5" /> Preview
                 </a>
-                <a href={`/admin/checkout-editor/bundle/${bundleId}`}
+                <a href={`/admin/bundles/${bundleId}/landing-builder`}
                   className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
                   Open Page Editor
                 </a>

@@ -250,29 +250,16 @@ export default function BundleLanding() {
           })}
         </div>
       ) : (
-        /* Default included items layout */
-        <div className="max-w-3xl mx-auto px-4 py-8">
-          <h2 className="text-xl font-semibold mb-4">What's Included ({itemCount} items)</h2>
-          <div className="space-y-3">
-            {items.map((item) => (
-              <Card key={item.id} className="hover:border-teal-400 transition-colors">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0">
-                    {ITEM_TYPE_ICONS[item.itemType] || <Package className="w-5 h-5 text-gray-400" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">
-                      {(item as any).itemTitle || `${ITEM_TYPE_LABELS[item.itemType]} #${item.itemId}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground capitalize">{ITEM_TYPE_LABELS[item.itemType]}</p>
-                  </div>
-                  <Badge variant="outline" className="text-xs capitalize">{item.itemType}</Badge>
-                  <Check className="w-5 h-5 text-teal-500" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+        /* Default included items layout — matches membership IncludedItemsBlock style */
+        <IncludedItemsBlock
+          data={{ title: `What's Included`, subtitle: `${itemCount} item${itemCount !== 1 ? "s" : ""} in this bundle`, ctaText: "Explore", showIncluded: true }}
+          items={(items as any[]).map(item => ({
+            ...item,
+            itemTitle: (item as any).itemTitle ?? null,
+            itemSlug: (item as any).itemSlug ?? null,
+            itemCoverImage: (item as any).itemCoverImage ?? null,
+          }))}
+        />
       )}
     </div>
   );

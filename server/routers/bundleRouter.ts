@@ -322,7 +322,32 @@ export const bundleAdminRouter = router({
     await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [bundle] = await db.select().from(bundles).where(eq(bundles.id, input.id)).limit(1);
     if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
-    const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, input.id)).orderBy(asc(bundleItems.sortOrder));
+    const rawItems = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, input.id)).orderBy(asc(bundleItems.sortOrder));
+    const items = await Promise.all(rawItems.map(async (item) => {
+      let itemTitle: string | null = null, itemSlug: string | null = null, itemCoverImage: string | null = null;
+      try {
+        if (item.itemType === "course" || item.itemType === "cohort") {
+          const [c] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, img: lmsCourses.coverImageUrl }).from(lmsCourses).where(eq(lmsCourses.id, item.itemId)).limit(1);
+          if (c) { itemTitle = c.title; itemSlug = c.slug; itemCoverImage = c.img ?? null; }
+        } else if (item.itemType === "quiz") {
+          const [q] = await db.select({ title: sonoQuizzes.title }).from(sonoQuizzes).where(eq(sonoQuizzes.id, item.itemId)).limit(1);
+          if (q) { itemTitle = q.title; }
+        } else if (item.itemType === "download") {
+          const [d] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug, img: digitalProducts.thumbnailUrl }).from(digitalProducts).where(eq(digitalProducts.id, item.itemId)).limit(1);
+          if (d) { itemTitle = d.title; itemSlug = d.slug; itemCoverImage = d.img ?? null; }
+        } else if (item.itemType === "product") {
+          const [p] = await db.select({ title: physicalProducts.title, slug: physicalProducts.slug }).from(physicalProducts).where(eq(physicalProducts.id, item.itemId)).limit(1);
+          if (p) { itemTitle = p.title; itemSlug = p.slug; }
+        } else if (item.itemType === "webinar") {
+          const [w] = await db.select({ title: webinars.title, slug: webinars.slug, img: webinars.coverImage }).from(webinars).where(eq(webinars.id, item.itemId)).limit(1);
+          if (w) { itemTitle = w.title; itemSlug = w.slug; itemCoverImage = w.img ?? null; }
+        } else if (item.itemType === "community") {
+          const [cm] = await db.select({ title: communities.title, slug: communities.slug, img: communities.coverImage }).from(communities).where(eq(communities.id, item.itemId)).limit(1);
+          if (cm) { itemTitle = cm.title; itemSlug = cm.slug; itemCoverImage = cm.img ?? null; }
+        }
+      } catch {}
+      return { ...item, itemTitle, itemSlug, itemCoverImage };
+    }));
     return { bundle, items };
   }),
 
