@@ -18,7 +18,7 @@ import {
   User, BookOpen, CreditCard, Award, Camera, Save, Lock, Eye, EyeOff,
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
   Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart, BarChart2, Bell,
-  GraduationCap, BookMarked, PenLine, ArrowRight, Video, Layers, Users, Star, Briefcase, MapPin, CalendarDays,
+  GraduationCap, BookMarked, PenLine, ArrowRight, Video, Layers, Users, Star, Briefcase, MapPin, CalendarDays, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1415,6 +1415,16 @@ function SubscriptionsTab() {
                                   Cancel
                                 </Button>
                               )
+                            ) : !sub.stripeSubscriptionId && !isThinkific && sub.tier !== "premium" ? (
+                              <a href="/premium">
+                                <Button
+                                  size="sm"
+                                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                                >
+                                  <Zap className="w-3.5 h-3.5 mr-1" />
+                                  Upgrade to Premium
+                                </Button>
+                              </a>
                             ) : null}
                           </div>
                         </div>
