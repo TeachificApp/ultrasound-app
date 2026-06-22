@@ -524,9 +524,6 @@ export default function Premium() {
               {/* 4. Dual Lifetime — BEST VALUE */}
               <div className="rounded-2xl shadow-2xl px-5 py-6 flex flex-col relative overflow-hidden min-h-[260px]"
                 style={{ background: "linear-gradient(135deg, #0e1e2e, #0e4a50)" }}>
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-gradient-to-r from-[#189aa1] to-amber-400 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
-                  <Star className="w-3 h-3" /> Best Value
-                </div>
                 <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                   <Timer className="w-2.5 h-2.5" /> Limited-time offer
                 </div>
