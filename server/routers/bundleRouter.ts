@@ -11,6 +11,7 @@ import {
   bundles, bundleItems, bundleEnrollments, users,
   lmsCourses, lmsEnrollments, lmsQuizzes, digitalBundlePurchases,
   digitalProducts, physicalProducts, webinars, sonoQuizzes, communities,
+  bundlePricingOptions,
 } from "../../drizzle/schema";
 
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80); }
@@ -169,17 +170,40 @@ export const bundleLearnerRouter = router({
       const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
         .where(and(eq(bundleEnrollments.bundleId, input.bundleId), eq(bundleEnrollments.userId, ctx.user.id))).limit(1);
       if (ex) return { alreadyEnrolled: true, checkoutUrl: null };
-      // Parse pricing options
-      let pricingOptions: any[] = [];
-      try { pricingOptions = JSON.parse(bundle.pricingOptions || "[]"); } catch {}
-      const selectedOption = input.pricingOptionId
-        ? pricingOptions.find((p: any) => p.id === input.pricingOptionId)
-        : pricingOptions[0];
-      if (!selectedOption && pricingOptions.length === 0) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "No pricing options configured for this bundle" });
+      // Parse pricing options — prefer structured table, fall back to legacy JSON column
+      const structuredOpts = await db.select().from(bundlePricingOptions)
+        .where(and(eq(bundlePricingOptions.bundleId, input.bundleId), eq(bundlePricingOptions.isActive, true)))
+        .orderBy(asc(bundlePricingOptions.sortOrder), asc(bundlePricingOptions.id));
+
+      let selectedOption: any;
+      let isStructured = false;
+
+      if (structuredOpts.length > 0) {
+        isStructured = true;
+        const optId = input.pricingOptionId ? parseInt(input.pricingOptionId) : null;
+        selectedOption = optId
+          ? structuredOpts.find(o => o.id === optId)
+          : structuredOpts[0];
+      } else {
+        // Legacy JSON fallback
+        let pricingOptions: any[] = [];
+        try { pricingOptions = JSON.parse(bundle.pricingOptions || "[]"); } catch {}
+        selectedOption = input.pricingOptionId
+          ? pricingOptions.find((p: any) => p.id === input.pricingOptionId)
+          : pricingOptions[0];
+        if (!selectedOption && pricingOptions.length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No pricing options configured for this bundle" });
+        }
       }
-      const price = selectedOption?.price ?? 0;
-      if (price <= 0) {
+
+      if (!selectedOption) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Pricing option not found" });
+      }
+
+      // Normalize price: structured table stores cents, legacy JSON stores dollars
+      const price = isStructured ? (selectedOption.price / 100) : (selectedOption.price ?? 0);
+
+      if (price <= 0 || selectedOption.pricingType === "free") {
         // Free pricing option — enroll directly
         await db.insert(bundleEnrollments).values({ bundleId: input.bundleId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId });
         const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, input.bundleId));
@@ -195,7 +219,9 @@ export const bundleLearnerRouter = router({
       const { default: Stripe } = await import("stripe");
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-12-18.acacia" as any });
       const origin = ctx.req.headers.origin || "https://app.allaboutultrasound.com";
-      const isSubscription = selectedOption?.type === "subscription";
+      const isSubscription = isStructured
+        ? selectedOption.pricingType === "subscription"
+        : selectedOption?.type === "subscription";
 
       // ── 100% promo intercept for bundles ──────────────────────────────────
       if (input.promoCode && !isSubscription) {
@@ -221,6 +247,28 @@ export const bundleLearnerRouter = router({
         } catch { /* ignore — checkout still works without promo */ }
       }
 
+      // Resolve subscription interval for structured options
+      const subIntervalMap: Record<string, string> = { monthly: "month", quarterly: "month", annual: "year" };
+      const subInterval = isStructured
+        ? (subIntervalMap[selectedOption.subscriptionInterval ?? "monthly"] ?? "month")
+        : (selectedOption?.interval || "month");
+      const subIntervalCount = isStructured && selectedOption.subscriptionInterval === "quarterly" ? 3 : 1;
+
+      // Use explicit Stripe Price ID if provided
+      const explicitStripePriceId = isStructured ? (selectedOption.stripePriceId ?? null) : null;
+
+      const lineItem = explicitStripePriceId
+        ? { price: explicitStripePriceId, quantity: 1 }
+        : {
+            price_data: {
+              currency: "usd",
+              product_data: { name: bundle.title, description: `Bundle: ${bundle.title}` },
+              unit_amount: Math.round(price * 100),
+              ...(isSubscription ? { recurring: { interval: subInterval, ...(subIntervalCount > 1 ? { interval_count: subIntervalCount } : {}) } } : {}),
+            },
+            quantity: 1,
+          };
+
       const session = await stripe.checkout.sessions.create({
         mode: isSubscription ? "subscription" : "payment",
         customer_email: ctx.user.email || undefined,
@@ -232,15 +280,7 @@ export const bundleLearnerRouter = router({
           pricing_option_id: input.pricingOptionId || "",
           purchase_type: "bundle_purchase",
         },
-        line_items: [{
-          price_data: {
-            currency: "usd",
-            product_data: { name: bundle.title, description: `Bundle: ${bundle.title}` },
-            unit_amount: Math.round(price * 100),
-            ...(isSubscription ? { recurring: { interval: selectedOption?.interval || "month" } } : {}),
-          },
-          quantity: 1,
-        }],
+        line_items: [lineItem],
         success_url: `${origin}/bundles/${bundle.slug}?success=1`,
         cancel_url: `${origin}/bundles/${bundle.slug}?cancelled=1`,
         ...(isSubscription ? {} : { payment_intent_data: { metadata: { user_id: ctx.user.id.toString(), bundle_id: input.bundleId.toString(), purchase_type: "bundle_purchase" } } }),
@@ -481,6 +521,103 @@ export const bundleAdminRouter = router({
       await db.update(bundles).set({ landingPageBlocks: input.config }).where(eq(bundles.id, input.bundleId));
       return { success: true };
     }),
+  // ─── Bundle Pricing Options CRUD ───────────────────────────────────────────────────────────────────────
+  listPricingOptions: protectedProcedure
+    .input(z.object({ bundleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) return [];
+      return db.select().from(bundlePricingOptions)
+        .where(eq(bundlePricingOptions.bundleId, input.bundleId))
+        .orderBy(asc(bundlePricingOptions.sortOrder), asc(bundlePricingOptions.id));
+    }),
+
+  createPricingOption: protectedProcedure
+    .input(z.object({
+      bundleId: z.number(),
+      label: z.string().min(1),
+      sublabel: z.string().optional(),
+      pricingType: z.enum(["one_time", "subscription", "payment_plan", "free"]),
+      price: z.number().default(0),
+      stripePriceId: z.string().optional(),
+      subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).optional(),
+      downPayment: z.number().optional(),
+      installmentCount: z.number().optional(),
+      installmentAmount: z.number().optional(),
+      installmentIntervalDays: z.number().optional(),
+      ctaLabel: z.string().optional(),
+      ctaUrl: z.string().optional(),
+      isActive: z.boolean().default(true),
+      sortOrder: z.number().default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const priceCents = Math.round((input.price ?? 0) * 100);
+      const [res] = await db.insert(bundlePricingOptions).values({
+        bundleId: input.bundleId,
+        label: input.label,
+        sublabel: input.sublabel ?? null,
+        pricingType: input.pricingType,
+        price: priceCents,
+        stripePriceId: input.stripePriceId ?? null,
+        subscriptionInterval: input.subscriptionInterval ?? null,
+        downPayment: input.downPayment != null ? Math.round(input.downPayment * 100) : 0,
+        installmentCount: input.installmentCount ?? 0,
+        installmentAmount: input.installmentAmount != null ? Math.round(input.installmentAmount * 100) : 0,
+        installmentIntervalDays: input.installmentIntervalDays ?? 30,
+        ctaLabel: input.ctaLabel ?? null,
+        ctaUrl: input.ctaUrl ?? null,
+        isActive: input.isActive,
+        sortOrder: input.sortOrder,
+      });
+      return { id: (res as any).insertId };
+    }),
+
+  updatePricingOption: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      label: z.string().min(1).optional(),
+      sublabel: z.string().nullable().optional(),
+      pricingType: z.enum(["one_time", "subscription", "payment_plan", "free"]).optional(),
+      price: z.number().optional(),
+      stripePriceId: z.string().nullable().optional(),
+      subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).nullable().optional(),
+      downPayment: z.number().nullable().optional(),
+      installmentCount: z.number().nullable().optional(),
+      installmentAmount: z.number().nullable().optional(),
+      installmentIntervalDays: z.number().nullable().optional(),
+      ctaLabel: z.string().nullable().optional(),
+      ctaUrl: z.string().nullable().optional(),
+      isActive: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, price, downPayment, installmentAmount, ...rest } = input;
+      const patch: any = { ...rest };
+      if (price != null) patch.price = Math.round(price * 100);
+      if (downPayment != null) patch.downPayment = Math.round(downPayment * 100);
+      if (installmentAmount != null) patch.installmentAmount = Math.round(installmentAmount * 100);
+      await db.update(bundlePricingOptions).set(patch).where(eq(bundlePricingOptions.id, id));
+      return { success: true };
+    }),
+
+  deletePricingOption: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(bundlePricingOptions).where(eq(bundlePricingOptions.id, input.id));
+      return { success: true };
+    }),
+
+  reorderPricingOptions: protectedProcedure
+    .input(z.object({ orderedIds: z.array(z.number()) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(input.orderedIds.map((id, idx) =>
+        db.update(bundlePricingOptions).set({ sortOrder: idx }).where(eq(bundlePricingOptions.id, id))
+      ));
+      return { success: true };
+    }),
+
   listAvailableItems: protectedProcedure.query(async ({ ctx }) => {
     await assertAdmin(ctx);
     const db = await getDb();

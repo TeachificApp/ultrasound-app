@@ -1,7 +1,7 @@
 /**
  * BundlesAdmin.tsx — Admin CRUD for multi-type bundles (courses, downloads, products, webinars, quizzes)
  */
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,25 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, GripVertical, BookOpen, Download, ShoppingBag, Radio, HelpCircle, X, Users, DollarSign, Eye, Workflow, Search, Copy, ExternalLink, BarChart2, Settings, RefreshCw, CheckCircle2, Code } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, GripVertical, BookOpen, Download, ShoppingBag, Radio, HelpCircle, X, Users, DollarSign, Eye, EyeOff, Edit2, Link2, Workflow, Search, Copy, ExternalLink, BarChart2, Settings, RefreshCw, CheckCircle2, Code } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
@@ -400,13 +418,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
                 </Select>
               </div>
               {accessType === "paid" && (
-                <div>
-                  <Label>Pricing Options (JSON)</Label>
-                  <Textarea value={pricingOptions} onChange={(e) => setPricingOptions(e.target.value)} rows={4}
-                    placeholder='[{"id":"one-time","label":"One-Time Purchase","price":99.99,"type":"one_time"}]'
-                    className="font-mono text-xs mt-1" />
-                  <p className="text-xs text-muted-foreground mt-1">JSON array of pricing options. Each needs: id, label, price, type (one_time/subscription).</p>
-                </div>
+                <BundlePricingOptionsEditor bundleId={bundleId} bundleSlug={bundle.slug} />
               )}
             </CardContent>
           </Card>
@@ -895,6 +907,365 @@ function IncludedItemsWidgetCodePanel({ source, id, title }: { source: "membersh
         </div>
         <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">{iframeSnippet}</pre>
       </div>
+    </div>
+  );
+}
+
+// ─── Bundle Pricing Options Editor ────────────────────────────────────────────
+
+type BundlePricingOption = {
+  id: number;
+  bundleId: number;
+  label: string;
+  sublabel: string | null;
+  pricingType: "one_time" | "subscription" | "payment_plan" | "free";
+  price: number;
+  stripePriceId: string | null;
+  subscriptionInterval: "monthly" | "quarterly" | "annual" | null;
+  downPayment: number | null;
+  installmentCount: number | null;
+  installmentAmount: number | null;
+  installmentIntervalDays: number | null;
+  ctaLabel: string | null;
+  ctaUrl: string | null;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+function BundlePricingOptionForm({
+  initial,
+  onSave,
+  onCancel,
+  saving,
+}: {
+  initial?: Partial<BundlePricingOption>;
+  onSave: (data: Omit<BundlePricingOption, "id" | "bundleId" | "sortOrder">) => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const [label, setLabel] = useState(initial?.label ?? "");
+  const [sublabel, setSublabel] = useState(initial?.sublabel ?? "");
+  const [pricingType, setPricingType] = useState<BundlePricingOption["pricingType"]>(initial?.pricingType ?? "one_time");
+  const [price, setPrice] = useState(String(Number((initial?.price ?? 0) / 100).toFixed(2)));
+  const [stripePriceId, setStripePriceId] = useState(initial?.stripePriceId ?? "");
+  const [subscriptionInterval, setSubscriptionInterval] = useState<"monthly" | "quarterly" | "annual">(initial?.subscriptionInterval ?? "monthly");
+  const [downPayment, setDownPayment] = useState(String(Number((initial?.downPayment ?? 0) / 100).toFixed(2)));
+  const [installmentCount, setInstallmentCount] = useState(String(initial?.installmentCount ?? ""));
+  const [installmentAmount, setInstallmentAmount] = useState(String(Number((initial?.installmentAmount ?? 0) / 100).toFixed(2)));
+  const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(initial?.installmentIntervalDays ?? 30));
+  const [ctaLabel, setCtaLabel] = useState(initial?.ctaLabel ?? "");
+  const [ctaUrl, setCtaUrl] = useState(initial?.ctaUrl ?? "");
+  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+
+  return (
+    <div className="border border-teal-200 rounded-lg p-4 bg-teal-50/30 space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium">Label *</Label>
+          <Input value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. 3-Month Payment Plan" className="mt-1 h-8 text-sm" />
+        </div>
+        <div>
+          <Label className="text-xs font-medium">Sub-label</Label>
+          <Input value={sublabel} onChange={e => setSublabel(e.target.value)} placeholder="e.g. 3 × $99/month" className="mt-1 h-8 text-sm" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium">Pricing Type</Label>
+          <Select value={pricingType} onValueChange={v => setPricingType(v as any)}>
+            <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="free">Free</SelectItem>
+              <SelectItem value="one_time">One-Time Purchase</SelectItem>
+              <SelectItem value="subscription">Subscription</SelectItem>
+              <SelectItem value="payment_plan">Payment Plan</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {pricingType !== "free" && pricingType !== "payment_plan" && (
+          <div>
+            <Label className="text-xs font-medium">Price (USD)</Label>
+            <Input type="number" step="0.01" min="0" value={price} onChange={e => setPrice(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+        )}
+        {pricingType === "subscription" && (
+          <div>
+            <Label className="text-xs font-medium">Billing Interval</Label>
+            <Select value={subscriptionInterval} onValueChange={v => setSubscriptionInterval(v as any)}>
+              <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="quarterly">Quarterly (every 3 months)</SelectItem>
+                <SelectItem value="annual">Annual</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+      {pricingType === "payment_plan" && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <Label className="text-xs font-medium">Down Payment ($)</Label>
+            <Input type="number" step="0.01" min="0" value={downPayment} onChange={e => setDownPayment(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs font-medium">Installments</Label>
+            <Input type="number" min="0" value={installmentCount} onChange={e => setInstallmentCount(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs font-medium">Amount Each ($)</Label>
+            <Input type="number" step="0.01" min="0" value={installmentAmount} onChange={e => setInstallmentAmount(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs font-medium">Interval (days)</Label>
+            <Input type="number" min="1" value={installmentIntervalDays} onChange={e => setInstallmentIntervalDays(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium">CTA Button Label (optional)</Label>
+          <Input value={ctaLabel} onChange={e => setCtaLabel(e.target.value)} placeholder="e.g. Buy Bundle Now" className="mt-1 h-8 text-sm" />
+        </div>
+        <div>
+          <Label className="text-xs font-medium">CTA Link URL (optional)</Label>
+          <Input value={ctaUrl} onChange={e => setCtaUrl(e.target.value)} placeholder="https://..." className="mt-1 h-8 text-sm" />
+          <p className="text-xs text-gray-400 mt-0.5">If set, the CTA button links here instead of triggering Stripe checkout.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium">Stripe Price ID (optional)</Label>
+          <Input value={stripePriceId} onChange={e => setStripePriceId(e.target.value)} placeholder="price_..." className="mt-1 h-8 text-sm font-mono" />
+          <p className="text-xs text-gray-400 mt-0.5">If set, this Stripe Price is used directly at checkout.</p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Switch checked={isActive} onCheckedChange={setIsActive} />
+          <Label className="text-xs">Active (visible on landing page)</Label>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={onCancel} className="h-7 text-xs">Cancel</Button>
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+            disabled={saving || !label.trim()}
+            onClick={() => onSave({
+              label: label.trim(),
+              sublabel: sublabel.trim() || null,
+              pricingType,
+              price: pricingType === "free" ? 0 : parseFloat(price || "0"),
+              stripePriceId: stripePriceId.trim() || null,
+              subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
+              downPayment: pricingType === "payment_plan" ? parseFloat(downPayment || "0") : null,
+              installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
+              installmentAmount: pricingType === "payment_plan" ? parseFloat(installmentAmount || "0") : null,
+              installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
+              ctaLabel: ctaLabel.trim() || null,
+              ctaUrl: ctaUrl.trim() || null,
+              isActive,
+            })}
+          >
+            {saving ? "Saving..." : "Save Option"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BundlePricingOptionRow({ opt, editingId, setEditingId, setShowAdd, updateOption, deleteOption, bundleSlug }: {
+  opt: BundlePricingOption;
+  editingId: number | null;
+  setEditingId: (id: number | null) => void;
+  setShowAdd: (v: boolean) => void;
+  updateOption: any;
+  deleteOption: any;
+  bundleSlug?: string | null;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: opt.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  const formatPrice = (o: BundlePricingOption) => {
+    if (o.pricingType === "free") return "Free";
+    if (o.pricingType === "payment_plan") {
+      const dp = Number((o.downPayment ?? 0) / 100).toFixed(2);
+      const inst = Number((o.installmentAmount ?? 0) / 100).toFixed(2);
+      const n = o.installmentCount ?? 0;
+      return `$${dp} down + ${n}×$${inst}`;
+    }
+    if (o.pricingType === "subscription") {
+      return `$${Number(o.price / 100).toFixed(2)}/${o.subscriptionInterval ?? "month"}`;
+    }
+    return `$${Number(o.price / 100).toFixed(2)}`;
+  };
+
+  const copyCheckoutLink = () => {
+    if (!bundleSlug) { toast.error("Bundle slug not available"); return; }
+    const url = `${window.location.origin}/checkout/${bundleSlug}?type=bundle&option=${opt.id}`;
+    navigator.clipboard.writeText(url)
+      .then(() => toast.success("Checkout link copied!"))
+      .catch(() => toast.success(`Checkout link: ${url}`));
+  };
+
+  if (editingId === opt.id) {
+    return (
+      <div ref={setNodeRef} style={style}>
+        <BundlePricingOptionForm
+          initial={opt}
+          onSave={(data) => updateOption.mutate({ id: opt.id, ...data })}
+          onCancel={() => setEditingId(null)}
+          saving={updateOption.isPending}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className={`flex items-center gap-2 bg-white rounded-lg border px-3 py-2 ${opt.isActive ? "border-gray-200" : "border-gray-100 opacity-60"}`}>
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 p-0.5 flex-shrink-0" title="Drag to reorder">
+        <GripVertical className="w-3.5 h-3.5" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-800 truncate">{opt.label}</p>
+        <p className="text-xs text-gray-400">{formatPrice(opt)}{opt.sublabel ? ` · ${opt.sublabel}` : ""}{opt.ctaLabel ? ` · CTA: "${opt.ctaLabel}"` : ""}</p>
+      </div>
+      <Badge className={`text-xs flex-shrink-0 ${opt.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+        {opt.isActive ? "Active" : "Hidden"}
+      </Badge>
+      <button onClick={() => updateOption.mutate({ id: opt.id, isActive: !opt.isActive })} className="text-xs text-gray-400 hover:text-gray-600 p-1 flex-shrink-0" title={opt.isActive ? "Hide" : "Show"}>
+        {opt.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+      </button>
+      <button onClick={() => { setEditingId(opt.id); setShowAdd(false); }} className="text-xs text-teal-500 hover:text-teal-700 p-1 flex-shrink-0">
+        <Edit2 className="w-3.5 h-3.5" />
+      </button>
+      <button onClick={copyCheckoutLink} className="text-xs text-teal-500 hover:text-teal-700 p-1 flex-shrink-0" title="Copy hosted checkout link">
+        <Link2 className="w-3.5 h-3.5" />
+      </button>
+      <button onClick={() => { if (confirm("Delete this pricing option?")) deleteOption.mutate({ id: opt.id }); }} className="text-xs text-red-400 hover:text-red-600 p-1 flex-shrink-0">
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function BundlePricingOptionsEditor({ bundleId, bundleSlug }: { bundleId: number; bundleSlug?: string | null }) {
+  const utils = trpc.useUtils();
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [localOrder, setLocalOrder] = useState<number[]>([]);
+
+  const { data: options = [], isLoading } = trpc.bundlesAdmin.listPricingOptions.useQuery({ bundleId });
+
+  useEffect(() => {
+    setLocalOrder((options as BundlePricingOption[]).map(o => o.id));
+  }, [options]);
+
+  const createOption = trpc.bundlesAdmin.createPricingOption.useMutation({
+    onSuccess: () => { toast.success("Pricing option added"); setShowAdd(false); utils.bundlesAdmin.listPricingOptions.invalidate({ bundleId }); },
+    onError: e => toast.error(e.message),
+  });
+
+  const updateOption = trpc.bundlesAdmin.updatePricingOption.useMutation({
+    onSuccess: () => { toast.success("Pricing option updated"); setEditingId(null); utils.bundlesAdmin.listPricingOptions.invalidate({ bundleId }); },
+    onError: e => toast.error(e.message),
+  });
+
+  const deleteOption = trpc.bundlesAdmin.deletePricingOption.useMutation({
+    onSuccess: () => { toast.success("Pricing option removed"); utils.bundlesAdmin.listPricingOptions.invalidate({ bundleId }); },
+    onError: e => toast.error(e.message),
+  });
+
+  const reorderOptions = trpc.bundlesAdmin.reorderPricingOptions.useMutation({
+    onSuccess: () => utils.bundlesAdmin.listPricingOptions.invalidate({ bundleId }),
+    onError: e => toast.error(e.message),
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = localOrder.indexOf(active.id as number);
+    const newIdx = localOrder.indexOf(over.id as number);
+    const newOrder = arrayMove(localOrder, oldIdx, newIdx);
+    setLocalOrder(newOrder);
+    reorderOptions.mutate({ orderedIds: newOrder });
+  };
+
+  const sortedOptions = localOrder
+    .map(id => (options as BundlePricingOption[]).find(o => o.id === id))
+    .filter(Boolean) as BundlePricingOption[];
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <DollarSign className="w-4 h-4 text-teal-600" /> Pricing Options
+        </h3>
+        <Button size="sm" variant="outline" className="h-7 text-xs border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => { setShowAdd(true); setEditingId(null); }}>
+          <Plus className="w-3 h-3 mr-1" /> Add Option
+        </Button>
+      </div>
+      <p className="text-xs text-gray-400">Add payment plans, group rates, or alternate pricing. Drag <GripVertical className="inline w-3 h-3" /> to reorder.</p>
+
+      {isLoading ? (
+        <div className="space-y-2">{[0,1].map(i => <Skeleton key={i} className="h-10 w-full rounded" />)}</div>
+      ) : sortedOptions.length === 0 && !showAdd ? (
+        <p className="text-xs text-gray-400 italic py-2">No pricing options yet. Click "Add Option" to create one.</p>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={localOrder} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {sortedOptions.map((opt) => (
+                <BundlePricingOptionRow
+                  key={opt.id}
+                  opt={opt}
+                  editingId={editingId}
+                  setEditingId={setEditingId}
+                  setShowAdd={setShowAdd}
+                  updateOption={updateOption}
+                  deleteOption={deleteOption}
+                  bundleSlug={bundleSlug}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {showAdd && (
+        <BundlePricingOptionForm
+          onSave={(data) => createOption.mutate({
+            bundleId,
+            label: data.label,
+            sublabel: data.sublabel ?? undefined,
+            pricingType: data.pricingType,
+            price: data.price,
+            stripePriceId: data.stripePriceId ?? undefined,
+            subscriptionInterval: data.subscriptionInterval ?? undefined,
+            downPayment: data.downPayment ?? undefined,
+            installmentCount: data.installmentCount ?? undefined,
+            installmentAmount: data.installmentAmount ?? undefined,
+            installmentIntervalDays: data.installmentIntervalDays ?? undefined,
+            ctaLabel: data.ctaLabel ?? undefined,
+            ctaUrl: data.ctaUrl ?? undefined,
+            isActive: data.isActive,
+            sortOrder: (options as BundlePricingOption[]).length,
+          })}
+          onCancel={() => setShowAdd(false)}
+          saving={createOption.isPending}
+        />
+      )}
     </div>
   );
 }

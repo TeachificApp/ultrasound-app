@@ -5058,6 +5058,29 @@ export const bundleItems = mysqlTable("bundle_items", {
 });
 export type BundleItem = typeof bundleItems.$inferSelect;
 
+// Multiple named pricing tiers per bundle (mirrors lmsPricingOptions)
+export const bundlePricingOptions = mysqlTable("bundle_pricing_options", {
+  id: int("id").autoincrement().primaryKey(),
+  bundleId: int("bundle_id").notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  sublabel: varchar("sublabel", { length: 500 }),
+  pricingType: mysqlEnum("pricing_type", ["one_time", "subscription", "payment_plan", "free"]).default("one_time").notNull(),
+  price: int("price").default(0).notNull(), // cents
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  subscriptionInterval: mysqlEnum("subscription_interval", ["monthly", "quarterly", "annual"]),
+  downPayment: int("down_payment").default(0),
+  installmentCount: int("installment_count").default(0),
+  installmentAmount: int("installment_amount").default(0),
+  installmentIntervalDays: int("installment_interval_days").default(30),
+  ctaLabel: varchar("cta_label", { length: 100 }),
+  ctaUrl: varchar("cta_url", { length: 2048 }),
+  sortOrder: int("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type BundlePricingOption = typeof bundlePricingOptions.$inferSelect;
+
 export const bundleEnrollments = mysqlTable("bundle_enrollments", {
   id: int("id").autoincrement().primaryKey(),
   bundleId: int("bundle_id").notNull(),
