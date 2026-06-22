@@ -59,14 +59,15 @@ export const funnelRouter = router({
       db.select({ id: workshops.id, title: workshops.title, slug: workshops.slug, price: workshops.price, thumbnailUrl: workshops.thumbnailUrl, isFree: workshops.isFree, status: workshops.status }).from(workshops).orderBy(asc(workshops.title)),
     ]);
     // Hardcoded app products (UltrasoundAssist + EchoAssist, Free + Premium)
-    const AAUS_HERO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
-    const IHE_HERO  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
+    // Use hero banner images (teal probe / teal heart) for product cards
+    const AAUS_HERO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp";
+    const IHE_HERO  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
     const APP_PRODUCTS = [
-      { id: 1001, type: "app" as const, name: "UltrasoundAssist™ — Free", price: 0, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: true, appLabel: "UltrasoundAssist" },
-      { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: 9.97, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "UltrasoundAssist", priceLabel: "$9.97/mo" },
-      { id: 1003, type: "app" as const, name: "EchoAssist™ — Free", price: 0, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: true, appLabel: "EchoAssist" },
-      { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: 9.97, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: false, appLabel: "EchoAssist", priceLabel: "$9.97/mo" },
-      { id: 1005, type: "app" as const, name: "UltrasoundAssist™ + EchoAssist™ — Bundle", price: 12.99, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "Bundle", priceLabel: "$12.99/mo" },
+      { id: 1001, type: "app" as const, name: "UltrasoundAssist™ — Free", price: 0, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: true, appLabel: "UltrasoundAssist™" },
+      { id: 1002, type: "app" as const, name: "UltrasoundAssist™ — Premium", price: 9.97, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "UltrasoundAssist™", priceLabel: "$9.97/mo" },
+      { id: 1003, type: "app" as const, name: "EchoAssist™ — Free", price: 0, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: true, appLabel: "EchoAssist™" },
+      { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: 9.97, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: false, appLabel: "EchoAssist™", priceLabel: "$9.97/mo" },
+      { id: 1005, type: "app" as const, name: "UltrasoundAssist™ + EchoAssist™ — Bundle", price: 12.99, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "UltrasoundAssist™ + EchoAssist™", priceLabel: "$12.99/mo" },
     ];
     return [
       ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
@@ -103,15 +104,15 @@ export const funnelRouter = router({
       const appIds = input.items.filter(i => i.type === "app").map(i => i.id);
       const allLmsCourseIds = [...new Set([...courseIds, ...cohortIds])];
 
-      // Hardcoded app products registry
-      const AAUS_HERO_R = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
-      const IHE_HERO_R  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
+      // Hardcoded app products registry — use hero banner images for product cards
+      const AAUS_HERO_R = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp";
+      const IHE_HERO_R  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
       const APP_REGISTRY: Record<number, { id: number; type: string; title: string; slug: string; description: string; price: number; isFree: boolean; imageUrl: string; href: string; appLabel?: string }> = {
-        1001: { id: 1001, type: "app", title: "UltrasoundAssist™ — Free", slug: "ultrasound-assist-free", description: "AI-powered ultrasound clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist" },
-        1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: 9.97, isFree: false, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist", priceLabel: "$9.97/mo" },
-        1003: { id: 1003, type: "app", title: "EchoAssist™ — Free", slug: "echo-assist-free", description: "AI-powered echocardiography clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist" },
-        1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: 9.97, isFree: false, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist", priceLabel: "$9.97/mo" },
-        1005: { id: 1005, type: "app", title: "UltrasoundAssist™ + EchoAssist™ — Bundle", slug: "ultrasound-echo-bundle", description: "Full access to both UltrasoundAssist™ and EchoAssist™ premium apps.", price: 12.99, isFree: false, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "Bundle", priceLabel: "$12.99/mo" },
+        1001: { id: 1001, type: "app", title: "UltrasoundAssist™ — Free", slug: "ultrasound-assist-free", description: "AI-powered ultrasound clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist™" },
+        1002: { id: 1002, type: "app", title: "UltrasoundAssist™ — Premium", slug: "ultrasound-assist-premium", description: "Full access to AI-powered ultrasound clinical intelligence.", price: 9.97, isFree: false, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist™", priceLabel: "$9.97/mo" },
+        1003: { id: 1003, type: "app", title: "EchoAssist™ — Free", slug: "echo-assist-free", description: "AI-powered echocardiography clinical intelligence, free tier.", price: 0, isFree: true, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist™" },
+        1004: { id: 1004, type: "app", title: "EchoAssist™ — Premium", slug: "echo-assist-premium", description: "Full access to AI-powered echocardiography clinical intelligence.", price: 9.97, isFree: false, imageUrl: IHE_HERO_R, href: "https://app.iheartecho.com", appLabel: "EchoAssist™", priceLabel: "$9.97/mo" },
+        1005: { id: 1005, type: "app", title: "UltrasoundAssist™ + EchoAssist™ — Bundle", slug: "ultrasound-echo-bundle", description: "Full access to both UltrasoundAssist™ and EchoAssist™ premium apps.", price: 12.99, isFree: false, imageUrl: AAUS_HERO_R, href: "https://app.allaboutultrasound.com", appLabel: "UltrasoundAssist™ + EchoAssist™", priceLabel: "$12.99/mo" },
       };
 
       const [courses, downloads, bundles, physicals, webinarRows, communityRows, workshopRows] = await Promise.all([

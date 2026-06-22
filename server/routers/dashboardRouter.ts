@@ -606,10 +606,10 @@ export const dashboardRouter = router({
       iheartecho: { premium: "EchoAssist™ Premium", free: "EchoAssist™ Free", basic: "EchoAssist™ Basic" },
     };
     const BRAND_COVER_IMAGES: Record<string, string> = {
-      // aaus: UltrasoundAssist™ — teal icon (reliable CDN URL)
-      aaus: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_teal_f0c966ce.png",
-      // iheartecho: EchoAssist™ — logo served from the iHeartEcho app domain
-      iheartecho: "https://app.iheartecho.com/manus-storage/iheartecho-logo_f9d91cd4.webp",
+      // aaus: UltrasoundAssist™ — teal probe hero banner
+      aaus: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp",
+      // iheartecho: EchoAssist™ — teal heart hero banner
+      iheartecho: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp",
     };
     const brandMembershipCards = brandMembershipRows.map(m => ({
       type: "brand" as const,
