@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   Package, Check, ArrowLeft, ShoppingCart, BookOpen,
-  FileDown, Radio, HelpCircle, Box, Sparkles
+  FileDown, Radio, HelpCircle, Box, Sparkles, Truck
 } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useMemo } from "react";
@@ -136,9 +136,16 @@ export default function BundleLanding() {
               </div>
             )}
             <div>
-              <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 mb-2">
-                <Sparkles className="w-3 h-3 mr-1" /> Bundle
-              </Badge>
+              <div className="flex flex-wrap gap-2 mb-2">
+                <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30">
+                  <Sparkles className="w-3 h-3 mr-1" /> Bundle
+                </Badge>
+                {bundle.collectShippingAddress && (
+                  <Badge className="bg-amber-400/20 text-amber-200 border-amber-400/30">
+                    <Truck className="w-3 h-3 mr-1" /> Physical item included
+                  </Badge>
+                )}
+              </div>
               <h1 className="text-3xl font-bold">{bundle.title}</h1>
               <p className="text-teal-200 mt-1 text-sm">{itemCount} items included</p>
             </div>

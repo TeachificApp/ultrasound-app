@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package } from "lucide-react";
+import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package, Truck } from "lucide-react";
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-4 h-4" />,
@@ -157,6 +157,11 @@ function BundleCard({ bundle, enrolledBundleIds }: { bundle: any; enrolledBundle
             {bundle.brand && (
               <Badge variant="outline" className="text-xs text-gray-500 border-gray-200">
                 {BRAND_LABELS[bundle.brand === "all_about_ultrasound" ? "aaus" : "iheartecho"] ?? bundle.brand}
+              </Badge>
+            )}
+            {bundle.collectShippingAddress && (
+              <Badge className="bg-amber-100 text-amber-800 border border-amber-200 text-xs font-medium flex items-center gap-1">
+                <Truck className="w-3 h-3" /> Physical item included
               </Badge>
             )}
           </div>
