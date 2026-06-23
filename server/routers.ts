@@ -453,11 +453,11 @@ export const appRouter = router({
         const token = crypto.randomBytes(48).toString('hex');
         const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
         await setPasswordResetToken(user.id, token, expiry);
-        // Always use canonical app domain for reset URLs
-        const { detectBrandMode: dbm2, getBrandDisplayConfig: gbcReset } = await import('@shared/brands');
+        // Use the origin the user is actually on for the reset URL so the link works on any domain
+        const { detectBrandMode: dbm2 } = await import('@shared/brands');
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
         const brandMode = dbm2(originHostname);
-        const appUrlReset = gbcReset(brandMode).appUrl;
+        const appUrlReset = input.origin || `https://${originHostname}`;
         const resetUrl = `${appUrlReset}/reset-password?token=${token}`;
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
