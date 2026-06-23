@@ -757,7 +757,8 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
     return;
   }
 
-  // \u2500\u2500 Grant brand membership \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Grant brand membership ─────────────────────────────────────────────────
+  const membershipTier = meta.interval === "lifetime" || !subscriptionId ? "lifetime" : "premium";
   const [existing] = await db
     .select()
     .from(brandMemberships)
@@ -767,7 +768,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
   if (existing) {
     await db.update(brandMemberships)
       .set({
-        tier: "premium",
+        tier: membershipTier,
         status: "active",
         source: "stripe",
         stripeSubscriptionId: subscriptionId ?? null,
@@ -779,7 +780,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
     await db.insert(brandMemberships).values({
       userId,
       brand,
-      tier: "premium",
+      tier: membershipTier,
       status: "active",
       source: "stripe",
       stripeSubscriptionId: subscriptionId ?? null,

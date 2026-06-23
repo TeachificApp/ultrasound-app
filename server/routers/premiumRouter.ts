@@ -19,7 +19,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getUserByEmail, getUserById, setPremiumStatus } from "../db";
 import { getDb } from "../db";
 import { brandMemberships } from "../../drizzle/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 /**
  * Check if a user has active premium via brandMemberships table (Stripe-based).
@@ -36,7 +36,7 @@ async function checkStripePremiumByUserId(userId: number, brand: string = "aaus"
         and(
           eq(brandMemberships.userId, userId),
           eq(brandMemberships.brand, brand),
-          eq(brandMemberships.tier, "premium"),
+          inArray(brandMemberships.tier, ["premium", "lifetime"]),
           eq(brandMemberships.status, "active")
         )
       )

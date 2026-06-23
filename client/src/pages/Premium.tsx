@@ -185,79 +185,55 @@ export default function Premium() {
 
   const appName = isIHE ? "EchoAssist™" : "UltrasoundAssist™";
 
-  // Stripe checkout mutations
-  const singleMonthly = trpc.brandMembership.createCheckout.useMutation({
-    onSuccess: (data) => {
-      if (data.checkoutUrl) {
-        window.open(data.checkoutUrl, "_blank");
-        toast("Redirecting to checkout…", { description: "Opening Stripe in a new tab." });
-      }
-    },
-    onError: (e: any) => {
-      if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already")) {
-        toast.success("You already have premium access!", { description: "Redirecting to your dashboard..." });
-        setTimeout(() => navigate("/"), 1200);
-      } else {
-        toast.error("Checkout failed — please try again.");
-      }
-    },
-  });
-
-  const singleLifetime = trpc.brandMembership.createCheckout.useMutation({
-    onSuccess: (data) => {
-      if (data.checkoutUrl) {
-        window.open(data.checkoutUrl, "_blank");
-        toast("Redirecting to checkout…", { description: "Opening Stripe in a new tab." });
-      }
-    },
-    onError: (e: any) => {
-      if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already")) {
-        toast.success("You already have premium access!", { description: "Redirecting to your dashboard..." });
-        setTimeout(() => navigate("/"), 1200);
-      } else {
-        toast.error("Checkout failed — please try again.");
-      }
-    },
-  });
-
-  const dualMonthly = trpc.brandMembership.createDualMembershipCheckout.useMutation({
-    onSuccess: (data) => {
-      if (data.checkoutUrl) {
-        window.open(data.checkoutUrl, "_blank");
-        toast("Redirecting to checkout…", { description: "Opening Stripe in a new tab." });
-      }
-    },
-    onError: (e: any) => {
-      if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already")) {
-        toast.success("You already have premium access!", { description: "Redirecting to your dashboard..." });
-        setTimeout(() => navigate("/"), 1200);
-      } else {
-        toast.error("Checkout failed — please try again.");
-      }
-    },
-  });
-
-  const dualLifetime = trpc.brandMembership.createDualLifetimeCheckout.useMutation({
-    onSuccess: (data) => {
-      if (data.checkoutUrl) {
-        window.open(data.checkoutUrl, "_blank");
-        toast("Redirecting to checkout…", { description: "Opening Stripe in a new tab." });
-      }
-    },
-    onError: (e: any) => {
-      if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already")) {
-        toast.success("You already have premium access!", { description: "Redirecting to your dashboard..." });
-        setTimeout(() => navigate("/"), 1200);
-      } else {
-        toast.error("Checkout failed — please try again.");
-      }
-    },
-  });
-
   const { data: status, isLoading: statusLoading, refetch } = trpc.premium.getStatus.useQuery(
     undefined,
     { enabled: !!user }
   );
+
+  const handleCheckoutSuccess = (data: { checkoutUrl?: string | null; free?: boolean }) => {
+    if (data.free) {
+      toast.success("Premium access activated!", { description: "Your membership is ready." });
+      refetch();
+      setTimeout(() => navigate("/upgrade-success"), 800);
+      return;
+    }
+    if (data.checkoutUrl) {
+      window.open(data.checkoutUrl, "_blank");
+      toast("Redirecting to checkout…", { description: "Opening Stripe in a new tab." });
+    } else {
+      toast.error("Checkout failed — no payment URL returned. Please try again.");
+    }
+  };
+
+  const handleCheckoutError = (e: { data?: { code?: string }; message?: string }) => {
+    if (e?.data?.code === "BAD_REQUEST" && e.message?.toLowerCase().includes("already")) {
+      toast.success("You already have premium access!", { description: "Redirecting to your dashboard..." });
+      setTimeout(() => navigate("/"), 1200);
+      return;
+    }
+    toast.error(e.message || "Checkout failed — please try again.");
+  };
+
+  // Stripe checkout mutations
+  const singleMonthly = trpc.brandMembership.createCheckout.useMutation({
+    onSuccess: handleCheckoutSuccess,
+    onError: handleCheckoutError,
+  });
+
+  const singleLifetime = trpc.brandMembership.createCheckout.useMutation({
+    onSuccess: handleCheckoutSuccess,
+    onError: handleCheckoutError,
+  });
+
+  const dualMonthly = trpc.brandMembership.createDualMembershipCheckout.useMutation({
+    onSuccess: handleCheckoutSuccess,
+    onError: handleCheckoutError,
+  });
+
+  const dualLifetime = trpc.brandMembership.createDualLifetimeCheckout.useMutation({
+    onSuccess: handleCheckoutSuccess,
+    onError: handleCheckoutError,
+  });
 
   const checkAndSync = trpc.premium.checkAndSync.useMutation({
     onSuccess: (data) => {
