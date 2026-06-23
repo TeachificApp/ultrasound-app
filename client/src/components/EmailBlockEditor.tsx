@@ -32,6 +32,61 @@ import {
 } from "@/pages/admin/LandingPageBuilder";
 import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search } from "lucide-react";
 
+// ─── Email-specific auto-content block types ─────────────────────────────────
+// These are email-only blocks not in the main BLOCK_CATALOG
+const EMAIL_AUTO_BLOCKS: { type: BlockType; label: string; icon: React.ReactNode; category: string; defaultData: Record<string, any> }[] = [
+  {
+    type: "included_items_auto",
+    label: "Membership Included Items",
+    icon: "✅",
+    category: "Auto Content",
+    defaultData: {
+      headline: "What's Included in Your Membership",
+      subtext: "Everything you need to advance your skills.",
+      items: [
+        { icon: "🎓", title: "All Courses", text: "Full access to every course in the library" },
+        { icon: "📹", title: "Live Cohort Replays", text: "Watch recordings of all live sessions" },
+        { icon: "📄", title: "Clinical Resources", text: "Downloadable references and guides" },
+        { icon: "🏆", title: "CME Credits", text: "Earn continuing education credits" },
+      ],
+      bgColor: "#f0fafa",
+      accentColor: "#179ca3",
+    },
+  },
+  {
+    type: "cohort_sessions_auto",
+    label: "Upcoming Cohort Sessions",
+    icon: "📅",
+    category: "Auto Content",
+    defaultData: {
+      headline: "Upcoming Live Sessions",
+      sessions: [
+        { title: "Live Q&A Session", date: "TBD", time: "TBD", description: "" },
+      ],
+      ctaText: "View All Sessions",
+      ctaLink: "https://",
+      bgColor: "#f9fafb",
+      accentColor: "#179ca3",
+    },
+  },
+  {
+    type: "related_products",
+    label: "Related Products",
+    icon: "🛍️",
+    category: "Auto Content",
+    defaultData: {
+      headline: "You Might Also Like",
+      subtext: "Explore more resources to advance your skills.",
+      products: [
+        { title: "Course Title", description: "Short description", price: "", imageUrl: "", link: "https://" },
+      ],
+      ctaText: "Learn More",
+      bgColor: "#f9fafb",
+      accentColor: "#179ca3",
+    },
+  },
+];
+
 // ─── Email-safe block types ───────────────────────────────────────────────────
 // These block types render correctly in email clients (no JS, no interactive)
 const EMAIL_SAFE_TYPES: BlockType[] = [
@@ -62,10 +117,11 @@ const EMAIL_SAFE_TYPES: BlockType[] = [
   "divided_columns",
 ];
 
-// Filter catalog to email-safe blocks only
-const EMAIL_BLOCK_CATALOG = BLOCK_CATALOG.filter((b) =>
-  EMAIL_SAFE_TYPES.includes(b.type)
-);
+// Filter catalog to email-safe blocks only, then append email-auto blocks
+const EMAIL_BLOCK_CATALOG = [
+  ...BLOCK_CATALOG.filter((b) => EMAIL_SAFE_TYPES.includes(b.type)),
+  ...EMAIL_AUTO_BLOCKS,
+];
 
 // Categories that have at least one email-safe block
 const EMAIL_CATALOG_CATEGORIES = [
@@ -73,6 +129,7 @@ const EMAIL_CATALOG_CATEGORIES = [
   "Content",
   "Marketing",
   "Conversion",
+  "Auto Content",
 ];
 
 // ─── Block → Email HTML renderer ─────────────────────────────────────────────
@@ -299,6 +356,41 @@ export function emailBlockToHtml(block: Block): string {
       ).join("");
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 20px;text-align:center;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0"><tr>${itemsHtml}</tr></table></td></tr></table>`;
     }
+    case "included_items_auto": {
+      const headline = (d.headline as string) ?? "What's Included";
+      const subtext = (d.subtext as string) ?? "";
+      const items = (d.items as { icon: string; title: string; text: string }[]) ?? [];
+      const bg = (d.bgColor as string) ?? "#f0fafa";
+      const accent = (d.accentColor as string) ?? "#179ca3";
+      const itemsHtml = items.map((item) =>
+        `<tr><td style="padding:10px 0;"><table cellpadding="0" cellspacing="0"><tr><td style="width:32px;vertical-align:top;font-size:20px;">${item.icon}</td><td style="padding-left:10px;vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${item.title}</strong><span style="color:#4a6070;font-size:13px;line-height:1.5;">${item.text}</span></td></tr></table></td></tr>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 ${subtext ? '4px' : '16px'};">` + headline + `</h3>` : ""}${subtext ? `<p style="color:#4a6070;font-size:14px;margin:0 0 16px;">` + subtext + `</p>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${itemsHtml}</table></td></tr></table>`;
+    }
+    case "cohort_sessions_auto": {
+      const headline = (d.headline as string) ?? "Upcoming Live Sessions";
+      const sessions = (d.sessions as { title: string; date: string; time: string; description: string }[]) ?? [];
+      const ctaText = (d.ctaText as string) ?? "View All Sessions";
+      const ctaLink = (d.ctaLink as string) ?? "#";
+      const bg = (d.bgColor as string) ?? "#f9fafb";
+      const accent = (d.accentColor as string) ?? "#179ca3";
+      const sessionsHtml = sessions.map((s) =>
+        `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><strong style="color:#0e1e2e;font-size:14px;">${s.title}</strong><br/><span style="color:${accent};font-size:13px;font-weight:600;">${s.date}${s.time ? ' · ' + s.time : ''}</span>${s.description ? `<p style="color:#4a6070;font-size:13px;margin:4px 0 0;">${s.description}</p>` : ""}</td></tr>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 16px;">` + headline + `</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${sessionsHtml}</table>${ctaText ? `<div style="margin-top:16px;text-align:center;"><a href="${ctaLink}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:10px 24px;border-radius:6px;font-weight:600;font-size:14px;">${ctaText}</a></div>` : ""}</td></tr></table>`;
+    }
+    case "related_products": {
+      const headline = (d.headline as string) ?? "You Might Also Like";
+      const subtext = (d.subtext as string) ?? "";
+      const products = (d.products as { title: string; description: string; price: string; imageUrl: string; link: string }[]) ?? [];
+      const ctaText = (d.ctaText as string) ?? "Learn More";
+      const bg = (d.bgColor as string) ?? "#f9fafb";
+      const accent = (d.accentColor as string) ?? "#179ca3";
+      const productsHtml = products.map((p) =>
+        `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><table cellpadding="0" cellspacing="0" width="100%"><tr>${p.imageUrl ? `<td style="width:64px;vertical-align:top;padding-right:12px;"><img src="${p.imageUrl}" alt="${p.title}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;display:block;" /></td>` : ""}<td style="vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${p.title}</strong>${p.description ? `<p style="color:#4a6070;font-size:13px;margin:2px 0;">${p.description}</p>` : ""}${p.price ? `<span style="color:${accent};font-size:13px;font-weight:600;">${p.price}</span>` : ""}</td><td style="vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${p.link || '#'}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td></tr>`
+      ).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 ${subtext ? '4px' : '16px'};">` + headline + `</h3>` : ""}${subtext ? `<p style="color:#4a6070;font-size:14px;margin:0 0 16px;">` + subtext + `</p>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${productsHtml}</table></td></tr></table>`;
+    }
     case "flip_cards": {
       const headline = (d.headline as string) ?? "";
       const cards = (d.cards as { front: string; back: string }[]) ?? [];
@@ -316,6 +408,154 @@ export function emailBlockToHtml(block: Block): string {
 
 export function emailBlocksToHtml(blocks: Block[]): string {
   return blocks.map(emailBlockToHtml).filter(Boolean).join("\n");
+}
+
+// ─── Email Auto Block Settings ──────────────────────────────────────────────
+// Simple inline settings editor for email-specific auto-content blocks
+// (avoids tRPC course/lesson context requirements of the main BlockSettings)
+function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (data: Record<string, any>) => void }) {
+  const d = block.data ?? {};
+  const set = (key: string, value: any) => onChange({ ...d, [key]: value });
+
+  if (block.type === "included_items_auto") {
+    const items = (d.items as { icon: string; title: string; text: string }[]) ?? [];
+    return (
+      <div className="space-y-3">
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Membership Included Items</p>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Headline</label>
+          <input className="w-full h-8 text-xs border rounded px-2" value={(d.headline as string) ?? ""} onChange={e => set("headline", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Subtext</label>
+          <input className="w-full h-8 text-xs border rounded px-2" value={(d.subtext as string) ?? ""} onChange={e => set("subtext", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Items</label>
+          {items.map((item, i) => (
+            <div key={i} className="border rounded p-2 mb-2 space-y-1 bg-gray-50">
+              <div className="flex gap-1">
+                <input className="w-10 h-7 text-xs border rounded px-1" value={item.icon} placeholder="emoji" onChange={e => { const next = [...items]; next[i] = { ...next[i], icon: e.target.value }; set("items", next); }} />
+                <input className="flex-1 h-7 text-xs border rounded px-2" value={item.title} placeholder="Title" onChange={e => { const next = [...items]; next[i] = { ...next[i], title: e.target.value }; set("items", next); }} />
+                <button className="text-red-400 hover:text-red-600 text-xs px-1" onClick={() => set("items", items.filter((_, j) => j !== i))}>✕</button>
+              </div>
+              <input className="w-full h-7 text-xs border rounded px-2" value={item.text} placeholder="Description" onChange={e => { const next = [...items]; next[i] = { ...next[i], text: e.target.value }; set("items", next); }} />
+            </div>
+          ))}
+          <button className="text-xs text-teal-600 hover:text-teal-800 font-medium" onClick={() => set("items", [...items, { icon: "✅", title: "", text: "" }])}>+ Add Item</button>
+        </div>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-gray-600 block mb-1">Background</label>
+            <input type="color" className="w-full h-8 border rounded" value={(d.bgColor as string) ?? "#f0fafa"} onChange={e => set("bgColor", e.target.value)} />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs font-medium text-gray-600 block mb-1">Accent</label>
+            <input type="color" className="w-full h-8 border rounded" value={(d.accentColor as string) ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (block.type === "cohort_sessions_auto") {
+    const sessions = (d.sessions as { title: string; date: string; time: string; description: string }[]) ?? [];
+    return (
+      <div className="space-y-3">
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Upcoming Cohort Sessions</p>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Headline</label>
+          <input className="w-full h-8 text-xs border rounded px-2" value={(d.headline as string) ?? ""} onChange={e => set("headline", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Sessions</label>
+          {sessions.map((s, i) => (
+            <div key={i} className="border rounded p-2 mb-2 space-y-1 bg-gray-50">
+              <div className="flex gap-1">
+                <input className="flex-1 h-7 text-xs border rounded px-2" value={s.title} placeholder="Session title" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], title: e.target.value }; set("sessions", next); }} />
+                <button className="text-red-400 hover:text-red-600 text-xs px-1" onClick={() => set("sessions", sessions.filter((_, j) => j !== i))}>✕</button>
+              </div>
+              <div className="flex gap-1">
+                <input className="flex-1 h-7 text-xs border rounded px-2" value={s.date} placeholder="Date" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], date: e.target.value }; set("sessions", next); }} />
+                <input className="flex-1 h-7 text-xs border rounded px-2" value={s.time} placeholder="Time" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], time: e.target.value }; set("sessions", next); }} />
+              </div>
+              <input className="w-full h-7 text-xs border rounded px-2" value={s.description} placeholder="Description (optional)" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], description: e.target.value }; set("sessions", next); }} />
+            </div>
+          ))}
+          <button className="text-xs text-teal-600 hover:text-teal-800 font-medium" onClick={() => set("sessions", [...sessions, { title: "", date: "", time: "", description: "" }])}>+ Add Session</button>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">CTA Button Text</label>
+          <input className="w-full h-8 text-xs border rounded px-2" value={(d.ctaText as string) ?? ""} onChange={e => set("ctaText", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">CTA Link</label>
+          <input className="w-full h-8 text-xs border rounded px-2" value={(d.ctaLink as string) ?? ""} onChange={e => set("ctaLink", e.target.value)} />
+        </div>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-gray-600 block mb-1">Background</label>
+            <input type="color" className="w-full h-8 border rounded" value={(d.bgColor as string) ?? "#f9fafb"} onChange={e => set("bgColor", e.target.value)} />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs font-medium text-gray-600 block mb-1">Accent</label>
+            <input type="color" className="w-full h-8 border rounded" value={(d.accentColor as string) ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (block.type === "related_products") {
+    const products = (d.products as { title: string; description: string; price: string; imageUrl: string; link: string }[]) ?? [];
+    return (
+      <div className="space-y-3">
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Related Products</p>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Headline</label>
+          <input className="w-full h-8 text-xs border rounded px-2" value={(d.headline as string) ?? ""} onChange={e => set("headline", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Subtext</label>
+          <input className="w-full h-8 text-xs border rounded px-2" value={(d.subtext as string) ?? ""} onChange={e => set("subtext", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">CTA Button Text</label>
+          <input className="w-full h-8 text-xs border rounded px-2" value={(d.ctaText as string) ?? ""} onChange={e => set("ctaText", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Products</label>
+          {products.map((p, i) => (
+            <div key={i} className="border rounded p-2 mb-2 space-y-1 bg-gray-50">
+              <div className="flex gap-1">
+                <input className="flex-1 h-7 text-xs border rounded px-2" value={p.title} placeholder="Product title" onChange={e => { const next = [...products]; next[i] = { ...next[i], title: e.target.value }; set("products", next); }} />
+                <button className="text-red-400 hover:text-red-600 text-xs px-1" onClick={() => set("products", products.filter((_, j) => j !== i))}>✕</button>
+              </div>
+              <input className="w-full h-7 text-xs border rounded px-2" value={p.description} placeholder="Description" onChange={e => { const next = [...products]; next[i] = { ...next[i], description: e.target.value }; set("products", next); }} />
+              <div className="flex gap-1">
+                <input className="flex-1 h-7 text-xs border rounded px-2" value={p.price} placeholder="Price (e.g. $99)" onChange={e => { const next = [...products]; next[i] = { ...next[i], price: e.target.value }; set("products", next); }} />
+                <input className="flex-1 h-7 text-xs border rounded px-2" value={p.link} placeholder="URL" onChange={e => { const next = [...products]; next[i] = { ...next[i], link: e.target.value }; set("products", next); }} />
+              </div>
+              <input className="w-full h-7 text-xs border rounded px-2" value={p.imageUrl} placeholder="Image URL (optional)" onChange={e => { const next = [...products]; next[i] = { ...next[i], imageUrl: e.target.value }; set("products", next); }} />
+            </div>
+          ))}
+          <button className="text-xs text-teal-600 hover:text-teal-800 font-medium" onClick={() => set("products", [...products, { title: "", description: "", price: "", imageUrl: "", link: "https://" }])}>+ Add Product</button>
+        </div>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-gray-600 block mb-1">Background</label>
+            <input type="color" className="w-full h-8 border rounded" value={(d.bgColor as string) ?? "#f9fafb"} onChange={e => set("bgColor", e.target.value)} />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs font-medium text-gray-600 block mb-1">Accent</label>
+            <input type="color" className="w-full h-8 border rounded" value={(d.accentColor as string) ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 // ─── Default block factory ────────────────────────────────────────────────────
@@ -342,6 +582,14 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(EMAIL_CATALOG_CATEGORIES));
   const [rightPanelWidth, setRightPanelWidth] = useState(300);
   const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+
+  // Scroll settings panel to top whenever a new block is selected
+  useEffect(() => {
+    if (selectedId && rightPanelRef.current) {
+      rightPanelRef.current.scrollTop = 0;
+    }
+  }, [selectedId]);
 
   // Sync initialBlocks when parent re-fetches (e.g. loading a draft)
   const initialized = useRef(false);
@@ -442,7 +690,7 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
   })).filter((g) => g.items.length > 0);
 
   return (
-    <div className="flex h-full min-h-[500px]">
+    <div className="flex" style={{ minHeight: 500, height: '100%' }}>
       {/* Block catalog sidebar */}
       {catalogOpen && (
         <div className="w-56 border-r border-gray-200 bg-gray-50 flex flex-col shrink-0 overflow-hidden">
@@ -500,8 +748,11 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
       {/* Canvas */}
       <div
         className="flex-1 overflow-y-auto bg-gray-100 p-4"
+        style={{ maxHeight: 'calc(100vh - 180px)' }}
         onClick={(e) => {
-          if (e.target === e.currentTarget) setSelectedId(null);
+          // Only deselect if clicking directly on the canvas background, not on a child block
+          const target = e.target as HTMLElement;
+          if (target === e.currentTarget || target.classList.contains('email-canvas-bg')) setSelectedId(null);
         }}
       >
         {/* Toolbar */}
@@ -520,7 +771,7 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
 
         {blocks.length === 0 ? (
           <div
-            className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 cursor-pointer hover:border-teal-400 hover:text-teal-500 transition-colors"
+            className="email-canvas-bg flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 cursor-pointer hover:border-teal-400 hover:text-teal-500 transition-colors"
             onClick={() => setCatalogOpen(true)}
           >
             <Plus className="w-8 h-8 mb-2" />
@@ -552,9 +803,23 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
             </SortableContext>
           </DndContext>
         )}
+
+        {/* Bottom Add Block button */}
+        {blocks.length > 0 && (
+          <div className="flex justify-center mt-4 pb-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-dashed border-teal-400 text-teal-600 hover:bg-teal-50 hover:border-teal-500"
+              onClick={() => setCatalogOpen((v) => !v)}
+            >
+              <Plus className="w-4 h-4 mr-1" /> Add Block
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Right panel — block settings */}
+      {/* Right panel — block settings (sticky, scrolls independently) */}
       {selectedBlock && (
         <>
           <div
@@ -562,8 +827,9 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
             onMouseDown={handleRightPanelMouseDown}
           />
           <div
-            className="border-l border-gray-200 bg-white overflow-y-auto shrink-0"
-            style={{ width: rightPanelWidth }}
+            ref={rightPanelRef}
+            className="border-l border-gray-200 bg-white shrink-0"
+            style={{ width: rightPanelWidth, position: 'sticky', top: 0, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto', alignSelf: 'flex-start' }}
           >
             <div className="p-3 border-b border-gray-100 flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
@@ -577,10 +843,19 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
               </button>
             </div>
             <div className="p-3">
-              <BlockSettings
-                block={selectedBlock}
-                onChange={(data) => updateBlock(selectedBlock.id, data)}
-              />
+              {/* For email-specific auto-content blocks, use a simple inline editor
+                  instead of BlockSettings (which requires tRPC course/lesson context) */}
+              {["included_items_auto", "cohort_sessions_auto", "related_products"].includes(selectedBlock.type) ? (
+                <EmailAutoBlockSettings
+                  block={selectedBlock}
+                  onChange={(data) => updateBlock(selectedBlock.id, data)}
+                />
+              ) : (
+                <BlockSettings
+                  block={selectedBlock}
+                  onChange={(data) => updateBlock(selectedBlock.id, data)}
+                />
+              )}
             </div>
           </div>
         </>

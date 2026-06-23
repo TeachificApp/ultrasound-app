@@ -639,7 +639,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="p-0 overflow-hidden" style={{ minHeight: 400 }}>
+            <CardContent className="p-0" style={{ minHeight: 400 }}>
               <EmailBlockEditor key={draftLoaded ? "loaded" : "default"} initialBlocks={blocks} onChange={handleBlocksChange} />
             </CardContent>
           </Card>
