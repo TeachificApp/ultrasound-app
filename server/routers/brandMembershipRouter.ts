@@ -328,6 +328,10 @@ export const brandMembershipRouter = router({
                   source: "promo_free",
                 });
               }
+                            (await import("../_core/notification")).notifyOwner({
+                title: `🎉 Free Brand Membership Activated (100% Promo)`,
+                content: `User ${ctx.user.id} (${ctx.user.email}) activated ${brand} ${isLifetime ? "lifetime" : "premium"} membership via 100% promo code. Source: promo_free.`,
+              }).catch(() => {});
               return { checkoutUrl: null, free: true };
             }
           } catch (err) {
@@ -335,7 +339,6 @@ export const brandMembershipRouter = router({
             /* fall through to paid checkout */
           }
         }
-
         // ── Lifetime duplicate guard ─────────────────────────────────────────────
         if (isLifetime) {
           const db = await getDb();
@@ -524,6 +527,10 @@ export const brandMembershipRouter = router({
         });
       }
 
+      (await import("../_core/notification")).notifyOwner({
+        title: `👑 Brand Membership Granted (Admin)`,
+        content: `Admin granted ${input.brand} premium membership to user ${input.userId}.`,
+      }).catch(() => {});
       return { success: true };
     }),
 

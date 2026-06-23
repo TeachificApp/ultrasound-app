@@ -164,6 +164,10 @@ export const bundleLearnerRouter = router({
             if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId: ctx.user.id, source: "bundle" });
           }
         }
+        (await import("../_core/notification")).notifyOwner({
+          title: `🎁 Free Bundle Enrollment`,
+          content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in free bundle: ${bundle.title} (ID: ${input.bundleId}).`,
+        }).catch(() => {});
         return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
       }
       // Paid bundle — create Stripe Checkout
@@ -214,6 +218,10 @@ export const bundleLearnerRouter = router({
             if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId: ctx.user.id, source: "bundle" });
           }
         }
+        (await import("../_core/notification")).notifyOwner({
+          title: `🎁 Free Bundle Enrollment (Free Pricing Option)`,
+          content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in bundle: ${bundle.title} (ID: ${input.bundleId}) via free pricing option.`,
+        }).catch(() => {});
         return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
       }
       const { default: Stripe } = await import("stripe");
@@ -241,6 +249,10 @@ export const bundleLearnerRouter = router({
                   if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId: ctx.user.id, source: "bundle" });
                 }
               }
+              (await import("../_core/notification")).notifyOwner({
+                title: `🎉 Bundle Enrolled via 100% Promo`,
+                content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in bundle: ${bundle.title} (ID: ${input.bundleId}) using 100% promo code.`,
+              }).catch(() => {});
               return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
             }
           }

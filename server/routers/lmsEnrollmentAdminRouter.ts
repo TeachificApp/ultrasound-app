@@ -173,6 +173,18 @@ export const lmsEnrollmentAdminRouter = router({
           console.error("[enrollment-email] Failed to send:", e);
         }
       })();
+      // Admin notification (fire-and-forget)
+      void (async () => {
+        try {
+          const { notifyOwner } = await import("../_core/notification");
+          const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+          const [user] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
+          await notifyOwner({
+            title: `🎓 Manual Enrollment (Admin)`,
+            content: `Admin enrolled user ${input.userId} (${user?.email ?? "unknown"}) in course: ${course?.title ?? input.courseId}.`,
+          });
+        } catch { /* ignore */ }
+      })();
       return { enrollmentId: result.id, alreadyEnrolled: false };
     }),
 
