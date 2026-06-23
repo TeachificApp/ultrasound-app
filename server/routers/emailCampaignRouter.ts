@@ -599,7 +599,7 @@ export const emailCampaignRouter = router({
     await assertAdmin(ctx.user.id);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const [courses, products, groups, cohortGroups, forms, interests, lists] = await Promise.all([
+    const [courses, products, groups, cohortGroups, forms, interests, lists, membershipPlans, bundles, workshops, communities] = await Promise.all([
       db.execute(sql`SELECT id, title FROM lms_courses WHERE status='published' ORDER BY title LIMIT 200`),
       db.execute(sql`SELECT id, title FROM digital_products WHERE is_active=1 ORDER BY title LIMIT 200`),
       db.execute(sql`SELECT id, name FROM lms_groups ORDER BY name LIMIT 200`),
@@ -625,6 +625,11 @@ export const emailCampaignRouter = router({
         .where(eq(emailLists.isActive, true))
         .orderBy(desc(emailLists.createdAt))
         .limit(200),
+      // New option lists
+      db.execute(sql`SELECT id, title FROM membership_plans WHERE status='published' ORDER BY title LIMIT 200`),
+      db.execute(sql`SELECT id, title FROM bundles WHERE status='published' ORDER BY title LIMIT 200`),
+      db.execute(sql`SELECT id, title FROM workshops WHERE status='public' OR status='hidden' ORDER BY title LIMIT 200`),
+      db.execute(sql`SELECT id, title FROM communities WHERE status='published' ORDER BY title LIMIT 200`),
     ]);
     const roleRows = await db
       .selectDistinct({ role: userRoles.role })
@@ -662,6 +667,22 @@ export const emailCampaignRouter = router({
         subscriberCount: r.subscriberCount,
       })),
       roles: roleRows.map((r) => ({ id: r.role, label: r.role.replace(/_/g, " ") })),
+      membershipPlans: (membershipPlans[0] as { id: number; title: string }[]).map((r) => ({
+        id: r.id,
+        label: r.title,
+      })),
+      bundles: (bundles[0] as { id: number; title: string }[]).map((r) => ({
+        id: r.id,
+        label: r.title,
+      })),
+      workshops: (workshops[0] as { id: number; title: string }[]).map((r) => ({
+        id: r.id,
+        label: r.title,
+      })),
+      communities: (communities[0] as { id: number; title: string }[]).map((r) => ({
+        id: r.id,
+        label: r.title,
+      })),
     };
   }),
 

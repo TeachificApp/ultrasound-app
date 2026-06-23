@@ -10,7 +10,7 @@
  *  - Save as template / load from template
  *  - Automatic unsubscribe footer injected on send
  */
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Eye, EyeOff, Send, Save, Clock, Users, Mail,
@@ -169,6 +169,14 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
   const [expanded, setExpanded] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [specificEmailsText, setSpecificEmailsText] = useState(filter.specificEmails.join("\n"));
+  // Keep specificEmailsText in sync when the filter is loaded from a saved draft
+  const prevSpecificEmails = useRef(filter.specificEmails);
+  useEffect(() => {
+    if (filter.specificEmails !== prevSpecificEmails.current) {
+      prevSpecificEmails.current = filter.specificEmails;
+      setSpecificEmailsText(filter.specificEmails.join("\n"));
+    }
+  }, [filter.specificEmails]);
 
   function update(patch: Partial<AudienceFilter>) {
     onChange({ ...filter, ...patch });
@@ -296,6 +304,24 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
             </div>
           </div>
 
+          {/* Brand / App filter */}
+          <div>
+            <label className="text-xs text-gray-500 mb-1.5 block">App / Brand</label>
+            <div className="flex flex-wrap gap-1.5">
+              {([{ key: "aaus", label: "All About Ultrasound" }, { key: "iheartecho", label: "iHeartEcho" }] as const).map(({ key, label }) => {
+                const selected = (filter.brands ?? []).includes(key);
+                return (
+                  <button key={key} type="button" onClick={() => {
+                    const arr = selected ? (filter.brands ?? []).filter((b) => b !== key) : [...(filter.brands ?? []), key];
+                    update({ brands: arr });
+                  }} className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${selected ? "bg-[#189aa1] text-white border-[#189aa1]" : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"}`}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <button type="button" onClick={() => setShowAdvanced(!showAdvanced)} className="text-xs text-[#189aa1] font-medium flex items-center gap-1">
             {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             {showAdvanced ? "Hide" : "Show"} course, product, cohort & date filters
@@ -331,6 +357,18 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
               <MultiSelect label="In Team/Group" options={options.groups} selected={filter.inGroupIds} onChange={(v) => update({ inGroupIds: v })} />
               <MultiSelect label="In Cohort Group" options={options.cohortGroups} selected={filter.inCohortGroupIds} onChange={(v) => update({ inCohortGroupIds: v })} />
               <MultiSelect label="Submitted Form" options={options.forms} selected={filter.submittedFormIds} onChange={(v) => update({ submittedFormIds: v })} />
+              {options.membershipPlans && options.membershipPlans.length > 0 && (
+                <MultiSelect label="Membership Plan" options={options.membershipPlans} selected={filter.membershipPlanIds ?? []} onChange={(v) => update({ membershipPlanIds: v })} />
+              )}
+              {options.bundles && options.bundles.length > 0 && (
+                <MultiSelect label="Bundle Enrolled" options={options.bundles} selected={filter.bundleIds ?? []} onChange={(v) => update({ bundleIds: v })} />
+              )}
+              {options.workshops && options.workshops.length > 0 && (
+                <MultiSelect label="Workshop Enrolled" options={options.workshops} selected={filter.workshopIds ?? []} onChange={(v) => update({ workshopIds: v })} />
+              )}
+              {options.communities && options.communities.length > 0 && (
+                <MultiSelect label="Community Member" options={options.communities} selected={filter.communityIds ?? []} onChange={(v) => update({ communityIds: v })} />
+              )}
             </div>
           )}
 

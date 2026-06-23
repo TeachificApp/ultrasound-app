@@ -13,6 +13,11 @@ import {
   emailListSubscribers,
   userInterests,
   lmsOrders,
+  brandMemberships,
+  membershipSubscriptions,
+  bundleEnrollments,
+  workshopEnrollments,
+  communityMembers,
 } from "../../drizzle/schema";
 import {
   type AudienceFilter,
@@ -402,6 +407,88 @@ async function emailsMatchingDimension(
     return matches;
   }
 
+  // ── New dimensions ────────────────────────────────────────────────────────
+
+  if (dimension === "brands" && filter.brands.length > 0) {
+    const rows = await db
+      .select({ userId: brandMemberships.userId })
+      .from(brandMemberships)
+      .where(
+        and(
+          inArray(brandMemberships.brand, filter.brands as string[]),
+          eq(brandMemberships.status, "active"),
+        ),
+      );
+    const idSet = new Set(rows.map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
+  if (dimension === "membershipPlans" && filter.membershipPlanIds.length > 0) {
+    const rows = await db
+      .select({ userId: membershipSubscriptions.userId })
+      .from(membershipSubscriptions)
+      .where(
+        and(
+          inArray(membershipSubscriptions.planId, filter.membershipPlanIds),
+          inArray(membershipSubscriptions.status, ["active", "trialing"]),
+        ),
+      );
+    const idSet = new Set(rows.map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
+  if (dimension === "bundles" && filter.bundleIds.length > 0) {
+    const rows = await db
+      .select({ userId: bundleEnrollments.userId })
+      .from(bundleEnrollments)
+      .where(inArray(bundleEnrollments.bundleId, filter.bundleIds));
+    const idSet = new Set(rows.map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
+  if (dimension === "workshops" && filter.workshopIds.length > 0) {
+    const rows = await db
+      .select({ userId: workshopEnrollments.userId })
+      .from(workshopEnrollments)
+      .where(inArray(workshopEnrollments.workshopId, filter.workshopIds));
+    const idSet = new Set(rows.map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
+  if (dimension === "communities" && filter.communityIds.length > 0) {
+    const rows = await db
+      .select({ userId: communityMembers.userId })
+      .from(communityMembers)
+      .where(
+        and(
+          inArray(communityMembers.communityId, filter.communityIds),
+          eq(communityMembers.memberStatus, "approved"),
+        ),
+      );
+    const idSet = new Set(rows.map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
   void candidateUserIds;
   void candidateEmails;
   return matches;
@@ -421,6 +508,11 @@ function activeDimensions(filter: AudienceFilter): string[] {
   if (filter.inGroupIds.length > 0) dims.push("groups");
   if (filter.inCohortGroupIds.length > 0) dims.push("cohorts");
   if (filter.submittedFormIds.length > 0) dims.push("forms");
+  if ((filter.brands ?? []).length > 0) dims.push("brands");
+  if ((filter.membershipPlanIds ?? []).length > 0) dims.push("membershipPlans");
+  if ((filter.bundleIds ?? []).length > 0) dims.push("bundles");
+  if ((filter.workshopIds ?? []).length > 0) dims.push("workshops");
+  if ((filter.communityIds ?? []).length > 0) dims.push("communities");
   return dims;
 }
 

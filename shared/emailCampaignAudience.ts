@@ -53,6 +53,16 @@ export const AudienceFilterSchema = z.object({
   enrolledBefore: z.string().optional(),
   purchasedAfter: z.string().optional(),
   purchasedBefore: z.string().optional(),
+  /** Filter by brand/App: "aaus" | "iheartecho" — users who have a brandMembership for this brand */
+  brands: z.array(z.enum(["aaus", "iheartecho"])).default([]),
+  /** Users subscribed to these membership plan IDs (membership_subscriptions) */
+  membershipPlanIds: z.array(z.number().int()).default([]),
+  /** Users enrolled in these bundle IDs (bundle_enrollments) */
+  bundleIds: z.array(z.number().int()).default([]),
+  /** Users enrolled in these workshop IDs (workshop_enrollments) */
+  workshopIds: z.array(z.number().int()).default([]),
+  /** Users who are members of these community IDs (community_members) */
+  communityIds: z.array(z.number().int()).default([]),
   logic: z.enum(["and", "or"]).default("and"),
   abTest: AbTestConfigSchema.optional(),
 });
@@ -89,6 +99,11 @@ export const DEFAULT_AUDIENCE_FILTER: AudienceFilter = {
   inGroupIds: [],
   inCohortGroupIds: [],
   submittedFormIds: [],
+  brands: [],
+  membershipPlanIds: [],
+  bundleIds: [],
+  workshopIds: [],
+  communityIds: [],
   logic: "and",
 };
 
