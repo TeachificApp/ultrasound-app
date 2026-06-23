@@ -30,7 +30,8 @@ import {
   type Block,
   type BlockType,
 } from "@/pages/admin/LandingPageBuilder";
-import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search, RefreshCw } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 import {
   BlockTemplateLibraryProvider,
   OpenTemplateLibraryButton,
@@ -364,36 +365,89 @@ export function emailBlockToHtml(block: Block): string {
     case "included_items_auto": {
       const headline = (d.headline as string) ?? "What's Included";
       const subtext = (d.subtext as string) ?? "";
-      const items = (d.items as { icon: string; title: string; text: string }[]) ?? [];
       const bg = (d.bgColor as string) ?? "#f0fafa";
       const accent = (d.accentColor as string) ?? "#179ca3";
-      const itemsHtml = items.map((item) =>
-        `<tr><td style="padding:10px 0;"><table cellpadding="0" cellspacing="0"><tr><td style="width:32px;vertical-align:top;font-size:20px;">${item.icon}</td><td style="padding-left:10px;vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${item.title}</strong><span style="color:#4a6070;font-size:13px;line-height:1.5;">${item.text}</span></td></tr></table></td></tr>`
-      ).join("");
+      const sourceMode = (d.sourceMode as string) ?? "manual";
+      const viewMode = (d.viewMode as string) ?? "list";
+      // Database mode: use resolvedItems (populated server-side at send time)
+      const resolvedPlans = (d.resolvedItems as { title: string; price: number; billingInterval: string; features: string[] }[]) ?? [];
+      const manualItems = (d.items as { icon: string; title: string; text: string }[]) ?? [];
+      let itemsHtml = "";
+      if (sourceMode === "database" && resolvedPlans.length > 0) {
+        if (viewMode === "card") {
+          const cardsHtml = resolvedPlans.map((plan) => {
+            const feats = (plan.features ?? []).map((f: string) =>
+              `<tr><td style="padding:3px 0;"><table cellpadding="0" cellspacing="0"><tr><td style="width:16px;color:${accent};font-size:13px;font-weight:bold;">✓</td><td style="padding-left:6px;color:#4a6070;font-size:12px;">${f}</td></tr></table></td></tr>`
+            ).join("");
+            return `<td style="width:50%;vertical-align:top;padding:8px;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5eaec;border-radius:8px;padding:16px;"><tr><td><strong style="color:#0e1e2e;font-size:15px;">${plan.title}</strong><br/><span style="color:${accent};font-size:13px;font-weight:600;">$${((plan.price ?? 0) / 100).toFixed(0)}/${plan.billingInterval}</span><table width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">${feats}</table></td></tr></table></td>`;
+          }).join("");
+          itemsHtml = `<tr>${cardsHtml}</tr>`;
+        } else {
+          itemsHtml = resolvedPlans.map((plan) => {
+            const feats = (plan.features ?? []).slice(0, 4).map((f: string) =>
+              `<span style="color:#4a6070;font-size:12px;">✓ ${f}</span>`
+            ).join(" &nbsp;·&nbsp; ");
+            return `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${plan.title}</strong><span style="color:${accent};font-size:12px;font-weight:600;">$${((plan.price ?? 0) / 100).toFixed(0)}/${plan.billingInterval}</span>${feats ? `<br/><span style="color:#4a6070;font-size:12px;">${feats}</span>` : ""}</td></tr>`;
+          }).join("");
+        }
+      } else {
+        itemsHtml = manualItems.map((item) =>
+          `<tr><td style="padding:10px 0;"><table cellpadding="0" cellspacing="0"><tr><td style="width:32px;vertical-align:top;font-size:20px;">${item.icon}</td><td style="padding-left:10px;vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${item.title}</strong><span style="color:#4a6070;font-size:13px;line-height:1.5;">${item.text}</span></td></tr></table></td></tr>`
+        ).join("");
+      }
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 ${subtext ? '4px' : '16px'};">` + headline + `</h3>` : ""}${subtext ? `<p style="color:#4a6070;font-size:14px;margin:0 0 16px;">` + subtext + `</p>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${itemsHtml}</table></td></tr></table>`;
     }
     case "cohort_sessions_auto": {
       const headline = (d.headline as string) ?? "Upcoming Live Sessions";
-      const sessions = (d.sessions as { title: string; date: string; time: string; description: string }[]) ?? [];
       const ctaText = (d.ctaText as string) ?? "View All Sessions";
       const ctaLink = (d.ctaLink as string) ?? "#";
       const bg = (d.bgColor as string) ?? "#f9fafb";
       const accent = (d.accentColor as string) ?? "#179ca3";
-      const sessionsHtml = sessions.map((s) =>
-        `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><strong style="color:#0e1e2e;font-size:14px;">${s.title}</strong><br/><span style="color:${accent};font-size:13px;font-weight:600;">${s.date}${s.time ? ' · ' + s.time : ''}</span>${s.description ? `<p style="color:#4a6070;font-size:13px;margin:4px 0 0;">${s.description}</p>` : ""}</td></tr>`
-      ).join("");
+      const sourceMode = (d.sourceMode as string) ?? "manual";
+      const viewMode = (d.viewMode as string) ?? "list";
+      const resolvedSessions = (d.resolvedItems as { title: string; date: string; time?: string; description?: string; location?: string; type?: string; link?: string }[]) ?? [];
+      const manualSessions = (d.sessions as { title: string; date: string; time: string; description: string }[]) ?? [];
+      const sessionsToRender = sourceMode === "database" && resolvedSessions.length > 0 ? resolvedSessions : manualSessions;
+      let sessionsHtml = "";
+      if (viewMode === "card" && sourceMode === "database" && resolvedSessions.length > 0) {
+        const cardsHtml = resolvedSessions.map((s) =>
+          `<td style="width:50%;vertical-align:top;padding:8px;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5eaec;border-radius:8px;padding:16px;"><tr><td><strong style="color:#0e1e2e;font-size:14px;">${s.title}</strong><br/><span style="color:${accent};font-size:12px;font-weight:600;">${s.date}${s.time ? ' · ' + s.time : ''}${s.location ? ' · ' + s.location : ''}</span>${s.description ? `<p style="color:#4a6070;font-size:12px;margin:6px 0 0;">${s.description}</p>` : ""}${s.link ? `<br/><a href="${s.link}" style="color:${accent};font-size:12px;font-weight:600;">Register →</a>` : ""}</td></tr></table></td>`
+        ).join("");
+        sessionsHtml = `<tr>${cardsHtml}</tr>`;
+      } else {
+        sessionsHtml = sessionsToRender.map((s) =>
+          `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><strong style="color:#0e1e2e;font-size:14px;">${s.title}</strong><br/><span style="color:${accent};font-size:13px;font-weight:600;">${s.date}${s.time ? ' · ' + s.time : ''}${'location' in s && s.location ? ' · ' + s.location : ''}</span>${s.description ? `<p style="color:#4a6070;font-size:13px;margin:4px 0 0;">${s.description}</p>` : ""}${'link' in s && s.link ? `<br/><a href="${s.link}" style="color:${accent};font-size:12px;font-weight:600;">Register →</a>` : ""}</td></tr>`
+        ).join("");
+      }
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 16px;">` + headline + `</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${sessionsHtml}</table>${ctaText ? `<div style="margin-top:16px;text-align:center;"><a href="${ctaLink}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:10px 24px;border-radius:6px;font-weight:600;font-size:14px;">${ctaText}</a></div>` : ""}</td></tr></table>`;
     }
     case "related_products": {
       const headline = (d.headline as string) ?? "You Might Also Like";
       const subtext = (d.subtext as string) ?? "";
-      const products = (d.products as { title: string; description: string; price: string; imageUrl: string; link: string }[]) ?? [];
       const ctaText = (d.ctaText as string) ?? "Learn More";
       const bg = (d.bgColor as string) ?? "#f9fafb";
       const accent = (d.accentColor as string) ?? "#179ca3";
-      const productsHtml = products.map((p) =>
-        `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><table cellpadding="0" cellspacing="0" width="100%"><tr>${p.imageUrl ? `<td style="width:64px;vertical-align:top;padding-right:12px;"><img src="${p.imageUrl}" alt="${p.title}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;display:block;" /></td>` : ""}<td style="vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${p.title}</strong>${p.description ? `<p style="color:#4a6070;font-size:13px;margin:2px 0;">${p.description}</p>` : ""}${p.price ? `<span style="color:${accent};font-size:13px;font-weight:600;">${p.price}</span>` : ""}</td><td style="vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${p.link || '#'}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td></tr>`
-      ).join("");
+      const sourceMode = (d.sourceMode as string) ?? "manual";
+      const viewMode = (d.viewMode as string) ?? "list";
+      const resolvedBundles = (d.resolvedItems as { title: string; description?: string; price: number; imageUrl?: string; link?: string }[]) ?? [];
+      const manualProducts = (d.products as { title: string; description: string; price: string; imageUrl: string; link: string }[]) ?? [];
+      let productsHtml = "";
+      if (sourceMode === "database" && resolvedBundles.length > 0) {
+        if (viewMode === "card") {
+          const cardsHtml = resolvedBundles.map((b) =>
+            `<td style="width:50%;vertical-align:top;padding:8px;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5eaec;border-radius:8px;overflow:hidden;"><tr><td>${b.imageUrl ? `<img src="${b.imageUrl}" alt="${b.title}" style="width:100%;height:120px;object-fit:cover;display:block;" />` : ""}</td></tr><tr><td style="padding:14px;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${b.title}</strong>${b.description ? `<p style="color:#4a6070;font-size:12px;margin:4px 0;">${b.description}</p>` : ""}<span style="color:${accent};font-size:13px;font-weight:600;">$${((b.price ?? 0) / 100).toFixed(0)}</span><br/><a href="${b.link || '#'}" style="display:inline-block;margin-top:8px;background:${accent};color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td>`
+          ).join("");
+          productsHtml = `<tr>${cardsHtml}</tr>`;
+        } else {
+          productsHtml = resolvedBundles.map((b) =>
+            `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><table cellpadding="0" cellspacing="0" width="100%"><tr>${b.imageUrl ? `<td style="width:64px;vertical-align:top;padding-right:12px;"><img src="${b.imageUrl}" alt="${b.title}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;display:block;" /></td>` : ""}<td style="vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${b.title}</strong>${b.description ? `<p style="color:#4a6070;font-size:13px;margin:2px 0;">${b.description}</p>` : ""}<span style="color:${accent};font-size:13px;font-weight:600;">$${((b.price ?? 0) / 100).toFixed(0)}</span></td><td style="vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${b.link || '#'}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td></tr>`
+          ).join("");
+        }
+      } else {
+        productsHtml = manualProducts.map((p) =>
+          `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><table cellpadding="0" cellspacing="0" width="100%"><tr>${p.imageUrl ? `<td style="width:64px;vertical-align:top;padding-right:12px;"><img src="${p.imageUrl}" alt="${p.title}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;display:block;" /></td>` : ""}<td style="vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${p.title}</strong>${p.description ? `<p style="color:#4a6070;font-size:13px;margin:2px 0;">${p.description}</p>` : ""}${p.price ? `<span style="color:${accent};font-size:13px;font-weight:600;">${p.price}</span>` : ""}</td><td style="vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${p.link || '#'}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td></tr>`
+        ).join("");
+      }
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 ${subtext ? '4px' : '16px'};">` + headline + `</h3>` : ""}${subtext ? `<p style="color:#4a6070;font-size:14px;margin:0 0 16px;">` + subtext + `</p>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${productsHtml}</table></td></tr></table>`;
     }
     case "flip_cards": {
@@ -416,17 +470,86 @@ export function emailBlocksToHtml(blocks: Block[]): string {
 }
 
 // ─── Email Auto Block Settings ──────────────────────────────────────────────
-// Simple inline settings editor for email-specific auto-content blocks
-// (avoids tRPC course/lesson context requirements of the main BlockSettings)
+// Dynamic settings editor for email-specific auto-content blocks.
+// Supports two source modes: Manual (hand-entered) and Database (live data).
 function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (data: Record<string, any>) => void }) {
   const d = block.data ?? {};
   const set = (key: string, value: any) => onChange({ ...d, [key]: value });
+  const setMany = (patch: Record<string, any>) => onChange({ ...d, ...patch });
+
+  // Fetch live data for all three block types at once (cached, shared)
+  const { data: blockOptions, isLoading: optionsLoading, refetch } = trpc.emailCampaign.getEmailBlockOptions.useQuery(undefined, {
+    staleTime: 60_000,
+  });
+
+  // Source mode: 'manual' | 'database'
+  const sourceMode = (d.sourceMode as string) ?? "manual";
+  // View mode: 'list' | 'card'
+  const viewMode = (d.viewMode as string) ?? "list";
+  // Selected IDs (for database mode)
+  const selectedIds = (d.selectedIds as number[]) ?? [];
+
+  const toggleId = (id: number) => {
+    const next = selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
+    set("selectedIds", next);
+  };
+
+  // Shared color pickers
+  const ColorPickers = () => (
+    <div className="flex gap-2 pt-1">
+      <div className="flex-1">
+        <label className="text-xs font-medium text-gray-600 block mb-1">Background</label>
+        <input type="color" className="w-full h-8 border rounded" value={(d.bgColor as string) ?? "#f0fafa"} onChange={e => set("bgColor", e.target.value)} />
+      </div>
+      <div className="flex-1">
+        <label className="text-xs font-medium text-gray-600 block mb-1">Accent</label>
+        <input type="color" className="w-full h-8 border rounded" value={(d.accentColor as string) ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} />
+      </div>
+    </div>
+  );
+
+  // Source toggle
+  const SourceToggle = () => (
+    <div className="flex rounded border border-gray-200 overflow-hidden mb-3">
+      {(["manual", "database"] as const).map((mode) => (
+        <button
+          key={mode}
+          className={`flex-1 text-xs py-1.5 font-medium transition-colors ${
+            sourceMode === mode ? "bg-teal-600 text-white" : "bg-white text-gray-500 hover:bg-gray-50"
+          }`}
+          onClick={() => set("sourceMode", mode)}
+        >
+          {mode === "manual" ? "Manual" : "From Database"}
+        </button>
+      ))}
+    </div>
+  );
+
+  // View mode toggle (for database mode)
+  const ViewModeToggle = () => (
+    <div className="mb-3">
+      <label className="text-xs font-medium text-gray-600 block mb-1">View Mode</label>
+      <div className="flex rounded border border-gray-200 overflow-hidden">
+        {(["list", "card"] as const).map((mode) => (
+          <button
+            key={mode}
+            className={`flex-1 text-xs py-1.5 font-medium transition-colors ${
+              viewMode === mode ? "bg-teal-600 text-white" : "bg-white text-gray-500 hover:bg-gray-50"
+            }`}
+            onClick={() => set("viewMode", mode)}
+          >
+            {mode === "list" ? "List" : "Card Grid"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   if (block.type === "included_items_auto") {
     const items = (d.items as { icon: string; title: string; text: string }[]) ?? [];
     return (
       <div className="space-y-3">
-        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Membership Included Items</p>
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Membership Plans</p>
         <div>
           <label className="text-xs font-medium text-gray-600 block mb-1">Headline</label>
           <input className="w-full h-8 text-xs border rounded px-2" value={(d.headline as string) ?? ""} onChange={e => set("headline", e.target.value)} />
@@ -435,30 +558,49 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
           <label className="text-xs font-medium text-gray-600 block mb-1">Subtext</label>
           <input className="w-full h-8 text-xs border rounded px-2" value={(d.subtext as string) ?? ""} onChange={e => set("subtext", e.target.value)} />
         </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">Items</label>
-          {items.map((item, i) => (
-            <div key={i} className="border rounded p-2 mb-2 space-y-1 bg-gray-50">
-              <div className="flex gap-1">
-                <input className="w-10 h-7 text-xs border rounded px-1" value={item.icon} placeholder="emoji" onChange={e => { const next = [...items]; next[i] = { ...next[i], icon: e.target.value }; set("items", next); }} />
-                <input className="flex-1 h-7 text-xs border rounded px-2" value={item.title} placeholder="Title" onChange={e => { const next = [...items]; next[i] = { ...next[i], title: e.target.value }; set("items", next); }} />
-                <button className="text-red-400 hover:text-red-600 text-xs px-1" onClick={() => set("items", items.filter((_, j) => j !== i))}>✕</button>
-              </div>
-              <input className="w-full h-7 text-xs border rounded px-2" value={item.text} placeholder="Description" onChange={e => { const next = [...items]; next[i] = { ...next[i], text: e.target.value }; set("items", next); }} />
+        <SourceToggle />
+        {sourceMode === "database" ? (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-600">Select Plans</label>
+              <button onClick={() => refetch()} className="text-gray-400 hover:text-teal-600" title="Refresh"><RefreshCw size={11} /></button>
             </div>
-          ))}
-          <button className="text-xs text-teal-600 hover:text-teal-800 font-medium" onClick={() => set("items", [...items, { icon: "✅", title: "", text: "" }])}>+ Add Item</button>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Background</label>
-            <input type="color" className="w-full h-8 border rounded" value={(d.bgColor as string) ?? "#f0fafa"} onChange={e => set("bgColor", e.target.value)} />
+            {optionsLoading ? (
+              <p className="text-xs text-gray-400">Loading plans…</p>
+            ) : !blockOptions?.membershipPlans?.length ? (
+              <p className="text-xs text-gray-400">No published membership plans found.</p>
+            ) : (
+              <div className="space-y-1 max-h-48 overflow-y-auto border rounded p-2 bg-gray-50">
+                {blockOptions.membershipPlans.map((plan) => (
+                  <label key={plan.id} className="flex items-start gap-2 cursor-pointer hover:bg-white rounded p-1">
+                    <input type="checkbox" className="mt-0.5" checked={selectedIds.includes(plan.id)} onChange={() => toggleId(plan.id)} />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-800 leading-tight">{plan.title}</p>
+                      <p className="text-[10px] text-gray-400">${((plan.price ?? 0) / 100).toFixed(0)}/{plan.billingInterval} · {(plan.featureBullets as string[])?.length ?? 0} features</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+            <ViewModeToggle />
           </div>
-          <div className="flex-1">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Accent</label>
-            <input type="color" className="w-full h-8 border rounded" value={(d.accentColor as string) ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} />
+        ) : (
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Feature Items</label>
+            {items.map((item, i) => (
+              <div key={i} className="border rounded p-2 mb-2 space-y-1 bg-gray-50">
+                <div className="flex gap-1">
+                  <input className="w-10 h-7 text-xs border rounded px-1" value={item.icon} placeholder="emoji" onChange={e => { const next = [...items]; next[i] = { ...next[i], icon: e.target.value }; set("items", next); }} />
+                  <input className="flex-1 h-7 text-xs border rounded px-2" value={item.title} placeholder="Title" onChange={e => { const next = [...items]; next[i] = { ...next[i], title: e.target.value }; set("items", next); }} />
+                  <button className="text-red-400 hover:text-red-600 text-xs px-1" onClick={() => set("items", items.filter((_, j) => j !== i))}>✕</button>
+                </div>
+                <input className="w-full h-7 text-xs border rounded px-2" value={item.text} placeholder="Description" onChange={e => { const next = [...items]; next[i] = { ...next[i], text: e.target.value }; set("items", next); }} />
+              </div>
+            ))}
+            <button className="text-xs text-teal-600 hover:text-teal-800 font-medium" onClick={() => set("items", [...items, { icon: "✅", title: "", text: "" }])}>+ Add Item</button>
           </div>
-        </div>
+        )}
+        <ColorPickers />
       </div>
     );
   }
@@ -467,28 +609,80 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
     const sessions = (d.sessions as { title: string; date: string; time: string; description: string }[]) ?? [];
     return (
       <div className="space-y-3">
-        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Upcoming Cohort Sessions</p>
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Upcoming Cohort / Workshop Sessions</p>
         <div>
           <label className="text-xs font-medium text-gray-600 block mb-1">Headline</label>
           <input className="w-full h-8 text-xs border rounded px-2" value={(d.headline as string) ?? ""} onChange={e => set("headline", e.target.value)} />
         </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">Sessions</label>
-          {sessions.map((s, i) => (
-            <div key={i} className="border rounded p-2 mb-2 space-y-1 bg-gray-50">
-              <div className="flex gap-1">
-                <input className="flex-1 h-7 text-xs border rounded px-2" value={s.title} placeholder="Session title" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], title: e.target.value }; set("sessions", next); }} />
-                <button className="text-red-400 hover:text-red-600 text-xs px-1" onClick={() => set("sessions", sessions.filter((_, j) => j !== i))}>✕</button>
+        <SourceToggle />
+        {sourceMode === "database" ? (
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-gray-600">Cohort Groups</label>
+                <button onClick={() => refetch()} className="text-gray-400 hover:text-teal-600" title="Refresh"><RefreshCw size={11} /></button>
               </div>
-              <div className="flex gap-1">
-                <input className="flex-1 h-7 text-xs border rounded px-2" value={s.date} placeholder="Date" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], date: e.target.value }; set("sessions", next); }} />
-                <input className="flex-1 h-7 text-xs border rounded px-2" value={s.time} placeholder="Time" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], time: e.target.value }; set("sessions", next); }} />
-              </div>
-              <input className="w-full h-7 text-xs border rounded px-2" value={s.description} placeholder="Description (optional)" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], description: e.target.value }; set("sessions", next); }} />
+              {optionsLoading ? (
+                <p className="text-xs text-gray-400">Loading…</p>
+              ) : !blockOptions?.cohortGroups?.length ? (
+                <p className="text-xs text-gray-400">No upcoming open cohort groups found.</p>
+              ) : (
+                <div className="space-y-1 max-h-36 overflow-y-auto border rounded p-2 bg-gray-50">
+                  {blockOptions.cohortGroups.map((cg) => (
+                    <label key={`cg-${cg.id}`} className="flex items-start gap-2 cursor-pointer hover:bg-white rounded p-1">
+                      <input type="checkbox" className="mt-0.5" checked={selectedIds.includes(cg.id)} onChange={() => toggleId(cg.id)} />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-800 leading-tight">{cg.name}</p>
+                        <p className="text-[10px] text-gray-400">{cg.courseTitle}{cg.startDate ? ` · ${new Date(cg.startDate).toLocaleDateString()}` : ""}{cg.location ? ` · ${cg.location}` : ""}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
-          <button className="text-xs text-teal-600 hover:text-teal-800 font-medium" onClick={() => set("sessions", [...sessions, { title: "", date: "", time: "", description: "" }])}>+ Add Session</button>
-        </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-gray-600">Workshop Instances</label>
+              </div>
+              {optionsLoading ? (
+                <p className="text-xs text-gray-400">Loading…</p>
+              ) : !blockOptions?.workshopInstances?.length ? (
+                <p className="text-xs text-gray-400">No upcoming workshop instances found.</p>
+              ) : (
+                <div className="space-y-1 max-h-36 overflow-y-auto border rounded p-2 bg-gray-50">
+                  {blockOptions.workshopInstances.map((wi) => (
+                    <label key={`wi-${wi.id}`} className="flex items-start gap-2 cursor-pointer hover:bg-white rounded p-1">
+                      <input type="checkbox" className="mt-0.5" checked={selectedIds.includes(wi.id + 100000)} onChange={() => toggleId(wi.id + 100000)} />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-800 leading-tight">{wi.workshopTitle} — {wi.title}</p>
+                        <p className="text-[10px] text-gray-400">{new Date(wi.startDate).toLocaleDateString()}{wi.venueCity ? ` · ${wi.venueCity}` : ""}{wi.locationType === "virtual" ? " · Virtual" : ""}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            <ViewModeToggle />
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Sessions</label>
+            {sessions.map((s, i) => (
+              <div key={i} className="border rounded p-2 mb-2 space-y-1 bg-gray-50">
+                <div className="flex gap-1">
+                  <input className="flex-1 h-7 text-xs border rounded px-2" value={s.title} placeholder="Session title" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], title: e.target.value }; set("sessions", next); }} />
+                  <button className="text-red-400 hover:text-red-600 text-xs px-1" onClick={() => set("sessions", sessions.filter((_, j) => j !== i))}>✕</button>
+                </div>
+                <div className="flex gap-1">
+                  <input className="flex-1 h-7 text-xs border rounded px-2" value={s.date} placeholder="Date" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], date: e.target.value }; set("sessions", next); }} />
+                  <input className="flex-1 h-7 text-xs border rounded px-2" value={s.time} placeholder="Time" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], time: e.target.value }; set("sessions", next); }} />
+                </div>
+                <input className="w-full h-7 text-xs border rounded px-2" value={s.description} placeholder="Description (optional)" onChange={e => { const next = [...sessions]; next[i] = { ...next[i], description: e.target.value }; set("sessions", next); }} />
+              </div>
+            ))}
+            <button className="text-xs text-teal-600 hover:text-teal-800 font-medium" onClick={() => set("sessions", [...sessions, { title: "", date: "", time: "", description: "" }])}>+ Add Session</button>
+          </div>
+        )}
         <div>
           <label className="text-xs font-medium text-gray-600 block mb-1">CTA Button Text</label>
           <input className="w-full h-8 text-xs border rounded px-2" value={(d.ctaText as string) ?? ""} onChange={e => set("ctaText", e.target.value)} />
@@ -497,16 +691,7 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
           <label className="text-xs font-medium text-gray-600 block mb-1">CTA Link</label>
           <input className="w-full h-8 text-xs border rounded px-2" value={(d.ctaLink as string) ?? ""} onChange={e => set("ctaLink", e.target.value)} />
         </div>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Background</label>
-            <input type="color" className="w-full h-8 border rounded" value={(d.bgColor as string) ?? "#f9fafb"} onChange={e => set("bgColor", e.target.value)} />
-          </div>
-          <div className="flex-1">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Accent</label>
-            <input type="color" className="w-full h-8 border rounded" value={(d.accentColor as string) ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} />
-          </div>
-        </div>
+        <ColorPickers />
       </div>
     );
   }
@@ -515,7 +700,7 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
     const products = (d.products as { title: string; description: string; price: string; imageUrl: string; link: string }[]) ?? [];
     return (
       <div className="space-y-3">
-        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Related Products</p>
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Related Products / Bundles</p>
         <div>
           <label className="text-xs font-medium text-gray-600 block mb-1">Headline</label>
           <input className="w-full h-8 text-xs border rounded px-2" value={(d.headline as string) ?? ""} onChange={e => set("headline", e.target.value)} />
@@ -524,38 +709,56 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
           <label className="text-xs font-medium text-gray-600 block mb-1">Subtext</label>
           <input className="w-full h-8 text-xs border rounded px-2" value={(d.subtext as string) ?? ""} onChange={e => set("subtext", e.target.value)} />
         </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">CTA Button Text</label>
-          <input className="w-full h-8 text-xs border rounded px-2" value={(d.ctaText as string) ?? ""} onChange={e => set("ctaText", e.target.value)} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">Products</label>
-          {products.map((p, i) => (
-            <div key={i} className="border rounded p-2 mb-2 space-y-1 bg-gray-50">
-              <div className="flex gap-1">
-                <input className="flex-1 h-7 text-xs border rounded px-2" value={p.title} placeholder="Product title" onChange={e => { const next = [...products]; next[i] = { ...next[i], title: e.target.value }; set("products", next); }} />
-                <button className="text-red-400 hover:text-red-600 text-xs px-1" onClick={() => set("products", products.filter((_, j) => j !== i))}>✕</button>
-              </div>
-              <input className="w-full h-7 text-xs border rounded px-2" value={p.description} placeholder="Description" onChange={e => { const next = [...products]; next[i] = { ...next[i], description: e.target.value }; set("products", next); }} />
-              <div className="flex gap-1">
-                <input className="flex-1 h-7 text-xs border rounded px-2" value={p.price} placeholder="Price (e.g. $99)" onChange={e => { const next = [...products]; next[i] = { ...next[i], price: e.target.value }; set("products", next); }} />
-                <input className="flex-1 h-7 text-xs border rounded px-2" value={p.link} placeholder="URL" onChange={e => { const next = [...products]; next[i] = { ...next[i], link: e.target.value }; set("products", next); }} />
-              </div>
-              <input className="w-full h-7 text-xs border rounded px-2" value={p.imageUrl} placeholder="Image URL (optional)" onChange={e => { const next = [...products]; next[i] = { ...next[i], imageUrl: e.target.value }; set("products", next); }} />
+        <SourceToggle />
+        {sourceMode === "database" ? (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-600">Select Bundles</label>
+              <button onClick={() => refetch()} className="text-gray-400 hover:text-teal-600" title="Refresh"><RefreshCw size={11} /></button>
             </div>
-          ))}
-          <button className="text-xs text-teal-600 hover:text-teal-800 font-medium" onClick={() => set("products", [...products, { title: "", description: "", price: "", imageUrl: "", link: "https://" }])}>+ Add Product</button>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Background</label>
-            <input type="color" className="w-full h-8 border rounded" value={(d.bgColor as string) ?? "#f9fafb"} onChange={e => set("bgColor", e.target.value)} />
+            {optionsLoading ? (
+              <p className="text-xs text-gray-400">Loading bundles…</p>
+            ) : !blockOptions?.bundles?.length ? (
+              <p className="text-xs text-gray-400">No published bundles found.</p>
+            ) : (
+              <div className="space-y-1 max-h-48 overflow-y-auto border rounded p-2 bg-gray-50">
+                {blockOptions.bundles.map((b) => (
+                  <label key={b.id} className="flex items-start gap-2 cursor-pointer hover:bg-white rounded p-1">
+                    <input type="checkbox" className="mt-0.5" checked={selectedIds.includes(b.id)} onChange={() => toggleId(b.id)} />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-800 leading-tight">{b.title}</p>
+                      {b.subtitle && <p className="text-[10px] text-gray-400 truncate">{b.subtitle}</p>}
+                      <p className="text-[10px] text-gray-400">${((b.price ?? 0) / 100).toFixed(0)}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+            <ViewModeToggle />
           </div>
-          <div className="flex-1">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Accent</label>
-            <input type="color" className="w-full h-8 border rounded" value={(d.accentColor as string) ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} />
+        ) : (
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">CTA Button Text</label>
+            <input className="w-full h-8 text-xs border rounded px-2" value={(d.ctaText as string) ?? ""} onChange={e => set("ctaText", e.target.value)} />
+            <label className="text-xs font-medium text-gray-600 block mb-1 mt-2">Products</label>
+            {products.map((p, i) => (
+              <div key={i} className="border rounded p-2 mb-2 space-y-1 bg-gray-50">
+                <div className="flex gap-1">
+                  <input className="flex-1 h-7 text-xs border rounded px-2" value={p.title} placeholder="Product title" onChange={e => { const next = [...products]; next[i] = { ...next[i], title: e.target.value }; set("products", next); }} />
+                  <button className="text-red-400 hover:text-red-600 text-xs px-1" onClick={() => set("products", products.filter((_, j) => j !== i))}>✕</button>
+                </div>
+                <input className="w-full h-7 text-xs border rounded px-2" value={p.description} placeholder="Description" onChange={e => { const next = [...products]; next[i] = { ...next[i], description: e.target.value }; set("products", next); }} />
+                <div className="flex gap-1">
+                  <input className="flex-1 h-7 text-xs border rounded px-2" value={p.price} placeholder="Price (e.g. $99)" onChange={e => { const next = [...products]; next[i] = { ...next[i], price: e.target.value }; set("products", next); }} />
+                  <input className="flex-1 h-7 text-xs border rounded px-2" value={p.link} placeholder="URL" onChange={e => { const next = [...products]; next[i] = { ...next[i], link: e.target.value }; set("products", next); }} />
+                </div>
+                <input className="w-full h-7 text-xs border rounded px-2" value={p.imageUrl} placeholder="Image URL (optional)" onChange={e => { const next = [...products]; next[i] = { ...next[i], imageUrl: e.target.value }; set("products", next); }} />
+              </div>
+            ))}
+            <button className="text-xs text-teal-600 hover:text-teal-800 font-medium" onClick={() => set("products", [...products, { title: "", description: "", price: "", imageUrl: "", link: "https://" }])}>+ Add Product</button>
           </div>
-        </div>
+        )}
+        <ColorPickers />
       </div>
     );
   }

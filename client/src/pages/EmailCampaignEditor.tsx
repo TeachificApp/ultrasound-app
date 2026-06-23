@@ -284,8 +284,8 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
 
           {options?.interests && options.interests.length > 0 && (
             <div>
-              <label className="text-xs text-gray-500 mb-1.5 block">Specialty Interests (all)</label>
-              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+              <label className="text-xs text-gray-500 mb-1.5 block">Content Interests</label>
+              <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
                 {options.interests.map((i) => (
                   <button key={i.id} type="button" onClick={() => toggleInterestId(i.id)} className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${filter.interestIds.includes(i.id) ? "bg-[#189aa1] text-white border-[#189aa1]" : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"}`}>
                     {i.label}
@@ -295,16 +295,7 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
             </div>
           )}
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1.5 block">Legacy Echo Interests</label>
-            <div className="flex flex-wrap gap-1.5">
-              {LEGACY_INTEREST_OPTIONS.map(({ key, label }) => (
-                <button key={key} type="button" onClick={() => toggleLegacyInterest(key)} className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${filter.interests.includes(key) ? "bg-[#189aa1] text-white border-[#189aa1]" : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+
 
           {/* Brand / App filter */}
           <div>
@@ -359,18 +350,12 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
               <MultiSelect label="In Team/Group" options={options.groups} selected={filter.inGroupIds} onChange={(v) => update({ inGroupIds: v })} />
               <MultiSelect label="In Cohort Group" options={options.cohortGroups} selected={filter.inCohortGroupIds} onChange={(v) => update({ inCohortGroupIds: v })} />
               <MultiSelect label="Submitted Form" options={options.forms} selected={filter.submittedFormIds} onChange={(v) => update({ submittedFormIds: v })} />
-              {options.membershipPlans && options.membershipPlans.length > 0 && (
-                <MultiSelect label="Membership Plan" options={options.membershipPlans} selected={filter.membershipPlanIds ?? []} onChange={(v) => update({ membershipPlanIds: v })} />
+              {(options.membershipPlans?.length ?? 0) > 0 && (
+                <MultiSelect label="Membership Plan" options={options.membershipPlans!} selected={filter.membershipPlanIds ?? []} onChange={(v) => update({ membershipPlanIds: v })} />
               )}
-              {options.bundles && options.bundles.length > 0 && (
-                <MultiSelect label="Bundle Enrolled" options={options.bundles} selected={filter.bundleIds ?? []} onChange={(v) => update({ bundleIds: v })} />
-              )}
-              {options.workshops && options.workshops.length > 0 && (
-                <MultiSelect label="Workshop Enrolled" options={options.workshops} selected={filter.workshopIds ?? []} onChange={(v) => update({ workshopIds: v })} />
-              )}
-              {options.communities && options.communities.length > 0 && (
-                <MultiSelect label="Community Member" options={options.communities} selected={filter.communityIds ?? []} onChange={(v) => update({ communityIds: v })} />
-              )}
+              <MultiSelect label="Bundle Enrolled" options={options.bundles ?? []} selected={filter.bundleIds ?? []} onChange={(v) => update({ bundleIds: v })} />
+              <MultiSelect label="Workshop Enrolled" options={options.workshops ?? []} selected={filter.workshopIds ?? []} onChange={(v) => update({ workshopIds: v })} />
+              <MultiSelect label="Community Member" options={options.communities ?? []} selected={filter.communityIds ?? []} onChange={(v) => update({ communityIds: v })} />
             </div>
           )}
 

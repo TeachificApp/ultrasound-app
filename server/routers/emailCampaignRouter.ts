@@ -30,6 +30,12 @@ import {
   emailListSubscribers,
   leadCaptureWidgets,
   lmsInterests,
+  membershipPlans,
+  lmsCohortGroups,
+  lmsCourses,
+  workshopInstances,
+  workshops,
+  bundles,
 } from "../../drizzle/schema";
 import { addToEmailList, ensureAllContactsList } from "../lib/emailListHelper";
 import { resolveRecipients } from "../lib/emailCampaignAudienceResolver";
@@ -627,9 +633,9 @@ export const emailCampaignRouter = router({
         .limit(200),
       // New option lists
       db.execute(sql`SELECT id, title FROM membership_plans WHERE status='published' ORDER BY title LIMIT 200`),
-      db.execute(sql`SELECT id, title FROM bundles WHERE status='published' ORDER BY title LIMIT 200`),
-      db.execute(sql`SELECT id, title FROM workshops WHERE status='public' OR status='hidden' ORDER BY title LIMIT 200`),
-      db.execute(sql`SELECT id, title FROM communities WHERE status='published' ORDER BY title LIMIT 200`),
+      db.execute(sql`SELECT id, title FROM bundles ORDER BY title LIMIT 200`),
+      db.execute(sql`SELECT id, title FROM workshops WHERE status IN ('public','hidden','private') ORDER BY title LIMIT 200`),
+      db.execute(sql`SELECT id, title FROM communities ORDER BY title LIMIT 200`),
     ]);
     const roleRows = await db
       .selectDistinct({ role: userRoles.role })
@@ -683,6 +689,120 @@ export const emailCampaignRouter = router({
         id: r.id,
         label: r.title,
       })),
+    };
+  }),
+
+  // ── Email block dynamic data ──────────────────────────────────────────────
+
+  /**
+   * Returns live data for the three dynamic email auto-content block types:
+   * - membershipPlans: published plans with featureBullets
+   * - cohortGroups: open/active cohort groups with course title and dates
+   * - workshopInstances: upcoming available workshop instances with parent title
+   * - bundles: published bundles
+   */
+  getEmailBlockOptions: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx.user.id);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+    const now = new Date();
+
+    const [plans, cohortGroupRows, instanceRows, bundleRows] = await Promise.all([
+      db
+        .select({
+          id: membershipPlans.id,
+          title: membershipPlans.title,
+          subtitle: membershipPlans.subtitle,
+          price: membershipPlans.price,
+          compareAtPrice: membershipPlans.compareAtPrice,
+          billingInterval: membershipPlans.billingInterval,
+          coverImage: membershipPlans.coverImage,
+          accentColor: membershipPlans.accentColor,
+          featureBullets: membershipPlans.featureBullets,
+          brand: membershipPlans.brand,
+          slug: membershipPlans.slug,
+        })
+        .from(membershipPlans)
+        .where(eq(membershipPlans.status, "published"))
+        .orderBy(membershipPlans.sortOrder)
+        .limit(50),
+
+      db
+        .select({
+          id: lmsCohortGroups.id,
+          name: lmsCohortGroups.name,
+          description: lmsCohortGroups.description,
+          startDate: lmsCohortGroups.startDate,
+          endDate: lmsCohortGroups.endDate,
+          location: lmsCohortGroups.location,
+          status: lmsCohortGroups.status,
+          courseId: lmsCohortGroups.courseId,
+          courseTitle: lmsCourses.title,
+          courseCoverImageUrl: lmsCourses.coverImageUrl,
+          courseSlug: lmsCourses.slug,
+          courseBrand: lmsCourses.brand,
+          coursePrice: lmsCourses.price,
+        })
+        .from(lmsCohortGroups)
+        .innerJoin(lmsCourses, eq(lmsCohortGroups.courseId, lmsCourses.id))
+        .where(
+          sql`${lmsCohortGroups.status} IN ('open','active') AND (${lmsCohortGroups.startDate} IS NULL OR ${lmsCohortGroups.startDate} >= ${now})`
+        )
+        .orderBy(lmsCohortGroups.startDate)
+        .limit(50),
+
+      db
+        .select({
+          id: workshopInstances.id,
+          title: workshopInstances.title,
+          description: workshopInstances.description,
+          startDate: workshopInstances.startDate,
+          endDate: workshopInstances.endDate,
+          locationType: workshopInstances.locationType,
+          venueCity: workshopInstances.venueCity,
+          venueState: workshopInstances.venueState,
+          price: workshopInstances.price,
+          compareAtPrice: workshopInstances.compareAtPrice,
+          workshopId: workshopInstances.workshopId,
+          workshopTitle: workshops.title,
+          workshopCoverImageUrl: workshops.coverImageUrl,
+          workshopSlug: workshops.slug,
+          workshopBrand: workshops.brand,
+          workshopPrice: workshops.price,
+        })
+        .from(workshopInstances)
+        .innerJoin(workshops, eq(workshopInstances.workshopId, workshops.id))
+        .where(
+          sql`${workshopInstances.status} = 'published' AND ${workshopInstances.availableForPurchase} = 1 AND ${workshopInstances.startDate} >= ${now}`
+        )
+        .orderBy(workshopInstances.startDate)
+        .limit(50),
+
+      db
+        .select({
+          id: bundles.id,
+          title: bundles.title,
+          subtitle: bundles.subtitle,
+          price: bundles.price,
+          coverImage: bundles.coverImage,
+          brand: bundles.brand,
+          slug: bundles.slug,
+        })
+        .from(bundles)
+        .where(eq(bundles.status, "published"))
+        .orderBy(bundles.title)
+        .limit(50),
+    ]);
+
+    return {
+      membershipPlans: plans.map((p) => ({
+        ...p,
+        featureBullets: p.featureBullets ? (() => { try { return JSON.parse(p.featureBullets as string); } catch { return []; } })() : [],
+      })),
+      cohortGroups: cohortGroupRows,
+      workshopInstances: instanceRows,
+      bundles: bundleRows,
     };
   }),
 
