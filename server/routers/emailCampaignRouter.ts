@@ -381,7 +381,7 @@ export const emailCampaignRouter = router({
       z.object({
         id: z.number().optional(),
         name: z.string().min(1).max(200),
-        subject: z.string().min(1).max(500),
+        subject: z.string().max(500).default(""),
         htmlBody: z.string().min(1),
         blocksJson: z.string().optional(),
         previewText: z.string().max(300).optional(),
