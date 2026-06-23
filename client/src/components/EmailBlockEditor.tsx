@@ -156,10 +156,12 @@ export function emailBlockToHtml(block: Block): string {
       const url = (d.url as string) ?? "";
       if (!url) return "";
       const alt = (d.alt as string) ?? "";
-      const maxWidth = (d.maxWidth as string) ?? "100%";
+      // Default to 50% width for email; always cap at 100% so images never overflow
+      const rawWidth = (d.maxWidth as string) ?? "50%";
+      const imgWidth = rawWidth === "auto" ? "100%" : rawWidth;
       const link = (d.linkUrl as string) ?? "";
       const shadow = d.showShadow ? "box-shadow:0 2px 8px rgba(0,0,0,0.12);" : "";
-      const img = `<img src="${url}" alt="${alt}" style="max-width:${maxWidth === "auto" ? "100%" : maxWidth};display:block;border-radius:8px;${shadow}" />`;
+      const img = `<img src="${url}" alt="${alt}" style="max-width:100%;width:${imgWidth};display:block;border-radius:8px;${shadow}" />`;
       const wrapped = link ? `<a href="${link}" style="text-decoration:none;">${img}</a>` : img;
       return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;"><tr><td align="${align}">${wrapped}</td></tr></table>`;
     }
@@ -168,10 +170,15 @@ export function emailBlockToHtml(block: Block): string {
       const subheadline = (d.subheadline as string) ?? "";
       const bgColor = (d.bgColor as string) ?? "#179ca3";
       const textColor = (d.textColor as string) ?? "#ffffff";
+      // Only render buttons when hideButtons is false AND the button has non-default text
+      const hideButtons = d.hideButtons as boolean;
       const buttons = (d.buttons as any[]) ?? [];
-      const btnHtml = buttons.map((btn: any) =>
-        btn.text ? `<a href="${btn.link || "#"}" style="display:inline-block;background:${btn.color || "#ffffff"};color:${btn.textColor || "#179ca3"};text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:15px;margin:4px;">${btn.text}</a>` : ""
-      ).join("");
+      const btnHtml = hideButtons ? "" : buttons.map((btn: any) => {
+        const btnText = (btn.text as string) ?? "";
+        // Skip empty or default placeholder text that should not appear in email
+        if (!btnText || btnText === "Enroll Now" || btnText === "Get Started") return "";
+        return `<a href="${btn.link || "#"}" style="display:inline-block;background:${btn.color || "#ffffff"};color:${btn.textColor || "#179ca3"};text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:15px;margin:4px;">${btnText}</a>`;
+      }).join("");
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bgColor};border-radius:8px;margin:0 0 16px;"><tr><td style="padding:32px;text-align:${align};"><h1 style="color:${textColor};font-size:28px;font-weight:900;margin:0 0 12px;line-height:1.2;">${headline}</h1>${subheadline ? `<p style="color:${textColor};font-size:16px;margin:0 0 20px;opacity:0.9;">${subheadline}</p>` : ""}${btnHtml ? `<div style="margin-top:16px;">${btnHtml}</div>` : ""}</td></tr></table>`;
     }
     case "spacer": {
@@ -271,10 +278,15 @@ export function emailBlockToHtml(block: Block): string {
     case "footer": {
       const bg = (d.bgColor as string) ?? "#0e1e2e";
       const textColor = (d.textColor as string) ?? "#ffffff";
-      const copyright = (d.copyrightText as string) ?? "";
-      const links = (d.links as { text: string; url: string }[]) ?? [];
-      const linksHtml = links.map((l) => `<a href="${l.url}" style="color:#189aa1;text-decoration:none;margin:0 8px;">${l.text}</a>`).join(" · ");
-      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:0 0 8px 8px;"><tr><td style="padding:20px 32px;text-align:center;"><p style="color:${textColor};font-size:12px;margin:0 0 8px;">${copyright}</p>${linksHtml ? `<p style="margin:0;font-size:12px;">${linksHtml}</p>` : ""}</td></tr></table>`;
+      const copyright = (d.copyrightText as string) ?? `\u00a9 ${new Date().getFullYear()} All About Ultrasound\u2122 | iHeartEcho\u2122. All rights reserved.`;
+      // Support both d.links (array) and d.footerLinks (legacy key)
+      const links = ((d.links ?? d.footerLinks) as { text: string; url: string }[] | undefined) ?? [];
+      const linksHtml = links
+        .filter((l) => l && l.text && l.url)
+        .map((l) => `<a href="${l.url}" style="color:#189aa1;text-decoration:none;margin:0 8px;">${l.text}</a>`)
+        .join(" &middot; ");
+      const accountNotice = `<p style="color:${textColor};font-size:11px;margin:8px 0 0;opacity:0.7;">You are receiving this email because you have an account on All About Ultrasound\u2122 | iHeartEcho\u2122</p>`;
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:0 0 8px 8px;"><tr><td style="padding:20px 32px;text-align:center;"><p style="color:${textColor};font-size:12px;margin:0 0 8px;">${copyright}</p>${linksHtml ? `<p style="margin:4px 0;font-size:12px;">${linksHtml}</p>` : ""}${accountNotice}</td></tr></table>`;
     }
     case "data_table": {
       const rows = (d.rows as string[][]) ?? [];
@@ -465,8 +477,35 @@ export function emailBlockToHtml(block: Block): string {
   }
 }
 
-export function emailBlocksToHtml(blocks: Block[]): string {
-  return blocks.map(emailBlockToHtml).filter(Boolean).join("\n");
+/**
+ * Convert blocks to email HTML.
+ * @param blocks - The blocks to convert
+ * @param trackingPixelUrl - Optional tracking pixel URL to inject
+ * @param standalone - When true (default), wraps output in a 900px outer table suitable for
+ *   standalone preview. When false, returns raw inner HTML for use inside wrapInBrandedEmail.
+ */
+export function emailBlocksToHtml(blocks: Block[], trackingPixelUrl?: string, standalone = true): string {
+  const innerHtml = blocks.map(emailBlockToHtml).filter(Boolean).join("\n");
+  const pixel = trackingPixelUrl
+    ? `<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:none;" />`
+    : "";
+  if (!standalone) {
+    // Raw inner HTML — caller (wrapInBrandedEmail) handles the outer container
+    return innerHtml + pixel;
+  }
+  // Wrap in a 900px-wide centered outer table for standalone preview / plain send
+  return [
+    `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;margin:0;padding:0;">`,
+    `  <tr><td align="center" style="padding:20px 0;">`,
+    `    <table width="900" cellpadding="0" cellspacing="0" border="0" style="max-width:900px;width:100%;background:#ffffff;border-radius:8px;">`,
+    `      <tr><td style="padding:0;">`,
+    innerHtml,
+    pixel,
+    `      </td></tr>`,
+    `    </table>`,
+    `  </td></tr>`,
+    `</table>`,
+  ].join("\n");
 }
 
 // ─── Email Auto Block Settings ──────────────────────────────────────────────

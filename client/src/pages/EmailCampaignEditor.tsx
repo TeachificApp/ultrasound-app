@@ -46,35 +46,36 @@ function defaultEmailBlocks(): Block[] {
 // ─── Branded email wrapper ────────────────────────────────────────────────────
 function wrapInBrandedEmail(bodyHtml: string, previewText?: string): string {
   const preview = previewText ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${previewText}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>` : "";
+  const year = new Date().getFullYear();
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>All About Ultrasound™</title>
+  <title>All About Ultrasound\u2122 | iHeartEcho\u2122</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f7f8;font-family:'Open Sans',Arial,sans-serif;">
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:'Open Sans',Arial,sans-serif;">
 ${preview}
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f8;padding:32px 0;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;margin:0;padding:0;">
+  <tr><td align="center" style="padding:20px 0;">
+    <table width="900" cellpadding="0" cellspacing="0" border="0" style="max-width:900px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
       <tr>
-        <td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;">
-          <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">All About Ultrasound™</span>
-          <div style="font-size:11px;color:#4ad9e0;font-weight:600;margin-top:2px;letter-spacing:0.5px;">ECHOCARDIOGRAPHY CLINICAL COMPANION</div>
+        <td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:24px 32px;">
+          <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">All About Ultrasound\u2122</span>
+          <span style="font-size:13px;color:#4ad9e0;font-weight:600;margin-left:10px;letter-spacing:0.5px;">| iHeartEcho\u2122</span>
         </td>
       </tr>
       <tr>
-        <td style="padding:32px;color:#1a2e3b;font-size:15px;line-height:1.7;">
+        <td style="padding:0;color:#1a2e3b;font-size:15px;line-height:1.7;">
           ${bodyHtml}
         </td>
       </tr>
       <tr>
-        <td style="background:#f4f7f8;padding:20px 32px;border-top:1px solid #e5eaec;">
+        <td style="background:#f4f4f4;padding:20px 32px;border-top:1px solid #e5eaec;">
           <p style="margin:0;font-size:11px;color:#8a9bb0;text-align:center;line-height:1.6;">
-            © ${new Date().getFullYear()} All About Ultrasound™<br/>
-            You are receiving this email because you have an account on All About Ultrasound™.<br/>
-            <a href="{{UNSUBSCRIBE_URL}}" style="color:#189aa1;text-decoration:none;">Unsubscribe</a> · <a href="https://app.allaboutultrasound.com/profile" style="color:#189aa1;text-decoration:none;">Manage preferences</a>
+            \u00a9 ${year} All About Ultrasound\u2122 | iHeartEcho\u2122. All rights reserved.<br/>
+            You are receiving this email because you have an account on All About Ultrasound\u2122 | iHeartEcho\u2122.<br/>
+            <a href="{{UNSUBSCRIBE_URL}}" style="color:#189aa1;text-decoration:none;">Unsubscribe</a> &middot; <a href="https://app.allaboutultrasound.com/profile" style="color:#189aa1;text-decoration:none;">Manage preferences</a>
           </p>
         </td>
       </tr>
@@ -167,7 +168,33 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
 }) {
   const { data: options } = trpc.emailCampaign.getAudienceOptions.useQuery();
   const [expanded, setExpanded] = useState(true);
+  // Auto-expand advanced section if any advanced filters are already active (e.g. loaded from saved draft)
+  const hasAdvancedFilters =
+    (filter.enrolledInCourseIds?.length ?? 0) > 0 ||
+    (filter.activeAccessCourseIds?.length ?? 0) > 0 ||
+    (filter.freePreviewCourseIds?.length ?? 0) > 0 ||
+    (filter.completedCourseIds?.length ?? 0) > 0 ||
+    (filter.purchasedCourseIds?.length ?? 0) > 0 ||
+    (filter.purchasedProductIds?.length ?? 0) > 0 ||
+    (filter.downloadedProductIds?.length ?? 0) > 0 ||
+    (filter.inGroupIds?.length ?? 0) > 0 ||
+    (filter.inCohortGroupIds?.length ?? 0) > 0 ||
+    (filter.submittedFormIds?.length ?? 0) > 0 ||
+    (filter.membershipPlanIds?.length ?? 0) > 0 ||
+    (filter.bundleIds?.length ?? 0) > 0 ||
+    (filter.workshopIds?.length ?? 0) > 0 ||
+    (filter.communityIds?.length ?? 0) > 0 ||
+    !!filter.enrolledAfter || !!filter.enrolledBefore ||
+    !!filter.purchasedAfter || !!filter.purchasedBefore;
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Expand advanced section once if active filters are detected (e.g. on draft load)
+  const didAutoExpand = useRef(false);
+  useEffect(() => {
+    if (hasAdvancedFilters && !didAutoExpand.current) {
+      didAutoExpand.current = true;
+      setShowAdvanced(true);
+    }
+  }, [hasAdvancedFilters]);
   const [specificEmailsText, setSpecificEmailsText] = useState(filter.specificEmails.join("\n"));
   // Keep specificEmailsText in sync when the filter is loaded from a saved draft
   // Use JSON.stringify to compare arrays by value, not reference
@@ -535,7 +562,8 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     if (!draftLoaded || !user) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      const htmlBody = emailBlocksToHtml(blocks);
+      // standalone=false: raw inner HTML, wrapInBrandedEmail provides the 900px outer container
+      const htmlBody = emailBlocksToHtml(blocks, undefined, false);
       const wrappedHtml = wrapInBrandedEmail(htmlBody, previewText);
       autoSaveDraftMutation.mutate({
         id: draftId,
@@ -578,7 +606,8 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   });
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const htmlBody = useMemo(() => emailBlocksToHtml(blocks), [blocks]);
+  // standalone=false: raw inner HTML, wrapInBrandedEmail provides the 900px outer container
+  const htmlBody = useMemo(() => emailBlocksToHtml(blocks, undefined, false), [blocks]);
   const wrappedHtml = useMemo(() => wrapInBrandedEmail(htmlBody, previewText), [htmlBody, previewText]);
 
   function handleSaveDraft() {

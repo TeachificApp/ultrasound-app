@@ -106,7 +106,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   { type: "text", label: "Text / Rich Text", icon: <Type size={14} />, category: "Content",
     defaultData: { html: "<p>Add your content here. Click to edit.</p>", align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } },
   { type: "image", label: "Image", icon: <Image size={14} />, category: "Content",
-    defaultData: { url: "", alt: "", caption: "", align: "center", maxWidth: "auto", linkUrl: "", openInNewTab: true, showShadow: true, noBorder: false } },
+    defaultData: { url: "", alt: "", caption: "", align: "center", maxWidth: "50%", linkUrl: "", openInNewTab: true, showShadow: true, noBorder: false } },
   { type: "video", label: "Video Embed", icon: <Video size={14} />, category: "Content",
     defaultData: { embedUrl: "", caption: "", autoplay: false, muted: true, loop: false, controls: true, trimStart: 0, trimEnd: 0, accentColor: "#189aa1" } },
   { type: "audio", label: "Audio Player", icon: <Music size={14} />, category: "Content",
@@ -305,7 +305,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   { type: "footer", label: "Footer", icon: <Columns size={14} />, category: "Layout",
     defaultData: {
       bgColor: "#0e1e2e", textColor: "#ffffff", align: "center",
-      copyrightText: `© ${new Date().getFullYear()} All About Ultrasound. All rights reserved.`,
+      copyrightText: `© ${new Date().getFullYear()} All About Ultrasound™ | iHeartEcho™. All rights reserved.`,
       links: [{ text: "Privacy Policy", url: "https://www.allaboutultrasound.com/privacy-policy.html" }, { text: "Terms of Service", url: "https://www.allaboutultrasound.com/terms-of-service.html" }, { text: "Contact", url: "https://www.allaboutultrasound.com/contact.html" }],
       showSocial: true, socialLinks: { facebook: "", instagram: "", youtube: "", linkedin: "" },
       logoUrl: "", logoMaxWidth: "120px",
