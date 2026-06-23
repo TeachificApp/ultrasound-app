@@ -31,6 +31,11 @@ import {
   type BlockType,
 } from "@/pages/admin/LandingPageBuilder";
 import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search } from "lucide-react";
+import {
+  BlockTemplateLibraryProvider,
+  OpenTemplateLibraryButton,
+  useBlockTemplateLibrary,
+} from "@/components/BlockTemplateLibrary";
 
 // ─── Email-specific auto-content block types ─────────────────────────────────
 // These are email-only blocks not in the main BLOCK_CATALOG
@@ -572,9 +577,12 @@ function defaultBlock(type: BlockType): Block {
 interface EmailBlockEditorProps {
   initialBlocks: Block[];
   onChange: (blocks: Block[]) => void;
+  /** Internal: called once on mount so the outer wrapper can forward template inserts */
+  _registerInsert?: (fn: (block: Block) => void) => void;
 }
 
-export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlockEditorProps) {
+function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: EmailBlockEditorProps) {
+  const { saveAsTemplate } = useBlockTemplateLibrary();
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -625,6 +633,15 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
     setSelectedId(block.id);
     setCatalogOpen(false);
   };
+
+  // Register the template-insert handler with the outer wrapper once on mount
+  useEffect(() => {
+    _registerInsert?.((block) => {
+      setBlocks((prev) => [...prev, block]);
+      setSelectedId(block.id);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateBlock = useCallback((id: string, data: Record<string, unknown>) => {
     setBlocks((prev) =>
@@ -764,6 +781,7 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
           >
             <Plus className="w-4 h-4 mr-1" /> Add Block
           </Button>
+          <OpenTemplateLibraryButton />
           <span className="text-xs text-gray-400 ml-auto">
             {blocks.length} block{blocks.length !== 1 ? "s" : ""}
           </span>
@@ -791,6 +809,7 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
                   onDuplicate={() => duplicateBlock(block.id)}
                   onMoveUp={idx > 0 ? () => moveBlock(block.id, "up") : undefined}
                   onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, "down") : undefined}
+                  onSaveAsTemplate={(b) => saveAsTemplate(b)}
                   activeDragId={null}
                   activeColumnTarget={null}
                   onMoveBlockOutOfColumn={() => {}}
@@ -861,5 +880,26 @@ export default function EmailBlockEditor({ initialBlocks, onChange }: EmailBlock
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * EmailBlockEditor — public export.
+ * Wraps the inner editor with BlockTemplateLibraryProvider so the
+ * "Templates" toolbar button and per-block "Save as template" bookmark
+ * button both work without any extra setup in the parent.
+ */
+export default function EmailBlockEditor(props: EmailBlockEditorProps) {
+  // insertRef lets the provider's onInsert reach the inner component's
+  // addBlock function without prop-drilling through the provider.
+  const insertRef = useRef<((block: Block) => void) | null>(null);
+  return (
+    <BlockTemplateLibraryProvider onInsert={(block) => insertRef.current?.(block)}>
+      <EmailBlockEditorInner
+        {...props}
+        // Pass the ref setter so the inner component can register itself
+        _registerInsert={(fn) => { insertRef.current = fn; }}
+      />
+    </BlockTemplateLibraryProvider>
   );
 }
