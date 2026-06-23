@@ -4588,6 +4588,21 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             <p className="text-xs text-gray-400">"Inherit from course" uses the course-level default setting.</p>
           </div>
 
+          {/* Video controls toggle — only for video/video_text lessons */}
+          {(lessonType === "video" || lessonType === "video_text") && (
+            <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Show video controls</p>
+                <p className="text-xs text-gray-400 mt-0.5">Display play, pause, volume, and seek controls to students. Disable to hide controls (e.g., for embeds that handle their own UI).</p>
+              </div>
+              <Switch
+                checked={showVideoControls}
+                onCheckedChange={v => { setShowVideoControls(v); setIsDirty(true); }}
+                className="ml-4 shrink-0"
+              />
+            </div>
+          )}
+
           {/* Comments toggle */}
           <div className="flex items-center gap-2">
             <Switch checked={commentsEnabled} onCheckedChange={setCommentsEnabled} id="edit-comments-enabled" />

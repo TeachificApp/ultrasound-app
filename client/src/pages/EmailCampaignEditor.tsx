@@ -10,7 +10,7 @@
  *  - Save as template / load from template
  *  - Automatic unsubscribe footer injected on send
  */
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Eye, EyeOff, Send, Save, Clock, Users, Mail,
@@ -419,6 +419,16 @@ interface EditorProps {
   onClose?: () => void;
 }
 
+function formatRelativeTime(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  return `${diffHr}h ago`;
+}
+
 export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps) {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -441,6 +451,9 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [draftId, setDraftId] = useState<number | undefined>(campaignId);
   const [isSaving, setIsSaving] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(!campaignId);
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const LS_KEY = `email_draft_backup_${campaignId ?? "new"}`;
 
   // ── Queries ─────────────────────────────────────────────────────────────────
   const { data: senderProfiles } = trpc.emailCampaign.listSenderProfiles.useQuery(undefined, { enabled: !!user });
@@ -472,9 +485,40 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     setDraftLoaded(true);
   }, [existingCampaign, draftLoaded]);
 
+  // ── Auto-save to localStorage backup ────────────────────────────────────────
+  useEffect(() => {
+    if (!draftLoaded) return;
+    // Save to localStorage as a backup every time blocks/subject/previewText change
+    const backup = { subject, previewText, blocks, filter, senderProfileId, savedAt: Date.now() };
+    try { localStorage.setItem(LS_KEY, JSON.stringify(backup)); } catch { /* quota exceeded */ }
+  }, [blocks, subject, previewText, filter, senderProfileId, draftLoaded, LS_KEY]);
+
+  // ── Auto-save to server every 30 seconds ─────────────────────────────────────
+  const autoSaveDraftMutation = trpc.emailCampaign.saveDraft.useMutation({
+    onSuccess: (r) => { setDraftId(r.id); setLastAutoSave(new Date()); },
+    onError: () => { /* silent — don't toast on auto-save errors */ },
+  });
+
+  useEffect(() => {
+    if (!draftLoaded || !user) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      const htmlBody = emailBlocksToHtml(blocks);
+      const wrappedHtml = wrapInBrandedEmail(htmlBody, previewText);
+      autoSaveDraftMutation.mutate({
+        id: draftId,
+        subject, htmlBody: wrappedHtml, previewText,
+        audienceFilter: filter,
+        senderProfileId,
+        blocksJson: JSON.stringify(blocks),
+      });
+    }, 30_000); // 30 second debounce
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [blocks, subject, previewText, filter, senderProfileId, draftId, draftLoaded, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Mutations ───────────────────────────────────────────────────────────────
   const saveDraftMutation = trpc.emailCampaign.saveDraft.useMutation({
-    onSuccess: (r) => { setDraftId(r.id); toast.success("Draft saved"); setIsSaving(false); },
+    onSuccess: (r) => { setDraftId(r.id); toast.success("Draft saved"); setIsSaving(false); setLastAutoSave(new Date()); try { localStorage.removeItem(LS_KEY); } catch {} },
     onError: (e) => { toast.error(e.message); setIsSaving(false); },
   });
 
@@ -583,6 +627,17 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
             {showPreview ? <EyeOff className="w-4 h-4 mr-1.5" /> : <Eye className="w-4 h-4 mr-1.5" />}
             {showPreview ? "Hide Preview" : "Preview"}
           </Button>
+          {/* Auto-save status indicator */}
+          {autoSaveDraftMutation.isPending ? (
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <RefreshCw className="w-3 h-3 animate-spin" /> Saving…
+            </span>
+          ) : lastAutoSave ? (
+            <span className="text-xs text-gray-400 flex items-center gap-1" title={`Auto-saved at ${lastAutoSave.toLocaleTimeString()}`}>
+              <Check className="w-3 h-3 text-green-500" />
+              Auto-saved {formatRelativeTime(lastAutoSave)}
+            </span>
+          ) : null}
           <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSaving}>
             <Save className="w-4 h-4 mr-1.5" /> {isSaving ? "Saving…" : "Save Draft"}
           </Button>

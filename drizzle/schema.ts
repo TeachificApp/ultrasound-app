@@ -2128,6 +2128,8 @@ export const emailTemplates = mysqlTable("emailTemplates", {
   htmlBody: longtext("htmlBody").notNull(),
   // Optional plain-text version
   previewText: varchar("previewText", { length: 300 }),
+  // Blocks JSON for the visual editor
+  blocksJson: longtext("blocksJson"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -2153,6 +2155,14 @@ export const emailCampaigns = mysqlTable("emailCampaigns", {
   // If set, the campaign will be sent at this time by the scheduler cron job
   scheduledAt: timestamp("scheduledAt"),
   errorMessage: text("errorMessage"),
+  // Blocks JSON for the visual editor
+  blocksJson: longtext("blocksJson"),
+  // Sender profile override
+  senderProfileId: int("senderProfileId"),
+  fromName: varchar("fromName", { length: 200 }),
+  fromEmail: varchar("fromEmail", { length: 300 }),
+  // Engagement metrics
+  openCount: int("openCount").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
