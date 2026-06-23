@@ -23,7 +23,7 @@ import { ENV } from "../_core/env";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb, ensureUserRole, markThinkificEnrolled } from "../db";
 import { sendEmail, buildWelcomeEmail, buildVerificationEmail, buildPasswordResetEmail } from "../_core/email";
-import { type BrandMode, detectBrandMode } from "@shared/brands";
+import { type BrandMode, detectBrandMode, getBrandDisplayConfig, BRAND_DOMAINS } from "@shared/brands";
 import { enrollInFreeMembership } from "../thinkific";
 import { users, userEmailAliases } from "../../drizzle/schema";
 import { eq, or } from "drizzle-orm";
@@ -68,8 +68,22 @@ export type EmailPayload = {
   html: string;
 };
 
-async function sendVerificationEmail(to: string, token: string, name: string, brandMode?: BrandMode) {
-  const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
+/** Resolve the correct app URL from an origin string (mirrors the KNOWN_APP_SUBDOMAINS logic in routers.ts) */
+function resolveAppUrl(origin: string | undefined, brandMode: BrandMode): string {
+  if (origin) {
+    try {
+      const hostname = new URL(origin).hostname.toLowerCase();
+      // If the origin is a known app domain, use it directly so the link works on any domain
+      if (hostname in BRAND_DOMAINS || hostname.includes("manus.space") || hostname.includes("manus.computer")) {
+        return origin;
+      }
+    } catch { /* ignore invalid origins */ }
+  }
+  return getBrandDisplayConfig(brandMode).appUrl;
+}
+
+async function sendVerificationEmail(to: string, token: string, name: string, brandMode?: BrandMode, origin?: string) {
+  const appUrl = resolveAppUrl(origin, brandMode ?? "aaus");
   const verificationUrl = `${appUrl}/verify-email?token=${token}`;
   const firstName = name || "there";
   const { subject, htmlBody, previewText } = buildVerificationEmail({ firstName, verificationUrl, brandMode });
@@ -144,7 +158,8 @@ export const emailAuthRouter = router({
             })
             .where(eq(users.id, existingUser.id));
           const brandMode = detectBrandMode(ctx.req.hostname || "");
-          await sendVerificationEmail(email, verificationToken, input.firstName, brandMode);
+          const origin = ctx.req.headers.origin as string | undefined;
+          await sendVerificationEmail(email, verificationToken, input.firstName, brandMode, origin);
           // Send welcome email asynchronously (don't block activation)
           const appUrlActivate = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
           const welcomeActivate = buildWelcomeEmail({
@@ -211,7 +226,8 @@ export const emailAuthRouter = router({
 
       // Send verification email
       const brandModeReg = detectBrandMode(ctx.req.hostname || "");
-      await sendVerificationEmail(email, verificationToken, input.firstName, brandModeReg);
+      const originReg = ctx.req.headers.origin as string | undefined;
+      await sendVerificationEmail(email, verificationToken, input.firstName, brandModeReg, originReg);
 
       // Send welcome email asynchronously (don't block registration)
       const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
@@ -369,7 +385,8 @@ export const emailAuthRouter = router({
           .where(eq(users.id, user.id));
         const firstName = (user.name ?? "").split(" ")[0] ?? "there";
         const bm = detectBrandMode(ctx.req.hostname || "");
-        await sendVerificationEmail(email, verificationToken, firstName, bm);
+        const originResend = ctx.req.headers.origin as string | undefined;
+        await sendVerificationEmail(email, verificationToken, firstName, bm, originResend);
       }
 
       return { success: true };
