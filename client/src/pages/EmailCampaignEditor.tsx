@@ -170,10 +170,12 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [specificEmailsText, setSpecificEmailsText] = useState(filter.specificEmails.join("\n"));
   // Keep specificEmailsText in sync when the filter is loaded from a saved draft
-  const prevSpecificEmails = useRef(filter.specificEmails);
+  // Use JSON.stringify to compare arrays by value, not reference
+  const prevSpecificEmailsJson = useRef(JSON.stringify(filter.specificEmails));
   useEffect(() => {
-    if (filter.specificEmails !== prevSpecificEmails.current) {
-      prevSpecificEmails.current = filter.specificEmails;
+    const json = JSON.stringify(filter.specificEmails);
+    if (json !== prevSpecificEmailsJson.current) {
+      prevSpecificEmailsJson.current = json;
       setSpecificEmailsText(filter.specificEmails.join("\n"));
     }
   }, [filter.specificEmails]);
@@ -374,6 +376,13 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
 
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Specific Emails (overrides all filters)</label>
+            {filter.specificEmails.length > 0 && (
+              <div className="mb-2 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                <span className="font-semibold">⚠ Override active:</span>
+                <span>Only {filter.specificEmails.length} specific email{filter.specificEmails.length !== 1 ? "s" : ""} will receive this campaign. Clear the field below to send to all matched users.</span>
+                <button type="button" onClick={() => { setSpecificEmailsText(""); update({ specificEmails: [] }); }} className="ml-auto text-amber-700 underline font-semibold hover:text-amber-900">Clear</button>
+              </div>
+            )}
             <Textarea
               value={specificEmailsText}
               onChange={(e) => {
