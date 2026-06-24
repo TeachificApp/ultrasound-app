@@ -20,6 +20,9 @@ describe("emailCampaignAudience", () => {
     expect(filter.logic).toBe("and");
     expect(filter.workshopInstanceIds).toEqual([]);
     expect(filter.purchasedPhysicalProductIds).toEqual([]);
+    expect(filter.webinarIds).toEqual([]);
+    expect(filter.purchasedDigitalBundleIds).toEqual([]);
+    expect(filter.enrolledInQuizIds).toEqual([]);
   });
 
   it("assigns stable A/B buckets", () => {

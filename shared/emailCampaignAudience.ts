@@ -67,6 +67,16 @@ export const AudienceFilterSchema = z.object({
   purchasedPhysicalProductIds: z.array(z.number().int()).default([]),
   /** Users who are members of these community IDs (community_members) */
   communityIds: z.array(z.number().int()).default([]),
+  /** Users registered for these webinar IDs (webinar_registrations) */
+  webinarIds: z.array(z.number().int()).default([]),
+  /** Users who purchased these digital download bundle IDs */
+  purchasedDigitalBundleIds: z.array(z.number().int()).default([]),
+  /** Quiz offerings (lms_courses.type = quiz) — same enrollment tables as courses */
+  enrolledInQuizIds: z.array(z.number().int()).default([]),
+  completedQuizIds: z.array(z.number().int()).default([]),
+  freePreviewQuizIds: z.array(z.number().int()).default([]),
+  activeAccessQuizIds: z.array(z.number().int()).default([]),
+  purchasedQuizIds: z.array(z.number().int()).default([]),
   logic: z.enum(["and", "or"]).default("and"),
   abTest: AbTestConfigSchema.optional(),
 });
@@ -110,6 +120,13 @@ export const DEFAULT_AUDIENCE_FILTER: AudienceFilter = {
   workshopInstanceIds: [],
   purchasedPhysicalProductIds: [],
   communityIds: [],
+  webinarIds: [],
+  purchasedDigitalBundleIds: [],
+  enrolledInQuizIds: [],
+  completedQuizIds: [],
+  freePreviewQuizIds: [],
+  activeAccessQuizIds: [],
+  purchasedQuizIds: [],
   logic: "and",
 };
 

@@ -638,6 +638,7 @@ export const emailCampaignRouter = router({
 
     const [
       courses,
+      quizzes,
       products,
       groups,
       cohortGroups,
@@ -646,16 +647,21 @@ export const emailCampaignRouter = router({
       lists,
       membershipPlans,
       bundles,
+      digitalBundles,
+      webinars,
       workshops,
       communities,
       workshopInstanceRows,
       physicalProducts,
     ] = await Promise.all([
       safeAudienceSqlRows<{ id: number; title: string }>("courses", () =>
-        db.execute(sql`SELECT id, title FROM lms_courses WHERE status != 'archived' ORDER BY title LIMIT 500`),
+        db.execute(sql`SELECT id, title FROM lms_courses WHERE status != 'archived' AND type IN ('course', 'cohort') ORDER BY title LIMIT 500`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("quizzes", () =>
+        db.execute(sql`SELECT id, title FROM lms_courses WHERE status != 'archived' AND type = 'quiz' ORDER BY title LIMIT 200`),
       ),
       safeAudienceSqlRows<{ id: number; title: string }>("products", () =>
-        db.execute(sql`SELECT id, title FROM digital_products WHERE is_active = 1 ORDER BY title LIMIT 500`),
+        db.execute(sql`SELECT id, title FROM digital_products WHERE status != 'archived' ORDER BY title LIMIT 500`),
       ),
       safeAudienceSqlRows<{ id: number; name: string }>("groups", () =>
         db.execute(sql`SELECT id, name FROM lms_groups ORDER BY name LIMIT 200`),
@@ -706,6 +712,12 @@ export const emailCampaignRouter = router({
       safeAudienceSqlRows<{ id: number; title: string }>("bundles", () =>
         db.execute(sql`SELECT id, title FROM bundles ORDER BY title LIMIT 200`),
       ),
+      safeAudienceSqlRows<{ id: number; title: string }>("digitalBundles", () =>
+        db.execute(sql`SELECT id, title FROM digital_bundles WHERE status != 'archived' ORDER BY title LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("webinars", () =>
+        db.execute(sql`SELECT id, title FROM webinars ORDER BY title LIMIT 200`),
+      ),
       safeAudienceSqlRows<{ id: number; title: string }>("workshops", () =>
         db.execute(sql`SELECT id, title FROM workshops WHERE status != 'archived' ORDER BY title LIMIT 200`),
       ),
@@ -737,6 +749,7 @@ export const emailCampaignRouter = router({
 
     return {
       courses: courses.map((r) => ({ id: r.id, label: r.title })),
+      quizzes: quizzes.map((r) => ({ id: r.id, label: r.title })),
       products: products.map((r) => ({ id: r.id, label: r.title })),
       groups: groups.map((r) => ({ id: r.id, label: r.name })),
       cohortGroups: cohortGroups.map((r) => ({ id: r.id, label: r.name })),
@@ -754,6 +767,8 @@ export const emailCampaignRouter = router({
       roles: roleRows.map((r) => ({ id: r.role, label: r.role.replace(/_/g, " ") })),
       membershipPlans: membershipPlans.map((r) => ({ id: r.id, label: r.title })),
       bundles: bundles.map((r) => ({ id: r.id, label: r.title })),
+      digitalBundles: digitalBundles.map((r) => ({ id: r.id, label: r.title })),
+      webinars: webinars.map((r) => ({ id: r.id, label: r.title })),
       workshops: workshops.map((r) => ({ id: r.id, label: r.title })),
       communities: communities.map((r) => ({ id: r.id, label: r.title })),
       workshopInstances: workshopInstanceRows.map((r) => ({ id: r.id, label: r.label })),

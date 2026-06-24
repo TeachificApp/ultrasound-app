@@ -19,6 +19,9 @@ import {
   workshopEnrollments,
   physicalProductOrders,
   workshopInstances,
+  communityMembers,
+  webinarRegistrations,
+  digitalBundlePurchases,
 } from "../../drizzle/schema";
 import {
   type AudienceFilter,
@@ -526,6 +529,129 @@ async function emailsMatchingDimension(
     return matches;
   }
 
+  if (dimension === "webinars" && (filter.webinarIds ?? []).length > 0) {
+    const rows = await db
+      .select({ userId: webinarRegistrations.userId })
+      .from(webinarRegistrations)
+      .where(inArray(webinarRegistrations.webinarId, filter.webinarIds!));
+    const idSet = new Set(rows.map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
+  if (dimension === "digitalBundles" && (filter.purchasedDigitalBundleIds ?? []).length > 0) {
+    for (const bundleId of filter.purchasedDigitalBundleIds!) {
+      const conditions = [eq(digitalBundlePurchases.bundleId, bundleId)];
+      if (purchasedAfter) conditions.push(gte(digitalBundlePurchases.purchasedAt, purchasedAfter));
+      if (purchasedBefore) conditions.push(lte(digitalBundlePurchases.purchasedAt, purchasedBefore));
+      const rows = await db
+        .select({ userId: digitalBundlePurchases.userId })
+        .from(digitalBundlePurchases)
+        .where(and(...conditions));
+      const allUsers = await loadAllUsers();
+      const idSet = new Set(rows.map((r) => r.userId));
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  if (dimension === "enrolledQuiz" && (filter.enrolledInQuizIds ?? []).length > 0) {
+    for (const quizId of filter.enrolledInQuizIds!) {
+      const conditions = [eq(lmsEnrollments.courseId, quizId)];
+      if (enrolledAfter) conditions.push(gte(lmsEnrollments.enrolledAt, enrolledAfter));
+      if (enrolledBefore) conditions.push(lte(lmsEnrollments.enrolledAt, enrolledBefore));
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(and(...conditions));
+      const allUsers = await loadAllUsers();
+      const idSet = new Set(rows.map((r) => r.userId));
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  if (dimension === "completedQuiz" && (filter.completedQuizIds ?? []).length > 0) {
+    for (const quizId of filter.completedQuizIds!) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, quizId), isNotNull(lmsEnrollments.completedAt)));
+      const allUsers = await loadAllUsers();
+      const idSet = new Set(rows.map((r) => r.userId));
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  if (dimension === "freePreviewQuiz" && (filter.freePreviewQuizIds ?? []).length > 0) {
+    for (const quizId of filter.freePreviewQuizIds!) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(
+          and(
+            eq(lmsEnrollments.courseId, quizId),
+            eq(lmsEnrollments.enrollmentType, "free_preview"),
+          ),
+        );
+      const allUsers = await loadAllUsers();
+      const idSet = new Set(rows.map((r) => r.userId));
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  if (dimension === "activeAccessQuiz" && (filter.activeAccessQuizIds ?? []).length > 0) {
+    for (const quizId of filter.activeAccessQuizIds!) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(
+          and(
+            eq(lmsEnrollments.courseId, quizId),
+            eq(lmsEnrollments.enrollmentType, "full"),
+            isNull(lmsEnrollments.completedAt),
+          ),
+        );
+      const allUsers = await loadAllUsers();
+      const idSet = new Set(rows.map((r) => r.userId));
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  if (dimension === "purchasedQuiz" && (filter.purchasedQuizIds ?? []).length > 0) {
+    for (const quizId of filter.purchasedQuizIds!) {
+      const conditions = [eq(lmsOrders.courseId, quizId), eq(lmsOrders.status, "paid")];
+      if (purchasedAfter) conditions.push(gte(lmsOrders.createdAt, purchasedAfter));
+      if (purchasedBefore) conditions.push(lte(lmsOrders.createdAt, purchasedBefore));
+      const rows = await db
+        .select({ userId: lmsOrders.userId })
+        .from(lmsOrders)
+        .where(and(...conditions));
+      const allUsers = await loadAllUsers();
+      const idSet = new Set(rows.map((r) => r.userId));
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
   void candidateUserIds;
   void candidateEmails;
   return matches;
@@ -552,6 +678,13 @@ function activeDimensions(filter: AudienceFilter): string[] {
   if ((filter.workshopInstanceIds ?? []).length > 0) dims.push("workshopInstances");
   if ((filter.purchasedPhysicalProductIds ?? []).length > 0) dims.push("physicalProducts");
   if ((filter.communityIds ?? []).length > 0) dims.push("communities");
+  if ((filter.webinarIds ?? []).length > 0) dims.push("webinars");
+  if ((filter.purchasedDigitalBundleIds ?? []).length > 0) dims.push("digitalBundles");
+  if ((filter.enrolledInQuizIds ?? []).length > 0) dims.push("enrolledQuiz");
+  if ((filter.completedQuizIds ?? []).length > 0) dims.push("completedQuiz");
+  if ((filter.freePreviewQuizIds ?? []).length > 0) dims.push("freePreviewQuiz");
+  if ((filter.activeAccessQuizIds ?? []).length > 0) dims.push("activeAccessQuiz");
+  if ((filter.purchasedQuizIds ?? []).length > 0) dims.push("purchasedQuiz");
   return dims;
 }
 
