@@ -464,7 +464,7 @@ export default function EmailCampaignDashboard() {
               </div>
             ) : (
               <div className="border rounded-xl overflow-x-auto bg-white shadow-sm">
-                <table className="w-full min-w-[700px] text-sm">
+                <table className="w-full min-w-[640px] text-sm">
                   <thead className="bg-gray-50 border-b">
                     <tr>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">CAMPAIGN</th>
@@ -474,7 +474,7 @@ export default function EmailCampaignDashboard() {
                       <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">CLICKS</th>
                       <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">UNSUBS</th>
                       <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">DATE</th>
-                      <th className="px-4 py-3"></th>
+                      <th className="sticky right-0 bg-gray-50 px-3 py-3 text-xs font-semibold text-gray-500 border-l border-gray-100"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -504,7 +504,7 @@ export default function EmailCampaignDashboard() {
                         <td className="px-4 py-3 text-right text-xs text-gray-400">
                           {c.sentAt ? new Date(c.sentAt).toLocaleDateString() : c.scheduledAt ? `📅 ${new Date(c.scheduledAt).toLocaleDateString()}` : "—"}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="sticky right-0 bg-white px-3 py-3 border-l border-gray-100">
                           <div className="flex items-center justify-end gap-1">
                             {c.status === "sent" && (
                               <button onClick={() => { setAnalyticsId(c.id); setAnalyticsSubject(c.subject); }} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#189aa1]" title="Analytics">
