@@ -60,12 +60,6 @@ ${preview}
   <tr><td align="center" style="padding:20px 0;">
     <table width="900" cellpadding="0" cellspacing="0" border="0" style="max-width:900px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
       <tr>
-        <td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:24px 32px;">
-          <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">All About Ultrasound\u2122</span>
-          <span style="font-size:13px;color:#4ad9e0;font-weight:600;margin-left:10px;letter-spacing:0.5px;">| iHeartEcho\u2122</span>
-        </td>
-      </tr>
-      <tr>
         <td style="padding:0;color:#1a2e3b;font-size:15px;line-height:1.7;">
           ${bodyHtml}
         </td>
