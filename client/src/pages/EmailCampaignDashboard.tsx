@@ -416,7 +416,7 @@ export default function EmailCampaignDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4 flex-wrap">
+          <TabsList className="mb-4">
             <TabsTrigger value="campaigns" className="flex items-center gap-1.5">
               <Mail className="w-4 h-4" /> Campaigns
               {campaigns && <Badge variant="secondary" className="ml-1 text-xs">{campaigns.length}</Badge>}

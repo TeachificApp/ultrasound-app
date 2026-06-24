@@ -546,7 +546,7 @@ export default function ProductLandingPageBuilder() {
           </DialogTitle>
         </DialogHeader>
         {/* Top-level tabs */}
-        <div className="flex gap-1 border-b border-gray-200 shrink-0 -mx-1 px-1">
+        <div className="flex gap-1 border-b border-gray-200 shrink-0 -mx-1 px-1 overflow-x-auto scrollbar-hide flex-nowrap">
           <button onClick={() => setPickerTab("catalog")} className={cn("px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5", pickerTab === "catalog" ? "text-teal-700 border-b-2 border-teal-500" : "text-gray-500 hover:text-gray-700")}>
             <Plus className="w-3.5 h-3.5" /> New Block
           </button>

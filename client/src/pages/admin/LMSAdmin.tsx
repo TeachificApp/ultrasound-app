@@ -6815,7 +6815,7 @@ function AffiliatesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto scrollbar-hide flex-nowrap">
         {(["affiliates", "payouts", "instructors"] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)}
             className={`px-3 py-1.5 text-xs font-medium rounded-t border-b-2 transition-colors ${
@@ -7733,7 +7733,7 @@ function CommunitiesTab() {
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto scrollbar-hide flex-nowrap">
         {([
           { key: "communities", label: "Communities", icon: Users },
           { key: "channels", label: "Channels", icon: Hash },
@@ -10988,7 +10988,7 @@ function CohortTab({ courseId }: { courseId: number }) {
   return (
     <div className="space-y-4">
       {/* Sub-tabs */}
-      <div className="flex gap-1 border-b border-gray-200 pb-0">
+      <div className="flex gap-1 border-b border-gray-200 pb-0 overflow-x-auto scrollbar-hide flex-nowrap">
         {(["settings", "groups", "sessions", "assignments", "recordings", "resources", "discussions"] as const).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize",
