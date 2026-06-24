@@ -34,6 +34,8 @@ import { cn } from "@/lib/utils";
 
 export interface LessonBlockEditorHandle {
   save: (andClose?: boolean) => Promise<void>;
+  /** Returns the current blocks array synchronously — use before saving the parent form. */
+  getBlocks: () => Block[];
   openAddBlock: () => void;
   openSaveLessonTemplate: () => void;
 }
@@ -446,8 +448,12 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
 
   const handleSaveRef = React.useRef<(andClose?: boolean) => Promise<void>>();
 
+  const blocksRef = React.useRef<Block[]>(blocks);
+  useEffect(() => { blocksRef.current = blocks; }, [blocks]);
+
   useImperativeHandle(ref, () => ({
     save: (andClose = false) => handleSaveRef.current?.(andClose) ?? Promise.resolve(),
+    getBlocks: () => blocksRef.current,
     openAddBlock: () => setAddMenuOpen(true),
     openSaveLessonTemplate: () => { setLessonTemplateName(""); setLessonTemplateTags(""); setSaveLessonTemplateOpen(true); },
   }));

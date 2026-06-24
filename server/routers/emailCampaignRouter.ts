@@ -606,7 +606,7 @@ export const emailCampaignRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const [courses, products, groups, cohortGroups, forms, interests, lists, membershipPlans, bundles, workshops, communities] = await Promise.all([
-      db.execute(sql`SELECT id, title FROM lms_courses WHERE status='published' ORDER BY title LIMIT 200`),
+      db.execute(sql`SELECT id, title FROM lms_courses WHERE status='public' ORDER BY title LIMIT 200`),
       db.execute(sql`SELECT id, title FROM digital_products WHERE is_active=1 ORDER BY title LIMIT 200`),
       db.execute(sql`SELECT id, name FROM lms_groups ORDER BY name LIMIT 200`),
       db.execute(sql`SELECT id, name FROM lmsCohortGroups ORDER BY name LIMIT 200`),

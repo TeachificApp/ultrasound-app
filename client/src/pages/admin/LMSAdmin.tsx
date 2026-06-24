@@ -10952,10 +10952,13 @@ function CohortTab({ courseId }: { courseId: number }) {
 
   const handleSaveAssignment = () => {
     if (!assignForm.title.trim()) { toast.error("Title is required"); return; }
+    // Read the latest blocks directly from the editor ref so any unsaved block edits
+    // (e.g. smart block settings changed but inner Save not clicked) are captured.
+    const latestBlocks = assignBlockEditorRef.current?.getBlocks() ?? assignForm.contentBlocks;
     const payload = {
       title: assignForm.title.trim(),
       description: assignForm.description || undefined,
-      contentBlocks: assignForm.contentBlocks.length > 0 ? assignForm.contentBlocks : undefined,
+      contentBlocks: latestBlocks.length > 0 ? latestBlocks : undefined,
       dueDate: assignForm.dueDate ? new Date(assignForm.dueDate).toISOString() : null,
       maxPoints: assignForm.maxPoints,
       submissionType: assignForm.submissionType,
