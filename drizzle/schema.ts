@@ -2169,6 +2169,19 @@ export const emailCampaigns = mysqlTable("emailCampaigns", {
 export type EmailCampaign = typeof emailCampaigns.$inferSelect;
 export type InsertEmailCampaign = typeof emailCampaigns.$inferInsert;
 
+/** Per-recipient open/click/unsubscribe events for campaign analytics */
+export const emailCampaignEvents = mysqlTable("emailCampaignEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId").notNull(),
+  userId: int("userId"),
+  recipientKey: varchar("recipientKey", { length: 128 }).notNull(),
+  eventType: mysqlEnum("eventType", ["open", "click", "unsubscribe"]).notNull(),
+  metadata: text("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EmailCampaignEvent = typeof emailCampaignEvents.$inferSelect;
+export type InsertEmailCampaignEvent = typeof emailCampaignEvents.$inferInsert;
+
 // ─── EducatorAssist Platform ──────────────────────────────────────────────────
 //
 // Roles:

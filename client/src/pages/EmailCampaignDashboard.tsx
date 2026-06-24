@@ -238,12 +238,18 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
                 <div className="text-xs text-gray-500">Sent</div>
               </div>
               <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <div className="text-xl font-bold text-blue-700">{analytics.totalOpens.toLocaleString()}</div>
-                <div className="text-xs text-blue-500">Opens ({analytics.openRate}%)</div>
+                <div className="text-xl font-bold text-blue-700">{analytics.uniqueOpens.toLocaleString()}</div>
+                <div className="text-xs text-blue-500">Unique Opens ({analytics.openRate}%)</div>
+                {analytics.totalOpens > analytics.uniqueOpens && (
+                  <div className="text-[10px] text-blue-400 mt-1">{analytics.totalOpens.toLocaleString()} total</div>
+                )}
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
-                <div className="text-xl font-bold text-green-700">{analytics.totalClicks.toLocaleString()}</div>
-                <div className="text-xs text-green-500">Clicks ({analytics.clickRate}%)</div>
+                <div className="text-xl font-bold text-green-700">{analytics.uniqueClicks.toLocaleString()}</div>
+                <div className="text-xs text-green-500">Unique Clicks ({analytics.clickRate}%)</div>
+                {analytics.totalClicks > analytics.uniqueClicks && (
+                  <div className="text-[10px] text-green-400 mt-1">{analytics.totalClicks.toLocaleString()} total</div>
+                )}
               </div>
               <div className="text-center p-3 bg-red-50 rounded-lg">
                 <div className="text-xl font-bold text-red-700">{analytics.totalUnsubscribes.toLocaleString()}</div>
