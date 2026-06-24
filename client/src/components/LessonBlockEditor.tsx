@@ -448,9 +448,6 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
 
   const handleSaveRef = React.useRef<(andClose?: boolean) => Promise<void>>();
 
-  const blocksRef = React.useRef<Block[]>(blocks);
-  useEffect(() => { blocksRef.current = blocks; }, [blocks]);
-
   useImperativeHandle(ref, () => ({
     save: (andClose = false) => handleSaveRef.current?.(andClose) ?? Promise.resolve(),
     getBlocks: () => blocksRef.current,
