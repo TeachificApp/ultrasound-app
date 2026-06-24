@@ -48,6 +48,11 @@ import {
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
 import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
+import {
+  injectTrackingPixel,
+  wrapLinksForTracking,
+  recordEmailCampaignEvent,
+} from "../lib/emailCampaignTracking";
 
 // ─── Shared Zod schemas ───────────────────────────────────────────────────────
 
@@ -81,9 +86,11 @@ async function ensureUnsubscribeToken(userId: number): Promise<string> {
 }
 
 /** Build the unsubscribe URL for a given token */
-function buildUnsubscribeUrl(token: string): string {
+function buildUnsubscribeUrl(token: string, campaignId?: number): string {
   const appUrl = process.env.VITE_APP_URL || "https://app.allaboutultrasound.com";
-  return `${appUrl}/unsubscribe?token=${token}`;
+  const params = new URLSearchParams({ token });
+  if (campaignId) params.set("campaignId", String(campaignId));
+  return `${appUrl}/unsubscribe?${params.toString()}`;
 }
 
 /** Inject an unsubscribe footer block into HTML email body */
@@ -125,38 +132,6 @@ async function assertAdmin(userId: number) {
 }
 
 // ─── Core send function (shared by immediate and scheduled sends) ─────────────
-
-/** Inject a 1x1 tracking pixel into an HTML email body */
-function injectTrackingPixel(
-  html: string,
-  campaignId: number,
-  recipientKey: string,
-  variant?: string,
-): string {
-  const appUrl = process.env.CANONICAL_ROOT_DOMAIN || "https://app.allaboutultrasound.com";
-  const vq = variant ? `?v=${encodeURIComponent(variant)}` : "";
-  const pixelUrl = `${appUrl}/api/email/track/open/${campaignId}/${recipientKey}.gif${vq}`;
-  const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;" />`;
-  if (html.includes("</body>")) return html.replace("</body>", `${pixel}</body>`);
-  return html + pixel;
-}
-
-/** Wrap all <a href="..."> links in the email with click-tracking redirect */
-function wrapLinksForTracking(
-  html: string,
-  campaignId: number,
-  recipientKey: string,
-  variant?: string,
-): string {
-  const appUrl = process.env.CANONICAL_ROOT_DOMAIN || "https://app.allaboutultrasound.com";
-  const hrefPattern = new RegExp('href="(https?://[^"]+)"', 'gi');
-  const vq = variant ? `&v=${encodeURIComponent(variant)}` : "";
-  return html.replace(hrefPattern, (_, url: string) => {
-    if (url.includes("/api/email/track/") || url.includes("/unsubscribe")) return `href="${url}"`;
-    const encoded = encodeURIComponent(url);
-    return `href="${appUrl}/api/email/track/click/${campaignId}/${recipientKey}?url=${encoded}${vq}"`;
-  });
-}
 
 export async function executeCampaignSend(campaignId: number): Promise<void> {
   const db = await getDb();
@@ -212,7 +187,7 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     let unsubscribeUrl: string | undefined;
     if (recipient.userId) {
       const token = await ensureUnsubscribeToken(recipient.userId);
-      unsubscribeUrl = buildUnsubscribeUrl(token);
+      unsubscribeUrl = buildUnsubscribeUrl(token, campaignId);
       if (html.includes("{{UNSUBSCRIBE_URL}}")) {
         html = html.replaceAll("{{UNSUBSCRIBE_URL}}", unsubscribeUrl);
       } else {
@@ -345,7 +320,10 @@ export const emailCampaignRouter = router({
   // ── Public: unsubscribe via token ─────────────────────────────────────────
 
   unsubscribe: publicProcedure
-    .input(z.object({ token: z.string().min(1) }))
+    .input(z.object({
+      token: z.string().min(1),
+      campaignId: z.number().int().positive().optional(),
+    }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -362,9 +340,19 @@ export const emailCampaignRouter = router({
           .update(users)
           .set({ unsubscribedAt: new Date() })
           .where(eq(users.id, u.id));
-        // Add to SendGrid Global Unsubscribe list — blocks delivery across all apps
         if (u.email) {
           await addToSendGridGlobalUnsubscribes([u.email]);
+        }
+      }
+      if (input.campaignId) {
+        try {
+          await recordEmailCampaignEvent(db, {
+            campaignId: input.campaignId,
+            recipientKey: `u${u.id}`,
+            eventType: "unsubscribe",
+          });
+        } catch (err) {
+          console.error("[EmailCampaign] Failed to record unsubscribe event:", err);
         }
       }
       return { success: true, alreadyUnsubscribed: !!u.unsubscribedAt };
@@ -836,12 +824,21 @@ export const emailCampaignRouter = router({
         campaignId,
         SUM(CASE WHEN eventType = 'open' THEN 1 ELSE 0 END) as openCount,
         SUM(CASE WHEN eventType = 'click' THEN 1 ELSE 0 END) as clickCount,
-        SUM(CASE WHEN eventType = 'unsubscribe' THEN 1 ELSE 0 END) as unsubscribeCount
+        SUM(CASE WHEN eventType = 'unsubscribe' THEN 1 ELSE 0 END) as unsubscribeCount,
+        COUNT(DISTINCT CASE WHEN eventType = 'open' THEN recipientKey END) as uniqueOpenCount,
+        COUNT(DISTINCT CASE WHEN eventType = 'click' THEN recipientKey END) as uniqueClickCount
       FROM emailCampaignEvents
       WHERE campaignId IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
       GROUP BY campaignId
     `)) as [
-      { campaignId: number; openCount: number; clickCount: number; unsubscribeCount: number }[],
+      {
+        campaignId: number;
+        openCount: number;
+        clickCount: number;
+        unsubscribeCount: number;
+        uniqueOpenCount: number;
+        uniqueClickCount: number;
+      }[],
       unknown,
     ];
     const metricsMap = new Map(
@@ -853,14 +850,18 @@ export const emailCampaignRouter = router({
       const sent = c.recipientCount ?? 0;
       const openCount = Number(m?.openCount ?? 0);
       const clickCount = Number(m?.clickCount ?? 0);
+      const uniqueOpenCount = Number(m?.uniqueOpenCount ?? 0);
+      const uniqueClickCount = Number(m?.uniqueClickCount ?? 0);
       const unsubscribeCount = Number(m?.unsubscribeCount ?? 0);
       return {
         ...c,
         openCount,
         clickCount,
+        uniqueOpenCount,
+        uniqueClickCount,
         unsubscribeCount,
-        openRate: sent > 0 ? Math.round((openCount / sent) * 100) : 0,
-        clickRate: sent > 0 ? Math.round((clickCount / sent) * 100) : 0,
+        openRate: sent > 0 ? Math.round((uniqueOpenCount / sent) * 100) : 0,
+        clickRate: sent > 0 ? Math.round((uniqueClickCount / sent) * 100) : 0,
       };
     });
   }),
@@ -890,7 +891,7 @@ export const emailCampaignRouter = router({
       const [uniqueRaw] = (await db.execute(sql`
         SELECT
           eventType,
-          COUNT(DISTINCT COALESCE(userId, metadata)) as uniqueCnt
+          COUNT(DISTINCT recipientKey) as uniqueCnt
         FROM emailCampaignEvents
         WHERE campaignId = ${input.campaignId}
         GROUP BY eventType

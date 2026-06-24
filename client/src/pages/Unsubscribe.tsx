@@ -23,6 +23,8 @@ export default function Unsubscribe() {
   const params = new URLSearchParams(search);
   const status = params.get("status"); // from HMAC server redirect
   const token = params.get("token");   // from legacy tRPC flow
+  const campaignIdParam = params.get("campaignId");
+  const campaignId = campaignIdParam ? parseInt(campaignIdParam, 10) : undefined;
 
   const [attempted, setAttempted] = useState(false);
   const unsubscribeMutation = trpc.emailCampaign.unsubscribe.useMutation();
@@ -32,7 +34,10 @@ export default function Unsubscribe() {
   useEffect(() => {
     if (token && !status && !attempted) {
       setAttempted(true);
-      unsubscribeMutation.mutate({ token });
+      unsubscribeMutation.mutate({
+        token,
+        campaignId: campaignId && !Number.isNaN(campaignId) ? campaignId : undefined,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, status]);
