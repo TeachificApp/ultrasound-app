@@ -90,6 +90,23 @@ const LEGACY_INTEREST_OPTIONS: { key: LegacyInterestKey; label: string }[] = [
 
 const DEFAULT_FILTER: AudienceFilter = { ...DEFAULT_AUDIENCE_FILTER };
 
+const EMPTY_AUDIENCE_OPTIONS = {
+  courses: [] as { id: number; label: string }[],
+  products: [] as { id: number; label: string }[],
+  groups: [] as { id: number; label: string }[],
+  cohortGroups: [] as { id: number; label: string }[],
+  forms: [] as { id: number; label: string }[],
+  interests: [] as { id: number; label: string; category: string | null }[],
+  lists: [] as { id: number; label: string; subscriberCount: number | null }[],
+  roles: [] as { id: string; label: string }[],
+  membershipPlans: [] as { id: number; label: string }[],
+  bundles: [] as { id: number; label: string }[],
+  workshops: [] as { id: number; label: string }[],
+  communities: [] as { id: number; label: string }[],
+  workshopInstances: [] as { id: number; label: string }[],
+  physicalProducts: [] as { id: number; label: string }[],
+};
+
 function MultiSelect({ label, options, selected, onChange, hint }: {
   label: string;
   options: { id: number; label: string }[];
@@ -160,7 +177,8 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
   onChange: (f: AudienceFilter) => void;
   preview: { count: number; sampleEmails: string[] } | undefined;
 }) {
-  const { data: options } = trpc.emailCampaign.getAudienceOptions.useQuery();
+  const { data: options, isError: optionsError } = trpc.emailCampaign.getAudienceOptions.useQuery();
+  const audienceOptions = options ?? EMPTY_AUDIENCE_OPTIONS;
   const [expanded, setExpanded] = useState(true);
   // Auto-expand advanced section if any advanced filters are already active (e.g. loaded from saved draft)
   const hasAdvancedFilters =
@@ -177,10 +195,12 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
     (filter.membershipPlanIds?.length ?? 0) > 0 ||
     (filter.bundleIds?.length ?? 0) > 0 ||
     (filter.workshopIds?.length ?? 0) > 0 ||
+    (filter.workshopInstanceIds?.length ?? 0) > 0 ||
+    (filter.purchasedPhysicalProductIds?.length ?? 0) > 0 ||
     (filter.communityIds?.length ?? 0) > 0 ||
     !!filter.enrolledAfter || !!filter.enrolledBefore ||
     !!filter.purchasedAfter || !!filter.purchasedBefore;
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(true);
   // Expand advanced section once if active filters are detected (e.g. on draft load)
   const didAutoExpand = useRef(false);
   useEffect(() => {
@@ -299,15 +319,27 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
             </div>
           </div>
 
-          {options?.roles && options.roles.length > 0 && (
-            <StringMultiSelect label="Roles" options={options.roles} selected={filter.roles} onChange={(v) => update({ roles: v })} />
+          {options?.roles && audienceOptions.roles.length > 0 && (
+            <StringMultiSelect label="Roles" options={audienceOptions.roles} selected={filter.roles} onChange={(v) => update({ roles: v })} />
           )}
 
-          {options?.interests && options.interests.length > 0 && (
+          <div>
+            <label className="text-xs text-gray-500 mb-1.5 block">Profile Interests</label>
+            <p className="text-[10px] text-gray-400 mb-1.5">From each user&apos;s profile interest preferences</p>
+            <div className="flex flex-wrap gap-1.5">
+              {LEGACY_INTEREST_OPTIONS.map((i) => (
+                <button key={i.key} type="button" onClick={() => toggleLegacyInterest(i.key)} className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${filter.interests.includes(i.key) ? "bg-[#189aa1] text-white border-[#189aa1]" : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"}`}>
+                  {i.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {audienceOptions.interests.length > 0 && (
             <div>
               <label className="text-xs text-gray-500 mb-1.5 block">Content Interests</label>
               <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
-                {options.interests.map((i) => (
+                {audienceOptions.interests.map((i) => (
                   <button key={i.id} type="button" onClick={() => toggleInterestId(i.id)} className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${filter.interestIds.includes(i.id) ? "bg-[#189aa1] text-white border-[#189aa1]" : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"}`}>
                     {i.label}
                   </button>
@@ -336,12 +368,18 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
             </div>
           </div>
 
+          {optionsError && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Some enrollment filter options could not be loaded. You can still send; try refreshing if lists look incomplete.
+            </p>
+          )}
+
           <button type="button" onClick={() => setShowAdvanced(!showAdvanced)} className="text-xs text-[#189aa1] font-medium flex items-center gap-1">
             {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {showAdvanced ? "Hide" : "Show"} course, product, cohort & date filters
+            {showAdvanced ? "Hide" : "Show"} course, product, cohort & enrollment filters
           </button>
 
-          {showAdvanced && options && (
+          {showAdvanced && (
             <div className="space-y-4 pl-1 border-l-2 border-gray-100 ml-1">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -361,22 +399,24 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
                   <Input type="date" value={filter.purchasedBefore?.slice(0, 10) ?? ""} onChange={(e) => update({ purchasedBefore: e.target.value ? `${e.target.value}T23:59:59.999Z` : undefined })} className="text-sm h-9" />
                 </div>
               </div>
-              <MultiSelect label="Enrolled in Course" options={options.courses} selected={filter.enrolledInCourseIds} onChange={(v) => update({ enrolledInCourseIds: v })} />
-              <MultiSelect label="Active Course Access (in progress)" options={options.courses} selected={filter.activeAccessCourseIds} onChange={(v) => update({ activeAccessCourseIds: v })} />
-              <MultiSelect label="Free Preview Enrollees" options={options.courses} selected={filter.freePreviewCourseIds} onChange={(v) => update({ freePreviewCourseIds: v })} />
-              <MultiSelect label="Completed Course" options={options.courses} selected={filter.completedCourseIds} onChange={(v) => update({ completedCourseIds: v })} />
-              <MultiSelect label="Purchased Course (paid order)" options={options.courses} selected={filter.purchasedCourseIds} onChange={(v) => update({ purchasedCourseIds: v })} />
-              <MultiSelect label="Purchased Product" options={options.products} selected={filter.purchasedProductIds} onChange={(v) => update({ purchasedProductIds: v })} />
-              <MultiSelect label="Downloaded Product" options={options.products} selected={filter.downloadedProductIds} onChange={(v) => update({ downloadedProductIds: v })} />
-              <MultiSelect label="In Team/Group" options={options.groups} selected={filter.inGroupIds} onChange={(v) => update({ inGroupIds: v })} />
-              <MultiSelect label="In Cohort Group" options={options.cohortGroups} selected={filter.inCohortGroupIds} onChange={(v) => update({ inCohortGroupIds: v })} />
-              <MultiSelect label="Submitted Form" options={options.forms} selected={filter.submittedFormIds} onChange={(v) => update({ submittedFormIds: v })} />
-              {(options.membershipPlans?.length ?? 0) > 0 && (
-                <MultiSelect label="Membership Plan" options={options.membershipPlans!} selected={filter.membershipPlanIds ?? []} onChange={(v) => update({ membershipPlanIds: v })} />
+              <MultiSelect label="Enrolled in Course" options={audienceOptions.courses} selected={filter.enrolledInCourseIds} onChange={(v) => update({ enrolledInCourseIds: v })} />
+              <MultiSelect label="Active Course Access (in progress)" options={audienceOptions.courses} selected={filter.activeAccessCourseIds} onChange={(v) => update({ activeAccessCourseIds: v })} />
+              <MultiSelect label="Free Preview Enrollees" options={audienceOptions.courses} selected={filter.freePreviewCourseIds} onChange={(v) => update({ freePreviewCourseIds: v })} />
+              <MultiSelect label="Completed Course" options={audienceOptions.courses} selected={filter.completedCourseIds} onChange={(v) => update({ completedCourseIds: v })} />
+              <MultiSelect label="Purchased Course (paid order)" options={audienceOptions.courses} selected={filter.purchasedCourseIds} onChange={(v) => update({ purchasedCourseIds: v })} />
+              <MultiSelect label="Purchased Digital Product" options={audienceOptions.products} selected={filter.purchasedProductIds} onChange={(v) => update({ purchasedProductIds: v })} />
+              <MultiSelect label="Downloaded Digital Product" options={audienceOptions.products} selected={filter.downloadedProductIds} onChange={(v) => update({ downloadedProductIds: v })} />
+              <MultiSelect label="Purchased Physical Product" options={audienceOptions.physicalProducts} selected={filter.purchasedPhysicalProductIds ?? []} onChange={(v) => update({ purchasedPhysicalProductIds: v })} />
+              <MultiSelect label="In Team/Group" options={audienceOptions.groups} selected={filter.inGroupIds} onChange={(v) => update({ inGroupIds: v })} />
+              <MultiSelect label="In Cohort Group" options={audienceOptions.cohortGroups} selected={filter.inCohortGroupIds} onChange={(v) => update({ inCohortGroupIds: v })} />
+              <MultiSelect label="Submitted Form" options={audienceOptions.forms} selected={filter.submittedFormIds} onChange={(v) => update({ submittedFormIds: v })} />
+              {audienceOptions.membershipPlans.length > 0 && (
+                <MultiSelect label="Membership Plan" options={audienceOptions.membershipPlans} selected={filter.membershipPlanIds ?? []} onChange={(v) => update({ membershipPlanIds: v })} />
               )}
-              <MultiSelect label="Bundle Enrolled" options={options.bundles ?? []} selected={filter.bundleIds ?? []} onChange={(v) => update({ bundleIds: v })} />
-              <MultiSelect label="Workshop Enrolled" options={options.workshops ?? []} selected={filter.workshopIds ?? []} onChange={(v) => update({ workshopIds: v })} />
-              <MultiSelect label="Community Member" options={options.communities ?? []} selected={filter.communityIds ?? []} onChange={(v) => update({ communityIds: v })} />
+              <MultiSelect label="Bundle Enrolled" options={audienceOptions.bundles} selected={filter.bundleIds ?? []} onChange={(v) => update({ bundleIds: v })} />
+              <MultiSelect label="Workshop Enrolled" options={audienceOptions.workshops} selected={filter.workshopIds ?? []} onChange={(v) => update({ workshopIds: v })} />
+              <MultiSelect label="Workshop Instance Enrolled" options={audienceOptions.workshopInstances} selected={filter.workshopInstanceIds ?? []} onChange={(v) => update({ workshopInstanceIds: v })} hint="Specific scheduled workshop sessions" />
+              <MultiSelect label="Community Member" options={audienceOptions.communities} selected={filter.communityIds ?? []} onChange={(v) => update({ communityIds: v })} />
             </div>
           )}
 
@@ -596,7 +636,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     onSuccess: (r) => {
       toast.success(`Sending to ${r.recipientCount} recipient${r.recipientCount !== 1 ? "s" : ""}…`);
       setSendDialogOpen(false);
-      if (onClose) onClose(); else navigate("/admin/email");
+      if (onClose) onClose(); else navigate("/admin/email-campaigns");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -605,7 +645,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     onSuccess: (r) => {
       toast.success(`Scheduled for ${new Date(r.scheduledAt).toLocaleString()}`);
       setScheduleDialogOpen(false);
-      if (onClose) onClose(); else navigate("/admin/email");
+      if (onClose) onClose(); else navigate("/admin/email-campaigns");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -672,7 +712,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     toast.success(`Loaded: ${t.name}`);
   }
 
-  const goBack = onClose ?? (() => navigate("/admin/email"));
+  const goBack = onClose ?? (() => navigate("/admin/email-campaigns"));
 
   return (
     <div className="min-h-screen bg-gray-50">

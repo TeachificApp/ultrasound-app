@@ -61,6 +61,10 @@ export const AudienceFilterSchema = z.object({
   bundleIds: z.array(z.number().int()).default([]),
   /** Users enrolled in these workshop IDs (workshop_enrollments) */
   workshopIds: z.array(z.number().int()).default([]),
+  /** Users enrolled in these workshop instance IDs (specific scheduled sessions) */
+  workshopInstanceIds: z.array(z.number().int()).default([]),
+  /** Users who purchased these physical product IDs */
+  purchasedPhysicalProductIds: z.array(z.number().int()).default([]),
   /** Users who are members of these community IDs (community_members) */
   communityIds: z.array(z.number().int()).default([]),
   logic: z.enum(["and", "or"]).default("and"),
@@ -103,6 +107,8 @@ export const DEFAULT_AUDIENCE_FILTER: AudienceFilter = {
   membershipPlanIds: [],
   bundleIds: [],
   workshopIds: [],
+  workshopInstanceIds: [],
+  purchasedPhysicalProductIds: [],
   communityIds: [],
   logic: "and",
 };

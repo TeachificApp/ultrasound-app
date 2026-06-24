@@ -18,6 +18,8 @@ describe("emailCampaignAudience", () => {
     expect(filter.listMode).toBe("intersect");
     expect(filter.interestIds).toEqual([3]);
     expect(filter.logic).toBe("and");
+    expect(filter.workshopInstanceIds).toEqual([]);
+    expect(filter.purchasedPhysicalProductIds).toEqual([]);
   });
 
   it("assigns stable A/B buckets", () => {

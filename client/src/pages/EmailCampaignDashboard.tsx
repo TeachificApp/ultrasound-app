@@ -9,7 +9,7 @@
  *  - Sender profiles management tab
  *  - Unsubscribe list management
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   Mail, Plus, BarChart2, Users, Send, Clock, CheckCircle, XCircle,
@@ -346,7 +346,13 @@ export default function EmailCampaignDashboard() {
   const [showWidgetForm, setShowWidgetForm] = useState(false);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
-  const { data: campaigns, refetch: refetchCampaigns, isLoading: campaignsLoading } = trpc.emailCampaign.listCampaigns.useQuery(undefined, { enabled: !!user });
+  const { data: campaigns, refetch: refetchCampaigns, isLoading: campaignsLoading, isError: campaignsError, error: campaignsQueryError } = trpc.emailCampaign.listCampaigns.useQuery(undefined, { enabled: !!user });
+
+  useEffect(() => {
+    if (campaignsError && campaignsQueryError) {
+      toast.error(campaignsQueryError.message || "Failed to load campaigns");
+    }
+  }, [campaignsError, campaignsQueryError]);
   const { data: senderProfiles, refetch: refetchProfiles } = trpc.emailCampaign.listSenderProfiles.useQuery(undefined, { enabled: !!user });
   const { data: emailLists } = trpc.emailCampaign.listEmailLists.useQuery(undefined, { enabled: !!user });
   const { data: leadCaptureWidgets, refetch: refetchWidgets } = trpc.emailCampaign.listLeadCaptureWidgets.useQuery(undefined, { enabled: !!user });
@@ -463,6 +469,15 @@ export default function EmailCampaignDashboard() {
 
             {campaignsLoading ? (
               <div className="flex justify-center py-12"><RefreshCw className="w-6 h-6 animate-spin text-[#189aa1]" /></div>
+            ) : campaignsError ? (
+              <div className="text-center py-16 text-red-600">
+                <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-60" />
+                <p className="font-medium">Could not load campaigns</p>
+                <p className="text-sm text-gray-500 mt-1">{campaignsQueryError?.message ?? "Unknown error"}</p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={() => refetchCampaigns()}>
+                  <RefreshCw className="w-4 h-4 mr-1.5" /> Retry
+                </Button>
+              </div>
             ) : filteredCampaigns.length === 0 ? (
               <div className="text-center py-16 text-gray-400">
                 <Mail className="w-12 h-12 mx-auto mb-3 opacity-30" />

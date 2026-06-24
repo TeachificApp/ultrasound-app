@@ -17,7 +17,8 @@ import {
   membershipSubscriptions,
   bundleEnrollments,
   workshopEnrollments,
-  communityMembers,
+  physicalProductOrders,
+  workshopInstances,
 } from "../../drizzle/schema";
 import {
   type AudienceFilter,
@@ -471,6 +472,42 @@ async function emailsMatchingDimension(
     return matches;
   }
 
+  if (dimension === "workshopInstances" && (filter.workshopInstanceIds ?? []).length > 0) {
+    const rows = await db
+      .select({ userId: workshopEnrollments.userId })
+      .from(workshopEnrollments)
+      .where(
+        and(
+          inArray(workshopEnrollments.instanceId, filter.workshopInstanceIds!),
+          eq(workshopEnrollments.status, "active"),
+        ),
+      );
+    const idSet = new Set(rows.map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
+  if (dimension === "physicalProducts" && (filter.purchasedPhysicalProductIds ?? []).length > 0) {
+    for (const productId of filter.purchasedPhysicalProductIds!) {
+      const conditions = [eq(physicalProductOrders.productId, productId)];
+      if (purchasedAfter) conditions.push(gte(physicalProductOrders.orderedAt, purchasedAfter));
+      if (purchasedBefore) conditions.push(lte(physicalProductOrders.orderedAt, purchasedBefore));
+      const rows = await db
+        .select({ userId: physicalProductOrders.userId })
+        .from(physicalProductOrders)
+        .where(and(...conditions));
+      const allUsers = await loadAllUsers();
+      const idSet = new Set(rows.map((r) => r.userId));
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
   if (dimension === "communities" && filter.communityIds.length > 0) {
     const rows = await db
       .select({ userId: communityMembers.userId })
@@ -497,10 +534,7 @@ async function emailsMatchingDimension(
 function activeDimensions(filter: AudienceFilter): string[] {
   const dims: string[] = [];
   if (filter.roles.length > 0) dims.push("roles");
-  // Only activate the interests dimension when interestIds (userInterests table) are selected.
-  // Legacy filter.interests (JSON interestPrefs) is no longer surfaced in the UI and most
-  // Thinkific-synced users lack that data, so ignoring it prevents incorrect narrow counts.
-  if (filter.interestIds.length > 0) dims.push("interests");
+  if (filter.interests.length > 0 || filter.interestIds.length > 0) dims.push("interests");
   if (filter.enrolledInCourseIds.length > 0) dims.push("enrolled");
   if (filter.completedCourseIds.length > 0) dims.push("completed");
   if (filter.freePreviewCourseIds.length > 0) dims.push("freePreview");
@@ -515,6 +549,8 @@ function activeDimensions(filter: AudienceFilter): string[] {
   if ((filter.membershipPlanIds ?? []).length > 0) dims.push("membershipPlans");
   if ((filter.bundleIds ?? []).length > 0) dims.push("bundles");
   if ((filter.workshopIds ?? []).length > 0) dims.push("workshops");
+  if ((filter.workshopInstanceIds ?? []).length > 0) dims.push("workshopInstances");
+  if ((filter.purchasedPhysicalProductIds ?? []).length > 0) dims.push("physicalProducts");
   if ((filter.communityIds ?? []).length > 0) dims.push("communities");
   return dims;
 }
