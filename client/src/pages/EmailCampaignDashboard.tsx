@@ -457,8 +457,8 @@ export default function EmailCampaignDashboard() {
                 <p className="text-sm mt-1">Click "New Campaign" to get started</p>
               </div>
             ) : (
-              <div className="border rounded-xl overflow-hidden bg-white shadow-sm">
-                <table className="w-full text-sm">
+              <div className="border rounded-xl overflow-x-auto bg-white shadow-sm">
+                <table className="w-full min-w-[700px] text-sm">
                   <thead className="bg-gray-50 border-b">
                     <tr>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">CAMPAIGN</th>
@@ -531,8 +531,8 @@ export default function EmailCampaignDashboard() {
               {(!senderProfiles || senderProfiles.length === 0) ? (
                 <div className="text-center py-8 text-gray-400 text-sm">No sender profiles yet. Add one above.</div>
               ) : (
-                <div className="border rounded-xl overflow-hidden bg-white shadow-sm">
-                  <table className="w-full text-sm">
+                <div className="border rounded-xl overflow-x-auto bg-white shadow-sm">
+                  <table className="w-full min-w-[500px] text-sm">
                     <thead className="bg-gray-50 border-b">
                       <tr>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">NAME</th>
