@@ -319,54 +319,60 @@ async function startServer() {
   });
   // Email open/click tracking routes
   app.get("/api/email/track/open/:campaignId/:recipientKeyGif", async (req: any, res: any) => {
-    const gif = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
-    res.setHeader("Content-Type", "image/gif");
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-    res.end(gif);
+    const { recordEmailCampaignEvent, TRACKING_GIF } = await import("../lib/emailCampaignTracking");
+    const campaignId = parseInt(req.params.campaignId, 10);
+    const key = String(req.params.recipientKeyGif ?? "").replace(/\.gif$/i, "");
+    const variant = typeof req.query.v === "string" ? req.query.v : undefined;
+
     try {
-      const campaignId = parseInt(req.params.campaignId);
-      const key = req.params.recipientKeyGif.replace(/\.gif$/i, "");
-      const variant = typeof req.query.v === "string" ? req.query.v : undefined;
       if (!Number.isNaN(campaignId) && key) {
-        const { parseRecipientTrackingKey } = await import("../../shared/emailCampaignAudience");
-        const { userId, email } = parseRecipientTrackingKey(key);
         const { getDb } = await import("../db");
         const db = await getDb();
         if (db) {
-          const { sql } = await import("drizzle-orm");
-          const meta = JSON.stringify({ recipient: email ?? key, variant });
-          await db.execute(sql`
-            INSERT IGNORE INTO emailCampaignEvents (campaignId, userId, eventType, metadata, createdAt)
-            VALUES (${campaignId}, ${userId}, 'open', ${meta}, NOW())
-          `);
+          await recordEmailCampaignEvent(db, {
+            campaignId,
+            recipientKey: key,
+            eventType: "open",
+            metadata: variant ? { variant } : undefined,
+          });
         }
       }
-    } catch { /* non-critical */ }
+    } catch (err) {
+      console.error("[EmailTrack] Failed to record open:", err);
+    }
+
+    res.setHeader("Content-Type", "image/gif");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.setHeader("Pragma", "no-cache");
+    res.end(TRACKING_GIF);
   });
 
   app.get("/api/email/track/click/:campaignId/:recipientKey", async (req: any, res: any) => {
     const url = req.query.url as string;
-    if (!url) return res.redirect(302, "/");
-    res.redirect(302, url);
+    const destination = url && typeof url === "string" ? url : "/";
+    const campaignId = parseInt(req.params.campaignId, 10);
+    const key = String(req.params.recipientKey ?? "");
+    const variant = typeof req.query.v === "string" ? req.query.v : undefined;
+
     try {
-      const campaignId = parseInt(req.params.campaignId);
-      const key = req.params.recipientKey;
-      const variant = typeof req.query.v === "string" ? req.query.v : undefined;
       if (!Number.isNaN(campaignId) && key) {
-        const { parseRecipientTrackingKey } = await import("../../shared/emailCampaignAudience");
-        const { userId, email } = parseRecipientTrackingKey(key);
         const { getDb } = await import("../db");
         const db = await getDb();
         if (db) {
-          const { sql } = await import("drizzle-orm");
-          const meta = JSON.stringify({ url, recipient: email ?? key, variant });
-          await db.execute(sql`
-            INSERT INTO emailCampaignEvents (campaignId, userId, eventType, metadata, createdAt)
-            VALUES (${campaignId}, ${userId}, 'click', ${meta}, NOW())
-          `);
+          const { recordEmailCampaignEvent } = await import("../lib/emailCampaignTracking");
+          await recordEmailCampaignEvent(db, {
+            campaignId,
+            recipientKey: key,
+            eventType: "click",
+            metadata: { url: destination, ...(variant ? { variant } : {}) },
+          });
         }
       }
-    } catch { /* non-critical */ }
+    } catch (err) {
+      console.error("[EmailTrack] Failed to record click:", err);
+    }
+
+    res.redirect(302, destination);
   });
 
   // ── Public Email List Webhook (POST /api/email-lists/:token/subscribe) ───────
