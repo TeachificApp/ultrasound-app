@@ -104,9 +104,10 @@ async function processUnsubscribeEvent(event: SendGridEvent): Promise<void> {
     return;
   }
 
-  // Already unsubscribed — nothing to do
+  // Already unsubscribed — still attribute to recent campaign if applicable
   if (user.unsubscribedAt) {
     console.log(`[SendGridWebhook] ${event.event} — already unsubscribed: ${email}`);
+    await recordCampaignUnsubscribeFromSendLog(user.id, email);
     return;
   }
 
@@ -131,6 +132,35 @@ async function processUnsubscribeEvent(event: SendGridEvent): Promise<void> {
   await addToSendGridGlobalUnsubscribes([email]);
 
   console.log(`[SendGridWebhook] ${event.event} — unsubscribed user #${user.id}: ${email}`);
+  await recordCampaignUnsubscribeFromSendLog(user.id, email);
+}
+
+/** Attribute SendGrid unsubscribe/spam events to the most recent campaign email. */
+async function recordCampaignUnsubscribeFromSendLog(userId: number, email: string): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    const [rows] = await db.execute(sql`
+      SELECT campaign_id AS campaignId
+      FROM email_send_log
+      WHERE LOWER(TRIM(recipient_email)) = ${email.toLowerCase().trim()}
+        AND campaign_id IS NOT NULL
+      ORDER BY sent_at DESC
+      LIMIT 1
+    `) as [{ campaignId: number }[], unknown];
+    const campaignId = Array.isArray(rows) ? rows[0]?.campaignId : undefined;
+    if (!campaignId) return;
+    const { ensureEmailCampaignEventsTable } = await import("../lib/campaignUnsubscribe");
+    const { recordEmailCampaignEvent } = await import("../lib/emailCampaignTracking");
+    await ensureEmailCampaignEventsTable(db);
+    await recordEmailCampaignEvent(db, {
+      campaignId: Number(campaignId),
+      recipientKey: `u${userId}`,
+      eventType: "unsubscribe",
+    });
+  } catch (err) {
+    console.error("[SendGridWebhook] Failed to record campaign unsubscribe:", err);
+  }
 }
 
 /**

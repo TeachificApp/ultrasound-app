@@ -252,13 +252,16 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
                 )}
               </div>
               <div className="text-center p-3 bg-red-50 rounded-lg">
-                <div className="text-xl font-bold text-red-700">{analytics.totalUnsubscribes.toLocaleString()}</div>
+                <div className="text-xl font-bold text-red-700">{analytics.uniqueUnsubscribes.toLocaleString()}</div>
                 <div className="text-xs text-red-500">Unsubscribes ({analytics.unsubscribeRate}%)</div>
+                {analytics.totalUnsubscribes > analytics.uniqueUnsubscribes && (
+                  <div className="text-[10px] text-red-400 mt-1">{analytics.totalUnsubscribes.toLocaleString()} total</div>
+                )}
               </div>
             </div>
 
             {/* Unique vs total */}
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-3 gap-3 text-sm">
               <div className="p-3 border rounded-lg">
                 <p className="text-xs text-gray-500 mb-1">Unique Opens</p>
                 <p className="font-bold text-gray-900">{analytics.uniqueOpens.toLocaleString()}</p>
@@ -266,6 +269,10 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
               <div className="p-3 border rounded-lg">
                 <p className="text-xs text-gray-500 mb-1">Unique Clicks</p>
                 <p className="font-bold text-gray-900">{analytics.uniqueClicks.toLocaleString()}</p>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Unique Unsubscribes</p>
+                <p className="font-bold text-gray-900">{analytics.uniqueUnsubscribes.toLocaleString()}</p>
               </div>
             </div>
 

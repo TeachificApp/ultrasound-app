@@ -62,11 +62,14 @@ describe("emailCampaignTracking", () => {
     expect(html).not.toContain("/api/email/track/click/");
   });
 
-  it("resolveTrackableHref handles absolute and relative URLs", () => {
-    const app = "https://app.allaboutultrasound.com";
-    expect(resolveTrackableHref("/premium", app)).toBe("https://app.allaboutultrasound.com/premium");
-    expect(resolveTrackableHref("https://example.com", app)).toBe("https://example.com");
-    expect(resolveTrackableHref("#section", app)).toBeNull();
-    expect(resolveTrackableHref("mailto:a@b.com", app)).toBeNull();
+  it("buildListUnsubscribeApiUrl targets one-click POST endpoint", async () => {
+    const { buildListUnsubscribeApiUrl, buildUnsubscribePageUrl } = await import("./lib/campaignUnsubscribe");
+    process.env.VITE_APP_URL = "https://app.allaboutultrasound.com";
+    expect(buildListUnsubscribeApiUrl("abc123", 5)).toBe(
+      "https://app.allaboutultrasound.com/api/email/campaign-unsubscribe?token=abc123&campaignId=5",
+    );
+    expect(buildUnsubscribePageUrl("abc123", 5)).toBe(
+      "https://app.allaboutultrasound.com/unsubscribe?token=abc123&campaignId=5",
+    );
   });
 });

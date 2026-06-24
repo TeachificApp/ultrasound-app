@@ -114,7 +114,7 @@ export async function recordEmailCampaignEvent(
     ...input.metadata,
   });
 
-  if (input.eventType === "open") {
+  if (input.eventType === "open" || input.eventType === "unsubscribe") {
     const [existing] = await db
       .select({ id: emailCampaignEvents.id })
       .from(emailCampaignEvents)
@@ -122,7 +122,7 @@ export async function recordEmailCampaignEvent(
         and(
           eq(emailCampaignEvents.campaignId, input.campaignId),
           eq(emailCampaignEvents.recipientKey, input.recipientKey),
-          eq(emailCampaignEvents.eventType, "open"),
+          eq(emailCampaignEvents.eventType, input.eventType),
         ),
       )
       .limit(1);

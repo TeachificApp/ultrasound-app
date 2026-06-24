@@ -47,12 +47,16 @@ import {
 } from "../../shared/emailCampaignAudience";
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
-import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
 import {
   injectTrackingPixel,
   wrapLinksForTracking,
-  recordEmailCampaignEvent,
 } from "../lib/emailCampaignTracking";
+import {
+  buildListUnsubscribeApiUrl,
+  buildUnsubscribePageUrl,
+  ensureEmailCampaignEventsTable,
+  processCampaignUnsubscribe,
+} from "../lib/campaignUnsubscribe";
 
 // ─── Shared Zod schemas ───────────────────────────────────────────────────────
 
@@ -85,12 +89,9 @@ async function ensureUnsubscribeToken(userId: number): Promise<string> {
   return token;
 }
 
-/** Build the unsubscribe URL for a given token */
+/** Build the unsubscribe URL for a given token (footer link in email body). */
 function buildUnsubscribeUrl(token: string, campaignId?: number): string {
-  const appUrl = process.env.VITE_APP_URL || "https://app.allaboutultrasound.com";
-  const params = new URLSearchParams({ token });
-  if (campaignId) params.set("campaignId", String(campaignId));
-  return `${appUrl}/unsubscribe?${params.toString()}`;
+  return buildUnsubscribePageUrl(token, campaignId);
 }
 
 /** Inject an unsubscribe footer block into HTML email body */
@@ -136,6 +137,8 @@ async function assertAdmin(userId: number) {
 export async function executeCampaignSend(campaignId: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
+
+  await ensureEmailCampaignEventsTable(db);
 
   const [campaign] = await db
     .select()
@@ -185,9 +188,11 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     let html = variant?.htmlBody?.trim() || campaign.htmlBody;
 
     let unsubscribeUrl: string | undefined;
+    let listUnsubscribeApiUrl: string | undefined;
     if (recipient.userId) {
       const token = await ensureUnsubscribeToken(recipient.userId);
       unsubscribeUrl = buildUnsubscribeUrl(token, campaignId);
+      listUnsubscribeApiUrl = buildListUnsubscribeApiUrl(token, campaignId);
       if (html.includes("{{UNSUBSCRIBE_URL}}")) {
         html = html.replaceAll("{{UNSUBSCRIBE_URL}}", unsubscribeUrl);
       } else {
@@ -213,7 +218,7 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
       previewText: campaign.previewText ?? undefined,
       fromName: senderName,
       fromEmail: senderEmail,
-      listUnsubscribeUrl: unsubscribeUrl,
+      listUnsubscribeUrl: listUnsubscribeApiUrl,
     });
     if (ok) {
       sent++;
@@ -327,35 +332,15 @@ export const emailCampaignRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const [u] = await db
-        .select({ id: users.id, email: users.email, unsubscribedAt: users.unsubscribedAt })
-        .from(users)
-        .where(eq(users.unsubscribeToken, input.token))
-        .limit(1);
-      if (!u) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired unsubscribe link." });
+      await ensureEmailCampaignEventsTable(db);
+      const result = await processCampaignUnsubscribe(db, input.token, input.campaignId);
+      if (!result.ok) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Invalid or expired unsubscribe link.",
+        });
       }
-      if (!u.unsubscribedAt) {
-        await db
-          .update(users)
-          .set({ unsubscribedAt: new Date() })
-          .where(eq(users.id, u.id));
-        if (u.email) {
-          await addToSendGridGlobalUnsubscribes([u.email]);
-        }
-      }
-      if (input.campaignId) {
-        try {
-          await recordEmailCampaignEvent(db, {
-            campaignId: input.campaignId,
-            recipientKey: `u${u.id}`,
-            eventType: "unsubscribe",
-          });
-        } catch (err) {
-          console.error("[EmailCampaign] Failed to record unsubscribe event:", err);
-        }
-      }
-      return { success: true, alreadyUnsubscribed: !!u.unsubscribedAt };
+      return { success: true, alreadyUnsubscribed: result.alreadyUnsubscribed };
     }),
 
   // ── Admin: email templates ────────────────────────────────────────────────
@@ -826,7 +811,8 @@ export const emailCampaignRouter = router({
         SUM(CASE WHEN eventType = 'click' THEN 1 ELSE 0 END) as clickCount,
         SUM(CASE WHEN eventType = 'unsubscribe' THEN 1 ELSE 0 END) as unsubscribeCount,
         COUNT(DISTINCT CASE WHEN eventType = 'open' THEN recipientKey END) as uniqueOpenCount,
-        COUNT(DISTINCT CASE WHEN eventType = 'click' THEN recipientKey END) as uniqueClickCount
+        COUNT(DISTINCT CASE WHEN eventType = 'click' THEN recipientKey END) as uniqueClickCount,
+        COUNT(DISTINCT CASE WHEN eventType = 'unsubscribe' THEN recipientKey END) as uniqueUnsubscribeCount
       FROM emailCampaignEvents
       WHERE campaignId IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
       GROUP BY campaignId
@@ -838,6 +824,7 @@ export const emailCampaignRouter = router({
         unsubscribeCount: number;
         uniqueOpenCount: number;
         uniqueClickCount: number;
+        uniqueUnsubscribeCount: number;
       }[],
       unknown,
     ];
@@ -852,6 +839,7 @@ export const emailCampaignRouter = router({
       const clickCount = Number(m?.clickCount ?? 0);
       const uniqueOpenCount = Number(m?.uniqueOpenCount ?? 0);
       const uniqueClickCount = Number(m?.uniqueClickCount ?? 0);
+      const uniqueUnsubscribeCount = Number(m?.uniqueUnsubscribeCount ?? 0);
       const unsubscribeCount = Number(m?.unsubscribeCount ?? 0);
       return {
         ...c,
@@ -860,8 +848,10 @@ export const emailCampaignRouter = router({
         uniqueOpenCount,
         uniqueClickCount,
         unsubscribeCount,
+        uniqueUnsubscribeCount,
         openRate: sent > 0 ? Math.round((uniqueOpenCount / sent) * 100) : 0,
         clickRate: sent > 0 ? Math.round((uniqueClickCount / sent) * 100) : 0,
+        unsubscribeRate: sent > 0 ? Math.round((uniqueUnsubscribeCount / sent) * 100) : 0,
       };
     });
   }),
@@ -942,6 +932,7 @@ export const emailCampaignRouter = router({
       const totalUnsubscribes = Number(events.find((e) => e.eventType === "unsubscribe")?.cnt ?? 0);
       const uniqueOpens = Number(uniqueEvents.find((e) => e.eventType === "open")?.uniqueCnt ?? 0);
       const uniqueClicks = Number(uniqueEvents.find((e) => e.eventType === "click")?.uniqueCnt ?? 0);
+      const uniqueUnsubscribes = Number(uniqueEvents.find((e) => e.eventType === "unsubscribe")?.uniqueCnt ?? 0);
       const sent = campaign.recipientCount ?? 0;
 
       const variantStats: Record<string, { opens: number; clicks: number }> = {};
@@ -954,7 +945,7 @@ export const emailCampaignRouter = router({
 
       const openRate = sent > 0 ? Math.round((uniqueOpens / sent) * 100) : 0;
       const clickRate = sent > 0 ? Math.round((uniqueClicks / sent) * 100) : 0;
-      const unsubscribeRate = sent > 0 ? Math.round((totalUnsubscribes / sent) * 100) : 0;
+      const unsubscribeRate = sent > 0 ? Math.round((uniqueUnsubscribes / sent) * 100) : 0;
 
       return {
         campaignId: campaign.id,
@@ -968,6 +959,7 @@ export const emailCampaignRouter = router({
         totalUnsubscribes,
         uniqueOpens,
         uniqueClicks,
+        uniqueUnsubscribes,
         openCount: totalOpens,
         clickCount: totalClicks,
         unsubscribeCount: totalUnsubscribes,
