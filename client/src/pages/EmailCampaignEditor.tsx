@@ -495,6 +495,8 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [senderProfileId, setSenderProfileId] = useState<number | undefined>();
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [showPreview, setShowPreview] = useState(false);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(0.7);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
@@ -506,6 +508,17 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [draftLoaded, setDraftLoaded] = useState(!campaignId);
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Compute scale to fit 900px email into the preview container
+  useEffect(() => {
+    if (!previewContainerRef.current) return;
+    const obs = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      if (w > 0) setPreviewScale(Math.min(1, (w - 32) / 900));
+    });
+    obs.observe(previewContainerRef.current);
+    return () => obs.disconnect();
+  }, [showPreview]);
   const LS_KEY = `email_draft_backup_${campaignId ?? "new"}`;
 
   // ── Queries ─────────────────────────────────────────────────────────────────
@@ -774,15 +787,34 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
                 </button>
                 <span className="ml-auto text-xs text-gray-400">{subject || "(no subject)"}</span>
               </div>
-              <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
-                <div className={`mx-auto ${previewMode === "mobile" ? "max-w-sm" : "max-w-2xl"} p-4`}>
-                  <iframe
-                    srcDoc={wrappedHtml}
-                    className="w-full border-0 rounded"
-                    style={{ height: "600px" }}
-                    title="Email preview"
-                  />
-                </div>
+              <div ref={previewContainerRef} className="overflow-hidden" style={{ maxHeight: "calc(100vh - 160px)", overflowY: "auto" }}>
+                {previewMode === "desktop" ? (
+                  // Scale the 900px email down to fit the preview pane
+                  <div className="p-4">
+                    <div style={{ position: "relative", width: "100%", paddingBottom: `${140 / previewScale}%` }}>
+                      <iframe
+                        srcDoc={wrappedHtml}
+                        style={{
+                          position: "absolute", top: 0, left: 0,
+                          width: "900px", height: `${900 / previewScale}px`,
+                          border: "none", borderRadius: "6px",
+                          transformOrigin: "top left",
+                          transform: `scale(${previewScale})`,
+                        }}
+                        title="Email preview"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mx-auto max-w-sm p-4">
+                    <iframe
+                      srcDoc={wrappedHtml}
+                      className="w-full border-0 rounded"
+                      style={{ height: "700px" }}
+                      title="Email preview mobile"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
