@@ -859,7 +859,7 @@ function MyContentTab() {
   return (
     <div className="space-y-6">
       {/* Sub-tabs */}
-      <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 w-full flex-nowrap overflow-x-auto">
+      <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 w-full flex-nowrap overflow-x-auto scrollbar-hide">
         {subTabs.map(t => (
           <button
             key={t.key}
@@ -2081,20 +2081,19 @@ export default function StudentDashboardPage() {
 
         <div className="max-w-5xl mx-auto px-3 sm:px-8 py-4 sm:py-8">
           {/* Tab Navigation */}
-          <div className="flex gap-1 bg-white rounded-xl border border-gray-100 shadow-sm p-1 mb-5 sm:mb-8">
+          <div className="flex gap-1 bg-white rounded-xl border border-gray-100 shadow-sm p-1 mb-5 sm:mb-8 overflow-x-auto scrollbar-hide">
             {TABS.map(t => (
               <button
                 key={t.key}
                 onClick={() => handleTabChange(t.key)}
-                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex-1 min-h-[44px] ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all shrink-0 min-h-[44px] whitespace-nowrap ${
                   activeTab === t.key
                     ? "bg-[#189aa1] text-white shadow-sm"
                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 }`}
               >
                 <t.icon className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">{t.label}</span>
-                <span className="sm:hidden text-[10px] font-semibold leading-tight text-center">{t.label.split(' ')[0]}</span>
+                <span>{t.label}</span>
               </button>
             ))}
           </div>
