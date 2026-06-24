@@ -526,7 +526,10 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     if (existingCampaign.audienceFilter) {
       try {
         const parsed = JSON.parse(existingCampaign.audienceFilter) as Partial<AudienceFilter>;
-        setFilter({ ...DEFAULT_FILTER, ...parsed });
+        // Strip legacy interests — they are no longer used in the UI and cause
+        // incorrect narrow counts because most Thinkific-synced users lack interestPrefs JSON.
+        // Use interestIds (userInterests table) for content interest filtering instead.
+        setFilter({ ...DEFAULT_FILTER, ...parsed, interests: [] });
       } catch { /* ignore */ }
     }
     if (existingCampaign.blocksJson) {

@@ -497,7 +497,10 @@ async function emailsMatchingDimension(
 function activeDimensions(filter: AudienceFilter): string[] {
   const dims: string[] = [];
   if (filter.roles.length > 0) dims.push("roles");
-  if (filter.interests.length > 0 || filter.interestIds.length > 0) dims.push("interests");
+  // Only activate the interests dimension when interestIds (userInterests table) are selected.
+  // Legacy filter.interests (JSON interestPrefs) is no longer surfaced in the UI and most
+  // Thinkific-synced users lack that data, so ignoring it prevents incorrect narrow counts.
+  if (filter.interestIds.length > 0) dims.push("interests");
   if (filter.enrolledInCourseIds.length > 0) dims.push("enrolled");
   if (filter.completedCourseIds.length > 0) dims.push("completed");
   if (filter.freePreviewCourseIds.length > 0) dims.push("freePreview");
