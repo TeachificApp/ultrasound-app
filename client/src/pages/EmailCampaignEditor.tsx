@@ -503,6 +503,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [loadTemplateDialogOpen, setLoadTemplateDialogOpen] = useState(false);
+  const [templateLoadKey, setTemplateLoadKey] = useState(0);
   const [draftId, setDraftId] = useState<number | undefined>(campaignId);
   const [isSaving, setIsSaving] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(!campaignId);
@@ -668,6 +669,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     } else {
       setBlocks([{ id: uid(), type: "text", data: { html: t.htmlBody || "", align: "left", bgColor: "#ffffff", textColor: "#1a2e3b" } }]);
     }
+    setTemplateLoadKey((k) => k + 1);
     setLoadTemplateDialogOpen(false);
     toast.success(`Loaded: ${t.name}`);
   }
@@ -766,7 +768,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
               </div>
             </CardHeader>
             <CardContent className="p-0" style={{ minHeight: 400 }}>
-              <EmailBlockEditor key={draftLoaded ? "loaded" : "default"} initialBlocks={blocks} onChange={handleBlocksChange} />
+              <EmailBlockEditor key={draftLoaded ? `loaded-${templateLoadKey}` : "default"} initialBlocks={blocks} onChange={handleBlocksChange} />
             </CardContent>
           </Card>
 
