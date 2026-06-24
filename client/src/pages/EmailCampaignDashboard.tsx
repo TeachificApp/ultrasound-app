@@ -368,6 +368,11 @@ export default function EmailCampaignDashboard() {
     onError: (e) => toast.error(e.message),
   });
 
+  const deleteCampaignMutation = trpc.emailCampaign.deleteCampaign.useMutation({
+    onSuccess: () => { toast.success("Campaign deleted"); setDeleteConfirmId(null); refetchCampaigns(); },
+    onError: (e) => { toast.error(e.message); setDeleteConfirmId(null); },
+  });
+
   // ── Auth guards ─────────────────────────────────────────────────────────────
   if (loading) return <Layout><div className="container py-12 flex justify-center"><RefreshCw className="w-6 h-6 animate-spin text-[#189aa1]" /></div></Layout>;
   if (!isAuthenticated || !user) return <Layout><div className="container py-12 text-center text-gray-500">Please log in.</div></Layout>;
@@ -480,9 +485,21 @@ export default function EmailCampaignDashboard() {
                   <tbody className="divide-y">
                     {filteredCampaigns.map((c) => (
                       <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-gray-900 truncate max-w-xs">{c.subject}</div>
+                        <td
+                          className="px-4 py-3 cursor-pointer"
+                          onClick={() => {
+                            if (c.status === "draft" || c.status === "scheduled") {
+                              setEditCampaignId(c.id); setShowEditor(true);
+                            } else if (c.status === "sent") {
+                              setAnalyticsId(c.id); setAnalyticsSubject(c.subject);
+                            }
+                          }}
+                        >
+                          <div className="font-medium text-gray-900 truncate max-w-xs hover:text-[#189aa1] transition-colors">{c.subject}</div>
                           {c.previewText && <div className="text-xs text-gray-400 truncate max-w-xs">{c.previewText}</div>}
+                          <div className="text-[10px] text-gray-300 mt-0.5 md:hidden">
+                            {c.status === "draft" || c.status === "scheduled" ? "Tap to edit" : "Tap for analytics"}
+                          </div>
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
                         <td className="px-4 py-3 text-right text-gray-700">{(c.recipientCount ?? 0).toLocaleString()}</td>
@@ -518,6 +535,9 @@ export default function EmailCampaignDashboard() {
                             )}
                             <button onClick={() => duplicateMutation.mutate({ campaignId: c.id })} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#189aa1]" title="Duplicate">
                               <Copy className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setDeleteConfirmId(c.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" title="Delete">
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
@@ -666,6 +686,40 @@ export default function EmailCampaignDashboard() {
           onClose={() => { setAnalyticsId(null); setAnalyticsSubject(""); }}
         />
       )}
+
+      {/* Delete campaign confirm dialog */}
+      <Dialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" /> Delete Campaign
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 py-2">
+            {(() => {
+              const c = campaigns?.find((x) => x.id === deleteConfirmId);
+              return c?.status === "sent"
+                ? `This campaign was already sent to ${c.recipientCount ?? 0} recipient${(c.recipientCount ?? 0) !== 1 ? "s" : ""}. Deleting it will remove all analytics data. Are you sure?`
+                : "Are you sure you want to delete this campaign? This cannot be undone.";
+            })()}
+          </p>
+          <DialogFooter className="gap-2">
+            <button
+              onClick={() => setDeleteConfirmId(null)}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => deleteConfirmId !== null && deleteCampaignMutation.mutate({ id: deleteConfirmId })}
+              disabled={deleteCampaignMutation.isPending}
+              className="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+            >
+              {deleteCampaignMutation.isPending ? "Deleting…" : "Delete"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

@@ -645,6 +645,22 @@ export const emailCampaignRouter = router({
       return { success: true };
     }),
 
+  // ── Admin: delete campaign ──────────────────────────────────────────────────
+
+  deleteCampaign: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      // Only allow deleting drafts and scheduled campaigns, not sent ones
+      const [campaign] = await db.select({ status: emailCampaigns.status }).from(emailCampaigns).where(eq(emailCampaigns.id, input.id)).limit(1);
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campaign not found" });
+      if (campaign.status === "sending") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete a campaign that is currently sending" });
+      await db.delete(emailCampaigns).where(eq(emailCampaigns.id, input.id));
+      return { success: true };
+    }),
+
   // ── Admin: option lists for audience builder ──────────────────────────────
 
   getAudienceOptions: protectedProcedure.query(async ({ ctx }) => {
