@@ -489,6 +489,144 @@ async function emailsMatchingDimension(
     return matches;
   }
 
+  // ── Quiz dimensions (same enrollment tables as courses, filtered by type='quiz') ──
+
+  if (dimension === "enrolledInQuiz" && (filter.enrolledInQuizIds ?? []).length > 0) {
+    for (const quizId of filter.enrolledInQuizIds!) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, quizId), eq(lmsEnrollments.status, "enrolled")));
+      const idSet = new Set(rows.map((r) => r.userId));
+      const allUsers = await loadAllUsers();
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  if (dimension === "completedQuiz" && (filter.completedQuizIds ?? []).length > 0) {
+    for (const quizId of filter.completedQuizIds!) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, quizId), eq(lmsEnrollments.status, "completed")));
+      const idSet = new Set(rows.map((r) => r.userId));
+      const allUsers = await loadAllUsers();
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  if (dimension === "freePreviewQuiz" && (filter.freePreviewQuizIds ?? []).length > 0) {
+    for (const quizId of filter.freePreviewQuizIds!) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, quizId), eq(lmsEnrollments.status, "free_preview")));
+      const idSet = new Set(rows.map((r) => r.userId));
+      const allUsers = await loadAllUsers();
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  if (dimension === "activeAccessQuiz" && (filter.activeAccessQuizIds ?? []).length > 0) {
+    for (const quizId of filter.activeAccessQuizIds!) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, quizId), eq(lmsEnrollments.status, "active")));
+      const idSet = new Set(rows.map((r) => r.userId));
+      const allUsers = await loadAllUsers();
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  if (dimension === "purchasedQuiz" && (filter.purchasedQuizIds ?? []).length > 0) {
+    for (const quizId of filter.purchasedQuizIds!) {
+      const rows = await db
+        .select({ userId: lmsOrders.userId })
+        .from(lmsOrders)
+        .where(and(eq(lmsOrders.courseId, quizId), eq(lmsOrders.status, "paid")));
+      const idSet = new Set(rows.map((r) => r.userId));
+      const allUsers = await loadAllUsers();
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    }
+    return matches;
+  }
+
+  // ── Webinars ────────────────────────────────────────────────────────────────
+
+  if (dimension === "webinars" && (filter.webinarIds ?? []).length > 0) {
+    const [rows] = (await db.execute(sql`
+      SELECT user_id as userId FROM webinar_registrations
+      WHERE webinar_id IN (${sql.join(filter.webinarIds!.map((id) => sql`${id}`), sql`, `)})
+    `)) as [{ userId: number }[], unknown];
+    const idSet = new Set((Array.isArray(rows) ? rows : []).map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
+  // ── Digital bundles ─────────────────────────────────────────────────────────
+
+  if (dimension === "digitalBundles" && (filter.purchasedDigitalBundleIds ?? []).length > 0) {
+    const [rows] = (await db.execute(sql`
+      SELECT user_id as userId FROM digital_bundle_purchases
+      WHERE bundle_id IN (${sql.join(filter.purchasedDigitalBundleIds!.map((id) => sql`${id}`), sql`, `)})
+    `)) as [{ userId: number }[], unknown];
+    const idSet = new Set((Array.isArray(rows) ? rows : []).map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
+  // ── Workshop instances ──────────────────────────────────────────────────────
+
+  if (dimension === "workshopInstances" && (filter.workshopInstanceIds ?? []).length > 0) {
+    const rows = await db
+      .select({ userId: workshopEnrollments.userId })
+      .from(workshopEnrollments)
+      .where(inArray(workshopEnrollments.workshopInstanceId, filter.workshopInstanceIds!));
+    const idSet = new Set(rows.map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
+  // ── Physical products ───────────────────────────────────────────────────────
+
+  if (dimension === "physicalProducts" && (filter.purchasedPhysicalProductIds ?? []).length > 0) {
+    const [rows] = (await db.execute(sql`
+      SELECT user_id as userId FROM physical_product_orders
+      WHERE product_id IN (${sql.join(filter.purchasedPhysicalProductIds!.map((id) => sql`${id}`), sql`, `)})
+        AND status IN ('paid', 'fulfilled', 'shipped')
+    `)) as [{ userId: number }[], unknown];
+    const idSet = new Set((Array.isArray(rows) ? rows : []).map((r) => r.userId));
+    const allUsers = await loadAllUsers();
+    for (const u of allUsers) {
+      if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+    }
+    return matches;
+  }
+
   void candidateUserIds;
   void candidateEmails;
   return matches;
@@ -516,6 +654,16 @@ function activeDimensions(filter: AudienceFilter): string[] {
   if ((filter.bundleIds ?? []).length > 0) dims.push("bundles");
   if ((filter.workshopIds ?? []).length > 0) dims.push("workshops");
   if ((filter.communityIds ?? []).length > 0) dims.push("communities");
+  // New PR #45 dimensions
+  if ((filter.enrolledInQuizIds ?? []).length > 0) dims.push("enrolledInQuiz");
+  if ((filter.completedQuizIds ?? []).length > 0) dims.push("completedQuiz");
+  if ((filter.freePreviewQuizIds ?? []).length > 0) dims.push("freePreviewQuiz");
+  if ((filter.activeAccessQuizIds ?? []).length > 0) dims.push("activeAccessQuiz");
+  if ((filter.purchasedQuizIds ?? []).length > 0) dims.push("purchasedQuiz");
+  if ((filter.webinarIds ?? []).length > 0) dims.push("webinars");
+  if ((filter.purchasedDigitalBundleIds ?? []).length > 0) dims.push("digitalBundles");
+  if ((filter.workshopInstanceIds ?? []).length > 0) dims.push("workshopInstances");
+  if ((filter.purchasedPhysicalProductIds ?? []).length > 0) dims.push("physicalProducts");
   return dims;
 }
 

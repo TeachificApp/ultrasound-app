@@ -361,22 +361,40 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
                   <Input type="date" value={filter.purchasedBefore?.slice(0, 10) ?? ""} onChange={(e) => update({ purchasedBefore: e.target.value ? `${e.target.value}T23:59:59.999Z` : undefined })} className="text-sm h-9" />
                 </div>
               </div>
-              <MultiSelect label="Enrolled in Course" options={options.courses} selected={filter.enrolledInCourseIds} onChange={(v) => update({ enrolledInCourseIds: v })} />
-              <MultiSelect label="Active Course Access (in progress)" options={options.courses} selected={filter.activeAccessCourseIds} onChange={(v) => update({ activeAccessCourseIds: v })} />
-              <MultiSelect label="Free Preview Enrollees" options={options.courses} selected={filter.freePreviewCourseIds} onChange={(v) => update({ freePreviewCourseIds: v })} />
-              <MultiSelect label="Completed Course" options={options.courses} selected={filter.completedCourseIds} onChange={(v) => update({ completedCourseIds: v })} />
-              <MultiSelect label="Purchased Course (paid order)" options={options.courses} selected={filter.purchasedCourseIds} onChange={(v) => update({ purchasedCourseIds: v })} />
-              <MultiSelect label="Purchased Product" options={options.products} selected={filter.purchasedProductIds} onChange={(v) => update({ purchasedProductIds: v })} />
-              <MultiSelect label="Downloaded Product" options={options.products} selected={filter.downloadedProductIds} onChange={(v) => update({ downloadedProductIds: v })} />
-              <MultiSelect label="In Team/Group" options={options.groups} selected={filter.inGroupIds} onChange={(v) => update({ inGroupIds: v })} />
-              <MultiSelect label="In Cohort Group" options={options.cohortGroups} selected={filter.inCohortGroupIds} onChange={(v) => update({ inCohortGroupIds: v })} />
-              <MultiSelect label="Submitted Form" options={options.forms} selected={filter.submittedFormIds} onChange={(v) => update({ submittedFormIds: v })} />
-              {(options.membershipPlans?.length ?? 0) > 0 && (
-                <MultiSelect label="Membership Plan" options={options.membershipPlans!} selected={filter.membershipPlanIds ?? []} onChange={(v) => update({ membershipPlanIds: v })} />
-              )}
-              <MultiSelect label="Bundle Enrolled" options={options.bundles ?? []} selected={filter.bundleIds ?? []} onChange={(v) => update({ bundleIds: v })} />
-              <MultiSelect label="Workshop Enrolled" options={options.workshops ?? []} selected={filter.workshopIds ?? []} onChange={(v) => update({ workshopIds: v })} />
-              <MultiSelect label="Community Member" options={options.communities ?? []} selected={filter.communityIds ?? []} onChange={(v) => update({ communityIds: v })} />
+              <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide pt-1">Courses</p>
+              <MultiSelect label="Enrolled in Course" options={audienceOptions.courses} selected={filter.enrolledInCourseIds} onChange={(v) => update({ enrolledInCourseIds: v })} />
+              <MultiSelect label="Active Course Access" options={audienceOptions.courses} selected={filter.activeAccessCourseIds} onChange={(v) => update({ activeAccessCourseIds: v })} />
+              <MultiSelect label="Free Preview Course" options={audienceOptions.courses} selected={filter.freePreviewCourseIds} onChange={(v) => update({ freePreviewCourseIds: v })} />
+              <MultiSelect label="Completed Course" options={audienceOptions.courses} selected={filter.completedCourseIds} onChange={(v) => update({ completedCourseIds: v })} />
+              <MultiSelect label="Purchased Course (paid order)" options={audienceOptions.courses} selected={filter.purchasedCourseIds} onChange={(v) => update({ purchasedCourseIds: v })} />
+              <MultiSelect label="In Cohort Group" options={audienceOptions.cohortGroups} selected={filter.inCohortGroupIds} onChange={(v) => update({ inCohortGroupIds: v })} />
+
+              <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide pt-1">Quizzes</p>
+              <MultiSelect label="Enrolled in Quiz" options={audienceOptions.quizzes} selected={filter.enrolledInQuizIds ?? []} onChange={(v) => update({ enrolledInQuizIds: v })} />
+              <MultiSelect label="Active Quiz Access" options={audienceOptions.quizzes} selected={filter.activeAccessQuizIds ?? []} onChange={(v) => update({ activeAccessQuizIds: v })} />
+              <MultiSelect label="Free Preview Quiz" options={audienceOptions.quizzes} selected={filter.freePreviewQuizIds ?? []} onChange={(v) => update({ freePreviewQuizIds: v })} />
+              <MultiSelect label="Completed Quiz" options={audienceOptions.quizzes} selected={filter.completedQuizIds ?? []} onChange={(v) => update({ completedQuizIds: v })} />
+              <MultiSelect label="Purchased Quiz (paid order)" options={audienceOptions.quizzes} selected={filter.purchasedQuizIds ?? []} onChange={(v) => update({ purchasedQuizIds: v })} />
+
+              <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide pt-1">Digital Downloads</p>
+              <MultiSelect label="Purchased Download" options={audienceOptions.products} selected={filter.purchasedProductIds} onChange={(v) => update({ purchasedProductIds: v })} />
+              <MultiSelect label="Downloaded File" options={audienceOptions.products} selected={filter.downloadedProductIds} onChange={(v) => update({ downloadedProductIds: v })} />
+              <MultiSelect label="Purchased Download Bundle" options={audienceOptions.digitalBundles} selected={filter.purchasedDigitalBundleIds ?? []} onChange={(v) => update({ purchasedDigitalBundleIds: v })} />
+
+              <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide pt-1">Bundles, Memberships &amp; Webinars</p>
+              <MultiSelect label="LMS Bundle Enrolled" options={audienceOptions.bundles} selected={filter.bundleIds ?? []} onChange={(v) => update({ bundleIds: v })} />
+              <MultiSelect label="Membership Plan Subscribed" options={audienceOptions.membershipPlans} selected={filter.membershipPlanIds ?? []} onChange={(v) => update({ membershipPlanIds: v })} />
+              <MultiSelect label="Webinar Registered" options={audienceOptions.webinars} selected={filter.webinarIds ?? []} onChange={(v) => update({ webinarIds: v })} />
+
+              <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide pt-1">Workshops, Products &amp; Communities</p>
+              <MultiSelect label="Workshop Enrolled" options={audienceOptions.workshops} selected={filter.workshopIds ?? []} onChange={(v) => update({ workshopIds: v })} />
+              <MultiSelect label="Workshop Instance Enrolled" options={audienceOptions.workshopInstances} selected={filter.workshopInstanceIds ?? []} onChange={(v) => update({ workshopInstanceIds: v })} hint="Specific scheduled workshop sessions" />
+              <MultiSelect label="Purchased Physical Product" options={audienceOptions.physicalProducts} selected={filter.purchasedPhysicalProductIds ?? []} onChange={(v) => update({ purchasedPhysicalProductIds: v })} />
+              <MultiSelect label="Community Member" options={audienceOptions.communities} selected={filter.communityIds ?? []} onChange={(v) => update({ communityIds: v })} />
+
+              <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide pt-1">Teams &amp; Forms</p>
+              <MultiSelect label="In Team/Group" options={audienceOptions.groups} selected={filter.inGroupIds} onChange={(v) => update({ inGroupIds: v })} />
+              <MultiSelect label="Submitted Form" options={audienceOptions.forms} selected={filter.submittedFormIds} onChange={(v) => update({ submittedFormIds: v })} />
             </div>
           )}
 
@@ -597,7 +615,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     onSuccess: (r) => {
       toast.success(`Sending to ${r.recipientCount} recipient${r.recipientCount !== 1 ? "s" : ""}…`);
       setSendDialogOpen(false);
-      if (onClose) onClose(); else navigate("/admin/email");
+      if (onClose) onClose(); else navigate("/admin/email-campaigns");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -606,7 +624,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     onSuccess: (r) => {
       toast.success(`Scheduled for ${new Date(r.scheduledAt).toLocaleString()}`);
       setScheduleDialogOpen(false);
-      if (onClose) onClose(); else navigate("/admin/email");
+      if (onClose) onClose(); else navigate("/admin/email-campaigns");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -674,7 +692,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     toast.success(`Loaded: ${t.name}`);
   }
 
-  const goBack = onClose ?? (() => navigate("/admin/email"));
+  const goBack = onClose ?? (() => navigate("/admin/email-campaigns"));
 
   return (
     <div className="min-h-screen bg-gray-50">

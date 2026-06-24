@@ -53,6 +53,64 @@ import {
   wrapLinksForTracking,
   recordEmailCampaignEvent,
 } from "../lib/emailCampaignTracking";
+import { ensureEmailCampaignEventsTable } from "../lib/campaignUnsubscribe";
+
+// ─── Campaign metrics helper ──────────────────────────────────────────────────
+
+type CampaignMetricsRow = {
+  campaignId: number;
+  openCount: number;
+  clickCount: number;
+  unsubscribeCount: number;
+  uniqueOpenCount: number;
+  uniqueClickCount: number;
+  uniqueUnsubscribeCount: number;
+};
+
+/** Load engagement metrics; never throw — campaigns list must still render if events table is missing. */
+async function loadCampaignMetricsMap(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  campaignIds: number[],
+): Promise<Map<number, CampaignMetricsRow>> {
+  const empty = new Map<number, CampaignMetricsRow>();
+  if (campaignIds.length === 0) return empty;
+  try {
+    await ensureEmailCampaignEventsTable(db);
+    const [metricsRaw] = (await db.execute(sql`
+      SELECT
+        campaignId,
+        SUM(CASE WHEN eventType = 'open' THEN 1 ELSE 0 END) as openCount,
+        SUM(CASE WHEN eventType = 'click' THEN 1 ELSE 0 END) as clickCount,
+        SUM(CASE WHEN eventType = 'unsubscribe' THEN 1 ELSE 0 END) as unsubscribeCount,
+        COUNT(DISTINCT CASE WHEN eventType = 'open' THEN recipientKey END) as uniqueOpenCount,
+        COUNT(DISTINCT CASE WHEN eventType = 'click' THEN recipientKey END) as uniqueClickCount,
+        COUNT(DISTINCT CASE WHEN eventType = 'unsubscribe' THEN recipientKey END) as uniqueUnsubscribeCount
+      FROM emailCampaignEvents
+      WHERE campaignId IN (${sql.join(campaignIds.map((id) => sql`${id}`), sql`, `)})
+      GROUP BY campaignId
+    `)) as [CampaignMetricsRow[], unknown];
+    return new Map(
+      (Array.isArray(metricsRaw) ? metricsRaw : []).map((m) => [m.campaignId, m]),
+    );
+  } catch (err) {
+    console.error("[EmailCampaign] Failed to load campaign metrics:", err);
+    return empty;
+  }
+}
+
+/** Run one audience-options query without failing the whole builder. */
+async function safeAudienceSqlRows<T>(
+  label: string,
+  query: () => Promise<[{ id: number; title?: string; name?: string; label?: string }[], unknown]>,
+): Promise<T[]> {
+  try {
+    const [rows] = await query();
+    return (Array.isArray(rows) ? rows : []) as T[];
+  } catch (err) {
+    console.error(`[EmailCampaign] getAudienceOptions ${label}:`, err);
+    return [];
+  }
+}
 
 // ─── Shared Zod schemas ───────────────────────────────────────────────────────
 
@@ -593,90 +651,128 @@ export const emailCampaignRouter = router({
     await assertAdmin(ctx.user.id);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const [courses, products, groups, cohortGroups, forms, interests, lists, membershipPlans, bundles, workshops, communities] = await Promise.all([
-      db.execute(sql`SELECT id, title FROM lms_courses WHERE status='public' ORDER BY title LIMIT 200`),
-      db.execute(sql`SELECT id, title FROM digital_products WHERE is_active=1 ORDER BY title LIMIT 200`),
-      db.execute(sql`SELECT id, name FROM lms_groups ORDER BY name LIMIT 200`),
-      db.execute(sql`SELECT id, name FROM lmsCohortGroups ORDER BY name LIMIT 200`),
-      db.execute(sql`SELECT id, title FROM generalFormTemplates WHERE status='open' ORDER BY title LIMIT 200`),
-      db
-        .select({
-          id: lmsInterests.id,
-          name: lmsInterests.name,
-          category: lmsInterests.category,
-        })
-        .from(lmsInterests)
-        .where(eq(lmsInterests.isActive, true))
-        .orderBy(lmsInterests.sortOrder)
-        .limit(200),
-      db
-        .select({
-          id: emailLists.id,
-          name: emailLists.name,
-          subscriberCount: emailLists.subscriberCount,
-        })
-        .from(emailLists)
-        .where(eq(emailLists.isActive, true))
-        .orderBy(desc(emailLists.createdAt))
-        .limit(200),
-      // New option lists
-      db.execute(sql`SELECT id, title FROM membership_plans WHERE status='published' ORDER BY title LIMIT 200`),
-      db.execute(sql`SELECT id, title FROM bundles ORDER BY title LIMIT 200`),
-      db.execute(sql`SELECT id, title FROM workshops WHERE status IN ('public','hidden','private') ORDER BY title LIMIT 200`),
-      db.execute(sql`SELECT id, title FROM communities ORDER BY title LIMIT 200`),
+
+    const [
+      courses,
+      quizzes,
+      products,
+      groups,
+      cohortGroups,
+      forms,
+      interests,
+      lists,
+      membershipPlans,
+      bundles,
+      digitalBundles,
+      webinars,
+      workshopsList,
+      communities,
+      workshopInstanceRows,
+      physicalProducts,
+    ] = await Promise.all([
+      safeAudienceSqlRows<{ id: number; title: string }>("courses", () =>
+        db.execute(sql`SELECT id, title FROM lms_courses WHERE status != 'archived' AND type IN ('course', 'cohort') ORDER BY title LIMIT 500`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("quizzes", () =>
+        db.execute(sql`SELECT id, title FROM lms_courses WHERE status != 'archived' AND type = 'quiz' ORDER BY title LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("products", () =>
+        db.execute(sql`SELECT id, title FROM digital_products WHERE status != 'archived' ORDER BY title LIMIT 500`),
+      ),
+      safeAudienceSqlRows<{ id: number; name: string }>("groups", () =>
+        db.execute(sql`SELECT id, name FROM lms_groups ORDER BY name LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; name: string }>("cohortGroups", () =>
+        db.execute(sql`SELECT id, name FROM lms_cohort_groups ORDER BY name LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("forms", () =>
+        db.execute(sql`SELECT id, title FROM generalFormTemplates WHERE status != 'archived' ORDER BY title LIMIT 200`),
+      ),
+      (async () => {
+        try {
+          return await db
+            .select({ id: lmsInterests.id, name: lmsInterests.name, category: lmsInterests.category })
+            .from(lmsInterests)
+            .where(eq(lmsInterests.isActive, true))
+            .orderBy(lmsInterests.sortOrder)
+            .limit(200);
+        } catch (err) {
+          console.error("[EmailCampaign] getAudienceOptions interests:", err);
+          return [];
+        }
+      })(),
+      (async () => {
+        try {
+          return await db
+            .select({ id: emailLists.id, name: emailLists.name, subscriberCount: emailLists.subscriberCount })
+            .from(emailLists)
+            .where(eq(emailLists.isActive, true))
+            .orderBy(desc(emailLists.createdAt))
+            .limit(200);
+        } catch (err) {
+          console.error("[EmailCampaign] getAudienceOptions lists:", err);
+          return [];
+        }
+      })(),
+      safeAudienceSqlRows<{ id: number; title: string }>("membershipPlans", () =>
+        db.execute(sql`SELECT id, title FROM membership_plans WHERE status != 'archived' ORDER BY title LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("bundles", () =>
+        db.execute(sql`SELECT id, title FROM bundles ORDER BY title LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("digitalBundles", () =>
+        db.execute(sql`SELECT id, title FROM digital_bundles WHERE status != 'archived' ORDER BY title LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("webinars", () =>
+        db.execute(sql`SELECT id, title FROM webinars ORDER BY title LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("workshops", () =>
+        db.execute(sql`SELECT id, title FROM workshops WHERE status != 'archived' ORDER BY title LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("communities", () =>
+        db.execute(sql`SELECT id, title FROM communities WHERE status != 'archived' ORDER BY title LIMIT 200`),
+      ),
+      safeAudienceSqlRows<{ id: number; label: string }>("workshopInstances", () =>
+        db.execute(sql`
+          SELECT wi.id,
+            CONCAT(w.title, ' — ', COALESCE(NULLIF(wi.title, ''), DATE_FORMAT(wi.start_date, '%b %d, %Y'))) as label
+          FROM workshop_instances wi
+          INNER JOIN workshops w ON w.id = wi.workshop_id
+          WHERE wi.status != 'archived'
+          ORDER BY wi.start_date DESC
+          LIMIT 300
+        `),
+      ),
+      safeAudienceSqlRows<{ id: number; title: string }>("physicalProducts", () =>
+        db.execute(sql`SELECT id, title FROM physical_products WHERE status != 'archived' ORDER BY title LIMIT 200`),
+      ),
     ]);
-    const roleRows = await db
-      .selectDistinct({ role: userRoles.role })
-      .from(userRoles)
-      .limit(50);
+
+    let roleRows: { role: string }[] = [];
+    try {
+      roleRows = await db.selectDistinct({ role: userRoles.role }).from(userRoles).limit(50);
+    } catch (err) {
+      console.error("[EmailCampaign] getAudienceOptions roles:", err);
+    }
+
     return {
-      courses: (courses[0] as { id: number; title: string }[]).map((r) => ({
-        id: r.id,
-        label: r.title,
-      })),
-      products: (products[0] as { id: number; title: string }[]).map((r) => ({
-        id: r.id,
-        label: r.title,
-      })),
-      groups: (groups[0] as { id: number; name: string }[]).map((r) => ({
-        id: r.id,
-        label: r.name,
-      })),
-      cohortGroups: (cohortGroups[0] as { id: number; name: string }[]).map((r) => ({
-        id: r.id,
-        label: r.name,
-      })),
-      forms: (forms[0] as { id: number; title: string }[]).map((r) => ({
-        id: r.id,
-        label: r.title,
-      })),
-      interests: interests.map((r) => ({
-        id: r.id,
-        label: r.name,
-        category: r.category,
-      })),
-      lists: lists.map((r) => ({
-        id: r.id,
-        label: r.name,
-        subscriberCount: r.subscriberCount,
-      })),
+      courses: courses.map((r) => ({ id: r.id, label: r.title })),
+      quizzes: quizzes.map((r) => ({ id: r.id, label: r.title })),
+      products: products.map((r) => ({ id: r.id, label: r.title })),
+      groups: groups.map((r) => ({ id: r.id, label: r.name })),
+      cohortGroups: cohortGroups.map((r) => ({ id: r.id, label: r.name })),
+      forms: forms.map((r) => ({ id: r.id, label: r.title })),
+      interests: interests.map((r) => ({ id: r.id, label: r.name, category: r.category })),
+      lists: lists.map((r) => ({ id: r.id, label: r.name, subscriberCount: r.subscriberCount })),
       roles: roleRows.map((r) => ({ id: r.role, label: r.role.replace(/_/g, " ") })),
-      membershipPlans: (membershipPlans[0] as { id: number; title: string }[]).map((r) => ({
-        id: r.id,
-        label: r.title,
-      })),
-      bundles: (bundles[0] as { id: number; title: string }[]).map((r) => ({
-        id: r.id,
-        label: r.title,
-      })),
-      workshops: (workshops[0] as { id: number; title: string }[]).map((r) => ({
-        id: r.id,
-        label: r.title,
-      })),
-      communities: (communities[0] as { id: number; title: string }[]).map((r) => ({
-        id: r.id,
-        label: r.title,
-      })),
+      membershipPlans: membershipPlans.map((r) => ({ id: r.id, label: r.title })),
+      bundles: bundles.map((r) => ({ id: r.id, label: r.title })),
+      digitalBundles: digitalBundles.map((r) => ({ id: r.id, label: r.title })),
+      webinars: webinars.map((r) => ({ id: r.id, label: r.title })),
+      workshops: workshopsList.map((r) => ({ id: r.id, label: r.title })),
+      communities: communities.map((r) => ({ id: r.id, label: r.title })),
+      workshopInstances: workshopInstanceRows.map((r) => ({ id: r.id, label: r.label })),
+      physicalProducts: physicalProducts.map((r) => ({ id: r.id, label: r.title })),
     };
   }),
 
@@ -818,32 +914,7 @@ export const emailCampaignRouter = router({
       .limit(100);
     if (campaigns.length === 0) return [];
 
-    const ids = campaigns.map((c) => c.id);
-    const [metricsRaw] = (await db.execute(sql`
-      SELECT
-        campaignId,
-        SUM(CASE WHEN eventType = 'open' THEN 1 ELSE 0 END) as openCount,
-        SUM(CASE WHEN eventType = 'click' THEN 1 ELSE 0 END) as clickCount,
-        SUM(CASE WHEN eventType = 'unsubscribe' THEN 1 ELSE 0 END) as unsubscribeCount,
-        COUNT(DISTINCT CASE WHEN eventType = 'open' THEN recipientKey END) as uniqueOpenCount,
-        COUNT(DISTINCT CASE WHEN eventType = 'click' THEN recipientKey END) as uniqueClickCount
-      FROM emailCampaignEvents
-      WHERE campaignId IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
-      GROUP BY campaignId
-    `)) as [
-      {
-        campaignId: number;
-        openCount: number;
-        clickCount: number;
-        unsubscribeCount: number;
-        uniqueOpenCount: number;
-        uniqueClickCount: number;
-      }[],
-      unknown,
-    ];
-    const metricsMap = new Map(
-      (Array.isArray(metricsRaw) ? metricsRaw : []).map((m) => [m.campaignId, m]),
-    );
+    const metricsMap = await loadCampaignMetricsMap(db, campaigns.map((c) => c.id));
 
     return campaigns.map((c) => {
       const m = metricsMap.get(c.id);
