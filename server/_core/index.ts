@@ -324,6 +324,7 @@ async function startServer() {
     const key = String(req.params.recipientKeyGif ?? "").replace(/\.gif$/i, "");
     const variant = typeof req.query.v === "string" ? req.query.v : undefined;
 
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || undefined;
     try {
       if (!Number.isNaN(campaignId) && key) {
         const { getDb } = await import("../db");
@@ -334,6 +335,7 @@ async function startServer() {
             recipientKey: key,
             eventType: "open",
             metadata: variant ? { variant } : undefined,
+            ip,
           });
         }
       }
@@ -354,6 +356,7 @@ async function startServer() {
     const key = String(req.params.recipientKey ?? "");
     const variant = typeof req.query.v === "string" ? req.query.v : undefined;
 
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || undefined;
     try {
       if (!Number.isNaN(campaignId) && key) {
         const { getDb } = await import("../db");
@@ -365,6 +368,7 @@ async function startServer() {
             recipientKey: key,
             eventType: "click",
             metadata: { url: destination, ...(variant ? { variant } : {}) },
+            ip,
           });
         }
       }

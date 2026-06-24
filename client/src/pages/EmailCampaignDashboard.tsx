@@ -15,7 +15,7 @@ import {
   Mail, Plus, BarChart2, Users, Send, Clock, CheckCircle, XCircle,
   RefreshCw, Trash2, Copy, Eye, TrendingUp, MousePointer, UserMinus,
   Shield, ChevronRight, Settings, UserCircle, Edit, Star, StarOff,
-  AlertTriangle, Download, Zap, Code, List,
+  AlertTriangle, Download, Zap, Code, List, Globe, MapPin, UserCheck, Link2,
 } from "lucide-react";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -217,104 +217,327 @@ function LeadCaptureWidgetForm({
   );
 }
 function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; subject: string; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<"overview" | "recipients" | "geo">("overview");
+  const [recipientFilter, setRecipientFilter] = useState<"open" | "click" | "unsubscribe" | undefined>(undefined);
+  const [segmentName, setSegmentName] = useState("");
+  const [segmentEventType, setSegmentEventType] = useState<"open" | "click">("open");
+  const [showSegmentForm, setShowSegmentForm] = useState(false);
+  const utils = trpc.useUtils();
+
   const { data: analytics, isLoading } = trpc.emailCampaign.getCampaignAnalytics.useQuery({ campaignId });
+  const { data: recipientsData, isLoading: recipientsLoading } = trpc.emailCampaign.getCampaignRecipients.useQuery(
+    { campaignId, eventType: recipientFilter, limit: 200, offset: 0 },
+    { enabled: activeTab === "recipients" }
+  );
+  const { data: geoData, isLoading: geoLoading } = trpc.emailCampaign.getCampaignGeo.useQuery(
+    { campaignId },
+    { enabled: activeTab === "geo" }
+  );
+  const createSegmentMutation = trpc.emailCampaign.createSegmentFromCampaign.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Segment "${data.listName}" created with ${data.added} subscribers`);
+      setShowSegmentForm(false);
+      setSegmentName("");
+      utils.emailCampaign.listEmailLists.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const eventBadgeColor = (et: string) => {
+    if (et === "open") return "bg-blue-100 text-blue-700";
+    if (et === "click") return "bg-green-100 text-green-700";
+    if (et === "unsubscribe") return "bg-red-100 text-red-700";
+    return "bg-gray-100 text-gray-700";
+  };
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BarChart2 className="w-5 h-5 text-[#189aa1]" /> Analytics: {subject}
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <BarChart2 className="w-5 h-5 text-[#189aa1]" />
+            <span className="truncate">{subject}</span>
           </DialogTitle>
-        </DialogHeader>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12"><RefreshCw className="w-6 h-6 animate-spin text-[#189aa1]" /></div>
-        ) : analytics ? (
-          <div className="space-y-4 py-2">
-            {/* Summary stats */}
-            <div className="grid grid-cols-4 gap-3">
-              <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <div className="text-xl font-bold text-gray-900">{analytics.totalSent.toLocaleString()}</div>
-                <div className="text-xs text-gray-500">Sent</div>
-              </div>
-              <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <div className="text-xl font-bold text-blue-700">{analytics.uniqueOpens.toLocaleString()}</div>
-                <div className="text-xs text-blue-500">Unique Opens ({analytics.openRate}%)</div>
-                {analytics.totalOpens > analytics.uniqueOpens && (
-                  <div className="text-[10px] text-blue-400 mt-1">{analytics.totalOpens.toLocaleString()} total</div>
-                )}
-              </div>
-              <div className="text-center p-3 bg-green-50 rounded-lg">
-                <div className="text-xl font-bold text-green-700">{analytics.uniqueClicks.toLocaleString()}</div>
-                <div className="text-xs text-green-500">Unique Clicks ({analytics.clickRate}%)</div>
-                {analytics.totalClicks > analytics.uniqueClicks && (
-                  <div className="text-[10px] text-green-400 mt-1">{analytics.totalClicks.toLocaleString()} total</div>
-                )}
-              </div>
-              <div className="text-center p-3 bg-red-50 rounded-lg">
-                <div className="text-xl font-bold text-red-700">{analytics.totalUnsubscribes.toLocaleString()}</div>
-                <div className="text-xs text-red-500">Unsubscribes ({analytics.unsubscribeRate}%)</div>
-              </div>
-            </div>
-
-            {/* Unique vs total */}
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="p-3 border rounded-lg">
-                <p className="text-xs text-gray-500 mb-1">Unique Opens</p>
-                <p className="font-bold text-gray-900">{analytics.uniqueOpens.toLocaleString()}</p>
-              </div>
-              <div className="p-3 border rounded-lg">
-                <p className="text-xs text-gray-500 mb-1">Unique Clicks</p>
-                <p className="font-bold text-gray-900">{analytics.uniqueClicks.toLocaleString()}</p>
-              </div>
-            </div>
-
-            {/* Top clicked links */}
-            {analytics.topLinks && analytics.topLinks.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">TOP CLICKED LINKS</p>
-                <div className="space-y-1">
-                  {analytics.topLinks.map((link: { url: string; clicks: number }, i: number) => (
-                    <div key={i} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
-                      <span className="text-blue-600 truncate flex-1 mr-3">{link.url}</span>
-                      <span className="font-medium text-gray-700 shrink-0">{link.clicks} clicks</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {analytics.orders && analytics.orders.count > 0 && (
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="p-3 border rounded-lg bg-amber-50">
-                  <p className="text-xs text-amber-700 mb-1">Attributed Orders</p>
-                  <p className="font-bold text-amber-900">{analytics.orders.count}</p>
-                </div>
-                <div className="p-3 border rounded-lg bg-amber-50">
-                  <p className="text-xs text-amber-700 mb-1">Attributed Revenue</p>
-                  <p className="font-bold text-amber-900">${(analytics.orders.revenueCents / 100).toFixed(2)}</p>
-                </div>
-              </div>
-            )}
-
-            {analytics.variantStats && Object.keys(analytics.variantStats).length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">A/B VARIANT PERFORMANCE</p>
-                <div className="space-y-1">
-                  {Object.entries(analytics.variantStats).map(([variant, stats]) => (
-                    <div key={variant} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
-                      <span className="font-medium text-gray-700">Variant {variant}</span>
-                      <span className="text-gray-500">{stats.opens} opens · {stats.clicks} clicks</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+          {/* Tab bar */}
+          <div className="flex gap-1 mt-3 border-b">
+            {(["overview", "recipients", "geo"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors ${
+                  activeTab === tab
+                    ? "border-[#189aa1] text-[#189aa1]"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {tab === "overview" && <TrendingUp className="w-3.5 h-3.5 inline mr-1.5" />}
+                {tab === "recipients" && <Users className="w-3.5 h-3.5 inline mr-1.5" />}
+                {tab === "geo" && <Globe className="w-3.5 h-3.5 inline mr-1.5" />}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
           </div>
-        ) : (
-          <p className="text-sm text-gray-400 text-center py-8">No analytics data yet.</p>
-        )}
-        <DialogFooter>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto py-3">
+          {/* ── OVERVIEW TAB ── */}
+          {activeTab === "overview" && (
+            isLoading ? (
+              <div className="flex items-center justify-center py-12"><RefreshCw className="w-6 h-6 animate-spin text-[#189aa1]" /></div>
+            ) : analytics ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-xl font-bold text-gray-900">{analytics.totalSent.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">Sent</div>
+                  </div>
+                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <div className="text-xl font-bold text-blue-700">{analytics.uniqueOpens.toLocaleString()}</div>
+                    <div className="text-xs text-blue-500">Unique Opens ({analytics.openRate}%)</div>
+                    {analytics.totalOpens > analytics.uniqueOpens && (
+                      <div className="text-[10px] text-blue-400 mt-1">{analytics.totalOpens} total</div>
+                    )}
+                  </div>
+                  <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <div className="text-xl font-bold text-green-700">{analytics.uniqueClicks.toLocaleString()}</div>
+                    <div className="text-xs text-green-500">Unique Clicks ({analytics.clickRate}%)</div>
+                    {analytics.totalClicks > analytics.uniqueClicks && (
+                      <div className="text-[10px] text-green-400 mt-1">{analytics.totalClicks} total</div>
+                    )}
+                  </div>
+                  <div className="text-center p-3 bg-red-50 rounded-lg">
+                    <div className="text-xl font-bold text-red-700">{analytics.totalUnsubscribes.toLocaleString()}</div>
+                    <div className="text-xs text-red-500">Unsubs ({analytics.unsubscribeRate}%)</div>
+                  </div>
+                </div>
+
+                {analytics.topLinks && analytics.topLinks.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1.5"><Link2 className="w-3.5 h-3.5" /> TOP CLICKED LINKS</p>
+                    <div className="space-y-1">
+                      {analytics.topLinks.map((link: { url: string; clicks: number }, i: number) => (
+                        <div key={i} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
+                          <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 truncate flex-1 mr-3 hover:underline">{link.url}</a>
+                          <span className="font-medium text-gray-700 shrink-0">{link.clicks} clicks</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analytics.orders && analytics.orders.count > 0 && (
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="p-3 border rounded-lg bg-amber-50">
+                      <p className="text-xs text-amber-700 mb-1">Attributed Orders</p>
+                      <p className="font-bold text-amber-900">{analytics.orders.count}</p>
+                    </div>
+                    <div className="p-3 border rounded-lg bg-amber-50">
+                      <p className="text-xs text-amber-700 mb-1">Attributed Revenue</p>
+                      <p className="font-bold text-amber-900">${(analytics.orders.revenueCents / 100).toFixed(2)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {analytics.variantStats && Object.keys(analytics.variantStats).length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2">A/B VARIANT PERFORMANCE</p>
+                    <div className="space-y-1">
+                      {Object.entries(analytics.variantStats).map(([variant, stats]) => (
+                        <div key={variant} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
+                          <span className="font-medium text-gray-700">Variant {variant}</span>
+                          <span className="text-gray-500">{stats.opens} opens · {stats.clicks} clicks</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Create segment CTA */}
+                <div className="border border-dashed border-[#189aa1]/40 rounded-lg p-4 bg-[#189aa1]/5">
+                  <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5"><UserCheck className="w-4 h-4 text-[#189aa1]" /> Create Email List Segment</p>
+                  {!showSegmentForm ? (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="text-xs" onClick={() => { setSegmentEventType("open"); setShowSegmentForm(true); setSegmentName(`${subject} — Openers`); }}>
+                        <Eye className="w-3.5 h-3.5 mr-1" /> From Openers ({analytics.uniqueOpens})
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-xs" onClick={() => { setSegmentEventType("click"); setShowSegmentForm(true); setSegmentName(`${subject} — Clickers`); }}>
+                        <MousePointer className="w-3.5 h-3.5 mr-1" /> From Clickers ({analytics.uniqueClicks})
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        value={segmentName}
+                        onChange={(e) => setSegmentName(e.target.value)}
+                        placeholder="List name…"
+                        className="text-sm h-8 flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        style={{ background: "#189aa1" }}
+                        className="text-white text-xs shrink-0"
+                        disabled={!segmentName.trim() || createSegmentMutation.isPending}
+                        onClick={() => createSegmentMutation.mutate({ campaignId, eventType: segmentEventType, listName: segmentName.trim() })}
+                      >
+                        {createSegmentMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Create"}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-xs shrink-0" onClick={() => setShowSegmentForm(false)}>Cancel</Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-8">No analytics data yet.</p>
+            )
+          )}
+
+          {/* ── RECIPIENTS TAB ── */}
+          {activeTab === "recipients" && (
+            <div className="space-y-3">
+              {/* Filter buttons */}
+              <div className="flex gap-2 flex-wrap">
+                {([undefined, "open", "click", "unsubscribe"] as const).map((f) => (
+                  <button
+                    key={String(f)}
+                    onClick={() => setRecipientFilter(f)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      recipientFilter === f
+                        ? "bg-[#189aa1] text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {f === undefined ? "All Events" : f.charAt(0).toUpperCase() + f.slice(1) + "s"}
+                  </button>
+                ))}
+                {recipientsData && (
+                  <span className="ml-auto text-xs text-gray-400 self-center">{recipientsData.total} events</span>
+                )}
+              </div>
+
+              {recipientsLoading ? (
+                <div className="flex items-center justify-center py-10"><RefreshCw className="w-5 h-5 animate-spin text-[#189aa1]" /></div>
+              ) : recipientsData && recipientsData.recipients.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm min-w-[500px]">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Recipient</th>
+                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Event</th>
+                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Location</th>
+                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {recipientsData.recipients.map((r, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-gray-900 truncate max-w-[180px]">{r.displayName}</div>
+                            {r.email && r.email !== r.displayName && (
+                              <div className="text-xs text-gray-400 truncate max-w-[180px]">{r.email}</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${eventBadgeColor(r.eventType)}`}>
+                              {r.eventType}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-500">
+                            {r.city || r.region || r.country ? (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3 shrink-0" />
+                                {[r.city, r.region, r.country].filter(Boolean).join(", ")}
+                              </span>
+                            ) : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
+                            {r.timestamp ? new Date(r.timestamp).toLocaleString() : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-10 text-gray-400">
+                  <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No events recorded yet.</p>
+                  <p className="text-xs mt-1">Events will appear here after recipients open or click.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── GEO TAB ── */}
+          {activeTab === "geo" && (
+            <div className="space-y-4">
+              {geoLoading ? (
+                <div className="flex items-center justify-center py-10"><RefreshCw className="w-5 h-5 animate-spin text-[#189aa1]" /></div>
+              ) : geoData && (geoData.byCountry.length > 0 || geoData.byRegion.length > 0) ? (
+                <>
+                  {geoData.byCountry.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> BY COUNTRY</p>
+                      <div className="overflow-x-auto rounded-lg border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Country</th>
+                              <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">Unique Recipients</th>
+                              <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">Total Events</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {geoData.byCountry.map((row, i) => (
+                              <tr key={i} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 font-medium text-gray-900">{row.country}</td>
+                                <td className="px-3 py-2 text-right text-gray-700">{row.uniqueRecipients}</td>
+                                <td className="px-3 py-2 text-right text-gray-400">{row.totalEvents}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {geoData.byRegion.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> BY STATE / REGION</p>
+                      <div className="overflow-x-auto rounded-lg border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Region</th>
+                              <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Country</th>
+                              <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">Unique Recipients</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {geoData.byRegion.slice(0, 50).map((row, i) => (
+                              <tr key={i} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 font-medium text-gray-900">{row.region}</td>
+                                <td className="px-3 py-2 text-gray-500">{row.country}</td>
+                                <td className="px-3 py-2 text-right text-gray-700">{row.uniqueRecipients}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-10 text-gray-400">
+                  <Globe className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No geo data yet.</p>
+                  <p className="text-xs mt-1">Location data is captured from new opens and clicks going forward.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="shrink-0 border-t pt-3">
           <Button variant="outline" onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>

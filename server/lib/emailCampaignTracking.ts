@@ -96,7 +96,33 @@ export type RecordCampaignEventInput = {
   recipientKey: string;
   eventType: CampaignEventType;
   metadata?: Record<string, unknown>;
+  ip?: string;
 };
+
+/** Resolve geo data from IP using ip-api.com (free, no key required, 45 req/min). */
+async function resolveGeo(ip: string | undefined): Promise<{ country?: string; region?: string; city?: string }> {
+  if (!ip) return {};
+  // Skip private/loopback IPs
+  if (
+    ip === "127.0.0.1" || ip === "::1" ||
+    ip.startsWith("192.168.") || ip.startsWith("10.") ||
+    ip.startsWith("172.16.") || ip.startsWith("172.17.") ||
+    ip.startsWith("172.18.") || ip.startsWith("172.19.") ||
+    ip.startsWith("172.2") || ip.startsWith("172.30.") || ip.startsWith("172.31.")
+  ) return {};
+  try {
+    const res = await fetch(
+      `http://ip-api.com/json/${ip}?fields=status,country,regionName,city`,
+      { signal: AbortSignal.timeout(2500) }
+    );
+    if (!res.ok) return {};
+    const data = await res.json() as { status: string; country?: string; regionName?: string; city?: string };
+    if (data.status !== "success") return {};
+    return { country: data.country, region: data.regionName, city: data.city };
+  } catch {
+    return {};
+  }
+}
 
 function parseRecipientFromKey(recipientKey: string) {
   const { userId, email } = parseRecipientTrackingKey(recipientKey);
@@ -129,12 +155,18 @@ export async function recordEmailCampaignEvent(
     if (existing) return;
   }
 
+  // Resolve geo asynchronously — don't block the response
+  const geo = await resolveGeo(input.ip);
+
   await db.insert(emailCampaignEvents).values({
     campaignId: input.campaignId,
     userId,
     recipientKey: input.recipientKey,
     eventType: input.eventType,
     metadata,
+    country: geo.country ?? null,
+    region: geo.region ?? null,
+    city: geo.city ?? null,
   });
 }
 

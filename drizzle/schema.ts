@@ -2177,6 +2177,9 @@ export const emailCampaignEvents = mysqlTable("emailCampaignEvents", {
   recipientKey: varchar("recipientKey", { length: 128 }).notNull(),
   eventType: mysqlEnum("eventType", ["open", "click", "unsubscribe"]).notNull(),
   metadata: text("metadata"),
+  country: varchar("country", { length: 100 }),
+  region: varchar("region", { length: 100 }),
+  city: varchar("city", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type EmailCampaignEvent = typeof emailCampaignEvents.$inferSelect;

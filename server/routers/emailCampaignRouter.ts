@@ -1073,6 +1073,172 @@ export const emailCampaignRouter = router({
       };
     }),
 
+  // ── Admin: deep analytics — per-recipient list ────────────────────────────
+
+  getCampaignRecipients: protectedProcedure
+    .input(z.object({
+      campaignId: z.number(),
+      eventType: z.enum(["open", "click", "unsubscribe"]).optional(),
+      limit: z.number().min(1).max(500).default(200),
+      offset: z.number().min(0).default(0),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const eventFilter = input.eventType
+        ? sql`AND e.eventType = ${input.eventType}`
+        : sql``;
+
+      const [rows] = (await db.execute(sql`
+        SELECT
+          e.recipientKey,
+          e.eventType,
+          e.country,
+          e.region,
+          e.city,
+          e.createdAt,
+          COALESCE(u.name, u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as displayName,
+          COALESCE(u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as email,
+          u.id as userId
+        FROM emailCampaignEvents e
+        LEFT JOIN users u ON u.id = e.userId
+        WHERE e.campaignId = ${input.campaignId}
+          ${eventFilter}
+        ORDER BY e.createdAt DESC
+        LIMIT ${input.limit} OFFSET ${input.offset}
+      `)) as [{
+        recipientKey: string; eventType: string; country: string | null; region: string | null;
+        city: string | null; createdAt: Date; displayName: string | null; email: string | null; userId: number | null;
+      }[], unknown];
+
+      const [countRaw] = (await db.execute(sql`
+        SELECT COUNT(*) as total
+        FROM emailCampaignEvents e
+        WHERE e.campaignId = ${input.campaignId}
+          ${eventFilter}
+      `)) as [{ total: number }[], unknown];
+
+      return {
+        recipients: (Array.isArray(rows) ? rows : []).map((r) => ({
+          recipientKey: r.recipientKey,
+          eventType: r.eventType,
+          displayName: r.displayName ?? r.email ?? r.recipientKey,
+          email: r.email,
+          userId: r.userId,
+          country: r.country,
+          region: r.region,
+          city: r.city,
+          timestamp: r.createdAt,
+        })),
+        total: Number((Array.isArray(countRaw) ? countRaw[0] : null)?.total ?? 0),
+      };
+    }),
+
+  // ── Admin: deep analytics — geo breakdown ────────────────────────────────
+
+  getCampaignGeo: protectedProcedure
+    .input(z.object({ campaignId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [byCountry] = (await db.execute(sql`
+        SELECT country, COUNT(DISTINCT recipientKey) as uniqueRecipients, COUNT(*) as totalEvents
+        FROM emailCampaignEvents
+        WHERE campaignId = ${input.campaignId} AND country IS NOT NULL AND country != ''
+        GROUP BY country
+        ORDER BY uniqueRecipients DESC
+        LIMIT 50
+      `)) as [{ country: string; uniqueRecipients: number; totalEvents: number }[], unknown];
+
+      const [byRegion] = (await db.execute(sql`
+        SELECT country, region, COUNT(DISTINCT recipientKey) as uniqueRecipients, COUNT(*) as totalEvents
+        FROM emailCampaignEvents
+        WHERE campaignId = ${input.campaignId} AND region IS NOT NULL AND region != ''
+        GROUP BY country, region
+        ORDER BY uniqueRecipients DESC
+        LIMIT 100
+      `)) as [{ country: string; region: string; uniqueRecipients: number; totalEvents: number }[], unknown];
+
+      return {
+        byCountry: (Array.isArray(byCountry) ? byCountry : []).map((r) => ({
+          country: r.country,
+          uniqueRecipients: Number(r.uniqueRecipients),
+          totalEvents: Number(r.totalEvents),
+        })),
+        byRegion: (Array.isArray(byRegion) ? byRegion : []).map((r) => ({
+          country: r.country,
+          region: r.region,
+          uniqueRecipients: Number(r.uniqueRecipients),
+          totalEvents: Number(r.totalEvents),
+        })),
+      };
+    }),
+
+  // ── Admin: create email list segment from campaign engagement ─────────────
+
+  createSegmentFromCampaign: protectedProcedure
+    .input(z.object({
+      campaignId: z.number(),
+      eventType: z.enum(["open", "click", "unsubscribe"]),
+      listName: z.string().min(1).max(200),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Create the new email list
+      const [listResult] = await db.insert(emailLists).values({
+        name: input.listName,
+        description: `Auto-created from campaign #${input.campaignId} ${input.eventType}s`,
+        isActive: true,
+        subscriberCount: 0,
+      });
+      const listId = (listResult as any).insertId as number;
+
+      // Get unique recipients who performed the event
+      const [recipientsRaw] = (await db.execute(sql`
+        SELECT DISTINCT
+          e.recipientKey,
+          COALESCE(u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as email,
+          COALESCE(u.name, u.email) as name,
+          u.id as userId
+        FROM emailCampaignEvents e
+        LEFT JOIN users u ON u.id = e.userId
+        WHERE e.campaignId = ${input.campaignId}
+          AND e.eventType = ${input.eventType}
+          AND (u.email IS NOT NULL OR JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient')) IS NOT NULL)
+      `)) as [{ recipientKey: string; email: string | null; name: string | null; userId: number | null }[], unknown];
+
+      const recipients = Array.isArray(recipientsRaw) ? recipientsRaw : [];
+      let added = 0;
+
+      for (const r of recipients) {
+        if (!r.email) continue;
+        try {
+          await db.insert(emailListSubscribers).values({
+            listId,
+            email: r.email,
+            name: r.name ?? undefined,
+            userId: r.userId ?? undefined,
+            source: "campaign_segment",
+            sourceId: String(input.campaignId),
+            status: "subscribed",
+          });
+          added++;
+        } catch { /* skip duplicates */ }
+      }
+
+      // Update subscriber count
+      await db.update(emailLists).set({ subscriberCount: added }).where(eq(emailLists.id, listId));
+
+      return { listId, listName: input.listName, added };
+    }),
+
   // ── Admin: duplicate campaign ─────────────────────────────────────────────
 
   duplicateCampaign: protectedProcedure
