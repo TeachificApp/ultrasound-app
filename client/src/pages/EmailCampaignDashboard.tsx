@@ -533,7 +533,7 @@ export default function EmailCampaignDashboard() {
                                 <Edit className="w-4 h-4" />
                               </button>
                             )}
-                            <button onClick={() => duplicateMutation.mutate({ campaignId: c.id })} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#189aa1]" title="Duplicate">
+                            <button onClick={() => duplicateMutation.mutate({ id: c.id })} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#189aa1]" title="Duplicate">
                               <Copy className="w-4 h-4" />
                             </button>
                             <button onClick={() => setDeleteConfirmId(c.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" title="Delete">
