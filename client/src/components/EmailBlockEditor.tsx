@@ -497,7 +497,7 @@ export function emailBlocksToHtml(blocks: Block[], trackingPixelUrl?: string, st
   return [
     `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;margin:0;padding:0;">`,
     `  <tr><td align="center" style="padding:20px 0;">`,
-    `    <table width="700" cellpadding="0" cellspacing="0" border="0" style="max-width:700px;width:100%;background:#ffffff;border-radius:8px;">`,
+    `    <table width="750" cellpadding="0" cellspacing="0" border="0" style="max-width:750px;width:100%;background:#ffffff;border-radius:8px;">`,
     `      <tr><td style="padding:0;">`,
     innerHtml,
     pixel,

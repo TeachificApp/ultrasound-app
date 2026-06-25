@@ -58,7 +58,7 @@ function wrapInBrandedEmail(bodyHtml: string, previewText?: string): string {
 ${preview}
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;margin:0;padding:0;">
   <tr><td align="center" style="padding:20px 0;">
-    <table width="700" cellpadding="0" cellspacing="0" border="0" style="max-width:700px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+    <table width="750" cellpadding="0" cellspacing="0" border="0" style="max-width:750px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
       <tr>
         <td style="padding:0;color:#1a2e3b;font-size:15px;line-height:1.7;">
           ${bodyHtml}
