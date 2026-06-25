@@ -493,16 +493,18 @@ export function emailBlocksToHtml(blocks: Block[], trackingPixelUrl?: string, st
     // Raw inner HTML — caller (wrapInBrandedEmail) handles the outer container
     return innerHtml + pixel;
   }
-  // Wrap in a 700px-wide centered outer table for standalone preview / plain send
+  // Wrap in a 750px-wide centered outer table for standalone preview / plain send
   return [
-    `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;margin:0;padding:0;">`,
-    `  <tr><td align="center" style="padding:20px 0;">`,
-    `    <table width="750" cellpadding="0" cellspacing="0" border="0" style="max-width:750px;width:100%;background:#ffffff;border-radius:8px;">`,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;margin:0;padding:0;">`,
+    `  <tr><td align="center" valign="top" style="padding:20px 16px;">`,
+    `    <!--[if mso]><table role="presentation" align="center" width="750" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->`,
+    `    <table role="presentation" align="center" width="750" cellpadding="0" cellspacing="0" border="0" style="max-width:750px;width:100%;background:#ffffff;border-radius:8px;">`,
     `      <tr><td style="padding:0;">`,
     innerHtml,
     pixel,
     `      </td></tr>`,
     `    </table>`,
+    `    <!--[if mso]></td></tr></table><![endif]-->`,
     `  </td></tr>`,
     `</table>`,
   ].join("\n");

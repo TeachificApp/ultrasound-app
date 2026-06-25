@@ -56,9 +56,10 @@ function wrapInBrandedEmail(bodyHtml: string, previewText?: string): string {
 </head>
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:'Open Sans',Arial,sans-serif;">
 ${preview}
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;margin:0;padding:0;">
-  <tr><td align="center" style="padding:20px 0;">
-    <table width="750" cellpadding="0" cellspacing="0" border="0" style="max-width:750px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;margin:0;padding:0;">
+  <tr><td align="center" valign="top" style="padding:20px 16px;">
+    <!--[if mso]><table role="presentation" align="center" width="750" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+    <table role="presentation" align="center" width="750" cellpadding="0" cellspacing="0" border="0" style="max-width:750px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
       <tr>
         <td style="padding:0;color:#1a2e3b;font-size:15px;line-height:1.7;">
           ${bodyHtml}
@@ -74,6 +75,7 @@ ${preview}
         </td>
       </tr>
     </table>
+    <!--[if mso]></td></tr></table><![endif]-->
   </td></tr>
 </table>
 </body>
