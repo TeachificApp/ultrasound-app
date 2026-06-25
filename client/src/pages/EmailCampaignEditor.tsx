@@ -588,6 +588,8 @@ interface AudienceFilter {
   inCohortGroupIds: number[];
   submittedFormIds: number[];
   completedCourseIds: number[];
+  openedCampaignIds: number[];
+  clickedCampaignIds: number[];
   logic: "and" | "or";
 }
 
@@ -595,7 +597,9 @@ const DEFAULT_FILTER: AudienceFilter = {
   interests: [], roles: [], subscriptionType: "all", userStatus: "active",
   specificEmails: [], enrolledInCourseIds: [], purchasedProductIds: [],
   downloadedProductIds: [], inGroupIds: [], inCohortGroupIds: [],
-  submittedFormIds: [], completedCourseIds: [], logic: "and",
+  submittedFormIds: [], completedCourseIds: [],
+  openedCampaignIds: [], clickedCampaignIds: [],
+  logic: "and",
 };
 
 function MultiSelect({ label, options, selected, onChange }: {
@@ -717,6 +721,30 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Prior campaign engagement segments */}
+          <div className="border rounded-lg p-3 bg-[#f8fcfc] space-y-3">
+            <p className="text-xs font-semibold text-gray-700">Engagement segments</p>
+            <p className="text-[10px] text-gray-500">Target users who opened or clicked links in previous sent campaigns.</p>
+            {options?.sentCampaigns && options.sentCampaigns.length > 0 ? (
+              <>
+                <MultiSelect
+                  label="Opened campaign"
+                  options={options.sentCampaigns}
+                  selected={filter.openedCampaignIds}
+                  onChange={(v) => update({ openedCampaignIds: v })}
+                />
+                <MultiSelect
+                  label="Clicked campaign"
+                  options={options.sentCampaigns}
+                  selected={filter.clickedCampaignIds}
+                  onChange={(v) => update({ clickedCampaignIds: v })}
+                />
+              </>
+            ) : (
+              <p className="text-xs text-gray-400">No sent campaigns yet — send a campaign first to build open/click segments.</p>
+            )}
           </div>
 
           {/* Course enrollment */}
@@ -918,6 +946,9 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
       <div className={`p-6 ${showPreview ? "grid grid-cols-2 gap-6" : ""}`}>
         {/* Editor column */}
         <div className="space-y-4">
+          {/* Audience filter */}
+          <AudienceFilterBuilder filter={filter} onChange={setFilter} preview={audiencePreview} />
+
           {/* Subject + preview text */}
           <Card className="border shadow-sm">
             <CardContent className="p-5 space-y-4">
@@ -963,9 +994,6 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
               <BlockEditor blocks={blocks} onChange={setBlocks} />
             </CardContent>
           </Card>
-
-          {/* Audience filter */}
-          <AudienceFilterBuilder filter={filter} onChange={setFilter} preview={audiencePreview} />
         </div>
 
         {/* Preview column */}
