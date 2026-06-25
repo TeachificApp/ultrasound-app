@@ -31,6 +31,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/_core/hooks/useAuth";
+import {
+  EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX,
+  EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH,
+  renderCampaignImageHtml,
+  resolveCampaignImageWidth,
+  wrapInBrandedCampaignEmail,
+} from "@shared/emailCampaignLayout";
 
 // ─── Block types ──────────────────────────────────────────────────────────────
 type BlockType = "heading1" | "heading2" | "text" | "image" | "button" | "divider" | "spacer" | "quote" | "html" | "lead_capture";
@@ -94,7 +101,7 @@ function defaultBlock(type: BlockType): Block {
     case "text": return { ...base, content: "Write your email content here. Keep it concise and engaging." };
     case "quote": return { ...base, content: "A powerful quote or highlight from your message." };
     case "button": return { ...base, content: "Click Here", buttonUrl: "https://", buttonColor: "#189aa1", buttonTextColor: "#ffffff", align: "center" };
-    case "image": return { ...base, content: "", imageAlt: "", imageWidth: "100%" };
+    case "image": return { ...base, content: "", imageAlt: "", imageWidth: EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH };
     case "divider": return { ...base, content: "" };
     case "spacer": return { ...base, content: "", spacerHeight: 24 };
     case "html": return { ...base, content: "<p>Custom HTML here</p>" };
@@ -153,7 +160,13 @@ function blockToHtml(block: Block): string {
       return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr><td align="${align}"><a href="${block.buttonUrl || "#"}" style="display:inline-block;background:${btnBg};color:${btnText};text-decoration:none;padding:14px 28px;border-radius:${btnBr}px;font-weight:700;font-size:${btnSize}px;">${block.content}</a></td></tr></table>`;
     }
     case "image":
-      return block.content ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr><td align="${align}"><img src="${block.content}" alt="${block.imageAlt || ""}" width="${block.imageWidth || "100%"}" style="max-width:100%;border-radius:${block.borderRadius ?? 8}px;display:block;" /></td></tr></table>` : "";
+      return renderCampaignImageHtml({
+        src: block.content,
+        alt: block.imageAlt,
+        width: block.imageWidth,
+        align,
+        borderRadius: block.borderRadius,
+      });
     case "divider":
       return `<hr style="border:none;border-top:1px solid #e5eaec;margin:20px 0;" />`;
     case "spacer":
@@ -183,44 +196,7 @@ function blocksToHtml(blocks: Block[]): string {
 
 // ─── Branded email wrapper ────────────────────────────────────────────────────
 function wrapInBrandedEmail(bodyHtml: string, previewText?: string): string {
-  const preview = previewText ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${previewText}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>` : "";
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>All About Ultrasound™</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f7f8;font-family:'Open Sans',Arial,sans-serif;">
-${preview}
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f8;padding:32px 0;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-      <tr>
-        <td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;">
-          <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">All About Ultrasound™</span>
-          <div style="font-size:11px;color:#4ad9e0;font-weight:600;margin-top:2px;letter-spacing:0.5px;">ECHOCARDIOGRAPHY CLINICAL COMPANION</div>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:32px;color:#1a2e3b;font-size:15px;line-height:1.7;">
-          ${bodyHtml}
-        </td>
-      </tr>
-      <tr>
-        <td style="background:#f4f7f8;padding:20px 32px;border-top:1px solid #e5eaec;">
-          <p style="margin:0;font-size:11px;color:#8a9bb0;text-align:center;line-height:1.6;">
-            © ${new Date().getFullYear()} All About Ultrasound™<br/>
-            You are receiving this email because you have an account on All About Ultrasound™.<br/>
-            <a href="{{UNSUBSCRIBE_URL}}" style="color:#189aa1;text-decoration:none;">Unsubscribe</a> · <a href="https://app.allaboutultrasound.com/profile" style="color:#189aa1;text-decoration:none;">Manage preferences</a>
-          </p>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
+  return wrapInBrandedCampaignEmail(bodyHtml, previewText);
 }
 
 // ─── Audience filter types ────────────────────────────────────────────────────
@@ -439,7 +415,7 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Width</label>
-                  <Input value={selected.imageWidth || "100%"} onChange={(e) => updateBlock(selected.id, { imageWidth: e.target.value })} placeholder="100% or 300px" className="text-sm" />
+                  <Input value={resolveCampaignImageWidth(selected.imageWidth)} onChange={(e) => updateBlock(selected.id, { imageWidth: e.target.value })} placeholder="50% or 300px" className="text-sm" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Border Radius (px)</label>
@@ -1006,7 +982,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
                 <span className="ml-auto text-xs text-gray-400">{subject || "(no subject)"}</span>
               </div>
               <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
-                <div className={`mx-auto ${previewMode === "mobile" ? "max-w-sm" : "max-w-2xl"} p-4`}>
+                <div className={`mx-auto p-4 ${previewMode === "mobile" ? "max-w-sm" : ""}`} style={previewMode === "desktop" ? { maxWidth: `${EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX}px` } : undefined}>
                   <iframe
                     srcDoc={wrappedHtml}
                     className="w-full border-0 rounded"

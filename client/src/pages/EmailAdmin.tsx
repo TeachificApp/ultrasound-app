@@ -30,56 +30,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { wrapInBrandedCampaignEmail } from "@shared/emailCampaignLayout";
 
 // ─── Branded HTML email wrapper ───────────────────────────────────────────────
 function wrapInBrandedEmail(bodyHtml: string, previewText?: string): string {
-  const preview = previewText ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${previewText}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>` : "";
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>All About Ultrasound™</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f7f8;font-family:'Open Sans',Arial,sans-serif;">
-${preview}
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f8;padding:32px 0;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-      <!-- Header -->
-      <tr>
-        <td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;">
-          <table width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-              <td>
-                <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">All About Ultrasound™</span>
-                <div style="font-size:11px;color:#4ad9e0;font-weight:600;margin-top:2px;letter-spacing:0.5px;">ECHOCARDIOGRAPHY CLINICAL COMPANION</div>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <!-- Body -->
-      <tr>
-        <td style="padding:32px;color:#1a2e3b;font-size:15px;line-height:1.7;">
-          ${bodyHtml}
-        </td>
-      </tr>
-      <!-- Footer -->
-      <tr>
-        <td style="background:#f4f7f8;padding:20px 32px;border-top:1px solid #e5eaec;">
-          <p style="margin:0;font-size:11px;color:#8a9bb0;text-align:center;line-height:1.6;">
-            © ${new Date().getFullYear()} All About Ultrasound™ · All About Ultrasound™<br/>
-            You are receiving this email because you have an account on All About Ultrasound™.<br/>
-            <a href="https://app.allaboutultrasound.com/profile" style="color:#189aa1;text-decoration:none;">Manage your preferences</a>
-          </p>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
+  return wrapInBrandedCampaignEmail(bodyHtml, previewText);
 }
 
 // ─── Pre-loaded branded templates ────────────────────────────────────────────

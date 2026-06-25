@@ -41,6 +41,7 @@ import {
 import { addToEmailList, ensureAllContactsList } from "../lib/emailListHelper";
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
+import { wrapInBrandedCampaignEmail, normalizeCampaignEmailHtml } from "../../shared/emailCampaignLayout";
 import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
 
 // ─── Shared Zod schemas ───────────────────────────────────────────────────────
@@ -415,7 +416,8 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     const token = await ensureUnsubscribeToken(recipient.id);
     const unsubscribeUrl = buildUnsubscribeUrl(token);
     // Inject footer, tracking pixel, and wrap links
-    let html = injectUnsubscribeFooter(campaign.htmlBody, unsubscribeUrl);
+    let html = normalizeCampaignEmailHtml(campaign.htmlBody);
+    html = injectUnsubscribeFooter(html, unsubscribeUrl);
     html = injectTrackingPixel(html, campaignId, recipient.id);
     html = wrapLinksForTracking(html, campaignId, recipient.id);
 
@@ -656,11 +658,13 @@ export const emailCampaignRouter = router({
         });
       }
 
+      const htmlBody = normalizeCampaignEmailHtml(input.htmlBody);
+
       // Create campaign record in "sending" state
       const [result] = await db.insert(emailCampaigns).values({
         sentByUserId: ctx.user.id,
         subject: input.subject,
-        htmlBody: input.htmlBody,
+        htmlBody,
         previewText: input.previewText ?? null,
         audienceFilter: JSON.stringify(input.audienceFilter),
         recipientCount: recipients.length,
@@ -703,14 +707,12 @@ export const emailCampaignRouter = router({
       // Estimate recipient count (dry-run)
       const recipients = await resolveRecipients(input.audienceFilter);
 
+      const htmlBody = normalizeCampaignEmailHtml(input.htmlBody);
+
       const [result] = await db.insert(emailCampaigns).values({
         sentByUserId: ctx.user.id,
         subject: input.subject,
-        htmlBody: input.htmlBody,
-        previewText: input.previewText ?? null,
-        audienceFilter: JSON.stringify(input.audienceFilter),
-        recipientCount: recipients.length,
-        status: "scheduled",
+        htmlBody,
         scheduledAt: input.scheduledAt,
       });
       return { campaignId: (result as any).insertId as number, recipientCount: recipients.length, scheduledAt: input.scheduledAt };
@@ -1028,7 +1030,7 @@ export const emailCampaignRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const vals = {
         subject: input.subject,
-        htmlBody: input.htmlBody,
+        htmlBody: input.htmlBody ? normalizeCampaignEmailHtml(input.htmlBody) : input.htmlBody,
         previewText: input.previewText ?? null,
         audienceFilter: JSON.stringify(input.audienceFilter ?? {}),
         status: "draft" as const,
