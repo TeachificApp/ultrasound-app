@@ -722,6 +722,9 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
       <div className={`p-6 ${showPreview ? "grid grid-cols-2 gap-6" : ""}`}>
         {/* Editor column */}
         <div className="space-y-4">
+          {/* Audience filter — first so sender defines recipients before composing */}
+          <AudienceFilterBuilder filter={filter} onChange={setFilter} preview={audiencePreview} />
+
           {/* Subject + preview text */}
           <Card className="border shadow-sm">
             <CardContent className="p-5 space-y-4">
@@ -752,9 +755,6 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
               </div>
             </CardContent>
           </Card>
-
-          {/* Audience filter — above body so sender can confirm who receives before writing */}
-          <AudienceFilterBuilder filter={filter} onChange={setFilter} preview={audiencePreview} />
 
           {/* Block editor */}
           <Card className="border shadow-sm">
