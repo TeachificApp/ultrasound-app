@@ -998,29 +998,41 @@ export const emailCampaignRouter = router({
         LIMIT 10
       `)) as [{ url: string; clicks: number }[], unknown];
 
-      const [ordersRaw] = (await db.execute(sql`
-        SELECT COUNT(DISTINCT lo.id) as orderCount, COALESCE(SUM(lo.amount), 0) as revenueCents
-        FROM lms_orders lo
-        INNER JOIN users u ON u.id = lo.user_id
-        INNER JOIN emailCampaignEvents e ON e.userId = u.id
-          AND e.campaignId = ${input.campaignId}
-          AND e.eventType = 'click'
-        WHERE lo.status = 'paid'
-          AND lo.created_at >= (
-            SELECT MIN(createdAt) FROM emailCampaignEvents WHERE campaignId = ${input.campaignId}
-          )
-      `)) as [{ orderCount: number; revenueCents: number }[], unknown];
+      let ordersRaw: { orderCount: number; revenueCents: number }[] = [];
+      try {
+        const [_ordersRaw] = (await db.execute(sql`
+          SELECT COUNT(DISTINCT lo.id) as orderCount, COALESCE(SUM(lo.amount), 0) as revenueCents
+          FROM lms_orders lo
+          INNER JOIN users u ON u.id = lo.user_id
+          INNER JOIN emailCampaignEvents e ON e.userId = u.id
+            AND e.campaignId = ${input.campaignId}
+            AND e.eventType = 'click'
+          WHERE lo.status = 'paid'
+            AND lo.created_at >= (
+              SELECT MIN(createdAt) FROM emailCampaignEvents WHERE campaignId = ${input.campaignId}
+            )
+        `)) as [{ orderCount: number; revenueCents: number }[], unknown];
+        ordersRaw = Array.isArray(_ordersRaw) ? _ordersRaw : [];
+      } catch (err) {
+        console.error("[EmailCampaign] orders attribution query failed (non-fatal):", err);
+      }
 
-      const [variantRaw] = (await db.execute(sql`
-        SELECT
-          JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.variant')) as variant,
-          eventType,
-          COUNT(*) as cnt
-        FROM emailCampaignEvents
-        WHERE campaignId = ${input.campaignId}
-          AND metadata LIKE '%"variant"%'
-        GROUP BY variant, eventType
-      `)) as [{ variant: string; eventType: string; cnt: number }[], unknown];
+      let variantRaw: { variant: string; eventType: string; cnt: number }[] = [];
+      try {
+        const [_variantRaw] = (await db.execute(sql`
+          SELECT
+            JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.variant')) as variant,
+            eventType,
+            COUNT(*) as cnt
+          FROM emailCampaignEvents
+          WHERE campaignId = ${input.campaignId}
+            AND metadata LIKE '%"variant"%'
+          GROUP BY variant, eventType
+        `)) as [{ variant: string; eventType: string; cnt: number }[], unknown];
+        variantRaw = Array.isArray(_variantRaw) ? _variantRaw : [];
+      } catch (err) {
+        console.error("[EmailCampaign] variant stats query failed (non-fatal):", err);
+      }
 
       const events = Array.isArray(eventsRaw) ? eventsRaw : [];
       const uniqueEvents = Array.isArray(uniqueRaw) ? uniqueRaw : [];
@@ -1066,8 +1078,8 @@ export const emailCampaignRouter = router({
           clicks: Number(r.clicks),
         })),
         orders: {
-          count: Number((Array.isArray(ordersRaw) ? ordersRaw[0] : null)?.orderCount ?? 0),
-          revenueCents: Number((Array.isArray(ordersRaw) ? ordersRaw[0] : null)?.revenueCents ?? 0),
+          count: Number(ordersRaw[0]?.orderCount ?? 0),
+          revenueCents: Number(ordersRaw[0]?.revenueCents ?? 0),
         },
         variantStats,
       };
