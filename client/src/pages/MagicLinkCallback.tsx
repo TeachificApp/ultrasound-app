@@ -2,9 +2,10 @@
  * MagicLinkCallback.tsx — Handles the magic link callback
  * URL: /auth/magic?token=...
  *
- * Uses a full-page GET redirect to /api/auth/magic-verify so Cloudflare cannot
- * strip the Set-Cookie header (which it does on XHR/fetch responses).
- * The server encodes the public hostname in the URL (?host=) for correct cookie scoping.
+ * Automatically calls /api/auth/magic-verify on mount, then redirects to the app.
+ *
+ * NOTE: Uses /api/auth/magic-verify (server-side route) instead of the tRPC mutation.
+ * Reason: Cloudflare strips Set-Cookie headers from JavaScript fetch/XHR responses.
  */
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
@@ -33,17 +34,16 @@ export default function MagicLinkCallback() {
       return;
     }
 
-    // Use a full-page GET redirect so Cloudflare cannot strip Set-Cookie headers.
-    // The server reads ?host= to scope the cookie to the correct domain.
+    // Full-page GET navigation sets the session cookie reliably (Cloudflare-safe).
+    // POST /api/auth/magic-verify via fetch can drop Set-Cookie on some domains.
+    const returnTo = params.get("returnTo");
     const host = window.location.hostname;
-    const returnTo = params.get("returnTo") || "/my-dashboard";
-    const verifyUrl =
-      `/api/auth/magic-verify` +
-      `?token=${encodeURIComponent(token)}` +
-      `&host=${encodeURIComponent(host)}` +
-      `&returnTo=${encodeURIComponent(returnTo)}`;
-    window.location.href = verifyUrl;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const query = new URLSearchParams({ token, host });
+    if (returnTo && returnTo.startsWith("/")) {
+      query.set("returnTo", returnTo);
+    }
+    window.location.replace(`/api/auth/magic-verify?${query.toString()}`);
+  }, []);
 
   return (
     <div

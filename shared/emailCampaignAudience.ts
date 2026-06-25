@@ -77,6 +77,10 @@ export const AudienceFilterSchema = z.object({
   freePreviewQuizIds: z.array(z.number().int()).default([]),
   activeAccessQuizIds: z.array(z.number().int()).default([]),
   purchasedQuizIds: z.array(z.number().int()).default([]),
+  /** Filter to users who opened a specific sent campaign */
+  openedCampaignIds: z.array(z.number().int()).default([]),
+  /** Filter to users who clicked a link in a specific sent campaign */
+  clickedCampaignIds: z.array(z.number().int()).default([]),
   logic: z.enum(["and", "or"]).default("and"),
   abTest: AbTestConfigSchema.optional(),
 });
@@ -127,6 +131,8 @@ export const DEFAULT_AUDIENCE_FILTER: AudienceFilter = {
   freePreviewQuizIds: [],
   activeAccessQuizIds: [],
   purchasedQuizIds: [],
+  openedCampaignIds: [],
+  clickedCampaignIds: [],
   logic: "and",
 };
 

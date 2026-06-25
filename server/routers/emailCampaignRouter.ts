@@ -48,6 +48,7 @@ import {
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
 import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
+import { normalizeCampaignEmailHtml } from "../../shared/emailCampaignLayout";
 import {
   injectTrackingPixel,
   wrapLinksForTracking,
@@ -240,7 +241,7 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
   for (const recipient of recipients) {
     const variant = pickAbVariant(recipient.email, filter.abTest, campaignId);
     const subject = variant?.subject?.trim() || campaign.subject;
-    let html = variant?.htmlBody?.trim() || campaign.htmlBody;
+    let html = normalizeCampaignEmailHtml(variant?.htmlBody?.trim() || campaign.htmlBody);
 
     let unsubscribeUrl: string | undefined;
     if (recipient.userId) {
@@ -518,10 +519,11 @@ export const emailCampaignRouter = router({
       }
 
       // Create campaign record in "sending" state
+      const htmlBody = normalizeCampaignEmailHtml(input.htmlBody);
       const [result] = await db.insert(emailCampaigns).values({
         sentByUserId: ctx.user.id,
         subject: input.subject,
-        htmlBody: input.htmlBody,
+        htmlBody,
         blocksJson: input.blocksJson ?? null,
         previewText: input.previewText ?? null,
         audienceFilter: JSON.stringify(input.audienceFilter),
@@ -566,10 +568,11 @@ export const emailCampaignRouter = router({
       // Estimate recipient count (dry-run)
       const recipients = await resolveRecipients(input.audienceFilter);
 
+      const htmlBodyScheduled = normalizeCampaignEmailHtml(input.htmlBody);
       const [result] = await db.insert(emailCampaigns).values({
         sentByUserId: ctx.user.id,
         subject: input.subject,
-        htmlBody: input.htmlBody,
+        htmlBody: htmlBodyScheduled,
         blocksJson: input.blocksJson ?? null,
         previewText: input.previewText ?? null,
         audienceFilter: JSON.stringify(input.audienceFilter),
@@ -685,6 +688,7 @@ export const emailCampaignRouter = router({
       communities,
       workshopInstanceRows,
       physicalProducts,
+      sentCampaigns,
     ] = await Promise.all([
       safeAudienceSqlRows<{ id: number; title: string }>("courses", () =>
         db.execute(sql`SELECT id, title FROM lms_courses WHERE status != 'archived' AND type IN ('course', 'cohort') ORDER BY title LIMIT 500`),
@@ -762,6 +766,9 @@ export const emailCampaignRouter = router({
       safeAudienceSqlRows<{ id: number; title: string }>("physicalProducts", () =>
         db.execute(sql`SELECT id, title FROM physical_products WHERE status != 'archived' ORDER BY title LIMIT 200`),
       ),
+      safeAudienceSqlRows<{ id: number; subject: string; sentAt: Date | null }>("sentCampaigns", () =>
+        db.execute(sql`SELECT id, subject, sent_at as sentAt FROM email_campaigns WHERE status = 'sent' ORDER BY sent_at DESC LIMIT 200`),
+      ),
     ]);
 
     let roleRows: { role: string }[] = [];
@@ -789,6 +796,7 @@ export const emailCampaignRouter = router({
       communities: communities.map((r) => ({ id: r.id, label: r.title })),
       workshopInstances: workshopInstanceRows.map((r) => ({ id: r.id, label: r.label })),
       physicalProducts: physicalProducts.map((r) => ({ id: r.id, label: r.title })),
+      sentCampaigns: (sentCampaigns as Array<{ id: number; subject: string; sentAt: Date | null }>).map((r) => ({ id: r.id, label: r.subject || `Campaign #${r.id}` })),
     };
   }),
 
@@ -1427,7 +1435,7 @@ export const emailCampaignRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const vals = {
         subject: input.subject,
-        htmlBody: input.htmlBody,
+        htmlBody: input.htmlBody ? normalizeCampaignEmailHtml(input.htmlBody) : input.htmlBody,
         blocksJson: input.blocksJson ?? null,
         previewText: input.previewText ?? null,
         audienceFilter: JSON.stringify(input.audienceFilter ?? {}),

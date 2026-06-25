@@ -31,6 +31,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useAuth } from "@/_core/hooks/useAuth";
 import type { AudienceFilter, LegacyInterestKey } from "@shared/emailCampaignAudience";
 import { DEFAULT_AUDIENCE_FILTER } from "@shared/emailCampaignAudience";
+import { wrapInBrandedCampaignEmail } from "@shared/emailCampaignLayout";
 
 // Block type is imported from LandingPageBuilder via EmailBlockEditor
 function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -43,43 +44,9 @@ function defaultEmailBlocks(): Block[] {
 }
 
 
-// ─── Branded email wrapper ────────────────────────────────────────────────────
+// ─── Branded email wrapper (delegates to shared module) ──────────────────────
 function wrapInBrandedEmail(bodyHtml: string, previewText?: string): string {
-  const preview = previewText ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${previewText}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>` : "";
-  const year = new Date().getFullYear();
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>All About Ultrasound\u2122 | iHeartEcho\u2122</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:'Open Sans',Arial,sans-serif;">
-${preview}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f4;margin:0;padding:0;">
-  <tr><td align="center" valign="top" style="padding:20px 16px;">
-    <!--[if mso]><table role="presentation" align="center" width="750" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-    <table role="presentation" align="center" width="750" cellpadding="0" cellspacing="0" border="0" style="max-width:750px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-      <tr>
-        <td style="padding:0;color:#1a2e3b;font-size:15px;line-height:1.7;">
-          ${bodyHtml}
-        </td>
-      </tr>
-      <tr>
-        <td style="background:#f4f4f4;padding:20px 32px;border-top:1px solid #e5eaec;">
-          <p style="margin:0;font-size:11px;color:#8a9bb0;text-align:center;line-height:1.6;">
-            \u00a9 ${year} All About Ultrasound\u2122 | iHeartEcho\u2122. All rights reserved.<br/>
-            You are receiving this email because you have an account on All About Ultrasound\u2122 | iHeartEcho\u2122.<br/>
-            <a href="{{UNSUBSCRIBE_URL}}" style="color:#189aa1;text-decoration:none;">Unsubscribe</a> &middot; <a href="https://app.allaboutultrasound.com/profile" style="color:#189aa1;text-decoration:none;">Manage preferences</a>
-          </p>
-        </td>
-      </tr>
-    </table>
-    <!--[if mso]></td></tr></table><![endif]-->
-  </td></tr>
-</table>
-</body>
-</html>`;
+  return wrapInBrandedCampaignEmail(bodyHtml, previewText);
 }
 
 const LEGACY_INTEREST_OPTIONS: { key: LegacyInterestKey; label: string }[] = [
@@ -397,6 +364,15 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
               <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide pt-1">Teams &amp; Forms</p>
               <MultiSelect label="In Team/Group" options={audienceOptions.groups} selected={filter.inGroupIds} onChange={(v) => update({ inGroupIds: v })} />
               <MultiSelect label="Submitted Form" options={audienceOptions.forms} selected={filter.submittedFormIds} onChange={(v) => update({ submittedFormIds: v })} />
+
+              {/* Campaign engagement segments */}
+              {audienceOptions.sentCampaigns && audienceOptions.sentCampaigns.length > 0 && (
+                <>
+                  <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide pt-1">Campaign Engagement</p>
+                  <MultiSelect label="Opened campaign" options={audienceOptions.sentCampaigns} selected={filter.openedCampaignIds ?? []} onChange={(v) => update({ openedCampaignIds: v })} hint="Users who opened a previous campaign" />
+                  <MultiSelect label="Clicked campaign" options={audienceOptions.sentCampaigns} selected={filter.clickedCampaignIds ?? []} onChange={(v) => update({ clickedCampaignIds: v })} hint="Users who clicked a link in a previous campaign" />
+                </>
+              )}
             </div>
           )}
 
@@ -777,6 +753,9 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
             </CardContent>
           </Card>
 
+          {/* Audience filter — above body so sender can confirm who receives before writing */}
+          <AudienceFilterBuilder filter={filter} onChange={setFilter} preview={audiencePreview} />
+
           {/* Block editor */}
           <Card className="border shadow-sm">
             <CardHeader className="pb-2 pt-4 px-5">
@@ -791,9 +770,6 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
               <EmailBlockEditor key={draftLoaded ? `loaded-${templateLoadKey}` : "default"} initialBlocks={blocks} onChange={handleBlocksChange} />
             </CardContent>
           </Card>
-
-          {/* Audience filter */}
-          <AudienceFilterBuilder filter={filter} onChange={setFilter} preview={audiencePreview} />
         </div>
 
         {/* Preview column */}

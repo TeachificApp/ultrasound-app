@@ -169,6 +169,13 @@ export function resolveAuthHostname(req: Request, explicitHost?: string): string
     const cleaned = (Array.isArray(xApp) ? xApp[0] : xApp).split(":")[0];
     if (cleaned && !isInternalHost(cleaned)) return cleaned;
   }
+  const hostHeader = req.headers.host;
+  if (hostHeader) {
+    const cleaned = (Array.isArray(hostHeader) ? hostHeader[0] : hostHeader).split(":")[0];
+    if (cleaned && !LOCAL_HOSTS.has(cleaned) && !isIpAddress(cleaned) && !isInternalHost(cleaned)) {
+      return cleaned;
+    }
+  }
   return undefined;
 }
 

@@ -627,6 +627,44 @@ async function emailsMatchingDimension(
     return matches;
   }
 
+  // ── Campaign engagement (opened / clicked) ────────────────────────────────
+
+  if (dimension === "openedCampaigns" && (filter.openedCampaignIds ?? []).length > 0) {
+    try {
+      const [rows] = (await db.execute(sql`
+        SELECT DISTINCT userId FROM emailCampaignEvents
+        WHERE campaignId IN (${sql.join(filter.openedCampaignIds!.map((id) => sql`${id}`), sql`, `)})
+          AND eventType = 'open'
+      `)) as [{ userId: number }[], unknown];
+      const idSet = new Set((Array.isArray(rows) ? rows : []).map((r) => r.userId).filter(Boolean));
+      const allUsers = await loadAllUsers();
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    } catch (err) {
+      console.error("[AudienceResolver] openedCampaigns filter error:", err);
+    }
+    return matches;
+  }
+
+  if (dimension === "clickedCampaigns" && (filter.clickedCampaignIds ?? []).length > 0) {
+    try {
+      const [rows] = (await db.execute(sql`
+        SELECT DISTINCT userId FROM emailCampaignEvents
+        WHERE campaignId IN (${sql.join(filter.clickedCampaignIds!.map((id) => sql`${id}`), sql`, `)})
+          AND eventType = 'click'
+      `)) as [{ userId: number }[], unknown];
+      const idSet = new Set((Array.isArray(rows) ? rows : []).map((r) => r.userId).filter(Boolean));
+      const allUsers = await loadAllUsers();
+      for (const u of allUsers) {
+        if (u.email && idSet.has(u.id)) matches.add(normalizeEmail(u.email));
+      }
+    } catch (err) {
+      console.error("[AudienceResolver] clickedCampaigns filter error:", err);
+    }
+    return matches;
+  }
+
   void candidateUserIds;
   void candidateEmails;
   return matches;
@@ -664,6 +702,8 @@ function activeDimensions(filter: AudienceFilter): string[] {
   if ((filter.purchasedDigitalBundleIds ?? []).length > 0) dims.push("digitalBundles");
   if ((filter.workshopInstanceIds ?? []).length > 0) dims.push("workshopInstances");
   if ((filter.purchasedPhysicalProductIds ?? []).length > 0) dims.push("physicalProducts");
+  if ((filter.openedCampaignIds ?? []).length > 0) dims.push("openedCampaigns");
+  if ((filter.clickedCampaignIds ?? []).length > 0) dims.push("clickedCampaigns");
   return dims;
 }
 
