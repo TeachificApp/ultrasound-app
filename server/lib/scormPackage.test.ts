@@ -116,7 +116,9 @@ describe("pickScormPlaybackMode", () => {
     ).toBe("server");
   });
 
-  it("finds zip from an older version when current is HTML", () => {
+  it("uses server mode when zip exists in history (r2_zip_stream takes priority over clientZip)", () => {
+    // r2_zip_stream is added for all ZIP versions and always wins, so the browser
+    // gets a server-side streaming iframe rather than client-side ZIP extraction.
     const r = pickScormPlaybackMode(
       { s3Url: "https://cdn/index.html", versionNumber: 2 },
       [
@@ -124,8 +126,7 @@ describe("pickScormPlaybackMode", () => {
         { s3Url: "https://cdn/old.zip", versionNumber: 1 },
       ]
     );
-    expect(r.mode).toBe("clientZip");
-    expect(r.zipS3Url).toContain(".zip");
+    expect(r.mode).toBe("server");
   });
 
   it("uses server when current is HTML and no zip in history", () => {
