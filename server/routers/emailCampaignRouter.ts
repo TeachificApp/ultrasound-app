@@ -1616,6 +1616,118 @@ export const emailCampaignRouter = router({
       return { removed: input.subscriberIds.length };
     }),
 
+  // ── Admin: per-link click breakdown ─────────────────────────────────────────
+  getClickLinkBreakdown: protectedProcedure
+    .input(z.object({ campaignId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      // Per-link aggregate: URL, total clicks, unique clickers
+      const [linksRaw] = (await db.execute(sql`
+        SELECT
+          CASE
+            WHEN metadata LIKE '{%' THEN JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.url'))
+            ELSE metadata
+          END as url,
+          COUNT(*) as totalClicks,
+          COUNT(DISTINCT recipientKey) as uniqueClickers
+        FROM emailCampaignEvents
+        WHERE campaignId = ${input.campaignId}
+          AND eventType = 'click'
+          AND metadata IS NOT NULL
+        GROUP BY url
+        ORDER BY totalClicks DESC
+      `)) as [{ url: string; totalClicks: number; uniqueClickers: number }[], unknown];
+      // Per-click detail: who clicked what and when
+      const [detailRaw] = (await db.execute(sql`
+        SELECT
+          e.recipientKey,
+          CASE
+            WHEN e.metadata LIKE '{%' THEN JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.url'))
+            ELSE e.metadata
+          END as url,
+          e.createdAt,
+          e.country,
+          e.region,
+          e.city,
+          COALESCE(u.name, u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as displayName,
+          COALESCE(u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as email,
+          u.id as userId
+        FROM emailCampaignEvents e
+        LEFT JOIN users u ON u.id = e.userId
+        WHERE e.campaignId = ${input.campaignId}
+          AND e.eventType = 'click'
+          AND e.metadata IS NOT NULL
+        ORDER BY e.createdAt DESC
+        LIMIT 2000
+      `)) as [{
+        recipientKey: string; url: string; createdAt: Date;
+        country: string | null; region: string | null; city: string | null;
+        displayName: string | null; email: string | null; userId: number | null;
+      }[], unknown];
+      const links = (Array.isArray(linksRaw) ? linksRaw : []).map((r) => ({
+        url: r.url ?? "(unknown)",
+        totalClicks: Number(r.totalClicks),
+        uniqueClickers: Number(r.uniqueClickers),
+      }));
+      const detail = (Array.isArray(detailRaw) ? detailRaw : []).map((r) => ({
+        url: r.url ?? "(unknown)",
+        recipientKey: r.recipientKey,
+        displayName: r.displayName ?? r.email ?? r.recipientKey,
+        email: r.email ?? null,
+        userId: r.userId ?? null,
+        country: r.country ?? null,
+        region: r.region ?? null,
+        city: r.city ?? null,
+        timestamp: r.createdAt,
+      }));
+      return { links, detail };
+    }),
+
+  // ── Admin: export click events as CSV rows ────────────────────────────────
+  exportClickEvents: protectedProcedure
+    .input(z.object({ campaignId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [rows] = (await db.execute(sql`
+        SELECT
+          COALESCE(u.name, u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient')), e.recipientKey) as displayName,
+          COALESCE(u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as email,
+          CASE
+            WHEN e.metadata LIKE '{%' THEN JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.url'))
+            ELSE e.metadata
+          END as url,
+          e.createdAt,
+          e.country,
+          e.region,
+          e.city
+        FROM emailCampaignEvents e
+        LEFT JOIN users u ON u.id = e.userId
+        WHERE e.campaignId = ${input.campaignId}
+          AND e.eventType = 'click'
+          AND e.metadata IS NOT NULL
+        ORDER BY e.createdAt DESC
+        LIMIT 10000
+      `)) as [{
+        displayName: string | null; email: string | null; url: string | null;
+        createdAt: Date; country: string | null; region: string | null; city: string | null;
+      }[], unknown];
+      return {
+        rows: (Array.isArray(rows) ? rows : []).map((r) => ({
+          displayName: r.displayName ?? "",
+          email: r.email ?? "",
+          url: r.url ?? "(unknown)",
+          timestamp: r.createdAt,
+          country: r.country ?? "",
+          region: r.region ?? "",
+          city: r.city ?? "",
+        })),
+      };
+    }),
+
   // Public: submit a lead capture widget form (embedded on external sites)
   submitLeadCaptureWidget: publicProcedure
     .input(z.object({

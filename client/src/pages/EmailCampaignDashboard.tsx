@@ -217,7 +217,8 @@ function LeadCaptureWidgetForm({
   );
 }
 function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; subject: string; onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<"overview" | "recipients" | "geo">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "recipients" | "geo" | "links">("overview");
+  const [expandedLinkUrl, setExpandedLinkUrl] = useState<string | null>(null);
   const [recipientFilter, setRecipientFilter] = useState<"open" | "click" | "unsubscribe" | undefined>(undefined);
   const [segmentName, setSegmentName] = useState("");
   const [segmentEventType, setSegmentEventType] = useState<"open" | "click">("open");
@@ -233,6 +234,39 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
     { campaignId },
     { enabled: activeTab === "geo" }
   );
+  const { data: linkData, isLoading: linksLoading } = trpc.emailCampaign.getClickLinkBreakdown.useQuery(
+    { campaignId },
+    { enabled: activeTab === "links" }
+  );
+  const { refetch: fetchExport, isFetching: exportFetching } = trpc.emailCampaign.exportClickEvents.useQuery(
+    { campaignId },
+    { enabled: false }
+  );
+
+  const handleExportCsv = async () => {
+    const result = await fetchExport();
+    const rows = result.data?.rows ?? [];
+    if (rows.length === 0) { toast.error("No click events to export."); return; }
+    const header = ["Recipient Name", "Email", "Link URL", "Timestamp", "Country", "Region", "City"];
+    const csvRows = rows.map((r) => [
+      `"${(r.displayName ?? "").replace(/"/g, '""')}"`,
+      `"${(r.email ?? "").replace(/"/g, '""')}"`,
+      `"${(r.url ?? "").replace(/"/g, '""')}"`,
+      `"${r.timestamp ? new Date(r.timestamp).toLocaleString() : ""}"`,
+      `"${(r.country ?? "").replace(/"/g, '""')}"`,
+      `"${(r.region ?? "").replace(/"/g, '""')}"`,
+      `"${(r.city ?? "").replace(/"/g, '""')}"`,
+    ].join(","));
+    const csv = [header.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `campaign-${campaignId}-clicks.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} click events`);
+  };
   const createSegmentMutation = trpc.emailCampaign.createSegmentFromCampaign.useMutation({
     onSuccess: (data) => {
       toast.success(`Segment "${data.listName}" created with ${data.added} subscribers`);
@@ -260,7 +294,7 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
           </DialogTitle>
           {/* Tab bar */}
           <div className="flex gap-1 mt-3 border-b">
-            {(["overview", "recipients", "geo"] as const).map((tab) => (
+            {(["overview", "recipients", "geo", "links"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -273,7 +307,8 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
                 {tab === "overview" && <TrendingUp className="w-3.5 h-3.5 inline mr-1.5" />}
                 {tab === "recipients" && <Users className="w-3.5 h-3.5 inline mr-1.5" />}
                 {tab === "geo" && <Globe className="w-3.5 h-3.5 inline mr-1.5" />}
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === "links" && <Link2 className="w-3.5 h-3.5 inline mr-1.5" />}
+                {tab === "links" ? "Links" : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -531,6 +566,72 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
                   <Globe className="w-8 h-8 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">No geo data yet.</p>
                   <p className="text-xs mt-1">Location data is captured from new opens and clicks going forward.</p>
+                </div>
+              )}
+            </div>
+          )}
+          {/* ── LINKS TAB ── */}
+          {activeTab === "links" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500">{linkData?.links.length ?? 0} unique link{(linkData?.links.length ?? 0) !== 1 ? "s" : ""} clicked · {linkData?.detail.length ?? 0} total clicks</p>
+                <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={handleExportCsv} disabled={exportFetching}>
+                  {exportFetching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  Export CSV
+                </Button>
+              </div>
+              {linksLoading ? (
+                <div className="flex items-center justify-center py-10"><RefreshCw className="w-5 h-5 animate-spin text-[#189aa1]" /></div>
+              ) : linkData && linkData.links.length > 0 ? (
+                <div className="space-y-2">
+                  {linkData.links.map((link, i) => {
+                    const isExpanded = expandedLinkUrl === link.url;
+                    const clickers = linkData.detail.filter((d) => d.url === link.url);
+                    return (
+                      <div key={i} className="rounded-lg border overflow-hidden">
+                        <button
+                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-left"
+                          onClick={() => setExpandedLinkUrl(isExpanded ? null : link.url)}
+                        >
+                          <Link2 className="w-3.5 h-3.5 text-[#189aa1] shrink-0" />
+                          <span className="flex-1 text-xs text-blue-600 underline truncate min-w-0" title={link.url}>{link.url}</span>
+                          <span className="shrink-0 text-xs font-semibold text-gray-700">{link.totalClicks} click{link.totalClicks !== 1 ? "s" : ""}</span>
+                          <span className="shrink-0 text-xs text-gray-400">{link.uniqueClickers} unique</span>
+                          <ChevronRight className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                        </button>
+                        {isExpanded && (
+                          <div className="border-t bg-gray-50">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="text-left px-3 py-1.5 font-semibold text-gray-500">Recipient</th>
+                                  <th className="text-left px-3 py-1.5 font-semibold text-gray-500">Email</th>
+                                  <th className="text-left px-3 py-1.5 font-semibold text-gray-500">Location</th>
+                                  <th className="text-left px-3 py-1.5 font-semibold text-gray-500">Time</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y">
+                                {clickers.map((c, j) => (
+                                  <tr key={j} className="hover:bg-white">
+                                    <td className="px-3 py-1.5 font-medium text-gray-900 truncate max-w-[140px]">{c.displayName}</td>
+                                    <td className="px-3 py-1.5 text-gray-500 truncate max-w-[160px]">{c.email ?? "—"}</td>
+                                    <td className="px-3 py-1.5 text-gray-400">{[c.city, c.region, c.country].filter(Boolean).join(", ") || "—"}</td>
+                                    <td className="px-3 py-1.5 text-gray-400 whitespace-nowrap">{c.timestamp ? new Date(c.timestamp).toLocaleString() : "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-10 text-gray-400">
+                  <MousePointer className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No click events recorded yet.</p>
+                  <p className="text-xs mt-1">Link clicks will appear here after recipients click links in the email.</p>
                 </div>
               )}
             </div>
