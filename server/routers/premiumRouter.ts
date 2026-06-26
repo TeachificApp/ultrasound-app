@@ -284,4 +284,89 @@ export const premiumRouter = router({
       .where(eq(users.isPremium, true))
       .orderBy(desc(users.premiumGrantedAt));
   }),
+
+  /**
+   * Admin: flagged duplicate payment events from webhook log (review without checking email).
+   */
+  adminGetDuplicatePaymentEvents: adminProcedure
+    .input(z.object({ limit: z.number().min(1).max(200).default(100) }).optional())
+    .query(async ({ input }) => {
+      const { webhookEvents } = await import("../../drizzle/schema");
+      const { desc, eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) return [];
+      return db
+        .select()
+        .from(webhookEvents)
+        .where(eq(webhookEvents.outcome, "duplicate_flagged"))
+        .orderBy(desc(webhookEvents.createdAt))
+        .limit(input?.limit ?? 100);
+    }),
+
+  /**
+   * Admin: users with multiple active brandMemberships rows for the same brand (audit before renewals).
+   */
+  adminAuditDuplicateBrandMemberships: adminProcedure.query(async () => {
+    const { users } = await import("../../drizzle/schema");
+    const { and, eq, or, isNull, gt } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) return [];
+
+    const now = new Date();
+    const rows = await db
+      .select({
+        id: brandMemberships.id,
+        userId: brandMemberships.userId,
+        brand: brandMemberships.brand,
+        tier: brandMemberships.tier,
+        status: brandMemberships.status,
+        stripeSubscriptionId: brandMemberships.stripeSubscriptionId,
+        stripeCustomerId: brandMemberships.stripeCustomerId,
+        expiresAt: brandMemberships.expiresAt,
+        grantedAt: brandMemberships.grantedAt,
+        source: brandMemberships.source,
+        userEmail: users.email,
+        userName: users.name,
+      })
+      .from(brandMemberships)
+      .innerJoin(users, eq(brandMemberships.userId, users.id))
+      .where(
+        and(
+          eq(brandMemberships.status, "active"),
+          or(eq(brandMemberships.tier, "premium"), eq(brandMemberships.tier, "lifetime")),
+          or(isNull(brandMemberships.expiresAt), gt(brandMemberships.expiresAt, now)),
+        ),
+      );
+
+    const grouped = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const key = `${row.userId}:${row.brand}`;
+      const list = grouped.get(key) ?? [];
+      list.push(row);
+      grouped.set(key, list);
+    }
+
+    return [...grouped.entries()]
+      .filter(([, memberships]) => memberships.length > 1)
+      .map(([key, memberships]) => {
+        const [userIdStr, brand] = key.split(":");
+        return {
+          userId: Number(userIdStr),
+          brand,
+          email: memberships[0]?.userEmail ?? null,
+          name: memberships[0]?.userName ?? null,
+          activeCount: memberships.length,
+          memberships: memberships.map((m) => ({
+            id: m.id,
+            tier: m.tier,
+            stripeSubscriptionId: m.stripeSubscriptionId,
+            stripeCustomerId: m.stripeCustomerId,
+            grantedAt: m.grantedAt,
+            expiresAt: m.expiresAt,
+            source: m.source,
+          })),
+        };
+      })
+      .sort((a, b) => b.activeCount - a.activeCount);
+  }),
 });

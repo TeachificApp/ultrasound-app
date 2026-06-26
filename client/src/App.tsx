@@ -318,6 +318,7 @@ const SdmsCmeExportPage = lazy(() => import("./pages/admin/SdmsCmeExportPage"));
 const MembershipPage = lazy(() => import("./pages/MembershipPage"));
 const MyMemberships = lazy(() => import("./pages/MyMemberships"));
 const MembersHub = lazy(() => import("./pages/admin/MembersHub"));
+const DuplicatePaymentsAdmin = lazy(() => import("./pages/admin/DuplicatePaymentsAdmin"));
 const ProductAnalytics = lazy(() => import("./pages/admin/ProductAnalytics"));
 // ── Community ─────────────────────────────────────────────────────────────────
 const CommunityHub = lazy(() => import("./pages/Community"));
@@ -581,6 +582,7 @@ function Router() {
         <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
         <Route path="/admin/fulfillment">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FulfillmentAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/duplicate-payments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><DuplicatePaymentsAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/sdms-cme-export">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SdmsCmeExportPage /></RoleGuard>}</Route>
         <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>

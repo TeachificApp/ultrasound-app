@@ -17,6 +17,8 @@ import { trpc } from "@/lib/trpc";
 import Layout from "@/components/Layout";
 import { detectBrand } from "@/hooks/useBrand";
 import { toast } from "sonner";
+import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
+import { SUBSCRIPTION_RESUME_LABEL, premiumResumeHref } from "@/lib/accessCta";
 
 // ─── Countdown timer hook ─────────────────────────────────────────────────────
 // Counts down to a fixed "offer end" date — 14 days from a hard-coded epoch.
@@ -264,6 +266,7 @@ export default function Premium() {
   };
 
   const loading = authLoading || statusLoading;
+  const { runGuarded, isGuarded } = useCheckoutClickGuard();
 
   // ─── CTA button helper ─────────────────────────────────────────────────────
   function CheckoutBtn({
@@ -281,8 +284,8 @@ export default function Premium() {
     };
     return (
       <Button
-        onClick={onPay}
-        disabled={isPending}
+        onClick={() => runGuarded(onPay)}
+        disabled={isPending || isGuarded}
         className={`font-bold px-5 py-2.5 text-sm rounded-xl w-full ${styles[variant]}`}
         style={gradients[variant] ? { background: gradients[variant] } : undefined}
       >
@@ -305,11 +308,13 @@ export default function Premium() {
     );
   }
 
-  function ActiveBadge() {
+  function ResumeBtn() {
     return (
-      <div className="flex items-center justify-center gap-2 text-teal-600 font-semibold text-sm py-1">
-        <Check className="w-4 h-4" /> Active
-      </div>
+      <a href={premiumResumeHref(brand)}>
+        <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-5 py-2.5 text-sm rounded-xl w-full">
+          <ArrowRight className="w-4 h-4 mr-1.5" />{SUBSCRIPTION_RESUME_LABEL}
+        </Button>
+      </a>
     );
   }
 
@@ -420,7 +425,7 @@ export default function Premium() {
                       Checking…
                     </div>
                   ) : status?.isPremium ? (
-                    <ActiveBadge />
+                    <ResumeBtn />
                   ) : user ? (
                     <CheckoutBtn
                       label="Get Monthly"
@@ -453,7 +458,7 @@ export default function Premium() {
                       Checking…
                     </div>
                   ) : status?.isPremium ? (
-                    <ActiveBadge />
+                    <ResumeBtn />
                   ) : user ? (
                     <CheckoutBtn
                       label="Get Lifetime Access"

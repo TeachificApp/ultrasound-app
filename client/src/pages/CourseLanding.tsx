@@ -28,6 +28,8 @@ import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import { CohortSessionsCalendar } from "@/components/CohortSessionsCalendar";
 import type { Block } from "@/components/BlockPreview";
+import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
+import { SUBSCRIPTION_RESUME_LABEL } from "@/lib/accessCta";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
 import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
@@ -278,7 +280,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
   const d = block.data;
   // When ctaText has been overridden (e.g., "Join Waitlist"), apply it to enroll/checkout action buttons
   const enrollActions = new Set(["direct_checkout", "pricing_option", "group_purchase", "free_enrollment", "enroll_next_available"]);
-  const isCtaOverridden = ctaText !== "Enroll Now" && ctaText !== "Continue Learning" && ctaText !== "Enrollment Closed";
+  const isCtaOverridden = ctaText !== "Enroll Now" && ctaText !== "Continue Learning" && ctaText !== SUBSCRIPTION_RESUME_LABEL && ctaText !== "Enrollment Closed";
   switch (block.type) {
     case "hero": {
       const bgType = d.bgType ?? "color";
@@ -1613,6 +1615,7 @@ export default function CourseLanding() {
   const { data: course, isLoading } = trpc.lms.getCourse.useQuery({ slug: slug!, preview: isPreview || undefined }, { enabled: !!slug });
   const { data: myCourses } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
   const enrollment = myCourses?.find((e: any) => e.courseId === course?.id);
+  const { runGuarded, isGuarded } = useCheckoutClickGuard();
 
   const enrollFree = trpc.lmsLearner.enrollFree.useMutation({
     onSuccess: () => { toast.success("Enrolled! You now have access to this course."); navigate(`/courses/${slug}/player`); },
@@ -1934,7 +1937,15 @@ export default function CourseLanding() {
   // Either explicit waitlist mode OR all groups closed → show waitlist CTA
   const showWaitlistCta = isWaitlistMode || isAllGroupsClosed;
   const waitlistCtaLabel = featuredGroup?.waitlistCtaLabel || "Join the Waitlist";
-  const ctaText = enrollment ? "Continue Learning" : showWaitlistCta ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
+  const isSubscriptionCourse =
+    course?.pricingType === "subscription" ||
+    (course?.pricingOptions as { pricingType?: string }[] | undefined)?.some((o) => o.pricingType === "subscription");
+  const enrolledCtaLabel = isSubscriptionCourse ? SUBSCRIPTION_RESUME_LABEL : "Continue Learning";
+  const ctaText = enrollment ? enrolledCtaLabel : showWaitlistCta ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
+  const checkoutBusy = enrolling || enrollFree.isPending || createCheckout.isPending || isGuarded;
+  const handleEnrollGuarded = () => runGuarded(() => { void handleEnroll(); });
+  const handleEnrollWithOptionGuarded = (pricingOptionId: number | undefined) =>
+    runGuarded(() => { void handleEnrollWithOption(pricingOptionId); });
   const handleWaitlistCta = () => {
     if (featuredGroup?.waitlistCtaUrl) { window.open(featuredGroup.waitlistCtaUrl, "_blank"); return; }
     setCwSubmitted(false); setCwName(""); setCwEmail(""); setCwPhone(""); setCwMessage("");
@@ -1942,7 +1953,7 @@ export default function CourseLanding() {
   };
   const handleEnrollOrWaitlist = () => {
     if (showWaitlistCta) { handleWaitlistCta(); return; }
-    handleEnroll();
+    handleEnrollGuarded();
   };
 
   // Enrollment countdown: days remaining until close (only for cohorts, not yet closed, not enrolled)
@@ -2036,10 +2047,10 @@ export default function CourseLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
                 <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} />
+                  <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} />
                 </div>
               ) : (
-                <RenderBlock block={block} course={course} onEnroll={handleEnroll} onEnrollWithOption={handleEnrollWithOption} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} />
+                <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} />
               )}
             </div>
           );
@@ -2056,7 +2067,7 @@ export default function CourseLanding() {
             />
             {selectedOrderBumpId && (
               <div className="mt-3 text-center">
-                <Button onClick={handleEnroll} disabled={enrolling || createCheckout.isPending} className="bg-amber-500 hover:bg-amber-600 text-white">
+                <Button onClick={handleEnroll} disabled={checkoutBusy} className="bg-amber-500 hover:bg-amber-600 text-white">
                   Continue to checkout with selected bump
                 </Button>
               </div>
@@ -2214,7 +2225,7 @@ export default function CourseLanding() {
                 <Bell className="w-4 h-4 mr-2" />{waitlistCtaLabel}
               </Button>
             ) : (
-              <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
+              <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnrollGuarded} disabled={checkoutBusy}>
                 {enrolling ? "Processing..." : ctaText}<ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             )}
@@ -2350,7 +2361,7 @@ export default function CourseLanding() {
                 <Bell className="w-4 h-4 mr-2" />{waitlistCtaLabel}
               </Button>
             ) : (
-              <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
+              <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnrollGuarded} disabled={checkoutBusy}>
                 {enrolling ? "Processing..." : (selectedPricingOptionId ? (course.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.ctaLabel ?? ctaText) : ctaText)}
               </Button>
             )}

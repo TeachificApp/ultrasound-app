@@ -341,6 +341,16 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, productId))).limit(1);
   if (existing) {
     console.log(`[Stripe] Digital download already purchased: user ${userId}, product ${productId}`);
+    const { logDuplicatePaymentFlag } = await import("../lib/duplicatePaymentLog");
+    await logDuplicatePaymentFlag({
+      kind: "already_purchased_download",
+      email: customerEmail,
+      productName: `Download #${productId}`,
+      userId,
+      stripeSessionId: session.id as string,
+      stripePaymentIntentId: (session.payment_intent as string) ?? null,
+      message: `Checkout completed but user already owns download product ${productId}`,
+    });
     await fulfillOrderBumpPurchase(db, meta, {
       userId,
       sessionId: session.id as string,

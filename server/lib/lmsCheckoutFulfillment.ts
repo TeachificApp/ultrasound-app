@@ -517,6 +517,16 @@ export async function reconcileLmsCheckoutFromStripeSession(
     });
     console.warn(`[LmsCheckoutFulfillment] Duplicate one-time payment detected: user=${userId} course=${courseId} pi=${paymentIntentFromSession} — admin notified, no auto-refund`);
     notes.push(`Duplicate payment detected (${paymentIntentFromSession}) — admin notified, no auto-refund`);
+    const { logDuplicatePaymentFlag } = await import("./duplicatePaymentLog");
+    await logDuplicatePaymentFlag({
+      kind: "lms_duplicate_payment",
+      email: customerEmail,
+      productName: courseTitle,
+      userId,
+      stripePaymentIntentId: paymentIntentFromSession,
+      message: `Duplicate LMS payment for "${courseTitle}" — review refund in Stripe`,
+      rawPayload: { courseId, orderId, pricingType },
+    });
     return { success: true, userId, courseId, orderId, isNewUser, notes };
   }
 

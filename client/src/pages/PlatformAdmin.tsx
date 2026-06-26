@@ -96,6 +96,7 @@ import {
   PlusCircle,
   Pencil,
   FileQuestion,
+  AlertTriangle,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1278,6 +1279,7 @@ export default function PlatformAdmin() {
     { id: "funnels", href: getAdminUrl("/admin/funnels"), icon: LayoutTemplate, label: "Funnel Management", description: "Build funnels, manage contacts/leads, and track Lead \u2192 User \u2192 Purchaser conversions", color: "#be185d" },
     { id: "widgets", href: getAdminUrl("/admin/widgets"), icon: Code2, label: "Embed Widgets", description: "Create embeddable course/quiz card widgets for any external website", color: "#7c3aed" },
     { id: "members", href: getAdminUrl("/admin/members"), icon: Users, label: "Members", description: "Registered users, enrollments, sales, memberships, and activity logs", color: "#0d9488" },
+    { id: "duplicate-payments", href: getAdminUrl("/admin/duplicate-payments"), icon: AlertTriangle, label: "Duplicate Payments", description: "Review flagged duplicate charges and duplicate brand memberships before Stripe renewals", color: "#d97706" },
     { id: "career-network", href: getAdminUrl("/admin/career-network"), icon: Briefcase, label: "Career Network", description: "Manage job postings, RSS feed sources, candidate profiles, and employer subscriptions", color: "#0369a1" },
   ];
 

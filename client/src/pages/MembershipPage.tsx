@@ -16,6 +16,8 @@ import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { Check, Award, Loader2, Tag } from "lucide-react";
 import { getLoginUrl } from "@/const";
+import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
+import { SUBSCRIPTION_RESUME_LABEL, subscriptionResumeHref } from "@/lib/accessCta";
 
 const BILLING_LABELS: Record<string, string> = {
   monthly: "/month",
@@ -40,6 +42,13 @@ export default function MembershipPage() {
   const { data: planData, isLoading } = trpc.membership.getBySlug.useQuery({ slug: slug ?? "" });
   const plan = planData?.plan ?? null;
   const membershipItems = planData?.items ?? [];
+
+  const { data: accessData } = trpc.membership.checkAccess.useQuery(
+    { planId: plan?.id ?? 0 },
+    { enabled: !!user && !!plan?.id },
+  );
+  const hasAccess = accessData?.hasAccess ?? false;
+  const { runGuarded, isGuarded } = useCheckoutClickGuard();
 
   // validateCode is a query — we trigger it manually via refetch
   const [codeToValidate, setCodeToValidate] = useState<string | null>(null);
@@ -137,6 +146,28 @@ export default function MembershipPage() {
     setShowGuestForm(true);
   };
 
+  const handleCtaClick = () => {
+    if (hasAccess && slug) {
+      window.location.href = subscriptionResumeHref(slug);
+      return;
+    }
+    runGuarded(startCheckout);
+  };
+
+  const checkoutDisabled =
+    isGuarded ||
+    checkoutMutation.isPending ||
+    guestRegisterMutation.isPending ||
+    selfEnrollFreeMutation.isPending;
+
+  const checkoutLabel = hasAccess
+    ? SUBSCRIPTION_RESUME_LABEL
+    : isFree
+      ? "Join for Free"
+      : (plan?.trialDays ?? 0) > 0
+        ? `Start ${plan!.trialDays}-Day Free Trial`
+        : "Get Access Now";
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -187,7 +218,7 @@ export default function MembershipPage() {
             if (block.type === "included_items_auto") {
               return <IncludedItemsBlock key={block.id} data={block.data ?? {}} items={membershipItems} />;
             }
-            return <BlockPreview key={block.id} block={block} onEnroll={startCheckout} onCheckoutPage={startCheckout} />;
+            return <BlockPreview key={block.id} block={block} onEnroll={handleCtaClick} onCheckoutPage={handleCtaClick} />;
           })}
         </div>
       ) : (
@@ -270,15 +301,13 @@ export default function MembershipPage() {
             <Button
               className="w-full mt-6 text-white font-semibold py-3 text-base rounded-xl"
               style={{ backgroundColor: accentColor }}
-              disabled={checkoutMutation.isPending || guestRegisterMutation.isPending || selfEnrollFreeMutation.isPending}
-              onClick={startCheckout}
+              disabled={checkoutDisabled}
+              onClick={handleCtaClick}
             >
               {(checkoutMutation.isPending || guestRegisterMutation.isPending || selfEnrollFreeMutation.isPending) ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>
-              ) : isFree ? (
-                "Join for Free"
               ) : (
-                (plan?.trialDays ?? 0) > 0 ? `Start ${plan!.trialDays}-Day Free Trial` : "Get Access Now"
+                checkoutLabel
               )}
             </Button>
             {!user && !isFree && (
@@ -313,11 +342,13 @@ export default function MembershipPage() {
           <Button
             className="shadow-xl text-white font-semibold px-6 py-3 rounded-xl"
             style={{ backgroundColor: accentColor }}
-            disabled={checkoutMutation.isPending || selfEnrollFreeMutation.isPending}
-            onClick={startCheckout}
+            disabled={checkoutDisabled}
+            onClick={handleCtaClick}
             >
               {(checkoutMutation.isPending || selfEnrollFreeMutation.isPending) ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>
+              ) : hasAccess ? (
+                SUBSCRIPTION_RESUME_LABEL
               ) : isFree ? (
                 "Join for Free"
               ) : (

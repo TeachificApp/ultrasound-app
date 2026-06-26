@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useMemo } from "react";
+import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
+import { PURCHASE_ACCESS_LABEL, bundleAccessHref } from "@/lib/accessCta";
 import { BlockPreview } from "@/components/BlockPreview";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
@@ -66,6 +68,19 @@ export default function BundleLanding() {
     },
     onError: (e) => toast.error(e.message),
   });
+  const { runGuarded, isGuarded } = useCheckoutClickGuard();
+
+  const runCheckout = (bundleId: number, pricingOptionId?: string) => {
+    if (data?.isEnrolled) {
+      window.location.href = bundleAccessHref();
+      return;
+    }
+    runGuarded(() => {
+      checkoutMut.mutate({ bundleId, pricingOptionId });
+    });
+  };
+
+  const checkoutBusy = checkoutMut.isPending || isGuarded;
 
   // Handle success/cancelled query params
   useEffect(() => {
@@ -175,9 +190,9 @@ export default function BundleLanding() {
           {/* CTA */}
           <div className="mt-6 flex flex-wrap gap-3">
             {isEnrolled ? (
-              <Link href="/my-courses">
+              <Link href={bundleAccessHref()}>
                 <Button size="lg" className="bg-teal-500 hover:bg-teal-600 gap-2">
-                  <Check className="w-5 h-5" /> Already Enrolled — View Content
+                  <Check className="w-5 h-5" /> {PURCHASE_ACCESS_LABEL}
                 </Button>
               </Link>
             ) : user ? (
@@ -188,11 +203,11 @@ export default function BundleLanding() {
                       key={opt.id || i}
                       size="lg"
                       className={i === 0 ? "bg-teal-500 hover:bg-teal-600 gap-2" : "bg-white/10 hover:bg-white/20 gap-2 border border-teal-400/50"}
-                      onClick={() => checkoutMut.mutate({ bundleId: bundle.id, pricingOptionId: opt.id })}
-                      disabled={checkoutMut.isPending}
+                      onClick={() => runCheckout(bundle.id, opt.id)}
+                      disabled={checkoutBusy}
                     >
                       <ShoppingCart className="w-5 h-5" />
-                      {checkoutMut.isPending ? "Processing..." : (
+                      {checkoutBusy ? "Processing..." : (
                         opt.type === "subscription"
                           ? `Subscribe — $${Number(opt.price).toFixed(2)}/${opt.interval || "mo"}`
                           : `${opt.label || "Buy Now"} — $${Number(opt.price).toFixed(2)}`
@@ -203,13 +218,13 @@ export default function BundleLanding() {
                   <Button
                     size="lg"
                     className="bg-teal-500 hover:bg-teal-600 gap-2"
-                    onClick={() => checkoutMut.mutate({ bundleId: bundle.id })}
-                    disabled={checkoutMut.isPending}
+                    onClick={() => runCheckout(bundle.id)}
+                    disabled={checkoutBusy}
                   >
                     {bundle.accessType === "free" ? (
-                      <><Check className="w-5 h-5" /> {checkoutMut.isPending ? "Enrolling..." : "Enroll for Free"}</>
+                      <><Check className="w-5 h-5" /> {checkoutBusy ? "Enrolling..." : "Enroll for Free"}</>
                     ) : (
-                      <><ShoppingCart className="w-5 h-5" /> {checkoutMut.isPending ? "Processing..." : "Get Access"}</>
+                      <><ShoppingCart className="w-5 h-5" /> {checkoutBusy ? "Processing..." : "Get Access"}</>
                     )}
                   </Button>
                 )}

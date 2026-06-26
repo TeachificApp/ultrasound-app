@@ -18,6 +18,8 @@ import { toast } from "sonner";
 import { FileDown, Check, ShoppingCart, Download, ArrowLeft, Users, Globe, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
+import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
+import { PURCHASE_ACCESS_LABEL } from "@/lib/accessCta";
 import { normalizeVideoUrl } from "@/lib/videoTrim";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
@@ -708,6 +710,7 @@ export default function DownloadLanding() {
     { productId: product?.id ?? 0 },
     { enabled: !!user && !!product }
   );
+  const { runGuarded, isGuarded } = useCheckoutClickGuard();
 
   const checkoutMut = trpc.downloadsLearner.createCheckout.useMutation({
     onSuccess: (data) => {
@@ -780,12 +783,20 @@ export default function DownloadLanding() {
   const features = product.landingFeatures ? product.landingFeatures.split("\n").filter(Boolean) : [];
 
   const handleBuy = () => {
+    if (hasPurchased && slug) {
+      window.location.href = `/downloads/${slug}/files`;
+      return;
+    }
     if (!user) {
       window.location.href = getLoginUrl();
       return;
     }
-    checkoutMut.mutate({ productId: product.id, orderBumpId: selectedOrderBumpId, promoCode: promoCode ?? undefined, affiliateCode: getStoredAffiliateCode() ?? undefined });
+    runGuarded(() => {
+      checkoutMut.mutate({ productId: product.id, orderBumpId: selectedOrderBumpId, promoCode: promoCode ?? undefined, affiliateCode: getStoredAffiliateCode() ?? undefined });
+    });
   };
+
+  const buying = checkoutMut.isPending || isGuarded;
 
   // ── Parse landing page blocks ──
   let blocks: Block[] = [];
@@ -823,10 +834,10 @@ export default function DownloadLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxDL ? (
                 <div style={{ maxWidth: bwMaxDL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} onBuy={handleBuy} buying={checkoutMut.isPending} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} />
+                  <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} />
                 </div>
               ) : (
-                <RenderBlock block={block} onBuy={handleBuy} buying={checkoutMut.isPending} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} />
+                <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} />
               )}
             </div>
           );
@@ -843,7 +854,7 @@ export default function DownloadLanding() {
             />
             {selectedOrderBumpId && (
               <div className="mt-3 text-center">
-                <Button onClick={handleBuy} disabled={checkoutMut.isPending} className="bg-amber-500 hover:bg-amber-600 text-white">
+                <Button onClick={handleBuy} disabled={buying} className="bg-amber-500 hover:bg-amber-600 text-white">
                   Continue to checkout with selected bump
                 </Button>
               </div>
@@ -898,7 +909,7 @@ export default function DownloadLanding() {
                     <span>🎁</span> Available as part of a bundle only
                   </div>
                 ) : (
-                  <Button size="lg" className="bg-white text-teal-700 hover:bg-teal-50" onClick={handleBuy} disabled={checkoutMut.isPending}>
+                  <Button size="lg" className="bg-white text-teal-700 hover:bg-teal-50" onClick={handleBuy} disabled={buying}>
                     <ShoppingCart className="w-5 h-5 mr-2" /> {checkoutMut.isPending ? "Processing..." : product.isFree ? "Get It Free" : `Buy Now — ${price}`}
                   </Button>
                 )}
@@ -979,7 +990,7 @@ export default function DownloadLanding() {
                     </Button>
                   </Link>
                 ) : (
-                  <Button className="w-full" size="lg" onClick={handleBuy} disabled={checkoutMut.isPending}>
+                  <Button className="w-full" size="lg" onClick={handleBuy} disabled={buying}>
                     {checkoutMut.isPending ? "Processing..." : product.isFree ? "Get It Free" : "Buy Now"}
                   </Button>
                 )}

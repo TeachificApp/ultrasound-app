@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import { Package, Check, ShoppingCart, ArrowLeft, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
+import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
+import { PURCHASE_ACCESS_LABEL, productAccessHref } from "@/lib/accessCta";
 import { useState, useEffect, useRef } from "react";
 import { ImageLinkWrapper, BlockPreview, type Block } from "@/components/BlockPreview";
 
@@ -91,8 +93,8 @@ const CC = ({ children, className = "", ...rest }: React.HTMLAttributes<HTMLDivE
 );
 
 // ─── Block Renderer ───────────────────────────────────────────────────────────
-function RenderBlock({ block, onBuy, buying, price, slug }: {
-  block: Block; onBuy: () => void; buying: boolean; price: string; slug: string;
+function RenderBlock({ block, onBuy, buying, price, slug, hasPurchased }: {
+  block: Block; onBuy: () => void; buying: boolean; price: string; slug: string; hasPurchased?: boolean;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -144,7 +146,7 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
                       disabled={buying}
                       className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                      {buying ? "Processing…" : btn.text}
+                      {buying ? "Processing…" : (hasPurchased ? PURCHASE_ACCESS_LABEL : btn.text)}
                     </button>
                     {btn.showStrikethrough && btn.strikethroughPrice && (
                       <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
@@ -216,7 +218,7 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
             <button onClick={onBuy} disabled={buying}
               className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
-              {buying ? "Processing…" : (d.ctaText ?? "Buy Now")}
+              {buying ? "Processing…" : (hasPurchased ? PURCHASE_ACCESS_LABEL : (d.ctaText ?? "Buy Now"))}
             </button>
           </CC>
         </div>
@@ -367,6 +369,13 @@ export default function ProductLanding() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const { data: hasPurchased = false } = trpc.productsLearner.hasPurchased.useQuery(
+    { productId: product?.id ?? 0 },
+    { enabled: !!user && !!product?.id },
+  );
+  const { runGuarded, isGuarded } = useCheckoutClickGuard();
+  const buying = checkoutMut.isPending || isGuarded;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
@@ -424,6 +433,10 @@ export default function ProductLanding() {
       : `$${Number(product.price).toFixed(2)}`;
 
   const handleBuy = () => {
+    if (hasPurchased) {
+      window.location.href = productAccessHref();
+      return;
+    }
     if (product.checkoutMode === "shopify" && product.shopifyProductUrl && !product.shopifyEmbedCode) {
       window.open(product.shopifyProductUrl, "_blank");
       return;
@@ -437,9 +450,11 @@ export default function ProductLanding() {
       window.location.href = getLoginUrl();
       return;
     }
-    checkoutMut.mutate({
-      productId: product.id,
-      pricingOptionId: selectedPricingOptionId ?? undefined,
+    runGuarded(() => {
+      checkoutMut.mutate({
+        productId: product.id,
+        pricingOptionId: selectedPricingOptionId ?? undefined,
+      });
     });
   };
 
@@ -459,7 +474,7 @@ export default function ProductLanding() {
         <div className="min-h-screen bg-white">
           {blocks.map(block => (
             <div key={block.id}>
-              <RenderBlock block={block} onBuy={handleBuy} buying={checkoutMut.isPending} price={displayPrice} slug={slug!} />
+              <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={displayPrice} slug={slug!} hasPurchased={hasPurchased} />
             </div>
           ))}
           <div className="max-w-2xl mx-auto px-4 py-12">
@@ -504,7 +519,7 @@ export default function ProductLanding() {
       <div className="min-h-screen bg-white">
         {blocks.map(block => (
           <div key={block.id}>
-            <RenderBlock block={block} onBuy={handleBuy} buying={checkoutMut.isPending} price={displayPrice} slug={slug!} />
+            <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={displayPrice} slug={slug!} hasPurchased={hasPurchased} />
           </div>
         ))}
         {/* Pricing options selector below blocks if multiple options */}
@@ -564,7 +579,7 @@ export default function ProductLanding() {
                     </Button>
                   </a>
                 ) : (
-                  <Button size="lg" className="bg-white text-teal-700 hover:bg-teal-50" onClick={handleBuy} disabled={checkoutMut.isPending}>
+                  <Button size="lg" className="bg-white text-teal-700 hover:bg-teal-50" onClick={handleBuy} disabled={buying}>
                     <ShoppingCart className="w-5 h-5 mr-2" /> {checkoutMut.isPending ? "Processing..." : product.isFree ? "Get It Free" : `Buy Now — ${displayPrice}`}
                   </Button>
                 )}
@@ -629,7 +644,7 @@ export default function ProductLanding() {
                     </Button>
                   </a>
                 ) : (
-                  <Button className="w-full" size="lg" onClick={handleBuy} disabled={checkoutMut.isPending}>
+                  <Button className="w-full" size="lg" onClick={handleBuy} disabled={buying}>
                     {checkoutMut.isPending ? "Processing..." : product.isFree ? "Get It Free" : "Buy Now"}
                   </Button>
                 )}

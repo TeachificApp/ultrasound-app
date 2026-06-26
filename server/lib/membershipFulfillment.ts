@@ -784,6 +784,19 @@ export async function cancelDuplicateStripeSubscriptions(opts: {
       }).catch((emailErr: unknown) => {
         console.error("[MembershipFulfillment] Failed to send duplicate subscription admin email:", emailErr);
       });
+      const { logDuplicatePaymentFlag } = await import("./duplicatePaymentLog");
+      await logDuplicatePaymentFlag({
+        kind: "membership_duplicate_subscription",
+        email: opts.customerEmail,
+        stripeSubscriptionId: opts.keepSubscriptionId,
+        message: `Duplicate active subscriptions for same plan — kept ${opts.keepSubscriptionId}, review: ${duplicates.join(", ")}`,
+        rawPayload: {
+          stripeCustomerId: opts.stripeCustomerId,
+          keepSubscriptionId: opts.keepSubscriptionId,
+          duplicateSubscriptionIds: duplicates,
+          stripePriceId: opts.stripePriceId,
+        },
+      });
     }
   } catch (err) {
     console.error("[MembershipFulfillment] cancelDuplicateStripeSubscriptions failed:", err);
