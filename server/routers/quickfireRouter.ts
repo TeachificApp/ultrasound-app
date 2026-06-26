@@ -1150,6 +1150,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
             difficulty: input.difficulty,
             tags: JSON.stringify(q.tags),
             isActive: true,
+            brand: ctx.brand as "aaus" | "iheartecho",
             createdByUserId: ctx.user.id,
           });
           insertedIds.push((result as any).insertId);
@@ -1324,6 +1325,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
             difficulty: input.difficulty,
             tags: JSON.stringify(q.tags ?? []),
             isActive: true,
+            brand: ctx.brand as "aaus" | "iheartecho",
             createdByUserId: ctx.user.id,
           });
           insertedIds.push((result as any).insertId);
@@ -1372,6 +1374,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         difficulty: q.difficulty,
         tags: JSON.stringify(q.tags),
         isActive: true,
+        brand: ctx.brand as "aaus" | "iheartecho",
         createdByUserId: ctx.user.id,
       }));
       // Insert in batches of 50 to avoid hitting DB limits
