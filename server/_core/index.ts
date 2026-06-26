@@ -324,18 +324,18 @@ async function startServer() {
     const key = String(req.params.recipientKeyGif ?? "").replace(/\.gif$/i, "");
     const variant = typeof req.query.v === "string" ? req.query.v : undefined;
 
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || undefined;
     try {
       if (!Number.isNaN(campaignId) && key) {
         const { getDb } = await import("../db");
         const db = await getDb();
         if (db) {
+          const { ensureEmailCampaignEventsTable } = await import("../lib/campaignUnsubscribe");
+          await ensureEmailCampaignEventsTable(db);
           await recordEmailCampaignEvent(db, {
             campaignId,
             recipientKey: key,
             eventType: "open",
             metadata: variant ? { variant } : undefined,
-            ip,
           });
         }
       }
@@ -356,19 +356,19 @@ async function startServer() {
     const key = String(req.params.recipientKey ?? "");
     const variant = typeof req.query.v === "string" ? req.query.v : undefined;
 
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || undefined;
     try {
       if (!Number.isNaN(campaignId) && key) {
         const { getDb } = await import("../db");
         const db = await getDb();
         if (db) {
+          const { ensureEmailCampaignEventsTable } = await import("../lib/campaignUnsubscribe");
+          await ensureEmailCampaignEventsTable(db);
           const { recordEmailCampaignEvent } = await import("../lib/emailCampaignTracking");
           await recordEmailCampaignEvent(db, {
             campaignId,
             recipientKey: key,
             eventType: "click",
             metadata: { url: destination, ...(variant ? { variant } : {}) },
-            ip,
           });
         }
       }
@@ -378,6 +378,45 @@ async function startServer() {
 
     res.redirect(302, destination);
   });
+
+  // RFC 8058 one-click unsubscribe (List-Unsubscribe-Post from Gmail/Yahoo)
+  const handleCampaignUnsubscribeRequest = async (req: any, res: any) => {
+    const token = typeof req.query.token === "string" ? req.query.token : "";
+    const campaignIdRaw = typeof req.query.campaignId === "string" ? parseInt(req.query.campaignId, 10) : NaN;
+    const campaignId = Number.isNaN(campaignIdRaw) ? undefined : campaignIdRaw;
+
+    if (!token) {
+      if (req.method === "POST") return res.status(400).send("Missing token");
+      return res.redirect(302, "/unsubscribe?status=invalid");
+    }
+
+    try {
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) {
+        if (req.method === "POST") return res.status(503).send("Unavailable");
+        return res.redirect(302, "/unsubscribe?status=error");
+      }
+      const { ensureEmailCampaignEventsTable, processCampaignUnsubscribe } =
+        await import("../lib/campaignUnsubscribe");
+      await ensureEmailCampaignEventsTable(db);
+      const result = await processCampaignUnsubscribe(db, token, campaignId);
+      if (!result.ok) {
+        if (req.method === "POST") return res.status(404).send("Invalid token");
+        return res.redirect(302, "/unsubscribe?status=invalid");
+      }
+      if (req.method === "POST") return res.status(200).send("OK");
+      const status = result.alreadyUnsubscribed ? "already" : "success";
+      return res.redirect(302, `/unsubscribe?status=${status}`);
+    } catch (err) {
+      console.error("[EmailUnsubscribe] Error:", err);
+      if (req.method === "POST") return res.status(500).send("Error");
+      return res.redirect(302, "/unsubscribe?status=error");
+    }
+  };
+
+  app.post("/api/email/campaign-unsubscribe", handleCampaignUnsubscribeRequest);
+  app.get("/api/email/campaign-unsubscribe", handleCampaignUnsubscribeRequest);
 
   // ── Public Email List Webhook (POST /api/email-lists/:token/subscribe) ───────
   app.post("/api/email-lists/:token/subscribe", async (req: any, res: any) => {

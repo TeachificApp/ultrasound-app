@@ -54,7 +54,11 @@ import {
   wrapLinksForTracking,
   recordEmailCampaignEvent,
 } from "../lib/emailCampaignTracking";
-import { ensureEmailCampaignEventsTable } from "../lib/campaignUnsubscribe";
+import {
+  buildListUnsubscribeApiUrl,
+  buildUnsubscribePageUrl,
+  ensureEmailCampaignEventsTable,
+} from "../lib/campaignUnsubscribe";
 
 // ─── Campaign metrics helper ──────────────────────────────────────────────────
 
@@ -144,12 +148,9 @@ async function ensureUnsubscribeToken(userId: number): Promise<string> {
   return token;
 }
 
-/** Build the unsubscribe URL for a given token */
+/** Build the unsubscribe URL for a given token (footer link in email body). */
 function buildUnsubscribeUrl(token: string, campaignId?: number): string {
-  const appUrl = process.env.VITE_APP_URL || "https://app.allaboutultrasound.com";
-  const params = new URLSearchParams({ token });
-  if (campaignId) params.set("campaignId", String(campaignId));
-  return `${appUrl}/unsubscribe?${params.toString()}`;
+  return buildUnsubscribePageUrl(token, campaignId);
 }
 
 /** Inject an unsubscribe footer block into HTML email body */
@@ -243,14 +244,16 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     const subject = variant?.subject?.trim() || campaign.subject;
     let html = normalizeCampaignEmailHtml(variant?.htmlBody?.trim() || campaign.htmlBody);
 
-    let unsubscribeUrl: string | undefined;
+    let unsubscribePageUrl: string | undefined;
+    let listUnsubscribeApiUrl: string | undefined;
     if (recipient.userId) {
       const token = await ensureUnsubscribeToken(recipient.userId);
-      unsubscribeUrl = buildUnsubscribeUrl(token, campaignId);
+      unsubscribePageUrl = buildUnsubscribeUrl(token, campaignId);
+      listUnsubscribeApiUrl = buildListUnsubscribeApiUrl(token, campaignId);
       if (html.includes("{{UNSUBSCRIBE_URL}}")) {
-        html = html.replaceAll("{{UNSUBSCRIBE_URL}}", unsubscribeUrl);
+        html = html.replaceAll("{{UNSUBSCRIBE_URL}}", unsubscribePageUrl);
       } else {
-        html = injectUnsubscribeFooter(html, unsubscribeUrl);
+        html = injectUnsubscribeFooter(html, unsubscribePageUrl);
       }
     } else if (html.includes("{{UNSUBSCRIBE_URL}}")) {
       html = html.replaceAll(
@@ -272,7 +275,7 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
       previewText: campaign.previewText ?? undefined,
       fromName: senderName,
       fromEmail: senderEmail,
-      listUnsubscribeUrl: unsubscribeUrl,
+      listUnsubscribeUrl: listUnsubscribeApiUrl,
     });
     if (ok) {
       sent++;
@@ -504,6 +507,8 @@ export const emailCampaignRouter = router({
         audienceFilter: AudienceFilterSchema,
         headerTitle: z.string().max(300).optional(),
         headerSubtext: z.string().max(500).optional(),
+        headerColor: z.string().max(20).optional(),
+        headerEnabled: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -533,6 +538,8 @@ export const emailCampaignRouter = router({
         status: "sending",
         headerTitle: input.headerTitle ?? null,
         headerSubtext: input.headerSubtext ?? null,
+        headerColor: input.headerColor ?? null,
+        headerEnabled: input.headerEnabled ?? true,
       });
       const campaignId = (result as any).insertId as number;
 
@@ -557,6 +564,8 @@ export const emailCampaignRouter = router({
         scheduledAt: z.date(),
         headerTitle: z.string().max(300).optional(),
         headerSubtext: z.string().max(500).optional(),
+        headerColor: z.string().max(20).optional(),
+        headerEnabled: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -587,6 +596,8 @@ export const emailCampaignRouter = router({
         scheduledAt: input.scheduledAt,
         headerTitle: input.headerTitle ?? null,
         headerSubtext: input.headerSubtext ?? null,
+        headerColor: input.headerColor ?? null,
+        headerEnabled: input.headerEnabled ?? true,
       });
       return { campaignId: (result as any).insertId as number, recipientCount: recipients.length, scheduledAt: input.scheduledAt };
     }),
@@ -1438,6 +1449,8 @@ export const emailCampaignRouter = router({
       fromEmail: z.string().max(300).optional(),
       headerTitle: z.string().max(300).optional(),
       headerSubtext: z.string().max(500).optional(),
+      headerColor: z.string().max(20).optional(),
+      headerEnabled: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx.user.id);
@@ -1455,6 +1468,8 @@ export const emailCampaignRouter = router({
         fromEmail: input.fromEmail ?? null,
         headerTitle: input.headerTitle ?? null,
         headerSubtext: input.headerSubtext ?? null,
+        headerColor: input.headerColor ?? null,
+        headerEnabled: input.headerEnabled ?? true,
       };
       if (input.id) {
         await db.update(emailCampaigns).set(vals).where(eq(emailCampaigns.id, input.id));

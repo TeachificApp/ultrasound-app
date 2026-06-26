@@ -32,6 +32,8 @@ export function wrapInBrandedCampaignEmail(
   previewText?: string,
   headerTitle?: string | null,
   headerSubtext?: string | null,
+  headerColor?: string | null,
+  headerEnabled?: boolean | null,
 ): string {
   const w = EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX;
   const preview = previewText
@@ -39,6 +41,18 @@ export function wrapInBrandedCampaignEmail(
     : "";
   const title = headerTitle ?? "All About Ultrasound™";
   const subtext = headerSubtext ?? "ECHOCARDIOGRAPHY CLINICAL COMPANION";
+  const showHeader = headerEnabled !== false;
+  const bgColor = headerColor || null;
+  const headerBg = bgColor
+    ? `background:${bgColor};`
+    : "background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);";
+  const headerRow = showHeader ? `
+      <tr>
+        <td style="${headerBg}padding:28px 32px;">
+          <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">${title}</span>
+          <div style="font-size:11px;color:#4ad9e0;font-weight:600;margin-top:2px;letter-spacing:0.5px;">${subtext}</div>
+        </td>
+      </tr>` : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -51,12 +65,7 @@ ${preview}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f8;padding:32px 0;">
   <tr><td align="center">
     <table width="${w}" cellpadding="0" cellspacing="0" style="max-width:${w}px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-      <tr>
-        <td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;">
-          <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">${title}</span>
-          <div style="font-size:11px;color:#4ad9e0;font-weight:600;margin-top:2px;letter-spacing:0.5px;">${subtext}</div>
-        </td>
-      </tr>
+      ${headerRow}
       <tr>
         <td style="padding:32px;color:#1a2e3b;font-size:15px;line-height:1.7;">
           ${bodyHtml}
