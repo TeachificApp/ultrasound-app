@@ -34,7 +34,7 @@ import {
   userPointsTotals,
   userPointsLog,
 } from "../../drizzle/schema";
-import { eq, and, desc, sql, gte, lte, count, inArray, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, count, inArray, isNull, or } from "drizzle-orm";
 import { sendStreakReminders } from "../streakReminders";
 import { runChallengeCron } from "../jobs/challengeCron";
 import { notifyOwner } from "../_core/notification";
@@ -46,6 +46,7 @@ import {
   IHE_CHALLENGE_CATEGORIES,
   AAUS_QUESTION_CATEGORIES,
   IHE_QUESTION_CATEGORIES,
+  CROSS_BRAND_CATEGORIES,
   getBrandCategoryConfig,
 } from "../../shared/quickfireCategories";
 import { ensureTodaySet, parseDailySetIds } from "../lib/quickfireDailySet";
@@ -842,8 +843,11 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
       const conditions: any[] = [];
       // Always exclude trashed questions from the bank (they live in the Trash tab only)
       conditions.push(sql`${quickfireQuestions.deletedAt} IS NULL`);
-      // Filter by brand
-      conditions.push(eq(quickfireQuestions.brand, ctx.brand));
+      // Filter by brand — cross-brand categories (Fetal Echo, Physics) are visible on both brands
+      conditions.push(or(
+        eq(quickfireQuestions.brand, ctx.brand),
+        inArray(quickfireQuestions.category, CROSS_BRAND_CATEGORIES as string[]),
+      )!);
       // When fetching by specific IDs, skip the active filter so inactive questions are included
       if (!input.includeInactive && !input.ids?.length) {
         conditions.push(eq(quickfireQuestions.isActive, true));
@@ -2115,11 +2119,14 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Build conditions
+      // Build conditions — cross-brand categories (Fetal Echo, Physics) visible on both brands
       const conditions: any[] = [
         eq(quickfireQuestions.isActive, true),
         eq(quickfireQuestions.type, "quickReview"),
-        eq(quickfireQuestions.brand, ctx.brand),
+        or(
+          eq(quickfireQuestions.brand, ctx.brand),
+          inArray(quickfireQuestions.category, CROSS_BRAND_CATEGORIES as string[]),
+        )!,
       ];
       if (input.echoCategory) {
         conditions.push(eq(quickfireQuestions.echoCategory, input.echoCategory));

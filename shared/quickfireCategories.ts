@@ -77,6 +77,13 @@ export const IHE_CAT_KEY: Record<IheChallengeCategory, string> = {
   Physics: "physics",
 };
 
+/**
+ * Categories that belong to both AAUS and IHE — questions/challenges tagged with
+ * these categories are visible on both brand domains regardless of which brand
+ * created them.
+ */
+export const CROSS_BRAND_CATEGORIES: string[] = ["Fetal Echo", "Physics"];
+
 /** Map daily slot → granular question.category values for backfill queries (AAUS) */
 export const AAUS_QUESTION_POOL_LABELS: Record<string, string[]> = {
   "OB/Gyn": ["Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "OB/Gyn"],

@@ -1,6 +1,6 @@
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, or, sql } from "drizzle-orm";
 import { quickfireQuestions, quickfireDailySets, quickfireChallenges } from "../../drizzle/schema";
-import { getBrandCategoryConfig, type QuickfireBrand } from "../../shared/quickfireCategories";
+import { getBrandCategoryConfig, CROSS_BRAND_CATEGORIES, type QuickfireBrand } from "../../shared/quickfireCategories";
 import { notifyOwner } from "../_core/notification";
 
 function sampleN<T>(arr: T[], n: number): T[] {
@@ -147,7 +147,11 @@ export async function ensureTodaySet(
   }
 
   const fallbackLiveNeeded: { cat: string; questionId: number }[] = [];
-  const brandFilter = eq(quickfireQuestions.brand, brand);
+  // Brand filter: always include cross-brand categories (Fetal Echo, Physics) regardless of which brand created them
+  const brandFilter = or(
+    eq(quickfireQuestions.brand, brand),
+    inArray(quickfireQuestions.category, CROSS_BRAND_CATEGORIES as string[]),
+  )!;
 
   for (const cat of categories) {
     const key = catKey[cat];
