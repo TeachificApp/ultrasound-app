@@ -45,8 +45,8 @@ function defaultEmailBlocks(): Block[] {
 
 
 // ─── Branded email wrapper (delegates to shared module) ──────────────────────
-function wrapInBrandedEmail(bodyHtml: string, previewText?: string): string {
-  return wrapInBrandedCampaignEmail(bodyHtml, previewText);
+function wrapInBrandedEmail(bodyHtml: string, previewText?: string, headerTitle?: string, headerSubtext?: string): string {
+  return wrapInBrandedCampaignEmail(bodyHtml, previewText, headerTitle, headerSubtext);
 }
 
 const LEGACY_INTEREST_OPTIONS: { key: LegacyInterestKey; label: string }[] = [
@@ -485,6 +485,8 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   // ── State ───────────────────────────────────────────────────────────────────
   const [subject, setSubject] = useState("");
   const [previewText, setPreviewText] = useState("");
+  const [headerTitle, setHeaderTitle] = useState("");
+  const [headerSubtext, setHeaderSubtext] = useState("");
   const [blocks, setBlocks] = useState<Block[]>(defaultEmailBlocks());
   const handleBlocksChange = useCallback((newBlocks: Block[]) => setBlocks(newBlocks), []);
   const [filter, setFilter] = useState<AudienceFilter>(DEFAULT_FILTER);
@@ -532,6 +534,8 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     if (!existingCampaign || draftLoaded) return;
     setSubject(existingCampaign.subject ?? "");
     setPreviewText(existingCampaign.previewText ?? "");
+    setHeaderTitle(existingCampaign.headerTitle ?? "");
+    setHeaderSubtext(existingCampaign.headerSubtext ?? "");
     if (existingCampaign.senderProfileId) setSenderProfileId(existingCampaign.senderProfileId);
     if (existingCampaign.audienceFilter) {
       try {
@@ -555,9 +559,9 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   useEffect(() => {
     if (!draftLoaded) return;
     // Save to localStorage as a backup every time blocks/subject/previewText change
-    const backup = { subject, previewText, blocks, filter, senderProfileId, savedAt: Date.now() };
+    const backup = { subject, previewText, headerTitle, headerSubtext, blocks, filter, senderProfileId, savedAt: Date.now() };
     try { localStorage.setItem(LS_KEY, JSON.stringify(backup)); } catch { /* quota exceeded */ }
-  }, [blocks, subject, previewText, filter, senderProfileId, draftLoaded, LS_KEY]);
+  }, [blocks, subject, previewText, headerTitle, headerSubtext, filter, senderProfileId, draftLoaded, LS_KEY]);
 
   // ── Auto-save to server every 30 seconds ─────────────────────────────────────
   const autoSaveDraftMutation = trpc.emailCampaign.saveDraft.useMutation({
@@ -571,17 +575,19 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     autoSaveTimerRef.current = setTimeout(() => {
       // standalone=false: raw inner HTML, wrapInBrandedEmail provides the 900px outer container
       const htmlBody = emailBlocksToHtml(blocks, undefined, false);
-      const wrappedHtml = wrapInBrandedEmail(htmlBody, previewText);
+      const wrapped = wrapInBrandedEmail(htmlBody, previewText, headerTitle || undefined, headerSubtext || undefined);
       autoSaveDraftMutation.mutate({
         id: draftId,
-        subject, htmlBody: wrappedHtml, previewText,
+        subject, htmlBody: wrapped, previewText,
         audienceFilter: filter,
         senderProfileId,
         blocksJson: JSON.stringify(blocks),
+        headerTitle: headerTitle || undefined,
+        headerSubtext: headerSubtext || undefined,
       });
     }, 30_000); // 30 second debounce
     return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
-  }, [blocks, subject, previewText, filter, senderProfileId, draftId, draftLoaded, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [blocks, subject, previewText, headerTitle, headerSubtext, filter, senderProfileId, draftId, draftLoaded, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Mutations ───────────────────────────────────────────────────────────────
   const saveDraftMutation = trpc.emailCampaign.saveDraft.useMutation({
@@ -615,7 +621,10 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   // ── Helpers ─────────────────────────────────────────────────────────────────
   // standalone=false: raw inner HTML, wrapInBrandedEmail provides the 900px outer container
   const htmlBody = useMemo(() => emailBlocksToHtml(blocks, undefined, false), [blocks]);
-  const wrappedHtml = useMemo(() => wrapInBrandedEmail(htmlBody, previewText), [htmlBody, previewText]);
+  const wrappedHtml = useMemo(
+    () => wrapInBrandedEmail(htmlBody, previewText, headerTitle || undefined, headerSubtext || undefined),
+    [htmlBody, previewText, headerTitle, headerSubtext]
+  );
 
   function handleSaveDraft() {
     setIsSaving(true);
@@ -625,6 +634,8 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
       audienceFilter: filter,
       senderProfileId,
       blocksJson: JSON.stringify(blocks),
+      headerTitle: headerTitle || undefined,
+      headerSubtext: headerSubtext || undefined,
     });
   }
 
@@ -639,6 +650,8 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
       subject, htmlBody: wrappedHtml, previewText,
       audienceFilter: filter,
       blocksJson: JSON.stringify(blocks),
+      headerTitle: headerTitle || undefined,
+      headerSubtext: headerSubtext || undefined,
     });
   }
 
@@ -649,6 +662,8 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
       audienceFilter: filter,
       scheduledAt: new Date(scheduledAt),
       blocksJson: JSON.stringify(blocks),
+      headerTitle: headerTitle || undefined,
+      headerSubtext: headerSubtext || undefined,
     });
   }
 
@@ -752,6 +767,33 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Header customization */}
+          <Card className="border shadow-sm">
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-1 h-5 rounded-full" style={{ background: "#189aa1" }} />
+                <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Email Header</span>
+                <span className="text-xs text-gray-400 font-normal ml-1">(teal banner at top of email)</span>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Header Title</label>
+                <Input
+                  value={headerTitle}
+                  onChange={(e) => setHeaderTitle(e.target.value)}
+                  placeholder="All About Ultrasound™ (default)"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Header Subtext</label>
+                <Input
+                  value={headerSubtext}
+                  onChange={(e) => setHeaderSubtext(e.target.value)}
+                  placeholder="ECHOCARDIOGRAPHY CLINICAL COMPANION (default)"
+                />
               </div>
             </CardContent>
           </Card>

@@ -2,12 +2,12 @@
 export const EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX = 750;
 
 /** Default width for image blocks when not explicitly set narrower. */
-export const EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH = "50%";
+export const EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH = "100%";
 
 /** Resolve stored/legacy image width to the campaign default when appropriate. */
 export function resolveCampaignImageWidth(width?: string | null): string {
   const w = (width ?? "").trim();
-  if (!w || w === "100%") return EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH;
+  if (!w) return EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH;
   return w;
 }
 
@@ -27,11 +27,18 @@ export function renderCampaignImageHtml(opts: {
 }
 
 /** Branded wrapper for campaign emails (header, body slot, footer with unsubscribe placeholder). */
-export function wrapInBrandedCampaignEmail(bodyHtml: string, previewText?: string): string {
+export function wrapInBrandedCampaignEmail(
+  bodyHtml: string,
+  previewText?: string,
+  headerTitle?: string | null,
+  headerSubtext?: string | null,
+): string {
   const w = EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX;
   const preview = previewText
     ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${previewText}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>`
     : "";
+  const title = headerTitle ?? "All About Ultrasound™";
+  const subtext = headerSubtext ?? "ECHOCARDIOGRAPHY CLINICAL COMPANION";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,8 +53,8 @@ ${preview}
     <table width="${w}" cellpadding="0" cellspacing="0" style="max-width:${w}px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
       <tr>
         <td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;">
-          <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">All About Ultrasound™</span>
-          <div style="font-size:11px;color:#4ad9e0;font-weight:600;margin-top:2px;letter-spacing:0.5px;">ECHOCARDIOGRAPHY CLINICAL COMPANION</div>
+          <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">${title}</span>
+          <div style="font-size:11px;color:#4ad9e0;font-weight:600;margin-top:2px;letter-spacing:0.5px;">${subtext}</div>
         </td>
       </tr>
       <tr>
@@ -72,17 +79,17 @@ ${preview}
 }
 
 function normalizeImgTag(attrs: string): string {
+  // Only intervene when no explicit width is set at all — preserve any existing width.
   const widthMatch = attrs.match(/\bwidth=["']([^"']+)["']/i);
   const width = widthMatch?.[1]?.trim();
-  if (width && width !== "100%") return `<img${attrs}>`;
+  if (width) return `<img${attrs}>`;
 
-  let newAttrs = attrs.replace(/\bwidth=["'][^"']*["']\s*/i, "");
+  // No width attribute — apply default
+  let newAttrs = attrs;
 
   if (/\bstyle=/i.test(newAttrs)) {
     newAttrs = newAttrs.replace(/\bstyle=["']([^"']*)["']/i, (_m, style: string) => {
-      let s = style
-        .replace(/max-width:\s*100%/gi, `max-width:${EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH}`)
-        .replace(/width:\s*100%/gi, `width:${EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH}`);
+      let s = style;
       if (!/width\s*:/i.test(s)) s += `;width:${EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH}`;
       if (!/max-width\s*:/i.test(s)) s += `;max-width:${EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH}`;
       if (!/display\s*:/i.test(s)) s += ";display:block";
@@ -92,9 +99,7 @@ function normalizeImgTag(attrs: string): string {
     newAttrs += ` style="max-width:${EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH};width:${EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH};display:block;"`;
   }
 
-  if (!/\bwidth=/i.test(newAttrs)) {
-    newAttrs += ` width="${EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH}"`;
-  }
+  newAttrs += ` width="${EMAIL_CAMPAIGN_DEFAULT_IMAGE_WIDTH}"`;
 
   return `<img${newAttrs}>`;
 }
@@ -102,7 +107,7 @@ function normalizeImgTag(attrs: string): string {
 /**
  * Normalize stored/sent campaign HTML:
  * - Upgrade legacy 600px containers to 750px
- * - Default full-width or unset images to 50%
+ * - Apply default width to images that have no explicit width set
  */
 export function normalizeCampaignEmailHtml(html: string): string {
   const w = EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX;

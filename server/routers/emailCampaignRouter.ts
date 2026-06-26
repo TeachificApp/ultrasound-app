@@ -502,6 +502,8 @@ export const emailCampaignRouter = router({
         blocksJson: z.string().optional(),
         previewText: z.string().max(300).optional(),
         audienceFilter: AudienceFilterSchema,
+        headerTitle: z.string().max(300).optional(),
+        headerSubtext: z.string().max(500).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -529,6 +531,8 @@ export const emailCampaignRouter = router({
         audienceFilter: JSON.stringify(input.audienceFilter),
         recipientCount: recipients.length,
         status: "sending",
+        headerTitle: input.headerTitle ?? null,
+        headerSubtext: input.headerSubtext ?? null,
       });
       const campaignId = (result as any).insertId as number;
 
@@ -551,6 +555,8 @@ export const emailCampaignRouter = router({
         previewText: z.string().max(300).optional(),
         audienceFilter: AudienceFilterSchema,
         scheduledAt: z.date(),
+        headerTitle: z.string().max(300).optional(),
+        headerSubtext: z.string().max(500).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -579,6 +585,8 @@ export const emailCampaignRouter = router({
         recipientCount: recipients.length,
         status: "scheduled",
         scheduledAt: input.scheduledAt,
+        headerTitle: input.headerTitle ?? null,
+        headerSubtext: input.headerSubtext ?? null,
       });
       return { campaignId: (result as any).insertId as number, recipientCount: recipients.length, scheduledAt: input.scheduledAt };
     }),
@@ -1428,6 +1436,8 @@ export const emailCampaignRouter = router({
       senderProfileId: z.number().optional(),
       fromName: z.string().max(200).optional(),
       fromEmail: z.string().max(300).optional(),
+      headerTitle: z.string().max(300).optional(),
+      headerSubtext: z.string().max(500).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx.user.id);
@@ -1443,6 +1453,8 @@ export const emailCampaignRouter = router({
         senderProfileId: input.senderProfileId ?? null,
         fromName: input.fromName ?? null,
         fromEmail: input.fromEmail ?? null,
+        headerTitle: input.headerTitle ?? null,
+        headerSubtext: input.headerSubtext ?? null,
       };
       if (input.id) {
         await db.update(emailCampaigns).set(vals).where(eq(emailCampaigns.id, input.id));

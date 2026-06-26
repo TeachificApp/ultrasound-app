@@ -14,7 +14,7 @@ import { useLocation } from "wouter";
 import {
   Mail, Plus, BarChart2, Users, Send, Clock, CheckCircle, XCircle,
   RefreshCw, Trash2, Copy, Eye, TrendingUp, MousePointer, UserMinus,
-  Shield, ChevronRight, Settings, UserCircle, Edit, Star, StarOff,
+  Shield, ChevronRight, ChevronLeft, Settings, UserCircle, Edit, Star, StarOff,
   AlertTriangle, Download, Zap, Code, List, Globe, MapPin, UserCheck, Link2,
 } from "lucide-react";
 import Layout from "@/components/Layout";
@@ -625,6 +625,15 @@ export default function EmailCampaignDashboard() {
   return (
     <Layout>
       <div className="container py-8 max-w-7xl">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-5">
+          <button onClick={() => navigate("/platform-admin")} className="flex items-center gap-1 hover:text-[#189aa1] transition-colors">
+            <ChevronLeft className="w-3.5 h-3.5" />
+            Platform Admin
+          </button>
+          <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+          <span className="text-gray-700 font-medium">Email Campaigns</span>
+        </nav>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

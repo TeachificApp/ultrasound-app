@@ -2161,6 +2161,9 @@ export const emailCampaigns = mysqlTable("emailCampaigns", {
   senderProfileId: int("senderProfileId"),
   fromName: varchar("fromName", { length: 200 }),
   fromEmail: varchar("fromEmail", { length: 300 }),
+  // Per-campaign header customization
+  headerTitle: varchar("headerTitle", { length: 300 }),
+  headerSubtext: varchar("headerSubtext", { length: 500 }),
   // Engagement metrics
   openCount: int("openCount").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

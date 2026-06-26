@@ -156,8 +156,9 @@ export function emailBlockToHtml(block: Block): string {
       const url = (d.url as string) ?? "";
       if (!url) return "";
       const alt = (d.alt as string) ?? "";
-      // Default to 50% width for email; always cap at 100% so images never overflow
-      const rawWidth = (d.maxWidth as string) ?? "50%";
+      // Default to 100% width so images fill their designated column within the 750px container.
+      // Users can narrow via the Image Width selector in block settings.
+      const rawWidth = (d.maxWidth as string) ?? "100%";
       const imgWidth = rawWidth === "auto" ? "100%" : rawWidth;
       const link = (d.linkUrl as string) ?? "";
       const shadow = d.showShadow ? "box-shadow:0 2px 8px rgba(0,0,0,0.12);" : "";
