@@ -22,7 +22,7 @@
 import type { Express, Request, Response } from "express";
 import * as bcrypt from "bcryptjs";
 import { getDb, ensureUserRole } from "../db";
-import { users, accessTokenUses, ipSecurityFlags, userLoginEvents } from "../../drizzle/schema";
+import { users, accessTokenUses, ipSecurityFlags } from "../../drizzle/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { getSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
@@ -89,6 +89,10 @@ export function registerAuthLoginRoute(app: Express) {
       const cookieOptions = getSessionCookieOptions(req, hostnameOverride);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress, userAgent } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "password" });
+
       return res.status(200).json({
         success: true,
         emailVerified: user.emailVerified ?? false,
@@ -138,9 +142,9 @@ export function registerAuthLoginRoute(app: Express) {
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, redirecting to ${successRedirect}`);
-      // Track login event
-      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
-      db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip?.substring(0, 64) ?? null, userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null }).catch(() => {});
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress, userAgent } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "magic_link" });
       return res.redirect(successRedirect);
     } catch (err) {
       console.error("[magic-verify GET] Error:", err);
@@ -212,9 +216,9 @@ export function registerAuthLoginRoute(app: Express) {
       const cookieOptions = getSessionCookieOptions(req, magicPostHostname);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      // Track login event
-      const ip2 = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
-      db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip2?.substring(0, 64) ?? null, userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null }).catch(() => {});
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress, userAgent } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "magic_link" });
       return res.status(200).json({ success: true });
     } catch (err) {
       console.error("[magic-verify] Error:", err);
@@ -326,8 +330,9 @@ export function registerAuthLoginRoute(app: Express) {
       const cookieOptions = getSessionCookieOptions(req, accessHostname);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      // Track login event for access-link sessions
-      db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip.substring(0, 64), userAgent: userAgent.substring(0, 500) || null }).catch(() => {});
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress, userAgent } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "access_token" });
       return res.status(200).json({ success: true });
     } catch (err) {
       console.error("[access-verify] Error:", err);

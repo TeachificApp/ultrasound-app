@@ -624,6 +624,16 @@ export const appRouter = router({
         const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
+        try {
+          const { getDb: _gdb3 } = await import('./db');
+          const _db3 = await _gdb3();
+          if (_db3) {
+            const { getRequestClientInfo, recordUserLogin } = await import('./lib/recordUserLogin');
+            const { ipAddress, userAgent } = getRequestClientInfo(ctx.req);
+            await recordUserLogin(_db3, { userId: user.id, ipAddress, userAgent, method: "password" });
+          }
+        } catch { /* non-critical */ }
+
         return { success: true };
       }),
 

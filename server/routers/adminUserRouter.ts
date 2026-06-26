@@ -2088,14 +2088,44 @@ export const adminUserRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const offset = (input.page - 1) * input.pageSize;
       const [countRow] = await db.execute(sql`
-        SELECT COUNT(*) as total FROM user_activity_logs WHERE user_id = ${input.userId}
+        SELECT COUNT(*) as total FROM (
+          SELECT id FROM user_activity_logs WHERE user_id = ${input.userId}
+          UNION ALL
+          SELECT l.id FROM user_login_events l
+          WHERE l.user_id = ${input.userId}
+            AND NOT EXISTS (
+              SELECT 1 FROM user_activity_logs a
+              WHERE a.user_id = l.user_id
+                AND a.event_type = 'login'
+                AND ABS(TIMESTAMPDIFF(SECOND, a.created_at, l.created_at)) < 10
+            )
+        ) combined
       `) as any;
       const total = Number(Array.isArray(countRow) ? countRow[0]?.total : countRow?.total ?? 0);
       const [rows] = await db.execute(sql`
-        SELECT id, event_type AS eventType, description, path, ip_address AS ipAddress, metadata, created_at AS createdAt
-        FROM user_activity_logs
-        WHERE user_id = ${input.userId}
-        ORDER BY created_at DESC
+        SELECT id, eventType, description, path, ipAddress, metadata, createdAt FROM (
+          SELECT id, event_type AS eventType, description, path, ip_address AS ipAddress, metadata, created_at AS createdAt
+          FROM user_activity_logs
+          WHERE user_id = ${input.userId}
+          UNION ALL
+          SELECT
+            l.id,
+            'login' AS eventType,
+            CONCAT('Logged in', IF(l.ip_address IS NOT NULL AND l.ip_address != '', CONCAT(' from ', l.ip_address), '')) AS description,
+            NULL AS path,
+            l.ip_address AS ipAddress,
+            NULL AS metadata,
+            l.created_at AS createdAt
+          FROM user_login_events l
+          WHERE l.user_id = ${input.userId}
+            AND NOT EXISTS (
+              SELECT 1 FROM user_activity_logs a
+              WHERE a.user_id = l.user_id
+                AND a.event_type = 'login'
+                AND ABS(TIMESTAMPDIFF(SECOND, a.created_at, l.created_at)) < 10
+            )
+        ) combined
+        ORDER BY createdAt DESC
         LIMIT ${input.pageSize} OFFSET ${offset}
       `) as any;
       const events = (Array.isArray(rows) ? rows : []).map((r: any) => ({

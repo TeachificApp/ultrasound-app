@@ -4,7 +4,6 @@ import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 import { getDb } from "../db";
-import { userLoginEvents } from "../../drizzle/schema";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -62,23 +61,14 @@ export function registerOAuthRoutes(app: Express) {
         if (!dbConn) return;
         const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
                    req.socket.remoteAddress || null;
-        await dbConn.insert(userLoginEvents).values({
+        const userAgent = req.headers["user-agent"]?.substring(0, 500) ?? null;
+        const { recordUserLogin } = await import("../lib/recordUserLogin");
+        await recordUserLogin(dbConn, {
           userId: user.id,
           ipAddress: ip ? ip.substring(0, 64) : null,
-          userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null,
+          userAgent,
+          method: "oauth",
         });
-        // Also log to unified activity table
-        try {
-          const { userActivityLogs } = await import("../../drizzle/schema");
-          await dbConn.insert(userActivityLogs).values({
-            userId: user.id,
-            eventType: 'login',
-            description: `Logged in from ${ip || 'unknown IP'}`,
-            ipAddress: ip ? ip.substring(0, 64) : null,
-            userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null,
-            metadata: { country: null },
-          });
-        } catch (e) { /* non-blocking */ }
 
         // Sync user to Thinkific free membership if not already enrolled
         if (user.email && !user.thinkificEnrolledAt) {
