@@ -101,7 +101,7 @@ import {
 import { toast } from "sonner";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 import { perBrandUserPath } from "@/lib/perBrandUrls";
-import { detectBrandFromPath, getBrandCategoryConfig } from "@shared/quickfireCategories";
+import { detectBrandFromPath, getBrandCategoryConfig, AAUS_QUESTION_CATEGORIES, IHE_QUESTION_CATEGORIES } from "@shared/quickfireCategories";
 
 const TYPE_META = {
   scenario: { label: "Scenario (MCQ)", icon: Stethoscope, color: "bg-blue-100 text-blue-700" },
@@ -436,6 +436,11 @@ export default function QuickFireAdmin() {
     [adminBrand],
   );
   const defaultCategory = challengeCategories[0] ?? "Abdominal";
+  // DB-level question categories (used for AI generator and question creation — must match server enum)
+  const questionCategories = useMemo(
+    () => adminBrand === "iheartecho" ? IHE_QUESTION_CATEGORIES : AAUS_QUESTION_CATEGORIES,
+    [adminBrand],
+  );
   const brandLabel = adminBrand === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™";
 
   // List state
@@ -868,7 +873,7 @@ export default function QuickFireAdmin() {
   const [aiMixedPreview, setAiMixedPreview] = useState<Array<{ type: string; question: any }>>([]);
   const [aiMixedSelected, setAiMixedSelected] = useState<Set<number>>(new Set());
   const [aiMixedImporting, setAiMixedImporting] = useState(false);
-  const [aiCategory, setAiCategory] = useState<QuestionCategory>(() => defaultCategory as QuestionCategory);
+  const [aiCategory, setAiCategory] = useState<QuestionCategory>("Abdominal");
 
   // Brand-aware preset topics for the AI generator dialog
   const aiPresetTopics = useMemo(() => {
@@ -886,10 +891,15 @@ export default function QuickFireAdmin() {
     return [
       { label: "Abdominal", topic: "Abdominal ultrasound — liver, gallbladder, pancreas, spleen, kidneys, aorta, Doppler assessment, pathology identification", category: "Abdominal" as QuestionCategory },
       { label: "Small Parts", topic: "Small parts ultrasound — thyroid nodule characterization, TIRADS scoring, parathyroid, scrotal/testicular assessment, lymph node evaluation, salivary glands", category: "Small Parts" as QuestionCategory },
-      { label: "OB/Gyn", topic: "OB & gynecologic ultrasound — uterine pathology, ovarian cysts, fibroids, endometrial assessment, 1st/2nd/3rd trimester OB, fetal biometry, placenta, fetal echo, CHD screening", category: "OB/Gyn" as QuestionCategory },
+      { label: "Pelvic/Gyn", topic: "Gynecologic ultrasound — uterine pathology, fibroids, endometrial assessment, ovarian cysts, PCOS, adnexal masses, pelvic floor", category: "Pelvic/Gyn" as QuestionCategory },
+      { label: "OB 1st Tri", topic: "First trimester obstetric ultrasound — NT measurement, dating, viability, ectopic pregnancy, aneuploidy markers, early fetal anatomy", category: "OB 1st Trimester" as QuestionCategory },
+      { label: "OB 2nd/3rd Tri", topic: "Second and third trimester obstetric ultrasound — fetal biometry, growth restriction, placenta previa, amniotic fluid, fetal presentation, Doppler indices", category: "OB 2nd/3rd Trimester" as QuestionCategory },
+      { label: "Fetal Echo", topic: "Fetal echocardiography — four-chamber view, outflow tracts, CHD screening, ductal arch, venous connections, fetal arrhythmias", category: "Fetal Echo" as QuestionCategory },
+      { label: "Breast", topic: "Breast ultrasound — BI-RADS classification, cyst vs solid characterization, vascularity assessment, axillary nodes, post-surgical changes, guided biopsy", category: "Breast" as QuestionCategory },
       { label: "Vascular", topic: "Vascular ultrasound — DVT diagnosis, arterial duplex, carotid stenosis, ABI, renal artery stenosis, aortic aneurysm, Doppler waveform analysis", category: "Vascular" as QuestionCategory },
       { label: "MSK", topic: "MSK ultrasound — tendon pathology, rotator cuff tears, joint effusions, nerve entrapment, dynamic assessment, guided injections", category: "MSK" as QuestionCategory },
       { label: "POCUS", topic: "Point-of-care ultrasound (POCUS) — eFAST, RUSH protocol, lung POCUS, IVC assessment, pleural effusion, bedside assessment", category: "POCUS" as QuestionCategory },
+      { label: "Physics", topic: "Ultrasound physics — Doppler principles, aliasing, beam width artifacts, harmonic imaging, transducer selection, temporal resolution, image optimization", category: "Physics" as QuestionCategory },
     ];
   }, [adminBrand, defaultCategory]);
 
@@ -1403,7 +1413,7 @@ export default function QuickFireAdmin() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All categories</SelectItem>
-                    <ChallengeCategoryOptions categories={challengeCategories} />
+                    <ChallengeCategoryOptions categories={questionCategories} />
                   </SelectContent>
                 </Select>
               </div>
@@ -1584,7 +1594,7 @@ export default function QuickFireAdmin() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              <ChallengeCategoryOptions categories={challengeCategories} />
+              <ChallengeCategoryOptions categories={questionCategories} />
             </SelectContent>
           </Select>
           <Button
@@ -3098,7 +3108,7 @@ export default function QuickFireAdmin() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <ChallengeCategoryOptions categories={challengeCategories} />
+                  <ChallengeCategoryOptions categories={questionCategories} />
                 </SelectContent>
               </Select>
             </div>
@@ -3287,7 +3297,7 @@ export default function QuickFireAdmin() {
                     <Select value={aiCategory} onValueChange={(v) => setAiCategory(v as QuestionCategory)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <ChallengeCategoryOptions categories={challengeCategories} />
+                        <ChallengeCategoryOptions categories={questionCategories} />
                       </SelectContent>
                     </Select>
                   </div>
@@ -3352,7 +3362,7 @@ export default function QuickFireAdmin() {
                       <Select value={aiCategory} onValueChange={(v) => setAiCategory(v as QuestionCategory)}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <ChallengeCategoryOptions categories={challengeCategories} />
+                          <ChallengeCategoryOptions categories={questionCategories} />
                         </SelectContent>
                     </Select>
                   </div>

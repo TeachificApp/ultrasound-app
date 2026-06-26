@@ -740,12 +740,13 @@ export default function RichTextEditor({
   // Sync external value changes (only when value was set from outside, not from onUpdate)
   useEffect(() => {
     if (!editor) return;
-    if (isInternalUpdate.current) {
-      isInternalUpdate.current = false;
-      return;
-    }
     const current = editor.getHTML();
     const normalised = current === "<p></p>" ? "" : current;
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      // Only skip if the editor already has the correct content (no-op update)
+      if (normalised === value || (normalised === "" && !value)) return;
+    }
     if (normalised !== value) {
       editor.commands.setContent(value || "");
     }

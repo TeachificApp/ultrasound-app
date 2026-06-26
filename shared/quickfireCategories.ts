@@ -51,10 +51,11 @@ export const IHE_QUESTION_CATEGORIES = [
   "ACS",
   "Adult Echo",
   "Pediatric Echo",
-  "General",
   "Fetal Echo",
+  "ECG",
   "POCUS",
   "Physics",
+  "General",
 ] as const;
 
 export const AAUS_CAT_KEY: Record<AausChallengeCategory, string> = {
