@@ -470,7 +470,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
 
   // ── Duplicate one-time payment guard ──────────────────────────────────────
   // If the user is already actively enrolled and this is a one-time payment
-  // (not a subscription renewal), automatically refund the duplicate charge.
+  // (not a subscription renewal), notify admin — do NOT auto-refund.
   const pricingType = meta.pricing_type ?? "one_time";
   const isDuplicateOneTimePayment =
     !shouldRenew &&
@@ -479,26 +479,44 @@ export async function reconcileLmsCheckoutFromStripeSession(
     paymentIntentFromSession;
 
   if (isDuplicateOneTimePayment) {
-    try {
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
-      await stripe.refunds.create({
-        payment_intent: paymentIntentFromSession!,
-        reason: "duplicate",
-      });
-      notes.push(`Duplicate payment auto-refunded: ${paymentIntentFromSession}`);
-      await notifyOwner({
-        title: "⚠️ Duplicate LMS Payment Auto-Refunded",
-        content: `User ${userId} (${customerEmail}) was already enrolled in ${course?.title ?? `course #${courseId}`}. Payment ${paymentIntentFromSession} has been automatically refunded.`,
-      }).catch(() => {});
-    } catch (refundErr) {
-      console.error(`[LmsCheckoutFulfillment] Auto-refund failed for ${paymentIntentFromSession}:`, refundErr);
-      notes.push(`Auto-refund FAILED for ${paymentIntentFromSession} — manual action required`);
-      await notifyOwner({
-        title: "🚨 Duplicate LMS Payment — REFUND FAILED",
-        content: `User ${userId} (${customerEmail}) was already enrolled in ${course?.title ?? `course #${courseId}`}. Auto-refund of ${paymentIntentFromSession} FAILED. Manual refund required in Stripe Dashboard.`,
-      }).catch(() => {});
-    }
+    const courseTitle = course?.title ?? `Course #${courseId}`;
+    const stripeLink = `https://dashboard.stripe.com/payments/${paymentIntentFromSession}`;
+    const adminEmail = process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com";
+    // Notify owner via in-app notification
+    await notifyOwner({
+      title: "⚠️ Duplicate LMS Payment — Action Required",
+      content: `User ${userId} (${customerEmail}) was already enrolled in "${courseTitle}" but submitted a second payment.\n\nPayment Intent: ${paymentIntentFromSession}\nOrder ID: ${orderId ?? "N/A"}\n\nAction required: Review in Stripe Dashboard and issue a manual refund if appropriate.\nStripe link: ${stripeLink}`,
+    }).catch(() => {});
+    // Send admin email with full details and instructions
+    const { sendEmail } = await import("../_core/email");
+    await sendEmail({
+      to: { name: "Platform Admin", email: adminEmail },
+      subject: `⚠️ Duplicate LMS Payment — ${courseTitle} — Action Required`,
+      htmlBody: `
+        <h2 style="color:#b91c1c;">Duplicate LMS Payment Detected</h2>
+        <p>A user has been charged a second time for a course they are already enrolled in. <strong>No automatic action has been taken.</strong> Please review and refund manually if appropriate.</p>
+        <table style="border-collapse:collapse;width:100%;max-width:600px;">
+          <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>User ID</strong></td><td style="padding:8px;border:1px solid #e5e7eb;">${userId}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Email</strong></td><td style="padding:8px;border:1px solid #e5e7eb;">${customerEmail ?? "unknown"}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Course</strong></td><td style="padding:8px;border:1px solid #e5e7eb;">${courseTitle} (ID: ${courseId})</td></tr>
+          <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Payment Intent</strong></td><td style="padding:8px;border:1px solid #e5e7eb;"><a href="${stripeLink}">${paymentIntentFromSession}</a></td></tr>
+          <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Order ID</strong></td><td style="padding:8px;border:1px solid #e5e7eb;">${orderId ?? "N/A"}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Pricing Type</strong></td><td style="padding:8px;border:1px solid #e5e7eb;">${pricingType}</td></tr>
+        </table>
+        <h3 style="margin-top:24px;">Recommended Actions</h3>
+        <ol>
+          <li>Open the <a href="${stripeLink}">Stripe payment</a> and confirm it is a genuine duplicate (same user, same course).</li>
+          <li>If confirmed duplicate: click <strong>Refund</strong> in Stripe Dashboard and select reason <em>Duplicate</em>.</li>
+          <li>If the user intended to purchase a different course or product, contact them before refunding.</li>
+          <li>If the user should retain access (e.g. gift purchase), do not refund — update enrollment manually in the admin panel.</li>
+        </ol>
+        <p style="color:#6b7280;font-size:12px;">This notification was generated automatically. No refund has been issued.</p>
+      `,
+    }).catch((emailErr: unknown) => {
+      console.error("[LmsCheckoutFulfillment] Failed to send duplicate payment admin email:", emailErr);
+    });
+    console.warn(`[LmsCheckoutFulfillment] Duplicate one-time payment detected: user=${userId} course=${courseId} pi=${paymentIntentFromSession} — admin notified, no auto-refund`);
+    notes.push(`Duplicate payment detected (${paymentIntentFromSession}) — admin notified, no auto-refund`);
     return { success: true, userId, courseId, orderId, isNewUser, notes };
   }
 

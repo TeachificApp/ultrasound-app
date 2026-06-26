@@ -700,13 +700,14 @@ export async function reconcileMembershipFromStripeSession(
   });
 
   if (result.success && stripeCustomerId && stripeSubscriptionId) {
-    const cancelled = await cancelDuplicateStripeSubscriptions({
+    const duplicates = await cancelDuplicateStripeSubscriptions({
       stripeCustomerId,
       keepSubscriptionId: stripeSubscriptionId,
       stripePriceId,
+      customerEmail,
     });
-    if (cancelled.length > 0) {
-      result.notes.push(`Cancelled duplicate Stripe subs: ${cancelled.join(", ")}`);
+    if (duplicates.length > 0) {
+      result.notes.push(`Duplicate subscriptions detected (admin notified): ${duplicates.join(", ")}`);
     }
   }
 
@@ -720,16 +721,20 @@ export async function reconcileMembershipFromStripeSession(
   return result;
 }
 
-/** Cancel extra active Stripe subscriptions for the same price (double-checkout protection) */
+/**
+ * Detect extra active Stripe subscriptions for the same price.
+ * Does NOT auto-cancel — instead notifies admin with full details and instructions.
+ */
 export async function cancelDuplicateStripeSubscriptions(opts: {
   stripeCustomerId: string;
   keepSubscriptionId: string;
   stripePriceId?: string | null;
+  customerEmail?: string | null;
 }): Promise<string[]> {
   if (!process.env.STRIPE_SECRET_KEY) return [];
   const Stripe = (await import("stripe")).default;
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" as any });
-  const cancelled: string[] = [];
+  const duplicates: string[] = [];
   try {
     const subs = await stripe.subscriptions.list({
       customer: opts.stripeCustomerId,
@@ -740,18 +745,48 @@ export async function cancelDuplicateStripeSubscriptions(opts: {
       if (sub.id === opts.keepSubscriptionId) continue;
       const priceId = sub.items?.data?.[0]?.price?.id;
       if (opts.stripePriceId && priceId !== opts.stripePriceId) continue;
-      await stripe.subscriptions.cancel(sub.id);
-      cancelled.push(sub.id);
-      console.log(`[MembershipFulfillment] Cancelled duplicate subscription ${sub.id} (kept ${opts.keepSubscriptionId})`);
+      duplicates.push(sub.id);
+      console.warn(`[MembershipFulfillment] Duplicate subscription detected: ${sub.id} (active alongside ${opts.keepSubscriptionId}) — admin notified, no auto-cancel`);
     }
-    if (cancelled.length > 0) {
+    if (duplicates.length > 0) {
+      const adminEmail = process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com";
+      const keepLink = `https://dashboard.stripe.com/subscriptions/${opts.keepSubscriptionId}`;
+      const dupLinks = duplicates.map(id => `<a href="https://dashboard.stripe.com/subscriptions/${id}">${id}</a>`).join("<br>");
+      // In-app notification
       await notifyOwner({
-        title: "⚠️ Duplicate Stripe Subscription Cancelled",
-        content: `Kept ${opts.keepSubscriptionId}. Cancelled: ${cancelled.join(", ")}. Customer: ${opts.stripeCustomerId}.`,
+        title: "⚠️ Duplicate Stripe Subscription Detected — Action Required",
+        content: `Customer ${opts.stripeCustomerId} (${opts.customerEmail ?? "unknown"}) has multiple active subscriptions for the same plan.\n\nKept (newest): ${opts.keepSubscriptionId}\nDuplicates: ${duplicates.join(", ")}\n\nAction required: Review in Stripe Dashboard and cancel the duplicate(s) manually.`,
       }).catch(() => {});
+      // Admin email with instructions
+      const { sendEmail } = await import("../_core/email");
+      await sendEmail({
+        to: { name: "Platform Admin", email: adminEmail },
+        subject: `⚠️ Duplicate Stripe Subscription — Action Required`,
+        htmlBody: `
+          <h2 style="color:#b91c1c;">Duplicate Stripe Subscription Detected</h2>
+          <p>A customer has multiple active subscriptions for the same plan. <strong>No automatic action has been taken.</strong> Please review and cancel the duplicate(s) manually.</p>
+          <table style="border-collapse:collapse;width:100%;max-width:600px;">
+            <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Customer ID</strong></td><td style="padding:8px;border:1px solid #e5e7eb;">${opts.stripeCustomerId}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Customer Email</strong></td><td style="padding:8px;border:1px solid #e5e7eb;">${opts.customerEmail ?? "unknown"}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Keep (newest)</strong></td><td style="padding:8px;border:1px solid #e5e7eb;"><a href="${keepLink}">${opts.keepSubscriptionId}</a></td></tr>
+            <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Duplicates to Review</strong></td><td style="padding:8px;border:1px solid #e5e7eb;">${dupLinks}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #e5e7eb;"><strong>Price ID</strong></td><td style="padding:8px;border:1px solid #e5e7eb;">${opts.stripePriceId ?? "N/A"}</td></tr>
+          </table>
+          <h3 style="margin-top:24px;">Recommended Actions</h3>
+          <ol>
+            <li>Open each duplicate subscription link above in Stripe Dashboard.</li>
+            <li>Confirm the customer was charged twice for the same plan (check payment dates).</li>
+            <li>Cancel the older duplicate subscription(s) and issue a refund for any duplicate charge if appropriate.</li>
+            <li>If the customer intentionally has two subscriptions (e.g. different accounts), do not cancel — contact them first.</li>
+          </ol>
+          <p style="color:#6b7280;font-size:12px;">This notification was generated automatically. No subscription has been cancelled.</p>
+        `,
+      }).catch((emailErr: unknown) => {
+        console.error("[MembershipFulfillment] Failed to send duplicate subscription admin email:", emailErr);
+      });
     }
   } catch (err) {
     console.error("[MembershipFulfillment] cancelDuplicateStripeSubscriptions failed:", err);
   }
-  return cancelled;
+  return duplicates;
 }

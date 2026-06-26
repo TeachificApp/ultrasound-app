@@ -371,7 +371,7 @@ export const brandMembershipRouter = router({
               type: "brand_membership_upgrade",
               interval: "lifetime",
             },
-          });
+          }, { idempotencyKey: `brand-lifetime-${ctx.user.id}-${brand}-${new Date().toISOString().slice(0, 10)}` });
           if (!session.url) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
           }
@@ -401,7 +401,7 @@ export const brandMembershipRouter = router({
             type: "brand_membership_upgrade",
             interval: input.interval,
           },
-        });
+        }, { idempotencyKey: `brand-sub-${ctx.user.id}-${brand}-${input.interval}-${new Date().toISOString().slice(0, 10)}` });
         if (!session.url) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
         }
@@ -443,7 +443,7 @@ export const brandMembershipRouter = router({
             customer_name: ctx.user.name ?? "",
             type: "dual_membership",
           },
-        });
+        }, { idempotencyKey: `dual-monthly-${ctx.user.id}-${new Date().toISOString().slice(0, 10)}` });
         if (!session.url) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
         }
@@ -481,7 +481,7 @@ export const brandMembershipRouter = router({
             customer_name: ctx.user.name ?? "",
             type: "dual_membership_lifetime",
           },
-        });
+        }, { idempotencyKey: `dual-lifetime-${ctx.user.id}-${new Date().toISOString().slice(0, 10)}` });
         if (!session.url) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
         }
