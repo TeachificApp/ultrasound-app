@@ -627,6 +627,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
         tags: JSON.stringify(input.tags),
         echoCategory: input.echoCategory,
         category: input.category as any,
+        brand: ctx.brand as any,
         isActive: true,
         createdByUserId: ctx.user.id,
       });
@@ -2592,6 +2593,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         difficulty: input.difficulty,
         tags: JSON.stringify(input.tags),
         category: input.category as any,
+        brand: ctx.brand as any,
         isActive: false,
         submittedByUserId: ctx.user.id,
         submitterName: input.submitterName ?? null,
