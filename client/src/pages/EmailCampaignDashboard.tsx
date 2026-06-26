@@ -328,21 +328,26 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
                   </div>
                   <div className="text-center p-3 bg-blue-50 rounded-lg">
                     <div className="text-xl font-bold text-blue-700">{analytics.uniqueOpens.toLocaleString()}</div>
-                    <div className="text-xs text-blue-500">Unique Opens ({analytics.openRate}%)</div>
-                    {analytics.totalOpens > analytics.uniqueOpens && (
-                      <div className="text-[10px] text-blue-400 mt-1">{analytics.totalOpens} total</div>
-                    )}
+                    <div className="text-xs text-blue-500 font-medium">{analytics.openRate}% open rate</div>
+                    <div className="text-[10px] text-blue-400 mt-0.5">
+                      {analytics.totalOpens > analytics.uniqueOpens
+                        ? `${analytics.totalOpens.toLocaleString()} total · ${analytics.uniqueOpens.toLocaleString()} unique`
+                        : "unique opens"}
+                    </div>
                   </div>
                   <div className="text-center p-3 bg-green-50 rounded-lg">
                     <div className="text-xl font-bold text-green-700">{analytics.uniqueClicks.toLocaleString()}</div>
-                    <div className="text-xs text-green-500">Unique Clicks ({analytics.clickRate}%)</div>
-                    {analytics.totalClicks > analytics.uniqueClicks && (
-                      <div className="text-[10px] text-green-400 mt-1">{analytics.totalClicks} total</div>
-                    )}
+                    <div className="text-xs text-green-500 font-medium">{analytics.clickRate}% click rate</div>
+                    <div className="text-[10px] text-green-400 mt-0.5">
+                      {analytics.totalClicks > analytics.uniqueClicks
+                        ? `${analytics.totalClicks.toLocaleString()} total · ${analytics.uniqueClicks.toLocaleString()} unique`
+                        : "unique clicks"}
+                    </div>
                   </div>
                   <div className="text-center p-3 bg-red-50 rounded-lg">
                     <div className="text-xl font-bold text-red-700">{analytics.totalUnsubscribes.toLocaleString()}</div>
-                    <div className="text-xs text-red-500">Unsubs ({analytics.unsubscribeRate}%)</div>
+                    <div className="text-xs text-red-500 font-medium">{analytics.unsubscribeRate}% unsub rate</div>
+                    <div className="text-[10px] text-red-400 mt-0.5">unsubscribes</div>
                   </div>
                 </div>
 
