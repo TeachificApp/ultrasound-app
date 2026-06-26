@@ -292,6 +292,41 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
             <BarChart2 className="w-5 h-5 text-[#189aa1]" />
             <span className="truncate">{subject}</span>
           </DialogTitle>
+          {/* Campaign summary banner */}
+          {analytics && !isLoading && (
+            <div className="mt-2 mb-1 rounded-lg border bg-gradient-to-r from-[#189aa1]/8 to-[#189aa1]/4 px-4 py-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div>
+                  <div className="text-lg font-bold text-gray-900">{analytics.totalSent.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Sent</div>
+                  {analytics.sentAt && (
+                    <div className="text-[10px] text-gray-400 mt-0.5">{new Date(analytics.sentAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-blue-700">{analytics.uniqueOpens.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unique Opens</div>
+                  <div className="text-[10px] text-blue-500 mt-0.5">{analytics.openRate}% rate</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-green-700">{analytics.uniqueClicks.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unique Clicks</div>
+                  <div className="text-[10px] text-green-500 mt-0.5">{analytics.clickRate}% rate · {analytics.totalClicks.toLocaleString()} total</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-red-600">{analytics.totalUnsubscribes.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unsubscribes</div>
+                  <div className="text-[10px] text-red-400 mt-0.5">{analytics.unsubscribeRate}% rate</div>
+                </div>
+              </div>
+              {analytics.orders && analytics.orders.count > 0 && (
+                <div className="mt-2 pt-2 border-t border-[#189aa1]/20 flex items-center gap-4 text-xs text-amber-700">
+                  <span className="font-semibold">💰 {analytics.orders.count} attributed order{analytics.orders.count !== 1 ? "s" : ""}</span>
+                  <span>${(analytics.orders.revenueCents / 100).toFixed(2)} revenue</span>
+                </div>
+              )}
+            </div>
+          )}
           {/* Tab bar */}
           <div className="flex gap-1 mt-3 border-b">
             {(["overview", "recipients", "geo", "links"] as const).map((tab) => (
