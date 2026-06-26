@@ -666,6 +666,68 @@ export const teamRouter = router({
       };
     }),
   /**
+   * Public: submit a team/university inquiry (lead capture) for App brand subscriptions.
+   * No checkout — collects contact info and emails the admin.
+   */
+  submitInquiry: publicProcedure
+    .input(z.object({
+      orgName: z.string().min(2).max(200),
+      contactName: z.string().min(2).max(100),
+      contactEmail: z.string().email(),
+      contactPhone: z.string().max(30).optional(),
+      seatEstimate: z.number().int().min(1).max(10000),
+      brand: z.enum(["aaus", "iheartecho", "dual"]),
+      plan: z.enum(["monthly", "lifetime"]),
+      message: z.string().max(2000).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { env } = await import("../_core/env");
+      const bLabel =
+        input.brand === "aaus" ? "UltrasoundAssist\u2122" :
+        input.brand === "iheartecho" ? "EchoAssist\u2122" :
+        "Both Apps (UltrasoundAssist\u2122 + EchoAssist\u2122)";
+      const planLabel = input.plan === "monthly" ? "Monthly" : "Lifetime";
+
+      await notifyOwner({
+        title: `New Team Inquiry: ${input.orgName}`,
+        content: `**${input.contactName}** (${input.contactEmail}) from **${input.orgName}** is interested in a team subscription.\n\n- **App:** ${bLabel}\n- **Plan:** ${planLabel}\n- **Estimated seats:** ${input.seatEstimate}\n- **Message:** ${input.message || "(none)"}`,
+      });
+
+      await sendEmail({
+        to: env.platformAdminEmail,
+        subject: `[Team Inquiry] ${input.orgName} \u2014 ${input.seatEstimate} seats (${bLabel})`,
+        html: `
+          <h2>New Team / University Membership Inquiry</h2>
+          <table style="border-collapse:collapse;width:100%;max-width:600px">
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Organization</td><td style="padding:8px">${input.orgName}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Contact Name</td><td style="padding:8px">${input.contactName}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Contact Email</td><td style="padding:8px"><a href="mailto:${input.contactEmail}">${input.contactEmail}</a></td></tr>
+            ${input.contactPhone ? `<tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Phone</td><td style="padding:8px">${input.contactPhone}</td></tr>` : ""}
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">App Interest</td><td style="padding:8px">${bLabel}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Plan Preference</td><td style="padding:8px">${planLabel}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Estimated Seats</td><td style="padding:8px">${input.seatEstimate}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Message</td><td style="padding:8px">${input.message || "(none)"}</td></tr>
+          </table>
+          <p style="margin-top:16px">Reply directly to <a href="mailto:${input.contactEmail}">${input.contactEmail}</a> to follow up.</p>
+        `,
+      });
+
+      await sendEmail({
+        to: input.contactEmail,
+        subject: `We received your team membership inquiry \u2014 ${input.orgName}`,
+        html: `
+          <h2>Thanks for your interest, ${input.contactName}!</h2>
+          <p>We've received your inquiry for a <strong>${bLabel}</strong> team subscription (${planLabel}) for <strong>${input.orgName}</strong>.</p>
+          <p>Our team will be in touch within 1\u20132 business days to discuss pricing, onboarding, and next steps.</p>
+          <p>In the meantime, feel free to reply to this email with any questions.</p>
+          <br/><p>\u2014 The All About Ultrasound Team</p>
+        `,
+      });
+
+      return { success: true };
+    }),
+
+  /**
    * Admin: list all team subscriptions.
    */
   adminList: protectedProcedure.query(async ({ ctx }) => {
