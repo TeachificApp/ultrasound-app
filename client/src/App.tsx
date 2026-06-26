@@ -331,6 +331,10 @@ const CareerNetwork = lazy(() => import("./pages/CareerNetwork"));
 const CareerProfile = lazy(() => import("./pages/CareerProfile"));
 const CareerNetworkAdmin = lazy(() => import("./pages/admin/CareerNetworkAdmin"));
 const EmployerDashboard = lazy(() => import("./pages/EmployerDashboard"));
+const TeamSubscribePage = lazy(() => import("./pages/TeamSubscribePage"));
+const TeamDashboard = lazy(() => import("./pages/TeamDashboard"));
+const TeamJoinPage = lazy(() => import("./pages/TeamJoinPage"));
+const TeamSuccessPage = lazy(() => import("./pages/TeamSuccessPage"));
 
 function LearnAdminRedirect({ rest }: { rest?: string }) {
   return <HardRedirect to={`${LEARN_APP_URL}/admin/${rest ?? ""}`} />;
@@ -952,12 +956,17 @@ function IHeartEchoRouter() {
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />
-        <Route path="/premium" component={Premium} />
+                <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
-
+        {/* ── Team / University Subscriptions ──────────────────────── */}
+        <Route path="/team/subscribe" component={TeamSubscribePage} />
+        <Route path="/team/success" component={TeamSuccessPage} />
+        <Route path="/team/join" component={TeamJoinPage} />
+        <Route path="/team/:teamId">{() => <Suspense fallback={pageFallback}><TeamDashboard /></Suspense>}</Route>
+        <Route path="/team">{() => <Suspense fallback={pageFallback}><TeamDashboard /></Suspense>}</Route>
         {/* ── EchoAssist™ Hub ────────────────────────────────────────── */}
         <Route path="/echo-assist-hub" component={EchoAssistHub} />
         <Route path="/echoassist" component={EchoAssist} />

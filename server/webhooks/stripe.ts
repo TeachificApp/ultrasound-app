@@ -16,8 +16,8 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances } from "../../drizzle/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, teamSubscriptions, teamMembers } from "../../drizzle/schema";
+import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
@@ -2013,6 +2013,139 @@ function stripeWebhookRawBody(req: Request, res: Response, next: () => void) {
   });
 }
 
+/**
+ * Handle checkout.session.completed for Team/University subscriptions.
+ * Creates the teamSubscriptions row and sends a confirmation email.
+ * Reuses grantTeamMemberAccess from teamRouter (no duplication).
+ */
+async function handleTeamCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata as Record<string, string>) ?? {};
+  if (meta.type !== "team_subscription") return;
+
+  const db = await getDb();
+  if (!db) return;
+
+  const sessionId = session.id as string;
+  const userId = meta.user_id ? parseInt(meta.user_id) : null;
+  const customerEmail = (session.customer_email as string)
+    ?? (session.customer_details as Record<string, string>)?.email
+    ?? meta.customer_email;
+  const brand = (meta.brand ?? "aaus") as "aaus" | "iheartecho" | "dual";
+  const plan = (meta.plan ?? "monthly") as "monthly" | "lifetime";
+  const seatCount = meta.seat_count ? parseInt(meta.seat_count) : 1;
+  const orgName = meta.org_name ?? "Team";
+  const discountPct = meta.discount_pct ? parseInt(meta.discount_pct) : 0;
+  const pricePerSeatCents = meta.price_per_seat ? parseInt(meta.price_per_seat) : 0;
+  const totalAmountCents = (session.amount_total as number) ?? 0;
+
+  console.log(`[Stripe][Team] checkout.session.completed — email: ${customerEmail}, brand: ${brand}, plan: ${plan}, seats: ${seatCount}`);
+
+  if (!userId) {
+    console.warn(`[Stripe][Team] No user_id in metadata for session ${sessionId}`);
+    await notifyOwner({
+      title: "⚠️ Team Subscription — No User ID",
+      content: `Team subscription payment received but no user_id in metadata. Session: ${sessionId}. Email: ${customerEmail}. Manual fulfillment required.`,
+    });
+    return;
+  }
+
+  // Idempotency: check if already fulfilled
+  const [existing] = await db
+    .select({ id: teamSubscriptions.id })
+    .from(teamSubscriptions)
+    .where(eq(teamSubscriptions.stripeSessionId, sessionId))
+    .limit(1);
+  if (existing) {
+    console.log(`[Stripe][Team] Already fulfilled session ${sessionId} — skipping.`);
+    return;
+  }
+
+  // Extract Stripe subscription/payment intent IDs
+  const stripeSubscriptionId = plan === "monthly"
+    ? (session.subscription as string | undefined) ?? null
+    : null;
+  const stripePaymentIntentId = plan === "lifetime"
+    ? (session.payment_intent as string | undefined) ?? null
+    : null;
+  const stripeCustomerId = (session.customer as string | undefined) ?? null;
+
+  // Determine expiry for monthly (will be updated on renewal)
+  let currentPeriodEnd: Date | null = null;
+  if (plan === "monthly" && stripeSubscriptionId) {
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+      currentPeriodEnd = new Date((sub as any).current_period_end * 1000);
+    } catch (e) {
+      console.warn(`[Stripe][Team] Could not retrieve subscription period end:`, e);
+    }
+  }
+
+  // Create the team subscription row
+  const [inserted] = await db.insert(teamSubscriptions).values({
+    adminUserId: userId,
+    orgName,
+    brand,
+    plan,
+    seatCount,
+    status: "active",
+    stripeSessionId: sessionId,
+    stripeSubscriptionId,
+    stripePaymentIntentId,
+    stripeCustomerId,
+    discountPct,
+    pricePerSeatCents,
+    totalAmountCents,
+    currentPeriodEnd,
+    expiresAt: plan === "lifetime" ? null : currentPeriodEnd,
+  }).$returningId();
+
+  if (!inserted) {
+    console.error(`[Stripe][Team] Failed to insert teamSubscription for session ${sessionId}`);
+    await notifyOwner({
+      title: "⚠️ Team Subscription — DB Insert Failed",
+      content: `Session: ${sessionId}. Email: ${customerEmail}. Manual fulfillment required.`,
+    });
+    return;
+  }
+
+  console.log(`[Stripe][Team] Created team subscription ${inserted.id} for user ${userId} (${orgName})`);
+
+  // Send confirmation email to admin
+  const brandName = brand === "aaus" ? "UltrasoundAssist™" : brand === "iheartecho" ? "EchoAssist™" : "UltrasoundAssist™ + EchoAssist™";
+  const planLabel = plan === "lifetime" ? "Lifetime" : "Monthly";
+  const dashboardUrl = `https://app.allaboutultrasound.com/team/${inserted.id}`;
+  try {
+    await sendEmail({
+      to: { name: meta.customer_name ?? customerEmail, email: customerEmail },
+      subject: `Your ${brandName} Team Subscription is active — ${orgName}`,
+      htmlBody: emailWrapper(`
+        <h2 style="margin:0 0 16px;">Team subscription confirmed!</h2>
+        <p>Hi ${meta.customer_name ?? "there"},</p>
+        <p>Your <strong>${brandName} Team/University ${planLabel}</strong> subscription for <strong>${orgName}</strong> is now active.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px 0;color:#64748b;">Organisation</td><td style="padding:8px 0;font-weight:600;">${orgName}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;">Plan</td><td style="padding:8px 0;">${brandName} ${planLabel}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;">Seats</td><td style="padding:8px 0;">${seatCount} seat${seatCount > 1 ? "s" : ""}${discountPct > 0 ? ` (${discountPct}% bulk discount)` : ""}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;">Total</td><td style="padding:8px 0;">$${(totalAmountCents / 100).toFixed(2)}${plan === "monthly" ? "/month" : " one-time"}</td></tr>
+        </table>
+        <p>Head to your team dashboard to invite members and manage seats:</p>
+        <p style="margin:20px 0;"><a href="${dashboardUrl}" style="background:#0d9488;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Manage Team →</a></p>
+        <p style="color:#64748b;font-size:13px;">Each member you invite will receive an email with a link to activate their access.</p>
+      `),
+    });
+  } catch (emailErr) {
+    console.error(`[Stripe][Team] Failed to send confirmation email:`, emailErr);
+  }
+
+  // Notify owner
+  await notifyOwner({
+    title: `🎉 New Team Subscription — ${orgName}`,
+    content: `${customerEmail} purchased a ${brandName} Team ${planLabel} subscription for "${orgName}" — ${seatCount} seats. Total: $${(totalAmountCents / 100).toFixed(2)}. Team ID: ${inserted.id}.`,
+  }).catch(() => {});
+}
+
 async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Response) {
   const rawBody = req.rawBody ?? "";
   const sig = req.headers["stripe-signature"] as string | undefined;
@@ -2113,6 +2246,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       await handleWorkshopCheckoutCompleted(sessionObj);
       await handleMembershipCheckoutCompleted(sessionObj);
       await handleDiyCheckoutCompleted(sessionObj);
+      await handleTeamCheckoutCompleted(sessionObj);
       // Fire community workflow rules for any purchase (fire-and-forget)
       try {
         const meta = (sessionObj.metadata as Record<string, string>) ?? {};

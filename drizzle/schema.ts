@@ -7316,3 +7316,62 @@ export const lmsQuizGroupQuestions = mysqlTable("lms_quiz_group_questions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsQuizGroupQuestion = typeof lmsQuizGroupQuestions.$inferSelect;
+
+// ─── Team / University Subscriptions ─────────────────────────────────────────
+// A team subscription gives a purchaser (adminUserId) a pool of seats that
+// grant brand premium access to invited members.
+//
+// Pricing (per seat):
+//   Monthly: $9.97/seat/month  (15% discount → ~$8.47/seat/month at 10+ seats)
+//   Lifetime: $99.97/seat      (15% discount → ~$84.97/seat at 10+ seats)
+//
+// brand: "aaus" | "iheartecho" | "dual"
+//   dual = grants premium on both brands
+export const teamSubscriptions = mysqlTable("teamSubscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  adminUserId: int("adminUserId").notNull(),
+  orgName: varchar("orgName", { length: 200 }).notNull(),
+  brand: mysqlEnum("brand", ["aaus", "iheartecho", "dual"]).notNull(),
+  plan: mysqlEnum("plan", ["monthly", "lifetime"]).notNull(),
+  seatCount: int("seatCount").notNull(),
+  pricePerSeatCents: int("pricePerSeatCents").notNull(),
+  discountPct: int("discountPct").default(0).notNull(),
+  totalAmountCents: int("totalAmountCents").notNull(),
+  status: mysqlEnum("status", ["active", "past_due", "canceled", "expired"]).default("active").notNull(),
+  stripeCustomerId: varchar("stripeCustomerId", { length: 64 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 64 }),
+  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 64 }),
+  stripeSessionId: varchar("stripeSessionId", { length: 128 }),
+  currentPeriodStart: timestamp("currentPeriodStart"),
+  currentPeriodEnd: timestamp("currentPeriodEnd"),
+  canceledAt: timestamp("canceledAt"),
+  expiresAt: timestamp("expiresAt"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type TeamSubscription = typeof teamSubscriptions.$inferSelect;
+export type InsertTeamSubscription = typeof teamSubscriptions.$inferInsert;
+
+// ─── Team Members ─────────────────────────────────────────────────────────────
+// Each row is one seat assignment within a teamSubscription.
+// When a member accepts their invite, brandMemberships rows are created/updated
+// to grant them premium access on the subscription's brand(s).
+export const teamMembers = mysqlTable("teamMembers", {
+  id: int("id").autoincrement().primaryKey(),
+  teamId: int("teamId").notNull(),
+  userId: int("userId"),
+  inviteEmail: varchar("inviteEmail", { length: 320 }).notNull(),
+  displayName: varchar("displayName", { length: 100 }),
+  inviteStatus: mysqlEnum("inviteStatus", ["pending", "accepted", "revoked"]).default("pending").notNull(),
+  inviteToken: varchar("inviteToken", { length: 64 }),
+  invitedByUserId: int("invitedByUserId"),
+  joinedAt: timestamp("joinedAt"),
+  grantedMembershipIds: text("grantedMembershipIds"),
+  isActive: boolean("isActive").default(true).notNull(),
+  revokedAt: timestamp("revokedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type InsertTeamMember = typeof teamMembers.$inferInsert;
