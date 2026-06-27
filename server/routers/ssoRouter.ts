@@ -15,8 +15,8 @@ import { TRPCError } from "@trpc/server";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { ssoTokens, users, userRoles, diyOrganizations, diySubscriptions } from "../../drizzle/schema";
-import { getSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
+import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { sdk } from "../_core/sdk";
 
 const SSO_TOKEN_TTL_MS = 60_000; // 60 seconds
@@ -167,6 +167,12 @@ export const ssoRouter = router({
       const hostnameOverride = resolveAuthHostname(ctx.req);
       const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
       ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      // SameSite=Lax fallback — critical for browsers blocking SameSite=None cookies
+      // (Chrome 3rd-party blocking, Firefox Strict ETP, Brave, Safari ITP).
+      // Without this, exchangeToken sets a cookie the browser silently drops, causing
+      // window.location.reload() to see the user as unauthenticated and loop forever.
+      const laxCookieOptions = getLaxSessionCookieOptions(ctx.req, hostnameOverride);
+      ctx.res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxCookieOptions, maxAge: ONE_YEAR_MS });
       console.log(`[SSO exchangeToken] User ${user.id} signed in | domain=${hostnameOverride ?? "auto"} | cookie.domain=${cookieOptions.domain ?? "none"}`);
       return { success: true, userId: user.id };
     }),
