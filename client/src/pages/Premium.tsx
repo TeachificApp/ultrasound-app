@@ -711,7 +711,7 @@ export default function Premium() {
           <h3 className="text-center text-lg font-bold text-gray-700 mb-6" style={{ fontFamily: "Merriweather, serif" }}>
             Free vs Premium
           </h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-xl border border-gray-200 p-5">
               <div className="font-bold text-gray-500 text-sm mb-4 uppercase tracking-wider">Free</div>
               <ul className="space-y-2.5">
