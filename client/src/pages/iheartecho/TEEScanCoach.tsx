@@ -605,7 +605,7 @@ function ViewDetail({ view }: { view: typeof TEE_VIEWS[0] }) {
         <button onClick={() => toggle("howToGet")} className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors">
           <div className="flex items-center gap-2">
             <Target className="w-4 h-4" style={{ color: view.groupColor }} />
-            <span className="text-sm font-bold text-gray-800">How to Get This View</span>
+            <span className="text-sm font-bold text-gray-800">{(view as any).id === "tee_overview" ? "TEE Procedure" : "How to Get This View"}</span>
           </div>
           {openSections.howToGet ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
         </button>
