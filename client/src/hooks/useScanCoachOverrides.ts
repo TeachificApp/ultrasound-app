@@ -25,6 +25,8 @@ type OverrideRow = {
   echoImages: string | null;  // JSON array of EchoImage
   anatomyImageUrl: string | null;
   transducerImageUrl: string | null;
+  anatomy2ImageUrl: string | null;
+  transducer2ImageUrl: string | null;
   description: string | null;
   howToGet: string | null;
   tips: string | null;
@@ -73,8 +75,10 @@ function applyOverride<T extends Record<string, unknown>>(view: T, override: Ove
     merged.echoImageUrl = override.echoImageUrl;
     merged.echoImages = [{ url: override.echoImageUrl, fileKey: override.echoImageUrl, caption: null, sortOrder: 0 }];
   }
-  if (override.anatomyImageUrl)    merged.anatomyImageUrl    = override.anatomyImageUrl;
-  if (override.transducerImageUrl) merged.transducerImageUrl = override.transducerImageUrl;
+  if (override.anatomyImageUrl)     merged.anatomyImageUrl     = override.anatomyImageUrl;
+  if (override.transducerImageUrl)  merged.transducerImageUrl  = override.transducerImageUrl;
+  if (override.anatomy2ImageUrl)    merged.anatomy2ImageUrl    = override.anatomy2ImageUrl;
+  if (override.transducer2ImageUrl) merged.transducer2ImageUrl = override.transducer2ImageUrl;
 
   // Text overrides
   if (override.description) merged.description = override.description;
