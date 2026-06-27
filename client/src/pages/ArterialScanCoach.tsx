@@ -193,7 +193,6 @@ export default function ArterialScanCoach() {
                         <ScanCoachViewMediaPanel
               viewId={currentView.id}
               view={currentView}
-              showPlaceholder
             />
 
             {/* Tips */}

@@ -549,7 +549,7 @@ function ViewDetail({ view }: { view: typeof STRESS_VIEWS[0] }) {
           <p className="text-sm text-gray-700 leading-relaxed">{view.description}</p>
         </div>
       </div>
-      <ScanCoachViewMediaCard viewId={(view as any).id} view={view as any} showPlaceholder />
+      <ScanCoachViewMediaCard viewId={(view as any).id} view={view as any}/>
 
       {/* Acquisition grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

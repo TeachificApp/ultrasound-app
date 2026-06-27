@@ -196,7 +196,6 @@ export default function TCDScanCoach() {
                         <ScanCoachViewMediaPanel
               viewId={currentView.id}
               view={currentView}
-              showPlaceholder
             />
 
             {/* Tips */}

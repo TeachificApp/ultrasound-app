@@ -427,7 +427,6 @@ export default function PediatricScanCoach() {
                           <ScanCoachViewMediaPanel
               viewId={currentView.id}
               view={currentView}
-              showPlaceholder
             />
 
               {/* Tips */}

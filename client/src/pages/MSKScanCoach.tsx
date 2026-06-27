@@ -235,7 +235,6 @@ export default function MSKScanCoach() {
                         <ScanCoachViewMediaPanel
               viewId={currentView.id}
               view={currentView}
-              showPlaceholder
             />
 
             {/* Tips */}

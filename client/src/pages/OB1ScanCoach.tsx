@@ -210,7 +210,6 @@ export default function OB1ScanCoach() {
                         <ScanCoachViewMediaPanel
               viewId={currentView.id}
               view={currentView}
-              showPlaceholder
             />
 
             {/* Tips */}

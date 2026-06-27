@@ -216,7 +216,6 @@ export default function ScrotumScanCoach() {
                         <ScanCoachViewMediaPanel
               viewId={currentView.id}
               view={currentView}
-              showPlaceholder
             />
 
             {/* Tips */}

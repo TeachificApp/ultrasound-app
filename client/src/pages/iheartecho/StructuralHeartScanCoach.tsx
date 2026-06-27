@@ -530,7 +530,7 @@ function ViewDetail({ view }: { view: typeof SH_VIEWS[0] }) {
           <p className="text-sm text-gray-700 leading-relaxed">{view.description}</p>
         </div>
       </div>
-      <ScanCoachViewMediaCard viewId={(view as any).id} view={view as any} showPlaceholder />
+      <ScanCoachViewMediaCard viewId={(view as any).id} view={view as any}/>
 
       {/* Structures */}
       <div className="rounded-xl bg-white border border-gray-100 p-4">

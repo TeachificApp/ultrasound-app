@@ -304,7 +304,6 @@ function ViewDetail({ view }: { view: typeof RUSH_VIEWS[0] }) {
         <ScanCoachViewMediaPanel
           viewId={view.id}
           view={view}
-          showPlaceholder
           darkLabels
           className="mt-3"
         />

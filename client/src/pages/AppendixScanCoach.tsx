@@ -178,7 +178,6 @@ export default function AppendixScanCoach() {
                         <ScanCoachViewMediaPanel
               viewId={currentView.id}
               view={currentView}
-              showPlaceholder
             />
             <div className="divide-y divide-gray-50">
               {currentView.tips.map((tip, ti) => (

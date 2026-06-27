@@ -310,7 +310,6 @@ function ViewDetail({ view }: { view: typeof EFAST_VIEWS[0] }) {
         <ScanCoachViewMediaPanel
           viewId={view.id}
           view={view}
-          showPlaceholder
           darkLabels
           className="mt-3"
         />
