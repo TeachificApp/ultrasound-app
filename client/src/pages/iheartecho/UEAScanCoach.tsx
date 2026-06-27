@@ -746,6 +746,102 @@ function UEAScanCoachInner() {
             <p className="text-sm text-gray-500">Step-by-step protocol for safe and effective contrast administration</p>
           </div>
 
+          {/* ── Definity Reconstitution Guide ─────────────────────────────────── */}
+          <div className="bg-white rounded-xl border border-purple-100 shadow-sm mb-6 overflow-hidden"
+            style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
+            <div className="flex items-center gap-3 px-5 py-4"
+              style={{ background: "linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)" }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(255,255,255,0.15)" }}>
+                <Droplets className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-white font-black text-sm" style={{ fontFamily: "Merriweather, serif" }}>
+                  Definity® Activation — Step-by-Step
+                </h3>
+                <p className="text-purple-200 text-xs">Perflutren lipid microspheres · Lantheus Medical Imaging</p>
+              </div>
+              <span className="ml-auto text-[10px] font-bold px-2 py-1 rounded-full text-white"
+                style={{ background: "rgba(255,255,255,0.2)" }}>Vialmix Required</span>
+            </div>
+            <div className="p-5">
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-purple-50 border border-purple-100 mb-4">
+                <Info className="w-4 h-4 text-purple-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-purple-800 leading-relaxed">
+                  <strong>Kit contents:</strong> One vial of perflutren lipid microsphere suspension (2 mL), pre-filled with octafluoropropane (C₃F₈) gas. Refrigerate at 2–8 °C — do NOT freeze. Remove from refrigerator and allow to reach room temperature for at least 30 minutes before activation. Discard if frozen or if vial seal is broken.
+                </p>
+              </div>
+              <div className="space-y-3 mb-4">
+                {[
+                  { step: 1, title: "Inspect the vial", detail: "Check expiry date. The vial contains a clear, colorless liquid with a white gas headspace. Discard if the liquid appears cloudy, discolored, or contains visible particles. Ensure the vial has been at room temperature for ≥30 minutes.", timing: null, warning: null },
+                  { step: 2, title: "Load into Vialmix", detail: "Place the vial into the Vialmix mechanical activator (or equivalent vial shaker). Secure the vial in the holder. The Vialmix is required — manual shaking does not produce adequate microsphere activation.", timing: null, warning: "A Vialmix or equivalent mechanical activator is REQUIRED. Manual shaking is insufficient and will result in inadequate opacification." },
+                  { step: 3, title: "Activate for 45 seconds", detail: "Run the Vialmix for exactly 45 seconds. The liquid will turn milky-white as perflutren microspheres are formed. After activation, the suspension should appear uniformly opaque.", timing: "45 seconds", warning: null },
+                  { step: 4, title: "Inspect the activated suspension", detail: "Remove the vial from the Vialmix. Hold up to light — the suspension should be uniformly milky-white with no visible clumps. If the suspension is not uniform, activate for an additional 15 seconds. Discard if still not uniform.", timing: null, warning: null },
+                  { step: 5, title: "Withdraw the dose", detail: "Invert the vial immediately before each withdrawal. Using a 1 mL syringe, withdraw 10 µL/kg body weight (maximum 720 µL per injection). Dilute in 1 mL normal saline in the syringe for easier injection. For infusion: dilute 1.3 mL in 50 mL normal saline.", timing: null, warning: null },
+                  { step: 6, title: "Administer and flush", detail: "Inject as a slow IV bolus over 1–2 seconds via antecubital IV. Immediately follow with a 10 mL normal saline flush. LV opacification should appear within 3–5 cardiac cycles. For infusion: administer at 4 mL/min, titrate to effect.", timing: "Bolus over 1–2 sec", warning: null },
+                  { step: 7, title: "Repeat dosing", detail: "A second bolus of 10 µL/kg (max 720 µL) may be given if needed. Maximum total dose is 2 × 720 µL (1.44 mL) per study. Activated Definity is stable for 5 minutes after activation — discard unused suspension after 5 minutes.", timing: "Stable 5 min post-activation", warning: "Discard activated Definity after 5 minutes. Do NOT store activated suspension for later use." },
+                ].map(({ step, title, detail, timing, warning }) => (
+                  <div key={step} className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0 mt-0.5"
+                      style={{ background: "linear-gradient(135deg, #4c1d95, #7c3aed)" }}>
+                      {step}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                        <span className="text-xs font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>{title}</span>
+                        {timing && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">{timing}</span>}
+                      </div>
+                      <p className="text-xs text-gray-600 leading-relaxed">{detail}</p>
+                      {warning && (
+                        <div className="flex items-start gap-1.5 mt-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200">
+                          <AlertTriangle className="w-3 h-3 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-[10px] text-amber-800 leading-relaxed">{warning}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-lg border border-purple-100 overflow-hidden mb-4">
+                <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50">Quick-Reference Dosing</div>
+                <div className="divide-y divide-gray-100">
+                  {[
+                    { indication: "LVO — Bolus", dose: "10 µL/kg (max 720 µL)", flush: "10 mL NS", repeat: "×2 max" },
+                    { indication: "LVO — Infusion", dose: "1.3 mL in 50 mL NS", flush: "—", repeat: "4 mL/min" },
+                  ].map(({ indication, dose, flush, repeat }) => (
+                    <div key={indication} className="grid grid-cols-4 gap-2 px-3 py-2 text-xs">
+                      <span className="font-semibold text-gray-700">{indication}</span>
+                      <span className="text-purple-700 font-bold">{dose}</span>
+                      <span className="text-gray-500">{flush}</span>
+                      <span className="text-gray-500">{repeat}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg bg-purple-50 border border-purple-100 p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <CheckCircle className="w-3.5 h-3.5 text-purple-600" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Clinical Tips</span>
+                </div>
+                <ul className="space-y-1.5">
+                  {[
+                    "Definity REQUIRES a Vialmix — manual shaking does not produce adequate microsphere formation. Do not attempt to substitute.",
+                    "Activated Definity is only stable for 5 minutes — prepare immediately before injection and discard unused suspension.",
+                    "Definity carries an FDA Black Box Warning for serious cardiopulmonary reactions — have resuscitation equipment available.",
+                    "The weight-based dosing (10 µL/kg) means a 70 kg patient receives 700 µL — always calculate dose before drawing up.",
+                    "Definity is NOT approved for liver CEUS — use for cardiac LVO only in the United States.",
+                    "If the patient is obese (>100 kg), use the maximum dose of 720 µL — do not exceed regardless of weight.",
+                  ].map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" />
+                      <span className="text-xs text-purple-800 leading-relaxed">{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* ── Lumason Reconstitution Guide ─────────────────────────────────── */}
           <div className="bg-white rounded-xl border border-blue-100 shadow-sm mb-6 overflow-hidden"
             style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
@@ -898,102 +994,6 @@ function UEAScanCoachInner() {
                     <li key={i} className="flex items-start gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" />
                       <span className="text-xs text-teal-800 leading-relaxed">{tip}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Definity Reconstitution Guide ─────────────────────────────────── */}
-          <div className="bg-white rounded-xl border border-purple-100 shadow-sm mb-6 overflow-hidden"
-            style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
-            <div className="flex items-center gap-3 px-5 py-4"
-              style={{ background: "linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)" }}>
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: "rgba(255,255,255,0.15)" }}>
-                <Droplets className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-white font-black text-sm" style={{ fontFamily: "Merriweather, serif" }}>
-                  Definity® Activation — Step-by-Step
-                </h3>
-                <p className="text-purple-200 text-xs">Perflutren lipid microspheres · Lantheus Medical Imaging</p>
-              </div>
-              <span className="ml-auto text-[10px] font-bold px-2 py-1 rounded-full text-white"
-                style={{ background: "rgba(255,255,255,0.2)" }}>Vialmix Required</span>
-            </div>
-            <div className="p-5">
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-purple-50 border border-purple-100 mb-4">
-                <Info className="w-4 h-4 text-purple-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-purple-800 leading-relaxed">
-                  <strong>Kit contents:</strong> One vial of perflutren lipid microsphere suspension (2 mL), pre-filled with octafluoropropane (C₃F₈) gas. Refrigerate at 2–8 °C — do NOT freeze. Remove from refrigerator and allow to reach room temperature for at least 30 minutes before activation. Discard if frozen or if vial seal is broken.
-                </p>
-              </div>
-              <div className="space-y-3 mb-4">
-                {[
-                  { step: 1, title: "Inspect the vial", detail: "Check expiry date. The vial contains a clear, colorless liquid with a white gas headspace. Discard if the liquid appears cloudy, discolored, or contains visible particles. Ensure the vial has been at room temperature for ≥30 minutes.", timing: null, warning: null },
-                  { step: 2, title: "Load into Vialmix", detail: "Place the vial into the Vialmix mechanical activator (or equivalent vial shaker). Secure the vial in the holder. The Vialmix is required — manual shaking does not produce adequate microsphere activation.", timing: null, warning: "A Vialmix or equivalent mechanical activator is REQUIRED. Manual shaking is insufficient and will result in inadequate opacification." },
-                  { step: 3, title: "Activate for 45 seconds", detail: "Run the Vialmix for exactly 45 seconds. The liquid will turn milky-white as perflutren microspheres are formed. After activation, the suspension should appear uniformly opaque.", timing: "45 seconds", warning: null },
-                  { step: 4, title: "Inspect the activated suspension", detail: "Remove the vial from the Vialmix. Hold up to light — the suspension should be uniformly milky-white with no visible clumps. If the suspension is not uniform, activate for an additional 15 seconds. Discard if still not uniform.", timing: null, warning: null },
-                  { step: 5, title: "Withdraw the dose", detail: "Invert the vial immediately before each withdrawal. Using a 1 mL syringe, withdraw 10 µL/kg body weight (maximum 720 µL per injection). Dilute in 1 mL normal saline in the syringe for easier injection. For infusion: dilute 1.3 mL in 50 mL normal saline.", timing: null, warning: null },
-                  { step: 6, title: "Administer and flush", detail: "Inject as a slow IV bolus over 1–2 seconds via antecubital IV. Immediately follow with a 10 mL normal saline flush. LV opacification should appear within 3–5 cardiac cycles. For infusion: administer at 4 mL/min, titrate to effect.", timing: "Bolus over 1–2 sec", warning: null },
-                  { step: 7, title: "Repeat dosing", detail: "A second bolus of 10 µL/kg (max 720 µL) may be given if needed. Maximum total dose is 2 × 720 µL (1.44 mL) per study. Activated Definity is stable for 5 minutes after activation — discard unused suspension after 5 minutes.", timing: "Stable 5 min post-activation", warning: "Discard activated Definity after 5 minutes. Do NOT store activated suspension for later use." },
-                ].map(({ step, title, detail, timing, warning }) => (
-                  <div key={step} className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0 mt-0.5"
-                      style={{ background: "linear-gradient(135deg, #4c1d95, #7c3aed)" }}>
-                      {step}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                        <span className="text-xs font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>{title}</span>
-                        {timing && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">{timing}</span>}
-                      </div>
-                      <p className="text-xs text-gray-600 leading-relaxed">{detail}</p>
-                      {warning && (
-                        <div className="flex items-start gap-1.5 mt-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200">
-                          <AlertTriangle className="w-3 h-3 text-amber-600 flex-shrink-0 mt-0.5" />
-                          <p className="text-[10px] text-amber-800 leading-relaxed">{warning}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="rounded-lg border border-purple-100 overflow-hidden mb-4">
-                <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50">Quick-Reference Dosing</div>
-                <div className="divide-y divide-gray-100">
-                  {[
-                    { indication: "LVO — Bolus", dose: "10 µL/kg (max 720 µL)", flush: "10 mL NS", repeat: "×2 max" },
-                    { indication: "LVO — Infusion", dose: "1.3 mL in 50 mL NS", flush: "—", repeat: "4 mL/min" },
-                  ].map(({ indication, dose, flush, repeat }) => (
-                    <div key={indication} className="grid grid-cols-4 gap-2 px-3 py-2 text-xs">
-                      <span className="font-semibold text-gray-700">{indication}</span>
-                      <span className="text-purple-700 font-bold">{dose}</span>
-                      <span className="text-gray-500">{flush}</span>
-                      <span className="text-gray-500">{repeat}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="rounded-lg bg-purple-50 border border-purple-100 p-3">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <CheckCircle className="w-3.5 h-3.5 text-purple-600" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Clinical Tips</span>
-                </div>
-                <ul className="space-y-1.5">
-                  {[
-                    "Definity REQUIRES a Vialmix — manual shaking does not produce adequate microsphere formation. Do not attempt to substitute.",
-                    "Activated Definity is only stable for 5 minutes — prepare immediately before injection and discard unused suspension.",
-                    "Definity carries an FDA Black Box Warning for serious cardiopulmonary reactions — have resuscitation equipment available.",
-                    "The weight-based dosing (10 µL/kg) means a 70 kg patient receives 700 µL — always calculate dose before drawing up.",
-                    "Definity is NOT approved for liver CEUS — use for cardiac LVO only in the United States.",
-                    "If the patient is obese (>100 kg), use the maximum dose of 720 µL — do not exceed regardless of weight.",
-                  ].map((tip, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" />
-                      <span className="text-xs text-purple-800 leading-relaxed">{tip}</span>
                     </li>
                   ))}
                 </ul>

@@ -23,6 +23,12 @@ import type { Brand } from "../../shared/brands";
  * Brand-specific Stripe product configuration.
  * Annual plans are HIDDEN (showAnnual: false) — set to true to re-enable.
  */
+/** July 31 2026 11:59 PM ET — after this, annual replaces lifetime */
+const LIFETIME_OFFER_END = new Date("2026-08-01T03:59:00.000Z"); // 2026-07-31 23:59 ET = 2026-08-01 03:59 UTC
+export function isLifetimeOfferActive(): boolean {
+  return Date.now() < LIFETIME_OFFER_END.getTime();
+}
+
 export const BRAND_PRODUCTS: Record<Brand, {
   name: string;
   monthlyPrice: number;  // cents
@@ -44,7 +50,7 @@ export const BRAND_PRODUCTS: Record<Brand, {
     // If these IDs are missing in the active Stripe account (test vs live), checkout falls back to price_data.
     monthlyPriceId: "price_1Tl7paPvVOPkJOleJ54i6mht",
     lifetimePriceId: "price_1Tl7pbPvVOPkJOleDjA0D43O",
-    showAnnual: false,
+    showAnnual: !isLifetimeOfferActive() ? true : false,
   },
   iheartecho: {
     name: "EchoAssist™ Premium Access",
@@ -55,7 +61,7 @@ export const BRAND_PRODUCTS: Record<Brand, {
     // Canonical Stripe Price IDs — created 2026-06-22 via create-live-stripe-products.mts
     monthlyPriceId: "price_1Tl7pbPvVOPkJOleNx8QfKEJ",
     lifetimePriceId: "price_1Tl7pbPvVOPkJOleQayUZjad",
-    showAnnual: false,
+    showAnnual: !isLifetimeOfferActive() ? true : false,
   },
 };
 
@@ -67,6 +73,7 @@ export const DUAL_MEMBERSHIP_PRODUCT = {
   name: "All Access Dual Membership — UltrasoundAssist™ + EchoAssist™",
   description: "Full premium access to both All About Ultrasound™ (UltrasoundAssist™) and iHeartEcho™ (EchoAssist™) platforms.",
   monthlyPrice: 1299,   // $12.99/month
+  annualPrice: 14700,   // $147.00/year — same rate as former lifetime
   lifetimePrice: 14700, // $147.00 one-time Founding Member
   currency: "usd",
   // Canonical Stripe Price IDs — created 2026-06-22 via create-live-stripe-products.mts
@@ -202,6 +209,22 @@ async function buildDualMonthlyLineItem(stripe: StripeClient) {
       },
       unit_amount: DUAL_MEMBERSHIP_PRODUCT.monthlyPrice,
       recurring: { interval: "month" as const, interval_count: 1 },
+    },
+    quantity: 1,
+  };
+}
+
+async function buildDualAnnualLineItem(stripe: StripeClient) {
+  return {
+    price_data: {
+      currency: DUAL_MEMBERSHIP_PRODUCT.currency,
+      product_data: {
+        name: DUAL_MEMBERSHIP_PRODUCT.name,
+        description: "Annual subscription — UltrasoundAssist™ + EchoAssist™",
+        metadata: { type: "dual_membership" },
+      },
+      unit_amount: DUAL_MEMBERSHIP_PRODUCT.annualPrice,
+      recurring: { interval: "year" as const, interval_count: 1 },
     },
     quantity: 1,
   };
@@ -482,6 +505,48 @@ export const brandMembershipRouter = router({
             type: "dual_membership_lifetime",
           },
         }, { idempotencyKey: `dual-lifetime-${ctx.user.id}-${new Date().toISOString().slice(0, 10)}` });
+        if (!session.url) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
+        }
+        return { checkoutUrl: session.url };
+      } catch (err) {
+        wrapStripeCheckoutError(err);
+      }
+    }),
+
+  /**
+   * Create a Stripe Checkout session for Dual Annual Membership ($147/year — post-lifetime-offer).
+   */
+  createDualAnnualCheckout: protectedProcedure
+    .input(z.object({
+      origin: z.string().url(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertStripeConfigured();
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      try {
+        const dualAnnualLineItem = await buildDualAnnualLineItem(stripe);
+        const session = await stripe.checkout.sessions.create({
+          mode: "subscription",
+          customer_email: ctx.user.email ?? undefined,
+          allow_promotion_codes: true,
+          line_items: [dualAnnualLineItem],
+          subscription_data: {
+            description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Annual Subscription`,
+            metadata: { user_id: ctx.user.id.toString(), type: "dual_membership" },
+          },
+          success_url: `${input.origin}/upgrade-success?dual=1&session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${input.origin}/premium`,
+          client_reference_id: ctx.user.id.toString(),
+          metadata: {
+            user_id: ctx.user.id.toString(),
+            customer_email: ctx.user.email ?? "",
+            customer_name: ctx.user.name ?? "",
+            type: "dual_membership",
+          },
+        }, { idempotencyKey: `dual-annual-${ctx.user.id}-${new Date().toISOString().slice(0, 10)}` });
         if (!session.url) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
         }

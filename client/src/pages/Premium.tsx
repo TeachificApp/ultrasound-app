@@ -26,7 +26,8 @@ import { SUBSCRIPTION_RESUME_LABEL, premiumResumeHref } from "@/lib/accessCta";
 // ─── Countdown timer hook ─────────────────────────────────────────────────────
 // Counts down to a fixed "offer end" date — 14 days from a hard-coded epoch.
 // Update OFFER_END_DATE to change when the urgency timer expires.
-const OFFER_END_DATE = new Date("2025-12-31T23:59:59Z");
+// July 31 2026 11:59 PM ET = Aug 1 2026 03:59 UTC
+const OFFER_END_DATE = new Date("2026-08-01T03:59:00.000Z");
 
 function useCountdown(target: Date) {
   const calc = useCallback(() => {
@@ -250,6 +251,11 @@ export default function Premium() {
     onError: handleCheckoutError,
   });
 
+  const dualAnnual = trpc.brandMembership.createDualAnnualCheckout.useMutation({
+    onSuccess: handleCheckoutSuccess,
+    onError: handleCheckoutError,
+  });
+
   const checkAndSync = trpc.premium.checkAndSync.useMutation({
     onSuccess: (data) => {
       setSyncMessage(data.message);
@@ -278,6 +284,7 @@ export default function Premium() {
     checkAndSync.mutate();
   };
 
+  const lifetimeExpired = countdown.expired; // true after July 31 11:59 PM ET
   const loading = authLoading || statusLoading;
   const { runGuarded, isGuarded } = useCheckoutClickGuard();
 
@@ -334,10 +341,10 @@ export default function Premium() {
   return (
     <Layout>
       {/* ── Urgency Banner ──────────────────────────────────────────────────── */}
-      {!countdown.expired && (
+      {!lifetimeExpired && (
         <div className="bg-amber-500 text-white text-center py-2 px-4 text-xs font-bold tracking-wide flex items-center justify-center gap-2">
           <Flame className="w-3.5 h-3.5 flex-shrink-0" />
-          Founding Member pricing ending soon — lock in lifetime access before prices increase.
+          Founding Member pricing ending July 31 — lock in lifetime access before it’s gone.
           <Flame className="w-3.5 h-3.5 flex-shrink-0" />
         </div>
       )}
@@ -369,24 +376,28 @@ export default function Premium() {
             {!status?.isPremium && (
               <div className="inline-block bg-amber-50/10 border border-amber-400/30 rounded-2xl px-5 py-4 mb-6 w-full max-w-md mx-auto">
                 <div className="flex items-center justify-center gap-2 mb-1.5">
-                  <Flame className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                  {!lifetimeExpired && <Flame className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
                   <span className="font-black text-white text-sm" style={{ fontFamily: "Merriweather, serif" }}>
-                    Founding Member Pricing — Limited Time
+                    {lifetimeExpired ? "Annual Membership" : "Founding Member Pricing — Limited Time"}
                   </span>
-                  <Flame className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                  {!lifetimeExpired && <Flame className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
                 </div>
                 <p className="text-white/60 text-xs mb-3">
-                  Lock in lifetime access to {appName} before future pricing increases.
+                  {lifetimeExpired
+                    ? `Get full annual access to ${appName} — $99.97/year.`
+                    : `Lock in lifetime access to ${appName} before future pricing increases.`}
                 </p>
                 {user ? (
                   <Button
-                    onClick={() => singleLifetime.mutate({ interval: "lifetime", origin: window.location.origin })}
+                    onClick={() => lifetimeExpired
+                      ? singleLifetime.mutate({ interval: "annual", origin: window.location.origin })
+                      : singleLifetime.mutate({ interval: "lifetime", origin: window.location.origin })}
                     disabled={singleLifetime.isPending}
                     className="font-bold px-6 py-2 text-sm rounded-xl text-white w-full sm:w-auto"
-                    style={{ background: "linear-gradient(90deg, #189aa1, #f59e0b)" }}
+                    style={{ background: lifetimeExpired ? "#189aa1" : "linear-gradient(90deg, #189aa1, #f59e0b)" }}
                   >
                     <Crown className="w-3.5 h-3.5 mr-1.5" />
-                    Get Lifetime Access — $99.97
+                    {lifetimeExpired ? "Get Annual Access — $99.97/yr" : "Get Lifetime Access — $99.97"}
                     <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
                   </Button>
                 ) : (
@@ -452,32 +463,43 @@ export default function Premium() {
                 </div>
               </div>
 
-              {/* 2. Lifetime — single app — FEATURED */}
-              <div className="bg-white rounded-2xl shadow-2xl px-5 py-6 flex flex-col border-2 border-amber-400 relative min-h-[260px]">
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-amber-400 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
-                  <Timer className="w-3 h-3" /> Limited Time
+              {/* 2. Lifetime (before deadline) / Annual (after deadline) — single app — FEATURED */}
+              <div className={`bg-white rounded-2xl shadow-2xl px-5 py-6 flex flex-col relative min-h-[260px] ${lifetimeExpired ? "border-2 border-[#189aa1]" : "border-2 border-amber-400"}`}>
+                {!lifetimeExpired && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-amber-400 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
+                    <Timer className="w-3 h-3" /> Limited Time
+                  </div>
+                )}
+                {lifetimeExpired && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-[#189aa1] text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
+                    <Crown className="w-3 h-3" /> Best Value
+                  </div>
+                )}
+                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${lifetimeExpired ? "text-[#189aa1]" : "text-amber-500"}`}>
+                  {lifetimeExpired ? "Annual Access" : "Lifetime Access"}
                 </div>
-                <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1">Lifetime Access</div>
-                <div className="text-3xl sm:text-4xl font-black text-amber-500 mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
+                <div className={`text-3xl sm:text-4xl font-black mb-0.5 ${lifetimeExpired ? "text-[#189aa1]" : "text-amber-500"}`} style={{ fontFamily: "Merriweather, serif" }}>
                   $99.97
                 </div>
-                <div className="text-gray-400 text-xs mb-0.5">one-time payment</div>
-                <div className="text-[10px] text-amber-500 font-semibold mb-1">{appName} only</div>
-                <div className="text-[10px] text-gray-400 mb-4">Lock in lifetime access before future pricing increases.</div>
+                <div className="text-gray-400 text-xs mb-0.5">{lifetimeExpired ? "per year · renews annually" : "one-time payment"}</div>
+                <div className={`text-[10px] font-semibold mb-1 ${lifetimeExpired ? "text-[#189aa1]" : "text-amber-500"}`}>{appName} only</div>
+                <div className="text-[10px] text-gray-400 mb-4">
+                  {lifetimeExpired ? "Full annual access — cancel anytime." : "Lock in lifetime access before future pricing increases."}
+                </div>
                 <div className="mt-auto">
                   {loading ? (
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-xs py-2">
-                      <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                      <div className={`w-3 h-3 border-2 ${lifetimeExpired ? "border-[#189aa1]" : "border-amber-400"} border-t-transparent rounded-full animate-spin`} />
                       Checking…
                     </div>
                   ) : status?.isPremium ? (
                     <ResumeBtn />
                   ) : user ? (
                     <CheckoutBtn
-                      label="Get Lifetime Access"
-                      onPay={() => singleLifetime.mutate({ interval: "lifetime", origin: window.location.origin, promoCode: promoCode ?? undefined })}
+                      label={lifetimeExpired ? "Get Annual Access" : "Get Lifetime Access"}
+                      onPay={() => singleLifetime.mutate({ interval: lifetimeExpired ? "annual" : "lifetime", origin: window.location.origin, promoCode: promoCode ?? undefined })}
                       isPending={singleLifetime.isPending}
-                      variant="gold"
+                      variant={lifetimeExpired ? "teal" : "gold"}
                     />
                   ) : (
                     <SignInBtn />
@@ -515,22 +537,26 @@ export default function Premium() {
                 </div>
               </div>
 
-              {/* 4. Dual Lifetime — BEST VALUE */}
+              {/* 4. Dual Lifetime (before deadline) / Dual Annual (after deadline) — BEST VALUE */}
               <div className="rounded-2xl shadow-2xl px-5 py-6 flex flex-col relative overflow-hidden min-h-[260px]"
                 style={{ background: "linear-gradient(135deg, #0e1e2e, #0e4a50)" }}>
                 <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  <Timer className="w-2.5 h-2.5" /> Limited-time offer
+                  {lifetimeExpired ? <><Crown className="w-2.5 h-2.5" /> Best Value</> : <><Timer className="w-2.5 h-2.5" /> Limited-time offer</>}
                 </div>
-                <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">Both Apps · Lifetime</div>
+                <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+                  {lifetimeExpired ? "Both Apps · Annual" : "Both Apps · Lifetime"}
+                </div>
                 <div className="text-3xl sm:text-4xl font-black text-white mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
                   $147
                 </div>
-                <div className="text-white/50 text-xs mb-0.5">one-time payment</div>
+                <div className="text-white/50 text-xs mb-0.5">{lifetimeExpired ? "per year · renews annually" : "one-time payment"}</div>
                 <div className="flex items-center gap-1 text-[10px] text-amber-400 font-semibold mb-1">
                   <Infinity className="w-3 h-3" />
                   UltrasoundAssist™ + EchoAssist™
                 </div>
-                <div className="text-[10px] text-white/40 mb-4">Founding Member pricing. Lock in before future increases.</div>
+                <div className="text-[10px] text-white/40 mb-4">
+                  {lifetimeExpired ? "Full annual access to both apps — cancel anytime." : "Founding Member pricing. Lock in before future increases."}
+                </div>
                 <div className="mt-auto">
                   {loading ? (
                     <div className="flex items-center justify-center gap-2 text-white/50 text-xs py-2">
@@ -539,13 +565,17 @@ export default function Premium() {
                     </div>
                   ) : user ? (
                     <Button
-                      onClick={() => dualLifetime.mutate({ origin: window.location.origin })}
-                      disabled={dualLifetime.isPending}
+                      onClick={() => lifetimeExpired
+                        ? dualAnnual.mutate({ origin: window.location.origin })
+                        : dualLifetime.mutate({ origin: window.location.origin })}
+                      disabled={lifetimeExpired ? dualAnnual.isPending : dualLifetime.isPending}
                       className="font-bold px-5 py-2.5 text-sm rounded-xl w-full text-white"
                       style={{ background: "linear-gradient(90deg, #189aa1, #f59e0b)" }}
                     >
-                      {dualLifetime.isPending ? (
+                      {(lifetimeExpired ? dualAnnual.isPending : dualLifetime.isPending) ? (
                         <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Processing…</>
+                      ) : lifetimeExpired ? (
+                        <><Crown className="w-4 h-4 mr-1.5" />Get Annual — Both Apps</>
                       ) : (
                         <><Crown className="w-4 h-4 mr-1.5" />Get Lifetime — Both Apps</>
                       )}
@@ -565,8 +595,10 @@ export default function Premium() {
             {/* Trust signals */}
             <div className="flex flex-wrap items-center justify-center gap-3 text-white/50 text-[11px] mb-4">
               <span className="flex items-center gap-1"><Shield className="w-3 h-3" /> Secure Stripe checkout</span>
-              <span className="flex items-center gap-1"><Clock  className="w-3 h-3" /> Monthly plans cancel anytime</span>
-              <span className="flex items-center gap-1"><Lock   className="w-3 h-3" /> One-time payment = permanent access</span>
+              <span className="flex items-center gap-1"><Clock  className="w-3 h-3" /> Monthly &amp; annual plans cancel anytime</span>
+              {!lifetimeExpired && (
+                <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> One-time payment = permanent access</span>
+              )}
               <span className="flex items-center gap-1"><Star   className="w-3 h-3" /> Instant access after checkout</span>
             </div>
 
@@ -749,16 +781,18 @@ export default function Premium() {
         {/* ── Bottom CTA ───────────────────────────────────────────────────── */}
         {!status?.isPremium && (
           <div className="mt-14 text-center">
-            <div className="inline-block bg-amber-50 border border-amber-200 rounded-2xl px-8 py-6 mb-6">
+            <div className={`inline-block rounded-2xl px-8 py-6 mb-6 ${lifetimeExpired ? "bg-[#f0fbfc] border border-[#189aa1]/30" : "bg-amber-50 border border-amber-200"}`}>
               <div className="flex items-center justify-center gap-2 mb-2">
-                <Flame className="w-4 h-4 text-amber-500" />
+                {!lifetimeExpired && <Flame className="w-4 h-4 text-amber-500" />}
                 <span className="font-black text-gray-800 text-base" style={{ fontFamily: "Merriweather, serif" }}>
-                  Founding Member Pricing — Limited Time
+                  {lifetimeExpired ? "Annual Membership" : "Founding Member Pricing — Limited Time"}
                 </span>
-                <Flame className="w-4 h-4 text-amber-500" />
+                {!lifetimeExpired && <Flame className="w-4 h-4 text-amber-500" />}
               </div>
               <p className="text-gray-500 text-sm mb-4">
-                Lock in lifetime access to {appName} before future pricing increases.
+                {lifetimeExpired
+                  ? `Get full annual access to ${appName} — cancel anytime.`
+                  : `Lock in lifetime access to ${appName} before future pricing increases.`}
               </p>
               {user ? (
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -773,23 +807,25 @@ export default function Premium() {
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                   <Button
-                    onClick={() => singleLifetime.mutate({ interval: "lifetime", origin: window.location.origin })}
+                    onClick={() => singleLifetime.mutate({ interval: lifetimeExpired ? "annual" : "lifetime", origin: window.location.origin })}
                     disabled={singleLifetime.isPending}
                     className="font-bold px-8 py-3 text-sm rounded-xl text-white"
-                    style={{ background: "linear-gradient(90deg, #b45309, #d97706)" }}
+                    style={{ background: lifetimeExpired ? "#189aa1" : "linear-gradient(90deg, #b45309, #d97706)" }}
                   >
                     <Crown className="w-4 h-4 mr-2" />
-                    Lifetime Access — $99.97
+                    {lifetimeExpired ? "Annual Access — $99.97/yr" : "Lifetime Access — $99.97"}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                   <Button
-                    onClick={() => dualLifetime.mutate({ origin: window.location.origin })}
-                    disabled={dualLifetime.isPending}
+                    onClick={() => lifetimeExpired
+                      ? dualAnnual.mutate({ origin: window.location.origin })
+                      : dualLifetime.mutate({ origin: window.location.origin })}
+                    disabled={lifetimeExpired ? dualAnnual.isPending : dualLifetime.isPending}
                     className="font-bold px-8 py-3 text-sm rounded-xl text-white"
                     style={{ background: "linear-gradient(90deg, #189aa1, #f59e0b)" }}
                   >
                     <Crown className="w-4 h-4 mr-2" />
-                    Both Apps Lifetime — $147
+                    {lifetimeExpired ? "Both Apps Annual — $147/yr" : "Both Apps Lifetime — $147"}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
@@ -803,7 +839,8 @@ export default function Premium() {
               )}
             </div>
             <p className="text-gray-400 text-xs">
-              Secure Stripe checkout · Monthly plans cancel anytime · One-time payment = permanent access
+              Secure Stripe checkout · Monthly &amp; annual plans cancel anytime
+              {!lifetimeExpired && " · One-time payment = permanent access"}
             </p>
           </div>
         )}
