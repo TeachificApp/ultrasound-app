@@ -54,7 +54,6 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScanCoachMediaPanel } from "@/components/ScanCoachMediaPanel";
 
 // Icon map for each ScanCoach module
 const MODULE_ICONS: Record<string, React.ReactNode> = {
@@ -99,6 +98,8 @@ type Override = {
   measurements: string | null;
   criticalFindings: string | null;
   updatedAt: Date;
+  transducerLabel: string | null;
+  anatomyLabel: string | null;
 };
 
 type DraftState = {
@@ -832,6 +833,9 @@ export default function ScanCoachEditor() {
   const [uploadingSlot, setUploadingSlot] = useState<ImageSlotKey | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
+  const [anatomyLabelDraft, setAnatomyLabelDraft] = useState<string>("");
+  const [transducerLabelDraft, setTransducerLabelDraft] = useState<string>("");
+  const [savingLabel, setSavingLabel] = useState<"anatomy" | "transducer" | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -846,6 +850,15 @@ export default function ScanCoachEditor() {
   );
 
   const { data: isAdmin, isLoading: checkingAdmin } = trpc.platformAdmin.isAdmin.useQuery();
+
+  const upsertSectionLabelsMutation = trpc.scanCoachAdmin.upsertSectionLabels.useMutation({
+    onSuccess: () => {
+      utils.scanCoachAdmin.listOverrides.invalidate();
+      setSavingLabel(null);
+      toast.success("Label saved");
+    },
+    onError: (e) => { setSavingLabel(null); toast.error(e.message); },
+  });
 
   const upsertMutation = trpc.scanCoachAdmin.upsertOverride.useMutation({
     onSuccess: () => {
@@ -1459,25 +1472,66 @@ export default function ScanCoachEditor() {
                         );
                       })()}
 
-                      {/* ── Anatomy + Transducer slots (single-image, unchanged) ── */}
+                      {/* ── Anatomy + Transducer slots with editable labels ── */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {IMAGE_SLOTS.filter((s) => s.key !== "echoImageUrl").map((slot) => (
+                        {/* Anatomy Image */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              className="text-xs font-semibold text-gray-600 bg-transparent border-b border-dashed border-gray-300 focus:border-[#189aa1] focus:outline-none flex-1 min-w-0 py-0.5"
+                              value={anatomyLabelDraft !== "" ? anatomyLabelDraft : (currentOverride?.anatomyLabel ?? "Anatomy Reference Image")}
+                              onChange={(e) => setAnatomyLabelDraft(e.target.value)}
+                              placeholder="Anatomy Reference Image"
+                              onBlur={() => {
+                                if (!selectedViewId) return;
+                                const val = anatomyLabelDraft.trim() || null;
+                                setSavingLabel("anatomy");
+                                upsertSectionLabelsMutation.mutate({ module: selectedModule, viewId: selectedViewId, anatomyLabel: val });
+                                setAnatomyLabelDraft("");
+                              }}
+                            />
+                            {savingLabel === "anatomy" && <span className="text-[10px] text-gray-400">saving…</span>}
+                          </div>
+                          <p className="text-xs text-gray-400">Anatomy diagram or labelled schematic</p>
                           <ImageUploadZone
-                            key={slot.key}
-                            slot={slot}
-                            currentUrl={currentOverride?.[slot.key as "anatomyImageUrl" | "transducerImageUrl"]}
-                            isUploading={uploadingSlot === slot.key}
-                            setIsUploading={(v) => setIsUploading(v ? slot.key : null)}
-                            onUploaded={(rawData) => handleImageUploaded(slot.key, rawData)}
-                            onCleared={() => handleClearImage(slot.key)}
+                            slot={{ key: "anatomyImageUrl", label: "", hint: "" }}
+                            currentUrl={currentOverride?.["anatomyImageUrl"]}
+                            isUploading={uploadingSlot === "anatomyImageUrl"}
+                            setIsUploading={(v) => setUploadingSlot(v ? "anatomyImageUrl" : null)}
+                            onUploaded={(rawData) => handleImageUploaded("anatomyImageUrl", rawData)}
+                            onCleared={() => handleClearImage("anatomyImageUrl")}
                           />
-                        ))}
+                        </div>
+                        {/* Transducer / Reference Image — editable title */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              className="text-xs font-semibold text-gray-600 bg-transparent border-b border-dashed border-gray-300 focus:border-[#189aa1] focus:outline-none flex-1 min-w-0 py-0.5"
+                              value={transducerLabelDraft !== "" ? transducerLabelDraft : (currentOverride?.transducerLabel ?? "Transducer Position Image")}
+                              onChange={(e) => setTransducerLabelDraft(e.target.value)}
+                              placeholder="Transducer Position Image"
+                              onBlur={() => {
+                                if (!selectedViewId) return;
+                                const val = transducerLabelDraft.trim() || null;
+                                setSavingLabel("transducer");
+                                upsertSectionLabelsMutation.mutate({ module: selectedModule, viewId: selectedViewId, transducerLabel: val });
+                                setTransducerLabelDraft("");
+                              }}
+                            />
+                            {savingLabel === "transducer" && <span className="text-[10px] text-gray-400">saving…</span>}
+                          </div>
+                          <p className="text-xs text-gray-400">Click the title above to rename for this exam type</p>
+                          <ImageUploadZone
+                            slot={{ key: "transducerImageUrl", label: "", hint: "" }}
+                            currentUrl={currentOverride?.["transducerImageUrl"]}
+                            isUploading={uploadingSlot === "transducerImageUrl"}
+                            setIsUploading={(v) => setUploadingSlot(v ? "transducerImageUrl" : null)}
+                            onUploaded={(rawData) => handleImageUploaded("transducerImageUrl", rawData)}
+                            onCleared={() => handleClearImage("transducerImageUrl")}
+                          />
+                        </div>
                       </div>
                     </div>
-                    {/* Admin Media Upload Panel (clinical + reference images/clips) */}
-                    {selectedViewId && (
-                      <ScanCoachMediaPanel viewId={selectedViewId} />
-                    )}
                     {/* WYSIWYG Content Editor */}
                     {draft && (
                       <div className="space-y-4">
