@@ -4,11 +4,19 @@
  * When authenticated, issues short-lived tokens and pings other app domains so
  * each can set a first-party session cookie on its own TLD (.allaboutultrasound.com
  * vs .iheartecho.com cookies are never shared — SSO is required).
+ *
+ * NOTE: Uses localStorage (not sessionStorage) so the broadcast flag persists
+ * across page reloads. sessionStorage is cleared on reload, which caused the
+ * broadcast to re-fire on every reload, wasting tokens and causing race conditions.
+ * The broadcast flag has a 30-minute TTL so it re-broadcasts after a while.
  */
 import { useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { broadcastStorageKey } from "@/lib/ssoSession";
+
+/** How long to suppress re-broadcast after a successful broadcast (30 minutes) */
+const BROADCAST_TTL_MS = 30 * 60 * 1000;
 
 const ALL_DOMAINS = [
   "https://app.iheartecho.com",
@@ -32,6 +40,12 @@ function hostnameFromOrigin(origin: string): string {
   }
 }
 
+/**
+ * Returns target domains to broadcast to, excluding the current domain.
+ * On staging (*.manus.space / *.manus.computer), the current origin won't
+ * match any of the production ALL_DOMAINS entries, so all production domains
+ * will be included as targets — this is correct and intentional.
+ */
 function getTargetDomains(): string[] {
   const current = window.location.origin;
   return ALL_DOMAINS.filter((d) => d !== current);
@@ -66,6 +80,36 @@ async function pingDomain(domain: string, token: string): Promise<void> {
   pingDomainWithImg(domain, token);
 }
 
+/**
+ * Check if the broadcast was already done recently for this user.
+ * Uses localStorage with a TTL so it persists across page reloads but
+ * re-broadcasts after 30 minutes (e.g., if the user opens a new tab later).
+ */
+function isBroadcastDone(userId: number): boolean {
+  try {
+    const key = broadcastStorageKey(userId);
+    const raw = localStorage.getItem(key);
+    if (!raw) return false;
+    const ts = Number(raw);
+    if (!Number.isFinite(ts)) return false;
+    if (Date.now() - ts >= BROADCAST_TTL_MS) {
+      localStorage.removeItem(key);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function markBroadcastDone(userId: number): void {
+  try {
+    localStorage.setItem(broadcastStorageKey(userId), String(Date.now()));
+  } catch {
+    /* storage full or private mode */
+  }
+}
+
 export function useCrossDomainSso() {
   const { user, loading } = useAuth();
   const issueTokens = trpc.sso.issueTokens.useMutation();
@@ -85,8 +129,8 @@ export function useCrossDomainSso() {
     if (lastUserId.current === userId) return;
     lastUserId.current = userId;
 
-    const broadcastKey = broadcastStorageKey(userId);
-    if (sessionStorage.getItem(broadcastKey)) return;
+    // localStorage-based TTL check — survives page reloads
+    if (isBroadcastDone(userId)) return;
 
     const targets = getTargetDomains();
     if (targets.length === 0) return;
@@ -98,7 +142,8 @@ export function useCrossDomainSso() {
       {
         onSuccess: ({ tokens, allowed }) => {
           if (!allowed || tokens.length === 0) return;
-          sessionStorage.setItem(broadcastKey, "1");
+          // Mark broadcast done BEFORE pinging so concurrent renders don't double-broadcast
+          markBroadcastDone(userId);
           targets.forEach((domain, i) => {
             const token = tokens[i];
             if (token) void pingDomain(domain, token);

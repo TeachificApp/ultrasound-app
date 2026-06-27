@@ -51,6 +51,8 @@ const ACCREDITATION_HOSTNAMES = [
 
 /** The canonical iHeartEcho app URL — used for all outbound links */
 export const IHEARTECHO_APP_URL = "https://app.iheartecho.com";
+/** The canonical accreditation division domain */
+export const ACCREDITATION_APP_URL = "https://accreditation.iheartecho.com";
 /** The canonical learn subdomain — course/quiz/download/product player access only */
 export const LEARN_APP_URL = "https://learn.allaboutultrasound.com";
 /** The canonical members subdomain — profile, dashboard, subscriptions */

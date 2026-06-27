@@ -6,13 +6,21 @@
  * the reload triggers a new network request, causing auth.me to return null and
  * restarting the SSO bridge loop.
  *
- * Fix: invalidate the auth.me cache first (React re-render), then do a delayed reload
- * only if auth.me still returns null after the invalidation (i.e., the cookie really
- * didn't land). This gives the browser time to commit the cookie before the next request.
+ * Fix strategy:
+ * 1. markSsoSuccess() — writes a localStorage timestamp BEFORE reload.
+ *    useSsoBridge checks isSsoSuccessRecent() and skips the bridge for 5 minutes.
+ *    This is the primary loop-breaker that survives the page reload.
+ * 2. 150ms delay — gives the browser time to commit the Set-Cookie header.
+ * 3. utils.auth.me.invalidate() — re-fetches auth state without a full reload.
+ * 4. 300ms delayed reload — refreshes full app state (memberships, roles, etc.).
  */
 import { useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
-import { clearSsoBridgeLock, clearSsoSessionLocks } from "@/lib/ssoSession";
+import {
+  clearSsoBridgeLock,
+  clearSsoSessionLocks,
+  markSsoSuccess,
+} from "@/lib/ssoSession";
 
 export function useSsoConsumer() {
   const exchangeToken = trpc.sso.exchangeToken.useMutation();
@@ -21,32 +29,42 @@ export function useSsoConsumer() {
 
   useEffect(() => {
     if (hasRun.current) return;
+
     const params = new URLSearchParams(window.location.search);
     const token = params.get("sso");
     if (!token) return;
 
     hasRun.current = true;
 
+    // Clean the token from the URL immediately so it's not reused on back-navigation
     params.delete("sso");
     const cleanSearch = params.toString();
     const cleanUrl =
-      window.location.pathname + (cleanSearch ? `?${cleanSearch}` : "") + window.location.hash;
+      window.location.pathname +
+      (cleanSearch ? `?${cleanSearch}` : "") +
+      window.location.hash;
     window.history.replaceState({}, "", cleanUrl);
 
     exchangeToken.mutate(
       { token },
       {
         onSuccess: async () => {
+          // CRITICAL: mark success BEFORE any reload so useSsoBridge skips
+          // re-triggering even if auth.me hasn't seen the cookie yet.
+          markSsoSuccess();
           clearSsoBridgeLock();
           clearSsoSessionLocks();
+
           // Give the browser a tick to commit the Set-Cookie header before
           // we query auth.me — this prevents the race condition where reload()
           // fires before the cookie is stored, making auth.me return null again.
           await new Promise((resolve) => setTimeout(resolve, 150));
+
           // Invalidate auth.me so React re-fetches with the new cookie.
           // If the cookie landed correctly, this will resolve the user and
           // useSsoBridge will see user !== null and stop retrying.
           await utils.auth.me.invalidate();
+
           // Small additional delay then reload to ensure the full app state
           // (memberships, roles, etc.) is refreshed from the server.
           setTimeout(() => {
