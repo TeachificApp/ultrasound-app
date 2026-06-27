@@ -79,8 +79,9 @@ describe("setSessionCookiesForUser", () => {
       "app.iheartecho.com",
     );
 
-    expect(res.cookie).toHaveBeenCalledTimes(2);
-    const domains = res.cookie.mock.calls.map((c) => c[2]?.domain);
-    expect(domains).toEqual([".iheartecho.com", ".iheartecho.com"]);
+    expect(res.cookie).toHaveBeenCalledTimes(3);
+    const domains = res.cookie.mock.calls.map((c: unknown[]) => (c[2] as { domain?: string })?.domain);
+    expect(domains).toContain(".iheartecho.com");
+    expect(domains).toContain(undefined);
   });
 });

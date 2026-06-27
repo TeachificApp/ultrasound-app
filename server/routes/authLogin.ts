@@ -24,10 +24,11 @@ import * as bcrypt from "bcryptjs";
 import { getDb, ensureUserRole } from "../db";
 import { users, accessTokenUses, ipSecurityFlags } from "../../drizzle/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
-import { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
+import { resolveAuthHostname } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
-import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { ONE_YEAR_MS } from "@shared/const";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
+import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
 
 export function registerAuthLoginRoute(app: Express) {
   /**
@@ -83,11 +84,7 @@ export function registerAuthLoginRoute(app: Express) {
         expiresInMs: ONE_YEAR_MS,
       });
       const hostnameOverride = resolveAuthHostname(req, typeof host === "string" ? host : undefined);
-      const cookieOptions = getSessionCookieOptions(req, hostnameOverride);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback for browsers blocking SameSite=None
-      const laxOpts = getLaxSessionCookieOptions(req, hostnameOverride);
-      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOpts, maxAge: ONE_YEAR_MS });
+      setAuthSessionCookies(req, res, sessionToken, hostnameOverride);
 
       const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
       const { ipAddress, userAgent } = getRequestClientInfo(req);
@@ -143,13 +140,8 @@ export function registerAuthLoginRoute(app: Express) {
         name: user.name ?? user.email ?? "User",
         expiresInMs: ONE_YEAR_MS,
       });
-      // Use the host param encoded in the magic link URL for cookie domain scoping.
-      // Cloudflare rewrites the Host header to the internal Cloud Run hostname, so we can't rely on req.hostname.
-      const cookieOptions = getSessionCookieOptions(req, hostParam || undefined);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback for browsers blocking SameSite=None
-      const laxOptsGet = getLaxSessionCookieOptions(req, hostParam || undefined);
-      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsGet, maxAge: ONE_YEAR_MS });
+      const cookieHostname = resolveAuthHostname(req, hostParam);
+      setAuthSessionCookies(req, res, sessionToken, cookieHostname);
 
       // IMPORTANT: Return a 200 HTML page instead of a 302 redirect.
       // Cloudflare strips Set-Cookie headers from 302 redirect responses on some configurations,
@@ -158,14 +150,23 @@ export function registerAuthLoginRoute(app: Express) {
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
 
-      console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, cookie domain=${cookieOptions.domain ?? 'none'}, secure=${cookieOptions.secure}, redirecting to ${successRedirect}`);
+      // Add auth_pending=1 so the dashboard retries auth.me before redirecting to login
+      const redirectUrl =
+        successRedirect +
+        (successRedirect.includes("?") ? "&" : "?") +
+        "auth_pending=1";
+
+      console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, host=${cookieHostname ?? hostParam ?? "auto"}, redirecting to ${redirectUrl}`);
       // Track login event via recordUserLogin
       const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
       const { ipAddress: mlIp, userAgent: mlUa } = getRequestClientInfo(req);
       await recordUserLogin(db, { userId: user.id, ipAddress: mlIp, userAgent: mlUa, method: "magic_link" });
 
+      // IMPORTANT: Return a 200 HTML page instead of a 302 redirect.
+      // Cloudflare strips Set-Cookie headers from 302 redirect responses on some configurations,
+      // even with Cache-Control: no-store. A 200 response with inline JS redirect is immune to this.
       // Escape the redirect path for safe HTML embedding
-      const safeRedirect = successRedirect.replace(/[<>"'&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] ?? c));
+      const safeRedirect = redirectUrl.replace(/[<>"'&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] ?? c));
       return res.status(200).send(`<!DOCTYPE html>
 <html>
 <head>
@@ -180,7 +181,7 @@ export function registerAuthLoginRoute(app: Express) {
     <p style="color:#4ad9e0;font-size:14px">Signing you in…</p>
   </div>
   <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-  <script>window.location.replace(${JSON.stringify(safeRedirect)});<\/script>
+  <script>window.location.replace(${JSON.stringify(redirectUrl)});<\/script>
 </body>
 </html>`);
     } catch (err) {
@@ -247,11 +248,7 @@ export function registerAuthLoginRoute(app: Express) {
         req,
         typeof hostBody === "string" ? hostBody : undefined,
       );
-      const cookieOptions = getSessionCookieOptions(req, magicPostHostname);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback for browsers blocking SameSite=None
-      const laxOptsPost = getLaxSessionCookieOptions(req, magicPostHostname);
-      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsPost, maxAge: ONE_YEAR_MS });
+      setAuthSessionCookies(req, res, sessionToken, magicPostHostname);
 
       const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
       const { ipAddress, userAgent } = getRequestClientInfo(req);
@@ -362,11 +359,7 @@ export function registerAuthLoginRoute(app: Express) {
       });
       // Use X-App-Hostname for cookie domain scoping on access-verify too
       const accessHostname = resolveAuthHostname(req);
-      const cookieOptions = getSessionCookieOptions(req, accessHostname);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback for browsers blocking SameSite=None
-      const laxOptsAccess = getLaxSessionCookieOptions(req, accessHostname);
-      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsAccess, maxAge: ONE_YEAR_MS });
+      setAuthSessionCookies(req, res, sessionToken, accessHostname);
 
       const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
       const { ipAddress: atIp, userAgent: atUa } = getRequestClientInfo(req);

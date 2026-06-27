@@ -159,8 +159,17 @@ export function hostnameFromRequestOrigin(req: Request): string | undefined {
 /** Resolve hostname override for cookie scoping on auth routes. */
 export function resolveAuthHostname(req: Request, explicitHost?: string): string | undefined {
   if (explicitHost) {
-    const cleaned = explicitHost.split(":")[0];
-    if (cleaned && !isInternalHost(cleaned)) return cleaned;
+    const cleaned = explicitHost.trim().split(":")[0].toLowerCase();
+    if (cleaned && !LOCAL_HOSTS.has(cleaned) && !isIpAddress(cleaned) && !isInternalHost(cleaned)) {
+      return cleaned;
+    }
+  }
+  const hostQuery = req.query?.host;
+  if (typeof hostQuery === "string" && hostQuery.trim()) {
+    const cleaned = hostQuery.trim().split(":")[0].toLowerCase();
+    if (cleaned && !LOCAL_HOSTS.has(cleaned) && !isIpAddress(cleaned) && !isInternalHost(cleaned)) {
+      return cleaned;
+    }
   }
   const fromOrigin = hostnameFromRequestOrigin(req);
   if (fromOrigin) return fromOrigin;
@@ -231,6 +240,27 @@ export function getLaxSessionCookieOptions(
     sameSite: "lax",
     secure,
     ...(domain ? { domain } : {}),
+  };
+}
+
+/**
+ * Host-only Lax cookie (no Domain attribute).
+ * Most reliable for magic-link email clicks — avoids Domain-scoped cookie rejection.
+ */
+export function getHostOnlyLaxSessionCookieOptions(
+  req: Request,
+): Pick<CookieOptions, "httpOnly" | "path" | "sameSite" | "secure"> {
+  const isProduction = !!(
+    req.headers["x-forwarded-proto"] ||
+    req.headers["x-forwarded-host"] ||
+    process.env.NODE_ENV === "production"
+  );
+  const secure = isProduction ? true : isSecureRequest(req);
+  return {
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax",
+    secure,
   };
 }
 

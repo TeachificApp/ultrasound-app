@@ -32,12 +32,13 @@ import * as crypto from "crypto";
 import { parse as parseCookieHeader } from "cookie";
 import { getDb } from "../db";
 import { ssoTokens, users } from "../../drizzle/schema";
-import { getSessionCookieOptions, getLaxSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
+import { ENV } from "../_core/env";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 import { redeemSsoTokenAndSetCookies } from "../lib/ssoExchange";
 import { resolveUserFromSessionOpenId } from "../lib/resolveUserFromSession";
-import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
+import { COOKIE_NAME, LAX_COOKIE_NAME } from "@shared/const";
 
 // 1×1 transparent GIF — used as the response body so <img> tags can trigger this
 const TRANSPARENT_GIF = Buffer.from(
@@ -173,21 +174,14 @@ export function registerSsoAutoRoute(app: Express) {
 
       const openId = await ensureUserOpenId(db, user);
 
-      // Issue a session token for this domain — same user, free membership
       const sessionToken = await sdk.signSession({
         openId,
-        appId: process.env.VITE_APP_ID ?? "",
+        appId: ENV.appId,
         name: user.name ?? user.email ?? "User",
       });
 
-      // Resolve the target hostname from ?domain= param (most reliable for <img> pings)
-      // then fall back to standard request-based resolution.
       const cookieHostname = resolveCookieHostname(req);
-      const cookieOptions = getSessionCookieOptions(req, cookieHostname);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback — for browsers blocking SameSite=None
-      const laxCookieOptions = getLaxSessionCookieOptions(req, cookieHostname);
-      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxCookieOptions, maxAge: ONE_YEAR_MS });
+      setAuthSessionCookies(req, res, sessionToken, cookieHostname ?? undefined);
 
       console.log(
         `[SsoAuto] Signed in user ${user.id} via cross-domain SSO` +
@@ -254,10 +248,15 @@ export function registerSsoAutoRoute(app: Express) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.setHeader("Pragma", "no-cache");
 
+      const redirectUrl =
+        successRedirect +
+        (successRedirect.includes("?") ? "&" : "?") +
+        "auth_pending=1";
+
       console.log(
-        `[SsoExchange] User ${result.userId} signed in | host=${hostParam ?? "auto"} | redirect=${successRedirect}`,
+        `[SsoExchange] User ${result.userId} signed in | host=${hostParam ?? "auto"} | redirect=${redirectUrl}`,
       );
-      return res.redirect(successRedirect);
+      return res.redirect(redirectUrl);
     } catch (err) {
       console.error("[SsoExchange] Error:", err);
       return res.redirect(`/login?sso_failed=1&returnTo=${encodeURIComponent(successRedirect)}`);

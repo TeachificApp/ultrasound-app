@@ -89,6 +89,20 @@ export default function Login() {
   // Detect if user just logged out — don't auto-redirect back
   const isPostLogout = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("logout");
 
+  // Clean SSO bridge noise from URL (left over from failed cross-domain bridge)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("bridge_try") && !params.has("sso_failed")) return;
+    params.delete("bridge_try");
+    params.delete("sso_failed");
+    const clean = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      window.location.pathname + (clean ? `?${clean}` : "") + window.location.hash,
+    );
+  }, []);
+
   // Redirect if already signed in (but NOT if user just clicked logout)
   useEffect(() => {
     if (isPostLogout) return; // User explicitly logged out — stay on login page

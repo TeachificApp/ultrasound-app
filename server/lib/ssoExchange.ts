@@ -3,11 +3,11 @@
  */
 import { and, eq, gt, isNull } from "drizzle-orm";
 import type { Request, Response } from "express";
-import { ssoTokens, users } from "../../drizzle/schema";
-import { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
+import { ENV } from "../_core/env";
 import { sdk } from "../_core/sdk";
-import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { ssoTokens, users } from "../../drizzle/schema";
 import { ensureUserOpenId } from "./ensureUserOpenId";
+import { setAuthSessionCookies } from "./setAuthSessionCookies";
 
 type Db = NonNullable<Awaited<ReturnType<typeof import("../db").getDb>>>;
 
@@ -48,14 +48,10 @@ export async function setSessionCookiesForUser(
 ): Promise<void> {
   const sessionToken = await sdk.signSession({
     openId,
-    appId: process.env.VITE_APP_ID ?? "",
+    appId: ENV.appId,
     name: displayName || "User",
   });
-  const hostname = resolveAuthHostname(req, hostnameOverride);
-  const cookieOptions = getSessionCookieOptions(req, hostname);
-  res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-  const laxCookieOptions = getLaxSessionCookieOptions(req, hostname);
-  res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxCookieOptions, maxAge: ONE_YEAR_MS });
+  setAuthSessionCookies(req, res, sessionToken, hostnameOverride);
 }
 
 export async function redeemSsoTokenAndSetCookies(
