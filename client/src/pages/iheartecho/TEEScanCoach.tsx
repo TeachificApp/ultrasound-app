@@ -466,38 +466,6 @@ export const TEE_VIEWS = [
     measurements: ["LVOT VTI", "AV peak velocity (CW)", "AVA by continuity equation"],
     criticalFindings: ["Severe AS (Vmax >4 m/s)", "LVOTO (dynamic obstruction)", "Prosthetic valve dysfunction"],
   },
-  {
-    id: "tgrvio",
-    group: "Transgastric",
-    groupColor: "#189aa1",
-    name: "TG RV Inflow",
-    angle: "100–120°",
-    depth: "40–45 cm",
-    flexion: "Anteflexion + rightward rotation",
-    patientPosition: "Supine; rotate probe clockwise from TG LAX",
-    description: "Transgastric view of the RV inflow. Shows the tricuspid valve subvalvular apparatus and RV from a transgastric window. Useful for TV repair guidance and RV function assessment.",
-    howToGet: [
-      "From TG LAX, rotate clockwise (rightward) 30–40°",
-      "Rotate multiplane angle to 100–120°",
-      "The RV and TV should come into view on the right side of the screen",
-    ],
-    structures: [
-      "Tricuspid valve (subvalvular apparatus)", "RV inflow",
-      "Right atrium", "Papillary muscles (RV)",
-    ],
-    doppler: [
-      { label: "TR CW Doppler (TG)", detail: "Alternative window for TR Vmax when ME alignment is poor" },
-    ],
-    tips: [
-      "Papillary muscle rupture of the TV is best seen from TG",
-      "Useful for TV repair — shows subvalvular anatomy clearly",
-    ],
-    pitfalls: [
-      "This view is technically challenging — may not be obtainable in all patients",
-    ],
-    measurements: ["TV subvalvular anatomy", "RV size (qualitative)"],
-    criticalFindings: ["TV papillary muscle rupture", "TV chordal rupture"],
-  },
   // ── Upper Esophageal ─────────────────────────────────────────────────────────
   {
     id: "uepv",
@@ -578,7 +546,7 @@ export const TEE_VIEWS = [
 const GROUPS = [
   { key: "Overview",        color: "#189aa1", label: "Overview",             count: 1 },
   { key: "Mid-Esophageal",  color: "#189aa1", label: "Mid-Esophageal (ME)",  count: 7 },
-  { key: "Transgastric",    color: "#189aa1", label: "Transgastric (TG)",    count: 4 },
+  { key: "Transgastric",    color: "#189aa1", label: "Transgastric (TG)",    count: 3 },
   { key: "Upper Esophageal",color: "#189aa1", label: "Upper Esophageal (UE)",count: 2 },
 ];
 

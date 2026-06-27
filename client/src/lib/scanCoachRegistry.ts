@@ -86,7 +86,6 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
       { id: "tgbasal",      name: "TG Basal SAX",                           group: "Transgastric" },
       { id: "tgsax",        name: "TG Mid SAX",                             group: "Transgastric" },
       { id: "tglax",        name: "TG Long Axis (LAX)",                     group: "Transgastric" },
-      { id: "tgrvio",       name: "TG RV Inflow",                           group: "Transgastric" },
       { id: "uepv",         name: "UE Pulmonary Veins",                     group: "Upper Esophageal" },
       { id: "ueaorticarch", name: "UE Aortic Arch",                         group: "Upper Esophageal" },
     ],
