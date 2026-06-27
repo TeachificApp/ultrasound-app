@@ -1,7 +1,7 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
-import { getSessionCookieOptions } from "./cookies";
+import { getSessionCookieOptions, getLaxSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 import { getDb } from "../db";
 import { userLoginEvents } from "../../drizzle/schema";
@@ -54,6 +54,11 @@ export function registerOAuthRoutes(app: Express) {
       } catch { /* ignore decode errors */ }
       const cookieOptions = getSessionCookieOptions(req, stateHostname);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      // Also set a SameSite=Lax fallback cookie so browsers that block SameSite=None
+      // (Chrome 3rd-party cookie blocking, Firefox Strict ETP, Brave, Safari ITP)
+      // can still authenticate on the same domain after a direct OAuth login.
+      const laxOptions = getLaxSessionCookieOptions(req, stateHostname);
+      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptions, maxAge: ONE_YEAR_MS });
 
       // Track login event + Thinkific free-member sync (fire-and-forget, non-blocking)
       db.getUserByOpenId(userInfo.openId).then(async (user) => {

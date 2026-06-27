@@ -254,9 +254,12 @@ export function registerSsoAutoRoute(app: Express) {
       const session = sessionCookie ? await sdk.verifySession(sessionCookie) : null;
 
       if (!session) {
-        // Not authenticated — redirect back without a token
+        // Not authenticated — redirect back with ?sso_failed=1 so the client
+        // knows the bridge was attempted and stops retrying (loop-breaker).
         console.log(`[SsoBridge] No session, redirecting back to ${returnUrl}`);
-        return res.redirect(returnUrl);
+        const failUrl = new URL(returnUrl);
+        failUrl.searchParams.set("sso_failed", "1");
+        return res.redirect(failUrl.toString());
       }
 
       // Authenticated — look up user and issue a short-lived SSO token
@@ -286,8 +289,10 @@ export function registerSsoAutoRoute(app: Express) {
       return res.redirect(redirectUrl.toString());
     } catch (err) {
       console.error("[SsoBridge] Error:", err);
-      // Fall through — redirect back without a token
-      return res.redirect(returnUrl);
+      // Fall through — redirect back with sso_failed so the client stops retrying
+      const failUrl = new URL(returnUrl);
+      failUrl.searchParams.set("sso_failed", "1");
+      return res.redirect(failUrl.toString());
     }
   });
 }

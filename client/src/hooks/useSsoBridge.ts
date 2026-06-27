@@ -47,6 +47,16 @@ export function useSsoBridge() {
     const params = new URLSearchParams(window.location.search);
     if (params.has("sso")) return;
 
+    // If the bridge already returned sso_failed=1, the primary domain has no session.
+    // Clean the param from the URL and stop retrying — the user needs to sign in manually.
+    if (params.has("sso_failed")) {
+      params.delete("sso_failed");
+      const cleanSearch = params.toString();
+      const cleanUrl = window.location.pathname + (cleanSearch ? `?${cleanSearch}` : "") + window.location.hash;
+      window.history.replaceState({}, "", cleanUrl);
+      return;
+    }
+
     const attemptBridge = () => {
       if (hasRun.current || userRef.current) return;
       if (isSsoBridgeBlocked()) return;
@@ -63,7 +73,8 @@ export function useSsoBridge() {
 
     const onVisible = () => {
       if (document.visibilityState !== "visible" || userRef.current) return;
-      if (new URLSearchParams(window.location.search).has("sso")) return;
+      const visParams = new URLSearchParams(window.location.search);
+      if (visParams.has("sso") || visParams.has("sso_failed")) return;
       if (!isSsoBridgeBlocked()) {
         hasRun.current = false;
         attemptBridge();

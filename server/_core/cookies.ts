@@ -1,5 +1,5 @@
 import type { CookieOptions, Request, Response } from "express";
-import { COOKIE_NAME, DEMO_COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, DEMO_COOKIE_NAME, LAX_COOKIE_NAME } from "@shared/const";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -204,11 +204,41 @@ export function getSessionCookieOptions(
   };
 }
 
+/**
+ * Returns cookie options for the SameSite=Lax fallback cookie.
+ * This cookie works in browsers that block SameSite=None (Chrome with 3rd-party
+ * cookie blocking, Firefox Strict ETP, Brave, Safari ITP).
+ * It is set alongside the SameSite=None cookie on every direct auth flow
+ * (OAuth callback, magic link, password login). It cannot be used for
+ * cross-domain SSO (that still requires SameSite=None), but it ensures
+ * same-domain navigation always works.
+ */
+export function getLaxSessionCookieOptions(
+  req: Request,
+  hostnameOverride?: string
+): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
+  const hostname = hostnameOverride || getPublicHostname(req);
+  const domain = getRootDomain(hostname);
+  const isProduction = !!(
+    req.headers["x-forwarded-proto"] ||
+    req.headers["x-forwarded-host"] ||
+    process.env.NODE_ENV === "production"
+  );
+  const secure = isProduction ? true : isSecureRequest(req);
+  return {
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax",
+    secure,
+    ...(domain ? { domain } : {}),
+  };
+}
+
 /** Clear session cookies across every domain variant that may have been set. */
 export function clearSessionCookies(
   res: Pick<Response, "clearCookie">,
   req: Request,
-  cookieNames: string[] = [COOKIE_NAME, DEMO_COOKIE_NAME],
+  cookieNames: string[] = [COOKIE_NAME, LAX_COOKIE_NAME, DEMO_COOKIE_NAME],
 ) {
   const opts = getSessionCookieOptions(req);
   const isProduction = !!(

@@ -1,4 +1,4 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { AXIOS_TIMEOUT_MS, COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
@@ -259,7 +259,12 @@ class SDKServer {
   async authenticateRequest(req: Request): Promise<User> {
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
-    const sessionCookie = cookies.get(COOKIE_NAME);
+    // Try the primary SameSite=None cookie first, then fall back to the
+    // SameSite=Lax cookie for browsers that block third-party cookies
+    // (Chrome with 3rd-party blocking, Firefox Strict ETP, Brave, Safari ITP).
+    const primaryCookie = cookies.get(COOKIE_NAME);
+    const laxCookie = cookies.get(LAX_COOKIE_NAME);
+    const sessionCookie = primaryCookie || laxCookie || undefined;
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
