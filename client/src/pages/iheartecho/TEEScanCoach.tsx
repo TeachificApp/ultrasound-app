@@ -574,23 +574,26 @@ function ViewDetail({ view }: { view: typeof TEE_VIEWS[0] }) {
             <p className="text-white/70 text-xs mt-1 leading-relaxed max-w-lg">{view.description}</p>
           </div>
         </div>
-        {/* Quick specs */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
+        {/* Quick specs — hide any box whose value is N/A or empty */}
+        {(() => {
+          const specs = [
             { label: "Angle", value: view.angle },
             { label: "Depth", value: view.depth },
             { label: "Flexion", value: view.flexion },
-          ].map(({ label, value }) => (
-            <div key={label} className="bg-white/10 rounded-lg px-3 py-2">
-              <div className="text-[10px] text-white/60 font-medium">{label}</div>
-              <div className="text-xs text-white font-semibold mt-0.5">{value}</div>
+            { label: "Patient Position", value: view.patientPosition },
+          ].filter(({ value }) => value && value !== "N/A" && value !== "n/a");
+          if (specs.length === 0) return null;
+          return (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {specs.map(({ label, value }) => (
+                <div key={label} className="bg-white/10 rounded-lg px-3 py-2">
+                  <div className="text-[10px] text-white/60 font-medium">{label}</div>
+                  <div className="text-xs text-white font-semibold mt-0.5 leading-snug">{value}</div>
+                </div>
+              ))}
             </div>
-          ))}
-          <div className="bg-white/10 rounded-lg px-3 py-2">
-            <div className="text-[10px] text-white/60 font-medium">Patient Position</div>
-            <div className="text-xs text-white font-semibold mt-0.5 leading-snug">{view.patientPosition}</div>
-          </div>
-        </div>
+          );
+        })()}
       </div>
 
       <ScanCoachViewMediaCard
