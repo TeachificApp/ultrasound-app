@@ -380,6 +380,59 @@ export const TEE_VIEWS = [
   },
   // ── Transgastric ────────────────────────────────────────────────────────────
   {
+    id: "tgbasal",
+    group: "Transgastric",
+    groupColor: "#189aa1",
+    name: "TG Basal SAX",
+    angle: "0°",
+    depth: "40–45 cm",
+    flexion: "Anteflexion with slight withdrawal from TG Mid SAX",
+    patientPosition: "Supine; probe in stomach, slightly withdrawn from TG Mid SAX position",
+    description: "Obtained by slightly withdrawing the probe from the TG Mid SAX position while maintaining anteflexion. This view images the LV at the mitral valve level (basal short axis), providing a cross-section through the mitral leaflets and subvalvular apparatus. It is the key transgastric view for mitral valve morphology, commissural anatomy, and for confirming correct clip placement during MitraClip/TEER procedures.",
+    howToGet: [
+      "From TG Mid SAX, slowly withdraw the probe 1–2 cm while maintaining anteflexion",
+      "The papillary muscles will disappear and the mitral leaflets will come into view",
+      "At 0°, the anterior mitral leaflet appears at the top and posterior at the bottom of the image",
+      "Fine-tune withdrawal depth until both leaflets are fully visualised in cross-section",
+      "Slight rotation of the shaft may be needed to centre the mitral orifice",
+    ],
+    structures: [
+      "Mitral valve — anterior leaflet (A1, A2, A3 scallops)",
+      "Mitral valve — posterior leaflet (P1, P2, P3 scallops)",
+      "Anterolateral commissure (ALC)",
+      "Posteromedial commissure (PMC)",
+      "Mitral subvalvular apparatus (chordae, papillary muscle heads)",
+      "LV basal cavity",
+    ],
+    doppler: [
+      { label: "MV Color Doppler", detail: "Identify origin of MR jet within the mitral orifice — central (A2/P2), commissural (ALC or PMC), or multi-jet" },
+      { label: "MVA by planimetry", detail: "Trace the mitral orifice at leaflet tips for MVA in mitral stenosis (most accurate TEE method)" },
+      { label: "3D zoom on MV", detail: "Acquire 3D dataset from this window for en-face \u2018surgical view\u2019 of the mitral valve" },
+    ],
+    tips: [
+      "This is the best view to map the exact location of MR within the mitral orifice before MitraClip/TEER",
+      "The \u2018fish-mouth\u2019 opening of the mitral valve at this level confirms correct basal positioning",
+      "Commissural MR jets are best confirmed here — a jet at the ALC or PMC confirms commissural origin",
+      "For MVA planimetry in MS, trace at the leaflet tips (not annulus) during diastole",
+      "3D acquisition from this window gives the classic en-face \u2018surgical view\u2019 of the MV",
+    ],
+    pitfalls: [
+      "Over-withdrawal brings the probe to the LVOT level — confirm mitral leaflets (not AV cusps) are in view",
+      "Incomplete anteflexion causes the probe to lose contact with the gastric wall and degrades image quality",
+      "Foreshortening of the mitral orifice leads to overestimation of MVA by planimetry",
+    ],
+    measurements: [
+      "MVA by planimetry (mitral stenosis)",
+      "Mitral annulus diameter (basal SAX)",
+      "MR jet location within mitral orifice",
+    ],
+    criticalFindings: [
+      "Commissural MR jet (ALC or PMC origin)",
+      "Severe mitral stenosis (MVA <1.0 cm\u00b2)",
+      "Flail or prolapsing leaflet scallop",
+    ],
+  },
+  {
     id: "tgsax",
     group: "Transgastric",
     groupColor: "#189aa1",
@@ -592,7 +645,7 @@ export const TEE_VIEWS = [
 const GROUPS = [
   { key: "Overview",        color: "#189aa1", label: "Overview",             count: 1 },
   { key: "Mid-Esophageal",  color: "#189aa1", label: "Mid-Esophageal (ME)",  count: 8 },
-  { key: "Transgastric",    color: "#189aa1", label: "Transgastric (TG)",    count: 4 },
+  { key: "Transgastric",    color: "#189aa1", label: "Transgastric (TG)",    count: 5 },
   { key: "Upper Esophageal",color: "#189aa1", label: "Upper Esophageal (UE)",count: 2 },
 ];
 
