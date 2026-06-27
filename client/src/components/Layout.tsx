@@ -362,7 +362,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* AAUS Store */}
         <div className="px-3 pb-2">
           <a
-            href="/premium"
+            href="https://store.allaboutultrasound.com"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all duration-150 group w-full"
