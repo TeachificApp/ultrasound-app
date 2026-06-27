@@ -90,6 +90,8 @@ type Override = {
   echoImages: string | null;  // JSON array of EchoImage objects
   anatomyImageUrl: string | null;
   transducerImageUrl: string | null;
+  anatomy2ImageUrl: string | null;
+  transducer2ImageUrl: string | null;
   description: string | null;
   howToGet: string | null;
   tips: string | null;
