@@ -104,6 +104,58 @@ export const TEE_VIEWS = [
     criticalFindings: ["New LV wall motion abnormality (ischaemia)", "Severe MR or TR", "Large pericardial effusion"],
   },
   {
+    id: "me_mc",
+    group: "Mid-Esophageal",
+    groupColor: "#189aa1",
+    name: "ME Mitral Commissure",
+    angle: "60–70°",
+    depth: "30–35 cm",
+    flexion: "Neutral to slight anteflexion",
+    patientPosition: "Supine; same position as ME 4-chamber",
+    description: "Obtained by rotating the multiplane angle from 0° to 60–70°. This view cuts through both mitral commissures simultaneously, displaying P1/A2/P3 segments in a single plane. It is the key view for identifying commissural MR jets, commissural fusion in mitral stenosis, and for guiding MitraClip/TEER procedures.",
+    howToGet: [
+      "From ME 4-chamber at 0°, slowly rotate multiplane angle to 60–70°",
+      "Do not advance or withdraw the probe from mid-esophageal position",
+      "The image should display the anterolateral commissure (ALC) on the right and the posteromedial commissure (PMC) on the left",
+      "Fine-tune angle between 55–75° to open both commissures simultaneously",
+      "Apply slight anteflexion if the valve plane is not fully visualised",
+    ],
+    structures: [
+      "Mitral valve — P1 (anterolateral scallop)",
+      "Mitral valve — A2 (central anterior leaflet)",
+      "Mitral valve — P3 (posteromedial scallop)",
+      "Anterolateral commissure (ALC)",
+      "Posteromedial commissure (PMC)",
+      "Left atrium", "Left ventricle",
+    ],
+    doppler: [
+      { label: "MV Color Doppler", detail: "Identify commissural MR jets — ALC jet (P1/A1 interface) vs PMC jet (P3/A3 interface)" },
+      { label: "CW through commissural jet", detail: "Quantify peak MR velocity and assess jet direction for severity" },
+      { label: "MVA by planimetry", detail: "In mitral stenosis, trace the mitral orifice at the leaflet tips in this view for accurate MVA" },
+    ],
+    tips: [
+      "This is the best view to identify P1 and P3 prolapse — both scallops are seen simultaneously",
+      "Commissural fusion in rheumatic MS is most clearly seen here — look for restricted leaflet separation at both commissures",
+      "For MitraClip/TEER guidance, the clip is steered in this view to confirm perpendicular alignment to the coaptation line",
+      "Colour Doppler at 60–70° helps differentiate a central A2 jet from a commissural jet",
+    ],
+    pitfalls: [
+      "Angle variation (55–75°) is common between patients — do not fix at exactly 60° without visual confirmation of both commissures",
+      "A commissural jet can appear central in other views — always interrogate at 60–70° to exclude commissural origin",
+      "Foreshortening of the LV is common at this angle — do not use for volumetric assessment",
+    ],
+    measurements: [
+      "MVA by planimetry (mitral stenosis)",
+      "Commissural width (rheumatic MS — Wilkins score)",
+      "Vena contracta of commissural MR jet",
+    ],
+    criticalFindings: [
+      "Commissural MR jet (P1/A1 or P3/A3 origin)",
+      "Severe commissural fusion (rheumatic MS)",
+      "Commissural leaflet tear or flail",
+    ],
+  },
+  {
     id: "me2c",
     group: "Mid-Esophageal",
     groupColor: "#189aa1",
@@ -539,7 +591,7 @@ export const TEE_VIEWS = [
 // ─── GROUP DEFINITIONS ────────────────────────────────────────────────────────
 const GROUPS = [
   { key: "Overview",        color: "#189aa1", label: "Overview",             count: 1 },
-  { key: "Mid-Esophageal",  color: "#189aa1", label: "Mid-Esophageal (ME)",  count: 7 },
+  { key: "Mid-Esophageal",  color: "#189aa1", label: "Mid-Esophageal (ME)",  count: 8 },
   { key: "Transgastric",    color: "#189aa1", label: "Transgastric (TG)",    count: 4 },
   { key: "Upper Esophageal",color: "#189aa1", label: "Upper Esophageal (UE)",count: 2 },
 ];
