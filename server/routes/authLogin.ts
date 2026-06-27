@@ -27,10 +27,7 @@ import { eq, and, gte, sql } from "drizzle-orm";
 import { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
 import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
-
-function emailOpenId(email: string) {
-  return `email:${email.toLowerCase().trim()}`;
-}
+import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 
 export function registerAuthLoginRoute(app: Express) {
   /**
@@ -79,8 +76,8 @@ export function registerAuthLoginRoute(app: Express) {
       // Ensure the user has the base "user" role (idempotent)
       await ensureUserRole(user.id);
 
-      // Issue session cookie
-      const openId = user.openId ?? emailOpenId(normalizedEmail);
+      // Issue session cookie — persist openId so auth.me can resolve the session
+      const openId = await ensureUserOpenId(db, user);
       const sessionToken = await sdk.createSessionToken(openId, {
         name: user.name ?? normalizedEmail,
         expiresInMs: ONE_YEAR_MS,
@@ -128,9 +125,13 @@ export function registerAuthLoginRoute(app: Express) {
         return res.redirect(`/auth/magic-error?reason=expired`);
       }
 
-      const openId = user.openId ?? emailOpenId(user.email ?? "");
-      const updateFields: Record<string, unknown> = { magicLinkToken: null, magicLinkExpiry: null, emailVerified: true };
-      if (!user.openId) updateFields.openId = openId;
+      const openId = await ensureUserOpenId(db, user);
+      const updateFields: Record<string, unknown> = {
+        magicLinkToken: null,
+        magicLinkExpiry: null,
+        emailVerified: true,
+        lastSignedIn: new Date(),
+      };
       await db.update(users).set(updateFields as any).where(eq(users.id, user.id));
       await ensureUserRole(user.id);
 
@@ -191,17 +192,14 @@ export function registerAuthLoginRoute(app: Express) {
         return res.status(401).json({ error: "This magic link has expired. Please request a new one." });
       }
 
-      // Consume the token — also persist openId if this user was created without one
-      // (e.g. admin-enrolled users created via grant-access have openId = null)
-      const openId = user.openId ?? emailOpenId(user.email ?? "");
+      // Consume the token — ensure openId is persisted for session lookup
+      const openId = await ensureUserOpenId(db, user);
       const updateFields: Record<string, unknown> = {
         magicLinkToken: null,
         magicLinkExpiry: null,
         emailVerified: true,
+        lastSignedIn: new Date(),
       };
-      if (!user.openId) {
-        updateFields.openId = openId;
-      }
       await db
         .update(users)
         .set(updateFields as any)
@@ -321,10 +319,8 @@ export function registerAuthLoginRoute(app: Express) {
       }
 
       // All good — issue session cookie
-      const openId = user.openId ?? emailOpenId(user.email ?? "");
-      if (!user.openId) {
-        await db.update(users).set({ openId, emailVerified: true, isPending: false }).where(eq(users.id, user.id));
-      } else if (user.isPending) {
+      const openId = await ensureUserOpenId(db, user);
+      if (user.isPending) {
         await db.update(users).set({ isPending: false, emailVerified: true }).where(eq(users.id, user.id));
       }
 

@@ -34,6 +34,8 @@ import { getDb } from "../db";
 import { ssoTokens, users } from "../../drizzle/schema";
 import { getSessionCookieOptions, getLaxSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
+import { ensureUserOpenId } from "../lib/ensureUserOpenId";
+import { resolveUserFromSessionOpenId } from "../lib/resolveUserFromSession";
 import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
 // 1×1 transparent GIF — used as the response body so <img> tags can trigger this
@@ -168,9 +170,11 @@ export function registerSsoAutoRoute(app: Express) {
 
       if (!user) return sendGif();
 
+      const openId = await ensureUserOpenId(db, user);
+
       // Issue a session token for this domain — same user, free membership
       const sessionToken = await sdk.signSession({
-        openId: user.openId ?? String(user.id),
+        openId,
         appId: process.env.VITE_APP_ID ?? "",
         name: user.name ?? user.email ?? "User",
       });
@@ -274,15 +278,20 @@ export function registerSsoAutoRoute(app: Express) {
 
       // Authenticated — look up user and issue a short-lived SSO token
       const db = await getDb();
-      if (!db) return res.redirect(returnUrl);
+      if (!db) {
+        const failUrl = new URL(returnUrl);
+        failUrl.searchParams.set("sso_failed", "1");
+        return res.redirect(failUrl.toString());
+      }
 
-      const [user] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.openId, session.openId))
-        .limit(1);
+      const user = await resolveUserFromSessionOpenId(db, session.openId);
 
-      if (!user) return res.redirect(returnUrl);
+      if (!user) {
+        console.log(`[SsoBridge] Session valid but user not found for openId=${session.openId}`);
+        const failUrl = new URL(returnUrl);
+        failUrl.searchParams.set("sso_failed", "1");
+        return res.redirect(failUrl.toString());
+      }
 
       const token = crypto.randomBytes(48).toString("hex");
       const expiresAt = new Date(Date.now() + 60_000); // 60-second TTL

@@ -18,8 +18,9 @@ import { useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   clearSsoBridgeLock,
-  clearSsoSessionLocks,
+  clearSsoBridgeFailedLock,
   markSsoSuccess,
+  markSsoBridgeFailed,
 } from "@/lib/ssoSession";
 
 export function useSsoConsumer() {
@@ -46,14 +47,15 @@ export function useSsoConsumer() {
     window.history.replaceState({}, "", cleanUrl);
 
     exchangeToken.mutate(
-      { token },
+      { token, hostname: window.location.hostname },
       {
         onSuccess: async () => {
           // CRITICAL: mark success BEFORE any reload so useSsoBridge skips
           // re-triggering even if auth.me hasn't seen the cookie yet.
           markSsoSuccess();
           clearSsoBridgeLock();
-          clearSsoSessionLocks();
+          clearSsoBridgeFailedLock();
+          // Do NOT call clearSsoSessionLocks() here — it clears markSsoSuccess and re-opens the loop.
 
           // Give the browser a tick to commit the Set-Cookie header before
           // we query auth.me — this prevents the race condition where reload()
@@ -73,7 +75,7 @@ export function useSsoConsumer() {
         },
         onError: (err) => {
           console.warn("[SSO] Token exchange failed:", err.message);
-          clearSsoBridgeLock();
+          markSsoBridgeFailed();
         },
       },
     );

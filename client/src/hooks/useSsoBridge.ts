@@ -29,13 +29,13 @@ import {
 /** Primary SSO domain (AAUS) — hosts the /api/sso/bridge endpoint */
 const PRIMARY_SSO_DOMAIN = "https://app.allaboutultrasound.com";
 
-/** Secondary domains that need cross-domain SSO via the bridge */
+/** Secondary domains that need cross-domain SSO via the bridge.
+ *  learn.allaboutultrasound.com is excluded — it shares .allaboutultrasound.com cookies with app. */
 const SECONDARY_DOMAINS = new Set([
   "app.iheartecho.com",
   "app.iheartecho.net",
   "accreditation.iheartecho.com",
   "members.allaboutultrasound.com",
-  "learn.allaboutultrasound.com",
 ]);
 
 /**
