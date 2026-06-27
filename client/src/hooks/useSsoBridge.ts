@@ -26,8 +26,11 @@ import {
   markSsoBridgeFailed,
 } from "@/lib/ssoSession";
 
-/** Primary SSO domain (AAUS) — hosts the /api/sso/bridge endpoint */
-const PRIMARY_SSO_DOMAIN = "https://app.allaboutultrasound.com";
+/** Primary SSO domains (AAU family) — hosts /api/sso/bridge; tried in order */
+const BRIDGE_ORIGINS = [
+  "https://app.allaboutultrasound.com",
+  "https://learn.allaboutultrasound.com",
+] as const;
 
 /** Secondary domains that need cross-domain SSO via the bridge.
  *  learn.allaboutultrasound.com is excluded — it shares .allaboutultrasound.com cookies with app. */
@@ -87,12 +90,26 @@ export function useSsoBridge() {
     // visibilitychange handler can retry quickly after the user logs in on AAUS
     // in another tab and switches back here.
     if (params.has("sso_failed")) {
+      const tryIndex = Number(params.get("bridge_try") ?? "0");
       params.delete("sso_failed");
+      params.delete("bridge_try");
       const cleanSearch = params.toString();
       const cleanUrl =
         window.location.pathname +
         (cleanSearch ? `?${cleanSearch}` : "") +
         window.location.hash;
+
+      // If AAUS bridge had no session, retry via learn (same cookie jar when Domain=.allaboutultrasound.com)
+      if (tryIndex + 1 < BRIDGE_ORIGINS.length) {
+        const returnUrl = new URL(window.location.href);
+        returnUrl.searchParams.delete("sso_failed");
+        returnUrl.searchParams.set("bridge_try", String(tryIndex + 1));
+        const bridgeUrl = `${BRIDGE_ORIGINS[tryIndex + 1]}/api/sso/bridge?return=${encodeURIComponent(returnUrl.toString())}`;
+        console.log("[SsoBridge] Retrying bridge via", BRIDGE_ORIGINS[tryIndex + 1]);
+        window.location.href = bridgeUrl;
+        return;
+      }
+
       window.history.replaceState({}, "", cleanUrl);
       clearSsoBridgeLock();
       markSsoBridgeFailed();
@@ -116,8 +133,11 @@ export function useSsoBridge() {
       hasRun.current = true;
       markSsoBridgeAttempted();
 
-      const returnUrl = window.location.href;
-      const bridgeUrl = `${PRIMARY_SSO_DOMAIN}/api/sso/bridge?return=${encodeURIComponent(returnUrl)}`;
+      const tryIndex = Number(params.get("bridge_try") ?? "0");
+      const bridgeOrigin = BRIDGE_ORIGINS[tryIndex] ?? BRIDGE_ORIGINS[0];
+      const returnUrl = new URL(window.location.href);
+      returnUrl.searchParams.set("bridge_try", String(tryIndex));
+      const bridgeUrl = `${bridgeOrigin}/api/sso/bridge?return=${encodeURIComponent(returnUrl.toString())}`;
       console.log("[SsoBridge] Redirecting to bridge:", bridgeUrl);
       window.location.href = bridgeUrl;
     };

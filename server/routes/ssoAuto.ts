@@ -35,6 +35,7 @@ import { ssoTokens, users } from "../../drizzle/schema";
 import { getSessionCookieOptions, getLaxSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
+import { redeemSsoTokenAndSetCookies } from "../lib/ssoExchange";
 import { resolveUserFromSessionOpenId } from "../lib/resolveUserFromSession";
 import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
@@ -212,6 +213,55 @@ export function registerSsoAutoRoute(app: Express) {
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     }
     res.sendStatus(204);
+  });
+
+  /**
+   * GET /api/sso/exchange?token=TOKEN&host=HOSTNAME&returnTo=/path
+   *
+   * Full-page SSO token exchange — mirrors GET /api/auth/magic-verify.
+   * Cloudflare strips Set-Cookie from tRPC/fetch responses, so the client
+   * must use a top-level navigation (not exchangeToken mutation) to receive
+   * the session cookie on app.iheartecho.com and other secondary domains.
+   */
+  app.get("/api/sso/exchange", async (req: Request, res: Response) => {
+    const { token, host: hostParam, returnTo } = req.query as Record<string, string>;
+    const successRedirect =
+      returnTo && returnTo.startsWith("/") ? returnTo : "/my-dashboard";
+
+    if (!token) {
+      return res.redirect(`/login?sso_failed=1&returnTo=${encodeURIComponent(successRedirect)}`);
+    }
+
+    try {
+      const db = await getDb();
+      if (!db) {
+        return res.redirect(`/login?sso_failed=1&returnTo=${encodeURIComponent(successRedirect)}`);
+      }
+
+      const result = await redeemSsoTokenAndSetCookies(
+        db,
+        req,
+        res,
+        String(token),
+        hostParam || undefined,
+      );
+
+      if (!result) {
+        console.log("[SsoExchange] Invalid or expired SSO token");
+        return res.redirect(`/login?sso_failed=1&returnTo=${encodeURIComponent(successRedirect)}`);
+      }
+
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      res.setHeader("Pragma", "no-cache");
+
+      console.log(
+        `[SsoExchange] User ${result.userId} signed in | host=${hostParam ?? "auto"} | redirect=${successRedirect}`,
+      );
+      return res.redirect(successRedirect);
+    } catch (err) {
+      console.error("[SsoExchange] Error:", err);
+      return res.redirect(`/login?sso_failed=1&returnTo=${encodeURIComponent(successRedirect)}`);
+    }
   });
 
   /**
