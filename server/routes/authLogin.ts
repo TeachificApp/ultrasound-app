@@ -369,8 +369,8 @@ export function registerAuthLoginRoute(app: Express) {
       res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsAccess, maxAge: ONE_YEAR_MS });
 
       const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
-      const { ipAddress, userAgent } = getRequestClientInfo(req);
-      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "access_token" });
+      const { ipAddress: atIp, userAgent: atUa } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress: atIp, userAgent: atUa, method: "access_token" });
       return res.status(200).json({ success: true });
     } catch (err) {
       console.error("[access-verify] Error:", err);

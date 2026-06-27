@@ -862,7 +862,7 @@ function MyContentTab() {
   return (
     <div className="space-y-6">
       {/* Sub-tabs */}
-      <div className="w-full overflow-x-auto scrollbar-hide">
+      <div className="w-full overflow-x-auto scrollbar-hide sticky top-0 z-10 bg-white pb-1 -mx-1 px-1">
       <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 min-w-max">
         {visibleSubTabs.map(t => (
           <button
@@ -880,7 +880,7 @@ function MyContentTab() {
               }`}>{t.count}</span>
             )}
           </button>
-        })}
+        ))}
       </div>
       </div>
 
