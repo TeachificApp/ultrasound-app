@@ -13,6 +13,10 @@ export type ScanCoachViewMediaSource = {
   echoImageUrl?: string | null;
   anatomyImageUrl?: string | null;
   transducerImageUrl?: string | null;
+  /** Second clinical image (pair 2, e.g. UE Aortic Arch SAX) */
+  anatomy2ImageUrl?: string | null;
+  /** Second reference image (pair 2) */
+  transducer2ImageUrl?: string | null;
   /** Legacy fetal / diagram field */
   imageUrl?: string | null;
 };
@@ -74,6 +78,29 @@ function itemsFromReferenceFields(view?: ScanCoachViewMediaSource): MediaItem[] 
     });
   }
   return items;
+}
+
+function itemsFromPair2Fields(view?: ScanCoachViewMediaSource): { clinical: MediaItem[]; reference: MediaItem[] } {
+  if (!view) return { clinical: [], reference: [] };
+  const clinical: MediaItem[] = [];
+  const reference: MediaItem[] = [];
+  if (view.anatomy2ImageUrl) {
+    clinical.push({
+      key: `anatomy2-${view.anatomy2ImageUrl}`,
+      url: view.anatomy2ImageUrl,
+      caption: "Clinical 2",
+      mediaType: "image",
+    });
+  }
+  if (view.transducer2ImageUrl) {
+    reference.push({
+      key: `transducer2-${view.transducer2ImageUrl}`,
+      url: view.transducer2ImageUrl,
+      caption: "Reference 2",
+      mediaType: "image",
+    });
+  }
+  return { clinical, reference };
 }
 
 function dedupeByUrl(items: MediaItem[]): MediaItem[] {
@@ -199,6 +226,8 @@ export type ScanCoachViewMediaPanelProps = {
   /** Labels on dark backgrounds (POCUS header, IHE panels) */
   darkLabels?: boolean;
   className?: string;
+  /** Number of clinical+reference pairs to render (default 1). Set to 2 for views like UE Aortic Arch */
+  mediaPairs?: number;
 };
 
 export type ScanCoachViewMediaCardProps = ScanCoachViewMediaPanelProps & {
@@ -240,11 +269,15 @@ export function ScanCoachViewMediaPanel({
   showPlaceholder = false,
   darkLabels = false,
   className = "mx-5 mt-4",
+  mediaPairs = 1,
 }: ScanCoachViewMediaPanelProps) {
   const { clinicalItems, referenceItems, hasAny } = useScanCoachViewMedia(viewId, view);
-  if (!hasAny && !showPlaceholder) return null;
+  const pair2 = mediaPairs >= 2 ? itemsFromPair2Fields(view) : { clinical: [], reference: [] };
+  const hasPair2 = pair2.clinical.length > 0 || pair2.reference.length > 0;
+  const hasAnything = hasAny || hasPair2;
+  if (!hasAnything && !showPlaceholder) return null;
 
-  if (!hasAny && showPlaceholder) {
+  if (!hasAnything && showPlaceholder) {
     if (darkLabels) {
       return (
         <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${className}`}>
@@ -272,19 +305,41 @@ export function ScanCoachViewMediaPanel({
   }
 
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${className}`}>
-      <MediaColumn
-        title="Clinical"
-        items={clinicalItems}
-        emptyHint="No clinical image or clip"
-        darkLabels={darkLabels}
-      />
-      <MediaColumn
-        title="Reference"
-        items={referenceItems}
-        emptyHint="No reference image or diagram"
-        darkLabels={darkLabels}
-      />
+    <div className={`space-y-4 ${className}`}>
+      {/* Pair 1 */}
+      {hasAny && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <MediaColumn
+            title="Clinical 1"
+            items={clinicalItems}
+            emptyHint="No clinical image or clip"
+            darkLabels={darkLabels}
+          />
+          <MediaColumn
+            title="Reference 1"
+            items={referenceItems}
+            emptyHint="No reference image or diagram"
+            darkLabels={darkLabels}
+          />
+        </div>
+      )}
+      {/* Pair 2 — only rendered when mediaPairs >= 2 and at least one image is present */}
+      {mediaPairs >= 2 && hasPair2 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <MediaColumn
+            title="Clinical 2"
+            items={pair2.clinical}
+            emptyHint="No second clinical image"
+            darkLabels={darkLabels}
+          />
+          <MediaColumn
+            title="Reference 2"
+            items={pair2.reference}
+            emptyHint="No second reference image"
+            darkLabels={darkLabels}
+          />
+        </div>
+      )}
     </div>
   );
 }

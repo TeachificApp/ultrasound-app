@@ -41,6 +41,11 @@ export interface ScanCoachViewMeta {
   id: string;
   name: string;
   group?: string;
+  /**
+   * Number of independent clinical+reference image pairs for this view.
+   * Defaults to 1. Set to 2 for views that need a second pair (e.g. SAX + LAX).
+   */
+  mediaPairs?: number;
 }
 
 export interface ScanCoachModuleMeta {
@@ -87,7 +92,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
       { id: "tgsax",        name: "TG Mid SAX",                             group: "Transgastric" },
       { id: "tglax",        name: "TG Long Axis (LAX)",                     group: "Transgastric" },
       { id: "uepv",         name: "UE Pulmonary Veins",                     group: "Upper Esophageal" },
-      { id: "ueaorticarch", name: "UE Aortic Arch",                         group: "Upper Esophageal" },
+      { id: "ueaorticarch", name: "UE Aortic Arch",                         group: "Upper Esophageal", mediaPairs: 2 },
     ],
   },
   // ─── ICE ──────────────────────────────────────────────────────────────────
@@ -553,9 +558,11 @@ export function getViewMeta(module: ScanCoachModule, viewId: string): ScanCoachV
 
 /** All editable image slots */
 export const IMAGE_SLOTS = [
-  { key: "echoImageUrl",       label: "Clinical Echo Image",      hint: "The echo image shown in the view reference panel" },
-  { key: "anatomyImageUrl",    label: "Anatomy Reference Image",  hint: "Anatomy diagram or labelled schematic" },
-  { key: "transducerImageUrl", label: "Transducer Position Image",hint: "Probe/transducer positioning photograph or diagram" },
+  { key: "echoImageUrl",        label: "Clinical Echo Image",        hint: "The echo image shown in the view reference panel" },
+  { key: "anatomyImageUrl",     label: "Anatomy Reference Image",    hint: "Anatomy diagram or labelled schematic" },
+  { key: "transducerImageUrl",  label: "Transducer Position Image",  hint: "Probe/transducer positioning photograph or diagram" },
+  { key: "anatomy2ImageUrl",    label: "Clinical Image 2",           hint: "Second clinical image (pair 2)" },
+  { key: "transducer2ImageUrl", label: "Reference Image 2",          hint: "Second reference image (pair 2)" },
 ] as const;
 
 export type ImageSlotKey = typeof IMAGE_SLOTS[number]["key"];

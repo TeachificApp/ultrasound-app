@@ -1086,7 +1086,7 @@ export default function ScanCoachEditor() {
     if (!selectedViewId) return;
     const [base64Data, mimeType, fileName] = rawData.split("|");
     setUploadingSlot(slot);
-    const slotKey = slot === "echoImageUrl" ? "echo" : slot === "anatomyImageUrl" ? "anatomy" : "transducer";
+    const slotKey = slot === "echoImageUrl" ? "echo" : slot === "anatomyImageUrl" ? "anatomy" : slot === "transducerImageUrl" ? "transducer" : slot === "anatomy2ImageUrl" ? "anatomy2" : "transducer2";
     uploadImageMutation.mutate({
       module: selectedModule,
       viewId: selectedViewId,
@@ -1134,6 +1134,8 @@ export default function ScanCoachEditor() {
   }
 
   const selectedViewName = moduleMeta.views.find((v) => v.id === selectedViewId)?.name ?? "";
+  const selectedViewMeta = moduleMeta.views.find((v) => v.id === selectedViewId);
+  const mediaPairs = selectedViewMeta?.mediaPairs ?? 1;
 
   return (
     <Layout>
@@ -1531,6 +1533,44 @@ export default function ScanCoachEditor() {
                           />
                         </div>
                       </div>
+
+                      {/* ── Second pair (only for views with mediaPairs >= 2) ── */}
+                      {mediaPairs >= 2 && (
+                        <div className="mt-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="text-xs font-bold text-[#189aa1] uppercase tracking-wide">Pair 2</span>
+                            <div className="flex-1 border-t border-dashed border-[#189aa1]/30" />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Clinical 2 */}
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-gray-600">Clinical 2</p>
+                              <p className="text-xs text-gray-400">Second clinical image (e.g. LAX view)</p>
+                              <ImageUploadZone
+                                slot={{ key: "anatomy2ImageUrl", label: "", hint: "" }}
+                                currentUrl={currentOverride?.["anatomy2ImageUrl"]}
+                                isUploading={uploadingSlot === "anatomy2ImageUrl"}
+                                setIsUploading={(v) => setUploadingSlot(v ? "anatomy2ImageUrl" : null)}
+                                onUploaded={(rawData) => handleImageUploaded("anatomy2ImageUrl", rawData)}
+                                onCleared={() => handleClearImage("anatomy2ImageUrl")}
+                              />
+                            </div>
+                            {/* Reference 2 */}
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-gray-600">Reference 2</p>
+                              <p className="text-xs text-gray-400">Second reference image (e.g. probe diagram)</p>
+                              <ImageUploadZone
+                                slot={{ key: "transducer2ImageUrl", label: "", hint: "" }}
+                                currentUrl={currentOverride?.["transducer2ImageUrl"]}
+                                isUploading={uploadingSlot === "transducer2ImageUrl"}
+                                setIsUploading={(v) => setUploadingSlot(v ? "transducer2ImageUrl" : null)}
+                                onUploaded={(rawData) => handleImageUploaded("transducer2ImageUrl", rawData)}
+                                onCleared={() => handleClearImage("transducer2ImageUrl")}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {/* WYSIWYG Content Editor */}
                     {draft && (

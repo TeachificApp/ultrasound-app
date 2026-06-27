@@ -593,7 +593,11 @@ function ViewDetail({ view }: { view: typeof TEE_VIEWS[0] }) {
         </div>
       </div>
 
-      <ScanCoachViewMediaCard viewId={(view as any).id} view={view as any} />
+      <ScanCoachViewMediaCard
+        viewId={(view as any).id}
+        view={view as any}
+        mediaPairs={(view as any).id === "ueaorticarch" ? 2 : 1}
+      />
       {/* How to Get This View */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <button onClick={() => toggle("howToGet")} className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors">

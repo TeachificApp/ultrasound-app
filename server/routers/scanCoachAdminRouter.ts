@@ -94,8 +94,8 @@ const upsertSchema = z.object({
 const imageUploadSchema = z.object({
   module: z.enum(MODULE_VALUES),
   viewId: z.string().min(1).max(64),
-  /** Which image slot to fill: echo | anatomy | transducer */
-  slot: z.enum(["echo", "anatomy", "transducer"]),
+  /** Which image slot to fill: echo | anatomy | transducer | anatomy2 | transducer2 */
+  slot: z.enum(["echo", "anatomy", "transducer", "anatomy2", "transducer2"]),
   /** Base64-encoded image data (without data: prefix) */
   base64Data: z.string(),
   /** MIME type, e.g. image/jpeg or video/mp4 */
@@ -245,7 +245,9 @@ export const scanCoachAdminRouter = router({
         echo: "echoImageUrl",
         anatomy: "anatomyImageUrl",
         transducer: "transducerImageUrl",
-      }[input.slot] as "echoImageUrl" | "anatomyImageUrl" | "transducerImageUrl";
+        anatomy2: "anatomy2ImageUrl",
+        transducer2: "transducer2ImageUrl",
+      }[input.slot] as "echoImageUrl" | "anatomyImageUrl" | "transducerImageUrl" | "anatomy2ImageUrl" | "transducer2ImageUrl";
 
       const existing = await db
         .select({ id: scanCoachOverrides.id })
@@ -674,7 +676,7 @@ export const scanCoachAdminRouter = router({
     .input(
       z.object({
         id: z.number().int().positive(),
-        field: z.enum(["echoImageUrl", "anatomyImageUrl", "transducerImageUrl"]),
+        field: z.enum(["echoImageUrl", "anatomyImageUrl", "transducerImageUrl", "anatomy2ImageUrl", "transducer2ImageUrl"]),
       })
     )
     .mutation(async ({ ctx, input }) => {

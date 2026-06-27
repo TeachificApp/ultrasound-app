@@ -1179,6 +1179,10 @@ export const scanCoachOverrides = mysqlTable("scanCoachOverrides", {
   anatomyImageUrl: text("anatomyImageUrl"),
   // Transducer / probe positioning image
   transducerImageUrl: text("transducerImageUrl"),
+  // Second clinical image (for views with mediaPairs: 2, e.g. UE Aortic Arch SAX + LAX)
+  anatomy2ImageUrl: text("anatomy2ImageUrl"),
+  // Second reference/transducer image (paired with anatomy2ImageUrl)
+  transducer2ImageUrl: text("transducer2ImageUrl"),
   // ── Text overrides (JSON arrays stored as text) ───────────────────────────────
   // Override for the view description paragraph
   description: text("description"),
