@@ -856,20 +856,23 @@ function MyContentTab() {
     { key: "communities",  label: "Communities",  icon: Users,          count: data?.communities?.length ?? 0 },
   ];
 
+  // On mobile, only show tabs that have content (count > 0) or the active tab
+  const visibleSubTabs = subTabs.filter(t => t.count > 0 || t.key === contentTab);
+
   return (
     <div className="space-y-6">
       {/* Sub-tabs */}
-      <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 w-full flex-nowrap overflow-x-auto scrollbar-hide">
-        {subTabs.map(t => (
+      <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 w-full overflow-x-auto scrollbar-hide">
+        {visibleSubTabs.map(t => (
           <button
             key={t.key}
             onClick={() => setContentTab(t.key)}
-            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap min-h-[36px] ${
               contentTab === t.key ? "bg-white text-[#189aa1] shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            <t.icon className="w-3 h-3 flex-shrink-0" />
-            {t.label}
+            <t.icon className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{t.label}</span>
             {t.count > 0 && (
               <span className={`text-[10px] px-1 py-0.5 rounded-full font-semibold ${
                 contentTab === t.key ? "bg-[#189aa1]/10 text-[#189aa1]" : "bg-gray-200 text-gray-500"

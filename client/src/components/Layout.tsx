@@ -397,7 +397,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="sticky top-0 z-10 bg-white border-b border-[#189aa1]/20 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-sm">
+        <header className="sticky top-0 z-10 bg-white border-b border-[#189aa1]/20 px-2 sm:px-4 py-2.5 sm:py-3 flex items-center gap-1.5 sm:gap-3 shadow-sm min-w-0 overflow-hidden">
           <button
             className="lg:hidden p-2 rounded-md text-[#189aa1] hover:bg-[#f0fbfc] min-w-[40px] min-h-[40px] flex items-center justify-center flex-shrink-0"
             onClick={() => setSidebarOpen(true)}
@@ -405,14 +405,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse flex-shrink-0" />
+          <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+            <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse flex-shrink-0 hidden sm:block" />
             <span className="text-xs sm:text-sm font-semibold text-[#189aa1] truncate" style={{ fontFamily: "Merriweather, serif" }}>
               {allNavItems.find((n: { path: string; label: string }) => n.path === location)?.label ?? brandNav.title}
             </span>
           </div>
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <span className="text-xs text-gray-400 hidden sm:block">{brandNav.subtitle}</span>
+          <div className="ml-auto flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            <span className="text-xs text-gray-400 hidden md:block">{brandNav.subtitle}</span>
             {isAuthenticated && <NotificationBell />}
             {/* Account / Login in header */}
             {authLoading ? null : isAuthenticated ? (
@@ -436,10 +436,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       </span>
                     </div>
                   )}
-                  <span className="text-xs font-semibold text-gray-700 hidden sm:block max-w-[100px] truncate">
+                  <span className="text-xs font-semibold text-gray-700 hidden lg:block max-w-[100px] truncate">
                     {user?.displayName || user?.name || "Account"}
                   </span>
-                  <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform hidden sm:block ${accountOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform hidden lg:block ${accountOpen ? "rotate-180" : ""}`} />
                 </button>
 
                 {/* Click-away overlay */}
@@ -659,20 +659,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 })()}
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <a
                   href="/register"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all hover:opacity-90 border border-[#189aa1] text-[#189aa1] bg-transparent"
+                  className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold text-xs transition-all hover:opacity-90 border border-[#189aa1] text-[#189aa1] bg-transparent"
                 >
                   Register
                 </a>
                 <a
                   href="/login"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs text-white transition-all hover:opacity-90"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold text-xs text-white transition-all hover:opacity-90"
                   style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  Sign In
+                  <span className="hidden sm:inline">Sign In</span>
                 </a>
               </div>
             )}
