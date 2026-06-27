@@ -14,6 +14,7 @@ import { HOCMScanCoachContent } from "@/pages/iheartecho/HOCMScanCoach";
 import { StrainScanCoachContent } from "@/pages/iheartecho/StrainScanCoach";
 import { UEAScanCoachContent } from "@/pages/iheartecho/UEAScanCoach";
 import { DiastolicScanCoachContent } from "@/pages/iheartecho/DiastolicNavigator";
+import { ScanCoachViewMediaCard } from "@/components/ScanCoachViewMediaPanel";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 import { TEEIceScanCoachContent } from "@/pages/iheartecho/TEEIceScanCoach";
 import { ICEScanCoachContent } from "@/pages/iheartecho/ICEScanCoach";
@@ -885,29 +886,11 @@ function PulmHTNScanCoach() {
                   </div>
                 </div>
               </div>
-              {/* Admin-uploaded reference images */}
-              {((selectedViewMerged as any).echoImageUrl || (selectedViewMerged as any).anatomyImageUrl) && (
-                <div className="border-t border-gray-100">
-                  <div className={`grid gap-0 bg-gray-950 ${ (selectedViewMerged as any).echoImageUrl && (selectedViewMerged as any).anatomyImageUrl ? 'grid-cols-2' : 'grid-cols-1' }`}>
-                    {(selectedViewMerged as any).anatomyImageUrl && (
-                      <div className="flex justify-center items-center p-3 border-r border-gray-800">
-                        <div className="text-center">
-                          <p className="text-xs text-gray-400 mb-1.5">Anatomy Diagram</p>
-                          <MediaDisplay src={(selectedViewMerged as any).anatomyImageUrl} alt={`${selectedView.label} diagram`} className="max-h-56 object-contain rounded" style={{ background: "#030712" }} />
-                        </div>
-                      </div>
-                    )}
-                    {(selectedViewMerged as any).echoImageUrl && (
-                      <div className="flex justify-center items-center p-3">
-                        <div className="text-center">
-                          <p className="text-xs text-gray-400 mb-1.5">Clinical Echo Image</p>
-                          <MediaDisplay src={(selectedViewMerged as any).echoImageUrl} alt={`${selectedView.label} echo`} className="max-h-56 object-contain rounded" style={{ background: "#030712" }} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              <ScanCoachViewMediaCard
+                viewId={(selectedViewMerged as any).id}
+                view={selectedViewMerged as any}
+                className="p-3"
+              />
               <div className="p-5 space-y-5">
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: BRAND_LOCAL }}>Probe Positioning</h4>
@@ -1131,29 +1114,11 @@ function ACHDScanCoach() {
               </div>
             </div>
           </div>
-          {/* Admin-uploaded reference images */}
-          {((selectedLesionMerged as any).echoImageUrl || (selectedLesionMerged as any).anatomyImageUrl) && (
-            <div className="border-t border-gray-100">
-              <div className={`grid gap-0 bg-gray-950 ${ (selectedLesionMerged as any).echoImageUrl && (selectedLesionMerged as any).anatomyImageUrl ? 'grid-cols-2' : 'grid-cols-1' }`}>
-                {(selectedLesionMerged as any).anatomyImageUrl && (
-                  <div className="flex justify-center items-center p-3 border-r border-gray-800">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 mb-1.5">Anatomy Diagram</p>
-                      <MediaDisplay src={(selectedLesionMerged as any).anatomyImageUrl} alt={`${selectedLesion.label} diagram`} className="max-h-56 object-contain rounded" style={{ background: "#030712" }} />
-                    </div>
-                  </div>
-                )}
-                {(selectedLesionMerged as any).echoImageUrl && (
-                  <div className="flex justify-center items-center p-3">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 mb-1.5">Clinical Echo Image</p>
-                      <MediaDisplay src={(selectedLesionMerged as any).echoImageUrl} alt={`${selectedLesion.label} echo`} className="max-h-56 object-contain rounded" style={{ background: "#030712" }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <ScanCoachViewMediaCard
+            viewId={(selectedLesionMerged as any).id}
+            view={selectedLesionMerged as any}
+            className="p-3"
+          />
           {/* View tabs */}
           <div className="px-5 pt-4 flex flex-wrap gap-2">
             {selectedLesion.views.map(v => (
@@ -1456,38 +1421,10 @@ export default function ScanCoach() {
                 </div>
               </div>
 
-              {/* Echo Image + Anatomy */}
-              {((selectedTTEMerged as any).echoImageUrl || (selectedTTEMerged as any).anatomyImageUrl) && (
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-100">
-                    <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>View Reference Images</h3>
-                  </div>
-                  <div className={`bg-gray-950 grid gap-2 p-4 ${ (selectedTTEMerged as any).echoImageUrl && (selectedTTEMerged as any).anatomyImageUrl ? 'grid-cols-2' : 'grid-cols-1' }`}>
-                    {(selectedTTEMerged as any).echoImageUrl && (
-                      <div className="flex flex-col items-center gap-1">
-                        <p className="text-xs text-gray-400">Clinical Echo</p>
-                        <MediaDisplay
-                          src={(selectedTTEMerged as any).echoImageUrl}
-                          alt={`${selectedTTEMerged.name} clinical echo`}
-                          className="max-h-64 object-contain rounded w-full"
-                          style={{ background: "#030712" }}
-                        />
-                      </div>
-                    )}
-                    {(selectedTTEMerged as any).anatomyImageUrl && (
-                      <div className="flex flex-col items-center gap-1">
-                        <p className="text-xs text-gray-400">Anatomy Reference</p>
-                        <MediaDisplay
-                          src={(selectedTTEMerged as any).anatomyImageUrl}
-                          alt={`${selectedTTEMerged.name} anatomy`}
-                          className="max-h-64 object-contain rounded w-full"
-                          style={{ background: "#030712" }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              <ScanCoachViewMediaCard
+                viewId={(selectedTTEMerged as any).id}
+                view={selectedTTEMerged as any}
+              />
               {/* Tips & Pitfalls */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
@@ -2041,37 +1978,14 @@ export default function ScanCoach() {
                 </div>
               </div>
 
-              {/* Diagram + Echo image */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>View Reference Images</h3>
-                  <span className="text-xs text-gray-400">Diagram · Clinical Echo</span>
-                </div>
-                <div className="grid grid-cols-2 gap-0 bg-gray-950">
-                  <div className="flex justify-center items-center p-3 border-r border-gray-800">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 mb-1.5">Anatomy Diagram</p>
-                      <MediaDisplay
-                        src={(selectedFetalMerged as any).anatomyImageUrl || selectedFetal.imageUrl}
-                        alt={`${selectedFetalMerged.name} diagram`}
-                        className="max-h-60 object-contain rounded"
-                        style={{ background: "#030712" }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-center items-center p-3">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 mb-1.5">Clinical Echo Image</p>
-                      <MediaDisplay
-                        src={(selectedFetalMerged as any).echoImageUrl || selectedFetal.imageUrl}
-                        alt={`${selectedFetalMerged.name} echo`}
-                        className="max-h-60 object-contain rounded"
-                        style={{ background: "#030712" }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ScanCoachViewMediaCard
+                viewId={(selectedFetalMerged as any).id}
+                view={{
+                  ...(selectedFetalMerged as any),
+                  anatomyImageUrl: (selectedFetalMerged as any).anatomyImageUrl || selectedFetal.imageUrl,
+                  echoImageUrl: (selectedFetalMerged as any).echoImageUrl || selectedFetal.imageUrl,
+                }}
+              />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Structures */}
@@ -2231,37 +2145,14 @@ export default function ScanCoach() {
                 </div>
               </div>
 
-              {/* Diagram + Echo image */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>View Reference Images</h3>
-                  <span className="text-xs text-gray-400">Diagram · Clinical Echo</span>
-                </div>
-                <div className="grid grid-cols-2 gap-0 bg-gray-950">
-                  <div className="flex justify-center items-center p-3 border-r border-gray-800">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 mb-1.5">Anatomy Diagram</p>
-                      <MediaDisplay
-                        src={(selectedFetalMerged as any).anatomyImageUrl || selectedFetal.imageUrl}
-                        alt={`${selectedFetalMerged.name} diagram`}
-                        className="max-h-60 object-contain rounded"
-                        style={{ background: "#030712" }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-center items-center p-3">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 mb-1.5">Clinical Echo Image</p>
-                      <MediaDisplay
-                        src={(selectedFetalMerged as any).echoImageUrl || selectedFetal.imageUrl}
-                        alt={`${selectedFetalMerged.name} echo`}
-                        className="max-h-60 object-contain rounded"
-                        style={{ background: "#030712" }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ScanCoachViewMediaCard
+                viewId={(selectedFetalMerged as any).id}
+                view={{
+                  ...(selectedFetalMerged as any),
+                  anatomyImageUrl: (selectedFetalMerged as any).anatomyImageUrl || selectedFetal.imageUrl,
+                  echoImageUrl: (selectedFetalMerged as any).echoImageUrl || selectedFetal.imageUrl,
+                }}
+              />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Structures */}

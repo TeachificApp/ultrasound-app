@@ -13,6 +13,7 @@ import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { usePremium } from "@/hooks/usePremium";
 import { pelvicGynBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
+import { ScanCoachViewMediaPanel } from "@/components/ScanCoachViewMediaPanel";
 
 type Approach = "TA" | "TVS";
 
@@ -240,59 +241,11 @@ export default function PelvicGynScanCoach() {
               <p className="text-[#4ad9e0] text-xs mt-0.5">{currentView.probe}</p>
             </div>
 
-            {/* Clinical images gallery */}
-            {(() => {
-              const imgs = (currentView as any).echoImages as Array<{url: string; caption: string | null}> | undefined;
-              const legacyUrl = (currentView as any).echoImageUrl as string | undefined;
-              const gallery = imgs && imgs.length > 0 ? imgs : legacyUrl ? [{ url: legacyUrl, caption: null }] : [];
-              if (gallery.length === 0) return (
-                <div
-                  className="mx-5 mt-4 rounded-xl flex items-center justify-center"
-                  style={{ height: 140, background: "linear-gradient(135deg, #0e1e2e20, #189aa120)", border: "2px dashed #189aa140" }}
-                >
-                  <div className="text-center">
-                    <Scan className="w-8 h-8 text-[#189aa1] mx-auto mb-2 opacity-50" />
-                    <p className="text-xs text-gray-400">Reference image placeholder</p>
-                    <p className="text-xs text-gray-300">Add via Admin → ScanCoach Editor</p>
-                  </div>
-                </div>
-              );
-              return (
-                <div className="mx-5 mt-4">
-                  {gallery.length === 1 ? (
-                    <div className="rounded-xl overflow-hidden border border-[#189aa130] bg-gray-950 relative">
-                      {/\.(mp4|webm|ogv|mov)$/i.test(gallery[0].url) ? (
-                        <video src={gallery[0].url} autoPlay loop muted playsInline className="w-full max-h-96 object-contain" />
-                      ) : (
-                        <img src={gallery[0].url} alt={gallery[0].caption ?? "Clinical image"} className="w-full max-h-96 object-contain" />
-                      )}
-                      {gallery[0].caption && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-1.5">
-                          <p className="text-xs text-white">{gallery[0].caption}</p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {gallery.map((img, idx) => (
-                        <div key={idx} className="relative flex-shrink-0 rounded-xl overflow-hidden border border-[#189aa130] bg-gray-950" style={{ width: 280, height: 210 }}>
-                          {/\.(mp4|webm|ogv|mov)$/i.test(img.url) ? (
-                            <video src={img.url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                          ) : (
-                            <img src={img.url} alt={img.caption ?? `Image ${idx + 1}`} className="w-full h-full object-cover" />
-                          )}
-                          {img.caption && (
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
-                              <p className="text-xs text-white truncate">{img.caption}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+                        <ScanCoachViewMediaPanel
+              viewId={currentView.id}
+              view={currentView}
+              showPlaceholder
+            />
 
             {/* Tips */}
             <div className="p-5 space-y-3">

@@ -13,6 +13,7 @@ import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import ScanCoachNavBar from "@/components/ScanCoachNavBar";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
+import { ScanCoachViewMediaCard } from "@/components/ScanCoachViewMediaPanel";
 import {
   ChevronDown, ChevronUp, ArrowRight, Zap, Activity,
   AlertTriangle, Lightbulb, Info, ImageIcon, Stethoscope,
@@ -548,43 +549,7 @@ function ViewDetail({ view }: { view: typeof STRESS_VIEWS[0] }) {
           <p className="text-sm text-gray-700 leading-relaxed">{view.description}</p>
         </div>
       </div>
-      {/* Reference Images — shown when admin has uploaded via ScanCoach Editor */}
-      {((view as any).echoImageUrl || (view as any).anatomyImageUrl || (view as any).transducerImageUrl) ? (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-50">
-            <p className="text-sm font-bold text-gray-800">Reference Images</p>
-          </div>
-          <div className={`bg-gray-950 grid gap-2 p-4 ${
-            [(view as any).echoImageUrl, (view as any).anatomyImageUrl, (view as any).transducerImageUrl].filter(Boolean).length > 1
-              ? 'grid-cols-2'
-              : 'grid-cols-1'
-          }`}>
-            {(view as any).echoImageUrl && (
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-medium">Echo Image</p>
-                <img src={(view as any).echoImageUrl} alt="Echo reference" className="max-h-64 object-contain rounded-lg w-full" onContextMenu={e => e.preventDefault()} />
-              </div>
-            )}
-            {(view as any).anatomyImageUrl && (
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-medium">Anatomy Diagram</p>
-                <img src={(view as any).anatomyImageUrl} alt="Anatomy diagram" className="max-h-64 object-contain rounded-lg w-full" onContextMenu={e => e.preventDefault()} />
-              </div>
-            )}
-            {(view as any).transducerImageUrl && (
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-medium">Probe Position</p>
-                <img src={(view as any).transducerImageUrl} alt="Probe position" className="max-h-64 object-contain rounded-lg w-full" onContextMenu={e => e.preventDefault()} />
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center py-10 gap-2">
-          <p className="text-xs text-gray-400 font-medium">Reference image — {view.name}</p>
-          <p className="text-xs text-gray-300">Upload images via the ScanCoach Editor in Admin</p>
-        </div>
-      )}
+      <ScanCoachViewMediaCard viewId={(view as any).id} view={view as any} showPlaceholder />
 
       {/* Acquisition grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
