@@ -6,6 +6,7 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
+import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -274,6 +275,21 @@ class SDKServer {
     const sessionUserId = session.openId;
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
+
+    // Legacy sessions: JWT openId was numeric user id while DB openId was null
+    if (!user && /^\d+$/.test(sessionUserId)) {
+      const byId = await db.getUserById(Number(sessionUserId));
+      const dbConn = await db.getDb();
+      if (byId && dbConn) {
+        const openId = await ensureUserOpenId(dbConn, byId);
+        user = { ...byId, openId };
+      }
+    }
+
+    // Synthetic email openId without DB row match (casing / migration edge cases)
+    if (!user && sessionUserId.startsWith("email:")) {
+      user = await db.getUserByEmail(sessionUserId.slice("email:".length));
+    }
 
     // If user not in DB, sync from OAuth server automatically
     if (!user) {

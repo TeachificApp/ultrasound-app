@@ -135,7 +135,10 @@ export function registerAuthLoginRoute(app: Express) {
       await db.update(users).set(updateFields as any).where(eq(users.id, user.id));
       await ensureUserRole(user.id);
 
-      const sessionToken = await sdk.createSessionToken(openId, { name: user.name ?? user.email ?? "", expiresInMs: ONE_YEAR_MS });
+      const sessionToken = await sdk.createSessionToken(openId, {
+        name: user.name ?? user.email ?? "User",
+        expiresInMs: ONE_YEAR_MS,
+      });
       // Use the host param encoded in the magic link URL for cookie domain scoping.
       // Cloudflare rewrites the Host header to the internal Cloud Run hostname, so we can't rely on req.hostname.
       const cookieOptions = getSessionCookieOptions(req, hostParam || undefined);
@@ -210,7 +213,7 @@ export function registerAuthLoginRoute(app: Express) {
 
       // Issue session cookie — use X-App-Hostname to scope to the correct domain
       const sessionToken = await sdk.createSessionToken(openId, {
-        name: user.name ?? user.email ?? "",
+        name: user.name ?? user.email ?? "User",
         expiresInMs: ONE_YEAR_MS,
       });
       const magicPostHostname = resolveAuthHostname(
@@ -327,7 +330,7 @@ export function registerAuthLoginRoute(app: Express) {
       await ensureUserRole(user.id);
 
       const sessionToken = await sdk.createSessionToken(openId, {
-        name: user.name ?? user.email ?? "",
+        name: user.name ?? user.email ?? "User",
         expiresInMs: ONE_YEAR_MS,
       });
       // Use X-App-Hostname for cookie domain scoping on access-verify too

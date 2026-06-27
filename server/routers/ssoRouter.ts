@@ -14,11 +14,8 @@ import { eq, and, isNull, gt, or, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { ssoTokens, users, userRoles, diyOrganizations, diySubscriptions } from "../../drizzle/schema";
-import { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
-import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
-import { sdk } from "../_core/sdk";
-import { ensureUserOpenId } from "../lib/ensureUserOpenId";
+import { ssoTokens, userRoles, diyOrganizations, diySubscriptions } from "../../drizzle/schema";
+import { redeemSsoTokenAndSetCookies } from "../lib/ssoExchange";
 
 const SSO_TOKEN_TTL_MS = 60_000; // 60 seconds
 
@@ -153,33 +150,15 @@ export const ssoRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const now = new Date();
-      const [row] = await db
-        .select()
-        .from(ssoTokens)
-        .where(and(eq(ssoTokens.token, input.token), isNull(ssoTokens.usedAt), gt(ssoTokens.expiresAt, now)))
-        .limit(1);
-      if (!row) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or expired SSO token" });
-      await db.update(ssoTokens).set({ usedAt: now }).where(eq(ssoTokens.id, row.id));
-      const [user] = await db.select().from(users).where(eq(users.id, row.userId)).limit(1);
-      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
-      const openId = await ensureUserOpenId(db, user);
-      const sessionToken = await sdk.signSession({
-        openId,
-        appId: process.env.VITE_APP_ID ?? "",
-        name: user.name ?? user.email ?? "User",
-      });
-      // Scope cookie to the requesting domain (critical for app.iheartecho.com bridge).
-      const hostnameOverride = resolveAuthHostname(ctx.req, input.hostname);
-      const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
-      ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback — critical for browsers blocking SameSite=None cookies
-      // (Chrome 3rd-party blocking, Firefox Strict ETP, Brave, Safari ITP).
-      // Without this, exchangeToken sets a cookie the browser silently drops, causing
-      // window.location.reload() to see the user as unauthenticated and loop forever.
-      const laxCookieOptions = getLaxSessionCookieOptions(ctx.req, hostnameOverride);
-      ctx.res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxCookieOptions, maxAge: ONE_YEAR_MS });
-      console.log(`[SSO exchangeToken] User ${user.id} signed in | domain=${hostnameOverride ?? "auto"} | cookie.domain=${cookieOptions.domain ?? "none"}`);
-      return { success: true, userId: user.id };
+      const result = await redeemSsoTokenAndSetCookies(
+        db,
+        ctx.req,
+        ctx.res,
+        input.token,
+        input.hostname,
+      );
+      if (!result) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or expired SSO token" });
+      console.log(`[SSO exchangeToken] User ${result.userId} signed in | domain=${input.hostname ?? "auto"}`);
+      return { success: true, userId: result.userId };
     }),
 });

@@ -954,6 +954,7 @@ function IHeartEchoRouter() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
+        <Route path="/auth/magic-error" component={MagicLinkError} />
         <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
