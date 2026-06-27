@@ -27,7 +27,7 @@ import { TTE_BILLING } from "@/lib/scanCoachBillingCodes";
 function MediaDisplay({ src, alt, className, style }: { src: string; alt: string; className?: string; style?: React.CSSProperties }) {
   const isVideo = /\.(mp4|webm|ogv|mov)(\?|$)/i.test(src);
   if (isVideo) {
-    return <video src={src} controls autoPlay loop muted playsInline className={className} style={style} />;
+    return <video src={src} autoPlay loop muted playsInline className={className} style={style} />;
   }
   return <img src={src} alt={alt} className={className} style={style} />;
 }

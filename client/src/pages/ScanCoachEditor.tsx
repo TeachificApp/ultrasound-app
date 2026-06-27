@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScanCoachMediaPanel } from "@/components/ScanCoachMediaPanel";
 
 // Icon map for each ScanCoach module
 const MODULE_ICONS: Record<string, React.ReactNode> = {
@@ -620,7 +621,7 @@ function SortableEchoImageRow({
       {/* Thumbnail */}
       <div className="flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-950 border border-gray-200" style={{ width: 120, height: 90 }}>
         {isVideo ? (
-          <video src={img.url} className="w-full h-full object-cover" />
+          <video src={img.url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
         ) : (
           <img src={img.url} alt={captionDraft || `Image ${idx + 1}`} className="w-full h-full object-cover" />
         )}
@@ -743,7 +744,10 @@ function ImageUploadZone({
           {/\.(mp4|webm|ogv|mov)$/i.test(currentUrl) ? (
             <video
               src={currentUrl}
-              controls
+              autoPlay
+              loop
+              muted
+              playsInline
               className="w-full max-h-48 object-contain"
             />
           ) : (
@@ -1470,7 +1474,10 @@ export default function ScanCoachEditor() {
                         ))}
                       </div>
                     </div>
-
+                    {/* Admin Media Upload Panel (clinical + reference images/clips) */}
+                    {selectedViewId && (
+                      <ScanCoachMediaPanel viewId={selectedViewId} />
+                    )}
                     {/* WYSIWYG Content Editor */}
                     {draft && (
                       <div className="space-y-4">

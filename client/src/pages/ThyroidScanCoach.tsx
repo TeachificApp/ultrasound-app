@@ -263,7 +263,7 @@ export default function ThyroidScanCoach() {
                   {gallery.length === 1 ? (
                     <div className="rounded-xl overflow-hidden border border-[#189aa130] bg-gray-950 relative">
                       {/\.(mp4|webm|ogv|mov)$/i.test(gallery[0].url) ? (
-                        <video src={gallery[0].url} controls className="w-full max-h-96 object-contain" />
+                        <video src={gallery[0].url} autoPlay loop muted playsInline className="w-full max-h-96 object-contain" />
                       ) : (
                         <img src={gallery[0].url} alt={gallery[0].caption ?? "Clinical image"} className="w-full max-h-96 object-contain" />
                       )}
@@ -278,7 +278,7 @@ export default function ThyroidScanCoach() {
                       {gallery.map((img, idx) => (
                         <div key={idx} className="relative flex-shrink-0 rounded-xl overflow-hidden border border-[#189aa130] bg-gray-950" style={{ width: 280, height: 210 }}>
                           {/\.(mp4|webm|ogv|mov)$/i.test(img.url) ? (
-                            <video src={img.url} className="w-full h-full object-cover" />
+                            <video src={img.url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
                           ) : (
                             <img src={img.url} alt={img.caption ?? `Image ${idx + 1}`} className="w-full h-full object-cover" />
                           )}
