@@ -143,7 +143,11 @@ export function registerAuthLoginRoute(app: Express) {
       const laxOptsGet = getLaxSessionCookieOptions(req, hostParam || undefined);
       res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsGet, maxAge: ONE_YEAR_MS });
 
-      console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, redirecting to ${successRedirect}`);
+      // Prevent Cloudflare (or any CDN) from caching this response — cached 302s lose Set-Cookie.
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      res.setHeader("Pragma", "no-cache");
+
+      console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, cookie domain=${cookieOptions.domain ?? 'none'}, secure=${cookieOptions.secure}, redirecting to ${successRedirect}`);
       // Track login event
       const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
       db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip?.substring(0, 64) ?? null, userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null }).catch(() => {});

@@ -20,8 +20,10 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import {
   clearSsoBridgeLock,
   isSsoBridgeBlocked,
+  isSsoBridgeFailedRecently,
   isSsoSuccessRecent,
   markSsoBridgeAttempted,
+  markSsoBridgeFailed,
 } from "@/lib/ssoSession";
 
 /** Primary SSO domain (AAUS) — hosts the /api/sso/bridge endpoint */
@@ -81,7 +83,9 @@ export function useSsoBridge() {
     if (params.has("sso")) return;
 
     // Bridge returned sso_failed=1 — AAUS has no session, user must log in manually.
-    // Clean the param from the URL and stop retrying.
+    // Replace the 5-min bridge lock with a short 30s "failed" lock so the
+    // visibilitychange handler can retry quickly after the user logs in on AAUS
+    // in another tab and switches back here.
     if (params.has("sso_failed")) {
       params.delete("sso_failed");
       const cleanSearch = params.toString();
@@ -90,12 +94,18 @@ export function useSsoBridge() {
         (cleanSearch ? `?${cleanSearch}` : "") +
         window.location.hash;
       window.history.replaceState({}, "", cleanUrl);
+      clearSsoBridgeLock();
+      markSsoBridgeFailed();
       return;
     }
 
     // A successful SSO exchange just happened (set by useSsoConsumer before reload).
     // The cookie may not be visible to auth.me yet — don't re-trigger the bridge.
     if (isSsoSuccessRecent()) return;
+    // If bridge failed recently (AAUS had no session), wait 30s before retrying.
+    // Shorter than the 5-min bridge lock so the user can log in on AAUS and
+    // switch back here to get auto-signed in quickly.
+    if (isSsoBridgeFailedRecently()) return;
 
     const attemptBridge = () => {
       if (hasRun.current || userRef.current) return;
@@ -120,7 +130,7 @@ export function useSsoBridge() {
       const visParams = new URLSearchParams(window.location.search);
       if (visParams.has("sso") || visParams.has("sso_failed")) return;
       if (isSsoSuccessRecent()) return;
-      if (!isSsoBridgeBlocked()) {
+      if (!isSsoBridgeBlocked() && !isSsoBridgeFailedRecently()) {
         hasRun.current = false;
         attemptBridge();
       }
