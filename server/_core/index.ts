@@ -24,6 +24,7 @@ import { registerUploadCohortMediaRoute } from "../routes/uploadCohortMedia";
 import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResource";
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
 import { registerUploadTeachRoute } from "../routes/uploadTeach";
+import { registerUploadGenericRoute } from "../routes/uploadGeneric";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
 import { registerFunnelOgMetaRoutes } from "../routes/funnelOgMeta";
 import { registerSitemapRoute } from "../routes/sitemap";
@@ -246,6 +247,8 @@ async function startServer() {
   registerUploadSocialImageRoute(app);
   // TEACH chunked file upload (multipart, bypasses tRPC JSON body limit for large PPTX files)
   registerUploadTeachRoute(app);
+  // Generic file upload endpoint — used by uploadFile() helper for scan coach media and other uploads
+  registerUploadGenericRoute(app);
   // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
   registerSsoAutoRoute(app);
   // Sitemap.xml and robots.txt — must be before SPA catch-all

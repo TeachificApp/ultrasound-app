@@ -1265,6 +1265,8 @@ export const scanCoachMedia = mysqlTable("scanCoachMedia", {
   viewId: varchar("viewId", { length: 64 }).notNull(),
   /** "image" | "clip" */
   mediaType: mysqlEnum("mediaType", ["image", "clip"]).notNull().default("image"),
+  /** Role of the media: clinical = real patient image, reference = diagram/schematic/annotated image, general = other */
+  role: mysqlEnum("role", ["clinical", "reference", "general"]).notNull().default("general"),
   /** Public S3 URL */
   url: text("url").notNull(),
   /** S3 key for deletion */

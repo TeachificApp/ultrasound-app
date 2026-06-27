@@ -712,44 +712,61 @@ export const scanCoachAdminRouter = router({
       z.object({
         viewId: z.string().min(1).max(64),
         mediaType: z.enum(["image", "clip"]),
-        /** Base64-encoded file data (without data: prefix) */
-        base64Data: z.string(),
+        /** Role: clinical = real patient image, reference = diagram/schematic, general = other */
+        role: z.enum(["clinical", "reference", "general"]).default("general"),
+        /** Pre-uploaded S3 URL (from /api/upload). Provide either url OR base64Data. */
+        url: z.string().url().optional(),
+        /** Pre-uploaded S3 file key (from /api/upload). Required when url is provided. */
+        fileKey: z.string().optional(),
+        /** Base64-encoded file data (without data: prefix). Alternative to url. */
+        base64Data: z.string().optional(),
         /** MIME type, e.g. image/jpeg or video/mp4 */
         mimeType: z.string().regex(/^(image\/(jpeg|png|gif|webp|svg\+xml)|video\/(mp4|webm|ogg|quicktime|x-ms-wmv|x-msvideo|avi))$/),
         /** Original filename */
         fileName: z.string().max(128),
         caption: z.string().max(255).optional(),
         sortOrder: z.number().int().min(0).default(0),
-      })
+      }).refine((d) => d.url || d.base64Data, { message: "Provide either url or base64Data" })
     )
     .mutation(async ({ ctx, input }) => {
       await assertPlatformAdmin(ctx);
 
-      const buffer = Buffer.from(input.base64Data, "base64");
-      const mimeToExt: Record<string, string> = {
-        "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif",
-        "image/webp": "webp", "image/svg+xml": "svg",
-        "video/mp4": "mp4", "video/webm": "webm", "video/ogg": "ogv", "video/quicktime": "mov",
-        "video/x-ms-wmv": "wmv", "video/x-msvideo": "avi", "video/avi": "avi",
-      };
-      const ext = mimeToExt[input.mimeType] ?? input.mimeType.split("/")[1];
-      const randomSuffix = Math.random().toString(36).slice(2, 10);
-      const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const key = `scancoach/tee-ice/${input.viewId}/${input.mediaType}-${safeFileName}-${randomSuffix}.${ext}`;
+      let finalUrl: string;
+      let finalKey: string;
 
-      const { url } = await storagePut(key, buffer, input.mimeType);
+      if (input.url) {
+        // Already uploaded via /api/upload — just record the metadata
+        finalUrl = input.url;
+        finalKey = input.fileKey ?? input.url;
+      } else {
+        // Legacy base64 path
+        const buffer = Buffer.from(input.base64Data!, "base64");
+        const mimeToExt: Record<string, string> = {
+          "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif",
+          "image/webp": "webp", "image/svg+xml": "svg",
+          "video/mp4": "mp4", "video/webm": "webm", "video/ogg": "ogv", "video/quicktime": "mov",
+          "video/x-ms-wmv": "wmv", "video/x-msvideo": "avi", "video/avi": "avi",
+        };
+        const ext = mimeToExt[input.mimeType] ?? input.mimeType.split("/")[1];
+        const randomSuffix = Math.random().toString(36).slice(2, 10);
+        const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        finalKey = `scancoach/tee-ice/${input.viewId}/${input.mediaType}-${safeFileName}-${randomSuffix}.${ext}`;
+        const { url: uploadedUrl } = await storagePut(finalKey, buffer, input.mimeType);
+        finalUrl = uploadedUrl;
+      }
 
       const id = await insertScanCoachMedia({
         viewId: input.viewId,
         mediaType: input.mediaType,
-        url,
-        fileKey: key,
+        role: input.role,
+        url: finalUrl,
+        fileKey: finalKey,
         caption: input.caption ?? null,
         sortOrder: input.sortOrder,
         uploadedBy: ctx.user.id,
       });
 
-      return { id, url, key };
+      return { id, url: finalUrl, key: finalKey };
     }),
 
   /**
