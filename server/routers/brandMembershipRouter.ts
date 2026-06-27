@@ -13,7 +13,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { brandMemberships } from "../../drizzle/schema";
 import { and, eq, desc } from "drizzle-orm";
@@ -859,5 +859,37 @@ export const brandMembershipRouter = router({
         .orderBy(desc(brandMemberships.grantedAt));
 
       return memberships;
+    }),
+
+  /**
+   * Public lead-capture: Team / Institution pricing inquiry.
+   * Sends an owner notification — no auth required.
+   */
+  submitTeamInquiry: publicProcedure
+    .input(z.object({
+      name: z.string().min(1).max(200),
+      email: z.string().email().max(320),
+      organization: z.string().min(1).max(300),
+      teamSize: z.string().min(1).max(100),
+      message: z.string().max(2000).optional(),
+      brand: z.enum(["aaus", "iheartecho"]),
+    }))
+    .mutation(async ({ input }) => {
+      const appLabel = input.brand === "iheartecho" ? "iHeartEcho" : "All About Ultrasound";
+      const lines = [
+        `App: ${appLabel}`,
+        `Name: ${input.name}`,
+        `Email: ${input.email}`,
+        `Organization: ${input.organization}`,
+        `Team Size: ${input.teamSize}`,
+        ...(input.message ? [`Message: ${input.message}`] : []),
+      ];
+      try {
+        await (await import("../_core/notification")).notifyOwner({
+          title: `[${appLabel}] Team/Institution Pricing Inquiry`,
+          content: lines.join("\n"),
+        });
+      } catch { /* non-fatal */ }
+      return { success: true };
     }),
 });

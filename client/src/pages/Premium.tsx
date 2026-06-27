@@ -3,14 +3,17 @@
  * Founding Member positioning: monthly $9.97, lifetime $99.97 (single) / $147 (dual).
  * Annual plans are HIDDEN — set showAnnual: true in brandMembershipRouter to re-enable.
  */
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   Crown, Check, Sparkles, ArrowRight, RefreshCw,
   Stethoscope, BookOpen, Zap, Activity, FileText,
   Star, Shield, Clock, Layers, Infinity, Heart, Waves,
-  Lock, Timer, TrendingUp, Users, Award, Flame
+  Lock, Timer, TrendingUp, Users, Award, Flame,
+  Building2, Mail, Send, CheckCircle2
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -164,6 +167,16 @@ export default function Premium() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState<string | null>(null);
+
+  // Team inquiry form state
+  const [teamFormOpen, setTeamFormOpen] = useState(false);
+  const [teamSubmitted, setTeamSubmitted] = useState(false);
+  const [teamName, setTeamName] = useState("");
+  const [teamEmail, setTeamEmail] = useState("");
+  const [teamOrg, setTeamOrg] = useState("");
+  const [teamSize, setTeamSize] = useState("");
+  const [teamMessage, setTeamMessage] = useState("");
+  const teamFormRef = useRef<HTMLDivElement>(null);
 
   const brand = detectBrand();
   const isIHE = brand === "iheartecho";
@@ -586,6 +599,62 @@ export default function Premium() {
         </div>
       </div>
 
+      {/* ── Team / Institution Pricing ─────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="container py-10">
+          <div className="max-w-2xl mx-auto">
+            <div
+              className="rounded-2xl border-2 border-dashed border-[#189aa1]/40 bg-gradient-to-br from-[#f0fbfc] to-white p-7 text-center cursor-pointer hover:border-[#189aa1]/70 transition-all"
+              onClick={() => {
+                setTeamFormOpen(o => !o);
+                setTimeout(() => teamFormRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 100);
+              }}
+            >
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Building2 className="w-5 h-5" style={{ color: "#189aa1" }} />
+                <span className="font-black text-gray-800 text-base" style={{ fontFamily: "Merriweather, serif" }}>
+                  Team &amp; Institution Pricing
+                </span>
+              </div>
+              <p className="text-gray-500 text-sm mb-3">
+                Training a residency program, sonography school, or clinical team?
+                We offer custom group rates for 5+ users.
+              </p>
+              <span
+                className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-4 py-2 text-white"
+                style={{ background: "#189aa1" }}
+              >
+                <Mail className="w-4 h-4" />
+                {teamFormOpen ? "Hide Form" : "Request Group Pricing"}
+              </span>
+            </div>
+
+            {teamFormOpen && (
+              <div ref={teamFormRef} className="mt-5 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                {teamSubmitted ? (
+                  <div className="text-center py-6">
+                    <CheckCircle2 className="w-10 h-10 mx-auto mb-3" style={{ color: "#189aa1" }} />
+                    <p className="font-bold text-gray-800 text-base mb-1">Thanks! We'll be in touch soon.</p>
+                    <p className="text-gray-500 text-sm">We typically respond within 1 business day.</p>
+                  </div>
+                ) : (
+                  <TeamInquiryForm
+                    brand={brand}
+                    user={user}
+                    name={teamName} setName={setTeamName}
+                    email={teamEmail} setEmail={setTeamEmail}
+                    org={teamOrg} setOrg={setTeamOrg}
+                    size={teamSize} setSize={setTeamSize}
+                    message={teamMessage} setMessage={setTeamMessage}
+                    onSuccess={() => setTeamSubmitted(true)}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* ── Value Pillars ────────────────────────────────────────────────────── */}
       <div className="bg-gray-50 border-b border-gray-100">
         <div className="container py-12">
@@ -740,5 +809,107 @@ export default function Premium() {
         )}
       </div>
     </Layout>
+  );
+}
+
+// ─── TeamInquiryForm ──────────────────────────────────────────────────────────
+function TeamInquiryForm({
+  brand, user,
+  name, setName,
+  email, setEmail,
+  org, setOrg,
+  size, setSize,
+  message, setMessage,
+  onSuccess,
+}: {
+  brand: "aaus" | "iheartecho";
+  user: { name?: string | null; email?: string | null; displayName?: string | null } | null;
+  name: string; setName: (v: string) => void;
+  email: string; setEmail: (v: string) => void;
+  org: string; setOrg: (v: string) => void;
+  size: string; setSize: (v: string) => void;
+  message: string; setMessage: (v: string) => void;
+  onSuccess: () => void;
+}) {
+  const submitInquiry = trpc.brandMembership.submitTeamInquiry.useMutation({
+    onSuccess: () => onSuccess(),
+    onError: (e) => toast.error(e.message || "Submission failed — please try again."),
+  });
+
+  // Pre-fill from logged-in user on first render
+  useEffect(() => {
+    if (user) {
+      if (!name) setName(user.displayName ?? user.name ?? "");
+      if (!email) setEmail(user.email ?? "");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !org.trim() || !size.trim()) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+    submitInquiry.mutate({ name: name.trim(), email: email.trim(), organization: org.trim(), teamSize: size.trim(), message: message.trim() || undefined, brand });
+  }
+
+  const TEAM_SIZES = ["5–10 users", "11–25 users", "26–50 users", "51–100 users", "100+ users"];
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="text-center mb-4">
+        <p className="font-bold text-gray-800 text-sm">Tell us about your team</p>
+        <p className="text-gray-500 text-xs mt-0.5">We'll follow up with custom pricing options.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Your Name *</label>
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="Jane Smith" className="text-sm" required />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Email Address *</label>
+          <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jane@hospital.org" className="text-sm" required />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Organization / Institution *</label>
+          <Input value={org} onChange={e => setOrg(e.target.value)} placeholder="City Medical Center" className="text-sm" required />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Team Size *</label>
+          <select
+            value={size}
+            onChange={e => setSize(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            required
+          >
+            <option value="">Select team size…</option>
+            {TEAM_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Additional Notes (optional)</label>
+        <Textarea
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          placeholder="Tell us about your program, use case, or any specific requirements…"
+          className="text-sm resize-none"
+          rows={3}
+        />
+      </div>
+      <Button
+        type="submit"
+        disabled={submitInquiry.isPending}
+        className="w-full font-bold text-sm rounded-xl text-white"
+        style={{ background: "#189aa1" }}
+      >
+        {submitInquiry.isPending ? (
+          <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Sending…</>
+        ) : (
+          <><Send className="w-4 h-4 mr-2" />Send Inquiry</>
+        )}
+      </Button>
+    </form>
   );
 }
