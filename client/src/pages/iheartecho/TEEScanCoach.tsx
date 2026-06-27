@@ -343,41 +343,6 @@ export const TEE_VIEWS = [
     measurements: ["TR Vmax", "RVSP", "PV Vmax", "TV annulus diameter"],
     criticalFindings: ["Severe TR with RV dilation", "RVOT obstruction", "Pulmonary hypertension"],
   },
-  {
-    id: "meaorta",
-    group: "Mid-Esophageal",
-    groupColor: "#189aa1",
-    name: "ME Ascending Aorta SAX/LAX",
-    angle: "0° (SAX) / 90° (LAX)",
-    depth: "20–25 cm",
-    flexion: "Slight retroflexion",
-    patientPosition: "Supine; probe withdrawn to upper esophagus",
-    description: "Visualises the ascending aorta in both short and long axis. Critical for aortic dissection assessment, atheroma grading, and measurement of the ascending aorta diameter before aortic cross-clamping.",
-    howToGet: [
-      "Withdraw probe to 20–25 cm from incisors",
-      "At 0°: ascending aorta in SAX (round cross-section)",
-      "Rotate to 90°: ascending aorta in LAX",
-      "Scan from proximal to distal by withdrawing slowly",
-    ],
-    structures: [
-      "Ascending aorta (proximal to mid)", "Aortic wall layers",
-      "Pericardium", "Right pulmonary artery (crosses posterior)",
-    ],
-    doppler: [
-      { label: "Aortic Color Doppler", detail: "True vs false lumen in dissection — true lumen expands in systole" },
-    ],
-    tips: [
-      "Intimal flap in Type A dissection: thin, mobile linear echo in ascending aorta",
-      "Grade aortic atheroma: Grade I (normal) to V (mobile plaque ≥5 mm)",
-      "The right PA crosses posterior to the ascending aorta — useful landmark",
-    ],
-    pitfalls: [
-      "Reverberation artifact can mimic intimal flap — confirm in two planes",
-      "The ascending aorta is partially obscured by the trachea — a 'blind spot' exists",
-    ],
-    measurements: ["Ascending aorta diameter (sinus, STJ, mid-ascending)", "Atheroma grade"],
-    criticalFindings: ["Type A aortic dissection", "Ascending aortic aneurysm >5.5 cm", "Mobile atheroma (embolic risk)"],
-  },
   // ── Transgastric ────────────────────────────────────────────────────────────
   {
     id: "tgbasal",
@@ -567,6 +532,42 @@ export const TEE_VIEWS = [
   },
   // ── Upper Esophageal ─────────────────────────────────────────────────────────
   {
+    id: "uepv",
+    group: "Upper Esophageal",
+    groupColor: "#189aa1",
+    name: "UE Pulmonary Veins",
+    angle: "0–30°",
+    depth: "20–25 cm",
+    flexion: "Slight anteflexion",
+    patientPosition: "Supine; probe at upper esophageal level",
+    description: "Upper esophageal view of the pulmonary veins entering the left atrium. Used for pulmonary vein flow assessment, anomalous pulmonary venous drainage, and post-ablation PV stenosis evaluation.",
+    howToGet: [
+      "Withdraw probe to 20–25 cm",
+      "Set angle to 0–30°",
+      "Apply slight anteflexion to bring the LA posterior wall and PV ostia into view",
+      "Rotate left/right to visualise LSPV, LIPV, RSPV, RIPV individually",
+    ],
+    structures: [
+      "Left superior pulmonary vein (LSPV)", "Left inferior pulmonary vein (LIPV)",
+      "Right superior pulmonary vein (RSPV)", "Left atrium (posterior wall)",
+    ],
+    doppler: [
+      { label: "PV PW Doppler", detail: "S/D ratio, AR wave. Blunted S wave = elevated LA pressure or severe MR" },
+      { label: "PV Color Doppler", detail: "Post-ablation: PV stenosis if velocity >1.2 m/s" },
+    ],
+    tips: [
+      "LSPV is the easiest to find — it enters the LA at the upper left",
+      "Blunted or reversed PV S wave = elevated LVEDP or severe MR",
+      "Post-ablation: compare PV diameters to baseline for stenosis",
+    ],
+    pitfalls: [
+      "RSPV is harder to visualise — may need slight probe rotation",
+      "Anomalous PV drainage: RSPV to SVC is the most common variant",
+    ],
+    measurements: ["PV S/D ratio", "PV AR velocity/duration", "PV ostium diameter (post-ablation)"],
+    criticalFindings: ["Anomalous pulmonary venous drainage", "PV stenosis post-ablation", "LA thrombus near PV ostia"],
+  },
+  {
     id: "ueaorticarch",
     group: "Upper Esophageal",
     groupColor: "#189aa1",
@@ -603,48 +604,12 @@ export const TEE_VIEWS = [
     measurements: ["Aortic arch diameter", "Descending Ao diameter", "Atheroma grade (I–V)"],
     criticalFindings: ["Type A or B aortic dissection", "Aortic arch aneurysm", "Mobile atheroma (embolic risk)"],
   },
-  {
-    id: "uepv",
-    group: "Upper Esophageal",
-    groupColor: "#189aa1",
-    name: "UE Pulmonary Veins",
-    angle: "0–30°",
-    depth: "20–25 cm",
-    flexion: "Slight anteflexion",
-    patientPosition: "Supine; probe at upper esophageal level",
-    description: "Upper esophageal view of the pulmonary veins entering the left atrium. Used for pulmonary vein flow assessment, anomalous pulmonary venous drainage, and post-ablation PV stenosis evaluation.",
-    howToGet: [
-      "Withdraw probe to 20–25 cm",
-      "Set angle to 0–30°",
-      "Apply slight anteflexion to bring the LA posterior wall and PV ostia into view",
-      "Rotate left/right to visualise LSPV, LIPV, RSPV, RIPV individually",
-    ],
-    structures: [
-      "Left superior pulmonary vein (LSPV)", "Left inferior pulmonary vein (LIPV)",
-      "Right superior pulmonary vein (RSPV)", "Left atrium (posterior wall)",
-    ],
-    doppler: [
-      { label: "PV PW Doppler", detail: "S/D ratio, AR wave. Blunted S wave = elevated LA pressure or severe MR" },
-      { label: "PV Color Doppler", detail: "Post-ablation: PV stenosis if velocity >1.2 m/s" },
-    ],
-    tips: [
-      "LSPV is the easiest to find — it enters the LA at the upper left",
-      "Blunted or reversed PV S wave = elevated LVEDP or severe MR",
-      "Post-ablation: compare PV diameters to baseline for stenosis",
-    ],
-    pitfalls: [
-      "RSPV is harder to visualise — may need slight probe rotation",
-      "Anomalous PV drainage: RSPV to SVC is the most common variant",
-    ],
-    measurements: ["PV S/D ratio", "PV AR velocity/duration", "PV ostium diameter (post-ablation)"],
-    criticalFindings: ["Anomalous pulmonary venous drainage", "PV stenosis post-ablation", "LA thrombus near PV ostia"],
-  },
 ];
 
 // ─── GROUP DEFINITIONS ────────────────────────────────────────────────────────
 const GROUPS = [
   { key: "Overview",        color: "#189aa1", label: "Overview",             count: 1 },
-  { key: "Mid-Esophageal",  color: "#189aa1", label: "Mid-Esophageal (ME)",  count: 8 },
+  { key: "Mid-Esophageal",  color: "#189aa1", label: "Mid-Esophageal (ME)",  count: 7 },
   { key: "Transgastric",    color: "#189aa1", label: "Transgastric (TG)",    count: 5 },
   { key: "Upper Esophageal",color: "#189aa1", label: "Upper Esophageal (UE)",count: 2 },
 ];
