@@ -682,7 +682,8 @@ function ViewCard({ view, isSelected, onClick }: { view: TEEView; isSelected: bo
 // ─── Main Export ───────────────────────────────────────────────────────────────
 export function TEEIceScanCoachContent() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const appRoles: string[] = (user as any)?.appRoles ?? [];
+  const isAdmin = appRoles.includes("platform_admin") || appRoles.includes("platform_owner") || user?.role === "admin";
 
   const [activeSection, setActiveSection] = useState<"ME" | "TG" | "UE">("ME");
   const [selectedView, setSelectedView] = useState<TEEView>(teeViews[0]);
@@ -752,9 +753,8 @@ export function TEEIceScanCoachContent() {
             </div>
           </div>
 
-          {/* Reference media — shown only when filled; admin upload panel shown to admins */}
+          {/* Reference media — shown only when filled */}
           <ViewMediaDisplay viewId={selectedView.id} />
-          {isAdmin && <AdminMediaPanel viewId={selectedView.id} />}
 
           {/* Override images from unified ScanCoach admin editor (registry-keyed) */}
           {((selectedViewMerged as any).echoImageUrl || (selectedViewMerged as any).anatomyImageUrl) && (
