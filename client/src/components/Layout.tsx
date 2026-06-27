@@ -397,7 +397,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="sticky top-0 z-10 bg-white border-b border-[#189aa1]/20 px-2 sm:px-4 py-2.5 sm:py-3 flex items-center gap-1.5 sm:gap-3 shadow-sm min-w-0 overflow-hidden">
+        <header className="sticky top-0 z-10 bg-white border-b border-[#189aa1]/20 px-2 sm:px-4 py-2.5 sm:py-3 flex items-center gap-1.5 sm:gap-3 shadow-sm min-w-0">
           <button
             className="lg:hidden p-2 rounded-md text-[#189aa1] hover:bg-[#f0fbfc] min-w-[40px] min-h-[40px] flex items-center justify-center flex-shrink-0"
             onClick={() => setSidebarOpen(true)}
