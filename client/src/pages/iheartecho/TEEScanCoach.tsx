@@ -23,8 +23,46 @@ const AQUA  = "#4ad9e0";
 
 // ─── VIEW DATA ────────────────────────────────────────────────────────────────
 
-const TEE_VIEWS = [
-  // ── Mid-Esophageal ──────────────────────────────────────────────────────────
+export const TEE_VIEWS = [
+  // ── Overview ───────────────────────────────────────────────────────────────────────────────────────
+  {
+    id: "tee_overview",
+    group: "Overview",
+    groupColor: "#189aa1",
+    name: "TEE Overview",
+    angle: "N/A",
+    depth: "N/A",
+    flexion: "N/A",
+    patientPosition: "Supine; sedated/anaesthetised; bite block in situ",
+    description: "A comprehensive introduction to the TEE procedure — covering patient preparation, probe insertion technique, and the fundamental principles of probe manipulation and multiplane imaging.",
+    howToGet: [
+      "Ensure patient is appropriately sedated/anaesthetised and airway is secured",
+      "Insert bite block and lubricate the probe tip generously",
+      "Advance probe with gentle forward pressure in the neutral position",
+      "Once past the cricopharyngeus (~15–20 cm), advance to mid-esophagus (~30–35 cm)",
+      "Confirm position by identifying all four cardiac chambers at 0°",
+    ],
+    structures: [
+      "Esophagus", "Oropharynx", "Bite block",
+      "Multiplane transducer (0–180°)", "Omniplane imaging",
+    ],
+    doppler: [],
+    tips: [
+      "Never force the probe — resistance suggests cricopharyngeal spasm or pathology",
+      "Rotate the multiplane angle (0–180°) to sweep through imaging planes without moving the probe",
+      "Anteflexion (forward) brings the transducer closer to anterior structures; retroflexion (backward) moves away",
+      "Left/right lateral flexion (LAT) steers the probe tip toward the patient’s left or right",
+      "Clockwise rotation of the shaft turns the image plane to the patient’s right; counter-clockwise to the left",
+    ],
+    pitfalls: [
+      "Probe insertion without adequate sedation risks laryngospasm and oesophageal injury",
+      "Excessive torque on the probe shaft can cause oesophageal trauma",
+      "Failure to unlock the probe controls before withdrawal risks mucosal injury",
+    ],
+    measurements: [],
+    criticalFindings: [],
+  },
+  // ── Mid-Esophageal ──────────────────────────────────────────────────────────────────────────────
   {
     id: "me4c",
     group: "Mid-Esophageal",
@@ -500,9 +538,10 @@ const TEE_VIEWS = [
 
 // ─── GROUP DEFINITIONS ────────────────────────────────────────────────────────
 const GROUPS = [
-  { key: "Mid-Esophageal", color: "#189aa1", label: "Mid-Esophageal (ME)", count: 7 },
-  { key: "Transgastric",   color: "#189aa1", label: "Transgastric (TG)",   count: 4 },
-  { key: "Upper Esophageal", color: "#189aa1", label: "Upper Esophageal (UE)", count: 2 },
+  { key: "Overview",        color: "#189aa1", label: "Overview",             count: 1 },
+  { key: "Mid-Esophageal",  color: "#189aa1", label: "Mid-Esophageal (ME)",  count: 7 },
+  { key: "Transgastric",    color: "#189aa1", label: "Transgastric (TG)",    count: 4 },
+  { key: "Upper Esophageal",color: "#189aa1", label: "Upper Esophageal (UE)",count: 2 },
 ];
 
 // ─── VIEW DETAIL PANEL ────────────────────────────────────────────────────────

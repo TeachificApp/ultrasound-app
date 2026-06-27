@@ -75,6 +75,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
     label: "TEE ScanCoach",
     path: "/tee-scan-coach",
     views: [
+      { id: "tee_overview", name: "TEE Overview",                             group: "Overview" },
       { id: "me4c",         name: "ME 4-Chamber",                           group: "Mid-Esophageal" },
       { id: "me2c",         name: "ME 2-Chamber",                           group: "Mid-Esophageal" },
       { id: "melax",        name: "ME Long Axis (LAX)",                     group: "Mid-Esophageal" },

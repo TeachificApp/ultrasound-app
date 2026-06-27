@@ -63,6 +63,11 @@ const MODULE_VALUES = [
   "appendix", "invasive_procedures",
   // Pediatric
   "pediatric",
+  // iHeartEcho modules
+  "tte", "tee", "ice", "uea", "strain", "hocm", "stress", "structural",
+  "chd", "diastolic", "pulm", "achd", "ecg",
+  "mcs_lvad", "mcs_ecmo", "mcs_impella_25", "mcs_impella_cp",
+  "mcs_impella_55", "mcs_impella_ecp", "mcs_impella_rp", "mcs_lifevest", "mcs_icd",
 ] as const;
 
 const upsertSchema = z.object({

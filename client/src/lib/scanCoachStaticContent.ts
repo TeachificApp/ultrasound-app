@@ -106,6 +106,28 @@ const STATIC_CONTENT: Record<string, StaticViewContent> = {
   },
 
   // ─── TEE ────────────────────────────────────────────────────────────────────
+  "tee:tee_overview": {
+    description: "A comprehensive introduction to the TEE procedure — covering patient preparation, probe insertion technique, and the fundamental principles of probe manipulation and multiplane imaging.",
+    structures: ["Esophagus", "Oropharynx", "Bite block", "Multiplane transducer", "Omniplane imaging"],
+    howToGet: [
+      "Ensure patient is appropriately sedated/anaesthetised and airway is secured",
+      "Insert bite block and lubricate the probe tip",
+      "Advance probe with gentle forward pressure in the neutral position",
+      "Once past the cricopharyngeus, advance to mid-esophagus (~30–35 cm)",
+      "Confirm position by identifying all four cardiac chambers",
+    ],
+    tips: [
+      "Never force the probe — resistance suggests cricopharyngeal spasm or pathology",
+      "Rotate the multiplane angle (0–180°) to sweep through imaging planes without moving the probe",
+      "Anteflexion (forward) brings the transducer closer to anterior structures; retroflexion (backward) moves away",
+    ],
+    pitfalls: [
+      "Probe insertion without adequate sedation risks laryngospasm and oesophageal injury",
+      "Excessive torque on the probe shaft can cause oesophageal trauma",
+    ],
+    measurements: [],
+    criticalFindings: [],
+  },
   "tee:me4c": {
     description: "The foundational TEE view. Provides simultaneous assessment of all four cardiac chambers, both AV valves, and the interatrial septum. Equivalent to the TTE apical 4-chamber but with superior resolution.",
     structures: ["LV (all walls, apex)", "RV", "LA", "RA", "Mitral valve (A2/P2 segments)", "Tricuspid valve", "Interatrial septum", "Moderator band (RV)"],
