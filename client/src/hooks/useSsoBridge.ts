@@ -92,6 +92,9 @@ export function useSsoBridge() {
 
     const params = new URLSearchParams(window.location.search);
 
+    // Magic-link / SSO exchange just set cookies — do not redirect to AAUS bridge
+    if (params.get("auth_pending") === "1") return;
+
     if (params.has("sso")) return;
 
     if (params.has("sso_failed")) {

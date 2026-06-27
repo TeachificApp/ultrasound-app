@@ -37,8 +37,8 @@ import { ENV } from "../_core/env";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 import { redeemSsoTokenAndSetCookies } from "../lib/ssoExchange";
 import { resolveUserFromSessionOpenId } from "../lib/resolveUserFromSession";
+import { resolveSessionFromCookies } from "../lib/resolveSessionCookie";
 import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
-import { COOKIE_NAME, LAX_COOKIE_NAME } from "@shared/const";
 
 // 1×1 transparent GIF — used as the response body so <img> tags can trigger this
 const TRANSPARENT_GIF = Buffer.from(
@@ -306,15 +306,10 @@ export function registerSsoAutoRoute(app: Express) {
       const cookies = cookieHeader
         ? new Map(Object.entries(parseCookieHeader(cookieHeader)))
         : new Map<string, string>();
-      // Check both SameSite=None and SameSite=Lax cookies — the Lax cookie is the
-      // fallback for browsers that block SameSite=None (Chrome 3rd-party blocking,
-      // Firefox Strict ETP, Brave, Safari ITP). Without this, a user logged in on
-      // AAUS via the Lax cookie would appear unauthenticated to the bridge, causing
-      // it to return sso_failed=1 and never sign them into iHeartEcho.
-      const primaryCookie = cookies.get(COOKIE_NAME);
-      const laxCookie = cookies.get(LAX_COOKIE_NAME);
-      const sessionCookie = primaryCookie || laxCookie;
-      const session = sessionCookie ? await sdk.verifySession(sessionCookie) : null;
+      const resolved = await resolveSessionFromCookies(cookies, (value) =>
+        sdk.verifySession(value),
+      );
+      const session = resolved?.session ?? null;
 
       if (!session) {
         // Not authenticated — redirect back with ?sso_failed=1 so the client

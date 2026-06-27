@@ -12,6 +12,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import {
@@ -2008,12 +2009,15 @@ function InstructorTab() {
 
 // TABS is built dynamically in the component based on user roles (see below)
 
+const AUTH_PENDING_MAX_RETRIES = 5;
+
 export default function StudentDashboardPage() {
   const { isAuthenticated, loading, user, refresh } = useAuth();
+  const utils = trpc.useUtils();
   const [, navigate] = useLocation();
   const search = useSearch();
   const authPending = new URLSearchParams(search).get("auth_pending") === "1";
-  const authRetryRef = useRef(0);
+  const [authRetryCount, setAuthRetryCount] = useState(0);
   const [authRetrying, setAuthRetrying] = useState(authPending);
   const isAdmin = (user as any)?.role === "admin";
   const isInstructor = isAdmin || (user as any)?.appRoles?.includes("instructor") || (user as any)?.appRoles?.includes("platform_admin") || (user as any)?.appRoles?.includes("platform_owner");
@@ -2032,28 +2036,40 @@ export default function StudentDashboardPage() {
   const initialTab: Tab = urlTab && VALID_TABS.includes(urlTab) ? urlTab : "content";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
+  // Fresh login via magic link / SSO exchange — drop stale SSO locks and cached auth
+  useEffect(() => {
+    if (!authPending) return;
+    clearSsoSessionLocks();
+    utils.auth.me.reset();
+  }, [authPending, utils.auth.me]);
+
   // After magic-link redirect (?auth_pending=1), retry auth.me before sending to login
   useEffect(() => {
-    if (!authPending || loading || isAuthenticated) {
-      if (isAuthenticated && authPending) {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("auth_pending");
-        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
-      }
-      return;
-    }
-    if (authRetryRef.current >= 3) {
+    if (!authPending) return;
+
+    if (isAuthenticated) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("auth_pending");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
       setAuthRetrying(false);
       return;
     }
+
+    if (loading) return;
+
+    if (authRetryCount >= AUTH_PENDING_MAX_RETRIES) {
+      setAuthRetrying(false);
+      return;
+    }
+
+    const delayMs = authRetryCount === 0 ? 100 : 400;
     const timer = window.setTimeout(() => {
-      authRetryRef.current += 1;
       void refresh().finally(() => {
-        if (authRetryRef.current >= 3) setAuthRetrying(false);
+        setAuthRetryCount((n) => n + 1);
       });
-    }, authRetryRef.current === 0 ? 100 : 400);
+    }, delayMs);
     return () => window.clearTimeout(timer);
-  }, [authPending, loading, isAuthenticated, refresh]);
+  }, [authPending, loading, isAuthenticated, refresh, authRetryCount]);
 
   // Scroll indicator state for the main tab bar
   const tabScrollRef = useRef<HTMLDivElement>(null);
