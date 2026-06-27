@@ -32,9 +32,9 @@ import * as crypto from "crypto";
 import { parse as parseCookieHeader } from "cookie";
 import { getDb } from "../db";
 import { ssoTokens, users } from "../../drizzle/schema";
-import { getSessionCookieOptions } from "../_core/cookies";
+import { getSessionCookieOptions, getLaxSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
 // 1×1 transparent GIF — used as the response body so <img> tags can trigger this
 const TRANSPARENT_GIF = Buffer.from(
@@ -180,6 +180,9 @@ export function registerSsoAutoRoute(app: Express) {
       const cookieHostname = resolveCookieHostname(req);
       const cookieOptions = getSessionCookieOptions(req, cookieHostname);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      // SameSite=Lax fallback — for browsers blocking SameSite=None
+      const laxCookieOptions = getLaxSessionCookieOptions(req, cookieHostname);
+      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxCookieOptions, maxAge: ONE_YEAR_MS });
 
       console.log(
         `[SsoAuto] Signed in user ${user.id} via cross-domain SSO` +
@@ -250,7 +253,14 @@ export function registerSsoAutoRoute(app: Express) {
       const cookies = cookieHeader
         ? new Map(Object.entries(parseCookieHeader(cookieHeader)))
         : new Map<string, string>();
-      const sessionCookie = cookies.get(COOKIE_NAME);
+      // Check both SameSite=None and SameSite=Lax cookies — the Lax cookie is the
+      // fallback for browsers that block SameSite=None (Chrome 3rd-party blocking,
+      // Firefox Strict ETP, Brave, Safari ITP). Without this, a user logged in on
+      // AAUS via the Lax cookie would appear unauthenticated to the bridge, causing
+      // it to return sso_failed=1 and never sign them into iHeartEcho.
+      const primaryCookie = cookies.get(COOKIE_NAME);
+      const laxCookie = cookies.get(LAX_COOKIE_NAME);
+      const sessionCookie = primaryCookie || laxCookie;
       const session = sessionCookie ? await sdk.verifySession(sessionCookie) : null;
 
       if (!session) {
