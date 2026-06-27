@@ -1,6 +1,7 @@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { useCallback, useEffect, useMemo } from "react";
+import { clearSsoSessionLocks } from "@/lib/ssoSession";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -38,6 +39,9 @@ export function useAuth(options?: UseAuthOptions) {
     // Clear client-side auth state
     utils.auth.me.setData(undefined, null);
     localStorage.removeItem("manus-runtime-user-info");
+    // Clear SSO session locks so the next user who logs in on this browser
+    // gets a fresh SSO broadcast to all other domains.
+    clearSsoSessionLocks();
     // Add ?logout=1 so the Login page knows not to auto-redirect even if
     // the cookie somehow persists (e.g., domain mismatch edge case).
     window.location.href = getLoginUrl() + "?logout=1";
