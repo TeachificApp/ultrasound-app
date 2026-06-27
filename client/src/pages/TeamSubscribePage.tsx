@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   Building2, Users, CheckCircle2, Loader2, Mail, Phone,
   GraduationCap, ChevronRight, ArrowLeft,
@@ -58,8 +58,6 @@ const SEAT_PRESETS = [5, 10, 25, 50, 100];
 
 export default function TeamSubscribePage() {
   const [, navigate] = useLocation();
-  const { toast } = useToast();
-
   // Form state
   const [brand, setBrand] = useState<"aaus" | "iheartecho" | "dual">("aaus");
   const [plan, setPlan] = useState<"monthly" | "lifetime">("monthly");
@@ -76,26 +74,22 @@ export default function TeamSubscribePage() {
       setSubmitted(true);
     },
     onError: (err) => {
-      toast({
-        title: "Submission failed",
-        description: err.message || "Please try again or email us directly.",
-        variant: "destructive",
-      });
+      toast.error(err.message || "Please try again or email us directly.");
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!orgName.trim()) {
-      toast({ title: "Organization name required", variant: "destructive" });
+      toast.error("Organization name is required.");
       return;
     }
     if (!contactName.trim()) {
-      toast({ title: "Contact name required", variant: "destructive" });
+      toast.error("Contact name is required.");
       return;
     }
     if (!contactEmail.trim()) {
-      toast({ title: "Contact email required", variant: "destructive" });
+      toast.error("Contact email is required.");
       return;
     }
     submitInquiry.mutate({

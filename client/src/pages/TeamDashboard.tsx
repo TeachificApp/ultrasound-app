@@ -11,11 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   Users, Mail, Trash2, RefreshCw, Plus, Building2, Loader2,
-  CheckCircle2, Clock, XCircle, Crown, ArrowLeft, ChevronRight,
+  Crown, ArrowLeft, ChevronRight,
 } from "lucide-react";
 
 function StatusBadge({ status }: { status: string }) {
@@ -29,8 +28,6 @@ export default function TeamDashboard() {
   const [, navigate] = useLocation();
   const params = useParams<{ teamId?: string }>();
   const { user, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
-
   const [inviteEmail, setInviteEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
 
@@ -49,30 +46,30 @@ export default function TeamDashboard() {
 
   const inviteMutation = trpc.team.inviteMember.useMutation({
     onSuccess: () => {
-      toast({ title: "Invite sent!", description: `An invitation email has been sent to ${inviteEmail}.` });
+      toast.success(`Invite sent to ${inviteEmail}.`);
       setInviteEmail("");
       setIsInviting(false);
       detailsQuery.refetch();
     },
     onError: (err) => {
-      toast({ title: "Invite failed", description: err.message, variant: "destructive" });
+      toast.error(err.message);
       setIsInviting(false);
     },
   });
 
   const revokeMutation = trpc.team.revokeMember.useMutation({
     onSuccess: () => {
-      toast({ title: "Seat revoked", description: "The member's access has been removed." });
+      toast.success("Seat revoked. The member's access has been removed.");
       detailsQuery.refetch();
     },
     onError: (err) => {
-      toast({ title: "Revoke failed", description: err.message, variant: "destructive" });
+      toast.error(err.message);
     },
   });
 
   const resendMutation = trpc.team.resendInvite.useMutation({
-    onSuccess: () => toast({ title: "Invite resent!" }),
-    onError: (err) => toast({ title: "Resend failed", description: err.message, variant: "destructive" }),
+    onSuccess: () => toast.success("Invite resent!"),
+    onError: (err) => toast.error(err.message),
   });
 
   if (authLoading || myTeamsQuery.isLoading || (selectedTeamId && detailsQuery.isLoading && !detailsQuery.data)) {
