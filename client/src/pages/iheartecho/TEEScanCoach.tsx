@@ -434,38 +434,6 @@ export const TEE_VIEWS = [
     criticalFindings: ["New regional wall motion abnormality (ischaemia)", "LV cavity obliteration (hypovolaemia)", "LV thrombus (apical)"],
   },
   {
-    id: "tg2c",
-    group: "Transgastric",
-    groupColor: "#189aa1",
-    name: "TG 2-Chamber",
-    angle: "90°",
-    depth: "40–45 cm",
-    flexion: "Anteflexion",
-    patientPosition: "Supine; same position as TG Mid SAX",
-    description: "Transgastric equivalent of the 2-chamber view. Shows LV anterior and inferior walls in long axis from the transgastric window. Useful when esophageal views are suboptimal.",
-    howToGet: [
-      "From TG Mid SAX (0°), rotate to 90°",
-      "LV anterior and inferior walls should appear in long axis",
-      "Optimize to show the full LV from base to apex",
-    ],
-    structures: [
-      "LV anterior wall", "LV inferior wall",
-      "Mitral valve (subvalvular apparatus)", "LV apex",
-    ],
-    doppler: [
-      { label: "MV Color (TG)", detail: "MR from transgastric window — useful when ME views are limited" },
-    ],
-    tips: [
-      "The LV apex is often better seen from TG than ME views",
-      "Subvalvular apparatus (chordae, papillary muscles) is well visualised here",
-    ],
-    pitfalls: [
-      "LV foreshortening is common — ensure full length from base to apex",
-    ],
-    measurements: ["LV length (for biplane EF)", "Papillary muscle morphology"],
-    criticalFindings: ["Anterior or inferior wall WMA", "Papillary muscle rupture (post-MI)"],
-  },
-  {
     id: "tglax",
     group: "Transgastric",
     groupColor: "#189aa1",
@@ -610,7 +578,7 @@ export const TEE_VIEWS = [
 const GROUPS = [
   { key: "Overview",        color: "#189aa1", label: "Overview",             count: 1 },
   { key: "Mid-Esophageal",  color: "#189aa1", label: "Mid-Esophageal (ME)",  count: 7 },
-  { key: "Transgastric",    color: "#189aa1", label: "Transgastric (TG)",    count: 5 },
+  { key: "Transgastric",    color: "#189aa1", label: "Transgastric (TG)",    count: 4 },
   { key: "Upper Esophageal",color: "#189aa1", label: "Upper Esophageal (UE)",count: 2 },
 ];
 
