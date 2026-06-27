@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import {
   User, BookOpen, CreditCard, Award, Camera, Save, Lock, Eye, EyeOff,
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
-  Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart, BarChart2, Bell,
+  Clock, XCircle, RefreshCw, Loader2, ChevronRight, ChevronLeft, ClipboardCheck, ShoppingCart, BarChart2, Bell,
   GraduationCap, BookMarked, PenLine, ArrowRight, Video, Layers, Users, Star, Briefcase, MapPin, CalendarDays, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -2029,6 +2029,26 @@ export default function StudentDashboardPage() {
   const initialTab: Tab = urlTab && VALID_TABS.includes(urlTab) ? urlTab : "content";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
+  // Scroll indicator state for the main tab bar
+  const tabScrollRef = useRef<HTMLDivElement>(null);
+  const [tabCanScrollRight, setTabCanScrollRight] = useState(false);
+  const [tabCanScrollLeft, setTabCanScrollLeft] = useState(false);
+  const updateTabScrollState = useCallback(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabCanScrollLeft(el.scrollLeft > 4);
+    setTabCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    updateTabScrollState();
+    el.addEventListener("scroll", updateTabScrollState, { passive: true });
+    const ro = new ResizeObserver(updateTabScrollState);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", updateTabScrollState); ro.disconnect(); };
+  }, [updateTabScrollState]);
+
   // Keep URL in sync when tab changes.
   // Use window.history.replaceState directly so the URL updates reliably
   // across all subdomains — wouter's navigate() can miss re-renders when
@@ -2084,21 +2104,38 @@ export default function StudentDashboardPage() {
 
         <div className="max-w-5xl mx-auto px-3 sm:px-8 py-4 sm:py-8">
           {/* Tab Navigation */}
-          <div className="flex gap-1 bg-white rounded-xl border border-gray-100 shadow-sm p-1 mb-5 sm:mb-8 overflow-x-auto scrollbar-hide">
-            {TABS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => handleTabChange(t.key)}
-                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all shrink-0 min-h-[44px] whitespace-nowrap ${
-                  activeTab === t.key
-                    ? "bg-[#189aa1] text-white shadow-sm"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                <t.icon className="w-4 h-4 shrink-0" />
-                <span>{t.label}</span>
-              </button>
-            ))}
+          <div className="relative mb-5 sm:mb-8">
+            {/* Left fade + chevron — only on mobile when scrolled right */}
+            {tabCanScrollLeft && (
+              <div className="absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-white to-transparent z-10 rounded-l-xl pointer-events-none flex items-center justify-start pl-1 sm:hidden">
+                <ChevronLeft className="w-4 h-4 text-gray-400" />
+              </div>
+            )}
+            {/* Right fade + chevron — only on mobile when more tabs to the right */}
+            {tabCanScrollRight && (
+              <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-white to-transparent z-10 rounded-r-xl pointer-events-none flex items-center justify-end pr-1 sm:hidden">
+                <ChevronRight className="w-4 h-4 text-[#189aa1]" />
+              </div>
+            )}
+            <div
+              ref={tabScrollRef}
+              className="flex gap-1 bg-white rounded-xl border border-gray-100 shadow-sm p-1 overflow-x-auto scrollbar-hide"
+            >
+              {TABS.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => handleTabChange(t.key)}
+                  className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all shrink-0 min-h-[44px] whitespace-nowrap ${
+                    activeTab === t.key
+                      ? "bg-[#189aa1] text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <t.icon className="w-4 h-4 shrink-0" />
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Tab Content */}
