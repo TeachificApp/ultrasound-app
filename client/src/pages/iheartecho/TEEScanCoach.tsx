@@ -6,6 +6,7 @@
 import { useState, useMemo } from "react";
 import { useSearch } from "wouter";
 import { PremiumOverlay } from "@/components/PremiumOverlay";
+import { ScanCoachViewMediaCard } from "@/components/ScanCoachViewMediaPanel";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
@@ -547,38 +548,7 @@ function ViewDetail({ view }: { view: typeof TEE_VIEWS[0] }) {
         </div>
       </div>
 
-      {/* Reference Images — shown when admin has uploaded via ScanCoach Editor */}
-      {((view as any).echoImageUrl || (view as any).anatomyImageUrl || (view as any).transducerImageUrl) && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-50">
-            <p className="text-sm font-bold text-gray-800">Reference Images</p>
-          </div>
-          <div className={`bg-gray-950 grid gap-2 p-4 ${
-            [(view as any).echoImageUrl, (view as any).anatomyImageUrl, (view as any).transducerImageUrl].filter(Boolean).length > 1
-              ? 'grid-cols-2'
-              : 'grid-cols-1'
-          }`}>
-            {(view as any).echoImageUrl && (
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-medium">Echo Image</p>
-                <img src={(view as any).echoImageUrl} alt="Echo reference" className="max-h-64 object-contain rounded-lg w-full" onContextMenu={e => e.preventDefault()} />
-              </div>
-            )}
-            {(view as any).anatomyImageUrl && (
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-medium">Anatomy Diagram</p>
-                <img src={(view as any).anatomyImageUrl} alt="Anatomy diagram" className="max-h-64 object-contain rounded-lg w-full" onContextMenu={e => e.preventDefault()} />
-              </div>
-            )}
-            {(view as any).transducerImageUrl && (
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-medium">Probe Position</p>
-                <img src={(view as any).transducerImageUrl} alt="Probe position" className="max-h-64 object-contain rounded-lg w-full" onContextMenu={e => e.preventDefault()} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <ScanCoachViewMediaCard viewId={(view as any).id} view={view as any} />
       {/* How to Get This View */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <button onClick={() => toggle("howToGet")} className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors">

@@ -15,6 +15,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { uploadFile } from "@/lib/uploadFile";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
+import { ScanCoachViewMediaCard } from "@/components/ScanCoachViewMediaPanel";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 import BillingCodesCard from "@/components/BillingCodesCard";
 import { TEE_BILLING } from "@/lib/scanCoachBillingCodes";
@@ -617,47 +618,6 @@ function AdminMediaPanel({ viewId }: { viewId: string }) {
   );
 }
 
-function ViewMediaDisplay({ viewId }: { viewId: string }) {
-  const { data: media = [], isLoading } = trpc.scanCoachAdmin.getMediaByView.useQuery({ viewId });
-  if (isLoading || media.length === 0) return null;
-  const clinicalMedia = (media as any[]).filter((m) => m.role === "clinical");
-  const referenceMedia = (media as any[]).filter((m) => m.role === "reference" || m.role === "general" || !m.role);
-
-  const renderGrid = (items: typeof media, label: string) => {
-    if (items.length === 0) return null;
-    return (
-      <div className="mb-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{label}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {items.map((m) => (
-            <div key={m.id} className="rounded-xl overflow-hidden border border-gray-100">
-              {m.mediaType === "image" ? (
-                <img src={m.url} alt={m.caption ?? label} className="w-full object-contain bg-gray-900 max-h-48" />
-              ) : (
-                <video src={m.url} className="w-full max-h-48 bg-gray-900" autoPlay loop muted playsInline controlsList="nodownload" onContextMenu={(e) => e.preventDefault()} />
-              )}
-              {m.caption && <p className="text-xs text-gray-500 px-3 py-2">{m.caption}</p>}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-      <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2" style={{ fontFamily: "Merriweather, serif" }}>
-        <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white bg-gray-600">
-          <Eye className="w-3.5 h-3.5" />
-        </div>
-        Reference Media
-      </h3>
-      {renderGrid(clinicalMedia, "Clinical Images")}
-      {renderGrid(referenceMedia, "Reference Images & Clips")}
-    </div>
-  );
-}
-
 // ─── View Card (sidebar) ──────────────────────────────────────────────────────
 function ViewCard({ view, isSelected, onClick }: { view: TEEView; isSelected: boolean; onClick: () => void }) {
   return (
@@ -753,41 +713,10 @@ export function TEEIceScanCoachContent() {
             </div>
           </div>
 
-          {/* Reference media — shown only when filled */}
-          <ViewMediaDisplay viewId={selectedView.id} />
-
-          {/* Override images from unified ScanCoach admin editor (registry-keyed) */}
-          {((selectedViewMerged as any).echoImageUrl || (selectedViewMerged as any).anatomyImageUrl) && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2" style={{ fontFamily: "Merriweather, serif" }}>
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white" style={{ background: selectedView.color }}>
-                    <Eye className="w-3.5 h-3.5" />
-                  </div>
-                  Reference Images
-                </h3>
-                <span className="text-xs text-gray-400">Diagram · Clinical Echo</span>
-              </div>
-              <div className={`grid gap-0 bg-gray-950 ${ (selectedViewMerged as any).echoImageUrl && (selectedViewMerged as any).anatomyImageUrl ? 'grid-cols-2' : 'grid-cols-1' }`}>
-                {(selectedViewMerged as any).anatomyImageUrl && (
-                  <div className="flex justify-center items-center p-3 border-r border-gray-800">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 mb-1.5">Anatomy Diagram</p>
-                      <MediaDisplay src={(selectedViewMerged as any).anatomyImageUrl} alt={`${selectedView.name} diagram`} className="max-h-56 object-contain rounded" style={{ background: "#030712" }} />
-                    </div>
-                  </div>
-                )}
-                {(selectedViewMerged as any).echoImageUrl && (
-                  <div className="flex justify-center items-center p-3">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 mb-1.5">Clinical Echo Image</p>
-                      <MediaDisplay src={(selectedViewMerged as any).echoImageUrl} alt={`${selectedView.name} echo`} className="max-h-56 object-contain rounded" style={{ background: "#030712" }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <ScanCoachViewMediaCard
+            viewId={TEE_ID_TO_REGISTRY[selectedView.id] ?? selectedView.id}
+            view={selectedViewMerged as any}
+          />
 
           {/* Probe Maneuver */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">

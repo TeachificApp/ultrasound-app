@@ -8,6 +8,7 @@ import { useState, useMemo } from "react";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
+import { ScanCoachViewMediaCard } from "@/components/ScanCoachViewMediaPanel";
 import { fetalBilling } from "@/lib/scanCoachBillingCodes";
 import {
   Baby, ChevronDown, ChevronUp, Info, AlertTriangle,
@@ -235,7 +236,6 @@ export const FETAL_VIEWS = [
 
 export default function FetalScanCoach() {
   const [selectedView, setSelectedView] = useState(0);
-  const [showImages, setShowImages] = useState<"both" | "diagram" | "echo">("both");
   const [showBilling, setShowBilling] = useState(false);
 
   const { mergeView, isLoading } = useScanCoachOverrides("fetal");
@@ -338,37 +338,13 @@ export default function FetalScanCoach() {
               </div>
             </div>
 
-            {/* Reference Images */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>View Reference Images</h3>
-                <div className="flex items-center gap-3 text-xs text-gray-400">
-                  <button onClick={() => setShowImages("diagram")} className={showImages === "diagram" ? "font-semibold text-gray-700" : "hover:text-gray-600"}>Diagram</button>
-                  <span>·</span>
-                  <button onClick={() => setShowImages("echo")} className={showImages === "echo" ? "font-semibold text-gray-700" : "hover:text-gray-600"}>Clinical Echo</button>
-                  <span>·</span>
-                  <button onClick={() => setShowImages("both")} className={showImages === "both" ? "font-semibold text-gray-700" : "hover:text-gray-600"}>Both</button>
-                </div>
-              </div>
-              <div className="p-4 bg-gray-900">
-                <div className={`grid gap-3 ${showImages === "both" ? "grid-cols-2" : "grid-cols-1"}`}>
-                  {(showImages === "both" || showImages === "diagram") && view.imageUrl && (
-                    <div>
-                      <div className="text-xs text-gray-400 text-center mb-1">Anatomy Diagram</div>
-                      <img src={view.imageUrl} alt={`${view.name} diagram`}
-                        className="w-full rounded-lg object-contain bg-white" style={{ maxHeight: "260px" }} />
-                    </div>
-                  )}
-                  {(showImages === "both" || showImages === "echo") && view.echoImageUrl && (
-                    <div>
-                      <div className="text-xs text-gray-400 text-center mb-1">Clinical Echo Image</div>
-                      <img src={view.echoImageUrl} alt={`${view.name} echo`}
-                        className="w-full rounded-lg object-contain bg-black" style={{ maxHeight: "260px" }} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <ScanCoachViewMediaCard
+              viewId={view.id}
+              view={{
+                ...view,
+                anatomyImageUrl: (view as any).anatomyImageUrl || view.imageUrl,
+              }}
+            />
 
             {/* Structures & Normal Findings */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
