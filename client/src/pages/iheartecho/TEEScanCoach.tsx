@@ -597,6 +597,8 @@ function ViewDetail({ view }: { view: typeof TEE_VIEWS[0] }) {
         viewId={(view as any).id}
         view={view as any}
         mediaPairs={(view as any).id === "ueaorticarch" ? 2 : 1}
+        hideColumnLabels={(view as any).id === "tee_overview"}
+        hideEmptyColumns={(view as any).id === "tee_overview"}
       />
       {/* How to Get This View */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">

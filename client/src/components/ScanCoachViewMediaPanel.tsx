@@ -149,19 +149,27 @@ function MediaColumn({
   items,
   emptyHint,
   darkLabels,
+  hideLabel = false,
+  hideIfEmpty = false,
 }: {
   title: string;
   items: MediaItem[];
   emptyHint: string;
   darkLabels?: boolean;
+  /** When true, the column title label is not rendered */
+  hideLabel?: boolean;
+  /** When true, the entire column is hidden if items is empty (no placeholder) */
+  hideIfEmpty?: boolean;
 }) {
+  if (hideIfEmpty && items.length === 0) return null;
+
   const labelClass = darkLabels
     ? "text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-2 text-center"
     : "text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-center";
 
   return (
     <div className="flex flex-col min-w-0">
-      <p className={labelClass}>{title}</p>
+      {!hideLabel && <p className={labelClass}>{title}</p>}
       {items.length === 0 ? (
         <div
           className={`aspect-square rounded-xl flex items-center justify-center border-2 border-dashed ${
@@ -173,7 +181,7 @@ function MediaColumn({
           </p>
         </div>
       ) : (
-        <div className={`grid gap-2 ${items.length > 1 ? "grid-cols-1" : "grid-cols-1"}`}>
+        <div className="grid gap-2 grid-cols-1">
           {items.map((item) => (
             <MediaSquare key={item.key} item={item} />
           ))}
@@ -228,6 +236,10 @@ export type ScanCoachViewMediaPanelProps = {
   className?: string;
   /** Number of clinical+reference pairs to render (default 1). Set to 2 for views like UE Aortic Arch */
   mediaPairs?: number;
+  /** When true, column titles ("Clinical", "Reference") are hidden */
+  hideColumnLabels?: boolean;
+  /** When true, empty columns are hidden entirely instead of showing a placeholder */
+  hideEmptyColumns?: boolean;
 };
 
 export type ScanCoachViewMediaCardProps = ScanCoachViewMediaPanelProps & {
@@ -270,6 +282,8 @@ export function ScanCoachViewMediaPanel({
   darkLabels = false,
   className = "mx-5 mt-4",
   mediaPairs = 1,
+  hideColumnLabels = false,
+  hideEmptyColumns = false,
 }: ScanCoachViewMediaPanelProps) {
   const { clinicalItems, referenceItems, hasAny } = useScanCoachViewMedia(viewId, view);
   const pair2 = mediaPairs >= 2 ? itemsFromPair2Fields(view) : { clinical: [], reference: [] };
@@ -304,22 +318,32 @@ export function ScanCoachViewMediaPanel({
     );
   }
 
+  // For single-pair views with hideEmptyColumns, determine grid width dynamically
+  const pair1HasClinical = clinicalItems.length > 0;
+  const pair1HasReference = referenceItems.length > 0;
+  const pair1BothPresent = pair1HasClinical && pair1HasReference;
+  const pair1GridClass = (hideEmptyColumns && !pair1BothPresent) ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2";
+
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Pair 1 */}
       {hasAny && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className={`grid gap-4 ${pair1GridClass}`}>
           <MediaColumn
-            title="Clinical 1"
+            title={mediaPairs >= 2 ? "Clinical 1" : "Clinical"}
             items={clinicalItems}
             emptyHint="No clinical image or clip"
             darkLabels={darkLabels}
+            hideLabel={hideColumnLabels}
+            hideIfEmpty={hideEmptyColumns}
           />
           <MediaColumn
-            title="Reference 1"
+            title={mediaPairs >= 2 ? "Reference 1" : "Reference"}
             items={referenceItems}
             emptyHint="No reference image or diagram"
             darkLabels={darkLabels}
+            hideLabel={hideColumnLabels}
+            hideIfEmpty={hideEmptyColumns}
           />
         </div>
       )}
@@ -331,12 +355,16 @@ export function ScanCoachViewMediaPanel({
             items={pair2.clinical}
             emptyHint="No second clinical image"
             darkLabels={darkLabels}
+            hideLabel={hideColumnLabels}
+            hideIfEmpty={hideEmptyColumns}
           />
           <MediaColumn
             title="Reference 2"
             items={pair2.reference}
             emptyHint="No second reference image"
             darkLabels={darkLabels}
+            hideLabel={hideColumnLabels}
+            hideIfEmpty={hideEmptyColumns}
           />
         </div>
       )}
