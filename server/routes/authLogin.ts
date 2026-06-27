@@ -144,15 +144,38 @@ export function registerAuthLoginRoute(app: Express) {
       const laxOptsGet = getLaxSessionCookieOptions(req, hostParam || undefined);
       res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsGet, maxAge: ONE_YEAR_MS });
 
-      // Prevent Cloudflare (or any CDN) from caching this response — cached 302s lose Set-Cookie.
+      // IMPORTANT: Return a 200 HTML page instead of a 302 redirect.
+      // Cloudflare strips Set-Cookie headers from 302 redirect responses on some configurations,
+      // even with Cache-Control: no-store. A 200 response with inline JS redirect is immune to this.
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.setHeader("Pragma", "no-cache");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
 
       console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, cookie domain=${cookieOptions.domain ?? 'none'}, secure=${cookieOptions.secure}, redirecting to ${successRedirect}`);
       // Track login event
       const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
       db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip?.substring(0, 64) ?? null, userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null }).catch(() => {});
-      return res.redirect(successRedirect);
+
+      // Escape the redirect path for safe HTML embedding
+      const safeRedirect = successRedirect.replace(/[<>"'&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] ?? c));
+      return res.status(200).send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Signing you in…</title>
+  <meta http-equiv="refresh" content="0;url=${safeRedirect}">
+  <style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0e1e2e;font-family:sans-serif;color:#fff}</style>
+</head>
+<body>
+  <div style="text-align:center">
+    <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,.2);border-top-color:#189aa1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
+    <p style="color:#4ad9e0;font-size:14px">Signing you in…</p>
+  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  <script>window.location.replace(${JSON.stringify(safeRedirect)});<\/script>
+</body>
+</html>`);
+
     } catch (err) {
       console.error("[magic-verify GET] Error:", err);
       return res.redirect(`/auth/magic-error?reason=server_error`);
