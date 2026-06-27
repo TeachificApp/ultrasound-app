@@ -18,6 +18,7 @@ import { ssoTokens, users, userRoles, diyOrganizations, diySubscriptions } from 
 import { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
 import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { sdk } from "../_core/sdk";
+import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 
 const SSO_TOKEN_TTL_MS = 60_000; // 60 seconds
 
@@ -144,7 +145,11 @@ export const ssoRouter = router({
   }),
 
   exchangeToken: publicProcedure
-    .input(z.object({ token: z.string().min(1) }))
+    .input(z.object({
+      token: z.string().min(1),
+      /** Public hostname for cookie scoping (e.g. app.iheartecho.com). */
+      hostname: z.string().max(253).optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -158,13 +163,14 @@ export const ssoRouter = router({
       await db.update(ssoTokens).set({ usedAt: now }).where(eq(ssoTokens.id, row.id));
       const [user] = await db.select().from(users).where(eq(users.id, row.userId)).limit(1);
       if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      const openId = await ensureUserOpenId(db, user);
       const sessionToken = await sdk.signSession({
-        openId: user.openId ?? String(user.id),
+        openId,
         appId: process.env.VITE_APP_ID ?? "",
         name: user.name ?? user.email ?? "User",
       });
       // Scope cookie to the requesting domain (critical for app.iheartecho.com bridge).
-      const hostnameOverride = resolveAuthHostname(ctx.req);
+      const hostnameOverride = resolveAuthHostname(ctx.req, input.hostname);
       const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
       ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
       // SameSite=Lax fallback — critical for browsers blocking SameSite=None cookies

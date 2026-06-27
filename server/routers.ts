@@ -578,8 +578,8 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail } = await import('./db');
         const { sdk } = await import('./_core/sdk');
-        const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
-        const { getSessionCookieOptions } = await import('./_core/cookies');
+        const { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
+        const { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } = await import('./_core/cookies');
         const bcrypt = await import('bcryptjs');
 
         const email = input.email.trim().toLowerCase();
@@ -624,6 +624,8 @@ export const appRouter = router({
         const hostnameOverride = resolveAuthHostname(ctx.req);
         const cookieOptions = getSessionCookieOptions(ctx.req, hostnameOverride);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        const laxOpts = getLaxSessionCookieOptions(ctx.req, hostnameOverride);
+        ctx.res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOpts, maxAge: ONE_YEAR_MS });
 
         return { success: true };
       }),

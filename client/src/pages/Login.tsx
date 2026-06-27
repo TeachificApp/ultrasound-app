@@ -76,7 +76,8 @@ export default function Login() {
   // Read returnTo from URL so magic link redirects back after login.
   // Sanitize: never redirect back to auth pages (would cause a loop).
   const AUTH_PATHS = ["/login", "/register", "/magic-link", "/auth/magic", "/auth/access", "/forgot-password", "/reset-password"];
-  const rawReturnTo = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("returnTo") ?? undefined : undefined;
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const rawReturnTo = searchParams?.get("returnTo") ?? searchParams?.get("return") ?? undefined;
   const returnTo = rawReturnTo && !AUTH_PATHS.some(p => rawReturnTo === p || rawReturnTo.startsWith(p + "?")) ? rawReturnTo : undefined;
 
   // On the learn subdomain:
