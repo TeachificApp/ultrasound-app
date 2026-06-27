@@ -38,6 +38,8 @@ import { startChallengeCron } from "../jobs/challengeCron";
 import { startMediaPurgeCron } from "../jobs/mediaPurgeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
 import { backfillAllContacts } from "../lib/emailListHelper";
+import { backfillUserOpenIds } from "../lib/backfillUserOpenIds";
+import { getDb } from "../db";
 import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
 import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
@@ -530,6 +532,10 @@ async function startServer() {
     startSharingMonitor();
     // Backfill all existing users into the "All Contacts" email list (safe to run on every startup)
     backfillAllContacts().catch((err) => console.error("[backfillAllContacts] Error:", err));
+    // Backfill missing user.openId for legacy accounts (SSO / magic link session lookup)
+    getDb()
+      .then((db) => (db ? backfillUserOpenIds(db) : null))
+      .catch((err) => console.error("[backfillUserOpenIds] Error:", err));
     // Auto-heal any SCORM versions stuck in processing/pending → serve via zip-stream
     healStuckScormVersions().then(({ healed }) => {
       if (healed > 0) console.log(`[Startup] Auto-healed ${healed} stuck SCORM version(s) → zip-stream`);

@@ -372,6 +372,24 @@ export const platformAdminRouter = router({
   }),
 
   /**
+   * Backfill users.openId for legacy rows (openId IS NULL).
+   * Idempotent — safe to run multiple times. Skips unique conflicts.
+   */
+  backfillUserOpenIds: protectedProcedure.mutation(async ({ ctx }) => {
+    const myRoles = await getUserRoles(ctx.user.id);
+    const isOwner = ctx.user.role === "admin";
+    const isPlatformAdmin = myRoles.includes("platform_admin");
+    if (!isOwner && !isPlatformAdmin) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
+    }
+    const { getDb } = await import("../db");
+    const { backfillUserOpenIds: runBackfill } = await import("../lib/backfillUserOpenIds");
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    return runBackfill(db);
+  }),
+
+  /**
    * Bulk backfill: fetch all users from Thinkific and create UltrasoundAssist™ pending accounts
    * for anyone not already registered. Runs silently (no emails sent).
    * Delegates to the shared runThinkificMemberSync job so logic is not duplicated.

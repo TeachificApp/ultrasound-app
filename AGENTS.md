@@ -40,6 +40,8 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 4. **Environment variables**: See `RAILWAY_DEPLOY.md` for the full list. For local dev, `JWT_SECRET` and `STRIPE_SECRET_KEY` (dummy test key OK) are required to start the server or run tests that load `appRouter`. `DATABASE_URL` (MySQL connection string) is needed for any DB-dependent features.
 
+4b. **User `openId` backfill (SSO)**: Legacy users with `openId IS NULL` break SSO bridge and magic-link sessions. The server runs idempotent `backfillUserOpenIds` on startup when `DATABASE_URL` is set. Manual SQL: `drizzle/backfill-user-openid.sql` (MySQL column is ``openId``, not `open_id`). Platform admins can call `admin.backfillUserOpenIds`.
+
 5. **pnpm build scripts warning**: On fresh `pnpm install`, you'll see a warning about ignored build scripts for `@tailwindcss/oxide`, `core-js`, `esbuild`. These packages still work correctly without running their postinstall scripts in this environment.
 
 6. **Service worker / white screen**: `pnpm build` runs `scripts/sync-public-assets.mjs` after Vite — it force-copies `sw.js` into `dist/public` and fails the build if `index.html` is missing the entry script or still has `%VITE_ANALYTICS_*%` placeholders. Bump `CACHE_VERSION` in `client/public/sw.js` when changing SW behavior. Production serves `/sw.js` with `Cache-Control: no-cache` via an explicit route in `server/_core/vite.ts` (not express.static). Recovery page: `/sw-clear.html`.
