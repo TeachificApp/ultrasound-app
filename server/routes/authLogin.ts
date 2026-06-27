@@ -24,10 +24,11 @@ import * as bcrypt from "bcryptjs";
 import { getDb, ensureUserRole } from "../db";
 import { users, accessTokenUses, ipSecurityFlags, userLoginEvents } from "../../drizzle/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
-import { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
+import { resolveAuthHostname } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
-import { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { ONE_YEAR_MS } from "@shared/const";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
+import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
 
 export function registerAuthLoginRoute(app: Express) {
   /**
@@ -83,11 +84,7 @@ export function registerAuthLoginRoute(app: Express) {
         expiresInMs: ONE_YEAR_MS,
       });
       const hostnameOverride = resolveAuthHostname(req, typeof host === "string" ? host : undefined);
-      const cookieOptions = getSessionCookieOptions(req, hostnameOverride);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback for browsers blocking SameSite=None
-      const laxOpts = getLaxSessionCookieOptions(req, hostnameOverride);
-      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOpts, maxAge: ONE_YEAR_MS });
+      setAuthSessionCookies(req, res, sessionToken, hostnameOverride);
 
       return res.status(200).json({
         success: true,
@@ -139,23 +136,23 @@ export function registerAuthLoginRoute(app: Express) {
         name: user.name ?? user.email ?? "User",
         expiresInMs: ONE_YEAR_MS,
       });
-      // Use the host param encoded in the magic link URL for cookie domain scoping.
-      // Cloudflare rewrites the Host header to the internal Cloud Run hostname, so we can't rely on req.hostname.
-      const cookieOptions = getSessionCookieOptions(req, hostParam || undefined);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback for browsers blocking SameSite=None
-      const laxOptsGet = getLaxSessionCookieOptions(req, hostParam || undefined);
-      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsGet, maxAge: ONE_YEAR_MS });
+      const cookieHostname = resolveAuthHostname(req, hostParam);
+      setAuthSessionCookies(req, res, sessionToken, cookieHostname);
 
       // Prevent Cloudflare (or any CDN) from caching this response — cached 302s lose Set-Cookie.
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.setHeader("Pragma", "no-cache");
 
-      console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, cookie domain=${cookieOptions.domain ?? 'none'}, secure=${cookieOptions.secure}, redirecting to ${successRedirect}`);
+      const redirectUrl =
+        successRedirect +
+        (successRedirect.includes("?") ? "&" : "?") +
+        "auth_pending=1";
+
+      console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, host=${cookieHostname ?? hostParam ?? "auto"}, redirecting to ${redirectUrl}`);
       // Track login event
       const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
       db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip?.substring(0, 64) ?? null, userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null }).catch(() => {});
-      return res.redirect(successRedirect);
+      return res.redirect(redirectUrl);
     } catch (err) {
       console.error("[magic-verify GET] Error:", err);
       return res.redirect(`/auth/magic-error?reason=server_error`);
@@ -220,11 +217,7 @@ export function registerAuthLoginRoute(app: Express) {
         req,
         typeof hostBody === "string" ? hostBody : undefined,
       );
-      const cookieOptions = getSessionCookieOptions(req, magicPostHostname);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback for browsers blocking SameSite=None
-      const laxOptsPost = getLaxSessionCookieOptions(req, magicPostHostname);
-      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsPost, maxAge: ONE_YEAR_MS });
+      setAuthSessionCookies(req, res, sessionToken, magicPostHostname);
 
       // Track login event
       const ip2 = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
@@ -335,11 +328,7 @@ export function registerAuthLoginRoute(app: Express) {
       });
       // Use X-App-Hostname for cookie domain scoping on access-verify too
       const accessHostname = resolveAuthHostname(req);
-      const cookieOptions = getSessionCookieOptions(req, accessHostname);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // SameSite=Lax fallback for browsers blocking SameSite=None
-      const laxOptsAccess = getLaxSessionCookieOptions(req, accessHostname);
-      res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsAccess, maxAge: ONE_YEAR_MS });
+      setAuthSessionCookies(req, res, sessionToken, accessHostname);
 
       // Track login event for access-link sessions
       db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip.substring(0, 64), userAgent: userAgent.substring(0, 500) || null }).catch(() => {});

@@ -2009,9 +2009,12 @@ function InstructorTab() {
 // TABS is built dynamically in the component based on user roles (see below)
 
 export default function StudentDashboardPage() {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading, user, refresh } = useAuth();
   const [, navigate] = useLocation();
   const search = useSearch();
+  const authPending = new URLSearchParams(search).get("auth_pending") === "1";
+  const authRetryRef = useRef(0);
+  const [authRetrying, setAuthRetrying] = useState(authPending);
   const isAdmin = (user as any)?.role === "admin";
   const isInstructor = isAdmin || (user as any)?.appRoles?.includes("instructor") || (user as any)?.appRoles?.includes("platform_admin") || (user as any)?.appRoles?.includes("platform_owner");
 
@@ -2028,6 +2031,29 @@ export default function StudentDashboardPage() {
   const urlTab = new URLSearchParams(search).get("tab") as Tab | null;
   const initialTab: Tab = urlTab && VALID_TABS.includes(urlTab) ? urlTab : "content";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+
+  // After magic-link redirect (?auth_pending=1), retry auth.me before sending to login
+  useEffect(() => {
+    if (!authPending || loading || isAuthenticated) {
+      if (isAuthenticated && authPending) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("auth_pending");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      }
+      return;
+    }
+    if (authRetryRef.current >= 3) {
+      setAuthRetrying(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      authRetryRef.current += 1;
+      void refresh().finally(() => {
+        if (authRetryRef.current >= 3) setAuthRetrying(false);
+      });
+    }, authRetryRef.current === 0 ? 100 : 400);
+    return () => window.clearTimeout(timer);
+  }, [authPending, loading, isAuthenticated, refresh]);
 
   // Scroll indicator state for the main tab bar
   const tabScrollRef = useRef<HTMLDivElement>(null);
@@ -2072,7 +2098,7 @@ export default function StudentDashboardPage() {
   // inside the render function — that creates a new component identity on every render,
   // causing all children (including ProfileTab) to unmount/remount and lose state.
   const skipLayout = isMembersDomain() || isLearnDomain();
-  if (loading) {
+  if (loading || (authPending && authRetrying && !isAuthenticated)) {
     const inner = (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-[#189aa1]" />

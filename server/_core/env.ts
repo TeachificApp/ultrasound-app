@@ -1,5 +1,5 @@
 export const ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
+  appId: process.env.VITE_APP_ID ?? process.env.APP_ID ?? "ultrasound-app",
   appUrl: process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com",
   // When a Cloudflare Worker proxies landing/funnel pages from the root domain,
   // it sends this header so the server can emit canonical URLs pointing to the
