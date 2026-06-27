@@ -55,7 +55,7 @@ const VALUE_PILLARS = [
   { icon: Zap,         title: "Everyday Workflow",    description: "Real-time calculators, report builders, and ScanCoach guidance that fit seamlessly into your day." },
   { icon: TrendingUp,  title: "Guideline-Based",      description: "Every tool, navigator, and reference is grounded in the latest ASE, IAC, and specialty society guidelines." },
   { icon: Award,       title: "Real-World Scanning",  description: "Practical, protocol-driven assistance for the cases you actually see — not just textbook scenarios." },
-  { icon: Users,       title: "Community Access",     description: "Connect with fellow sonographers and echo professionals in the All About Ultrasound community hub." },
+  { icon: Users,       title: "Community Access",     description: "Connect with fellow ultrasound professionals, sonographers, and physicians in the All About Ultrasound community hub." },
 ];
 
 const AAUS_PREMIUM_FEATURES = [
@@ -192,7 +192,7 @@ export default function Premium() {
 
   const heroSubtitle = isIHE
     ? "Everything an echocardiographer or echo professional needs — protocols, calculators, cases, and AI tools — in one guideline-based platform."
-    : "Everything a sonographer or ultrasound professional needs — protocols, calculators, cases, and AI tools — in one guideline-based platform.";
+    : "Everything an ultrasound professional needs — sonographers, physicians, and clinicians — protocols, calculators, cases, and AI tools — in one guideline-based platform.";
 
   const badgeLabel = isIHE
     ? "iHeartEcho™ — Founding Member Access"
@@ -660,7 +660,7 @@ export default function Premium() {
         <div className="container py-12">
           <div className="text-center mb-8">
             <h2 className="text-xl font-black text-gray-800 mb-2" style={{ fontFamily: "Merriweather, serif" }}>
-              Built for Sonographers Who Want to Be Better
+              Built for Ultrasound Professionals Who Want to Be Better
             </h2>
             <p className="text-gray-500 text-sm max-w-xl mx-auto">
               Not just an app — a clinical intelligence platform designed around how you actually work.
