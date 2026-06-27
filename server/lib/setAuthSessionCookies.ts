@@ -9,6 +9,7 @@
  */
 import type { Request, Response } from "express";
 import {
+  clearSessionCookies,
   getHostOnlyLaxSessionCookieOptions,
   getLaxSessionCookieOptions,
   getSessionCookieOptions,
@@ -22,6 +23,9 @@ export function setAuthSessionCookies(
   sessionToken: string,
   hostnameOverride?: string,
 ): void {
+  // Wipe stale domain/host cookie variants before issuing a new session.
+  clearSessionCookies(res, req, [COOKIE_NAME, LAX_COOKIE_NAME]);
+
   const hostname = resolveAuthHostname(req, hostnameOverride) ?? hostnameOverride;
   const maxAge = ONE_YEAR_MS;
 

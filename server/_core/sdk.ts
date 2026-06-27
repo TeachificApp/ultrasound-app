@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
+import { resolveSessionFromCookies } from "../lib/resolveSessionCookie";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -259,17 +260,15 @@ class SDKServer {
   async authenticateRequest(req: Request): Promise<User> {
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
-    // Try the primary SameSite=None cookie first, then fall back to the
-    // SameSite=Lax cookie for browsers that block third-party cookies
-    // (Chrome with 3rd-party blocking, Firefox Strict ETP, Brave, Safari ITP).
-    const primaryCookie = cookies.get(COOKIE_NAME);
-    const laxCookie = cookies.get(LAX_COOKIE_NAME);
-    const sessionCookie = primaryCookie || laxCookie || undefined;
-    const session = await this.verifySession(sessionCookie);
+    const resolved = await resolveSessionFromCookies(cookies, (value) =>
+      this.verifySession(value),
+    );
 
-    if (!session) {
+    if (!resolved) {
       throw ForbiddenError("Invalid session cookie");
     }
+
+    const { session, cookieValue: sessionCookie } = resolved;
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
