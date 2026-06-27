@@ -231,7 +231,7 @@ export default function Login() {
         <div className="relative my-8 lg:my-0">
           <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 mb-4 border border-white/20 bg-white/10">
             <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
-            <span className="text-xs text-white/80 font-medium">Trusted by Sonographers Worldwide</span>
+            <span className="text-xs text-white/80 font-medium">{isIHE ? "Trusted by Echo Professionals Worldwide" : "Trusted by Ultrasound Professionals Worldwide"}</span>
           </div>
           <h1 className="text-3xl lg:text-4xl font-black text-white leading-tight mb-4" style={{ fontFamily: "Merriweather, serif" }}>
             {HERO_HEADLINE}
