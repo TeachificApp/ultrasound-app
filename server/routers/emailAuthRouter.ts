@@ -308,6 +308,10 @@ export const emailAuthRouter = router({
       // Issue session
       await issueSession(ctx.req, ctx.res, openId, user.name ?? "");
 
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress, userAgent } = getRequestClientInfo(ctx.req);
+      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "email_auth" });
+
       return {
         success: true,
         emailVerified: user.emailVerified,

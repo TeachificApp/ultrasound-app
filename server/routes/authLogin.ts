@@ -22,7 +22,7 @@
 import type { Express, Request, Response } from "express";
 import * as bcrypt from "bcryptjs";
 import { getDb, ensureUserRole } from "../db";
-import { users, accessTokenUses, ipSecurityFlags, userLoginEvents } from "../../drizzle/schema";
+import { users, accessTokenUses, ipSecurityFlags } from "../../drizzle/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
@@ -89,6 +89,10 @@ export function registerAuthLoginRoute(app: Express) {
       const laxOpts = getLaxSessionCookieOptions(req, hostnameOverride);
       res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOpts, maxAge: ONE_YEAR_MS });
 
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress, userAgent } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "password" });
+
       return res.status(200).json({
         success: true,
         emailVerified: user.emailVerified ?? false,
@@ -152,9 +156,10 @@ export function registerAuthLoginRoute(app: Express) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
 
       console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, cookie domain=${cookieOptions.domain ?? 'none'}, secure=${cookieOptions.secure}, redirecting to ${successRedirect}`);
-      // Track login event
-      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
-      db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip?.substring(0, 64) ?? null, userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null }).catch(() => {});
+      // Track login event via recordUserLogin
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress: mlIp, userAgent: mlUa } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress: mlIp, userAgent: mlUa, method: "magic_link" });
 
       // Escape the redirect path for safe HTML embedding
       const safeRedirect = successRedirect.replace(/[<>"'&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] ?? c));
@@ -175,7 +180,6 @@ export function registerAuthLoginRoute(app: Express) {
   <script>window.location.replace(${JSON.stringify(safeRedirect)});<\/script>
 </body>
 </html>`);
-
     } catch (err) {
       console.error("[magic-verify GET] Error:", err);
       return res.redirect(`/auth/magic-error?reason=server_error`);
@@ -246,9 +250,9 @@ export function registerAuthLoginRoute(app: Express) {
       const laxOptsPost = getLaxSessionCookieOptions(req, magicPostHostname);
       res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsPost, maxAge: ONE_YEAR_MS });
 
-      // Track login event
-      const ip2 = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
-      db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip2?.substring(0, 64) ?? null, userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null }).catch(() => {});
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress, userAgent } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "magic_link" });
       return res.status(200).json({ success: true });
     } catch (err) {
       console.error("[magic-verify] Error:", err);
@@ -361,8 +365,9 @@ export function registerAuthLoginRoute(app: Express) {
       const laxOptsAccess = getLaxSessionCookieOptions(req, accessHostname);
       res.cookie(LAX_COOKIE_NAME, sessionToken, { ...laxOptsAccess, maxAge: ONE_YEAR_MS });
 
-      // Track login event for access-link sessions
-      db.insert(userLoginEvents).values({ userId: user.id, ipAddress: ip.substring(0, 64), userAgent: userAgent.substring(0, 500) || null }).catch(() => {});
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress, userAgent } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "access_token" });
       return res.status(200).json({ success: true });
     } catch (err) {
       console.error("[access-verify] Error:", err);

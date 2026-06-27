@@ -122,6 +122,10 @@ export function registerAutoLoginRoute(app: Express) {
       // Update last signed in
       await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
 
+      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+      const { ipAddress, userAgent } = getRequestClientInfo(req);
+      await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "auto_login" });
+
       console.log(`[AutoLogin] User ${user.id} (${user.email}) auto-logged in via purchase token`);
 
       // Redirect to the destination page
