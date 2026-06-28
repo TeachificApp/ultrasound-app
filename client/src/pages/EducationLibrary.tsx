@@ -76,20 +76,19 @@ function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { cour
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
-            <span className="text-sm font-bold text-teal-700">{price}</span>
+            {course.isFree ? (
+              <Badge className="bg-green-500 text-white text-xs">Free</Badge>
+            ) : <span />}
             <Button size="sm" variant="outline" className={`text-xs h-7 ${isOwned ? "border-green-400 text-green-700 hover:bg-green-50" : "border-teal-300 text-teal-700 hover:bg-teal-50"}`}>
               {isOwned && <CheckCircle className="w-3 h-3 mr-1" />}
               {ctaLabel}
             </Button>
           </div>
-          {/* Tags below price */}
+          {/* Tags */}
           <div className="flex flex-wrap gap-1.5 mt-2">
             <Badge variant="secondary" className="bg-teal-50 text-teal-700 text-xs font-medium flex items-center gap-1">
               {TYPE_ICONS[course.type]} {course.type === "download" ? "Digital Download" : course.type.charAt(0).toUpperCase() + course.type.slice(1)}
             </Badge>
-            {course.isFree && (
-              <Badge className="bg-green-500 text-white text-xs">Free</Badge>
-            )}
             {course.brand && (
               <Badge variant="outline" className="text-xs text-gray-500 border-gray-200">
                 {BRAND_LABELS[course.brand] ?? course.brand}
@@ -140,7 +139,9 @@ function BundleCard({ bundle, enrolledBundleIds }: { bundle: any; enrolledBundle
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
-            <span className="text-sm font-bold text-teal-700">{price}</span>
+            {isFree ? (
+              <Badge className="bg-green-500 text-white text-xs">Free</Badge>
+            ) : <span />}
             <Button size="sm" variant="outline" className={`text-xs h-7 ${isOwned ? "border-green-400 text-green-700 hover:bg-green-50" : "border-teal-300 text-teal-700 hover:bg-teal-50"}`}>
               {isOwned && <CheckCircle className="w-3 h-3 mr-1" />}
               {isOwned ? "View Bundle" : "View Bundle"}
@@ -151,9 +152,6 @@ function BundleCard({ bundle, enrolledBundleIds }: { bundle: any; enrolledBundle
             <Badge variant="secondary" className="bg-teal-50 text-teal-700 text-xs font-medium flex items-center gap-1">
               <Package className="w-3 h-3" /> Bundle
             </Badge>
-            {isFree && (
-              <Badge className="bg-green-500 text-white text-xs">Free</Badge>
-            )}
             {bundle.brand && (
               <Badge variant="outline" className="text-xs text-gray-500 border-gray-200">
                 {BRAND_LABELS[bundle.brand === "all_about_ultrasound" ? "aaus" : "iheartecho"] ?? bundle.brand}

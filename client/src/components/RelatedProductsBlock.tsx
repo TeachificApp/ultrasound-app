@@ -348,12 +348,10 @@ function ProductCard({ item, accent, textColor, cardBg, showPrice, showDescripti
           </div>
         )}
 
-        {/* Footer — price + button always on same row, pinned to bottom */}
+        {/* Footer — free badge + button always on same row, pinned to bottom */}
         <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 flex-shrink-0">
-          {showPrice ? (
-            <span className="text-sm font-bold whitespace-nowrap" style={{ color: accent }}>
-              {formatPrice(item.price, item.isFree, item.pricingType, item.subscriptionInterval)}
-            </span>
+          {item.isFree ? (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Free</span>
           ) : (
             <span />
           )}
@@ -423,12 +421,10 @@ function ProductListRow({ item, accent, textColor, cardBg, showPrice, showDescri
         )}
       </div>
 
-      {/* Price + CTA — same row, right-aligned */}
+      {/* Free badge + CTA — same row, right-aligned */}
       <div className="flex items-center gap-3 flex-shrink-0">
-        {showPrice && (
-          <span className="text-sm font-bold whitespace-nowrap" style={{ color: accent }}>
-            {formatPrice(item.price, item.isFree, item.pricingType, item.subscriptionInterval)}
-          </span>
+        {item.isFree && (
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Free</span>
         )}
         <Link href={item.href}>
           <button
