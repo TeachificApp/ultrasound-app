@@ -254,7 +254,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       if (item.path === "__LEARN_VASCULAR_URL__")
         return { ...item, path: learnLinks?.learnVascularUrl || "" };
       if (item.path === "__LEARN_ACS_URL__")
-        return { ...item, path: "https://www.allaboutultrasound.net/acs-preview-pass-access" };
+        return { ...item, path: "https://learn.allaboutultrasound.com/education-library?collection=acs" };
       if (item.path === "__LEARN_PEDS_ECHO_URL__")
         return { ...item, path: "https://www.allaboutultrasound.net/pediatric-echo-cross-training-2cfdb" };
       return item;
