@@ -49,7 +49,7 @@ import { getLoginUrl } from "@/const";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Seconds of free preview before the upgrade gate appears */
-const PREVIEW_SECONDS = 60;
+const PREVIEW_SECONDS = 35;
 /** Seconds remaining at which to show the "X seconds left" toast */
 const TOAST_TRIGGER_AT = 15;
 

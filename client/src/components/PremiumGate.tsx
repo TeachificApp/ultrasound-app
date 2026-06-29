@@ -13,7 +13,7 @@ import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
 
 // ── Timer helpers (shared session-storage pattern) ────────────────────────────
-const PREVIEW_SECONDS = 60;
+const PREVIEW_SECONDS = 35;
 const TOAST_TRIGGER_AT = 15;
 function getSessionKey(k: string | undefined) {
   return `ppg_start_${(k ?? "feature").replace(/\s+/g, "_").toLowerCase()}`;

@@ -22,7 +22,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { getLoginUrl } from "@/const";
 
 // ── Timer helpers ─────────────────────────────────────────────────────────────
-const PREVIEW_SECONDS = 60;
+const PREVIEW_SECONDS = 35;
 const TOAST_TRIGGER_AT = 15;
 function getSessionKey(k: string | undefined) {
   return `ppg_start_${(k ?? "feature").replace(/\s+/g, "_").toLowerCase()}`;
