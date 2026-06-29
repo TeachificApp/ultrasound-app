@@ -7,7 +7,6 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -147,17 +146,7 @@ export default function LMSHome() {
                     {course.subtitle && (
                       <p className="text-xs text-gray-500 line-clamp-1 mb-2">{course.subtitle}</p>
                     )}
-                    <div className="mt-auto flex items-center justify-between">
-                      <span className="text-sm font-bold text-[#189aa1]">
-                        {(course.isFree || course.price === 0) ? "Free" : `$${Number(course.price).toFixed(2)}${course.pricingType === "subscription" ? (course.subscriptionInterval === "annual" ? "/yr" : course.subscriptionInterval === "quarterly" ? "/qtr" : "/mo") : course.pricingType === "payment_plan" ? " (plan)" : ""}`}
-                      </span>
-
-                    </div>
-                    {course.isFree && (
-                      <div className="mt-1.5">
-                        <Badge className="bg-green-500 text-white text-xs">Free</Badge>
-                      </div>
-                    )}
+                    <div className="mt-auto" />
                   </div>
                 </div>
               </Link>
@@ -224,17 +213,9 @@ export default function LMSHome() {
                       <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-2 group-hover:text-[#189aa1] transition-colors">
                         {product.title}
                       </h3>
-                      <div className="mt-auto flex items-center justify-between">
-                        <span className="text-sm font-bold text-[#189aa1]">
-                          {product.price === 0 ? "Free" : `$${Number(product.price).toFixed(2)}`}
-                        </span>
+                      <div className="mt-auto flex items-center justify-end">
                         <FileDown className="w-4 h-4 text-gray-400 group-hover:text-[#4ad9e0] transition-colors" />
                       </div>
-                      {product.price === 0 && (
-                        <div className="mt-1.5">
-                          <Badge className="bg-green-500 text-white text-xs">Free</Badge>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </Link>
