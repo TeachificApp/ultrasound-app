@@ -1591,8 +1591,11 @@ function CurriculumCourseSelector({ d, set }: { d: Record<string, any>; set: (ke
 }
 
 function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: (key: string, val: any) => void; setMany: (patch: Record<string, any>) => void }) {
-  const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", pageSize: 100 });
-  const allItems = (coursesData?.courses ?? []).map((c: any) => ({
+  const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", pageSize: 500 });
+  const { data: downloadsData } = trpc.downloadsAdmin.list.useQuery(undefined);
+  const { data: bundlesData } = trpc.downloadsAdmin.listBundles.useQuery(undefined);
+  const catalogLoading = !coursesData && !downloadsData;
+  const courseItems = (coursesData?.courses ?? []).map((c: any) => ({
     id: c.id,
     title: c.title,
     type: c.type as string,
@@ -1602,6 +1605,27 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
     pricingType: (c.pricingType ?? "one_time") as string,
     subscriptionInterval: (c.subscriptionInterval ?? null) as string | null,
   }));
+  const downloadItems = (downloadsData?.downloads ?? downloadsData ?? []).map((dl: any) => ({
+    id: dl.id,
+    title: dl.title,
+    type: "download" as string,
+    slug: dl.slug,
+    price: dl.isFree ? 0 : (dl.price ?? 0),
+    isFree: !!dl.isFree,
+    pricingType: "one_time" as string,
+    subscriptionInterval: null as string | null,
+  }));
+  const bundleItems = (bundlesData?.bundles ?? bundlesData ?? []).map((b: any) => ({
+    id: b.id,
+    title: b.title,
+    type: "bundle" as string,
+    slug: b.slug,
+    price: b.isFree ? 0 : (b.price ?? 0),
+    isFree: !!b.isFree,
+    pricingType: "one_time" as string,
+    subscriptionInterval: null as string | null,
+  }));
+  const allItems = [...courseItems, ...downloadItems, ...bundleItems];
 
   // Three modes: "none" | "manual" | "linked"
   const priceSource = d.priceSource ?? "manual";
@@ -1616,10 +1640,18 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
       })
     : null;
 
-  // When priceSource === "item" (manual item picker), use stored linkedItemId
+  // When priceSource === "item" (manual item picker), use stored linkedItemId + linkedItemType
+  // We use a composite key "type:id" in the Select to avoid collisions across product types
   const selectedItemId = d.linkedItemId ? Number(d.linkedItemId) : null;
+  const selectedItemType = d.linkedItemType ?? null;
+  const selectedCompositeKey = selectedItemId
+    ? (selectedItemType ? `${selectedItemType}:${selectedItemId}` : String(selectedItemId))
+    : null;
   const selectedItem = priceSource === "item"
-    ? allItems.find((i: any) => i.id === selectedItemId)
+    ? allItems.find((i: any) => {
+        if (selectedItemType) return i.id === selectedItemId && i.type === selectedItemType;
+        return i.id === selectedItemId; // legacy fallback (no type stored)
+      })
     : null;
 
   // The item that drives the displayed price
@@ -1636,12 +1668,16 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
     return priceStr;
   };
 
-  const handleItemSelect = (idStr: string) => {
-    if (!idStr || idStr === "none") {
+  const handleItemSelect = (compositeKey: string) => {
+    if (!compositeKey || compositeKey === "none") {
       setMany({ linkedItemId: null, linkedItemType: null, linkedItemSlug: null });
       return;
     }
-    const item = allItems.find((i: any) => i.id === Number(idStr));
+    // Parse composite key "type:id" (or legacy plain id string)
+    const colonIdx = compositeKey.indexOf(":");
+    const itemType = colonIdx > -1 ? compositeKey.slice(0, colonIdx) : null;
+    const itemId = colonIdx > -1 ? Number(compositeKey.slice(colonIdx + 1)) : Number(compositeKey);
+    const item = allItems.find((i: any) => i.id === itemId && (itemType ? i.type === itemType : true));
     if (!item) return;
     const urlMap: Record<string, string> = { course: `/courses/${item.slug}`, quiz: `/courses/${item.slug}`, cohort: `/courses/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/product/${item.slug}` };
     const autoUrl = urlMap[item.type] ?? `/courses/${item.slug}`;
@@ -1712,20 +1748,31 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
             {priceSource === "item" && (
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Select Item</label>
-                <Select value={selectedItemId ? String(selectedItemId) : "none"} onValueChange={handleItemSelect}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Choose item…" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— None —</SelectItem>
-                    {allItems.map((item: any) => (
-                      <SelectItem key={item.id} value={String(item.id)}>
-                        [{item.type}] {item.title} — {formatItemPrice(item)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {catalogLoading ? (
+                  <div className="h-7 flex items-center text-xs text-gray-400 px-2 border border-gray-200 rounded">
+                    Loading catalog…
+                  </div>
+                ) : (
+                  <Select value={selectedCompositeKey ?? "none"} onValueChange={handleItemSelect}>
+                    <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Choose item…" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— None —</SelectItem>
+                      {allItems.map((item: any) => (
+                        <SelectItem key={`${item.type}:${item.id}`} value={`${item.type}:${item.id}`}>
+                          [{item.type}] {item.title} — {formatItemPrice(item)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 {activeItem && (
                   <p className="text-xs text-teal-600 mt-1">
                     {formatItemPrice(activeItem)} · URL auto-set
+                  </p>
+                )}
+                {!activeItem && selectedItemId && !catalogLoading && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Saved item (ID {selectedItemId}) not found in catalog — it may have been deleted or is a different type.
                   </p>
                 )}
               </div>
