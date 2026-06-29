@@ -1,16 +1,9 @@
 /**
  * CME Hub — All About Ultrasound™
- * Displays accredited CME/CE courses from the native catalog.
- * Uses cmeCatalog.getCatalog (E-Learning & CME collection).
+ * Displays accredited CME/CE courses from the native LMS CME collection (ID 1).
  * Brand: Teal #189aa1, Aqua #4ad9e0
- *
- * Routing (priority order):
- *  1. nativeLmsCourseId → native course player on learn.allaboutultrasound.com
- *  2. slug → native course landing page on learn.allaboutultrasound.com
- *  3. Thinkific fallback only when neither native option exists
  */
 import { useState } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 import { ExternalLink, GraduationCap, Award, Search, BookOpen, Play } from "lucide-react";
@@ -18,6 +11,7 @@ import { parseCreditHoursFromName } from "@/lib/cmeUtils";
 import { LEARN_APP_URL } from "@/hooks/useSubdomain";
 
 const EDUCATION_LIBRARY_URL = `${LEARN_APP_URL}/education-library`;
+const CME_COLLECTION_ID = 1;
 
 const BRAND = "#189aa1";
 const BRAND_LIGHT = "#f0fbfc";
@@ -37,57 +31,29 @@ const CREDIT_TYPE_COLORS: Record<string, string> = {
   OTHER: "#64748b",
 };
 
-/** Build the native course player URL on learn.allaboutultrasound.com */
-function buildCoursePlayerUrl(nativeLmsCourseId: number): string {
-  return `${LEARN_APP_URL}/learn/course/${nativeLmsCourseId}`;
-}
-
-/** Build the native course landing page URL on learn.allaboutultrasound.com */
 function buildCourseLandingUrl(slug: string): string {
   return `${LEARN_APP_URL}/courses/${slug}`;
 }
 
-/**
- * Build the best available URL for a course action.
- * Priority: native player > native landing page > Thinkific fallback.
- */
-function buildBestUrl(
-  nativeLmsCourseId: number | null,
-  slug: string | undefined,
-  thinkificFallback: string,
-  email?: string | null
-): string {
-  if (nativeLmsCourseId) {
-    return buildCoursePlayerUrl(nativeLmsCourseId);
-  }
-  if (slug) {
-    const url = buildCourseLandingUrl(slug);
-    if (email) return `${url}?prefill_email=${encodeURIComponent(email)}`;
-    return url;
-  }
-  // Only reach Thinkific if no native option exists
-  if (email) {
-    const sep = thinkificFallback.includes("?") ? "&" : "?";
-    return `${thinkificFallback}${sep}prefill_email=${encodeURIComponent(email)}`;
-  }
-  return thinkificFallback;
+function formatPrice(price: number | string | null | undefined, isFree: boolean | number | null): string {
+  if (isFree) return "Free";
+  const num = Number(price ?? 0);
+  if (num === 0) return "Free";
+  return `$${num.toFixed(2)}`;
 }
 
 export default function CMEHub() {
-  const { user } = useAuth();
   const [search, setSearch] = useState("");
 
-  const { data: courses = [], isLoading } = trpc.cmeCatalog.getCatalog.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: enrolledCourseIds = [] } = trpc.cmeCatalog.getMyEnrollments.useQuery(
-    undefined,
-    { enabled: !!user, staleTime: 5 * 60 * 1000 }
+  const { data: collection, isLoading } = trpc.lms.getCollection.useQuery(
+    { id: CME_COLLECTION_ID },
+    { staleTime: 5 * 60 * 1000 }
   );
 
-  const filtered = courses.filter((c) =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase())
+  const items = (collection?.courses ?? []).filter((item: any) => item !== null);
+
+  const filtered = items.filter((item: any) =>
+    !search || (item.title ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -160,48 +126,25 @@ export default function CMEHub() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((course) => {
-              const credit = parseCreditHoursFromName(course.name);
-              const isEnrolled = enrolledCourseIds.includes(course.thinkificProductId);
-              const hasNative = !!course.nativeLmsCourseId;
-              const hasSlug = !!course.slug;
-              const isNativeOrSlug = hasNative || hasSlug;
-
-              // Best URL for card image / title click
-              const detailUrl = buildBestUrl(course.nativeLmsCourseId, course.slug, course.courseUrl);
-
-              // Best URL for the primary CTA (enroll/start)
-              const actionUrl = buildBestUrl(
-                course.nativeLmsCourseId,
-                course.slug,
-                course.enrollUrl,
-                user?.email
-              );
-
-              // For enrolled users: go directly to the course player if native, else landing page
-              const continueUrl = hasNative
-                ? buildCoursePlayerUrl(course.nativeLmsCourseId!)
-                : hasSlug
-                  ? buildCourseLandingUrl(course.slug)
-                  : course.courseUrl;
+            {filtered.map((item: any) => {
+              const title: string = item.title ?? "";
+              const slug: string | undefined = item.slug;
+              const credit = parseCreditHoursFromName(title);
+              const detailUrl = slug ? buildCourseLandingUrl(slug) : EDUCATION_LIBRARY_URL;
+              const priceStr = formatPrice(item.price, item.isFree);
 
               return (
                 <div
-                  key={course.thinkificProductId}
+                  key={item.id}
                   className="rounded-xl border bg-white overflow-hidden flex flex-col hover:shadow-md transition-shadow"
                   style={{ borderColor: BRAND_BORDER }}
                 >
-                  {/* Card image — clicking goes to native course page */}
-                  <a
-                    href={detailUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block"
-                  >
-                    {course.cardImageUrl ? (
+                  {/* Card image */}
+                  <a href={detailUrl} target="_blank" rel="noopener noreferrer" className="block">
+                    {item.coverImageUrl ? (
                       <img
-                        src={course.cardImageUrl}
-                        alt={course.name}
+                        src={item.coverImageUrl}
+                        alt={title}
                         className="w-full h-32 object-cover"
                       />
                     ) : (
@@ -232,72 +175,27 @@ export default function CMEHub() {
                       href={detailUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-semibold text-gray-900 text-sm leading-snug mb-1 flex-1 hover:underline"
+                      className="font-semibold text-gray-900 text-sm leading-snug mb-2 flex-1 hover:underline"
                       style={{ fontFamily: "Merriweather, serif" }}
                     >
-                      {course.name}
+                      {title}
                     </a>
-
-                    {/* Native badge */}
-                    {hasNative && (
-                      <div className="flex items-center gap-1 mb-2">
-                        <span
-                          className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                          style={{ background: BRAND_LIGHT, color: BRAND }}
-                        >
-                          ✓ Available on this platform
-                        </span>
-                      </div>
-                    )}
 
                     {/* Price + CTA */}
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
-                      <span className="text-sm font-bold text-gray-800">
-                        {course.price === "0.00" || course.price === "0" ? (
-                          <span style={{ color: BRAND }}>Free</span>
-                        ) : (
-                          `$${course.price}`
-                        )}
+                      <span className="text-sm font-bold" style={{ color: item.isFree ? BRAND : "#1f2937" }}>
+                        {priceStr}
                       </span>
-                      <div className="flex items-center gap-1.5">
-                        {isEnrolled ? (
-                          <a
-                            href={continueUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
-                            style={{ background: BRAND }}
-                          >
-                            <Play className="w-3 h-3" />
-                            Continue
-                          </a>
-                        ) : (
-                          <>
-                            {/* Show Details button only when there's a separate detail page */}
-                            {isNativeOrSlug && (
-                              <a
-                                href={detailUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border"
-                                style={{ borderColor: BRAND + "40", color: BRAND }}
-                              >
-                                Details
-                              </a>
-                            )}
-                            <a
-                              href={actionUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
-                              style={{ background: BRAND }}
-                            >
-                              {isNativeOrSlug ? <Play className="w-3 h-3" /> : <ExternalLink className="w-3 h-3" />}
-                              {isNativeOrSlug ? "Start" : "Enroll"}
-                            </a>
-                          </>
-                        )}
-                      </div>
+                      <a
+                        href={detailUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
+                        style={{ background: BRAND }}
+                      >
+                        <Play className="w-3 h-3" />
+                        View Course
+                      </a>
                     </div>
                   </div>
                 </div>
