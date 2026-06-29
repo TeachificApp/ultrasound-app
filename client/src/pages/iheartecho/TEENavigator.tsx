@@ -16,18 +16,19 @@ type ChecklistItem = { id: string; label: string; detail?: string; critical?: bo
 type ViewSection = { id?: string; view: string; probe: string; position: string; angle: string; depth: string; items: ChecklistItem[]; clinicalUse?: string };
 
 const teeProtocol: ViewSection[] = [
+  // ── 1. ME Four-Chamber ──────────────────────────────────────────────────────
   {
     id: "me4c",
-    view: "ME 4-Chamber",
+    view: "ME Four-Chamber",
     probe: "Mid-esophageal",
     position: "Mid-esophageal",
-    angle: "0°",
-    depth: "30–35 cm",
-    clinicalUse: "LV/RV size and function, MV/TV morphology, ASD/PFO, LA/RA assessment",
+    angle: "0–20°",
+    depth: "28–32 cm",
+    clinicalUse: "LV/RV size & function, MV/TV morphology, IAS, LA/RA size",
     items: [
       { id: "me4c_lv", label: "LV size and systolic function", detail: "Biplane EF if needed. Assess all walls", critical: true },
-      { id: "me4c_rv", label: "RV size and function", detail: "RV should be <2/3 LV size. TAPSE not feasible — use FAC or S'" },
-      { id: "me4c_mv", label: "Mitral valve morphology (A4C equivalent)", detail: "Leaflet coaptation, prolapse, restriction, calcification", critical: true },
+      { id: "me4c_rv", label: "RV size and function", detail: "RV should be <2/3 LV size. TAPSE not feasible — use FAC or S'", critical: true },
+      { id: "me4c_mv", label: "Mitral valve morphology", detail: "Leaflet coaptation, prolapse, restriction, calcification", critical: true },
       { id: "me4c_tv", label: "Tricuspid valve morphology", detail: "TR severity, leaflet morphology" },
       { id: "me4c_la", label: "Left atrium size and LAA", detail: "LA dilation? Spontaneous echo contrast (SEC)?" },
       { id: "me4c_ias", label: "Interatrial septum (ASD/PFO)", detail: "Color Doppler + bubble study if PFO suspected", critical: true },
@@ -35,14 +36,30 @@ const teeProtocol: ViewSection[] = [
       { id: "me4c_tr_color", label: "TR color Doppler + CW", detail: "TR Vmax for RVSP estimation" },
     ],
   },
+  // ── 2. ME Mitral Commissural ────────────────────────────────────────────────
   {
-    id: "me2c",
-    view: "ME 2-Chamber",
+    id: "me_mitral_comm",
+    view: "ME Mitral Commissural",
     probe: "Mid-esophageal",
     position: "Mid-esophageal",
-    angle: "90°",
-    depth: "30–35 cm",
-    clinicalUse: "LV anterior/inferior walls, MV anterior/posterior leaflets, LAA",
+    angle: "60–70°",
+    depth: "28–32 cm",
+    clinicalUse: "MV commissures, P1/A3 and P3/A1 segments, MR mechanism",
+    items: [
+      { id: "me_mc_p1a3", label: "P1/A3 and P3/A1 segments visible", detail: "Commissural view — best for identifying commissural pathology", critical: true },
+      { id: "me_mc_mr", label: "MR color Doppler (commissural origin)", detail: "Commissural MR jets best seen here" },
+      { id: "me_mc_coaptation", label: "Leaflet coaptation line", detail: "Prolapse, flail, or restricted segment at commissures" },
+    ],
+  },
+  // ── 3. ME Two-Chamber ───────────────────────────────────────────────────────
+  {
+    id: "me2c",
+    view: "ME Two-Chamber",
+    probe: "Mid-esophageal",
+    position: "Mid-esophageal",
+    angle: "80–100°",
+    depth: "28–32 cm",
+    clinicalUse: "LV anterior/inferior walls, LAA thrombus, MV anterior/posterior leaflets",
     items: [
       { id: "me2c_lv", label: "LV anterior and inferior wall motion", detail: "LAD (anterior) and RCA (inferior) territories" },
       { id: "me2c_mv", label: "MV anterior and posterior leaflets", detail: "A1/A2/A3 and P1/P2/P3 segments visible" },
@@ -50,14 +67,15 @@ const teeProtocol: ViewSection[] = [
       { id: "me2c_laa_doppler", label: "LAA Doppler (emptying velocity)", detail: "Normal LAA emptying: >40 cm/s. <20 cm/s = high thrombus risk", critical: true },
     ],
   },
+  // ── 4. ME Long Axis ─────────────────────────────────────────────────────────
   {
     id: "melax",
-    view: "ME Long Axis (LAX)",
+    view: "ME Long Axis",
     probe: "Mid-esophageal",
     position: "Mid-esophageal",
-    angle: "120–135°",
-    depth: "30–35 cm",
-    clinicalUse: "LVOT, AV, aortic root, MV (PLAX equivalent)",
+    angle: "120–160°",
+    depth: "28–32 cm",
+    clinicalUse: "AV, LVOT, MV, aortic root, proximal ascending aorta",
     items: [
       { id: "melax_av", label: "Aortic valve morphology (3 cusps visible)", detail: "Bicuspid? Calcification? Restricted opening?" },
       { id: "melax_lvot", label: "LVOT diameter (for SV calculation)", detail: "Measure in systole, 0.5–1 cm below AV" },
@@ -66,14 +84,30 @@ const teeProtocol: ViewSection[] = [
       { id: "melax_mv", label: "MV (PLAX equivalent)", detail: "Posterior leaflet prolapse best seen here" },
     ],
   },
+  // ── 5. ME AV Long Axis ──────────────────────────────────────────────────────
+  {
+    id: "me_av_lax",
+    view: "ME AV Long Axis",
+    probe: "Mid-esophageal",
+    position: "Mid-esophageal",
+    angle: "120–160°",
+    depth: "25–30 cm",
+    clinicalUse: "AV leaflets in LAX, LVOT, aortic root — complements ME LAX",
+    items: [
+      { id: "me_av_lax_cusps", label: "AV cusp motion (LAX)", detail: "Opening excursion, doming, prolapse" },
+      { id: "me_av_lax_root", label: "Aortic root dimensions", detail: "Annulus, sinus, STJ, ascending aorta" },
+      { id: "me_av_lax_ar", label: "AR color Doppler", detail: "Jet width relative to LVOT. Central vs eccentric" },
+    ],
+  },
+  // ── 6. ME AV Short Axis ─────────────────────────────────────────────────────
   {
     id: "meavsax",
-    view: "ME AV SAX",
+    view: "ME AV Short Axis",
     probe: "Mid-esophageal",
     position: "Mid-esophageal",
     angle: "30–60°",
-    depth: "28–32 cm",
-    clinicalUse: "AV leaflet morphology, commissures, coronary ostia, RVOT/PV",
+    depth: "25–30 cm",
+    clinicalUse: "AV morphology (bicuspid?), coronary ostia, RVOT, PV",
     items: [
       { id: "meavsax_av", label: "AV leaflet morphology (tricuspid vs bicuspid)", detail: "R, L, N cusps. Commissural fusion? Calcification?", critical: true },
       { id: "meavsax_coronary", label: "Coronary ostia (LMCA and RCA)", detail: "LMCA from left cusp, RCA from right cusp. Dissection? Occlusion?" },
@@ -82,21 +116,7 @@ const teeProtocol: ViewSection[] = [
       { id: "meavsax_ar_color", label: "AR color Doppler (SAX)", detail: "Identify which cusp is prolapsing/perforated" },
     ],
   },
-  {
-    id: "mebicaval",
-    view: "ME Bicaval",
-    probe: "Mid-esophageal",
-    position: "Mid-esophageal",
-    angle: "90–110°",
-    depth: "28–32 cm",
-    clinicalUse: "IAS, SVC/IVC, ASD sizing, PFO, sinus venosus ASD",
-    items: [
-      { id: "mebicaval_ias", label: "Interatrial septum (full length)", detail: "Secundum ASD, sinus venosus ASD, PFO", critical: true },
-      { id: "mebicaval_svc", label: "Superior vena cava", detail: "SVC flow, sinus venosus ASD near SVC" },
-      { id: "mebicaval_ivc", label: "Inferior vena cava", detail: "IVC entry into RA. Eustachian valve?" },
-      { id: "mebicaval_color", label: "Color Doppler across IAS", detail: "Shunt direction and size. Bubble study if PFO" },
-    ],
-  },
+  // ── 7. ME RV Inflow-Outflow ──────────────────────────────────────────────────
   {
     id: "mervio",
     view: "ME RV Inflow-Outflow",
@@ -112,32 +132,143 @@ const teeProtocol: ViewSection[] = [
       { id: "mervio_pr", label: "PR color Doppler", detail: "PR severity. PHT of PR jet" },
     ],
   },
+  // ── 8. ME Bicaval ───────────────────────────────────────────────────────────
   {
-    view: "ME Ascending Aorta SAX / LAX",
+    id: "mebicaval",
+    view: "ME Bicaval",
+    probe: "Mid-esophageal",
+    position: "Mid-esophageal",
+    angle: "90–110°",
+    depth: "28–32 cm",
+    clinicalUse: "IAS, SVC/IVC, ASD sizing, PFO, sinus venosus ASD",
+    items: [
+      { id: "mebicaval_ias", label: "Interatrial septum (full length)", detail: "Secundum ASD, sinus venosus ASD, PFO", critical: true },
+      { id: "mebicaval_svc", label: "Superior vena cava", detail: "SVC flow, sinus venosus ASD near SVC" },
+      { id: "mebicaval_ivc", label: "Inferior vena cava", detail: "IVC entry into RA. Eustachian valve?" },
+      { id: "mebicaval_color", label: "Color Doppler across IAS", detail: "Shunt direction and size. Bubble study if PFO" },
+    ],
+  },
+  // ── 9. ME Modified Bicaval TV ────────────────────────────────────────────────
+  {
+    id: "me_mod_bicaval_tv",
+    view: "ME Modified Bicaval TV",
+    probe: "Mid-esophageal",
+    position: "Mid-esophageal",
+    angle: "100–120°",
+    depth: "28–32 cm",
+    clinicalUse: "TV in bicaval orientation — TR mechanism, TV repair planning",
+    items: [
+      { id: "me_mod_tv_leaflets", label: "TV leaflets (anterior and posterior)", detail: "Leaflet morphology, coaptation, prolapse, tethering" },
+      { id: "me_mod_tv_tr", label: "TR color Doppler", detail: "Jet direction and origin in bicaval plane" },
+      { id: "me_mod_tv_annulus", label: "TV annulus", detail: "Annular dilation? Relevant for TV repair planning" },
+    ],
+  },
+  // ── 10. ME Right Pulmonary Vein ──────────────────────────────────────────────
+  {
+    id: "me_rpv",
+    view: "ME Right Pulmonary Vein",
+    probe: "Mid-esophageal",
+    position: "Mid-esophageal",
+    angle: "0–30°",
+    depth: "28–32 cm",
+    clinicalUse: "RSPV/RIPV flow, MR severity (systolic reversal), AF ablation planning",
+    items: [
+      { id: "me_rpv_flow", label: "RSPV PW Doppler (S/D/Ar waves)", detail: "Systolic blunting or reversal = severe MR", critical: true },
+      { id: "me_rpv_ripv", label: "RIPV flow if visible", detail: "Inferior PV flow pattern" },
+      { id: "me_rpv_color", label: "Color Doppler at PV ostia", detail: "PV stenosis (post-ablation)? Turbulence?" },
+    ],
+  },
+  // ── 11. ME Left Pulmonary Vein ───────────────────────────────────────────────
+  {
+    id: "me_lpv",
+    view: "ME Left Pulmonary Vein",
+    probe: "Mid-esophageal",
+    position: "Mid-esophageal",
+    angle: "90–110°",
+    depth: "28–32 cm",
+    clinicalUse: "LSPV/LIPV flow, LAA assessment, MR severity",
+    items: [
+      { id: "me_lpv_flow", label: "LSPV PW Doppler (S/D/Ar waves)", detail: "Systolic blunting or reversal = severe MR", critical: true },
+      { id: "me_lpv_laa", label: "LAA (left atrial appendage)", detail: "LAA thrombus? SEC? Emptying velocity <20 cm/s = stasis" },
+      { id: "me_lpv_color", label: "Color Doppler at LSPV ostium", detail: "PV stenosis? Turbulence?" },
+    ],
+  },
+  // ── 12. ME Ascending Aorta SAX ───────────────────────────────────────────────
+  {
+    id: "me_asc_ao_sax",
+    view: "ME Ascending Aorta SAX",
     probe: "Mid-esophageal (upper)",
     position: "Mid-esophageal (upper)",
-    angle: "0° (SAX) / 90° (LAX)",
+    angle: "0–30°",
     depth: "20–25 cm",
-    clinicalUse: "Ascending aorta, aortic dissection, atheroma",
+    clinicalUse: "Ascending aorta SAX, PA bifurcation, RPA, SVC",
     items: [
-      { id: "meaorta_size", label: "Ascending aorta diameter", detail: "Measure at sinus, STJ, mid-ascending. Normal ≤38 mm", critical: true },
-      { id: "meaorta_dissection", label: "Aortic dissection (intimal flap?)", detail: "Type A: involves ascending. Color Doppler: true vs false lumen", critical: true },
-      { id: "meaorta_atheroma", label: "Aortic atheroma (plaque grade)", detail: "Grade I–V. Grade ≥IV (≥4 mm or mobile) = high embolic risk" },
+      { id: "me_asc_sax_ao", label: "Ascending aorta diameter (SAX)", detail: "Measure at mid-ascending level. Normal ≤38 mm", critical: true },
+      { id: "me_asc_sax_pa", label: "Main PA and bifurcation", detail: "PA dilation? Thrombus (PE)?" },
+      { id: "me_asc_sax_rpa", label: "Right pulmonary artery (RPA)", detail: "RPA thrombus? Dilation?" },
+      { id: "me_asc_sax_svc", label: "Superior vena cava", detail: "SVC diameter, flow direction" },
     ],
   },
+  // ── 13. ME Ascending Aorta LAX ───────────────────────────────────────────────
   {
-    view: "UE Aortic Arch",
+    id: "me_asc_ao_lax",
+    view: "ME Ascending Aorta LAX",
+    probe: "Mid-esophageal (upper)",
+    position: "Mid-esophageal (upper)",
+    angle: "90–120°",
+    depth: "20–25 cm",
+    clinicalUse: "Ascending aorta LAX — dissection flap, aneurysm, atheroma",
+    items: [
+      { id: "me_asc_lax_ao", label: "Ascending aorta LAX diameter", detail: "Measure at sinus, STJ, mid-ascending. Dissection flap?", critical: true },
+      { id: "me_asc_lax_dissection", label: "Intimal flap (dissection)", detail: "Type A dissection involves ascending aorta. True vs false lumen" },
+      { id: "me_asc_lax_atheroma", label: "Aortic atheroma grade", detail: "Grade I–V. Grade ≥IV (≥4 mm or mobile) = high embolic risk" },
+    ],
+  },
+  // ── 14. UE Aortic Arch LAX ───────────────────────────────────────────────────
+  {
+    id: "ue_arch_lax",
+    view: "UE Aortic Arch LAX",
     probe: "Upper esophageal",
     position: "Upper esophageal",
-    angle: "0° (arch LAX) / 90° (arch SAX)",
+    angle: "0°",
     depth: "18–22 cm",
-    clinicalUse: "Aortic arch, descending aorta, PDA, coarctation",
+    clinicalUse: "Aortic arch LAX — atheroma, dissection, PDA, coarctation",
     items: [
-      { id: "ue_arch", label: "Aortic arch diameter and morphology", detail: "Atheroma, dissection, aneurysm" },
-      { id: "ue_desc", label: "Descending thoracic aorta", detail: "Dissection flap? Atheroma? Aneurysm?" },
-      { id: "ue_pda", label: "PDA (if suspected)", detail: "Continuous flow from descending aorta to PA" },
+      { id: "ue_arch_lax_ao", label: "Aortic arch diameter and morphology", detail: "Atheroma, dissection, aneurysm" },
+      { id: "ue_arch_lax_pda", label: "PDA (if suspected)", detail: "Continuous flow from descending aorta to PA" },
+      { id: "ue_arch_lax_coarc", label: "Coarctation (if suspected)", detail: "Turbulent flow in descending aorta" },
     ],
   },
+  // ── 15. UE Aortic Arch SAX ───────────────────────────────────────────────────
+  {
+    id: "ue_arch_sax",
+    view: "UE Aortic Arch SAX",
+    probe: "Upper esophageal",
+    position: "Upper esophageal",
+    angle: "90°",
+    depth: "18–22 cm",
+    clinicalUse: "Aortic arch SAX — PA, PV, SVC, left pulmonary artery",
+    items: [
+      { id: "ue_arch_sax_pa", label: "Main PA and pulmonary valve (SAX)", detail: "PA dilation? PV morphology?" },
+      { id: "ue_arch_sax_lpa", label: "Left pulmonary artery", detail: "LPA thrombus? Dilation?" },
+      { id: "ue_arch_sax_svc", label: "SVC (SAX)", detail: "SVC diameter and flow" },
+    ],
+  },
+  // ── 16. TG Basal SAX ─────────────────────────────────────────────────────────
+  {
+    id: "tg_basal_sax",
+    view: "TG Basal SAX",
+    probe: "Transgastric",
+    position: "Transgastric",
+    angle: "0°",
+    depth: "38–42 cm",
+    clinicalUse: "MV leaflet tips (SAX), LV basal segments, papillary muscles",
+    items: [
+      { id: "tg_basal_mv", label: "MV leaflet tips (SAX)", detail: "Fish-mouth opening. Rheumatic stenosis? Commissural fusion?" },
+      { id: "tg_basal_lv", label: "LV basal wall motion", detail: "Basal anteroseptal, anterior, lateral, posterior, inferior, inferoseptal" },
+    ],
+  },
+  // ── 17. TG Mid SAX ───────────────────────────────────────────────────────────
   {
     id: "tg_mid_sax",
     view: "TG Mid SAX",
@@ -145,7 +276,7 @@ const teeProtocol: ViewSection[] = [
     position: "Transgastric",
     angle: "0°",
     depth: "40–45 cm",
-    clinicalUse: "LV wall motion (all 6 segments), papillary muscles, pericardium",
+    clinicalUse: "LV wall motion (all 6 mid segments), papillary muscles, pericardium",
     items: [
       { id: "tg_lv_wall", label: "LV wall motion (all 6 mid segments)", detail: "Anteroseptal, anterior, lateral, posterior, inferior, inferoseptal", critical: true },
       { id: "tg_pap", label: "Papillary muscles (anterolateral and posteromedial)", detail: "Papillary muscle rupture? Ischemia?" },
@@ -153,20 +284,78 @@ const teeProtocol: ViewSection[] = [
       { id: "tg_pericardium", label: "Pericardial effusion", detail: "Circumferential? Loculated?" },
     ],
   },
+  // ── 18. TG Apical SAX ────────────────────────────────────────────────────────
   {
-    id: "tglax",
-    view: "TG 2-Chamber / LAX",
+    id: "tg_apical_sax",
+    view: "TG Apical SAX",
     probe: "Transgastric",
     position: "Transgastric",
-    angle: "90° (2-chamber) / 120° (LAX)",
-    depth: "40–45 cm",
-    clinicalUse: "LV anterior/inferior walls, LVOT alignment for Doppler",
+    angle: "0°",
+    depth: "45–50 cm",
+    clinicalUse: "LV apical segments — apical thrombus, apical ballooning (Takotsubo)",
     items: [
-      { id: "tg2c_lv", label: "LV anterior and inferior wall motion", detail: "Anterior (LAD), inferior (RCA)" },
-      { id: "tglax_lvot", label: "LVOT (TG LAX — best Doppler alignment)", detail: "Best view for LVOT PW Doppler and AV CW Doppler in intraop TEE", critical: true },
-      { id: "tglax_av_cw", label: "AV CW Doppler (TG LAX)", detail: "Parallel alignment. Use for AS gradient in intraop TEE" },
+      { id: "tg_apical_lv", label: "LV apical wall motion", detail: "Apical anteroseptal, anterior, lateral, posterior, inferior, inferoseptal", critical: true },
+      { id: "tg_apical_thrombus", label: "LV apical thrombus", detail: "Apical thrombus? Spontaneous echo contrast?" },
     ],
   },
+  // ── 19. TG Two-Chamber ───────────────────────────────────────────────────────
+  {
+    id: "tg2c",
+    view: "TG Two-Chamber",
+    probe: "Transgastric",
+    position: "Transgastric",
+    angle: "80–100°",
+    depth: "40–45 cm",
+    clinicalUse: "LV anterior/inferior walls, MV subvalvular apparatus",
+    items: [
+      { id: "tg2c_lv", label: "LV anterior and inferior wall motion", detail: "Anterior (LAD), inferior (RCA)" },
+      { id: "tg2c_mv_sub", label: "MV subvalvular apparatus", detail: "Chordae, papillary muscles. Chordal rupture?" },
+    ],
+  },
+  // ── 20. TG LAX ───────────────────────────────────────────────────────────────
+  {
+    id: "tglax",
+    view: "TG LAX",
+    probe: "Transgastric",
+    position: "Transgastric",
+    angle: "90–120°",
+    depth: "40–45 cm",
+    clinicalUse: "LVOT alignment for Doppler — best intraoperative AV/LVOT assessment",
+    items: [
+      { id: "tglax_lvot", label: "LVOT (TG LAX — best Doppler alignment)", detail: "Best view for LVOT PW Doppler and AV CW Doppler in intraop TEE", critical: true },
+      { id: "tglax_av_cw", label: "AV CW Doppler (TG LAX)", detail: "Parallel alignment. Use for AS gradient in intraop TEE" },
+      { id: "tglax_lv_walls", label: "LV anterior and inferior walls", detail: "Anterior (LAD), inferior (RCA)" },
+    ],
+  },
+  // ── 21. TG RV Basal ──────────────────────────────────────────────────────────
+  {
+    id: "tg_rv_basal",
+    view: "TG RV Basal",
+    probe: "Transgastric",
+    position: "Transgastric",
+    angle: "0–20°",
+    depth: "38–42 cm",
+    clinicalUse: "RV basal function, TV subvalvular apparatus, RVOT",
+    items: [
+      { id: "tg_rv_basal_rv", label: "RV basal wall motion", detail: "RV free wall, moderator band" },
+      { id: "tg_rv_basal_tv", label: "TV subvalvular apparatus", detail: "Chordae, papillary muscles. Tricuspid chordal rupture?" },
+    ],
+  },
+  // ── 22. TG RV Inflow ─────────────────────────────────────────────────────────
+  {
+    id: "tg_rv_inflow",
+    view: "TG RV Inflow",
+    probe: "Transgastric",
+    position: "Transgastric",
+    angle: "100–120°",
+    depth: "38–42 cm",
+    clinicalUse: "TV, RV inflow, TR Doppler — complements ME RV IO",
+    items: [
+      { id: "tg_rv_inflow_tv", label: "TV leaflets (inflow view)", detail: "TV morphology, coaptation, prolapse" },
+      { id: "tg_rv_inflow_tr", label: "TR CW Doppler", detail: "TR Vmax for RVSP. Best alignment from TG RV Inflow" },
+    ],
+  },
+  // ── 23. Deep TG LAX ──────────────────────────────────────────────────────────
   {
     id: "deep_tg",
     view: "Deep TG LAX",
@@ -178,6 +367,35 @@ const teeProtocol: ViewSection[] = [
     items: [
       { id: "dtg_lvot_pw", label: "LVOT PW Doppler (best alignment)", detail: "Used for SV calculation in intraop TEE" },
       { id: "dtg_av_cw", label: "AV CW Doppler (best alignment for AS)", detail: "Most parallel to flow — preferred for intraop AS gradient", critical: true },
+    ],
+  },
+  // ── 24. Desc Aorta SAX ───────────────────────────────────────────────────────
+  {
+    id: "desc_ao_sax",
+    view: "Desc Aorta SAX",
+    probe: "Mid/lower esophageal (rotate left)",
+    position: "Mid-esophageal",
+    angle: "0°",
+    depth: "30–40 cm",
+    clinicalUse: "Descending thoracic aorta SAX — dissection, atheroma, aneurysm",
+    items: [
+      { id: "desc_sax_ao", label: "Descending aorta diameter (SAX)", detail: "Normal ≤28 mm. Aneurysm >40 mm", critical: true },
+      { id: "desc_sax_dissection", label: "Intimal flap (Type B dissection)", detail: "True vs false lumen. Color Doppler flow direction" },
+      { id: "desc_sax_atheroma", label: "Aortic atheroma grade", detail: "Grade I–V. Grade ≥IV = high embolic risk" },
+    ],
+  },
+  // ── 25. Desc Aorta LAX ───────────────────────────────────────────────────────
+  {
+    id: "desc_ao_lax",
+    view: "Desc Aorta LAX",
+    probe: "Mid/lower esophageal (rotate left)",
+    position: "Mid-esophageal",
+    angle: "90°",
+    depth: "30–40 cm",
+    clinicalUse: "Descending thoracic aorta LAX — dissection extent, atheroma, aneurysm",
+    items: [
+      { id: "desc_lax_ao", label: "Descending aorta LAX morphology", detail: "Dissection flap extent? Aneurysm? Atheroma?" },
+      { id: "desc_lax_flow", label: "Color Doppler (true vs false lumen)", detail: "Flow in true lumen (systolic) vs false lumen (variable)" },
     ],
   },
 ];
