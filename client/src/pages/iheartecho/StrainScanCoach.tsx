@@ -1310,7 +1310,7 @@ function StrainScanCoachInner({ isPremium = false }: { isPremium?: boolean }) {
 
             {/* ── Tips & Tricks Tab ── */}
             {leftTab === "tips" && (
-              <PremiumPearlGate isPremium={isPremium} label="Tips & Tricks" context="Unlock acquisition tips, ASE 2025 guideline updates, and common pitfalls for every strain view with Premium.">
+              <PremiumPearlGate featureName="Strain ScanCoach Tips & Tricks">
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: BRAND + "18" }}>

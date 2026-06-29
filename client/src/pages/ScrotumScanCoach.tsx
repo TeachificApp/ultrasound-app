@@ -220,7 +220,7 @@ export default function ScrotumScanCoach() {
 
             {/* Tips */}
             <div className="p-5 space-y-3">
-              <PremiumPearlGate>
+              <PremiumPearlGate featureName="ScanCoach Premium Content">
                 {currentView.tips.map((tip, ti) => (
                   <div
                     key={ti}

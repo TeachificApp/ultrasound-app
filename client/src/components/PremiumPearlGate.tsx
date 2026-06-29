@@ -1,14 +1,15 @@
 /**
  * PremiumPearlGate — unified teaser-lock component for All About Ultrasound™.
  *
- * Free users see a partial content preview that fades into a blur, with a
- * floating upgrade card anchored below the visible teaser. Premium users see
- * the full content with no overlay at all.
+ * Free users see a 60-second live preview of the content. After the timer
+ * expires, a full-screen upgrade modal slides in blocking further access.
+ * Premium users see the full content with no overlay at all.
  *
- * Replaces: BlurredOverlay (premium), PremiumGate, PremiumLockOverlay, PremiumOverlay
+ * Timer state is stored in sessionStorage keyed by featureName so it persists
+ * across tab switches within the same session but resets on a new session.
  *
  * Usage:
- *   // Wraps a full page or section — shows teaser + upgrade card for free users
+ *   // Wraps a full page or section — 60s preview then upgrade modal for free users
  *   <PremiumPearlGate featureName="Venous Navigator">
  *     <YourContent />
  *   </PremiumPearlGate>
@@ -34,15 +35,21 @@
  *   </PremiumPearlGate>
  */
 
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
-  Crown, Lock, Sparkles, ArrowRight, Loader2, LogIn, Layers,
-  Check, Zap, Star,
+  Crown, Lock, ArrowRight, Loader2, LogIn, Layers,
+  Check, Zap, Star, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Seconds of free preview before the upgrade gate appears */
+const PREVIEW_SECONDS = 60;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +68,7 @@ interface PremiumPearlGateProps {
   /**
    * How many pixels of content to show as the teaser before the fade.
    * Defaults to 340px. Set to 0 to show no teaser (full blur).
+   * Only used after the timer expires (legacy fallback gate).
    */
   teaserHeight?: number;
   /** Optional custom checkout URL (premium gate only) */
@@ -83,6 +91,36 @@ const DIY_BULLETS = [
   "Quality review tools & peer review tracking",
   "Accreditation document library & compliance checklists",
 ];
+
+// ─── Session-storage timer helpers ───────────────────────────────────────────
+
+function getSessionKey(featureName: string | undefined) {
+  return `ppg_start_${(featureName ?? "feature").replace(/\s+/g, "_").toLowerCase()}`;
+}
+
+function getElapsedSeconds(featureName: string | undefined): number {
+  try {
+    const key = getSessionKey(featureName);
+    const stored = sessionStorage.getItem(key);
+    if (!stored) return 0;
+    const startMs = parseInt(stored, 10);
+    if (isNaN(startMs)) return 0;
+    return Math.floor((Date.now() - startMs) / 1000);
+  } catch {
+    return 0;
+  }
+}
+
+function startSessionTimer(featureName: string | undefined) {
+  try {
+    const key = getSessionKey(featureName);
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, String(Date.now()));
+    }
+  } catch {
+    // sessionStorage unavailable — degrade gracefully
+  }
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -150,7 +188,22 @@ export function PremiumPearlGate({
     );
   }
 
-  // ── Full teaser gate ───────────────────────────────────────────────────────
+  // ── Timed preview gate (premium type only) ─────────────────────────────────
+  // For login/diy gates, skip the timer and show the gate immediately
+  if (type === "premium" && !isLoading) {
+    return (
+      <TimedPreviewGate
+        featureName={featureName}
+        isLoggedIn={isLoggedIn}
+        checkoutUrl={checkoutUrl ?? status?.checkoutUrl}
+        teaserHeight={teaserHeight}
+      >
+        {children}
+      </TimedPreviewGate>
+    );
+  }
+
+  // ── Non-premium gates (login / diy) or loading state ──────────────────────
   return (
     <div className="relative w-full">
       {/* Teaser — visible portion fades into blur */}
@@ -169,7 +222,6 @@ export function PremiumPearlGate({
           <div style={{ filter: "blur(2px)", opacity: 0.5 }}>{children}</div>
         </div>
       ) : (
-        /* No teaser — just a short blurred stub so the card has something behind it */
         <div
           className="pointer-events-none select-none overflow-hidden"
           style={{ maxHeight: "120px", filter: "blur(4px)", opacity: 0.3 }}
@@ -179,7 +231,7 @@ export function PremiumPearlGate({
         </div>
       )}
 
-      {/* Upgrade card — anchored below the teaser, not floating over it */}
+      {/* Upgrade card — anchored below the teaser */}
       <div className="relative z-10 flex justify-center px-4 pb-8 -mt-8">
         {isLoading ? (
           <LoadingCard />
@@ -195,6 +247,187 @@ export function PremiumPearlGate({
           />
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Timed Preview Gate ───────────────────────────────────────────────────────
+
+function TimedPreviewGate({
+  children,
+  featureName,
+  isLoggedIn,
+  checkoutUrl,
+  teaserHeight,
+}: {
+  children: React.ReactNode;
+  featureName?: string;
+  isLoggedIn: boolean;
+  checkoutUrl?: string;
+  teaserHeight: number;
+}) {
+  const elapsed = getElapsedSeconds(featureName);
+  const remaining = Math.max(0, PREVIEW_SECONDS - elapsed);
+  const [secondsLeft, setSecondsLeft] = useState(remaining);
+  const [gateVisible, setGateVisible] = useState(remaining === 0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Start the session timer on first mount (no-op if already started)
+  useEffect(() => {
+    startSessionTimer(featureName);
+  }, [featureName]);
+
+  // Countdown tick
+  useEffect(() => {
+    if (gateVisible) return;
+    intervalRef.current = setInterval(() => {
+      const newElapsed = getElapsedSeconds(featureName);
+      const newRemaining = Math.max(0, PREVIEW_SECONDS - newElapsed);
+      setSecondsLeft(newRemaining);
+      if (newRemaining === 0) {
+        setGateVisible(true);
+        if (intervalRef.current) clearInterval(intervalRef.current);
+      }
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [featureName, gateVisible]);
+
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = secondsLeft % 60;
+  const timeStr = `${mins}:${String(secs).padStart(2, "0")}`;
+  const pct = (secondsLeft / PREVIEW_SECONDS) * 100;
+
+  return (
+    <div className="relative w-full">
+      {/* Live content — fully interactive during preview */}
+      <div className={gateVisible ? "pointer-events-none select-none" : ""}>
+        {children}
+      </div>
+
+      {/* Countdown pill — shown while timer is running */}
+      {!gateVisible && (
+        <div
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-full px-4 py-2.5 shadow-xl border"
+          style={{
+            background: "rgba(14, 30, 46, 0.92)",
+            borderColor: "rgba(74, 217, 224, 0.35)",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          {/* Circular progress */}
+          <div className="relative w-8 h-8 flex-shrink-0">
+            <svg className="w-8 h-8 -rotate-90" viewBox="0 0 32 32">
+              <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(74,217,224,0.15)" strokeWidth="3" />
+              <circle
+                cx="16" cy="16" r="13" fill="none"
+                stroke="#4ad9e0" strokeWidth="3"
+                strokeDasharray={`${2 * Math.PI * 13}`}
+                strokeDashoffset={`${2 * Math.PI * 13 * (1 - pct / 100)}`}
+                strokeLinecap="round"
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+              />
+            </svg>
+            <Clock className="w-3.5 h-3.5 text-[#4ad9e0] absolute inset-0 m-auto" />
+          </div>
+          <div>
+            <div className="text-[10px] text-white/50 leading-none mb-0.5">Free preview</div>
+            <div className="text-sm font-bold text-white font-mono leading-none">{timeStr}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade modal — slides in after timer expires */}
+      {gateVisible && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(14, 30, 46, 0.88)", backdropFilter: "blur(12px)" }}
+        >
+          {/* Modal card */}
+          <div
+            className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border animate-in fade-in slide-in-from-bottom-4 duration-300"
+            style={{ borderColor: "rgba(245,158,11,0.35)" }}
+          >
+            {/* Header */}
+            <div
+              className="px-6 pt-6 pb-5 relative"
+              style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
+                >
+                  <Crown className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-amber-300 uppercase tracking-widest mb-0.5">
+                    Preview Ended
+                  </div>
+                  <h2
+                    className="text-base font-black text-white leading-tight"
+                    style={{ fontFamily: "Merriweather, serif" }}
+                  >
+                    {featureName ? `Unlock ${featureName}` : "Upgrade to Continue"}
+                  </h2>
+                </div>
+              </div>
+              <p className="text-white/60 text-xs leading-relaxed">
+                Your 60-second free preview has ended. Upgrade to{" "}
+                <strong className="text-white/90">All About Ultrasound™ Premium</strong> for{" "}
+                <strong className="text-white/90">$9.97/month</strong> — every Navigator protocol,
+                ScanCoach guide, calculator engine, and 500+ echo cases.
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="bg-white px-6 py-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Star className="w-4 h-4 text-amber-500" />
+                <span className="text-sm font-bold text-gray-800">What's included in Premium</span>
+              </div>
+              <ul className="space-y-1.5 mb-5">
+                {PREMIUM_BULLETS.map((b) => (
+                  <li key={b} className="flex items-start gap-2">
+                    <Check className="w-3.5 h-3.5 text-[#189aa1] flex-shrink-0 mt-0.5" />
+                    <span className="text-xs text-gray-600">{b}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* CTAs */}
+              <div className="flex flex-col gap-2">
+                <a href={checkoutUrl ?? "/premium"} target="_blank" rel="noopener noreferrer">
+                  <Button
+                    className="w-full font-bold text-white"
+                    style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
+                  >
+                    <Zap className="w-4 h-4 mr-1.5" />
+                    Upgrade — $9.97/month
+                  </Button>
+                </a>
+                {!isLoggedIn && (
+                  <a href={getLoginUrl()}>
+                    <Button
+                      className="w-full font-semibold text-white"
+                      style={{ background: "linear-gradient(135deg, #189aa1, #0e7490)" }}
+                    >
+                      <LogIn className="w-4 h-4 mr-1.5" />
+                      Sign In (Already a Member?)
+                    </Button>
+                  </a>
+                )}
+                <Link href="/premium">
+                  <Button variant="outline" className="w-full text-sm">
+                    Learn More <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -329,8 +562,6 @@ function UpgradeCard({
   isLoggedIn: boolean;
   checkoutUrl?: string;
 }) {
-  const returnUrl =
-    typeof window !== "undefined" ? `${window.location.origin}/enrolled` : "";
   const upgradeUrl = checkoutUrl ?? "/premium";
 
   return (

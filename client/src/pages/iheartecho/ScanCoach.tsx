@@ -2078,7 +2078,7 @@ export default function ScanCoach() {
                     <h4 className="font-semibold text-xs text-gray-500 mb-1 uppercase tracking-wide">Doppler</h4>
                     <p className="text-sm text-gray-600">{selectedFetal.doppler}</p>
                   </div>
-                  <PremiumPearlGate isPremium={isPremium} label="Common Pitfalls" count={selectedFetal.pitfalls.length}>
+                  <PremiumPearlGate featureName="Fetal Echo Common Pitfalls">
                   <div className="mt-3 pt-3 border-t border-gray-100">
                     <h4 className="font-semibold text-xs text-gray-500 mb-1 uppercase tracking-wide">Common Pitfalls</h4>
                     <ul className="space-y-1">
@@ -2094,7 +2094,7 @@ export default function ScanCoach() {
                 </div>
 
                 {/* Red Flags */}
-                <PremiumPearlGate isPremium={isPremium} label="Red Flags" count={selectedFetal.redFlags.length} context="Unlock clinical red flags and abnormal findings for every fetal echo view with Premium.">
+                <PremiumPearlGate featureName="Fetal Echo Red Flags">
                 <div className="bg-white rounded-xl border border-red-50 shadow-sm p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <AlertTriangle className="w-4 h-4 text-red-500" />
