@@ -46,7 +46,7 @@ import { views as _invasiveProceduresViews } from "@/pages/InvasiveProceduresSca
 // ── Fetal Echo ────────────────────────────────────────────────────────────
 import { FETAL_VIEWS as _fetalViews } from "@/pages/FetalScanCoach";
 // ── iHeartEcho ───────────────────────────────────────────────────────────────
-import { TEE_VIEWS as _teeViews } from "@/pages/iheartecho/TEEScanCoach";
+import { TEE_VIEWS as _teeViews } from "@/lib/teeViewData";
 // ── Pediatric ────────────────────────────────────────────────────────────
 import { VIEWS as _pediatricViews, EXAM_TIPS as _pediatricExamTips } from "@/pages/PediatricScanCoach";
 
