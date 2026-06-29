@@ -105,7 +105,7 @@ export default function RegistryReviewHub() {
               Registry Review
             </h1>
             <p className="text-[#4ad9e0] font-semibold text-base mb-3">
-              All About Ultrasound™ — Registry Review Courses
+              All About Ultrasound™ — Registry Review Resources
             </p>
             <p className="text-white/70 text-sm leading-relaxed max-w-lg mb-5">
               Prepare for your registry exams with comprehensive review courses and test &amp; learn quizzes from All About Ultrasound™.
@@ -241,7 +241,7 @@ export default function RegistryReviewHub() {
             ) : regular.length > 0 ? (
               <>
                 <h2 className="text-base font-bold text-gray-700 mb-4" style={{ fontFamily: "Merriweather, serif" }}>
-                  Registry Review Courses
+                  Registry Review Resources
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                   {regular.map((item: any) => {
