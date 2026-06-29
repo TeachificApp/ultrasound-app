@@ -7,6 +7,7 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -146,7 +147,11 @@ export default function LMSHome() {
                     {course.subtitle && (
                       <p className="text-xs text-gray-500 line-clamp-1 mb-2">{course.subtitle}</p>
                     )}
-                    <div className="mt-auto" />
+                    <div className="mt-auto">
+                      {course.isFree && (
+                        <Badge className="bg-green-500 text-white text-xs">Free</Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Link>
@@ -213,7 +218,10 @@ export default function LMSHome() {
                       <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-2 group-hover:text-[#189aa1] transition-colors">
                         {product.title}
                       </h3>
-                      <div className="mt-auto flex items-center justify-end">
+                      <div className="mt-auto flex items-center justify-between">
+                        {product.price === 0 ? (
+                          <Badge className="bg-green-500 text-white text-xs">Free</Badge>
+                        ) : <span />}
                         <FileDown className="w-4 h-4 text-gray-400 group-hover:text-[#4ad9e0] transition-colors" />
                       </div>
                     </div>
