@@ -31,7 +31,7 @@ import {
   getScanCoachMediaByViews,
   deleteScanCoachMedia,
 } from "../db";
-import { scanCoachOverrides } from "../../drizzle/schema";
+import { scanCoachOverrides, scanCoachChdImages } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ const MODULE_VALUES = [
   // MSK
   "msk",
   // Fetal Echo
-  "fetal",
+  "fetal", "fetal_chd",
   // POCUS-Assist™
   "pocus_efast", "pocus_rush", "pocus_cardiac", "pocus_lung",
   // Procedures
@@ -785,6 +785,149 @@ export const scanCoachAdminRouter = router({
       await assertPlatformAdmin(ctx);
       await deleteScanCoachMedia(input.id);
       return { deleted: true };
+    }),
+
+  // ─── CHD Image Procedures ──────────────────────────────────────────────────
+
+  /**
+   * Get all CHD images for a module.
+   * Returns a nested map: chdId → slotKey → { imageUrl, fileKey, label }
+   */
+  getChdImages: publicProcedure
+    .input(z.object({ module: z.enum(["fetal", "fetal_ihe"]) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const rows = await db
+        .select()
+        .from(scanCoachChdImages)
+        .where(eq(scanCoachChdImages.module, input.module));
+      // Build nested map: chdId → slotKey → { imageUrl, fileKey, label }
+      const result: Record<string, Record<string, { imageUrl: string | null; fileKey: string | null; label: string | null }>> = {};
+      for (const row of rows) {
+        if (!result[row.chdId]) result[row.chdId] = {};
+        result[row.chdId][row.slotKey] = {
+          imageUrl: row.imageUrl ?? null,
+          fileKey: row.fileKey ?? null,
+          label: row.label ?? null,
+        };
+      }
+      return result;
+    }),
+
+  /**
+   * Upload an image for a CHD slot (admin only).
+   * Accepts base64-encoded image data, uploads to S3, stores URL in DB.
+   */
+  uploadChdImage: protectedProcedure
+    .input(z.object({
+      module: z.enum(["fetal", "fetal_ihe"]),
+      chdId: z.string().min(1).max(100),
+      slotKey: z.string().min(1).max(100),
+      base64Data: z.string(),
+      mimeType: z.string().regex(/^image\/(jpeg|png|gif|webp|svg\+xml)$/),
+      fileName: z.string().max(128),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const buffer = Buffer.from(input.base64Data, "base64");
+      const ext = input.mimeType.split("/")[1].replace("svg+xml", "svg");
+      const fileKey = `chd-images/${input.module}/${input.chdId}/${input.slotKey}-${Date.now()}.${ext}`;
+      const { url } = await storagePut(fileKey, buffer, input.mimeType);
+
+      // Upsert: delete existing row for this slot, then insert new one
+      await db
+        .delete(scanCoachChdImages)
+        .where(
+          and(
+            eq(scanCoachChdImages.module, input.module),
+            eq(scanCoachChdImages.chdId, input.chdId),
+            eq(scanCoachChdImages.slotKey, input.slotKey)
+          )
+        );
+      await db.insert(scanCoachChdImages).values({
+        module: input.module,
+        chdId: input.chdId,
+        slotKey: input.slotKey,
+        imageUrl: url,
+        fileKey,
+        updatedAt: Date.now(),
+      });
+      return { url, fileKey };
+    }),
+
+  /**
+   * Remove an image for a CHD slot (admin only).
+   */
+  clearChdImage: protectedProcedure
+    .input(z.object({
+      module: z.enum(["fetal", "fetal_ihe"]),
+      chdId: z.string().min(1).max(100),
+      slotKey: z.string().min(1).max(100),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db
+        .delete(scanCoachChdImages)
+        .where(
+          and(
+            eq(scanCoachChdImages.module, input.module),
+            eq(scanCoachChdImages.chdId, input.chdId),
+            eq(scanCoachChdImages.slotKey, input.slotKey)
+          )
+        );
+      return { cleared: true };
+    }),
+
+  /**
+   * Update the admin-customizable label for a CHD image slot.
+   * Pass null to reset to the default label from fetalChdData.ts.
+   */
+  updateChdImageLabel: protectedProcedure
+    .input(z.object({
+      module: z.enum(["fetal", "fetal_ihe"]),
+      chdId: z.string().min(1).max(100),
+      slotKey: z.string().min(1).max(100),
+      label: z.string().max(200).nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Upsert: ensure row exists, then update label
+      const existing = await db
+        .select({ id: scanCoachChdImages.id })
+        .from(scanCoachChdImages)
+        .where(
+          and(
+            eq(scanCoachChdImages.module, input.module),
+            eq(scanCoachChdImages.chdId, input.chdId),
+            eq(scanCoachChdImages.slotKey, input.slotKey)
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db
+          .update(scanCoachChdImages)
+          .set({ label: input.label, updatedAt: Date.now() })
+          .where(eq(scanCoachChdImages.id, existing[0].id));
+      } else {
+        await db.insert(scanCoachChdImages).values({
+          module: input.module,
+          chdId: input.chdId,
+          slotKey: input.slotKey,
+          label: input.label,
+          updatedAt: Date.now(),
+        });
+      }
+      return { updated: true };
     }),
 
   /**

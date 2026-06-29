@@ -10,6 +10,7 @@ import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Scan, Heart, Info, Eye, AlertTriangle, ChevronRight, Zap, Clock, Activity, TrendingUp, CheckCircle2, XCircle, Wind, Stethoscope, Baby, Users, Wind as WindIcon, Microscope, Crown } from "lucide-react";
 import PedCHDCoach from "@/components/PedCHDCoach";
+import FetalCHDCoach from "@/components/FetalCHDCoach";
 import { HOCMScanCoachContent } from "@/pages/iheartecho/HOCMScanCoach";
 import { StrainScanCoachContent } from "@/pages/iheartecho/StrainScanCoach";
 import { UEAScanCoachContent } from "@/pages/iheartecho/UEAScanCoach";
@@ -1176,6 +1177,7 @@ export default function ScanCoach() {
   const _isPreviewMode = _params.get("preview") === "1";
   const [selectedTTE, setSelectedTTE] = useState(() => tteViews.find(v => v.id === _viewParam) ?? tteViews[0]);
   const [selectedFetal, setSelectedFetal] = useState(() => fetalViews.find(v => v.id === _viewParam) ?? fetalViews[0]);
+  const [fetalSubTab, setFetalSubTab] = useState<"normal" | "chd">("normal");
   const [mrExpanded, setMrExpanded] = useState(false);
   const [arExpanded, setArExpanded] = useState(false);
   const { mergeView: mergeTTEView } = useScanCoachOverrides("tte");
@@ -1935,6 +1937,46 @@ export default function ScanCoach() {
 
         {/* ─── FETAL ECHO TAB ─── */}
         {activeTab === "fetal" && (
+          <>
+          {/* Normal Heart / CHD sub-tab switcher */}
+          <div className="flex gap-2 mb-5">
+            <button
+              onClick={() => setFetalSubTab("normal")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                fetalSubTab === "normal"
+                  ? "text-white shadow-sm"
+                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+              }`}
+              style={fetalSubTab === "normal" ? { background: "#189aa1" } : {}}
+            >
+              <Baby className="w-4 h-4" />
+              Normal Heart
+            </button>
+            <button
+              onClick={() => setFetalSubTab("chd")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                fetalSubTab === "chd"
+                  ? "text-white shadow-sm"
+                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+              }`}
+              style={fetalSubTab === "chd" ? { background: "#b91c1c" } : {}}
+            >
+              <Heart className="w-4 h-4" />
+              Congenital Heart Defects
+            </button>
+          </div>
+
+          {/* CHD sub-tab */}
+          {fetalSubTab === "chd" && (
+            !loading && !isAuthenticated
+              ? <BlurredOverlay type="login" featureName="Fetal CHD ScanCoach"><FetalCHDCoach module="fetal_ihe" /></BlurredOverlay>
+              : !loading && !isPremium
+                ? <BlurredOverlay type="premium" featureName="Fetal CHD ScanCoach"><FetalCHDCoach module="fetal_ihe" /></BlurredOverlay>
+                : <FetalCHDCoach module="fetal_ihe" isPremium={isPremium} />
+          )}
+
+          {/* Normal Heart sub-tab */}
+          {fetalSubTab === "normal" && (
           !loading && !isAuthenticated
             ? <BlurredOverlay type="login" featureName="Fetal Echo ScanCoach">
 
@@ -2258,6 +2300,8 @@ export default function ScanCoach() {
             </div>
           </div>
               </>
+          )}
+          </>
         )}
         {/* ─── PEDIATRIC CHD TAB ─── */}
         {activeTab === "chd" && (

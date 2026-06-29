@@ -7381,3 +7381,38 @@ export const teamMembers = mysqlTable("teamMembers", {
 });
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type InsertTeamMember = typeof teamMembers.$inferInsert;
+
+// ─── ScanCoach CHD Images ─────────────────────────────────────────────────────
+// Stores admin-uploaded images for Congenital Heart Defect views in the
+// Fetal Echo ScanCoach (AAUS and iHeartEcho). Each row is one image slot
+// for a specific CHD view. Admins can customize the label for each slot.
+
+export const scanCoachChdImages = mysqlTable(
+  "scanCoachChdImages",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    /** Module identifier: "fetal" (AAUS) or "fetal_ihe" (iHeartEcho) */
+    module: varchar("module", { length: 50 }).notNull(),
+    /** CHD view id matching ChdView.id in fetalChdData.ts, e.g. "chd_vsd" */
+    chdId: varchar("chdId", { length: 100 }).notNull(),
+    /** Image slot key matching ChdImageSlot.slotKey, e.g. "vsd_4cv_2d" */
+    slotKey: varchar("slotKey", { length: 100 }).notNull(),
+    /** Public S3 URL of the uploaded image */
+    imageUrl: text("imageUrl"),
+    /** S3 file key for deletion */
+    fileKey: text("fileKey"),
+    /** Admin-customizable label (falls back to ChdImageSlot.defaultLabel if null) */
+    label: varchar("label", { length: 200 }),
+    updatedAt: bigint("updatedAt", { mode: "number" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => ({
+    uniq: uniqueIndex("scanCoachChdImages_module_chdId_slotKey").on(
+      t.module,
+      t.chdId,
+      t.slotKey
+    ),
+  })
+);
+export type ScanCoachChdImage = typeof scanCoachChdImages.$inferSelect;
+export type InsertScanCoachChdImage = typeof scanCoachChdImages.$inferInsert;

@@ -43,6 +43,7 @@ import {
   type ImageSlotKey,
 } from "@/lib/scanCoachRegistry";
 import { getStaticContent } from "@/lib/scanCoachStaticContent";
+import { FETAL_CHD_VIEWS, type ChdView } from "@/lib/fetalChdData";
 import { getViewsForModule, isStructuredTips, TIP_COLOR_MAP, TIP_CATEGORIES, type StructuredTip } from "@/lib/scanCoachViewData";
 import {
   Upload, Trash2, Save, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
@@ -66,6 +67,7 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
   stress:     <Ruler className="w-5 h-5" />,
   structural: <Layers className="w-5 h-5" />,
   fetal:      <Baby className="w-5 h-5" />,
+  fetal_chd:  <Heart className="w-5 h-5" style={{ color: "#b91c1c" }} />,
   chd:        <Users className="w-5 h-5" />,
   diastolic:  <Wind className="w-5 h-5" />,
   pulm:       <Wind className="w-5 h-5" />,
@@ -116,6 +118,9 @@ type DraftState = {
 
 /** Modules that use the legacy multi-section format (howToGet, structures, tips, pitfalls, measurements, criticalFindings as string[]) */
 const LEGACY_MODULES = new Set(["fetal", "pocus_efast", "pocus_rush", "pocus_cardiac", "pocus_lung"]);
+
+/** Modules that use the fetal CHD image-slot system (no standard override rows) */
+const CHD_IMAGE_MODULES = new Set(["fetal_chd"]);
 
 /** Modules that use {category, text}[] structured tips */
 const STRUCTURED_TIP_MODULES = new Set([
@@ -813,6 +818,162 @@ function ImageUploadZone({
   );
 }
 
+// ─── CHD Image Slot Admin Panel ─────────────────────────────────────────────
+
+function ChdImageSlotAdmin({
+  chdId,
+  module,
+  chdView,
+}: {
+  chdId: string;
+  module: "fetal_chd";
+  chdView?: ChdView;
+}) {
+  const utils = trpc.useUtils();
+  const { data: allImages = {} } = trpc.scanCoachAdmin.getChdImages.useQuery(
+    { module: module === "fetal_chd" ? "fetal" : "fetal_ihe" },
+    { staleTime: 30_000 }
+  );
+  const viewImages = allImages[chdId] ?? {};
+
+  const uploadMutation = trpc.scanCoachAdmin.uploadChdImage.useMutation({
+    onSuccess: () => utils.scanCoachAdmin.getChdImages.invalidate(),
+  });
+  const clearMutation = trpc.scanCoachAdmin.clearChdImage.useMutation({
+    onSuccess: () => utils.scanCoachAdmin.getChdImages.invalidate(),
+  });
+  const labelMutation = trpc.scanCoachAdmin.updateChdImageLabel.useMutation({
+    onSuccess: () => utils.scanCoachAdmin.getChdImages.invalidate(),
+  });
+
+  const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
+  const [labelEditing, setLabelEditing] = useState<Record<string, string>>({});
+
+  if (!chdView) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center">
+        <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2" />
+        <p className="text-sm text-gray-500">CHD view not found for ID: {chdId}</p>
+      </div>
+    );
+  }
+
+  const handleUpload = async (slotKey: string, file: File) => {
+    setUploadingSlot(slotKey);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = (e.target?.result as string).split(",")[1];
+        await uploadMutation.mutateAsync({
+          module: module === "fetal_chd" ? "fetal" : "fetal_ihe",
+          chdId,
+          slotKey,
+          base64Data: base64,
+          mimeType: file.type as "image/jpeg" | "image/png" | "image/gif" | "image/webp" | "image/svg+xml",
+          fileName: file.name,
+        });
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadingSlot(null);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center gap-3">
+          <Heart className="w-5 h-5 text-red-600" />
+          <div>
+            <h2 className="font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
+              {chdView.name}
+            </h2>
+            <p className="text-xs text-gray-400">{chdView.category} · {chdView.abbr}</p>
+          </div>
+        </div>
+        <p className="text-sm text-gray-600 mt-3 leading-relaxed">{chdView.description}</p>
+      </div>
+
+      {/* Image slots */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <ImageIcon className="w-4 h-4" style={{ color: BRAND }} />
+          <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Image Slots</h3>
+          <span className="text-xs text-gray-400">Upload images for each slot; add a custom label</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {chdView.imageSlots.map((slot) => {
+            const existing = viewImages[slot.slotKey];
+            const isUploading = uploadingSlot === slot.slotKey;
+            const labelVal = labelEditing[slot.slotKey] ?? (existing?.label ?? slot.defaultLabel);
+            return (
+              <div key={slot.slotKey} className="border border-gray-100 rounded-lg p-3 space-y-2">
+                {/* Label editor */}
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={labelVal}
+                    onChange={(e) => setLabelEditing(prev => ({ ...prev, [slot.slotKey]: e.target.value }))}
+                    onBlur={() => {
+                      const newLabel = labelEditing[slot.slotKey];
+                      if (newLabel !== undefined && newLabel !== (existing?.label ?? slot.defaultLabel)) {
+                        labelMutation.mutate({
+                          module: module === "fetal_chd" ? "fetal" : "fetal_ihe",
+                          chdId,
+                          slotKey: slot.slotKey,
+                          label: newLabel || null,
+                        });
+                      }
+                    }}
+                    placeholder={slot.defaultLabel}
+                    className="h-7 text-xs flex-1"
+                  />
+                  {labelMutation.isPending && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
+                </div>
+                {/* Image preview or upload */}
+                {existing?.imageUrl ? (
+                  <div className="relative group">
+                    <img src={existing.imageUrl} alt={labelVal} className="w-full h-32 object-cover rounded-lg" />
+                    <button
+                      onClick={() => clearMutation.mutate({ module: module === "fetal_chd" ? "fetal" : "fetal_ihe", chdId, slotKey: slot.slotKey })}
+                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-1 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className={`flex flex-col items-center justify-center h-24 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                    isUploading ? "border-[#189aa1] bg-[#189aa1]/5" : "border-gray-200 hover:border-[#189aa1]/50"
+                  }`}>
+                    {isUploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-[#189aa1]" />
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 text-gray-300 mb-1" />
+                        <span className="text-xs text-gray-400">Upload image</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUpload(slot.slotKey, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Editor ─────────────────────────────────────────────────────────────
 
 export default function ScanCoachEditor() {
@@ -1400,6 +1561,13 @@ export default function ScanCoachEditor() {
                     override={currentOverride}
                     moduleKey={selectedModule}
                     modulePath={moduleMeta.path}
+                  />
+                ) : CHD_IMAGE_MODULES.has(selectedModule) ? (
+                  // ── Fetal CHD image-slot admin panel ──
+                  <ChdImageSlotAdmin
+                    chdId={selectedViewId}
+                    module={selectedModule as "fetal_chd"}
+                    chdView={FETAL_CHD_VIEWS.find(v => v.id === selectedViewId)}
                   />
                 ) : (
                   <>

@@ -15,6 +15,7 @@ export type ScanCoachModule =
   | "stress"
   | "structural"
   | "fetal"
+  | "fetal_chd"
   | "chd"
   | "diastolic"
   | "pulm"
@@ -221,6 +222,29 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
       { id: "bicaval",           name: "Bicaval View",                      group: "Fetal Protocol" },
       { id: "aortic-arch",       name: "Aortic Arch",                       group: "Fetal Protocol" },
       { id: "ductal-arch",       name: "Ductal Arch",                       group: "Fetal Protocol" },
+    ],
+  },
+  // ─── Fetal Echo CHD ───────────────────────────────────────────────────────
+  {
+    key: "fetal_chd",
+    label: "Fetal Echo CHD ScanCoach",
+    path: "/fetal-scan-coach",
+    views: [
+      { id: "chd_vsd",               name: "Ventricular Septal Defect (VSD)",                group: "Septal Defects" },
+      { id: "chd_asd",               name: "Atrial Septal Defect (ASD)",                    group: "Septal Defects" },
+      { id: "chd_avsd",              name: "Atrioventricular Septal Defect (AVSD)",          group: "Septal Defects" },
+      { id: "chd_tof",               name: "Tetralogy of Fallot (TOF)",                     group: "Outflow Tract" },
+      { id: "chd_ps",                name: "Pulmonary Stenosis / Atresia",                  group: "Outflow Tract" },
+      { id: "chd_as",                name: "Aortic Stenosis / Critical AS",                 group: "Outflow Tract" },
+      { id: "chd_ebstein",           name: "Ebstein Anomaly",                               group: "Valve Anomalies" },
+      { id: "chd_tricuspid_atresia", name: "Tricuspid Atresia",                             group: "Valve Anomalies" },
+      { id: "chd_tga",               name: "Transposition of the Great Arteries (TGA)",    group: "Great Vessel" },
+      { id: "chd_coa",               name: "Coarctation of the Aorta (CoA)",               group: "Great Vessel" },
+      { id: "chd_tapvr",             name: "Total Anomalous Pulmonary Venous Return (TAPVR)",group: "Great Vessel" },
+      { id: "chd_hlhs",              name: "Hypoplastic Left Heart Syndrome (HLHS)",        group: "Complex / Conotruncal" },
+      { id: "chd_truncus",           name: "Truncus Arteriosus",                            group: "Complex / Conotruncal" },
+      { id: "chd_dorv",              name: "Double Outlet Right Ventricle (DORV)",          group: "Complex / Conotruncal" },
+      { id: "chd_heterotaxy",        name: "Heterotaxy / Situs Ambiguus",                   group: "Situs / Heterotaxy" },
     ],
   },
   // ─── Pediatric / CHD ──────────────────────────────────────────────────────

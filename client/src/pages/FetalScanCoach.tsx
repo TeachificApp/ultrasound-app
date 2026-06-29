@@ -10,10 +10,11 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 import { ScanCoachViewMediaCard } from "@/components/ScanCoachViewMediaPanel";
 import { fetalBilling } from "@/lib/scanCoachBillingCodes";
+import FetalCHDCoach from "@/components/FetalCHDCoach";
 import {
   Baby, ChevronDown, ChevronUp, Info, AlertTriangle,
   CheckCircle, Target, Receipt,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Heart,
 } from "lucide-react";
 
 const BRAND = "#189aa1";
@@ -237,6 +238,7 @@ export const FETAL_VIEWS = [
 export default function FetalScanCoach() {
   const [selectedView, setSelectedView] = useState(0);
   const [showBilling, setShowBilling] = useState(false);
+  const [fetalTab, setFetalTab] = useState<"normal" | "chd">("normal");
 
   const { mergeView, isLoading } = useScanCoachOverrides("fetal");
 
@@ -273,6 +275,41 @@ export default function FetalScanCoach() {
       </div>
 
       <div className="container py-6">
+        {/* ─── Normal Heart / CHD top-level tab switcher ─── */}
+        <div className="flex gap-2 mb-5">
+          <button
+            onClick={() => setFetalTab("normal")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              fetalTab === "normal"
+                ? "text-white shadow-sm"
+                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+            style={fetalTab === "normal" ? { background: BRAND } : {}}
+          >
+            <Baby className="w-4 h-4" />
+            Normal Heart
+          </button>
+          <button
+            onClick={() => setFetalTab("chd")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              fetalTab === "chd"
+                ? "text-white shadow-sm"
+                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+            style={fetalTab === "chd" ? { background: "#b91c1c" } : {}}
+          >
+            <Heart className="w-4 h-4" />
+            Congenital Heart Defects
+          </button>
+        </div>
+
+        {/* ─── CHD tab content ─── */}
+        {fetalTab === "chd" && (
+          <FetalCHDCoach module="fetal" isPremium={true} />
+        )}
+
+        {/* ─── Normal Heart tab content ─── */}
+        {fetalTab === "normal" && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-start">
           {/* ─── Sidebar view list ─── */}
           <div className="lg:col-span-1 lg:order-1 order-2 lg:sticky lg:top-4">
@@ -465,6 +502,7 @@ export default function FetalScanCoach() {
             </div>
           </div>
         </div>
+        )}
       </div>
     </Layout>
   );
