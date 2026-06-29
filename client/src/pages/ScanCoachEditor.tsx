@@ -825,7 +825,7 @@ function ChdImageSlotAdmin({
   module,
   chdView,
 }: {
-  chdId: string;
+  chdId: string | null;
   module: "fetal_chd";
   chdView?: ChdView;
 }) {
