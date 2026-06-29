@@ -16,13 +16,14 @@
 */
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Crown, Lock, Sparkles, ArrowRight, Loader2, Zap, Star, Check, LogIn, Clock } from "lucide-react";
+import { Crown, Lock, Sparkles, ArrowRight, Loader2, Zap, Star, Check, LogIn, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePremium } from "@/hooks/usePremium";
 import { getLoginUrl } from "@/const";
 
 // ── Timer helpers ─────────────────────────────────────────────────────────────
 const PREVIEW_SECONDS = 60;
+const TOAST_TRIGGER_AT = 15;
 function getSessionKey(k: string | undefined) {
   return `ppg_start_${(k ?? "feature").replace(/\s+/g, "_").toLowerCase()}`;
 }
@@ -115,12 +116,85 @@ function TimedPreviewOverlay({
 
   const mins = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
+  const timeStr = `${mins}:${String(secs).padStart(2, "0")}`;
   const pct = (secondsLeft / PREVIEW_SECONDS) * 100;
   const upgradeUrl = checkoutUrl ?? "/premium";
 
+  // Toast state — fires once when secondsLeft crosses TOAST_TRIGGER_AT
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastFiredRef = useRef(false);
+  useEffect(() => {
+    if (!toastFiredRef.current && secondsLeft <= TOAST_TRIGGER_AT && secondsLeft > 0 && !gateVisible) {
+      toastFiredRef.current = true;
+      setToastVisible(true);
+      const t = setTimeout(() => setToastVisible(false), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [secondsLeft, gateVisible]);
+
   return (
     <div className="relative w-full">
+      {/* Premium Access Preview banner */}
+      {!gateVisible && (
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-2.5 mb-3 rounded-xl border"
+          style={{
+            background: "linear-gradient(135deg, rgba(14,30,46,0.96) 0%, rgba(14,74,80,0.96) 100%)",
+            borderColor: "rgba(74,217,224,0.3)",
+          }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
+            >
+              <Crown className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-amber-300 uppercase tracking-widest block leading-none mb-0.5">
+                Premium Access Preview
+              </span>
+              <span className="text-xs text-white/70 leading-none">
+                {featureName ? `You're previewing ${featureName}` : "You're previewing a premium feature"}
+                {" — "}
+                <a href="/premium" className="text-[#4ad9e0] font-semibold hover:underline">
+                  Upgrade for full access →
+                </a>
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Clock className="w-3.5 h-3.5 text-[#4ad9e0]" />
+            <span className="text-xs font-bold text-white font-mono">{timeStr}</span>
+          </div>
+        </div>
+      )}
+
       <div className={gateVisible ? "pointer-events-none select-none" : ""}>{children}</div>
+
+      {/* 15-second toast warning */}
+      {toastVisible && (
+        <div
+          className="fixed bottom-24 right-6 z-50 flex items-center gap-3 rounded-xl px-4 py-3 shadow-2xl border animate-in slide-in-from-right-4 duration-300"
+          style={{
+            background: "rgba(14,30,46,0.96)",
+            borderColor: "rgba(245,158,11,0.5)",
+            backdropFilter: "blur(12px)",
+            maxWidth: "280px",
+          }}
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <div>
+            <div className="text-[10px] font-bold text-amber-300 uppercase tracking-widest leading-none mb-0.5">
+              Preview ending soon
+            </div>
+            <div className="text-xs text-white/80 leading-snug">
+              <span className="font-bold text-white">{secondsLeft} seconds</span> left —{" "}
+              <a href="/premium" className="text-[#4ad9e0] font-semibold hover:underline">upgrade now</a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Countdown pill */}
       {!gateVisible && (

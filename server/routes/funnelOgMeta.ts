@@ -23,6 +23,11 @@ import { ENV } from "../_core/env";
 
 function escapeHtml(str: string): string {
   return str
+    // Strip newlines and tabs — they break HTML attribute values and cause visible text overflow
+    // when the regex replacement fails to match across line boundaries
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim()
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
     .replace(/</g, "&lt;")
