@@ -7422,3 +7422,18 @@ export const scanCoachChdImages = mysqlTable(
 );
 export type ScanCoachChdImage = typeof scanCoachChdImages.$inferSelect;
 export type InsertScanCoachChdImage = typeof scanCoachChdImages.$inferInsert;
+
+// ── Admin Notifications ───────────────────────────────────────────────────────
+// Stores all admin-facing notifications (fulfillment events, alerts, system messages).
+// Visible in Platform Admin → Notifications page.
+export const adminNotifications = mysqlTable("admin_notifications", {
+  id: int("id").primaryKey().autoincrement(),
+  title: varchar("title", { length: 1200 }).notNull(),
+  content: text("content").notNull(),
+  /** Source tag for filtering: e.g. "lms_checkout", "membership", "physical_order", "system" */
+  source: varchar("source", { length: 100 }).notNull().default("system"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AdminNotification = typeof adminNotifications.$inferSelect;
+export type InsertAdminNotification = typeof adminNotifications.$inferInsert;

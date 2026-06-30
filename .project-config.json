@@ -15,16 +15,19 @@
   ],
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663401463434/UrcfdRVE8J6mpMNR48QuFe",
-    "access_key_id": "ASIAZV3A2ECZDIO6JU4S",
-    "secret_access_key": "KCMJLjWZbcDVC48DeMCSbTa39V8CuAdVGFNBRSAW",
-    "session_token": "IQoJb3JpZ2luX2VjELz//////////wEaCXVzLWVhc3QtMSJGMEQCIGtFpTfgueFDfjCuyfddtVImqCr50KxRNFN4ImOHxJSyAiBz3mFAjoS6ObzhS/BiHW1V2wvZZEysdeEDjwKOBJ4x5yr+AwiF//////////8BEAQaDDY2NTM4NjA5ODg2NiIMIQshIl0DQgMjruZYKtID5gob1F5jpg6W3Xs/20qtmuMPGNgkI+0Uh8W9/V6RZMfUL1yA5tWDMcskpAfZk865OmrRmxPgeBEvAXMqFcm8VRufDjZkz7de9jE8kBZXJsqe/1viLXB38wU0D12AY7KSRhPyW7zCxQyN9F5OvTpiZFonyo7vhIOe/LaBgwkWQlJzPzrjrQEHzSbIz0NW2VmkMIcxjWi8B3zG4CdjhcTlrvV6bQYjaIJ3hjiXBdXZDRIF0NWO//MSwb0Pdu7AZp5pDdaNECWT2NhHAuZgPMbHgfL3JaGF3nI/lEBhnR6jfahxPCSUAQHkr8j/Rbn2IsxK8Z/Jl+ltPushs+RElM4IxothVk521oKTE1u5I+9kOFqh6xqHGvs2++5qPmeUAPyziavQvhDRyhnX3jGnNgiINoz5ucZ0N+FKZRoXqylxnGCjEsJrTaU2ZvwsOtMDyW8ZayjQpdPhkfczj/fSESm1n6V4zlbQQ+mVFK/G6xB39rt+/TLPvBFULwA34ZVazcWLeuT93RVp/jL1ax+h6JodqSmDALO5ab9qMsc79jrmUig+jwjQpEOn16xYdDr40RbZdZ04uYyFQDKZzSPlE4y1yuTqrKNkUfFxHzdAkPKO7EMNIzDwzoDSBjqeAfl3zR2WUSx1pfTyEKoo3JKujaAPpLwgftpbieNQoshfeDsFMzBtGb5UlaKO+ne15Si/hAeCRx1N92mJggsWn6YFVQGK6VL8CwcHgwvrgxzcYay2p06ETASDZUkqThvquoO2NQquOKY07VLWWajaICiLx55AAOisTWtgh5P4frB21PWeGznP2lcIAY1H5AyERYzIQ4rX1Kuq0dGydtCC",
-    "expiration": "2026-06-28T07:41:36.000Z",
+    "access_key_id": "ASIAZV3A2ECZN2T4JGTC",
+    "secret_access_key": "vsb95ws0/We8hRTroo3kgyVQAe4tI/PfeS1Sn9AV",
+    "session_token": "IQoJb3JpZ2luX2VjEAMaCXVzLWVhc3QtMSJHMEUCIQD1XMLldT4HtCIfUpA/wKRsRE7OlI+DU/jgTTGQRnuXmwIgCnoab9shwAbHqbJ124/ho/TgGW4vTzaembNCly3vJpcq/gMIy///////////ARAEGgw2NjUzODYwOTg4NjYiDJt8fhBexd+qBFE/hCrSA9azEZ/jqjTZHZP4hc064GbZVXcsAfgyag0ovfFCpIj3RndNf5+9o4Eoq0njAbb+MoO9d41nkJmSeTduoWMpTO8V3iiP5mCvo2tPgik04B8gfGFCihtJiFJmMP/hVETFO7w010NpDTJE753kJu96eVSIs91d8PXFSw0dfn6DkLBvR8robVe1UxbvPXuff0uyrvqcAwNVJ3MXkN/jio16ymdiDcbJzrHzqK6Kb1GHvzlVJbS/cpcv21qdV2cTYjukfSexgRALTrXeOUrCE7+zsRQOwpO71F5U1Otvbzb/dkqVxxIWGqLFB6XFfCGesUxA5paWmRcwrXbKMy050SuIo1PcoLhaiQ0lnHObph/26Ws0lYK8wOXDnQ7yLXrUST9CqS3+qGCod3qiwkYu/5nelCnxiguf6SD6rNdxybym6m0O/J8HW+yORM4wESqPAkA+GvbSpkR51xueSooN2tbFHJlEIZ1vVomS2elh1GMJf+NuYNPJCIFiZjfxK+qSdILo7+azpsQ4yQtzyAUMh39gmJ7q0OCN4xQJdUp5ak1det3J6UshdtneAkjWzSPqTwB6Ab+/f1hRFkiEtdOJ5jwOuO5YWKz3mz0kCBQuaYGMYeMXf7IwhouQ0gY6nQHsUcZFifAEl7sedYshnamFpjhLnQysCKRQaC1hWPWDDkkjUG0fMeiLzbRCz42ZOA2jrD91dGrMN6uIcdijaiWWLabOR8iL2YRWQSh7fAGGZsyIreCjo45xnElIsOhJ22hT6Np6ZEBdjknEPiVixvBfuueR/wGvTDA/uz6AhJnrj9mTp5JePdWs4cHUK2OUQ9c3QUghBbfC462NOU6l",
+    "expiration": "2026-07-01T06:05:58.000Z",
     "backend": "GIT_BACKEND_S3"
   },
   "name": "ultrasound-assist",
   "path": "/home/ubuntu/ultrasound-assist",
   "port": 3000,
   "secrets": {
+    "BOOKVAULT_API_KEY": "bv_FYr8lTaA8svUVlVX4hcRSfrHV4yK",
+    "BOOKVAULT_DISPATCH_SERVICE": "CheapestTracked",
+    "BOOKVAULT_PRODUCTION_LEVEL": "Standard",
     "BUILT_IN_FORGE_API_KEY": "cuGrwern4Jfru4Q5D2KTaD",
     "BUILT_IN_FORGE_API_URL": "https://forge.manus.ai",
     "CANONICAL_ROOT_DOMAIN": "app.allaboutultrasound.com",

@@ -101,6 +101,13 @@ export async function fulfillBookvaultOrder(
     return { submitted: false, error: message, docRef };
   }
 
+  // For US orders, pin to PartnerID 1 (BookVault US hub) so the book is printed and
+  // shipped domestically — avoiding international customs fees for US customers.
+  // For all other countries, use PartnerID 0 (auto-select best partner).
+  const dispatchRequest = country === "US"
+    ? { RequestedService: "CheapestTracked", PartnerID: 1 }
+    : { RequestedService: process.env.BOOKVAULT_DISPATCH_SERVICE ?? "CheapestTracked", PartnerID: 0 };
+
   const payload: BookvaultCreateOrderPayload = {
     DocRef: docRef,
     CustomerRef: `user-${order.userId}`,
@@ -115,6 +122,7 @@ export async function fulfillBookvaultOrder(
       TelNumber: "0000000000",
       Email: email || "orders@allaboutultrasound.com",
     },
+    DispatchRequest: dispatchRequest,
     OrderLines: [{ Quantity: 1, ISBN: isbn }],
   };
 

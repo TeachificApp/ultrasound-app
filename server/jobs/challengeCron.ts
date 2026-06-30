@@ -308,6 +308,12 @@ async function sendChallengeNotifications(
         from: { email: SENDGRID_FROM_EMAIL, name: SENDGRID_FROM_NAME },
         subject: `🔥 Today's Ultrasound Challenges Are Live — ${todayETLong()}`,
         html,
+        // Disable click tracking so SendGrid does not wrap/mangle the HMAC-signed
+        // unsubscribe token URL — a wrapped URL breaks token verification.
+        trackingSettings: {
+          clickTracking: { enable: false },
+          openTracking: { enable: false },
+        },
       });
 
       // Mark as notified

@@ -335,6 +335,7 @@ const TeamSubscribePage = lazy(() => import("./pages/TeamSubscribePage"));
 const TeamDashboard = lazy(() => import("./pages/TeamDashboard"));
 const TeamJoinPage = lazy(() => import("./pages/TeamJoinPage"));
 const TeamSuccessPage = lazy(() => import("./pages/TeamSuccessPage"));
+const AdminNotificationsPage = lazy(() => import("./pages/admin/AdminNotifications"));
 
 function LearnAdminRedirect({ rest }: { rest?: string }) {
   return <HardRedirect to={`${LEARN_APP_URL}/admin/${rest ?? ""}`} />;
@@ -355,6 +356,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/login" component={Login} />
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/notifications">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminNotificationsPage /></RoleGuard>}</Route>
         <Route path="/register" component={Register} />
         <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/forgot-password" component={ForgotPassword} />

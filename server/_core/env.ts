@@ -21,6 +21,8 @@ export const ENV = {
   platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com",
   printfulApiKey: process.env.PRINTFUL_API_KEY ?? "",
   bookvaultApiKey: process.env.BOOKVAULT_API_KEY ?? "",
-  bookvaultDispatchService: process.env.BOOKVAULT_DISPATCH_SERVICE ?? "CheapestTracked",
+  // US orders are automatically routed to BookvaultUS in fulfillBookvaultOrder.ts.
+  // This fallback is used for all non-US orders (defaults to BookvaultUK).
+  bookvaultDispatchService: process.env.BOOKVAULT_DISPATCH_SERVICE ?? "BookvaultUK",
   bookvaultProductionLevel: process.env.BOOKVAULT_PRODUCTION_LEVEL ?? "Standard",
 };

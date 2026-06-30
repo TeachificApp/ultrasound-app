@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { ENV } from "./env";
+import { logAdminNotification } from "../lib/logAdminNotification";
 
 export type NotificationPayload = {
   title: string;
@@ -131,8 +132,12 @@ export async function notifyOwner(
 
   const endpoint = buildEndpointUrl(ENV.forgeApiUrl);
 
-  // Fire admin email in parallel — don't await so it doesn't block the Manus notification
-  sendAdminEmail(title, content).catch(() => {});
+  // NOTE: We do NOT call sendAdminEmail here anymore.
+  // Fulfillment code that needs an admin email sends it explicitly via sendEmail().
+  // Calling it here caused duplicate emails for every transaction.
+
+  // Log to the in-app admin notifications DB (fire-and-forget, never throws)
+  logAdminNotification({ title, content, source: "system" }).catch(() => {});
 
   try {
     const response = await fetch(endpoint, {

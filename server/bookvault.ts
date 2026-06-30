@@ -36,7 +36,11 @@ export interface BookvaultCreateOrderPayload {
   Address: BookvaultAddress;
   ProductionLevel?: string;
   DispatchRequest?: {
-    RequestedService: string;
+    RequestedService?: string;
+    /** Pin to a specific fulfillment partner (e.g. 1 = US hub). 0 = auto-select. */
+    PartnerID?: number;
+    /** Array of specific service IDs to restrict to. */
+    RequestedServID?: number[];
   };
   OrderLines: BookvaultOrderLine[];
 }

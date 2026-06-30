@@ -63,6 +63,7 @@ import { workshopPublicRouter, workshopLearnerRouter, workshopAdminRouter, works
 import { printfulAdminRouter, printfulPublicRouter } from "./routers/printfulRouter";
 import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuizAdminRouter } from "./routers/standaloneQuizRouter";
 import { teamRouter } from "./routers/teamRouter";
+import { adminNotificationsRouter } from "./routers/adminNotificationsRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -2697,6 +2698,7 @@ export const appRouter = router({
   standaloneQuizLearner: standaloneQuizLearnerRouter,
   standaloneQuizAdmin: standaloneQuizAdminRouter,
   team: teamRouter,
+  adminNotifications: adminNotificationsRouter,
   mirrorSync: router({
     /** Get the status of the last mirror sync run */
     status: protectedProcedure.query(async ({ ctx }) => {
