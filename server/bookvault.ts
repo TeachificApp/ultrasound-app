@@ -148,13 +148,13 @@ export async function listTitles(): Promise<BookvaultTitle[]> {
 export async function getTitleByIsbn(isbn: string): Promise<BookvaultTitle | null> {
   const normalized = isbn.replace(/[^0-9X]/gi, "");
   try {
-    const result = await bookvaultFetch<BookvaultTitle | { Title?: BookvaultTitle }>(
+    // The BookVault /Title endpoint returns the title object directly at the top level.
+    // The object has a "Title" property that is a string (the book title), not a nested object.
+    // We must return the full result object, not result.Title.
+    const result = await bookvaultFetch<BookvaultTitle>(
       `/Title?ISBN=${encodeURIComponent(normalized)}`,
     );
-    if (result && typeof result === "object" && "Title" in result && result.Title) {
-      return result.Title as BookvaultTitle;
-    }
-    return result as BookvaultTitle;
+    return result ?? null;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (/not found|404/i.test(message)) return null;
