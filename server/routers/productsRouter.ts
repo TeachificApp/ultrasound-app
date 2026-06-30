@@ -1315,7 +1315,6 @@ Make ALL content specific and compelling based on the product title and descript
         discountPercent: null,
       };
     }),
-});
 
   // ─── Printify Settings ──────────────────────────────────────────────────────
   getPrintifySettings: protectedProcedure
@@ -1438,6 +1437,7 @@ Make ALL content specific and compelling based on the product title and descript
       return { success: true };
     }),
 
+});
 // ─── Public: checkout page config for physical products ──────────────────────
 export const productsCheckoutPublicRouter = router({
   getPublicCheckoutPageConfig: publicProcedure
