@@ -97,6 +97,7 @@ import {
   Pencil,
   FileQuestion,
   AlertTriangle,
+  Bell,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1281,6 +1282,7 @@ export default function PlatformAdmin() {
     { id: "members", href: getAdminUrl("/admin/members"), icon: Users, label: "Members", description: "Registered users, enrollments, sales, memberships, and activity logs", color: "#0d9488" },
     { id: "duplicate-payments", href: getAdminUrl("/admin/duplicate-payments"), icon: AlertTriangle, label: "Duplicate Payments", description: "Review flagged duplicate charges and duplicate brand memberships before Stripe renewals", color: "#d97706" },
     { id: "career-network", href: getAdminUrl("/admin/career-network"), icon: Briefcase, label: "Career Network", description: "Manage job postings, RSS feed sources, candidate profiles, and employer subscriptions", color: "#0369a1" },
+    { id: "notifications", href: getAdminUrl("/admin/notifications"), icon: Bell, label: "Admin Notifications", description: "In-app log of all admin events: orders, enrollments, memberships, and system alerts", color: "#0d9488" },
   ];
 
   // Per-Brand tool cards — hrefs include `-aaus` / `-ihe` from brand selector above

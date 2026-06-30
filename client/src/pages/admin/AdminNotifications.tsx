@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Bell, BellOff, CheckCheck, Trash2, RefreshCw, Filter } from "lucide-react";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -46,7 +46,6 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 export default function AdminNotifications() {
-  const { toast } = useToast();
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(0);
@@ -73,7 +72,7 @@ export default function AdminNotifications() {
   const markAllRead = trpc.adminNotifications.markAllRead.useMutation({
     onSuccess: () => {
       utils.adminNotifications.list.invalidate();
-      toast({ title: "All notifications marked as read" });
+      toast.success("All notifications marked as read");
     },
   });
 
@@ -84,7 +83,7 @@ export default function AdminNotifications() {
   const clearRead = trpc.adminNotifications.clearRead.useMutation({
     onSuccess: () => {
       utils.adminNotifications.list.invalidate();
-      toast({ title: "Read notifications cleared" });
+      toast.success("Read notifications cleared");
     },
   });
 
