@@ -48,17 +48,23 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 7. **Site Pages CMS**: LMS Admin → Settings → **Site Pages** (`/admin/lms/site-pages`). Requires DB tables from `drizzle/site-pages-migration.sql`. Uses `site_pages` + `site_nav_menus` tables and the native `LandingPageBuilder` block system.
 
-6. **Production build requires analytics env vars OR safe strip**: `vite.config.ts` removes the umami `<script>` when `VITE_ANALYTICS_ENDPOINT` / `VITE_ANALYTICS_WEBSITE_ID` are unset. Use `VITE_ANALYTICS_ENDPOINT=... VITE_ANALYTICS_WEBSITE_ID=... pnpm build` for production-like builds. A broken build strips `#root` and JS if the old greedy regex matched — see `transformAnalyticsIndexHtml` in `vite.config.ts`.
+8. **Production build requires analytics env vars OR safe strip**: `vite.config.ts` removes the umami `<script>` when `VITE_ANALYTICS_ENDPOINT` / `VITE_ANALYTICS_WEBSITE_ID` are unset. Use `VITE_ANALYTICS_ENDPOINT=... VITE_ANALYTICS_WEBSITE_ID=... pnpm build` for production-like builds. A broken build strips `#root` and JS if the old greedy regex matched — see `transformAnalyticsIndexHtml` in `vite.config.ts`.
 
-<<<<<<< HEAD
-7. **PR #20 `isAdminOrAuthPath` reverted**: Do not skip the Router outer `<Suspense>` for admin paths — lazy admin pages need it. `/platform-admin` stays fixed via eager `PlatformAdmin` + `AdminLoginRedirect` (`window.location.replace`, not wouter `Redirect`). Funnel `/:slug` redirects use `HardRedirect` for the same reason.
+9. **PR #20 `isAdminOrAuthPath` reverted**: Do not skip the Router outer `<Suspense>` for admin paths — lazy admin pages need it. `/platform-admin` stays fixed via eager `PlatformAdmin` + `AdminLoginRedirect` (`window.location.replace`, not wouter `Redirect`). Funnel `/:slug` redirects use `HardRedirect` for the same reason.
 
-8. **wouter `<Switch>` + wrapper components**: Never place custom components (e.g. `PerBrandAdminRoutes`) as direct `<Switch>` children — wouter treats missing `path` as `*` and stops before later routes (blank funnel/admin pages). Use `perBrandAdminRouteElements()` / `perBrandUserRouteElements()` from `client/src/routes/perBrandRouteHelpers.tsx` to spread flat `<Route>` elements inside `<Switch>`.
+10. **wouter `<Switch>` + wrapper components**: Never place custom components (e.g. `PerBrandAdminRoutes`) as direct `<Switch>` children — wouter treats missing `path` as `*` and stops before later routes (blank funnel/admin pages). Use `perBrandAdminRouteElements()` / `perBrandUserRouteElements()` from `client/src/routes/perBrandRouteHelpers.tsx` to spread flat `<Route>` elements inside `<Switch>`.
 
-6. **Stripe webhooks**: `registerStripeWebhook(app)` is registered **before** `express.json()` so raw body + signature verification work. Production endpoint: `https://app.allaboutultrasound.com/api/stripe/webhook` (also `/api/webhooks/stripe`). The handler responds 200 immediately and processes events asynchronously to avoid Stripe timeouts.
+11. **Stripe webhooks**: `registerStripeWebhook(app)` is registered **before** `express.json()` so raw body + signature verification work. Production endpoint: `https://app.allaboutultrasound.com/api/stripe/webhook` (also `/api/webhooks/stripe`). The handler responds 200 immediately and processes events asynchronously to avoid Stripe timeouts.
 
-7. **SDMS CME tables**: Run `scripts/sdms-cme-migration.sql` against MySQL before using SDMS CME features. Admin configures per-activity SDMS settings under LMS course/cohort Settings or Webinar Settings. Learner CME module appears in the course player when enabled. API credentials are AES-encrypted at rest using `JWT_SECRET`; never exposed to the client.
-6. **No ESLint script**: Formatting is via Prettier only (`pnpm format` / `pnpm exec prettier --check .`). There is no `pnpm lint` target in `package.json`.
+12. **SDMS CME tables**: Run `scripts/sdms-cme-migration.sql` against MySQL before using SDMS CME features. Admin configures per-activity SDMS settings under LMS course/cohort Settings or Webinar Settings. Learner CME module appears in the course player when enabled. API credentials are AES-encrypted at rest using `JWT_SECRET`; never exposed to the client.
+
+13. **No ESLint script**: Formatting is via Prettier only (`pnpm format` / `pnpm exec prettier --check .`). There is no `pnpm lint` target in `package.json`.
+
+14. **Marketing Site staging (`site.allaboutultrasound.com`)**: Run `scripts/marketing-site-migration.sql`. Import pages via `/admin/marketing-site` or `pnpm exec tsx scripts/import-aau-marketing-site.ts --limit 25`. Staging has `noindex` + `robots.txt` disallow. Do **not** point www DNS until approved.
+
+15. **Form Embed Widget migration**: Run `scripts/form-embed-widget-migration.sql` after deploy. Embed loader is served at `/embed.js` (from `client/public/embed.js`). Public config/events API: `/api/form-embed/config` and `/api/form-embed/event`. For UI verification in Cloud VMs, use `pnpm build && node dist/index.js` (not `pnpm dev`) due to Vite HMR WSS issue.
+
+16. **Shopify product linking**: Physical products in Shopify checkout mode can link to a Shopify catalog via the Storefront API. Configure `SHOPIFY_STORE_DOMAIN` + `SHOPIFY_STOREFRONT_ACCESS_TOKEN` (primary), or add a second store with `SHOPIFY_STORE_DOMAIN_2` + `SHOPIFY_STOREFRONT_ACCESS_TOKEN_2`. Private Headless tokens (`shpss_`) are server-side only. Admin picker: Physical Products → Checkout tab.
 
 ### Stripe membership subscriptions
 
@@ -88,11 +94,6 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 - Migration: `drizzle/0012_digital_download_access.sql` before using limits/activity in production.
 - API: `downloadsAdmin.getAccessDashboard`, `listOrders`, `getOrderDetail`, `updateOrderAccess`, `expireOrder`, `reopenOrder`, `resendOrderEmail`.
 - Learner downloads enforced via `downloadsLearner.trackDownload` (must succeed before file opens).
-=======
-8. **Marketing Site staging (`site.allaboutultrasound.com`)**: Run `scripts/marketing-site-migration.sql`. Import pages via `/admin/marketing-site` or `pnpm exec tsx scripts/import-aau-marketing-site.ts --limit 25`. Staging has `noindex` + `robots.txt` disallow. Do **not** point www DNS until approved.
-
-7. **Form Embed Widget migration**: Run `scripts/form-embed-widget-migration.sql` after deploy. Embed loader is served at `/embed.js` (from `client/public/embed.js`). Public config/events API: `/api/form-embed/config` and `/api/form-embed/event`. For UI verification in Cloud VMs, use `pnpm build && node dist/index.js` (not `pnpm dev`) due to Vite HMR WSS issue.
->>>>>>> 67028fa (Add marketing site staging replica for www.allaboutultrasound.com)
 
 ### Key file locations
 

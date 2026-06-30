@@ -285,6 +285,133 @@ function PricingOptionsManager({ productId }: { productId: number }) {
   );
 }
 
+// ─── Shopify Product Linker ───────────────────────────────────────────────────
+function ShopifyProductLinker({
+  storeKey,
+  onStoreKeyChange,
+  productId,
+  productUrl,
+  onLink,
+}: {
+  storeKey: string;
+  onStoreKeyChange: (key: string) => void;
+  productId: string;
+  productUrl: string;
+  onLink: (data: { storeKey: string; shopifyProductId: string; shopifyProductUrl: string }) => void;
+}) {
+  const { data: stores } = trpc.shopifyAdmin.listStores.useQuery();
+  const { data: status } = trpc.shopifyAdmin.getConnectionStatus.useQuery();
+  const testMut = trpc.shopifyAdmin.testConnection.useMutation({
+    onSuccess: (data) => toast.success(`Connected to ${data.shopName}`),
+    onError: (e) => toast.error(e.message),
+  });
+  const { data: catalog, isLoading } = trpc.shopifyAdmin.listProducts.useQuery(
+    { storeKey, first: 100 },
+    { enabled: Boolean(storeKey) && (status?.configured ?? false) },
+  );
+
+  const activeStoreKey = storeKey || stores?.[0]?.key || "default";
+
+  return (
+    <div className="rounded-lg border border-violet-200 bg-violet-50/40 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-violet-900">Link from Shopify catalog</p>
+          <p className="text-xs text-violet-700 mt-0.5">
+            Pick a product from your Shopify store to auto-fill the product URL and ID.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs shrink-0"
+          onClick={() => testMut.mutate({ storeKey: activeStoreKey })}
+          disabled={testMut.isPending || !status?.configured}
+        >
+          {testMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Test connection"}
+        </Button>
+      </div>
+
+      {!status?.configured ? (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+          Shopify is not configured. Set <code className="font-mono">SHOPIFY_STORE_DOMAIN</code> +{" "}
+          <code className="font-mono">SHOPIFY_STOREFRONT_ACCESS_TOKEN</code>, or use{" "}
+          <code className="font-mono">SHOPIFY_STORE_DOMAIN_2</code> +{" "}
+          <code className="font-mono">SHOPIFY_STOREFRONT_ACCESS_TOKEN_2</code> for a second store.
+        </p>
+      ) : (
+        <>
+          {(stores?.length ?? 0) > 1 && (
+            <div>
+              <Label className="text-xs text-gray-600">Shopify store</Label>
+              <select
+                className="mt-1 w-full max-w-xs border rounded px-2 py-1.5 text-sm bg-background"
+                value={activeStoreKey}
+                onChange={(e) => onStoreKeyChange(e.target.value)}
+              >
+                {(stores ?? []).map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label} ({s.domain})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {(status?.stores ?? []).map((s) => (
+              <Badge
+                key={s.key}
+                variant="outline"
+                className={s.connected ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-200"}
+              >
+                {s.label}: {s.connected ? (s.shopName ?? "Connected") : (s.error ?? "Not connected")}
+              </Badge>
+            ))}
+          </div>
+
+          {isLoading ? (
+            <p className="text-xs text-muted-foreground">Loading Shopify products…</p>
+          ) : (catalog?.products?.length ?? 0) === 0 ? (
+            <p className="text-xs text-muted-foreground">No products found in this Shopify store.</p>
+          ) : (
+            <div className="max-h-56 overflow-y-auto space-y-1 border rounded-md bg-white p-1">
+              {catalog!.products.map((p) => {
+                const selected = productId === p.numericId;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => onLink({
+                      storeKey: activeStoreKey,
+                      shopifyProductId: p.numericId,
+                      shopifyProductUrl: p.url ?? productUrl,
+                    })}
+                    className={`w-full text-left flex items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-violet-50 ${selected ? "bg-violet-100 border border-violet-300" : ""}`}
+                  >
+                    {p.imageUrl ? (
+                      <img src={p.imageUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded bg-gray-100 shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate">{p.title}</div>
+                      <div className="text-muted-foreground truncate">
+                        ID {p.numericId}
+                        {p.priceAmount ? ` · ${p.priceCurrency ?? ""} ${p.priceAmount}` : ""}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Orders Tab ───────────────────────────────────────────────────────────────
 function OrdersTab({ productId }: { productId: number }) {
   const { data, isLoading } = trpc.productsAdmin.listOrders.useQuery({ productId });
@@ -541,6 +668,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       shopifyProductUrl: product.shopifyProductUrl ?? "",
       shopifyEmbedCode: product.shopifyEmbedCode ?? "",
       shopifyProductId: product.shopifyProductId ?? "",
+      shopifyStoreKey: (product as any).shopifyStoreKey ?? "default",
       externalCheckoutUrl: product.externalCheckoutUrl ?? "",
       requiresShipping: product.requiresShipping,
       status: product.status,
@@ -568,6 +696,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       shopifyProductUrl: form.shopifyProductUrl || null,
       shopifyEmbedCode: form.shopifyEmbedCode || null,
       shopifyProductId: form.shopifyProductId || null,
+      shopifyStoreKey: form.shopifyStoreKey || "default",
       externalCheckoutUrl: form.externalCheckoutUrl || null,
       requiresShipping: form.requiresShipping,
       status: form.status,
@@ -848,6 +977,22 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
 
               {form.checkoutMode === "shopify" && (
                 <div className="space-y-4 pt-2 border-t">
+                  <ShopifyProductLinker
+                    storeKey={form.shopifyStoreKey ?? "default"}
+                    onStoreKeyChange={(key) => setForm({ ...form, shopifyStoreKey: key })}
+                    productId={form.shopifyProductId ?? ""}
+                    productUrl={form.shopifyProductUrl ?? ""}
+                    onLink={({ storeKey, shopifyProductId, shopifyProductUrl }) => {
+                      setForm({
+                        ...form,
+                        shopifyStoreKey: storeKey,
+                        shopifyProductId,
+                        shopifyProductUrl,
+                        checkoutMode: "shopify",
+                      });
+                      toast.success("Shopify product linked — click Save Settings to persist");
+                    }}
+                  />
                   <div>
                     <Label>Shopify Product URL</Label>
                     <Input value={form.shopifyProductUrl ?? ""} onChange={(e) => setForm({ ...form, shopifyProductUrl: e.target.value })} placeholder="https://yourstore.myshopify.com/products/..." className="mt-1" />

@@ -25,4 +25,9 @@ export const ENV = {
   // This fallback is used for all non-US orders (defaults to BookvaultUK).
   bookvaultDispatchService: process.env.BOOKVAULT_DISPATCH_SERVICE ?? "BookvaultUK",
   bookvaultProductionLevel: process.env.BOOKVAULT_PRODUCTION_LEVEL ?? "Standard",
+  shopifyStoresJson: process.env.SHOPIFY_STORES ?? "",
+  shopifyStoreDomain: process.env.SHOPIFY_STORE_DOMAIN ?? "",
+  shopifyStorefrontAccessToken: process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN ?? "",
+  shopifyStoreDomain2: process.env.SHOPIFY_STORE_DOMAIN_2 ?? "",
+  shopifyStorefrontAccessToken2: process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN_2 ?? "",
 };

@@ -409,6 +409,7 @@ export const productsAdminRouter = router({
       shopifyProductUrl: z.string().optional().nullable(),
       shopifyEmbedCode: z.string().optional().nullable(),
       shopifyProductId: z.string().optional().nullable(),
+      shopifyStoreKey: z.string().max(64).optional().nullable(),
       externalCheckoutUrl: z.string().optional().nullable(),
       requiresShipping: z.boolean().optional(),
       shippingCountries: z.string().optional().nullable(),

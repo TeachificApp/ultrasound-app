@@ -81,6 +81,16 @@ Set these in your Railway service's **Variables** tab:
 | `BOOKVAULT_DISPATCH_SERVICE` | Optional dispatch service (default: `CheapestTracked`) |
 | `BOOKVAULT_PRODUCTION_LEVEL` | Optional production level (default: `Standard`) |
 
+### Shopify (Physical product checkout links)
+| Variable | Description |
+|----------|-------------|
+| `SHOPIFY_STORE_DOMAIN` | Primary store domain (e.g. `your-store.myshopify.com`) |
+| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | Primary Storefront API token (`shpua_` public or `shpss_` private) |
+| `SHOPIFY_STORE_DOMAIN_2` | Optional second store domain |
+| `SHOPIFY_STOREFRONT_ACCESS_TOKEN_2` | Optional second store Storefront API token |
+| `SHOPIFY_STORES` | Optional JSON array override: `[{"key":"default","label":"Primary","domain":"...","token":"..."}]` |
+| `SHOPIFY_API_VERSION` | Optional API version (default: `2025-01`) |
+
 ### Analytics (Optional)
 | Variable | Description |
 |----------|-------------|

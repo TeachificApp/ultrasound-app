@@ -4427,6 +4427,7 @@ export const physicalProducts = mysqlTable("physical_products", {
   shopifyProductUrl: text("shopify_product_url"),   // Paste a Shopify product URL
   shopifyEmbedCode: longtext("shopify_embed_code"), // Paste a Shopify Buy Button embed
   shopifyProductId: varchar("shopify_product_id", { length: 255 }),
+  shopifyStoreKey: varchar("shopify_store_key", { length: 64 }).default("default"),
   // External checkout URL (for non-Shopify external links)
   externalCheckoutUrl: text("external_checkout_url"),
   // Shipping
