@@ -20,4 +20,7 @@ export const ENV = {
   thinkificGraphqlJwt: process.env.THINKIFIC_GRAPHQL_JWT ?? "",
   platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com",
   printfulApiKey: process.env.PRINTFUL_API_KEY ?? "",
+  bookvaultApiKey: process.env.BOOKVAULT_API_KEY ?? "",
+  bookvaultDispatchService: process.env.BOOKVAULT_DISPATCH_SERVICE ?? "CheapestTracked",
+  bookvaultProductionLevel: process.env.BOOKVAULT_PRODUCTION_LEVEL ?? "Standard",
 };

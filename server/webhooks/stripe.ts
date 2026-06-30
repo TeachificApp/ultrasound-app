@@ -21,6 +21,7 @@ import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
+import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail, emailWrapper } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
@@ -562,7 +563,7 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
 
   const amountPaid = (session.amount_total as number) ?? 0;
 
-  await db.insert(physicalProductOrders).values({
+  const [inserted] = await db.insert(physicalProductOrders).values({
     userId,
     productId,
     pricingOptionId: pricingOptionId || null,
@@ -577,7 +578,23 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
     shippingPostalCode: addr?.postal_code ?? null,
     shippingCountry: addr?.country ?? null,
     fulfillmentStatus: "pending",
-  });
+  }).$returningId();
+
+  const orderId = inserted?.id;
+  if (orderId) {
+    try {
+      const bvResult = await fulfillBookvaultOrder(db, orderId, {
+        customerEmail: meta.customer_email ?? (session.customer_email as string) ?? null,
+      });
+      if (bvResult.submitted) {
+        console.log(`[Stripe] BookVault fulfillment started for order ${orderId}`);
+      } else if (bvResult.error) {
+        console.warn(`[Stripe] BookVault fulfillment failed for order ${orderId}: ${bvResult.error}`);
+      }
+    } catch (err) {
+      console.error(`[Stripe] BookVault fulfillment error for order ${orderId}:`, err);
+    }
+  }
 
   await notifyOwner({
     title: "📦 New Physical Product Order",

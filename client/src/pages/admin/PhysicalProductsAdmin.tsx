@@ -293,6 +293,13 @@ function OrdersTab({ productId }: { productId: number }) {
     onSuccess: () => { utils.productsAdmin.listOrders.invalidate({ productId }); toast.success("Order updated"); },
     onError: (e) => toast.error(e.message),
   });
+  const retryBvMut = trpc.productsAdmin.retryBookvaultFulfillment.useMutation({
+    onSuccess: () => {
+      utils.productsAdmin.listOrders.invalidate({ productId });
+      toast.success("BookVault fulfillment submitted");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 text-yellow-700",
@@ -346,8 +353,30 @@ function OrdersTab({ productId }: { productId: number }) {
                         Tracking: {order.trackingCarrier} {order.trackingNumber}
                       </div>
                     )}
+                    {(order.bookvaultDocRef || order.bookvaultStatus || order.bookvaultError) && (
+                      <div className="text-xs mt-1 rounded p-1.5 bg-slate-50 border border-slate-200">
+                        <span className="font-medium text-slate-700">BookVault:</span>{" "}
+                        {order.bookvaultStatus ?? "pending"}
+                        {order.bookvaultDocRef ? ` · ${order.bookvaultDocRef}` : ""}
+                        {order.bookvaultPodRef ? ` · PodRef ${order.bookvaultPodRef}` : ""}
+                        {order.bookvaultError ? (
+                          <span className="block text-red-600 mt-0.5">{order.bookvaultError}</span>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1">
+                    {(order.bookvaultError || (!order.bookvaultSubmittedAt && order.fulfillmentStatus === "pending")) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={retryBvMut.isPending}
+                        onClick={() => retryBvMut.mutate({ orderId: order.id, force: Boolean(order.bookvaultError) })}
+                      >
+                        {retryBvMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Send to BookVault"}
+                      </Button>
+                    )}
                     <select
                       className="border rounded px-1.5 py-0.5 text-xs bg-background"
                       value={order.fulfillmentStatus}
@@ -1019,6 +1048,17 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
   });
   // BookVault settings
   const { data: bvData } = trpc.productsAdmin.getBookvaultSettings.useQuery({ productId });
+  const { data: bvTitles, isLoading: bvTitlesLoading } = trpc.productsAdmin.listBookvaultTitles.useQuery(
+    undefined,
+    { enabled: Boolean(bvData?.connection?.connected) },
+  );
+  const testBvMut = trpc.productsAdmin.testBookvaultConnection.useMutation({
+    onSuccess: (data) => {
+      utils.productsAdmin.getBookvaultSettings.invalidate({ productId });
+      toast.success(`Connected to ${data.accountName}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
   const [bvIsbn, setBvIsbn] = React.useState("");
   React.useEffect(() => { if (bvData?.bookvaultIsbn) setBvIsbn(bvData.bookvaultIsbn); }, [bvData?.bookvaultIsbn]);
   const bvMut = trpc.productsAdmin.updateBookvaultSettings.useMutation({
@@ -1038,10 +1078,12 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
 
       {/* BookVault Print-on-Demand */}
       <div className="border border-gray-200 rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-gray-800">BookVault Print-on-Demand</p>
-            <p className="text-xs text-gray-500 mt-0.5">Automatically fulfill physical book orders via BookVault when enabled. Requires a valid ISBN.</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Automatically fulfill physical book orders via BookVault when enabled. Requires a valid ISBN linked to your BookVault account.
+            </p>
           </div>
           <Switch
             checked={bvData?.bookvaultEnabled ?? false}
@@ -1049,17 +1091,47 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
             disabled={bvMut.isPending}
           />
         </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {bvData?.connection?.connected ? (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              Connected{bvData.connection.accountName ? ` · ${bvData.connection.accountName}` : ""}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+              {bvData?.connection?.error ?? "Not connected"}
+            </Badge>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => testBvMut.mutate()}
+            disabled={testBvMut.isPending}
+          >
+            {testBvMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Test connection"}
+          </Button>
+        </div>
+
         {(bvData?.bookvaultEnabled) && (
           <div className="space-y-2">
             <Label className="text-xs text-gray-600">ISBN (13-digit)</Label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Input
                 value={bvIsbn}
                 onChange={(e) => setBvIsbn(e.target.value)}
                 placeholder="978-0-000000-00-0"
                 className="text-sm max-w-xs"
                 maxLength={32}
+                list="bookvault-title-options"
               />
+              {bvTitles && bvTitles.length > 0 && (
+                <datalist id="bookvault-title-options">
+                  {bvTitles.map((t) => (
+                    <option key={t.isbn} value={t.isbn}>{t.title}{t.author ? ` — ${t.author}` : ""}</option>
+                  ))}
+                </datalist>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -1069,6 +1141,15 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
                 {bvMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
               </Button>
             </div>
+            {bvTitlesLoading ? (
+              <p className="text-xs text-muted-foreground">Loading BookVault titles…</p>
+            ) : bvData?.titleMatch ? (
+              <p className="text-xs text-muted-foreground">
+                {bvData.titleMatch.title
+                  ? `Matched title: ${bvData.titleMatch.title}`
+                  : "ISBN saved — title lookup did not return a match (verify in BookVault)."}
+              </p>
+            ) : null}
           </div>
         )}
       </div>

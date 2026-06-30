@@ -7,6 +7,14 @@ import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
+  getTitleByIsbn,
+  isBookvaultConfigured,
+  listTitles,
+  normalizeIsbn,
+  testConnection,
+} from "../bookvault";
+import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
+import {
   physicalProducts,
   physicalProductPricingOptions,
   physicalProductOrders,
@@ -940,7 +948,120 @@ Make ALL content specific and compelling based on the product title and descript
       const [p] = await db.select({ id: physicalProducts.id, bookvaultEnabled: physicalProducts.bookvaultEnabled, bookvaultIsbn: physicalProducts.bookvaultIsbn })
         .from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
       if (!p) throw new TRPCError({ code: "NOT_FOUND" });
-      return { bookvaultEnabled: p.bookvaultEnabled ?? false, bookvaultIsbn: p.bookvaultIsbn ?? null };
+
+      let connection: { connected: boolean; accountName?: string | null; error?: string | null } = {
+        connected: false,
+        accountName: null,
+        error: null,
+      };
+      if (isBookvaultConfigured()) {
+        try {
+          const result = await testConnection();
+          connection = {
+            connected: true,
+            accountName:
+              (typeof result.account.Name === "string" && result.account.Name) ||
+              (typeof result.account.CompanyName === "string" && result.account.CompanyName) ||
+              null,
+            error: null,
+          };
+        } catch (err) {
+          connection = {
+            connected: false,
+            accountName: null,
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      } else {
+        connection.error = "BOOKVAULT_API_KEY is not configured";
+      }
+
+      let titleMatch: { isbn: string; title: string | null } | null = null;
+      const isbn = normalizeIsbn(p.bookvaultIsbn);
+      if (isbn && connection.connected) {
+        try {
+          const title = await getTitleByIsbn(isbn);
+          titleMatch = {
+            isbn,
+            title:
+              (typeof title?.Title === "string" && title.Title) ||
+              (typeof title?.title === "string" && title.title) ||
+              null,
+          };
+        } catch {
+          titleMatch = { isbn, title: null };
+        }
+      }
+
+      return {
+        bookvaultEnabled: p.bookvaultEnabled ?? false,
+        bookvaultIsbn: p.bookvaultIsbn ?? null,
+        connection,
+        titleMatch,
+      };
+    }),
+
+  testBookvaultConnection: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isBookvaultConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "BOOKVAULT_API_KEY is not configured" });
+      }
+      const result = await testConnection();
+      return {
+        accountName:
+          (typeof result.account.Name === "string" && result.account.Name) ||
+          (typeof result.account.CompanyName === "string" && result.account.CompanyName) ||
+          "BookVault account",
+        email: typeof result.account.Email === "string" ? result.account.Email : null,
+      };
+    }),
+
+  listBookvaultTitles: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isBookvaultConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "BOOKVAULT_API_KEY is not configured" });
+      }
+      const titles = await listTitles();
+      return titles.map((t) => ({
+        isbn:
+          (typeof t.ISBN === "string" && t.ISBN) ||
+          (typeof t.isbn === "string" && t.isbn) ||
+          "",
+        title:
+          (typeof t.Title === "string" && t.Title) ||
+          (typeof t.title === "string" && t.title) ||
+          "Untitled",
+        author:
+          (typeof t.Author === "string" && t.Author) ||
+          (typeof t.author === "string" && t.author) ||
+          null,
+      })).filter((t) => t.isbn);
+    }),
+
+  retryBookvaultFulfillment: protectedProcedure
+    .input(z.object({ orderId: z.number(), force: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin" && (ctx.user as { role?: string }).role !== "platform_admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const result = await fulfillBookvaultOrder(db, input.orderId, { force: input.force ?? false });
+      if (result.error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+      }
+      if (result.skipped && result.reason === "bookvault_disabled") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "BookVault is not enabled for this product" });
+      }
+      if (result.skipped && result.reason === "missing_isbn") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Product is missing a BookVault ISBN" });
+      }
+      if (result.skipped && result.reason === "api_key_not_configured") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "BOOKVAULT_API_KEY is not configured" });
+      }
+      return result;
     }),
 
   updateBookvaultSettings: protectedProcedure
