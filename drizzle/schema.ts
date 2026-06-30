@@ -4427,7 +4427,6 @@ export const physicalProducts = mysqlTable("physical_products", {
   shopifyProductUrl: text("shopify_product_url"),   // Paste a Shopify product URL
   shopifyEmbedCode: longtext("shopify_embed_code"), // Paste a Shopify Buy Button embed
   shopifyProductId: varchar("shopify_product_id", { length: 255 }),
-  shopifyStoreKey: varchar("shopify_store_key", { length: 64 }).default("default"),
   // External checkout URL (for non-Shopify external links)
   externalCheckoutUrl: text("external_checkout_url"),
   // Shipping
@@ -4455,6 +4454,11 @@ export const physicalProducts = mysqlTable("physical_products", {
   // BookVault print-on-demand integration
   bookvaultEnabled: boolean("bookvault_enabled").default(false).notNull(),
   bookvaultIsbn: varchar("bookvault_isbn", { length: 32 }),
+  // Printful print-on-demand integration
+  printfulEnabled: boolean("printful_enabled").default(false).notNull(),
+  printfulStoreId: int("printful_store_id"),
+  printfulSyncProductId: int("printful_sync_product_id"),
+  printfulSyncVariantId: int("printful_sync_variant_id"),
   // Printify print-on-demand integration
   printifyEnabled: boolean("printify_enabled").default(false).notNull(),
   printifyShopId: int("printify_shop_id"),
@@ -4517,6 +4521,10 @@ export const physicalProductOrders = mysqlTable("physical_product_orders", {
   bookvaultStatus: varchar("bookvault_status", { length: 64 }),
   bookvaultError: text("bookvault_error"),
   bookvaultSubmittedAt: timestamp("bookvault_submitted_at"),
+  printfulOrderId: varchar("printful_order_id", { length: 64 }),
+  printfulStatus: varchar("printful_status", { length: 64 }),
+  printfulError: text("printful_error"),
+  printfulSubmittedAt: timestamp("printful_submitted_at"),
   // Printify fulfillment
   printifyOrderId: varchar("printify_order_id", { length: 64 }),
   printifyStatus: varchar("printify_status", { length: 64 }),

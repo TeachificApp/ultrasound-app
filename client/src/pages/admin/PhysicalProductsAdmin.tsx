@@ -18,7 +18,7 @@ import {
   Plus, Pencil, Trash2, Copy, Upload, ShoppingBag, ArrowLeft,
   ExternalLink, Eye, Image as ImageIcon, Link as LinkIcon,
   Users, UserPlus, Loader2, Package, BarChart2, Settings,
-  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow, Search, Code2, Download,
+  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow, Search, Code2,
 } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
@@ -54,7 +54,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
     onError: (e) => toast.error(e.message),
   });
   const [showCreate, setShowCreate] = useState(false);
-  const [showImport, setShowImport] = useState(false);
+  const [showPrintfulImport, setShowPrintfulImport] = useState(false);
   const [showPrintifyImport, setShowPrintifyImport] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -80,16 +80,16 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Physical Products {searchQuery && <span className="text-sm font-normal text-gray-500">({filteredProducts.length} results)</span>}</h3>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
-            <Download className="w-4 h-4 mr-1" /> Import from Shopify
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setShowPrintifyImport(true)}>
-            <Package className="w-4 h-4 mr-1" /> Import from Printify
-          </Button>
-        </div>
+        <Button size="sm" variant="outline" onClick={() => setShowPrintfulImport(true)}>
+          <Package className="w-4 h-4 mr-1" /> Import from Printful
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setShowPrintifyImport(true)}>
+          <Package className="w-4 h-4 mr-1" /> Import from Printify
+        </Button>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="w-4 h-4 mr-1" /> New Product
         </Button>
+        </div>
       </div>
 
       {filteredProducts.length === 0 && allProducts.length > 0 ? (
@@ -99,14 +99,9 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
           <CardContent className="py-12 text-center">
             <ShoppingBag className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
             <p className="text-muted-foreground">No physical products yet.</p>
-            <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
-              <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
-                <Download className="w-4 h-4 mr-1" /> Import from Shopify
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowCreate(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Create Your First Product
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowCreate(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Create Your First Product
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -160,252 +155,140 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
 
       <CreateProductDialog open={showCreate} onClose={() => setShowCreate(false)}
         onCreated={(id) => { setShowCreate(false); onEdit(id); }} />
-      <ImportFromShopifyDialog
-        open={showImport}
-        onClose={() => setShowImport(false)}
-        onImported={(id) => { setShowImport(false); onEdit(id); }}
-      />
+      <ImportFromPrintfulDialog open={showPrintfulImport} onClose={() => setShowPrintfulImport(false)} />
       <ImportFromPrintifyDialog open={showPrintifyImport} onClose={() => setShowPrintifyImport(false)} />
     </div>
   );
 }
 
-// ─── Import from Shopify Dialog ───────────────────────────────────────────────
-function ImportFromShopifyDialog({
-  open,
-  onClose,
-  onImported,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onImported: (id: number) => void;
-}) {
+// ─── Import from Printful Dialog ─────────────────────────────────────────────
+function ImportFromPrintfulDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const utils = trpc.useUtils();
-  const { data: stores } = trpc.shopifyAdmin.listStores.useQuery(undefined, { enabled: open });
-  const { data: status } = trpc.shopifyAdmin.getConnectionStatus.useQuery(undefined, { enabled: open });
-  const [storeKey, setStoreKey] = React.useState("default");
-  const [cursor, setCursor] = React.useState<string | null>(null);
-  const [allProducts, setAllProducts] = React.useState<Array<{
-    id: string;
-    numericId: string;
-    title: string;
-    url: string | null;
-    imageUrl: string | null;
-    priceAmount: string | null;
-    priceCurrency: string | null;
-  }>>([]);
-  const [selected, setSelected] = React.useState<Set<string>>(new Set());
-  const [search, setSearch] = React.useState("");
-  const [publishOnImport, setPublishOnImport] = React.useState(false);
+  const statusQuery = trpc.printfulAdmin.getConnectionStatus.useQuery(undefined, { enabled: open });
+  const stores = statusQuery.data?.stores ?? [];
+  const [storeId, setStoreId] = useState<number | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [publish, setPublish] = useState(false);
+  const limit = 50;
 
   React.useEffect(() => {
-    if (stores?.[0]?.key) setStoreKey(stores[0].key);
-  }, [stores]);
+    if (!open) return;
+    if (stores.length > 0 && storeId === null) {
+      const preferred = statusQuery.data?.defaultStoreId;
+      setStoreId(preferred && stores.some((s) => s.id === preferred) ? preferred : stores[0]!.id);
+    }
+  }, [open, stores, storeId, statusQuery.data?.defaultStoreId]);
 
   React.useEffect(() => {
     if (!open) {
-      setCursor(null);
-      setAllProducts([]);
+      setStoreId(null);
+      setOffset(0);
       setSelected(new Set());
-      setSearch("");
+      setPublish(false);
     }
   }, [open]);
 
-  const activeStoreKey = storeKey || stores?.[0]?.key || "default";
-  const { data: page, isLoading, isFetching } = trpc.shopifyAdmin.listProducts.useQuery(
-    { storeKey: activeStoreKey, first: 50, after: cursor },
-    { enabled: open && Boolean(status?.configured) },
+  const productsQuery = trpc.printfulAdmin.listProducts.useQuery(
+    { storeId: storeId!, offset, limit },
+    { enabled: open && storeId != null },
   );
-  const { data: imported = [] } = trpc.shopifyAdmin.listImportedProductIds.useQuery(
-    { storeKey: activeStoreKey },
-    { enabled: open && Boolean(status?.configured) },
+  const importedQuery = trpc.printfulAdmin.listImportedProductIds.useQuery(
+    { storeId: storeId! },
+    { enabled: open && storeId != null },
   );
-
-  React.useEffect(() => {
-    if (!page?.products) return;
-    setAllProducts((prev) => {
-      const map = new Map(prev.map((p) => [p.numericId, p]));
-      for (const p of page.products) map.set(p.numericId, p);
-      return Array.from(map.values());
-    });
-  }, [page?.products]);
-
-  const importedIds = React.useMemo(
-    () => new Set(imported.map((r) => r.shopifyProductId)),
-    [imported],
-  );
-
-  const filtered = allProducts.filter((p) =>
-    !search.trim() || p.title.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const importOneMut = trpc.shopifyAdmin.importProduct.useMutation({
-    onSuccess: (result) => {
-      utils.productsAdmin.list.invalidate();
-      utils.shopifyAdmin.listImportedProductIds.invalidate({ storeKey: activeStoreKey });
-      if (result.action === "created" || result.action === "updated") {
-        toast.success(result.action === "created" ? "Product imported" : "Product updated from Shopify");
-        onImported(result.productId);
-      } else {
-        toast.info("Already imported — opening existing product");
-        onImported(result.productId);
-      }
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const importBulkMut = trpc.shopifyAdmin.importProducts.useMutation({
+  const importMut = trpc.printfulAdmin.importProducts.useMutation({
     onSuccess: (data) => {
+      toast.success(`Imported ${data.created} new, updated ${data.updated}, skipped ${data.skipped}`);
       utils.productsAdmin.list.invalidate();
-      utils.shopifyAdmin.listImportedProductIds.invalidate({ storeKey: activeStoreKey });
+      if (storeId) utils.printfulAdmin.listImportedProductIds.invalidate({ storeId });
       setSelected(new Set());
-      toast.success(`Imported ${data.created} · updated ${data.updated} · skipped ${data.skipped}`);
-      const firstCreated = data.results.find((r) => r.action === "created" || r.action === "updated");
-      if (firstCreated && firstCreated.productId) onImported(firstCreated.productId);
+      onClose();
     },
     onError: (e) => toast.error(e.message),
   });
 
-  const toggleSelected = (numericId: string) => {
+  const importedIds = new Set((importedQuery.data ?? []).map((r) => r.printfulSyncProductId));
+  const products = productsQuery.data?.products ?? [];
+  const total = productsQuery.data?.paging?.total ?? 0;
+  const lastOffset = Math.max(0, total - limit);
+
+  const toggle = (id: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(numericId)) next.delete(numericId);
-      else next.add(numericId);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Import from Shopify</DialogTitle>
-        </DialogHeader>
-
-        {!status?.configured ? (
-          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
-            Configure Shopify env vars first (`SHOPIFY_STORE_DOMAIN` + token, or `_2` for a second store).
-          </p>
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Import from Printful</DialogTitle></DialogHeader>
+        {!statusQuery.data?.configured ? (
+          <p className="text-sm text-muted-foreground">Set PRINTFUL_API_KEY in environment secrets to enable import.</p>
+        ) : !statusQuery.data.connected ? (
+          <p className="text-sm text-red-600">{statusQuery.data.error ?? "Could not connect to Printful"}</p>
         ) : (
-          <div className="space-y-3 flex-1 min-h-0 flex flex-col">
-            <div className="flex flex-wrap gap-2 items-center">
-              {(stores?.length ?? 0) > 1 && (
-                <select
-                  className="border rounded px-2 py-1.5 text-sm bg-background"
-                  value={activeStoreKey}
-                  onChange={(e) => {
-                    setStoreKey(e.target.value);
-                    setCursor(null);
-                    setAllProducts([]);
-                    setSelected(new Set());
-                  }}
-                >
-                  {(stores ?? []).map((s) => (
-                    <option key={s.key} value={s.key}>{s.label} ({s.domain})</option>
-                  ))}
-                </select>
-              )}
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search Shopify products..."
-                className="h-8 text-sm flex-1 min-w-[160px]"
-              />
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={publishOnImport}
-                  onChange={(e) => setPublishOnImport(e.target.checked)}
-                />
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Label className="text-sm">Store</Label>
+              <select
+                className="border rounded px-2 py-1 text-sm bg-background"
+                value={storeId ?? ""}
+                onChange={(e) => { setStoreId(Number(e.target.value)); setOffset(0); setSelected(new Set()); }}
+              >
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.type})</option>
+                ))}
+              </select>
+              <label className="flex items-center gap-2 text-xs ml-auto">
+                <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} />
                 Publish on import
               </label>
             </div>
-
-            <div className="flex-1 min-h-0 overflow-y-auto border rounded-md">
-              {isLoading && allProducts.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">Loading catalog…</div>
-              ) : filtered.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">No products found.</div>
-              ) : (
-                <div className="divide-y">
-                  {filtered.map((p) => {
-                    const already = importedIds.has(p.numericId);
-                    const isSelected = selected.has(p.numericId);
-                    return (
-                      <div key={p.numericId} className="flex items-center gap-2 p-2 hover:bg-muted/30">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          disabled={already}
-                          onChange={() => toggleSelected(p.numericId)}
-                          className="rounded"
-                        />
-                        {p.imageUrl ? (
-                          <img src={p.imageUrl} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
-                        ) : (
-                          <div className="w-10 h-10 rounded bg-muted shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{p.title}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {p.priceAmount ? `${p.priceCurrency ?? "USD"} ${p.priceAmount}` : "No price"}
-                            {already ? " · Imported" : ""}
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs shrink-0"
-                          disabled={importOneMut.isPending || importBulkMut.isPending}
-                          onClick={() => importOneMut.mutate({
-                            storeKey: activeStoreKey,
-                            shopifyProductId: p.numericId,
-                            publish: publishOnImport,
-                            updateExisting: already,
-                          })}
-                        >
-                          {already ? "Update" : "Import"}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <div className="text-xs text-muted-foreground">
-                {filtered.length} shown · {imported.length} already imported
+            {productsQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading products…</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                {products.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-muted/30">
+                    <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} />
+                    {p.thumbnail_url ? (
+                      <img src={p.thumbnail_url} alt="" className="w-10 h-10 rounded object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-muted" />
+                    )}
+                    <span className="text-sm flex-1 min-w-0 truncate">{p.name}</span>
+                    {importedIds.has(p.id) && (
+                      <Badge variant="outline" className="text-xs shrink-0">Imported</Badge>
+                    )}
+                  </label>
+                ))}
               </div>
-              <div className="flex gap-2">
-                {page?.hasNextPage && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={isFetching}
-                    onClick={() => setCursor(page.endCursor)}
-                  >
-                    {isFetching ? <Loader2 className="w-3 h-3 animate-spin" /> : "Load more"}
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  disabled={selected.size === 0 || importBulkMut.isPending}
-                  onClick={() => importBulkMut.mutate({
-                    storeKey: activeStoreKey,
-                    shopifyProductIds: Array.from(selected),
-                    publish: publishOnImport,
-                  })}
-                >
-                  {importBulkMut.isPending ? "Importing…" : `Import selected (${selected.size})`}
-                </Button>
+            )}
+            {total > limit && (
+              <div className="flex justify-between text-sm">
+                <Button size="sm" variant="outline" disabled={offset <= 0} onClick={() => setOffset((o) => Math.max(0, o - limit))}>Previous</Button>
+                <span className="text-muted-foreground">{offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
+                <Button size="sm" variant="outline" disabled={offset >= lastOffset} onClick={() => setOffset((o) => o + limit)}>Next</Button>
               </div>
-            </div>
+            )}
           </div>
         )}
-
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            disabled={selected.size === 0 || importMut.isPending || storeId == null}
+            onClick={() => importMut.mutate({
+              storeId: storeId!,
+              syncProductIds: Array.from(selected),
+              publish,
+            })}
+          >
+            {importMut.isPending ? "Importing…" : `Import ${selected.size || ""} product${selected.size === 1 ? "" : "s"}`}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -430,12 +313,7 @@ function ImportFromPrintifyDialog({ open, onClose }: { open: boolean; onClose: (
     }
   }, [open, shops, shopId, statusQuery.data?.defaultShopId]);
   React.useEffect(() => {
-    if (!open) {
-      setShopId(null);
-      setPage(1);
-      setSelected(new Set());
-      setPublish(false);
-    }
+    if (!open) { setShopId(null); setPage(1); setSelected(new Set()); setPublish(false); }
   }, [open]);
   const productsQuery = trpc.printifyAdmin.listProducts.useQuery(
     { shopId: shopId!, page, limit: 50 },
@@ -458,12 +336,7 @@ function ImportFromPrintifyDialog({ open, onClose }: { open: boolean; onClose: (
   const importedIds = new Set((importedQuery.data ?? []).map((r: any) => r.printifyProductId));
   const products = productsQuery.data?.products ?? [];
   const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   };
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -477,14 +350,8 @@ function ImportFromPrintifyDialog({ open, onClose }: { open: boolean; onClose: (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <Label className="text-sm">Shop</Label>
-              <select
-                className="border rounded px-2 py-1 text-sm bg-background"
-                value={shopId ?? ""}
-                onChange={(e) => { setShopId(Number(e.target.value)); setPage(1); setSelected(new Set()); }}
-              >
-                {shops.map((s) => (
-                  <option key={s.id} value={s.id}>{s.title} ({(s as any).sales_channel})</option>
-                ))}
+              <select className="border rounded px-2 py-1 text-sm bg-background" value={shopId ?? ""} onChange={(e) => { setShopId(Number(e.target.value)); setPage(1); setSelected(new Set()); }}>
+                {shops.map((s) => (<option key={s.id} value={s.id}>{s.title} ({(s as any).sales_channel})</option>))}
               </select>
               <label className="flex items-center gap-2 text-xs ml-auto">
                 <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} />
@@ -498,15 +365,9 @@ function ImportFromPrintifyDialog({ open, onClose }: { open: boolean; onClose: (
                 {products.map((p: any) => (
                   <label key={p.id} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-muted/30">
                     <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} />
-                    {p.imageUrl ? (
-                      <img src={p.imageUrl} alt="" className="w-10 h-10 rounded object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 rounded bg-muted" />
-                    )}
+                    {p.imageUrl ? (<img src={p.imageUrl} alt="" className="w-10 h-10 rounded object-cover" />) : (<div className="w-10 h-10 rounded bg-muted" />)}
                     <span className="text-sm flex-1 min-w-0 truncate">{p.title}</span>
-                    {importedIds.has(p.id) && (
-                      <Badge variant="outline" className="text-xs shrink-0">Imported</Badge>
-                    )}
+                    {importedIds.has(p.id) && (<Badge variant="outline" className="text-xs shrink-0">Imported</Badge>)}
                   </label>
                 ))}
               </div>
@@ -522,14 +383,7 @@ function ImportFromPrintifyDialog({ open, onClose }: { open: boolean; onClose: (
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button
-            disabled={selected.size === 0 || importMut.isPending || shopId == null}
-            onClick={() => importMut.mutate({
-              shopId: shopId!,
-              printifyProductIds: Array.from(selected),
-              publish,
-            })}
-          >
+          <Button disabled={selected.size === 0 || importMut.isPending || shopId == null} onClick={() => importMut.mutate({ shopId: shopId!, printifyProductIds: Array.from(selected), publish })}>
             {importMut.isPending ? "Importing…" : `Import ${selected.size || ""} product${selected.size === 1 ? "" : "s"}`}
           </Button>
         </DialogFooter>
@@ -674,133 +528,6 @@ function PricingOptionsManager({ productId }: { productId: number }) {
   );
 }
 
-// ─── Shopify Product Linker ───────────────────────────────────────────────────
-function ShopifyProductLinker({
-  storeKey,
-  onStoreKeyChange,
-  productId,
-  productUrl,
-  onLink,
-}: {
-  storeKey: string;
-  onStoreKeyChange: (key: string) => void;
-  productId: string;
-  productUrl: string;
-  onLink: (data: { storeKey: string; shopifyProductId: string; shopifyProductUrl: string }) => void;
-}) {
-  const { data: stores } = trpc.shopifyAdmin.listStores.useQuery();
-  const { data: status } = trpc.shopifyAdmin.getConnectionStatus.useQuery();
-  const testMut = trpc.shopifyAdmin.testConnection.useMutation({
-    onSuccess: (data) => toast.success(`Connected to ${data.shopName}`),
-    onError: (e) => toast.error(e.message),
-  });
-  const { data: catalog, isLoading } = trpc.shopifyAdmin.listProducts.useQuery(
-    { storeKey, first: 100 },
-    { enabled: Boolean(storeKey) && (status?.configured ?? false) },
-  );
-
-  const activeStoreKey = storeKey || stores?.[0]?.key || "default";
-
-  return (
-    <div className="rounded-lg border border-violet-200 bg-violet-50/40 p-4 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-violet-900">Link from Shopify catalog</p>
-          <p className="text-xs text-violet-700 mt-0.5">
-            Pick a product from your Shopify store to auto-fill the product URL and ID.
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 text-xs shrink-0"
-          onClick={() => testMut.mutate({ storeKey: activeStoreKey })}
-          disabled={testMut.isPending || !status?.configured}
-        >
-          {testMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Test connection"}
-        </Button>
-      </div>
-
-      {!status?.configured ? (
-        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-          Shopify is not configured. Set <code className="font-mono">SHOPIFY_STORE_DOMAIN</code> +{" "}
-          <code className="font-mono">SHOPIFY_STOREFRONT_ACCESS_TOKEN</code>, or use{" "}
-          <code className="font-mono">SHOPIFY_STORE_DOMAIN_2</code> +{" "}
-          <code className="font-mono">SHOPIFY_STOREFRONT_ACCESS_TOKEN_2</code> for a second store.
-        </p>
-      ) : (
-        <>
-          {(stores?.length ?? 0) > 1 && (
-            <div>
-              <Label className="text-xs text-gray-600">Shopify store</Label>
-              <select
-                className="mt-1 w-full max-w-xs border rounded px-2 py-1.5 text-sm bg-background"
-                value={activeStoreKey}
-                onChange={(e) => onStoreKeyChange(e.target.value)}
-              >
-                {(stores ?? []).map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.label} ({s.domain})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            {(status?.stores ?? []).map((s) => (
-              <Badge
-                key={s.key}
-                variant="outline"
-                className={s.connected ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-200"}
-              >
-                {s.label}: {s.connected ? (s.shopName ?? "Connected") : (s.error ?? "Not connected")}
-              </Badge>
-            ))}
-          </div>
-
-          {isLoading ? (
-            <p className="text-xs text-muted-foreground">Loading Shopify products…</p>
-          ) : (catalog?.products?.length ?? 0) === 0 ? (
-            <p className="text-xs text-muted-foreground">No products found in this Shopify store.</p>
-          ) : (
-            <div className="max-h-56 overflow-y-auto space-y-1 border rounded-md bg-white p-1">
-              {catalog!.products.map((p) => {
-                const selected = productId === p.numericId;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => onLink({
-                      storeKey: activeStoreKey,
-                      shopifyProductId: p.numericId,
-                      shopifyProductUrl: p.url ?? productUrl,
-                    })}
-                    className={`w-full text-left flex items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-violet-50 ${selected ? "bg-violet-100 border border-violet-300" : ""}`}
-                  >
-                    {p.imageUrl ? (
-                      <img src={p.imageUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
-                    ) : (
-                      <div className="w-8 h-8 rounded bg-gray-100 shrink-0" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium truncate">{p.title}</div>
-                      <div className="text-muted-foreground truncate">
-                        ID {p.numericId}
-                        {p.priceAmount ? ` · ${p.priceCurrency ?? ""} ${p.priceAmount}` : ""}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
 // ─── Orders Tab ───────────────────────────────────────────────────────────────
 function OrdersTab({ productId }: { productId: number }) {
   const { data, isLoading } = trpc.productsAdmin.listOrders.useQuery({ productId });
@@ -816,10 +543,10 @@ function OrdersTab({ productId }: { productId: number }) {
     },
     onError: (e) => toast.error(e.message),
   });
-  const retryPfMut = trpc.productsAdmin.retryPrintifyFulfillment.useMutation({
+  const retryPfMut = trpc.productsAdmin.retryPrintfulFulfillment.useMutation({
     onSuccess: () => {
       utils.productsAdmin.listOrders.invalidate({ productId });
-      toast.success("Printify fulfillment submitted");
+      toast.success("Printful fulfillment submitted");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -887,13 +614,13 @@ function OrdersTab({ productId }: { productId: number }) {
                         ) : null}
                       </div>
                     )}
-                    {((order as any).printifyOrderId || (order as any).printifyStatus || (order as any).printifyError) && (
-                      <div className="text-xs mt-1 rounded p-1.5 bg-violet-50 border border-violet-200">
-                        <span className="font-medium text-violet-700">Printify:</span>{" "}
-                        {(order as any).printifyStatus ?? "pending"}
-                        {(order as any).printifyOrderId ? ` · ${(order as any).printifyOrderId}` : ""}
-                        {(order as any).printifyError ? (
-                          <span className="block text-red-600 mt-0.5">{(order as any).printifyError}</span>
+                    {(order.printfulOrderId || order.printfulStatus || order.printfulError) && (
+                      <div className="text-xs mt-1 rounded p-1.5 bg-teal-50 border border-teal-200">
+                        <span className="font-medium text-teal-700">Printful:</span>{" "}
+                        {order.printfulStatus ?? "pending"}
+                        {order.printfulOrderId ? ` · ${order.printfulOrderId}` : ""}
+                        {order.printfulError ? (
+                          <span className="block text-red-600 mt-0.5">{order.printfulError}</span>
                         ) : null}
                       </div>
                     )}
@@ -908,6 +635,17 @@ function OrdersTab({ productId }: { productId: number }) {
                         onClick={() => retryBvMut.mutate({ orderId: order.id, force: Boolean(order.bookvaultError) })}
                       >
                         {retryBvMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Send to BookVault"}
+                      </Button>
+                    )}
+                    {(order.printfulError || (!order.printfulSubmittedAt && order.fulfillmentStatus === "pending")) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={retryPfMut.isPending}
+                        onClick={() => retryPfMut.mutate({ orderId: order.id, force: Boolean(order.printfulError) })}
+                      >
+                        {retryPfMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Send to Printful"}
                       </Button>
                     )}
                     <select
@@ -1074,7 +812,6 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       shopifyProductUrl: product.shopifyProductUrl ?? "",
       shopifyEmbedCode: product.shopifyEmbedCode ?? "",
       shopifyProductId: product.shopifyProductId ?? "",
-      shopifyStoreKey: (product as any).shopifyStoreKey ?? "default",
       externalCheckoutUrl: product.externalCheckoutUrl ?? "",
       requiresShipping: product.requiresShipping,
       status: product.status,
@@ -1102,7 +839,6 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       shopifyProductUrl: form.shopifyProductUrl || null,
       shopifyEmbedCode: form.shopifyEmbedCode || null,
       shopifyProductId: form.shopifyProductId || null,
-      shopifyStoreKey: form.shopifyStoreKey || "default",
       externalCheckoutUrl: form.externalCheckoutUrl || null,
       requiresShipping: form.requiresShipping,
       status: form.status,
@@ -1383,22 +1119,6 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
 
               {form.checkoutMode === "shopify" && (
                 <div className="space-y-4 pt-2 border-t">
-                  <ShopifyProductLinker
-                    storeKey={form.shopifyStoreKey ?? "default"}
-                    onStoreKeyChange={(key) => setForm({ ...form, shopifyStoreKey: key })}
-                    productId={form.shopifyProductId ?? ""}
-                    productUrl={form.shopifyProductUrl ?? ""}
-                    onLink={({ storeKey, shopifyProductId, shopifyProductUrl }) => {
-                      setForm({
-                        ...form,
-                        shopifyStoreKey: storeKey,
-                        shopifyProductId,
-                        shopifyProductUrl,
-                        checkoutMode: "shopify",
-                      });
-                      toast.success("Shopify product linked — click Save Settings to persist");
-                    }}
-                  />
                   <div>
                     <Label>Shopify Product URL</Label>
                     <Input value={form.shopifyProductUrl ?? ""} onChange={(e) => setForm({ ...form, shopifyProductUrl: e.target.value })} placeholder="https://yourstore.myshopify.com/products/..." className="mt-1" />
@@ -1616,36 +1336,37 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
     onSuccess: () => { utils.productsAdmin.getBookvaultSettings.invalidate({ productId }); toast.success("BookVault settings saved"); },
     onError: (e: any) => toast.error(e.message),
   });
-  // Printify settings
-  const { data: pfData } = trpc.productsAdmin.getPrintifySettings.useQuery({ productId });
-  const testPfMut = trpc.productsAdmin.testPrintifyConnection.useMutation({
+  // Printful settings
+  const { data: pfulData } = trpc.productsAdmin.getPrintfulSettings.useQuery({ productId });
+  const testPfulMut = trpc.productsAdmin.testPrintfulConnection.useMutation({
     onSuccess: () => {
-      utils.productsAdmin.getPrintifySettings.invalidate({ productId });
-      toast.success("Connected to Printify");
+      utils.productsAdmin.getPrintfulSettings.invalidate({ productId });
+      toast.success("Connected to Printful");
     },
     onError: (e: any) => toast.error(e.message),
   });
-  const [pfShopId, setPfShopId] = React.useState<string>("");
-  const [pfProductId, setPfProductId] = React.useState("");
-  const [pfVariantId, setPfVariantId] = React.useState("");
+  const [pfulStoreId, setPfulStoreId] = React.useState("");
+  const [pfulProductId, setPfulProductId] = React.useState("");
+  const [pfulVariantId, setPfulVariantId] = React.useState("");
   React.useEffect(() => {
-    if (pfData?.printifyShopId) setPfShopId(String(pfData.printifyShopId));
-    if (pfData?.printifyProductId) setPfProductId(pfData.printifyProductId);
-    if (pfData?.printifyVariantId) setPfVariantId(String(pfData.printifyVariantId));
-  }, [pfData?.printifyShopId, pfData?.printifyProductId, pfData?.printifyVariantId]);
-  const pfMut = trpc.productsAdmin.updatePrintifySettings.useMutation({
-    onSuccess: () => { utils.productsAdmin.getPrintifySettings.invalidate({ productId }); toast.success("Printify settings saved"); },
+    if (pfulData?.printfulStoreId) setPfulStoreId(String(pfulData.printfulStoreId));
+    if (pfulData?.printfulSyncProductId) setPfulProductId(String(pfulData.printfulSyncProductId));
+    if (pfulData?.printfulSyncVariantId) setPfulVariantId(String(pfulData.printfulSyncVariantId));
+  }, [pfulData?.printfulStoreId, pfulData?.printfulSyncProductId, pfulData?.printfulSyncVariantId]);
+  const pfulMut = trpc.productsAdmin.updatePrintfulSettings.useMutation({
+    onSuccess: () => { utils.productsAdmin.getPrintfulSettings.invalidate({ productId }); toast.success("Printful settings saved"); },
     onError: (e: any) => toast.error(e.message),
   });
-  const savePrintify = (enabled: boolean) => {
-    const shopNum = pfShopId.trim() ? Number.parseInt(pfShopId, 10) : null;
-    const variantNum = pfVariantId.trim() ? Number.parseInt(pfVariantId, 10) : null;
-    pfMut.mutate({
+  const savePrintful = (enabled: boolean) => {
+    const storeNum = pfulStoreId.trim() ? Number.parseInt(pfulStoreId, 10) : null;
+    const productNum = pfulProductId.trim() ? Number.parseInt(pfulProductId, 10) : null;
+    const variantNum = pfulVariantId.trim() ? Number.parseInt(pfulVariantId, 10) : null;
+    pfulMut.mutate({
       productId,
-      printifyEnabled: enabled,
-      printifyShopId: Number.isFinite(shopNum) ? shopNum : null,
-      printifyProductId: pfProductId.trim() || null,
-      printifyVariantId: Number.isFinite(variantNum) ? variantNum : null,
+      printfulEnabled: enabled,
+      printfulStoreId: Number.isFinite(storeNum) ? storeNum : null,
+      printfulSyncProductId: Number.isFinite(productNum) ? productNum : null,
+      printfulSyncVariantId: Number.isFinite(variantNum) ? variantNum : null,
     });
   };
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
@@ -1737,73 +1458,75 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
         )}
       </div>
 
-      {/* Printify Print-on-Demand */}
+      {/* Printful Print-on-Demand */}
       <div className="border border-gray-200 rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-gray-800">Printify Print-on-Demand</p>
+            <p className="text-sm font-semibold text-gray-800">Printful Print-on-Demand</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              Automatically submit orders to Printify when enabled. Link a Printify shop, product, and variant ID.
+              Automatically submit orders to Printful when enabled. Link a store, sync product, and variant ID.
             </p>
           </div>
           <Switch
-            checked={pfData?.printifyEnabled ?? false}
-            onCheckedChange={(v) => savePrintify(v)}
-            disabled={pfMut.isPending}
+            checked={pfulData?.printfulEnabled ?? false}
+            onCheckedChange={(v) => savePrintful(v)}
+            disabled={pfulMut.isPending}
           />
         </div>
+
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          {pfData?.connection?.connected ? (
+          {pfulData?.connection?.connected ? (
             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              Connected · {(pfData.connection as any).shops?.length ?? 0} shop(s)
+              Connected · {pfulData.connection.stores.length} store(s)
             </Badge>
           ) : (
             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-              {(pfData?.connection as any)?.error ?? "Not connected"}
+              {pfulData?.connection?.error ?? "Not connected"}
             </Badge>
           )}
           <Button
             size="sm"
             variant="outline"
             className="h-7 text-xs"
-            onClick={() => testPfMut.mutate()}
-            disabled={testPfMut.isPending}
+            onClick={() => testPfulMut.mutate()}
+            disabled={testPfulMut.isPending}
           >
-            {testPfMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Test connection"}
+            {testPfulMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Test connection"}
           </Button>
-          <a href="/admin/printify" className="text-xs text-teal-600 hover:underline">Open Printify admin →</a>
+          <a href="/admin/printful" className="text-xs text-teal-600 hover:underline">Open Printful admin →</a>
         </div>
-        {(pfData?.printifyEnabled) && (
+
+        {(pfulData?.printfulEnabled) && (
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <Label className="text-xs text-gray-600">Shop</Label>
+              <Label className="text-xs text-gray-600">Store</Label>
               <select
                 className="mt-1 w-full border rounded px-2 py-1.5 text-sm bg-background"
-                value={pfShopId}
-                onChange={(e) => setPfShopId(e.target.value)}
+                value={pfulStoreId}
+                onChange={(e) => setPfulStoreId(e.target.value)}
               >
-                <option value="">Select shop…</option>
-                {((pfData?.connection as any)?.shops ?? []).map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.title}</option>
+                <option value="">Select store…</option>
+                {(pfulData?.connection?.stores ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <Label className="text-xs text-gray-600">Product ID</Label>
-              <Input value={pfProductId} onChange={(e) => setPfProductId(e.target.value)} className="mt-1 text-sm" placeholder="Printify product ID" />
+              <Label className="text-xs text-gray-600">Sync Product ID</Label>
+              <Input value={pfulProductId} onChange={(e) => setPfulProductId(e.target.value)} className="mt-1 text-sm" placeholder="Printful sync product ID" />
             </div>
             <div>
-              <Label className="text-xs text-gray-600">Variant ID</Label>
-              <Input value={pfVariantId} onChange={(e) => setPfVariantId(e.target.value)} className="mt-1 text-sm" placeholder="Variant ID" />
+              <Label className="text-xs text-gray-600">Sync Variant ID</Label>
+              <Input value={pfulVariantId} onChange={(e) => setPfulVariantId(e.target.value)} className="mt-1 text-sm" placeholder="Sync variant ID" />
             </div>
             <div className="sm:col-span-3 flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => savePrintify(true)} disabled={pfMut.isPending}>
-                {pfMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save Printify link"}
+              <Button size="sm" variant="outline" onClick={() => savePrintful(true)} disabled={pfulMut.isPending}>
+                {pfulMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save Printful link"}
               </Button>
-              {(pfData as any)?.productMatch?.title && (
+              {pfulData?.productMatch?.title && (
                 <p className="text-xs text-muted-foreground">
-                  Linked: {(pfData as any).productMatch.title}
-                  {(pfData as any).productMatch.variantTitle ? ` · ${(pfData as any).productMatch.variantTitle}` : ""}
+                  Linked: {pfulData.productMatch.title}
+                  {pfulData.productMatch.variantName ? ` · ${pfulData.productMatch.variantName}` : ""}
                 </p>
               )}
             </div>

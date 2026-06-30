@@ -20,6 +20,8 @@ export const ENV = {
   thinkificGraphqlJwt: process.env.THINKIFIC_GRAPHQL_JWT ?? "",
   platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com",
   printfulApiKey: process.env.PRINTFUL_API_KEY ?? "",
+  printfulDefaultStoreId: process.env.PRINTFUL_DEFAULT_STORE_ID ?? "",
+  printfulShippingMethod: process.env.PRINTFUL_SHIPPING_METHOD ?? "STANDARD",
   bookvaultApiKey: process.env.BOOKVAULT_API_KEY ?? "",
   // US orders are automatically routed to BookvaultUS in fulfillBookvaultOrder.ts.
   // This fallback is used for all non-US orders (defaults to BookvaultUK).

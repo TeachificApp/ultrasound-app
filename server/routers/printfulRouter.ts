@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { printfulSyncProducts } from "../../drizzle/schema";
@@ -12,13 +13,58 @@ import {
   cancelOrder,
   calculateShipping,
   createOrder,
+  getDefaultPrintfulStoreId,
+  isPrintfulConfigured,
+  testConnection,
 } from "../printful";
+import {
+  importPrintfulProductById,
+  importPrintfulProductsBulk,
+  listImportedPrintfulProductIds,
+} from "../lib/importPrintfulProduct";
+import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
+
+function assertAdmin(role: string | undefined) {
+  if (role !== "admin" && role !== "platform_admin") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+}
 
 // ── Admin router ──────────────────────────────────────────────────────────────
 
 export const printfulAdminRouter = router({
+  getConnectionStatus: protectedProcedure.query(async ({ ctx }) => {
+    assertAdmin((ctx.user as { role?: string }).role);
+    if (!isPrintfulConfigured()) {
+      return { configured: false, connected: false, stores: [], error: "PRINTFUL_API_KEY is not configured" };
+    }
+    try {
+      const { stores } = await testConnection();
+      return { configured: true, connected: true, stores, defaultStoreId: getDefaultPrintfulStoreId() };
+    } catch (err) {
+      return {
+        configured: true,
+        connected: false,
+        stores: [],
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }),
+
+  testConnection: protectedProcedure.mutation(async ({ ctx }) => {
+    assertAdmin((ctx.user as { role?: string }).role);
+    if (!isPrintfulConfigured()) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTFUL_API_KEY is not configured" });
+    }
+    return testConnection();
+  }),
+
   /** List all Printful stores connected to the API key */
-  listStores: protectedProcedure.query(async () => {
+  listStores: protectedProcedure.query(async ({ ctx }) => {
+    assertAdmin((ctx.user as { role?: string }).role);
+    if (!isPrintfulConfigured()) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTFUL_API_KEY is not configured" });
+    }
     const stores = await listStores();
     return stores;
   }),
@@ -34,8 +80,10 @@ export const printfulAdminRouter = router({
   /** Sync all products from a Printful store into local DB cache */
   syncProducts: protectedProcedure
     .input(z.object({ storeId: z.number() }))
-    .mutation(async ({ input }) => {
-      const db = getDb();
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin((ctx.user as { role?: string }).role);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       let offset = 0;
       const limit = 100;
       let total = 0;
@@ -109,8 +157,10 @@ export const printfulAdminRouter = router({
   /** Get locally cached products for a store */
   getCachedProducts: protectedProcedure
     .input(z.object({ storeId: z.number() }))
-    .query(async ({ input }) => {
-      const db = getDb();
+    .query(async ({ ctx, input }) => {
+      assertAdmin((ctx.user as { role?: string }).role);
+      const db = await getDb();
+      if (!db) return [];
       const products = await db
         .select()
         .from(printfulSyncProducts)
@@ -143,8 +193,73 @@ export const printfulAdminRouter = router({
   /** Cancel an order */
   cancelOrder: protectedProcedure
     .input(z.object({ storeId: z.number(), orderId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin((ctx.user as { role?: string }).role);
       return cancelOrder(input.storeId, input.orderId);
+    }),
+
+  listImportedProductIds: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      assertAdmin((ctx.user as { role?: string }).role);
+      return listImportedPrintfulProductIds(input.storeId);
+    }),
+
+  importProduct: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      syncProductId: z.number(),
+      publish: z.boolean().optional(),
+      updateExisting: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin((ctx.user as { role?: string }).role);
+      if (!isPrintfulConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTFUL_API_KEY is not configured" });
+      }
+      try {
+        return await importPrintfulProductById(input.storeId, input.syncProductId, {
+          publish: input.publish ?? false,
+          updateExisting: input.updateExisting ?? false,
+        });
+      } catch (err) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: err instanceof Error ? err.message : String(err) });
+      }
+    }),
+
+  importProducts: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      syncProductIds: z.array(z.number()).min(1).max(50),
+      publish: z.boolean().optional(),
+      updateExisting: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin((ctx.user as { role?: string }).role);
+      if (!isPrintfulConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTFUL_API_KEY is not configured" });
+      }
+      const results = await importPrintfulProductsBulk(input.storeId, input.syncProductIds, {
+        publish: input.publish ?? false,
+        updateExisting: input.updateExisting ?? false,
+      });
+      return {
+        results,
+        created: results.filter((r) => r.action === "created").length,
+        updated: results.filter((r) => r.action === "updated").length,
+        skipped: results.filter((r) => r.action === "skipped").length,
+      };
+    }),
+
+  retryFulfillment: protectedProcedure
+    .input(z.object({ orderId: z.number(), force: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin((ctx.user as { role?: string }).role);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const result = await fulfillPrintfulOrder(db, input.orderId, { force: input.force ?? false });
+      if (result.error) throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+      return result;
     }),
 });
 
@@ -155,7 +270,8 @@ export const printfulPublicRouter = router({
   listProducts: publicProcedure
     .input(z.object({ storeId: z.number() }))
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
+      if (!db) return [];
       const products = await db
         .select()
         .from(printfulSyncProducts)

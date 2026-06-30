@@ -14,11 +14,18 @@ import {
   testConnection,
 } from "../bookvault";
 import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
+import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
+import {
+  getSyncProduct,
+  isPrintfulConfigured,
+  testConnection as printfulTestConnection,
+} from "../printful";
 import {
   getProduct as getPrintifyProduct,
   isPrintifyConfigured,
   testConnection as printifyTestConnection,
 } from "../printify";
+
 import {
   physicalProducts,
   physicalProductPricingOptions,
@@ -414,7 +421,6 @@ export const productsAdminRouter = router({
       shopifyProductUrl: z.string().optional().nullable(),
       shopifyEmbedCode: z.string().optional().nullable(),
       shopifyProductId: z.string().optional().nullable(),
-      shopifyStoreKey: z.string().max(64).optional().nullable(),
       externalCheckoutUrl: z.string().optional().nullable(),
       requiresShipping: z.boolean().optional(),
       shippingCountries: z.string().optional().nullable(),
@@ -1082,7 +1088,7 @@ Make ALL content specific and compelling based on the product title and descript
       return { success: true };
     }),
 
-  getPrintifySettings: protectedProcedure
+  getPrintfulSettings: protectedProcedure
     .input(z.object({ productId: z.number() }))
     .query(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -1090,84 +1096,88 @@ Make ALL content specific and compelling based on the product title and descript
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [p] = await db.select({
         id: physicalProducts.id,
-        printifyEnabled: physicalProducts.printifyEnabled,
-        printifyShopId: physicalProducts.printifyShopId,
-        printifyProductId: physicalProducts.printifyProductId,
-        printifyVariantId: physicalProducts.printifyVariantId,
+        printfulEnabled: physicalProducts.printfulEnabled,
+        printfulStoreId: physicalProducts.printfulStoreId,
+        printfulSyncProductId: physicalProducts.printfulSyncProductId,
+        printfulSyncVariantId: physicalProducts.printfulSyncVariantId,
       })
         .from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
       if (!p) throw new TRPCError({ code: "NOT_FOUND" });
 
-      let connection: { configured: boolean; connected: boolean; shops: Array<{ id: number; title: string; sales_channel: string }>; defaultShopId: number | null; error?: string | null } = {
+      let connection: {
+        configured: boolean;
+        connected: boolean;
+        stores: Array<{ id: number; name: string; type: string }>;
+        defaultStoreId: number | null;
+        error?: string | null;
+      } = {
         configured: false,
         connected: false,
-        shops: [],
-        defaultShopId: null,
+        stores: [],
+        defaultStoreId: null,
         error: null,
       };
-      if (isPrintifyConfigured()) {
+      if (isPrintfulConfigured()) {
         connection.configured = true;
         try {
-          const { shops } = await printifyTestConnection();
-          const { getDefaultPrintifyShopId } = await import("../printify");
+          const { stores } = await printfulTestConnection();
+          const { getDefaultPrintfulStoreId } = await import("../printful");
           connection = {
             configured: true,
             connected: true,
-            shops,
-            defaultShopId: getDefaultPrintifyShopId(),
+            stores,
+            defaultStoreId: getDefaultPrintfulStoreId(),
             error: null,
           };
         } catch (err) {
           connection = {
             configured: true,
             connected: false,
-            shops: [],
-            defaultShopId: null,
+            stores: [],
+            defaultStoreId: null,
             error: err instanceof Error ? err.message : String(err),
           };
         }
       } else {
-        connection.error = "PRINTIFY_API_TOKEN is not configured";
+        connection.error = "PRINTFUL_API_KEY is not configured";
       }
 
-      let productMatch: { title: string | null; variantTitle: string | null } | null = null;
-      if (p.printifyShopId && p.printifyProductId && connection.connected) {
+      let productMatch: { title: string | null; variantName: string | null } | null = null;
+      if (p.printfulStoreId && p.printfulSyncProductId && connection.connected) {
         try {
-          const detail = await getPrintifyProduct(p.printifyShopId, p.printifyProductId);
-          if (detail) {
-            const variant = detail.variants.find((v) => v.id === p.printifyVariantId) ?? detail.variants[0];
-            productMatch = {
-              title: detail.title,
-              variantTitle: variant?.title ?? null,
-            };
-          }
+          const detail = await getSyncProduct(p.printfulStoreId, p.printfulSyncProductId);
+          const variant = detail.sync_variants?.find((v) => v.id === p.printfulSyncVariantId) ?? detail.sync_variants?.[0];
+          productMatch = {
+            title: detail.sync_product?.name ?? null,
+            variantName: variant?.name ?? null,
+          };
         } catch {
-          productMatch = { title: null, variantTitle: null };
+          productMatch = { title: null, variantName: null };
         }
       }
 
       return {
-        printifyEnabled: p.printifyEnabled ?? false,
-        printifyShopId: p.printifyShopId ?? null,
-        printifyProductId: p.printifyProductId ?? null,
-        printifyVariantId: p.printifyVariantId ?? null,
+        printfulEnabled: p.printfulEnabled ?? false,
+        printfulStoreId: p.printfulStoreId ?? null,
+        printfulSyncProductId: p.printfulSyncProductId ?? null,
+        printfulSyncVariantId: p.printfulSyncVariantId ?? null,
         connection,
         productMatch,
       };
     }),
 
-  testPrintifyConnection: protectedProcedure
+  testPrintfulConnection: protectedProcedure
     .mutation(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      if (!isPrintifyConfigured()) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTIFY_API_TOKEN is not configured" });
+      if (!isPrintfulConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTFUL_API_KEY is not configured" });
       }
-      const { shops } = await printifyTestConnection();
-      const { getDefaultPrintifyShopId } = await import("../printify");
-      return { shops, defaultShopId: getDefaultPrintifyShopId() };
+      const { stores } = await printfulTestConnection();
+      const { getDefaultPrintfulStoreId } = await import("../printful");
+      return { stores, defaultStoreId: getDefaultPrintfulStoreId() };
     }),
 
-  retryPrintifyFulfillment: protectedProcedure
+  retryPrintfulFulfillment: protectedProcedure
     .input(z.object({ orderId: z.number(), force: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin" && (ctx.user as { role?: string }).role !== "platform_admin") {
@@ -1175,30 +1185,29 @@ Make ALL content specific and compelling based on the product title and descript
       }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { fulfillPrintifyOrder } = await import("../lib/fulfillPrintifyOrder");
-      const result = await fulfillPrintifyOrder(db, input.orderId, { force: input.force ?? false });
+      const result = await fulfillPrintfulOrder(db, input.orderId, { force: input.force ?? false });
       if (result.error) {
         throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
       }
-      if (result.skipped && result.reason === "printify_disabled") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Printify is not enabled for this product" });
+      if (result.skipped && result.reason === "printful_disabled") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Printful is not enabled for this product" });
       }
-      if (result.skipped && result.reason === "missing_printify_product_link") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Product is missing Printify shop/product/variant link" });
+      if (result.skipped && result.reason === "missing_printful_product_link") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Product is missing Printful store/sync variant link" });
       }
-      if (result.skipped && result.reason === "api_token_not_configured") {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTIFY_API_TOKEN is not configured" });
+      if (result.skipped && result.reason === "api_key_not_configured") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTFUL_API_KEY is not configured" });
       }
       return result;
     }),
 
-  updatePrintifySettings: protectedProcedure
+  updatePrintfulSettings: protectedProcedure
     .input(z.object({
       productId: z.number(),
-      printifyEnabled: z.boolean(),
-      printifyShopId: z.number().nullable(),
-      printifyProductId: z.string().max(64).nullable(),
-      printifyVariantId: z.number().nullable(),
+      printfulEnabled: z.boolean(),
+      printfulStoreId: z.number().nullable(),
+      printfulSyncProductId: z.number().nullable(),
+      printfulSyncVariantId: z.number().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -1206,10 +1215,10 @@ Make ALL content specific and compelling based on the product title and descript
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(physicalProducts)
         .set({
-          printifyEnabled: input.printifyEnabled,
-          printifyShopId: input.printifyShopId,
-          printifyProductId: input.printifyProductId,
-          printifyVariantId: input.printifyVariantId,
+          printfulEnabled: input.printfulEnabled,
+          printfulStoreId: input.printfulStoreId,
+          printfulSyncProductId: input.printfulSyncProductId,
+          printfulSyncVariantId: input.printfulSyncVariantId,
         })
         .where(eq(physicalProducts.id, input.productId));
       return { success: true };
@@ -1307,6 +1316,128 @@ Make ALL content specific and compelling based on the product title and descript
       };
     }),
 });
+
+  // ─── Printify Settings ──────────────────────────────────────────────────────
+  getPrintifySettings: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [p] = await db.select().from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
+      if (!p) throw new TRPCError({ code: "NOT_FOUND" });
+      let connection: { configured: boolean; connected: boolean; shops: Array<{ id: number; title: string; sales_channel: string }>; defaultShopId: number | null; error?: string | null } = {
+        configured: false,
+        connected: false,
+        shops: [],
+        defaultShopId: null,
+        error: null,
+      };
+      if (isPrintifyConfigured()) {
+        connection.configured = true;
+        try {
+          const { shops } = await printifyTestConnection();
+          const { getDefaultPrintifyShopId } = await import("../printify");
+          connection = {
+            configured: true,
+            connected: true,
+            shops,
+            defaultShopId: getDefaultPrintifyShopId(),
+            error: null,
+          };
+        } catch (err) {
+          connection = {
+            configured: true,
+            connected: false,
+            shops: [],
+            defaultShopId: null,
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      } else {
+        connection.error = "PRINTIFY_API_TOKEN is not configured";
+      }
+      let productMatch: { title: string | null; variantTitle: string | null } | null = null;
+      if (p.printifyShopId && p.printifyProductId && connection.connected) {
+        try {
+          const detail = await getPrintifyProduct(p.printifyShopId, p.printifyProductId);
+          if (detail) {
+            const variant = detail.variants.find((v) => v.id === p.printifyVariantId) ?? detail.variants[0];
+            productMatch = {
+              title: detail.title,
+              variantTitle: variant?.title ?? null,
+            };
+          }
+        } catch {
+          productMatch = { title: null, variantTitle: null };
+        }
+      }
+      return {
+        printifyEnabled: p.printifyEnabled ?? false,
+        printifyShopId: p.printifyShopId ?? null,
+        printifyProductId: p.printifyProductId ?? null,
+        printifyVariantId: p.printifyVariantId ?? null,
+        connection,
+        productMatch,
+      };
+    }),
+  testPrintifyConnection: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isPrintifyConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTIFY_API_TOKEN is not configured" });
+      }
+      const { shops } = await printifyTestConnection();
+      const { getDefaultPrintifyShopId } = await import("../printify");
+      return { shops, defaultShopId: getDefaultPrintifyShopId() };
+    }),
+  retryPrintifyFulfillment: protectedProcedure
+    .input(z.object({ orderId: z.number(), force: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin" && (ctx.user as { role?: string }).role !== "platform_admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { fulfillPrintifyOrder } = await import("../lib/fulfillPrintifyOrder");
+      const result = await fulfillPrintifyOrder(db, input.orderId, { force: input.force ?? false });
+      if (result.error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+      }
+      if (result.skipped && result.reason === "printify_disabled") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Printify is not enabled for this product" });
+      }
+      if (result.skipped && result.reason === "missing_printify_product_link") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Product is missing Printify shop/product/variant link" });
+      }
+      if (result.skipped && result.reason === "api_token_not_configured") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTIFY_API_TOKEN is not configured" });
+      }
+      return result;
+    }),
+  updatePrintifySettings: protectedProcedure
+    .input(z.object({
+      productId: z.number(),
+      printifyEnabled: z.boolean(),
+      printifyShopId: z.number().nullable(),
+      printifyProductId: z.string().max(64).nullable(),
+      printifyVariantId: z.number().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(physicalProducts)
+        .set({
+          printifyEnabled: input.printifyEnabled,
+          printifyShopId: input.printifyShopId,
+          printifyProductId: input.printifyProductId,
+          printifyVariantId: input.printifyVariantId,
+        })
+        .where(eq(physicalProducts.id, input.productId));
+      return { success: true };
+    }),
+
 // ─── Public: checkout page config for physical products ──────────────────────
 export const productsCheckoutPublicRouter = router({
   getPublicCheckoutPageConfig: publicProcedure
