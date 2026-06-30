@@ -95,6 +95,7 @@ const WorkshopInstanceLandingPageBuilder = lazy(() => import("./pages/admin/Work
 const CohortGroupLandingPageBuilder = lazy(() => import("./pages/admin/CohortGroupLandingPageBuilder"));
 const WidgetManager = lazy(() => import("./pages/admin/WidgetManager"));
 const PrintfulAdmin = lazy(() => import("./pages/admin/PrintfulAdmin"));
+const PrintifyAdmin = lazy(() => import("./pages/admin/PrintifyAdmin"));
 const MerchStore = lazy(() => import("./pages/MerchStore"));
 const WidgetRenderer = lazy(() => import("./pages/WidgetRenderer"));
 const MyDownloads = lazy(() => import("./pages/MyDownloads"));
@@ -519,6 +520,7 @@ function Router() {
         <Route path="/admin/lms/:courseId/cohorts/:cohortGroupId/page-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CohortGroupLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/widgets">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><WidgetManager /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/printful">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PrintfulAdmin /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/printify">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PrintifyAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/widget/:token">{() => <Suspense fallback={<div />}><WidgetRenderer /></Suspense>}</Route>
         <Route path="/merch">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MerchStore /></Suspense>}</Route>
         {/* ── Physical Products ────────────────────────────────────────────────────────────────────────────── */}

@@ -4454,6 +4454,11 @@ export const physicalProducts = mysqlTable("physical_products", {
   // BookVault print-on-demand integration
   bookvaultEnabled: boolean("bookvault_enabled").default(false).notNull(),
   bookvaultIsbn: varchar("bookvault_isbn", { length: 32 }),
+  // Printify print-on-demand integration
+  printifyEnabled: boolean("printify_enabled").default(false).notNull(),
+  printifyShopId: int("printify_shop_id"),
+  printifyProductId: varchar("printify_product_id", { length: 64 }),
+  printifyVariantId: int("printify_variant_id"),
   // Checkout page builder config (JSON)
   checkoutPageConfig: longtext("checkout_page_config"),
   // Stats
@@ -4511,6 +4516,11 @@ export const physicalProductOrders = mysqlTable("physical_product_orders", {
   bookvaultStatus: varchar("bookvault_status", { length: 64 }),
   bookvaultError: text("bookvault_error"),
   bookvaultSubmittedAt: timestamp("bookvault_submitted_at"),
+  // Printify fulfillment
+  printifyOrderId: varchar("printify_order_id", { length: 64 }),
+  printifyStatus: varchar("printify_status", { length: 64 }),
+  printifyError: text("printify_error"),
+  printifySubmittedAt: timestamp("printify_submitted_at"),
   notes: text("notes"),
   orderedAt: timestamp("ordered_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

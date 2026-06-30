@@ -81,6 +81,13 @@ Set these in your Railway service's **Variables** tab:
 | `BOOKVAULT_DISPATCH_SERVICE` | Optional dispatch service (default: `CheapestTracked`) |
 | `BOOKVAULT_PRODUCTION_LEVEL` | Optional production level (default: `Standard`) |
 
+### Printify (Print-on-demand fulfillment)
+| Variable | Description |
+|----------|-------------|
+| `PRINTIFY_API_TOKEN` | Personal access token from Printify → My Profile → Connections |
+| `PRINTIFY_DEFAULT_SHOP_ID` | Optional default shop ID (e.g. `5544447` for All About Ultrasound Shopify shop) |
+| `PRINTIFY_SHIPPING_METHOD` | Optional shipping method ID (default: `1`) |
+
 ### Analytics (Optional)
 | Variable | Description |
 |----------|-------------|
