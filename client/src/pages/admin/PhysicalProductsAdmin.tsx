@@ -93,9 +93,14 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
           <CardContent className="py-12 text-center">
             <ShoppingBag className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
             <p className="text-muted-foreground">No physical products yet.</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowCreate(true)}>
-              <Plus className="w-4 h-4 mr-1" /> Create Your First Product
-            </Button>
+            <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
+              <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+                <Download className="w-4 h-4 mr-1" /> Import from Shopify
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowCreate(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Create Your First Product
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
