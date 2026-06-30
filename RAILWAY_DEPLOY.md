@@ -74,6 +74,13 @@ Set these in your Railway service's **Variables** tab:
 | `THINKIFIC_API_KEY` | Thinkific API key |
 | `THINKIFIC_SUBDOMAIN` | Thinkific subdomain |
 
+### BookVault (Physical book fulfillment)
+| Variable | Description |
+|----------|-------------|
+| `BOOKVAULT_API_KEY` | BookVault API key from the BookVault portal (include `bv_` prefix) |
+| `BOOKVAULT_DISPATCH_SERVICE` | Optional dispatch service (default: `CheapestTracked`) |
+| `BOOKVAULT_PRODUCTION_LEVEL` | Optional production level (default: `Standard`) |
+
 ### Analytics (Optional)
 | Variable | Description |
 |----------|-------------|

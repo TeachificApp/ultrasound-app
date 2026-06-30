@@ -4505,6 +4505,12 @@ export const physicalProductOrders = mysqlTable("physical_product_orders", {
   fulfillmentStatus: mysqlEnum("fulfillment_status", ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]).default("pending").notNull(),
   trackingNumber: varchar("tracking_number", { length: 255 }),
   trackingCarrier: varchar("tracking_carrier", { length: 100 }),
+  // BookVault print-on-demand fulfillment
+  bookvaultDocRef: varchar("bookvault_doc_ref", { length: 64 }),
+  bookvaultPodRef: varchar("bookvault_pod_ref", { length: 64 }),
+  bookvaultStatus: varchar("bookvault_status", { length: 64 }),
+  bookvaultError: text("bookvault_error"),
+  bookvaultSubmittedAt: timestamp("bookvault_submitted_at"),
   notes: text("notes"),
   orderedAt: timestamp("ordered_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
