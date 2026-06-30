@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { RefreshCw, Package, ShoppingCart, Store, ExternalLink, X } from "lucide-react";
+import { RefreshCw, Package, ShoppingCart, Store, ExternalLink, X, CheckCircle2, AlertCircle } from "lucide-react";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -31,8 +31,12 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
 
 function ProductsTab({ storeId }: { storeId: number }) {
   const utils = trpc.useUtils();
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [publish, setPublish] = useState(false);
+  const [updateExisting, setUpdateExisting] = useState(false);
 
   const cachedQuery = trpc.printfulAdmin.getCachedProducts.useQuery({ storeId });
+  const importedQuery = trpc.printfulAdmin.listImportedProductIds.useQuery({ storeId });
   const syncMutation = trpc.printfulAdmin.syncProducts.useMutation({
     onSuccess: (data) => {
       toast.success(`Sync complete — ${data.synced} of ${data.total} products synced.`);
@@ -40,18 +44,60 @@ function ProductsTab({ storeId }: { storeId: number }) {
     },
     onError: (err) => toast.error(`Sync failed: ${err.message}`),
   });
+  const importMut = trpc.printfulAdmin.importProducts.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Imported ${data.created} new, updated ${data.updated}, skipped ${data.skipped}`);
+      utils.printfulAdmin.listImportedProductIds.invalidate({ storeId });
+      utils.productsAdmin.list.invalidate();
+      setSelected(new Set());
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   const products = cachedQuery.data ?? [];
+  const importedIds = new Set((importedQuery.data ?? []).map((r) => r.printfulSyncProductId));
+
+  const toggle = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {products.length} product{products.length !== 1 ? "s" : ""} cached locally
+          {importedIds.size > 0 && <> · {importedIds.size} imported to physical products</>}
           {products[0]?.lastSyncedAt && (
             <> · Last synced {new Date(products[0].lastSyncedAt).toLocaleString()}</>
           )}
         </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} />
+            Publish on import
+          </label>
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={updateExisting} onChange={(e) => setUpdateExisting(e.target.checked)} />
+            Update existing
+          </label>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={selected.size === 0 || importMut.isPending}
+            onClick={() => importMut.mutate({
+              storeId,
+              syncProductIds: Array.from(selected),
+              publish,
+              updateExisting,
+            })}
+          >
+            {importMut.isPending ? "Importing…" : `Import selected (${selected.size})`}
+          </Button>
         <Button
           size="sm"
           onClick={() => syncMutation.mutate({ storeId })}
@@ -60,6 +106,7 @@ function ProductsTab({ storeId }: { storeId: number }) {
           <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? "animate-spin" : ""}`} />
           {syncMutation.isPending ? "Syncing…" : "Sync from Printful"}
         </Button>
+        </div>
       </div>
 
       {cachedQuery.isLoading ? (
@@ -81,8 +128,14 @@ function ProductsTab({ storeId }: { storeId: number }) {
               ? (JSON.parse(p.variantsJson) as Array<{ retailPrice?: string; currency?: string }>)
               : [];
             const price = p.retailPrice ?? variants[0]?.retailPrice;
+            const isImported = importedIds.has(p.printfulProductId);
+            const isSelected = selected.has(p.printfulProductId);
             return (
-              <Card key={p.id} className="overflow-hidden">
+              <Card
+                key={p.id}
+                className={`overflow-hidden cursor-pointer transition-colors ${isSelected ? "ring-2 ring-teal-500" : ""}`}
+                onClick={() => toggle(p.printfulProductId)}
+              >
                 {p.thumbnailUrl ? (
                   <img src={p.thumbnailUrl} alt={p.name} className="w-full h-40 object-cover" />
                 ) : (
@@ -91,14 +144,30 @@ function ProductsTab({ storeId }: { storeId: number }) {
                   </div>
                 )}
                 <CardContent className="p-3">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggle(p.printfulProductId)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1"
+                    />
+                    <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm line-clamp-2">{p.name}</p>
-                  <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center justify-between mt-1 gap-1">
                     {price && (
                       <span className="text-sm text-teal-600 font-semibold">${price}</span>
                     )}
                     <span className="text-xs text-muted-foreground">
                       {p.syncedVariantCount}/{p.variantCount} variants
                     </span>
+                    {isImported && (
+                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                        Imported
+                      </Badge>
+                    )}
+                  </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -270,12 +339,26 @@ function OrdersTab({ storeId }: { storeId: number }) {
 
 export default function PrintfulAdmin() {
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
-  const storesQuery = trpc.printfulAdmin.listStores.useQuery();
-  const stores = storesQuery.data ?? [];
+  const statusQuery = trpc.printfulAdmin.getConnectionStatus.useQuery();
+  const testMut = trpc.printfulAdmin.testConnection.useMutation({
+    onSuccess: (data) => {
+      statusQuery.refetch();
+      toast.success(`Connected — ${data.stores.length} store(s) found`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  const storesFromStatus = statusQuery.data?.stores ?? [];
+  const storesFromList = trpc.printfulAdmin.listStores.useQuery(undefined, {
+    enabled: statusQuery.data?.connected === true,
+  });
+  const storeList = storesFromList.data ?? storesFromStatus;
 
   // Auto-select the first store once loaded
-  if (stores.length > 0 && selectedStoreId === null) {
-    setSelectedStoreId(stores[0].id);
+  if (storeList.length > 0 && selectedStoreId === null) {
+    const preferred = statusQuery.data?.defaultStoreId;
+    setSelectedStoreId(
+      preferred && storeList.some((s) => s.id === preferred) ? preferred : storeList[0]!.id,
+    );
   }
 
   return (
@@ -301,10 +384,42 @@ export default function PrintfulAdmin() {
         </a>
       </div>
 
+      <Card>
+        <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {statusQuery.data?.connected ? (
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+            )}
+            <div>
+              <p className="text-sm font-medium">
+                {statusQuery.data?.connected
+                  ? `Connected — ${storeList.length} store(s)`
+                  : statusQuery.data?.configured
+                    ? "Connection failed"
+                    : "Not configured"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {statusQuery.data?.error ?? "Set PRINTFUL_API_KEY in environment secrets"}
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => testMut.mutate()}
+            disabled={testMut.isPending || !statusQuery.data?.configured}
+          >
+            {testMut.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Test connection"}
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Store selector */}
-      {storesQuery.isLoading ? (
+      {statusQuery.isLoading ? (
         <div className="h-10 w-64 bg-muted animate-pulse rounded" />
-      ) : stores.length === 0 ? (
+      ) : storeList.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             No Printful stores found. Check your API key in Settings → Secrets.
@@ -322,7 +437,7 @@ export default function PrintfulAdmin() {
                 <SelectValue placeholder="Select a store" />
               </SelectTrigger>
               <SelectContent>
-                {stores.map((s) => (
+                {storeList.map((s) => (
                   <SelectItem key={s.id} value={s.id.toString()}>
                     {s.name}
                     <Badge variant="outline" className="ml-2 text-xs">{s.type}</Badge>

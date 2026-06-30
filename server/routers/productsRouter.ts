@@ -14,6 +14,12 @@ import {
   testConnection,
 } from "../bookvault";
 import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
+import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
+import {
+  getSyncProduct,
+  isPrintfulConfigured,
+  testConnection as printfulTestConnection,
+} from "../printful";
 import {
   physicalProducts,
   physicalProductPricingOptions,
@@ -1072,6 +1078,142 @@ Make ALL content specific and compelling based on the product title and descript
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(physicalProducts)
         .set({ bookvaultEnabled: input.bookvaultEnabled, bookvaultIsbn: input.bookvaultIsbn })
+        .where(eq(physicalProducts.id, input.productId));
+      return { success: true };
+    }),
+
+  getPrintfulSettings: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [p] = await db.select({
+        id: physicalProducts.id,
+        printfulEnabled: physicalProducts.printfulEnabled,
+        printfulStoreId: physicalProducts.printfulStoreId,
+        printfulSyncProductId: physicalProducts.printfulSyncProductId,
+        printfulSyncVariantId: physicalProducts.printfulSyncVariantId,
+      })
+        .from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
+      if (!p) throw new TRPCError({ code: "NOT_FOUND" });
+
+      let connection: {
+        configured: boolean;
+        connected: boolean;
+        stores: Array<{ id: number; name: string; type: string }>;
+        defaultStoreId: number | null;
+        error?: string | null;
+      } = {
+        configured: false,
+        connected: false,
+        stores: [],
+        defaultStoreId: null,
+        error: null,
+      };
+      if (isPrintfulConfigured()) {
+        connection.configured = true;
+        try {
+          const { stores } = await printfulTestConnection();
+          const { getDefaultPrintfulStoreId } = await import("../printful");
+          connection = {
+            configured: true,
+            connected: true,
+            stores,
+            defaultStoreId: getDefaultPrintfulStoreId(),
+            error: null,
+          };
+        } catch (err) {
+          connection = {
+            configured: true,
+            connected: false,
+            stores: [],
+            defaultStoreId: null,
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      } else {
+        connection.error = "PRINTFUL_API_KEY is not configured";
+      }
+
+      let productMatch: { title: string | null; variantName: string | null } | null = null;
+      if (p.printfulStoreId && p.printfulSyncProductId && connection.connected) {
+        try {
+          const detail = await getSyncProduct(p.printfulStoreId, p.printfulSyncProductId);
+          const variant = detail.sync_variants?.find((v) => v.id === p.printfulSyncVariantId) ?? detail.sync_variants?.[0];
+          productMatch = {
+            title: detail.sync_product?.name ?? null,
+            variantName: variant?.name ?? null,
+          };
+        } catch {
+          productMatch = { title: null, variantName: null };
+        }
+      }
+
+      return {
+        printfulEnabled: p.printfulEnabled ?? false,
+        printfulStoreId: p.printfulStoreId ?? null,
+        printfulSyncProductId: p.printfulSyncProductId ?? null,
+        printfulSyncVariantId: p.printfulSyncVariantId ?? null,
+        connection,
+        productMatch,
+      };
+    }),
+
+  testPrintfulConnection: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isPrintfulConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTFUL_API_KEY is not configured" });
+      }
+      const { stores } = await printfulTestConnection();
+      const { getDefaultPrintfulStoreId } = await import("../printful");
+      return { stores, defaultStoreId: getDefaultPrintfulStoreId() };
+    }),
+
+  retryPrintfulFulfillment: protectedProcedure
+    .input(z.object({ orderId: z.number(), force: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin" && (ctx.user as { role?: string }).role !== "platform_admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const result = await fulfillPrintfulOrder(db, input.orderId, { force: input.force ?? false });
+      if (result.error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+      }
+      if (result.skipped && result.reason === "printful_disabled") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Printful is not enabled for this product" });
+      }
+      if (result.skipped && result.reason === "missing_printful_product_link") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Product is missing Printful store/sync variant link" });
+      }
+      if (result.skipped && result.reason === "api_key_not_configured") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PRINTFUL_API_KEY is not configured" });
+      }
+      return result;
+    }),
+
+  updatePrintfulSettings: protectedProcedure
+    .input(z.object({
+      productId: z.number(),
+      printfulEnabled: z.boolean(),
+      printfulStoreId: z.number().nullable(),
+      printfulSyncProductId: z.number().nullable(),
+      printfulSyncVariantId: z.number().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(physicalProducts)
+        .set({
+          printfulEnabled: input.printfulEnabled,
+          printfulStoreId: input.printfulStoreId,
+          printfulSyncProductId: input.printfulSyncProductId,
+          printfulSyncVariantId: input.printfulSyncVariantId,
+        })
         .where(eq(physicalProducts.id, input.productId));
       return { success: true };
     }),

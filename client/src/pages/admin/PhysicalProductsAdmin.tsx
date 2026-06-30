@@ -54,6 +54,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
     onError: (e) => toast.error(e.message),
   });
   const [showCreate, setShowCreate] = useState(false);
+  const [showPrintfulImport, setShowPrintfulImport] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
@@ -77,9 +78,14 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
       </div>
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Physical Products {searchQuery && <span className="text-sm font-normal text-gray-500">({filteredProducts.length} results)</span>}</h3>
+        <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={() => setShowPrintfulImport(true)}>
+          <Package className="w-4 h-4 mr-1" /> Import from Printful
+        </Button>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="w-4 h-4 mr-1" /> New Product
         </Button>
+        </div>
       </div>
 
       {filteredProducts.length === 0 && allProducts.length > 0 ? (
@@ -145,7 +151,142 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
 
       <CreateProductDialog open={showCreate} onClose={() => setShowCreate(false)}
         onCreated={(id) => { setShowCreate(false); onEdit(id); }} />
+      <ImportFromPrintfulDialog open={showPrintfulImport} onClose={() => setShowPrintfulImport(false)} />
     </div>
+  );
+}
+
+// ─── Import from Printful Dialog ─────────────────────────────────────────────
+function ImportFromPrintfulDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const utils = trpc.useUtils();
+  const statusQuery = trpc.printfulAdmin.getConnectionStatus.useQuery(undefined, { enabled: open });
+  const stores = statusQuery.data?.stores ?? [];
+  const [storeId, setStoreId] = useState<number | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [publish, setPublish] = useState(false);
+  const limit = 50;
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (stores.length > 0 && storeId === null) {
+      const preferred = statusQuery.data?.defaultStoreId;
+      setStoreId(preferred && stores.some((s) => s.id === preferred) ? preferred : stores[0]!.id);
+    }
+  }, [open, stores, storeId, statusQuery.data?.defaultStoreId]);
+
+  React.useEffect(() => {
+    if (!open) {
+      setStoreId(null);
+      setOffset(0);
+      setSelected(new Set());
+      setPublish(false);
+    }
+  }, [open]);
+
+  const productsQuery = trpc.printfulAdmin.listProducts.useQuery(
+    { storeId: storeId!, offset, limit },
+    { enabled: open && storeId != null },
+  );
+  const importedQuery = trpc.printfulAdmin.listImportedProductIds.useQuery(
+    { storeId: storeId! },
+    { enabled: open && storeId != null },
+  );
+  const importMut = trpc.printfulAdmin.importProducts.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Imported ${data.created} new, updated ${data.updated}, skipped ${data.skipped}`);
+      utils.productsAdmin.list.invalidate();
+      if (storeId) utils.printfulAdmin.listImportedProductIds.invalidate({ storeId });
+      setSelected(new Set());
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const importedIds = new Set((importedQuery.data ?? []).map((r) => r.printfulSyncProductId));
+  const products = productsQuery.data?.products ?? [];
+  const total = productsQuery.data?.paging?.total ?? 0;
+  const lastOffset = Math.max(0, total - limit);
+
+  const toggle = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Import from Printful</DialogTitle></DialogHeader>
+        {!statusQuery.data?.configured ? (
+          <p className="text-sm text-muted-foreground">Set PRINTFUL_API_KEY in environment secrets to enable import.</p>
+        ) : !statusQuery.data.connected ? (
+          <p className="text-sm text-red-600">{statusQuery.data.error ?? "Could not connect to Printful"}</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Label className="text-sm">Store</Label>
+              <select
+                className="border rounded px-2 py-1 text-sm bg-background"
+                value={storeId ?? ""}
+                onChange={(e) => { setStoreId(Number(e.target.value)); setOffset(0); setSelected(new Set()); }}
+              >
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.type})</option>
+                ))}
+              </select>
+              <label className="flex items-center gap-2 text-xs ml-auto">
+                <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} />
+                Publish on import
+              </label>
+            </div>
+            {productsQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading products…</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                {products.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-muted/30">
+                    <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} />
+                    {p.thumbnail_url ? (
+                      <img src={p.thumbnail_url} alt="" className="w-10 h-10 rounded object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-muted" />
+                    )}
+                    <span className="text-sm flex-1 min-w-0 truncate">{p.name}</span>
+                    {importedIds.has(p.id) && (
+                      <Badge variant="outline" className="text-xs shrink-0">Imported</Badge>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+            {total > limit && (
+              <div className="flex justify-between text-sm">
+                <Button size="sm" variant="outline" disabled={offset <= 0} onClick={() => setOffset((o) => Math.max(0, o - limit))}>Previous</Button>
+                <span className="text-muted-foreground">{offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
+                <Button size="sm" variant="outline" disabled={offset >= lastOffset} onClick={() => setOffset((o) => o + limit)}>Next</Button>
+              </div>
+            )}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            disabled={selected.size === 0 || importMut.isPending || storeId == null}
+            onClick={() => importMut.mutate({
+              storeId: storeId!,
+              syncProductIds: Array.from(selected),
+              publish,
+            })}
+          >
+            {importMut.isPending ? "Importing…" : `Import ${selected.size || ""} product${selected.size === 1 ? "" : "s"}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -300,6 +441,13 @@ function OrdersTab({ productId }: { productId: number }) {
     },
     onError: (e) => toast.error(e.message),
   });
+  const retryPfMut = trpc.productsAdmin.retryPrintfulFulfillment.useMutation({
+    onSuccess: () => {
+      utils.productsAdmin.listOrders.invalidate({ productId });
+      toast.success("Printful fulfillment submitted");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 text-yellow-700",
@@ -364,6 +512,16 @@ function OrdersTab({ productId }: { productId: number }) {
                         ) : null}
                       </div>
                     )}
+                    {(order.printfulOrderId || order.printfulStatus || order.printfulError) && (
+                      <div className="text-xs mt-1 rounded p-1.5 bg-teal-50 border border-teal-200">
+                        <span className="font-medium text-teal-700">Printful:</span>{" "}
+                        {order.printfulStatus ?? "pending"}
+                        {order.printfulOrderId ? ` · ${order.printfulOrderId}` : ""}
+                        {order.printfulError ? (
+                          <span className="block text-red-600 mt-0.5">{order.printfulError}</span>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1">
                     {(order.bookvaultError || (!order.bookvaultSubmittedAt && order.fulfillmentStatus === "pending")) && (
@@ -375,6 +533,17 @@ function OrdersTab({ productId }: { productId: number }) {
                         onClick={() => retryBvMut.mutate({ orderId: order.id, force: Boolean(order.bookvaultError) })}
                       >
                         {retryBvMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Send to BookVault"}
+                      </Button>
+                    )}
+                    {(order.printfulError || (!order.printfulSubmittedAt && order.fulfillmentStatus === "pending")) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={retryPfMut.isPending}
+                        onClick={() => retryPfMut.mutate({ orderId: order.id, force: Boolean(order.printfulError) })}
+                      >
+                        {retryPfMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Send to Printful"}
                       </Button>
                     )}
                     <select
@@ -1065,6 +1234,39 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
     onSuccess: () => { utils.productsAdmin.getBookvaultSettings.invalidate({ productId }); toast.success("BookVault settings saved"); },
     onError: (e: any) => toast.error(e.message),
   });
+  // Printful settings
+  const { data: pfulData } = trpc.productsAdmin.getPrintfulSettings.useQuery({ productId });
+  const testPfulMut = trpc.productsAdmin.testPrintfulConnection.useMutation({
+    onSuccess: () => {
+      utils.productsAdmin.getPrintfulSettings.invalidate({ productId });
+      toast.success("Connected to Printful");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const [pfulStoreId, setPfulStoreId] = React.useState("");
+  const [pfulProductId, setPfulProductId] = React.useState("");
+  const [pfulVariantId, setPfulVariantId] = React.useState("");
+  React.useEffect(() => {
+    if (pfulData?.printfulStoreId) setPfulStoreId(String(pfulData.printfulStoreId));
+    if (pfulData?.printfulSyncProductId) setPfulProductId(String(pfulData.printfulSyncProductId));
+    if (pfulData?.printfulSyncVariantId) setPfulVariantId(String(pfulData.printfulSyncVariantId));
+  }, [pfulData?.printfulStoreId, pfulData?.printfulSyncProductId, pfulData?.printfulSyncVariantId]);
+  const pfulMut = trpc.productsAdmin.updatePrintfulSettings.useMutation({
+    onSuccess: () => { utils.productsAdmin.getPrintfulSettings.invalidate({ productId }); toast.success("Printful settings saved"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const savePrintful = (enabled: boolean) => {
+    const storeNum = pfulStoreId.trim() ? Number.parseInt(pfulStoreId, 10) : null;
+    const productNum = pfulProductId.trim() ? Number.parseInt(pfulProductId, 10) : null;
+    const variantNum = pfulVariantId.trim() ? Number.parseInt(pfulVariantId, 10) : null;
+    pfulMut.mutate({
+      productId,
+      printfulEnabled: enabled,
+      printfulStoreId: Number.isFinite(storeNum) ? storeNum : null,
+      printfulSyncProductId: Number.isFinite(productNum) ? productNum : null,
+      printfulSyncVariantId: Number.isFinite(variantNum) ? variantNum : null,
+    });
+  };
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
   return (
     <div className="space-y-4">
@@ -1150,6 +1352,82 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
                   : "ISBN saved — title lookup did not return a match (verify in BookVault)."}
               </p>
             ) : null}
+          </div>
+        )}
+      </div>
+
+      {/* Printful Print-on-Demand */}
+      <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Printful Print-on-Demand</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Automatically submit orders to Printful when enabled. Link a store, sync product, and variant ID.
+            </p>
+          </div>
+          <Switch
+            checked={pfulData?.printfulEnabled ?? false}
+            onCheckedChange={(v) => savePrintful(v)}
+            disabled={pfulMut.isPending}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {pfulData?.connection?.connected ? (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              Connected · {pfulData.connection.stores.length} store(s)
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+              {pfulData?.connection?.error ?? "Not connected"}
+            </Badge>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => testPfulMut.mutate()}
+            disabled={testPfulMut.isPending}
+          >
+            {testPfulMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Test connection"}
+          </Button>
+          <a href="/admin/printful" className="text-xs text-teal-600 hover:underline">Open Printful admin →</a>
+        </div>
+
+        {(pfulData?.printfulEnabled) && (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label className="text-xs text-gray-600">Store</Label>
+              <select
+                className="mt-1 w-full border rounded px-2 py-1.5 text-sm bg-background"
+                value={pfulStoreId}
+                onChange={(e) => setPfulStoreId(e.target.value)}
+              >
+                <option value="">Select store…</option>
+                {(pfulData?.connection?.stores ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs text-gray-600">Sync Product ID</Label>
+              <Input value={pfulProductId} onChange={(e) => setPfulProductId(e.target.value)} className="mt-1 text-sm" placeholder="Printful sync product ID" />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-600">Sync Variant ID</Label>
+              <Input value={pfulVariantId} onChange={(e) => setPfulVariantId(e.target.value)} className="mt-1 text-sm" placeholder="Sync variant ID" />
+            </div>
+            <div className="sm:col-span-3 flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => savePrintful(true)} disabled={pfulMut.isPending}>
+                {pfulMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save Printful link"}
+              </Button>
+              {pfulData?.productMatch?.title && (
+                <p className="text-xs text-muted-foreground">
+                  Linked: {pfulData.productMatch.title}
+                  {pfulData.productMatch.variantName ? ` · ${pfulData.productMatch.variantName}` : ""}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>

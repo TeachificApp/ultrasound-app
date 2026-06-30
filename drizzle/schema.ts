@@ -4454,6 +4454,11 @@ export const physicalProducts = mysqlTable("physical_products", {
   // BookVault print-on-demand integration
   bookvaultEnabled: boolean("bookvault_enabled").default(false).notNull(),
   bookvaultIsbn: varchar("bookvault_isbn", { length: 32 }),
+  // Printful print-on-demand integration
+  printfulEnabled: boolean("printful_enabled").default(false).notNull(),
+  printfulStoreId: int("printful_store_id"),
+  printfulSyncProductId: int("printful_sync_product_id"),
+  printfulSyncVariantId: int("printful_sync_variant_id"),
   // Checkout page builder config (JSON)
   checkoutPageConfig: longtext("checkout_page_config"),
   // Stats
@@ -4511,6 +4516,10 @@ export const physicalProductOrders = mysqlTable("physical_product_orders", {
   bookvaultStatus: varchar("bookvault_status", { length: 64 }),
   bookvaultError: text("bookvault_error"),
   bookvaultSubmittedAt: timestamp("bookvault_submitted_at"),
+  printfulOrderId: varchar("printful_order_id", { length: 64 }),
+  printfulStatus: varchar("printful_status", { length: 64 }),
+  printfulError: text("printful_error"),
+  printfulSubmittedAt: timestamp("printful_submitted_at"),
   notes: text("notes"),
   orderedAt: timestamp("ordered_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

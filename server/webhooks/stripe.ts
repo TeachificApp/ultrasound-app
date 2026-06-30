@@ -22,6 +22,7 @@ import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
 import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
+import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail, emailWrapper } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
@@ -593,6 +594,18 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
       }
     } catch (err) {
       console.error(`[Stripe] BookVault fulfillment error for order ${orderId}:`, err);
+    }
+    try {
+      const pfResult = await fulfillPrintfulOrder(db, orderId, {
+        customerEmail: meta.customer_email ?? (session.customer_email as string) ?? null,
+      });
+      if (pfResult.submitted) {
+        console.log(`[Stripe] Printful fulfillment started for order ${orderId}`);
+      } else if (pfResult.error) {
+        console.warn(`[Stripe] Printful fulfillment failed for order ${orderId}: ${pfResult.error}`);
+      }
+    } catch (err) {
+      console.error(`[Stripe] Printful fulfillment error for order ${orderId}:`, err);
     }
   }
 

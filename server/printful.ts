@@ -149,13 +149,18 @@ export interface PrintfulShippingRate {
   maxDeliveryDays: number;
 }
 
+function getApiKey(): string {
+  const apiKey = (process.env.PRINTFUL_API_KEY ?? ENV.printfulApiKey).trim();
+  if (!apiKey) throw new Error("PRINTFUL_API_KEY is not configured");
+  return apiKey;
+}
+
 async function printfulFetch<T>(
   path: string,
   options: RequestInit = {},
   storeId?: number
 ): Promise<T> {
-  const apiKey = ENV.printfulApiKey;
-  if (!apiKey) throw new Error("PRINTFUL_API_KEY is not configured");
+  const apiKey = getApiKey();
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
@@ -188,7 +193,7 @@ export async function listSyncProducts(
 ): Promise<{ paging: { total: number; limit: number; offset: number }; result: PrintfulSyncProduct[] }> {
   const raw = await fetch(`${BASE_URL}/store/products?limit=${limit}&offset=${offset}`, {
     headers: {
-      Authorization: `Bearer ${ENV.printfulApiKey}`,
+      Authorization: `Bearer ${getApiKey()}`,
       "X-PF-Store-Id": String(storeId),
     },
   });
@@ -219,7 +224,7 @@ export async function listOrders(
   if (status) params.set("status", status);
   const raw = await fetch(`${BASE_URL}/orders?${params}`, {
     headers: {
-      Authorization: `Bearer ${ENV.printfulApiKey}`,
+      Authorization: `Bearer ${getApiKey()}`,
       "X-PF-Store-Id": String(storeId),
     },
   });
@@ -300,4 +305,34 @@ export async function createOrder(
 ): Promise<PrintfulOrder> {
   const path = confirm ? "/orders?confirm=true" : "/orders";
   return printfulFetch<PrintfulOrder>(path, { method: "POST", body: JSON.stringify(orderData) }, storeId);
+}
+
+export function isPrintfulConfigured(): boolean {
+  return Boolean((process.env.PRINTFUL_API_KEY ?? ENV.printfulApiKey).trim());
+}
+
+export function getDefaultPrintfulStoreId(): number | null {
+  const raw = (process.env.PRINTFUL_DEFAULT_STORE_ID ?? ENV.printfulDefaultStoreId).trim();
+  if (!raw) return null;
+  const id = Number.parseInt(raw, 10);
+  return Number.isFinite(id) ? id : null;
+}
+
+export async function testConnection(): Promise<{ stores: PrintfulStore[] }> {
+  const stores = await listStores();
+  return { stores };
+}
+
+export function splitFullName(name: string | null | undefined): { first: string; last: string } {
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) return { first: "Customer", last: "." };
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) return { first: parts[0]!, last: "." };
+  return { first: parts[0]!, last: parts.slice(1).join(" ") };
+}
+
+export function retailPriceToCents(retailPrice: string | null | undefined): number {
+  if (!retailPrice) return 0;
+  const value = Number.parseFloat(retailPrice);
+  return Number.isFinite(value) ? Math.round(value * 100) : 0;
 }

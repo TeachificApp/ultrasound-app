@@ -81,6 +81,13 @@ Set these in your Railway service's **Variables** tab:
 | `BOOKVAULT_DISPATCH_SERVICE` | Optional dispatch service (default: `CheapestTracked`) |
 | `BOOKVAULT_PRODUCTION_LEVEL` | Optional production level (default: `Standard`) |
 
+### Printful (Print-on-demand fulfillment)
+| Variable | Description |
+|----------|-------------|
+| `PRINTFUL_API_KEY` | API key from Printful → Stores → API |
+| `PRINTFUL_DEFAULT_STORE_ID` | Optional default store ID (e.g. `18405098` for All About Ultrasound \| iHeartEcho) |
+| `PRINTFUL_SHIPPING_METHOD` | Optional shipping method (default: `STANDARD`) |
+
 ### Analytics (Optional)
 | Variable | Description |
 |----------|-------------|
