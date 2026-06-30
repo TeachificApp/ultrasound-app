@@ -376,18 +376,8 @@ export default function ProductLanding() {
   const { runGuarded, isGuarded } = useCheckoutClickGuard();
   const buying = checkoutMut.isPending || isGuarded;
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="max-w-4xl mx-auto px-4 space-y-6">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-64 rounded-xl" />
-        </div>
-      </div>
-    );
-  }
-
-  // Workshop redirect: if the physical product is not found or archived, check if there's a workshop with the same slug
+  // Workshop redirect: if the physical product is not found or archived, check if there's a workshop with the same slug.
+  // IMPORTANT: must be declared before any early returns to satisfy React hooks rules.
   const workshopCheckQuery = trpc.workshop.getBySlug.useQuery(
     { slug: slug! },
     { enabled: !!slug && (!!error || (!!product && product.status === "archived")), retry: false }
@@ -398,6 +388,17 @@ export default function ProductLanding() {
       window.location.replace(`/workshops/${slug}${search}`);
     }
   }, [workshopCheckQuery.data]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-4xl mx-auto px-4 space-y-6">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-64 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   if (error || !product) {
     if (workshopCheckQuery.isLoading) {
