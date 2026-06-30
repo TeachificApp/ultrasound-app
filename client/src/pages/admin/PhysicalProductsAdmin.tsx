@@ -18,7 +18,7 @@ import {
   Plus, Pencil, Trash2, Copy, Upload, ShoppingBag, ArrowLeft,
   ExternalLink, Eye, Image as ImageIcon, Link as LinkIcon,
   Users, UserPlus, Loader2, Package, BarChart2, Settings,
-  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow, Search, Code2,
+  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate, Workflow, Search, Code2, Download,
 } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
@@ -54,6 +54,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
     onError: (e) => toast.error(e.message),
   });
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
@@ -77,6 +78,9 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
       </div>
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Physical Products {searchQuery && <span className="text-sm font-normal text-gray-500">({filteredProducts.length} results)</span>}</h3>
+        <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
+          <Download className="w-4 h-4 mr-1" /> Import from Shopify
+        </Button>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="w-4 h-4 mr-1" /> New Product
         </Button>
@@ -145,7 +149,254 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
 
       <CreateProductDialog open={showCreate} onClose={() => setShowCreate(false)}
         onCreated={(id) => { setShowCreate(false); onEdit(id); }} />
+      <ImportFromShopifyDialog
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={(id) => { setShowImport(false); onEdit(id); }}
+      />
     </div>
+  );
+}
+
+// ─── Import from Shopify Dialog ───────────────────────────────────────────────
+function ImportFromShopifyDialog({
+  open,
+  onClose,
+  onImported,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onImported: (id: number) => void;
+}) {
+  const utils = trpc.useUtils();
+  const { data: stores } = trpc.shopifyAdmin.listStores.useQuery(undefined, { enabled: open });
+  const { data: status } = trpc.shopifyAdmin.getConnectionStatus.useQuery(undefined, { enabled: open });
+  const [storeKey, setStoreKey] = React.useState("default");
+  const [cursor, setCursor] = React.useState<string | null>(null);
+  const [allProducts, setAllProducts] = React.useState<Array<{
+    id: string;
+    numericId: string;
+    title: string;
+    url: string | null;
+    imageUrl: string | null;
+    priceAmount: string | null;
+    priceCurrency: string | null;
+  }>>([]);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [search, setSearch] = React.useState("");
+  const [publishOnImport, setPublishOnImport] = React.useState(false);
+
+  React.useEffect(() => {
+    if (stores?.[0]?.key) setStoreKey(stores[0].key);
+  }, [stores]);
+
+  React.useEffect(() => {
+    if (!open) {
+      setCursor(null);
+      setAllProducts([]);
+      setSelected(new Set());
+      setSearch("");
+    }
+  }, [open]);
+
+  const activeStoreKey = storeKey || stores?.[0]?.key || "default";
+  const { data: page, isLoading, isFetching } = trpc.shopifyAdmin.listProducts.useQuery(
+    { storeKey: activeStoreKey, first: 50, after: cursor },
+    { enabled: open && Boolean(status?.configured) },
+  );
+  const { data: imported = [] } = trpc.shopifyAdmin.listImportedProductIds.useQuery(
+    { storeKey: activeStoreKey },
+    { enabled: open && Boolean(status?.configured) },
+  );
+
+  React.useEffect(() => {
+    if (!page?.products) return;
+    setAllProducts((prev) => {
+      const map = new Map(prev.map((p) => [p.numericId, p]));
+      for (const p of page.products) map.set(p.numericId, p);
+      return Array.from(map.values());
+    });
+  }, [page?.products]);
+
+  const importedIds = React.useMemo(
+    () => new Set(imported.map((r) => r.shopifyProductId)),
+    [imported],
+  );
+
+  const filtered = allProducts.filter((p) =>
+    !search.trim() || p.title.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const importOneMut = trpc.shopifyAdmin.importProduct.useMutation({
+    onSuccess: (result) => {
+      utils.productsAdmin.list.invalidate();
+      utils.shopifyAdmin.listImportedProductIds.invalidate({ storeKey: activeStoreKey });
+      if (result.action === "created" || result.action === "updated") {
+        toast.success(result.action === "created" ? "Product imported" : "Product updated from Shopify");
+        onImported(result.productId);
+      } else {
+        toast.info("Already imported — opening existing product");
+        onImported(result.productId);
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const importBulkMut = trpc.shopifyAdmin.importProducts.useMutation({
+    onSuccess: (data) => {
+      utils.productsAdmin.list.invalidate();
+      utils.shopifyAdmin.listImportedProductIds.invalidate({ storeKey: activeStoreKey });
+      setSelected(new Set());
+      toast.success(`Imported ${data.created} · updated ${data.updated} · skipped ${data.skipped}`);
+      const firstCreated = data.results.find((r) => r.action === "created" || r.action === "updated");
+      if (firstCreated && firstCreated.productId) onImported(firstCreated.productId);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const toggleSelected = (numericId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(numericId)) next.delete(numericId);
+      else next.add(numericId);
+      return next;
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Import from Shopify</DialogTitle>
+        </DialogHeader>
+
+        {!status?.configured ? (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
+            Configure Shopify env vars first (`SHOPIFY_STORE_DOMAIN` + token, or `_2` for a second store).
+          </p>
+        ) : (
+          <div className="space-y-3 flex-1 min-h-0 flex flex-col">
+            <div className="flex flex-wrap gap-2 items-center">
+              {(stores?.length ?? 0) > 1 && (
+                <select
+                  className="border rounded px-2 py-1.5 text-sm bg-background"
+                  value={activeStoreKey}
+                  onChange={(e) => {
+                    setStoreKey(e.target.value);
+                    setCursor(null);
+                    setAllProducts([]);
+                    setSelected(new Set());
+                  }}
+                >
+                  {(stores ?? []).map((s) => (
+                    <option key={s.key} value={s.key}>{s.label} ({s.domain})</option>
+                  ))}
+                </select>
+              )}
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search Shopify products..."
+                className="h-8 text-sm flex-1 min-w-[160px]"
+              />
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={publishOnImport}
+                  onChange={(e) => setPublishOnImport(e.target.checked)}
+                />
+                Publish on import
+              </label>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto border rounded-md">
+              {isLoading && allProducts.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">Loading catalog…</div>
+              ) : filtered.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">No products found.</div>
+              ) : (
+                <div className="divide-y">
+                  {filtered.map((p) => {
+                    const already = importedIds.has(p.numericId);
+                    const isSelected = selected.has(p.numericId);
+                    return (
+                      <div key={p.numericId} className="flex items-center gap-2 p-2 hover:bg-muted/30">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={already}
+                          onChange={() => toggleSelected(p.numericId)}
+                          className="rounded"
+                        />
+                        {p.imageUrl ? (
+                          <img src={p.imageUrl} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded bg-muted shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{p.title}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {p.priceAmount ? `${p.priceCurrency ?? "USD"} ${p.priceAmount}` : "No price"}
+                            {already ? " · Imported" : ""}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0"
+                          disabled={importOneMut.isPending || importBulkMut.isPending}
+                          onClick={() => importOneMut.mutate({
+                            storeKey: activeStoreKey,
+                            shopifyProductId: p.numericId,
+                            publish: publishOnImport,
+                            updateExisting: already,
+                          })}
+                        >
+                          {already ? "Update" : "Import"}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <div className="text-xs text-muted-foreground">
+                {filtered.length} shown · {imported.length} already imported
+              </div>
+              <div className="flex gap-2">
+                {page?.hasNextPage && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isFetching}
+                    onClick={() => setCursor(page.endCursor)}
+                  >
+                    {isFetching ? <Loader2 className="w-3 h-3 animate-spin" /> : "Load more"}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  disabled={selected.size === 0 || importBulkMut.isPending}
+                  onClick={() => importBulkMut.mutate({
+                    storeKey: activeStoreKey,
+                    shopifyProductIds: Array.from(selected),
+                    publish: publishOnImport,
+                  })}
+                >
+                  {importBulkMut.isPending ? "Importing…" : `Import selected (${selected.size})`}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

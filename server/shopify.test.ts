@@ -83,6 +83,7 @@ describe("shopify API client", () => {
                 title: "Workbook",
                 handle: "workbook",
                 onlineStoreUrl: "https://demo.com/products/workbook",
+                description: "<p>Details</p>",
                 featuredImage: { url: "https://cdn.shopify.com/image.jpg" },
                 priceRange: { minVariantPrice: { amount: "29.00", currencyCode: "USD" } },
               },

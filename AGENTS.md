@@ -64,7 +64,7 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 15. **Form Embed Widget migration**: Run `scripts/form-embed-widget-migration.sql` after deploy. Embed loader is served at `/embed.js` (from `client/public/embed.js`). Public config/events API: `/api/form-embed/config` and `/api/form-embed/event`. For UI verification in Cloud VMs, use `pnpm build && node dist/index.js` (not `pnpm dev`) due to Vite HMR WSS issue.
 
-16. **Shopify product linking**: Physical products in Shopify checkout mode can link to a Shopify catalog via the Storefront API. Configure `SHOPIFY_STORE_DOMAIN` + `SHOPIFY_STOREFRONT_ACCESS_TOKEN` (primary), or add a second store with `SHOPIFY_STORE_DOMAIN_2` + `SHOPIFY_STOREFRONT_ACCESS_TOKEN_2`. Private Headless tokens (`shpss_`) are server-side only. Admin picker: Physical Products → Checkout tab.
+16. **Shopify product linking**: Physical products in Shopify checkout mode can link to a Shopify catalog via the Storefront API. Configure `SHOPIFY_STORE_DOMAIN` + `SHOPIFY_STOREFRONT_ACCESS_TOKEN` (primary), or add a second store with `SHOPIFY_STORE_DOMAIN_2` + `SHOPIFY_STOREFRONT_ACCESS_TOKEN_2`. Private Headless tokens (`shpss_`) are server-side only. Admin: Physical Products → **Import from Shopify** (bulk/single) or per-product Checkout tab linker.
 
 ### Stripe membership subscriptions
 

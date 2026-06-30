@@ -22,6 +22,7 @@ export interface ShopifyProductSummary {
   imageUrl: string | null;
   priceAmount: string | null;
   priceCurrency: string | null;
+  descriptionHtml: string | null;
 }
 
 interface GraphqlResponse<T> {
@@ -170,6 +171,7 @@ export async function listProducts(
           title: string;
           handle: string;
           onlineStoreUrl: string | null;
+          description: string;
           featuredImage: { url: string } | null;
           priceRange: {
             minVariantPrice: { amount: string; currencyCode: string };
@@ -188,6 +190,7 @@ export async function listProducts(
             title
             handle
             onlineStoreUrl
+            description
             featuredImage { url }
             priceRange {
               minVariantPrice { amount currencyCode }
@@ -208,6 +211,7 @@ export async function listProducts(
     imageUrl: node.featuredImage?.url ?? null,
     priceAmount: node.priceRange?.minVariantPrice?.amount ?? null,
     priceCurrency: node.priceRange?.minVariantPrice?.currencyCode ?? null,
+    descriptionHtml: node.description || null,
   }));
 
   return {
@@ -234,6 +238,7 @@ export async function getProductById(
       title: string;
       handle: string;
       onlineStoreUrl: string | null;
+      description: string;
       featuredImage: { url: string } | null;
       priceRange: {
         minVariantPrice: { amount: string; currencyCode: string };
@@ -247,6 +252,7 @@ export async function getProductById(
         title
         handle
         onlineStoreUrl
+        description
         featuredImage { url }
         priceRange {
           minVariantPrice { amount currencyCode }
@@ -267,5 +273,6 @@ export async function getProductById(
     imageUrl: node.featuredImage?.url ?? null,
     priceAmount: node.priceRange?.minVariantPrice?.amount ?? null,
     priceCurrency: node.priceRange?.minVariantPrice?.currencyCode ?? null,
+    descriptionHtml: node.description || null,
   };
 }
