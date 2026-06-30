@@ -30,4 +30,7 @@ export const ENV = {
   shopifyStorefrontAccessToken: process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN ?? "",
   shopifyStoreDomain2: process.env.SHOPIFY_STORE_DOMAIN_2 ?? "",
   shopifyStorefrontAccessToken2: process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN_2 ?? "",
+  printifyApiToken: process.env.PRINTIFY_API_TOKEN ?? "",
+  printifyDefaultShopId: process.env.PRINTIFY_DEFAULT_SHOP_ID ?? "",
+  printifyShippingMethod: process.env.PRINTIFY_SHIPPING_METHOD ?? "1",
 };

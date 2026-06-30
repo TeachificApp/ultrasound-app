@@ -55,6 +55,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
   });
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showPrintifyImport, setShowPrintifyImport] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
@@ -78,9 +79,14 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
       </div>
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Physical Products {searchQuery && <span className="text-sm font-normal text-gray-500">({filteredProducts.length} results)</span>}</h3>
-        <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
-          <Download className="w-4 h-4 mr-1" /> Import from Shopify
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
+            <Download className="w-4 h-4 mr-1" /> Import from Shopify
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowPrintifyImport(true)}>
+            <Package className="w-4 h-4 mr-1" /> Import from Printify
+          </Button>
+        </div>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="w-4 h-4 mr-1" /> New Product
         </Button>
@@ -159,6 +165,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
         onClose={() => setShowImport(false)}
         onImported={(id) => { setShowImport(false); onEdit(id); }}
       />
+      <ImportFromPrintifyDialog open={showPrintifyImport} onClose={() => setShowPrintifyImport(false)} />
     </div>
   );
 }
@@ -399,6 +406,132 @@ function ImportFromShopifyDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+// ─── Import from Printify Dialog ─────────────────────────────────────────────
+function ImportFromPrintifyDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const utils = trpc.useUtils();
+  const statusQuery = trpc.printifyAdmin.getConnectionStatus.useQuery(undefined, { enabled: open });
+  const shops = statusQuery.data?.shops ?? [];
+  const [shopId, setShopId] = React.useState<number | null>(null);
+  const [page, setPage] = React.useState(1);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [publish, setPublish] = React.useState(false);
+  React.useEffect(() => {
+    if (!open) return;
+    if (shops.length > 0 && shopId === null) {
+      const preferred = statusQuery.data?.defaultShopId;
+      setShopId(preferred && shops.some((s) => s.id === preferred) ? preferred : shops[0]!.id);
+    }
+  }, [open, shops, shopId, statusQuery.data?.defaultShopId]);
+  React.useEffect(() => {
+    if (!open) {
+      setShopId(null);
+      setPage(1);
+      setSelected(new Set());
+      setPublish(false);
+    }
+  }, [open]);
+  const productsQuery = trpc.printifyAdmin.listProducts.useQuery(
+    { shopId: shopId!, page, limit: 50 },
+    { enabled: open && shopId != null },
+  );
+  const importedQuery = trpc.printifyAdmin.listImportedProductIds.useQuery(
+    { shopId: shopId! },
+    { enabled: open && shopId != null },
+  );
+  const importMut = trpc.printifyAdmin.importProducts.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Imported ${data.created} new, updated ${data.updated}, skipped ${data.skipped}`);
+      utils.productsAdmin.list.invalidate();
+      if (shopId) utils.printifyAdmin.listImportedProductIds.invalidate({ shopId });
+      setSelected(new Set());
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const importedIds = new Set((importedQuery.data ?? []).map((r: any) => r.printifyProductId));
+  const products = productsQuery.data?.products ?? [];
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Import from Printify</DialogTitle></DialogHeader>
+        {!statusQuery.data?.configured ? (
+          <p className="text-sm text-muted-foreground">Set PRINTIFY_API_TOKEN in environment secrets to enable import.</p>
+        ) : !statusQuery.data.connected ? (
+          <p className="text-sm text-red-600">{(statusQuery.data as any).error ?? "Could not connect to Printify"}</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Label className="text-sm">Shop</Label>
+              <select
+                className="border rounded px-2 py-1 text-sm bg-background"
+                value={shopId ?? ""}
+                onChange={(e) => { setShopId(Number(e.target.value)); setPage(1); setSelected(new Set()); }}
+              >
+                {shops.map((s) => (
+                  <option key={s.id} value={s.id}>{s.title} ({(s as any).sales_channel})</option>
+                ))}
+              </select>
+              <label className="flex items-center gap-2 text-xs ml-auto">
+                <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} />
+                Publish on import
+              </label>
+            </div>
+            {productsQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading products…</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                {products.map((p: any) => (
+                  <label key={p.id} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-muted/30">
+                    <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} />
+                    {p.imageUrl ? (
+                      <img src={p.imageUrl} alt="" className="w-10 h-10 rounded object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-muted" />
+                    )}
+                    <span className="text-sm flex-1 min-w-0 truncate">{p.title}</span>
+                    {importedIds.has(p.id) && (
+                      <Badge variant="outline" className="text-xs shrink-0">Imported</Badge>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+            {(productsQuery.data?.lastPage ?? 1) > 1 && (
+              <div className="flex justify-between text-sm">
+                <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+                <span className="text-muted-foreground">Page {page} of {productsQuery.data?.lastPage ?? 1}</span>
+                <Button size="sm" variant="outline" disabled={page >= (productsQuery.data?.lastPage ?? 1)} onClick={() => setPage((p) => p + 1)}>Next</Button>
+              </div>
+            )}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            disabled={selected.size === 0 || importMut.isPending || shopId == null}
+            onClick={() => importMut.mutate({
+              shopId: shopId!,
+              printifyProductIds: Array.from(selected),
+              publish,
+            })}
+          >
+            {importMut.isPending ? "Importing…" : `Import ${selected.size || ""} product${selected.size === 1 ? "" : "s"}`}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -683,6 +816,13 @@ function OrdersTab({ productId }: { productId: number }) {
     },
     onError: (e) => toast.error(e.message),
   });
+  const retryPfMut = trpc.productsAdmin.retryPrintifyFulfillment.useMutation({
+    onSuccess: () => {
+      utils.productsAdmin.listOrders.invalidate({ productId });
+      toast.success("Printify fulfillment submitted");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 text-yellow-700",
@@ -744,6 +884,16 @@ function OrdersTab({ productId }: { productId: number }) {
                         {order.bookvaultPodRef ? ` · PodRef ${order.bookvaultPodRef}` : ""}
                         {order.bookvaultError ? (
                           <span className="block text-red-600 mt-0.5">{order.bookvaultError}</span>
+                        ) : null}
+                      </div>
+                    )}
+                    {((order as any).printifyOrderId || (order as any).printifyStatus || (order as any).printifyError) && (
+                      <div className="text-xs mt-1 rounded p-1.5 bg-violet-50 border border-violet-200">
+                        <span className="font-medium text-violet-700">Printify:</span>{" "}
+                        {(order as any).printifyStatus ?? "pending"}
+                        {(order as any).printifyOrderId ? ` · ${(order as any).printifyOrderId}` : ""}
+                        {(order as any).printifyError ? (
+                          <span className="block text-red-600 mt-0.5">{(order as any).printifyError}</span>
                         ) : null}
                       </div>
                     )}
@@ -1466,6 +1616,38 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
     onSuccess: () => { utils.productsAdmin.getBookvaultSettings.invalidate({ productId }); toast.success("BookVault settings saved"); },
     onError: (e: any) => toast.error(e.message),
   });
+  // Printify settings
+  const { data: pfData } = trpc.productsAdmin.getPrintifySettings.useQuery({ productId });
+  const testPfMut = trpc.productsAdmin.testPrintifyConnection.useMutation({
+    onSuccess: () => {
+      utils.productsAdmin.getPrintifySettings.invalidate({ productId });
+      toast.success("Connected to Printify");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const [pfShopId, setPfShopId] = React.useState<string>("");
+  const [pfProductId, setPfProductId] = React.useState("");
+  const [pfVariantId, setPfVariantId] = React.useState("");
+  React.useEffect(() => {
+    if (pfData?.printifyShopId) setPfShopId(String(pfData.printifyShopId));
+    if (pfData?.printifyProductId) setPfProductId(pfData.printifyProductId);
+    if (pfData?.printifyVariantId) setPfVariantId(String(pfData.printifyVariantId));
+  }, [pfData?.printifyShopId, pfData?.printifyProductId, pfData?.printifyVariantId]);
+  const pfMut = trpc.productsAdmin.updatePrintifySettings.useMutation({
+    onSuccess: () => { utils.productsAdmin.getPrintifySettings.invalidate({ productId }); toast.success("Printify settings saved"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const savePrintify = (enabled: boolean) => {
+    const shopNum = pfShopId.trim() ? Number.parseInt(pfShopId, 10) : null;
+    const variantNum = pfVariantId.trim() ? Number.parseInt(pfVariantId, 10) : null;
+    pfMut.mutate({
+      productId,
+      printifyEnabled: enabled,
+      printifyShopId: Number.isFinite(shopNum) ? shopNum : null,
+      printifyProductId: pfProductId.trim() || null,
+      printifyVariantId: Number.isFinite(variantNum) ? variantNum : null,
+    });
+  };
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
   return (
     <div className="space-y-4">
@@ -1551,6 +1733,80 @@ function ProductAfterPurchaseTab({ productId }: { productId: number }) {
                   : "ISBN saved — title lookup did not return a match (verify in BookVault)."}
               </p>
             ) : null}
+          </div>
+        )}
+      </div>
+
+      {/* Printify Print-on-Demand */}
+      <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Printify Print-on-Demand</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Automatically submit orders to Printify when enabled. Link a Printify shop, product, and variant ID.
+            </p>
+          </div>
+          <Switch
+            checked={pfData?.printifyEnabled ?? false}
+            onCheckedChange={(v) => savePrintify(v)}
+            disabled={pfMut.isPending}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {pfData?.connection?.connected ? (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              Connected · {(pfData.connection as any).shops?.length ?? 0} shop(s)
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+              {(pfData?.connection as any)?.error ?? "Not connected"}
+            </Badge>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => testPfMut.mutate()}
+            disabled={testPfMut.isPending}
+          >
+            {testPfMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Test connection"}
+          </Button>
+          <a href="/admin/printify" className="text-xs text-teal-600 hover:underline">Open Printify admin →</a>
+        </div>
+        {(pfData?.printifyEnabled) && (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label className="text-xs text-gray-600">Shop</Label>
+              <select
+                className="mt-1 w-full border rounded px-2 py-1.5 text-sm bg-background"
+                value={pfShopId}
+                onChange={(e) => setPfShopId(e.target.value)}
+              >
+                <option value="">Select shop…</option>
+                {((pfData?.connection as any)?.shops ?? []).map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs text-gray-600">Product ID</Label>
+              <Input value={pfProductId} onChange={(e) => setPfProductId(e.target.value)} className="mt-1 text-sm" placeholder="Printify product ID" />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-600">Variant ID</Label>
+              <Input value={pfVariantId} onChange={(e) => setPfVariantId(e.target.value)} className="mt-1 text-sm" placeholder="Variant ID" />
+            </div>
+            <div className="sm:col-span-3 flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => savePrintify(true)} disabled={pfMut.isPending}>
+                {pfMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save Printify link"}
+              </Button>
+              {(pfData as any)?.productMatch?.title && (
+                <p className="text-xs text-muted-foreground">
+                  Linked: {(pfData as any).productMatch.title}
+                  {(pfData as any).productMatch.variantTitle ? ` · ${(pfData as any).productMatch.variantTitle}` : ""}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -83,13 +83,20 @@ Set these in your Railway service's **Variables** tab:
 
 ### Shopify (Physical product checkout links)
 | Variable | Description |
-|----------|-------------|
+|----------|--------------|
 | `SHOPIFY_STORE_DOMAIN` | Primary store domain (e.g. `your-store.myshopify.com`) |
 | `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | Primary Storefront API token (`shpua_` public or `shpss_` private) |
 | `SHOPIFY_STORE_DOMAIN_2` | Optional second store domain |
 | `SHOPIFY_STOREFRONT_ACCESS_TOKEN_2` | Optional second store Storefront API token |
 | `SHOPIFY_STORES` | Optional JSON array override: `[{"key":"default","label":"Primary","domain":"...","token":"..."}]` |
 | `SHOPIFY_API_VERSION` | Optional API version (default: `2025-01`) |
+
+### Printify (Print-on-demand fulfillment)
+| Variable | Description |
+|----------|--------------|
+| `PRINTIFY_API_TOKEN` | Personal access token from Printify → My Profile → Connections |
+| `PRINTIFY_DEFAULT_SHOP_ID` | Optional default shop ID (e.g. `5544447` for All About Ultrasound Shopify shop) |
+| `PRINTIFY_SHIPPING_METHOD` | Optional shipping method ID (default: `1`) |
 
 ### Analytics (Optional)
 | Variable | Description |

@@ -62,6 +62,7 @@ import { widgetAdminRouter, widgetPublicRouter } from "./routers/widgetRouter";
 import { workshopPublicRouter, workshopLearnerRouter, workshopAdminRouter, workshopWaitlistRouter } from "./routers/workshopRouter";
 import { printfulAdminRouter, printfulPublicRouter } from "./routers/printfulRouter";
 import { shopifyAdminRouter } from "./routers/shopifyRouter";
+import { printifyAdminRouter } from "./routers/printifyRouter";
 import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuizAdminRouter } from "./routers/standaloneQuizRouter";
 import { teamRouter } from "./routers/teamRouter";
 import { adminNotificationsRouter } from "./routers/adminNotificationsRouter";
@@ -2068,6 +2069,7 @@ export const appRouter = router({
   printful: printfulPublicRouter,
   printfulAdmin: printfulAdminRouter,
   shopifyAdmin: shopifyAdminRouter,
+  printifyAdmin: printifyAdminRouter,
 
   // ─── Email/Password Auth (white-label, no OAuth portal) ──────────────────────
   emailAuth: emailAuthRouter,
