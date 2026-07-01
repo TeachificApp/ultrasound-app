@@ -549,6 +549,10 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: (res) => toast.success(`Access email resent to ${res.sentTo}`),
     onError: (e) => toast.error(e.message),
   });
+  const resendMembershipConfirmation = trpc.adminUser.resendMembershipConfirmation.useMutation({
+    onSuccess: (res) => toast.success(`Membership confirmation resent to ${res.sentTo}`),
+    onError: (e) => toast.error(e.message),
+  });
 
   const enrollments = data.enrollments ?? [];
   const courses   = enrollments.filter((e: any) => !e.isQuiz && !e.isDownload);
@@ -959,11 +963,22 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     <div>
                       <BrandBadge brand={m.brand} />
                       <p className="text-xs text-gray-500 mt-1">
-                        {m.tier === "premium" ? "★ Premium" : "Free"}{m.expiresAt ? ` · Expires ${formatDate(m.expiresAt)}` : " · No expiry"}
+                        {m.tier === "lifetime" ? "★ Lifetime Premium" : m.tier === "premium" ? "★ Premium" : "Free"}{m.expiresAt ? ` · Expires ${formatDate(m.expiresAt)}` : " · No expiry"}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">Granted {formatDate(m.createdAt ?? m.grantedAt)}</p>
                     </div>
-                    <StatusBadge status={m.status ?? "active"} />
+                    <div className="flex flex-col items-end gap-2">
+                      <StatusBadge status={m.status ?? "active"} />
+                      {(m.tier === "premium" || m.tier === "lifetime") && (
+                        <button
+                          onClick={() => resendMembershipConfirmation.mutate({ userId: data.user.id, brand: m.brand })}
+                          disabled={resendMembershipConfirmation.isPending}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 disabled:opacity-50"
+                        >
+                          {resendMembershipConfirmation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Confirmation
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))

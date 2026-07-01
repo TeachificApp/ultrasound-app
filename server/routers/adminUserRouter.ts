@@ -55,7 +55,7 @@ import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
-import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail } from "../_core/email";
+import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail, emailWrapper } from "../_core/email";
 import { sendEnrollmentEmail, sendDownloadAccessEmail } from "../lib/enrollmentEmail";
 import { getOrCreateAccessToken } from "../db";
 import { getBrandDisplayConfig } from "../../shared/brands";
@@ -2881,5 +2881,70 @@ export const adminUserRouter = router({
         .set({ accessExpiresAt: newExpiry })
         .where(eq(lmsEnrollments.id, input.enrollmentId));
       return { success: true, accessExpiresAt: newExpiry };
+    }),
+
+  /**
+   * Resend a brand membership purchase confirmation / access email to a user.
+   * Sends the same styled email the Stripe webhook sends for existing users.
+   */
+  resendMembershipConfirmation: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      brand: z.enum(["aaus", "iheartecho"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Load user
+      const [user] = await db
+        .select({ id: users.id, email: users.email, firstName: users.firstName, displayName: users.displayName, name: users.name })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!user || !user.email) throw new TRPCError({ code: "NOT_FOUND", message: "User not found or has no email" });
+
+      // Load brand membership to get tier
+      const [membership] = await db
+        .select({ tier: brandMemberships.tier, status: brandMemberships.status })
+        .from(brandMemberships)
+        .where(and(eq(brandMemberships.userId, input.userId), eq(brandMemberships.brand, input.brand)))
+        .limit(1);
+
+      const tier = membership?.tier ?? "premium";
+      const isLifetime = tier === "lifetime";
+      const brandLabel = input.brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
+      const planLabel = isLifetime ? `${brandLabel} Lifetime Premium Membership` : `${brandLabel} Premium Membership`;
+
+      const firstName = user.firstName || (user.displayName || user.name || user.email).split(" ")[0] || "there";
+      const customerName = user.displayName || user.name || `${user.firstName ?? ""} ${user.email}`.trim();
+
+      // Generate auto-login token
+      let accessToken: string | null = null;
+      try { accessToken = await getOrCreateAccessToken(input.userId); } catch { /* non-fatal */ }
+      const baseUrl = "https://app.allaboutultrasound.com";
+      const accessUrl = accessToken ? `${baseUrl}/api/auth/auto-login?token=${accessToken}` : `${baseUrl}/dashboard`;
+
+      const htmlBody = emailWrapper(`
+        <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>
+        <p style="margin:0 0 16px;color:#334155;">Hi ${firstName}, your ${planLabel} is now active and ready to use.</p>
+        <div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
+          <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Access your membership</p>
+          <p style="margin:0 0 8px;font-size:13px;color:#475569;">Click below to access your content \u2014 no password needed:</p>
+          <p style="margin:0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
+        </div>
+        <p style="margin:16px 0 0;font-size:13px;color:#64748b;">If you have any questions, reply to this email or contact support.</p>
+      `, input.brand === "iheartecho" ? "iheartecho" : "aaus");
+
+      const sent = await sendEmail({
+        to: { name: customerName, email: user.email },
+        subject: `Your ${planLabel} is ready`,
+        htmlBody,
+        previewText: `Access your ${planLabel} on All About Ultrasound`,
+      });
+
+      if (!sent) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Email delivery failed — check SendGrid configuration" });
+      return { success: true, sentTo: user.email };
     }),
 });
