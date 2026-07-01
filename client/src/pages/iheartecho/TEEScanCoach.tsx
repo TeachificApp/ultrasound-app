@@ -39,11 +39,6 @@ function ViewDetail({ view }: { view: typeof TEE_VIEWS[0] }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              {view.aseNumber && view.aseNumber !== "0" && (
-                <span className="inline-flex items-center bg-white/20 rounded-full px-2.5 py-0.5">
-                  <span className="text-[10px] font-bold text-white">ASE {view.aseNumber}</span>
-                </span>
-              )}
               <span className="inline-flex items-center bg-white/15 rounded-full px-2.5 py-0.5">
                 <span className="text-[10px] font-semibold text-white/80">{view.group}</span>
               </span>
@@ -300,9 +295,6 @@ export default function TEEScanCoach() {
                         >
                           <ArrowRight className="w-3 h-3 flex-shrink-0" />
                           <span className="flex-1">
-                            {view.aseNumber && view.aseNumber !== "0" && (
-                              <span className="text-[9px] opacity-50 mr-1">{view.aseNumber}</span>
-                            )}
                             {view.name}
                           </span>
                         </button>
