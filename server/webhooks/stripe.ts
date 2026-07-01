@@ -126,6 +126,9 @@ async function handleMembershipCheckoutCompleted(session: Record<string, unknown
   const db = await getDb();
   if (!db) return;
 
+  // Exclude brand membership and dual membership checkouts — handled by their own dedicated handlers
+  if (meta.type === "brand_membership_upgrade" || meta.type === "dual_membership" || meta.type === "dual_membership_lifetime") return;
+
   let isMembership = meta.type === "membership";
   if (!isMembership) {
     try {
@@ -798,7 +801,8 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
   }
 
   // ── Grant brand membership ─────────────────────────────────────────────────
-  const membershipTier = meta.interval === "lifetime" || !subscriptionId ? "lifetime" : "premium";
+  const isLifetime = meta.interval === "lifetime" || !subscriptionId;
+  const membershipTier = isLifetime ? "lifetime" : "premium";
   const [existing] = await db
     .select()
     .from(brandMemberships)
