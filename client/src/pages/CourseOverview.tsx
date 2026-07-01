@@ -29,6 +29,11 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import {
+  filterLessonsForPlayer,
+  flattenCourseLessons,
+  isLessonHiddenAfterPurchase,
+} from "@shared/lmsPreviewAccess";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 
@@ -189,8 +194,11 @@ export default function CourseOverview() {
     catch { return []; }
   })();
 
-  // Find first incomplete lesson for "Continue Learning"
-  const allLessons = [...(topLevelLessons ?? []), ...(sections ?? []).flatMap((s: any) => s.lessons)];
+  // Find first incomplete lesson for "Continue Learning" (skip hide-after-purchase teasers)
+  const allLessons = filterLessonsForPlayer(
+    flattenCourseLessons(topLevelLessons, sections),
+    data.enrollment,
+  );
   const firstIncomplete = allLessons.find((l: any) => !completedIds.has(l.id));
   const continueLesson = firstIncomplete ?? allLessons[0];
 
@@ -264,9 +272,7 @@ export default function CourseOverview() {
   };
 
   const renderLessonRow = (lesson: any, section?: any) => {
-    // Hide "preview_hide_after_purchase" lessons for enrolled users
-    const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
-    if (pm === "preview_hide_after_purchase") return null;
+    if (isLessonHiddenAfterPurchase(lesson, data.enrollment)) return null;
     const done = completedIds.has(lesson.id);
     const dripLocked = isDripLocked(lesson, section);
     const prereqLocked = isPrereqLocked(lesson);
@@ -502,10 +508,7 @@ export default function CourseOverview() {
           {/* Sections */}
           {sections?.map((section: any) => {
             // If every lesson in the section is hidden after purchase, hide the whole section too
-            const visibleLessons = section.lessons.filter((l: any) => {
-              const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
-              return pm !== "preview_hide_after_purchase";
-            });
+            const visibleLessons = filterLessonsForPlayer(section.lessons ?? [], data.enrollment);
             if (section.lessons.length > 0 && visibleLessons.length === 0) return null;
 
             const expanded = expandedSections.has(section.id);
