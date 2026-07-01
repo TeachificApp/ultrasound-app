@@ -492,10 +492,10 @@ export const productAnalyticsRouter = router({
       const total = Number(countRows[0]?.total ?? 0);
 
       // Total spent — normalize everything to cents before summing
-      // funnel_purchases.amount_paid is in dollars, lms_orders.amount and physical_product_orders.amount_paid are in cents
+      // funnel_purchases.amount_paid is in cents (from Stripe amount_total), lms_orders.amount and physical_product_orders.amount_paid are also in cents
       const spentResult = await db.execute(sql`
         SELECT (
-          COALESCE((SELECT ROUND(SUM(amount_paid) * 100) FROM funnel_purchases WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
+          COALESCE((SELECT SUM(amount_paid) FROM funnel_purchases WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
           COALESCE((SELECT SUM(amount) FROM lms_orders WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
           COALESCE((SELECT SUM(amount_paid) FROM physical_product_orders WHERE user_id = ${input.userId} AND fulfillment_status = 'paid'), 0)
         ) AS totalSpent
@@ -503,13 +503,9 @@ export const productAnalyticsRouter = router({
       const spentRows = Array.isArray(spentResult) ? spentResult : (spentResult as any)[0] ?? [];
       const totalSpent = Number(spentRows[0]?.totalSpent ?? 0);
 
-      // Normalize amounts: lms_orders and physical_product_orders store cents; others store dollars
-      // The frontend fmtCurrency divides by 100, so we return everything in cents
+      // Normalize amounts: all sources store cents; frontend fmtCurrency divides by 100
       const normalizeAmount = (r: any): number => {
-        const raw = Number(r.amountPaid ?? 0);
-        const src = r.sourceTable as string;
-        if (src === 'course' || src === 'physical') return raw; // already cents
-        return Math.round(raw * 100); // dollars → cents
+        return Number(r.amountPaid ?? 0); // all sources store cents
       };
       return {
         transactions: rows.map((r: any) => ({

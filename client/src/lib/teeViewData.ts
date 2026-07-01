@@ -26,8 +26,8 @@ export type TeeView = {
 
 const ME_COLOR = "#189aa1";
 const TG_COLOR = "#0e7490";
-const UE_COLOR = "#0369a1";
-const AO_COLOR = "#7c3aed";
+const UE_COLOR = "#0f766e";
+const AO_COLOR = "#134e4a";
 const OV_COLOR = "#189aa1";
 
 export const TEE_VIEWS: TeeView[] = [

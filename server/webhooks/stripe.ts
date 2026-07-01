@@ -904,6 +904,38 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
     }
   }
 
+  // ── Record purchase in funnel_purchases for Transactions tab ─────────────
+  try {
+    const amountTotal = (session.amount_total as number) ?? 0;
+    const paymentIntentId = (session.payment_intent as string) ?? null;
+    const checkoutSessionId = session.id as string;
+    // Idempotency: skip if already recorded
+    const [existingPurchase] = await db.select({ id: funnelPurchases.id })
+      .from(funnelPurchases)
+      .where(eq(funnelPurchases.stripeCheckoutSessionId, checkoutSessionId))
+      .limit(1);
+    if (!existingPurchase) {
+      const brandLabel = brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
+      const planLabel = isLifetime ? `${brandLabel} Lifetime Premium Membership` : `${brandLabel} Premium Membership`;
+      await db.insert(funnelPurchases).values({
+        userId: userId || null,
+        email: customerEmail || "",
+        name: customerName || null,
+        productName: planLabel,
+        productType: "membership",
+        amountPaid: amountTotal, // cents (from Stripe amount_total)
+        currency: (session.currency as string) ?? "usd",
+        stripePaymentIntentId: paymentIntentId,
+        stripeCheckoutSessionId: checkoutSessionId,
+        sourceType: "other",
+        status: "paid",
+      });
+      console.log(`[Stripe] Brand membership purchase recorded in funnel_purchases: user ${userId}, product "${planLabel}", amount ${amountTotal}`);
+    }
+  } catch (purchaseErr) {
+    console.error(`[Stripe] Brand membership: failed to record funnel_purchase:`, purchaseErr);
+  }
+
   await notifyOwner({
     title: `\u2b50 New ${brand === "iheartecho" ? "EchoAssist" : "UltrasoundAssist"} Premium Subscription`,
     content: `User ID ${userId} (${customerEmail ?? meta.customer_email}) upgraded to ${brand} premium via Stripe.${
@@ -1090,6 +1122,36 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
     } catch (emailErr) {
       console.error(`[Stripe] Dual membership: failed to send access email to existing user ${customerEmail}:`, emailErr);
     }
+  }
+
+  // ── Record purchase in funnel_purchases for Transactions tab ─────────────
+  try {
+    const amountTotal = (session.amount_total as number) ?? 0;
+    const paymentIntentId = (session.payment_intent as string) ?? null;
+    const checkoutSessionId = session.id as string;
+    const [existingPurchase] = await db.select({ id: funnelPurchases.id })
+      .from(funnelPurchases)
+      .where(eq(funnelPurchases.stripeCheckoutSessionId, checkoutSessionId))
+      .limit(1);
+    if (!existingPurchase) {
+      const dualPlanLabel = isLifetime ? "All Access Dual Lifetime Membership" : "All Access Dual Membership";
+      await db.insert(funnelPurchases).values({
+        userId: userId || null,
+        email: customerEmail || "",
+        name: customerName || null,
+        productName: dualPlanLabel,
+        productType: "membership",
+        amountPaid: amountTotal, // cents (from Stripe amount_total)
+        currency: (session.currency as string) ?? "usd",
+        stripePaymentIntentId: paymentIntentId,
+        stripeCheckoutSessionId: checkoutSessionId,
+        sourceType: "other",
+        status: "paid",
+      });
+      console.log(`[Stripe] Dual membership purchase recorded in funnel_purchases: user ${userId}, product "${dualPlanLabel}", amount ${amountTotal}`);
+    }
+  } catch (purchaseErr) {
+    console.error(`[Stripe] Dual membership: failed to record funnel_purchase:`, purchaseErr);
   }
 
   const planDescription = isLifetime
