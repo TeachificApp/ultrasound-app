@@ -7456,3 +7456,24 @@ export const adminNotifications = mysqlTable("admin_notifications", {
 });
 export type AdminNotification = typeof adminNotifications.$inferSelect;
 export type InsertAdminNotification = typeof adminNotifications.$inferInsert;
+
+// ── Educator / Instructor Lead Capture ───────────────────────────────────────
+// Stores contact form submissions from educators/instructors interested in
+// teaching CME classes or cohort groups on All About Ultrasound.
+export const educatorLeads = mysqlTable("educator_leads", {
+  id: int("id").primaryKey().autoincrement(),
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  credentials: varchar("credentials", { length: 200 }),
+  message: text("message"),
+  /** Admin review status: "new" | "contacted" | "closed" */
+  status: varchar("status", { length: 30 }).notNull().default("new"),
+  adminNotes: text("admin_notes"),
+  /** Comma-separated tags for CRM-style filtering, e.g. "Educator" */
+  tags: varchar("tags", { length: 500 }).notNull().default("Educator"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EducatorLead = typeof educatorLeads.$inferSelect;
+export type InsertEducatorLead = typeof educatorLeads.$inferInsert;

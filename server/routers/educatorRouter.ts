@@ -33,7 +33,10 @@ import {
   platformFeatureFlags,
   userRoles,
   users,
+  educatorLeads,
 } from "../../drizzle/schema";
+import { sendEmail } from "../_core/email";
+import { ENV } from "../_core/env";
 import { notifyOwner } from "../_core/notification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1225,6 +1228,102 @@ export const educatorRouter = router({
           assignedByUserId: ctx.user.id,
         });
       }
+      return { success: true };
+    }),
+
+  // ── Educator Lead Capture ────────────────────────────────────────────────────
+
+  /** Submit an educator/instructor interest form (public — no login required) */
+  submitEducatorLead: publicProcedure
+    .input(
+      z.object({
+        firstName: z.string().min(1).max(100),
+        lastName: z.string().min(1).max(100),
+        email: z.string().email().max(255),
+        phone: z.string().max(50).optional(),
+        credentials: z.string().max(200).optional(),
+        message: z.string().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = (await getDb())!;
+      const [result] = await db.insert(educatorLeads).values({
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email,
+        phone: input.phone ?? null,
+        credentials: input.credentials ?? null,
+        message: input.message ?? null,
+        tags: "Educator",
+        status: "new",
+      });
+      const leadId = (result as any).insertId as number;
+
+      // Notify owner (in-app)
+      await notifyOwner({
+        title: "New Educator Lead",
+        content: `${input.firstName} ${input.lastName} (${input.email}) submitted the educator interest form. Credentials: ${input.credentials ?? "—"}. Message: ${input.message ?? "—"}`,
+      });
+
+      // Send admin email notification
+      const adminEmail = ENV.platformAdminEmail;
+      await sendEmail({
+        to: { name: "All About Ultrasound Admin", email: adminEmail },
+        subject: `New Educator Lead: ${input.firstName} ${input.lastName}`,
+        htmlBody: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+            <h2 style="color:#189aa1;margin-bottom:4px;">New Educator Lead</h2>
+            <p style="color:#666;margin-top:0;">Someone is interested in teaching a CME class or cohort group.</p>
+            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+              <tr><td style="padding:8px 0;color:#888;width:140px;">Name</td><td style="padding:8px 0;font-weight:600;">${input.firstName} ${input.lastName}</td></tr>
+              <tr><td style="padding:8px 0;color:#888;">Email</td><td style="padding:8px 0;"><a href="mailto:${input.email}" style="color:#189aa1;">${input.email}</a></td></tr>
+              <tr><td style="padding:8px 0;color:#888;">Phone</td><td style="padding:8px 0;">${input.phone ?? "—"}</td></tr>
+              <tr><td style="padding:8px 0;color:#888;">Credentials</td><td style="padding:8px 0;">${input.credentials ?? "—"}</td></tr>
+              <tr><td style="padding:8px 0;color:#888;vertical-align:top;">Message</td><td style="padding:8px 0;">${input.message ?? "—"}</td></tr>
+              <tr><td style="padding:8px 0;color:#888;">Tag</td><td style="padding:8px 0;"><span style="background:#e0f7f8;color:#189aa1;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600;">Educator</span></td></tr>
+            </table>
+            <p style="margin-top:24px;font-size:12px;color:#aaa;">Submitted via learn.allaboutultrasound.com educator interest form.</p>
+          </div>`,
+        brandMode: "aaus",
+      });
+
+      return { success: true, leadId };
+    }),
+
+  /** Admin: list all educator leads (admin only) */
+  adminListEducatorLeads: protectedProcedure
+    .input(
+      z.object({
+        status: z.string().optional(),
+        limit: z.number().min(1).max(200).default(100),
+        offset: z.number().min(0).default(0),
+      }).optional()
+    )
+    .query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = (await getDb())!;
+      const rows = await db
+        .select()
+        .from(educatorLeads)
+        .orderBy(desc(educatorLeads.createdAt))
+        .limit(200);
+      return rows;
+    }),
+
+  /** Admin: update educator lead status/notes */
+  adminUpdateEducatorLead: protectedProcedure
+    .input(
+      z.object({
+        id: z.number(),
+        status: z.enum(["new", "contacted", "closed"]).optional(),
+        adminNotes: z.string().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = (await getDb())!;
+      const { id, ...updates } = input;
+      await db.update(educatorLeads).set(updates).where(eq(educatorLeads.id, id));
       return { success: true };
     }),
 });

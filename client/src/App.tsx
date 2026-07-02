@@ -235,6 +235,7 @@ const PublicFormAnalyticsDashboard = lazy(() => import("./pages/PublicFormAnalyt
 const EmailAdmin = lazy(() => import("./pages/EmailAdmin"));
 const EmailCampaignDashboard = lazy(() => import("./pages/EmailCampaignDashboard"));
 const EducatorAssist = lazy(() => import("./pages/EducatorAssist"));
+const EducatorLeadForm = lazy(() => import("./pages/EducatorLeadForm"));
 const SonoQuizCreator = lazy(() => import("./pages/SonoQuizCreator"));
 const SonoQuizHost = lazy(() => import("./pages/SonoQuizHost"));
 const SonoQuizPlay = lazy(() => import("./pages/SonoQuizPlay"));
@@ -878,6 +879,7 @@ function LMSRouter() {
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
                 <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/contacts">{() => { window.location.replace("/admin/funnels?tab=contacts"); return null; }}</Route>
+        <Route path="/admin/educator-leads">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><AdminEducatorLeads /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/user-analytics">{() => { window.location.replace("/admin/members?tab=members"); return null; }}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
@@ -919,6 +921,7 @@ function LMSRouter() {
             <Route path="/terms">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="terms" /></Suspense>}</Route>
             <Route path="/privacy">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="privacy" /></Suspense>}</Route>
             <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
+            <Route path="/teach-with-us">{() => <Suspense fallback={pageFallback}><EducatorLeadForm /></Suspense>}</Route>
             {/* Funnel pages — catch-all last */}
             <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
             <Route path="/:slug/:pageSlug">{() => <PublicFunnelPageRoute />}</Route>
