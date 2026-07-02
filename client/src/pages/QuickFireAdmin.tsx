@@ -596,7 +596,7 @@ export default function QuickFireAdmin() {
   const [activeAdminTab, setActiveAdminTab] = useState<"questions" | "challenges" | "archive" | "flashcards" | "trash" | "submissions">("questions");
 
   // ── Challenge Archive state ──────────────────────────────────────────────
-  const archivedChallengesQuery = trpc.quickfire.adminListArchivedChallenges.useQuery();
+  const archivedChallengesQuery = trpc.quickfire.adminListArchivedChallenges.useQuery({ brand: adminBrand });
   const archivedChallenges = archivedChallengesQuery.data ?? [];
 
   // ── Trash state ─────────────────────────────────────────────────────────
@@ -673,7 +673,7 @@ export default function QuickFireAdmin() {
     selectedQuestionIds: [] as number[],
   });
 
-  const challengeListQuery = trpc.quickfire.adminListChallenges.useQuery({ includeArchived: false });
+  const challengeListQuery = trpc.quickfire.adminListChallenges.useQuery({ includeArchived: false, brand: adminBrand });
   const challenges = challengeListQuery.data ?? [];
 
   const createChallengeMutation = trpc.quickfire.adminCreateChallenge.useMutation({

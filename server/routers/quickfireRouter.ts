@@ -1699,8 +1699,12 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
 
   /** List all challenges in the queue (draft + scheduled + live) */
     adminListChallenges: adminProcedure
-    .input(z.object({ includeArchived: z.boolean().default(false) }))
+    .input(z.object({ includeArchived: z.boolean().default(false), brand: z.string().optional() }))
     .query(async ({ input, ctx }) => {
+      // `input.brand` is included as a cache-key discriminator on the client so that
+      // navigating between -aaus and -ihe admin pages uses separate React Query cache
+      // entries. The actual brand used for filtering is always ctx.brand (from the
+      // per-request X-App-Brand header), never input.brand.
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const statuses = input.includeArchived
@@ -2537,7 +2541,9 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
 
   /** List only archived challenges for the archive tab */
   adminListArchivedChallenges: adminProcedure
+    .input(z.object({ brand: z.string().optional() }).optional())
     .query(async ({ ctx }) => {
+      // `input.brand` is a cache-key discriminator only; ctx.brand is used for filtering.
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(quickfireChallenges)
