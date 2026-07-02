@@ -288,7 +288,7 @@ export default function LMSHome() {
             Teach With Us
           </div>
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
-            Have a passion for Ultrasound and/or Echocardiography?
+            Have a passion for sonography?
           </h2>
           <p className="text-teal-100 text-base mb-7 max-w-xl mx-auto">
             We're looking for experienced sonographers and physicians who want to teach CME classes or lead a cohort group. Let's connect!
