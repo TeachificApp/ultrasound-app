@@ -1738,16 +1738,22 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       priority: z.number().int().min(1).default(100),
       category: z.string().optional(),
       queuePosition: z.number().int().min(1).optional(),
+      // Explicit brand from the client — prevents header timing race conditions when
+      // the user navigates between brand admin pages while a mutation is in-flight.
+      brand: z.enum(["aaus", "iheartecho"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const brandCfg = getBrandCategoryConfig(ctx.brand);
+      // Use explicit input.brand when provided; fall back to ctx.brand from header.
+      // If both are present and disagree, the explicit input takes precedence (client knows best).
+      const effectiveBrand = (input.brand ?? ctx.brand) as "aaus" | "iheartecho";
+      const brandCfg = getBrandCategoryConfig(effectiveBrand);
       const defaultCat = brandCfg.categories[0];
       if (input.category && !brandCfg.categories.includes(input.category)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Invalid category for ${ctx.brand}. Use: ${brandCfg.categories.join(", ")}`,
+          message: `Invalid category for ${effectiveBrand}. Use: ${brandCfg.categories.join(", ")}`,
         });
       }
       const activeChallenges = await db
@@ -1756,7 +1762,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         .where(
           and(
             inArray(quickfireChallenges.status, ["draft", "scheduled", "live"] as never[]),
-            eq(quickfireChallenges.brand, ctx.brand),
+            eq(quickfireChallenges.brand, effectiveBrand),
           ),
         );
       for (const ch of activeChallenges) {
@@ -1774,7 +1780,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         description: input.description ?? null,
         questionIds: JSON.stringify(input.questionIds),
         priority: input.priority,
-        brand: ctx.brand,
+        brand: effectiveBrand,
         category: (input.category as never) ?? (defaultCat as never),
         status: "scheduled",
         queuePosition: input.queuePosition ?? null,
@@ -1792,18 +1798,20 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       priority: z.number().int().min(1).optional(),
       category: z.string().optional(),
       queuePosition: z.number().int().min(1).optional().nullable(),
+      brand: z.enum(["aaus", "iheartecho"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const brandCfg = getBrandCategoryConfig(ctx.brand);
+      const effectiveBrand = (input.brand ?? ctx.brand) as "aaus" | "iheartecho";
+      const brandCfg = getBrandCategoryConfig(effectiveBrand);
       if (input.category && !brandCfg.categories.includes(input.category)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Invalid category for ${ctx.brand}. Use: ${brandCfg.categories.join(", ")}`,
+          message: `Invalid category for ${effectiveBrand}. Use: ${brandCfg.categories.join(", ")}`,
         });
       }
-      const { id, questionIds, ...rest } = input;
+      const { id, questionIds, brand: _inputBrand, ...rest } = input;
       // Duplicate prevention: if questionIds are being changed, ensure no other active challenge uses them
       if (questionIds && questionIds.length > 0) {
         const activeChallenges = await db
@@ -1812,7 +1820,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
           .where(
             and(
               inArray(quickfireChallenges.status, ["draft", "scheduled", "live"] as never[]),
-              eq(quickfireChallenges.brand, ctx.brand),
+              eq(quickfireChallenges.brand, effectiveBrand),
             ),
           );
         for (const ch of activeChallenges) {

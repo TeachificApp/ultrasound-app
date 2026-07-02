@@ -667,7 +667,7 @@ export default function QuickFireAdmin() {
   const [challengeForm, setChallengeForm] = useState({
     title: "",
     description: "",
-    category: "Abdominal",
+    category: "Abdominal" as string, // updated to defaultCategory in openCreateChallenge
     queuePosition: undefined as number | undefined,
     priority: 100,
     selectedQuestionIds: [] as number[],
@@ -681,7 +681,7 @@ export default function QuickFireAdmin() {
       toast.success("Challenge created and added to queue.");
       challengeListQuery.refetch();
       setChallengeFormOpen(false);
-      setChallengeForm({ title: "", description: "", category: "Abdominal", queuePosition: undefined, priority: 100, selectedQuestionIds: [] });
+      setChallengeForm({ title: "", description: "", category: defaultCategory, queuePosition: undefined, priority: 100, selectedQuestionIds: [] });
     },
     onError: (err) => toast.error(err.message || "Failed to create challenge."),
   });
@@ -803,7 +803,7 @@ export default function QuickFireAdmin() {
 
   function openCreateChallenge() {
     setEditingChallengeId(null);
-    setChallengeForm({ title: "", description: "", category: "Abdominal", queuePosition: undefined, priority: 100, selectedQuestionIds: [] });
+    setChallengeForm({ title: "", description: "", category: defaultCategory, queuePosition: undefined, priority: 100, selectedQuestionIds: [] });
     setChallengeQSearch("");
     setChallengeFormOpen(true);
   }
@@ -832,6 +832,9 @@ export default function QuickFireAdmin() {
       priority: challengeForm.priority,
       category: challengeForm.category || undefined,
       queuePosition: challengeForm.queuePosition || undefined,
+      // Pass brand explicitly so the server uses the correct brand regardless of
+      // any X-App-Brand header timing issues during SPA navigation.
+      brand: adminBrand as "aaus" | "iheartecho",
     };
     if (editingChallengeId !== null) {
       updateChallengeMutation.mutate({ id: editingChallengeId, ...payload } as any);
