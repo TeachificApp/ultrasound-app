@@ -2,8 +2,8 @@
  * Media Repository Upload Routes
  *
  * Strategy:
- *  - Files ≤ 50 MB  → single-shot upload via Forge API proxy (storagePut)
- *  - Files > 50 MB  → R2 native multipart upload tracked in DB
+ *  - Files ≤ 20 MB  → single-shot upload via Forge API proxy (storagePut)
+ *  - Files > 20 MB  → R2 native multipart upload tracked in DB
  *
  * Two chunked endpoints (used by the frontend for ALL file sizes):
  *
@@ -161,7 +161,8 @@ async function authenticateAdmin(req: Request): Promise<{ id: number; role: stri
 }
 
 // Threshold: files above this use R2 multipart, below use Forge API single-shot
-const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50 MB
+// Set to 20 MB to match the Forge API proxy upload limit
+const LARGE_FILE_THRESHOLD = 20 * 1024 * 1024; // 20 MB
 
 const router = Router();
 
