@@ -32,7 +32,7 @@ const highlights = [
   {
     icon: GraduationCap,
     title: "Teach CME Classes",
-    body: "Lead accredited continuing medical education sessions for sonographers and physicians.",
+    body: "Lead accredited Ultrasound and/or Echocardiography CME sessions for sonographers and physicians.",
   },
   {
     icon: Users,
@@ -93,12 +93,12 @@ export default function EducatorLeadForm() {
             </div>
 
             <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 leading-tight mb-4">
-              Have a passion for sonography?{" "}
+              Have a passion for Ultrasound and/or Echocardiography?{" "}
               <span className="text-teal-600">Let's connect.</span>
             </h1>
 
             <p className="text-gray-600 text-lg leading-relaxed mb-8">
-              We're looking for experienced sonographers and physicians who want to teach a CME class or lead a cohort group. Share your expertise with a growing community of ultrasound professionals.
+              We're looking for experienced sonographers and physicians who want to teach Ultrasound and/or Echocardiography CME classes or lead a cohort group. Share your expertise with a growing community of ultrasound professionals.
             </p>
 
             <div className="space-y-5">

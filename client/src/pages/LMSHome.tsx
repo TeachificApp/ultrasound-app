@@ -280,6 +280,28 @@ export default function LMSHome() {
         </div>
       </section>
 
+      {/* Educator CTA */}
+      <section className="bg-gradient-to-r from-teal-700 to-teal-600 py-14">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <div className="inline-flex items-center gap-2 bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-full mb-5 uppercase tracking-wider">
+            <GraduationCap className="h-3.5 w-3.5" />
+            Teach With Us
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+            Have a passion for Ultrasound and/or Echocardiography?
+          </h2>
+          <p className="text-teal-100 text-base mb-7 max-w-xl mx-auto">
+            We're looking for experienced sonographers and physicians who want to teach CME classes or lead a cohort group. Let's connect!
+          </p>
+          <a href="https://learn.allaboutultrasound.com/teach-with-us">
+            <button className="inline-flex items-center gap-2 bg-white text-teal-700 font-semibold px-7 py-3 rounded-full shadow-md hover:bg-teal-50 transition-colors text-sm">
+              Apply to Teach
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </a>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-8">
