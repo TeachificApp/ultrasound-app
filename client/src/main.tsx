@@ -89,7 +89,12 @@ const trpcClient = trpc.createClient({
       url: `/api/trpc?_brand=${getBrandParam()}`,
       transformer: superjson,
       headers() {
-        return { "X-App-Hostname": window.location.hostname };
+        // X-App-Brand is re-evaluated on every request so navigating between
+        // -aaus and -ihe admin pages sends the correct brand without a reload.
+        return {
+          "X-App-Hostname": window.location.hostname,
+          "X-App-Brand": getBrandParam(),
+        };
       },
       fetch(input, init) {
         return globalThis.fetch(input, {
