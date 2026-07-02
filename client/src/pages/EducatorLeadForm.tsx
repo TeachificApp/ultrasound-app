@@ -93,7 +93,7 @@ export default function EducatorLeadForm() {
             </div>
 
             <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 leading-tight mb-4">
-              Have a passion for Ultrasound and/or Echocardiography?{" "}
+              Have a passion for sonography?{" "}
               <span className="text-teal-600">Let's connect.</span>
             </h1>
 
