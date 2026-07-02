@@ -418,10 +418,10 @@ export default function EducationLibrary() {
             Teach With Us
           </div>
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
-            Have a passion for sonography?
+            Have a passion for sonography? Let's connect.
           </h2>
           <p className="text-teal-100 text-base mb-7 max-w-xl mx-auto">
-            We're looking for experienced sonographers and physicians who want to teach CME classes or lead a cohort group. Let's connect!
+            We're looking for experienced sonographers and physicians who want to teach Ultrasound and/or Echocardiography CME classes or lead a cohort group. Share your expertise with a growing community of ultrasound professionals.
           </p>
           <a href="https://learn.allaboutultrasound.com/teach-with-us">
             <button className="inline-flex items-center gap-2 bg-white text-teal-700 font-semibold px-7 py-3 rounded-full shadow-md hover:bg-teal-50 transition-colors text-sm">
