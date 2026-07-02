@@ -4143,6 +4143,8 @@ export const sitePages = mysqlTable(
     isHomePage: boolean("is_home_page").default(false).notNull(),
     externalUrl: varchar("external_url", { length: 512 }),
     createdByUserId: int("created_by_user_id"),
+    // JSON: editable content zones for default pages (hero, cta, etc.)
+    editableZones: longtext("editable_zones"),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

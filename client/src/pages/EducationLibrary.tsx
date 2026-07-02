@@ -196,6 +196,18 @@ export default function EducationLibrary() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
+  // Editable zones from DB (admin-managed content)
+  const { data: pageZones } = trpc.sitePages.admin.getPublicPageZones.useQuery(
+    { domain: "learn.allaboutultrasound.com", slug: "/education-library" },
+    { staleTime: 5 * 60 * 1000 },
+  );
+  const zones = pageZones ?? {};
+  const heroHeadline = zones.hero_headline || null;
+  const heroSubtitle = zones.hero_subtitle || null;
+  const ctaHeadline = zones.cta_headline || null;
+  const ctaBody = zones.cta_body || null;
+  const ctaButton = zones.cta_button || null;
+
   // Fetch collections for filter tabs (must be before useEffect that reads it)
   const { data: collections } = trpc.lms.listCollections.useQuery();
 
@@ -261,9 +273,9 @@ export default function EducationLibrary() {
       {/* Hero */}
       <div className="teal-header py-12 px-4">
         <div className="max-w-5xl mx-auto text-center">
-          <h1 className="text-3xl font-bold text-white mb-2">Education Library</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">{heroHeadline ?? "Education Library"}</h1>
           <p className="text-teal-100 text-base max-w-xl mx-auto">
-            Courses, quizzes, and downloads from All About Ultrasound™ and iHeartEcho™ — designed for sonographers, physicians, and educators.
+            {heroSubtitle ?? "Courses, quizzes, and downloads from All About Ultrasound™ and iHeartEcho™ — designed for sonographers, physicians, and educators."}
           </p>
         </div>
       </div>
@@ -418,14 +430,14 @@ export default function EducationLibrary() {
             Teach With Us
           </div>
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
-            Have a passion for sonography? Let's connect.
+            {ctaHeadline ?? "Have a passion for sonography? Let's connect."}
           </h2>
           <p className="text-teal-100 text-base mb-7 max-w-xl mx-auto">
-            We're looking for experienced sonographers and physicians who want to teach Ultrasound and/or Echocardiography CME classes or lead a cohort group. Share your expertise with a growing community of ultrasound professionals.
+            {ctaBody ?? "We're looking for experienced sonographers and physicians who want to teach Ultrasound and/or Echocardiography CME classes or lead a cohort group. Share your expertise with a growing community of ultrasound professionals."}
           </p>
           <a href="https://learn.allaboutultrasound.com/teach-with-us">
             <button className="inline-flex items-center gap-2 bg-white text-teal-700 font-semibold px-7 py-3 rounded-full shadow-md hover:bg-teal-50 transition-colors text-sm">
-              Apply to Teach
+              {ctaButton ?? "Apply to Teach"}
               <ArrowRight className="h-4 w-4" />
             </button>
           </a>

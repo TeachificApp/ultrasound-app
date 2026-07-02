@@ -286,6 +286,81 @@ export const sitePagesAdminRouter = router({
     }),
 
   newNavItemId: protectedProcedure.query(() => newNavItemId()),
+
+  // ── Editable Zones (default pages) ──────────────────────────────────────────
+
+  getPageZones: protectedProcedure
+    .input(z.object({ domain: domainSchema, slug: z.string().min(1).max(200) }))
+    .query(async ({ ctx, input }) => {
+      requireAdmin(ctx.user.role);
+      const db = await getDb();
+      if (!db) return null;
+      const [row] = await db
+        .select({ id: sitePages.id, editableZones: sitePages.editableZones })
+        .from(sitePages)
+        .where(and(eq(sitePages.domain, input.domain), eq(sitePages.slug, input.slug.toLowerCase())))
+        .limit(1);
+      if (!row) return null;
+      try {
+        return { id: row.id, zones: row.editableZones ? JSON.parse(row.editableZones) : {} };
+      } catch {
+        return { id: row.id, zones: {} };
+      }
+    }),
+
+  savePageZones: protectedProcedure
+    .input(
+      z.object({
+        domain: domainSchema,
+        slug: z.string().min(1).max(200),
+        zones: z.record(z.string(), z.string().max(2000)),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      requireAdmin(ctx.user.role);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const json = JSON.stringify(input.zones);
+      const [existing] = await db
+        .select({ id: sitePages.id })
+        .from(sitePages)
+        .where(and(eq(sitePages.domain, input.domain), eq(sitePages.slug, input.slug.toLowerCase())))
+        .limit(1);
+      if (existing) {
+        await db
+          .update(sitePages)
+          .set({ editableZones: json })
+          .where(eq(sitePages.id, existing.id));
+        return { ok: true };
+      }
+      // Auto-create the page record if it doesn't exist yet
+      await db.insert(sitePages).values({
+        domain: input.domain,
+        slug: input.slug.toLowerCase(),
+        title: input.slug.replace(/^\//,'').replace(/-/g,' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Home',
+        pageKind: 'standard',
+        status: 'published',
+        blocks: '[]',
+        editableZones: json,
+        createdByUserId: ctx.user.id,
+      });
+      return { ok: true };
+    }),
+
+  // Public: get editable zones for a default page (for frontend rendering)
+  getPublicPageZones: publicProcedure
+    .input(z.object({ domain: domainSchema, slug: z.string().min(1).max(200) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return {};
+      const [row] = await db
+        .select({ editableZones: sitePages.editableZones })
+        .from(sitePages)
+        .where(and(eq(sitePages.domain, input.domain), eq(sitePages.slug, input.slug.toLowerCase())))
+        .limit(1);
+      if (!row?.editableZones) return {};
+      try { return JSON.parse(row.editableZones) as Record<string, string>; } catch { return {}; }
+    }),
 });
 
 export const sitePagesPublicRouter = router({

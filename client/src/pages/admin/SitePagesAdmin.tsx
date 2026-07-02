@@ -54,7 +54,113 @@ import {
   Pencil,
   ExternalLink,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+
+// Default pages that have editable zones instead of (or in addition to) the block editor
+const DEFAULT_EDITABLE_PAGES: Record<string, { label: string; zones: Array<{ key: string; label: string; hint: string; multiline?: boolean }> }> = {
+  "/": {
+    label: "Home",
+    zones: [
+      { key: "hero_headline", label: "Hero Headline", hint: "Main headline shown in the hero banner" },
+      { key: "hero_subtitle", label: "Hero Subtitle", hint: "Supporting text below the headline", multiline: true },
+      { key: "cta_headline", label: "CTA Section Headline", hint: "Headline for the bottom call-to-action section" },
+      { key: "cta_body", label: "CTA Section Body", hint: "Body text for the call-to-action section", multiline: true },
+      { key: "cta_button", label: "CTA Button Label", hint: "Text on the CTA button" },
+    ],
+  },
+  "/education-library": {
+    label: "Education Library",
+    zones: [
+      { key: "hero_headline", label: "Hero Headline", hint: "Main headline on the Education Library page" },
+      { key: "hero_subtitle", label: "Hero Subtitle", hint: "Supporting text below the headline", multiline: true },
+      { key: "cta_headline", label: "CTA Section Headline", hint: "Headline for the educator CTA section" },
+      { key: "cta_body", label: "CTA Section Body", hint: "Body text for the educator CTA section", multiline: true },
+      { key: "cta_button", label: "CTA Button Label", hint: "Text on the CTA button" },
+    ],
+  },
+  "/workshops": {
+    label: "Workshops",
+    zones: [
+      { key: "hero_headline", label: "Hero Headline", hint: "Main headline on the Workshops page" },
+      { key: "hero_subtitle", label: "Hero Subtitle", hint: "Supporting text below the headline", multiline: true },
+    ],
+  },
+  "/community": {
+    label: "Community",
+    zones: [
+      { key: "hero_headline", label: "Hero Headline", hint: "Main headline on the Community page" },
+      { key: "hero_subtitle", label: "Hero Subtitle", hint: "Supporting text below the headline", multiline: true },
+    ],
+  },
+};
+
+function PageZoneEditor({
+  domain,
+  slug,
+  pageDef,
+  onClose,
+}: {
+  domain: string;
+  slug: string;
+  pageDef: (typeof DEFAULT_EDITABLE_PAGES)[string];
+  onClose: () => void;
+}) {
+  const { data, isLoading } = trpc.sitePages.admin.getPageZones.useQuery({ domain, slug });
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (data && !loaded) {
+      setValues(data.zones ?? {});
+      setLoaded(true);
+    }
+  }, [data, loaded]);
+
+  const save = trpc.sitePages.admin.savePageZones.useMutation({
+    onSuccess: () => { toast.success("Page content saved"); onClose(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-5">
+      {isLoading ? (
+        <p className="text-sm text-gray-500">Loading...</p>
+      ) : (
+        pageDef.zones.map((zone) => (
+          <div key={zone.key} className="space-y-1">
+            <Label className="text-sm font-medium">{zone.label}</Label>
+            <p className="text-xs text-gray-500">{zone.hint}</p>
+            {zone.multiline ? (
+              <Textarea
+                rows={3}
+                value={values[zone.key] ?? ""}
+                onChange={(e) => setValues((v) => ({ ...v, [zone.key]: e.target.value }))}
+                placeholder={`Default: (leave blank to use default)`}
+              />
+            ) : (
+              <Input
+                value={values[zone.key] ?? ""}
+                onChange={(e) => setValues((v) => ({ ...v, [zone.key]: e.target.value }))}
+                placeholder="Leave blank to use default"
+              />
+            )}
+          </div>
+        ))
+      )}
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button
+          className="bg-teal-600 hover:bg-teal-700"
+          onClick={() => save.mutate({ domain, slug, zones: values })}
+          disabled={save.isPending}
+        >
+          {save.isPending ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function useQueryParams() {
   const [loc] = useLocation();
@@ -266,6 +372,7 @@ export default function SitePagesAdmin() {
     () => new Set(["folder:system", "folder:custom", "folder:courses"]),
   );
   const [selectedNode, setSelectedNode] = useState<SitePageTreeNode | null>(null);
+  const [zoneEditorSlug, setZoneEditorSlug] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newSlug, setNewSlug] = useState("");
@@ -435,6 +542,21 @@ export default function SitePagesAdmin() {
                     </a>
                   </Button>
                 )}
+                {(() => {
+                  // Normalize slug: selectedNode.slug may not have leading slash
+                  const rawSlug = selectedNode.slug ?? "";
+                  const normalizedSlug = rawSlug.startsWith("/") ? rawSlug : "/" + rawSlug;
+                  const pageDef = DEFAULT_EDITABLE_PAGES[normalizedSlug];
+                  return pageDef ? (
+                    <Button
+                      variant="outline"
+                      className="border-teal-500 text-teal-700 hover:bg-teal-50"
+                      onClick={() => setZoneEditorSlug(normalizedSlug)}
+                    >
+                      <Pencil className="w-4 h-4 mr-2" /> Edit Page Content
+                    </Button>
+                  ) : null;
+                })()}
               </div>
             ) : (
               <div>
@@ -523,6 +645,23 @@ export default function SitePagesAdmin() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Zone editor dialog */}
+      {zoneEditorSlug && DEFAULT_EDITABLE_PAGES[zoneEditorSlug] && (
+        <Dialog open={!!zoneEditorSlug} onOpenChange={(open) => { if (!open) setZoneEditorSlug(null); }}>
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Page Content — {DEFAULT_EDITABLE_PAGES[zoneEditorSlug].label}</DialogTitle>
+            </DialogHeader>
+            <PageZoneEditor
+              domain={domain}
+              slug={zoneEditorSlug}
+              pageDef={DEFAULT_EDITABLE_PAGES[zoneEditorSlug]}
+              onClose={() => setZoneEditorSlug(null)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

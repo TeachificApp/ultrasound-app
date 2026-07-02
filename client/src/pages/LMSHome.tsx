@@ -28,6 +28,18 @@ export default function LMSHome() {
   const { data: downloadsData, isLoading: loadingDownloads } = trpc.downloads.list.useQuery({ limit: 4 });
   const downloads = downloadsData?.products ?? [];
 
+  // Editable zones from DB (admin-managed content)
+  const { data: pageZones } = trpc.sitePages.admin.getPublicPageZones.useQuery(
+    { domain: "learn.allaboutultrasound.com", slug: "/" },
+    { staleTime: 5 * 60 * 1000 },
+  );
+  const zones = pageZones ?? {};
+  const heroHeadline = zones.hero_headline || null;
+  const heroSubtitle = zones.hero_subtitle || null;
+  const ctaHeadline = zones.cta_headline || null;
+  const ctaBody = zones.cta_body || null;
+  const ctaButton = zones.cta_button || null;
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       {/* Hero Section */}
@@ -45,13 +57,15 @@ export default function LMSHome() {
               </span>
             </div>
             <h1 className="text-3xl lg:text-5xl font-bold text-white leading-tight mb-4">
-              Advance Your Ultrasound{" "}
-              <span className="text-[#4ad9e0]">Expertise</span>
+              {heroHeadline ?? (
+                <>
+                  Advance Your Ultrasound{" "}
+                  <span className="text-[#4ad9e0]">Expertise</span>
+                </>
+              )}
             </h1>
             <p className="text-lg text-white/80 mb-8 max-w-2xl">
-              Comprehensive courses, quizzes, and downloadable resources designed by
-              experienced sonographers and physicians. Earn CME credits and build
-              clinical confidence.
+              {heroSubtitle ?? "Comprehensive courses, quizzes, and downloadable resources designed by experienced sonographers and physicians. Earn CME credits and build clinical confidence."}
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/education-library">
@@ -245,11 +259,10 @@ export default function LMSHome() {
           <div className="relative flex flex-col lg:flex-row items-center gap-8">
             <div className="flex-1">
               <h2 className="text-2xl lg:text-3xl font-bold text-white mb-3">
-                Ready to Level Up Your Skills?
+                {ctaHeadline ?? "Ready to Level Up Your Skills?"}
               </h2>
               <p className="text-white/80 text-base max-w-lg">
-                Join thousands of ultrasound professionals advancing their careers with
-                our expert-led courses and resources. Start learning today.
+                {ctaBody ?? "Join thousands of ultrasound professionals advancing their careers with our expert-led courses and resources. Start learning today."}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -257,7 +270,7 @@ export default function LMSHome() {
                 <Link href="/education-library">
                   <Button size="lg" className="bg-white text-[#189aa1] hover:bg-white/90 font-semibold shadow-lg">
                     <BookOpen className="w-4 h-4 mr-2" />
-                    Continue Learning
+                    {ctaButton ?? "Continue Learning"}
                   </Button>
                 </Link>
               ) : (
@@ -265,7 +278,7 @@ export default function LMSHome() {
                   <a href={getLoginUrl()}>
                     <Button size="lg" className="bg-white text-[#189aa1] hover:bg-white/90 font-semibold shadow-lg">
                       <GraduationCap className="w-4 h-4 mr-2" />
-                      Create Free Account
+                      {ctaButton ?? "Create Free Account"}
                     </Button>
                   </a>
                   <Link href="/education-library">
