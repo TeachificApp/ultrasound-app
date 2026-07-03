@@ -246,6 +246,21 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
       });
     }
 
+    // ── Set subscription description so future renewal invoices show the course name ──
+    const stripeSubscriptionId = session.subscription as string | null;
+    if (stripeSubscriptionId) {
+      try {
+        const [courseRow2] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
+        if (courseRow2?.title) {
+          const Stripe = (await import("stripe")).default;
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+          await stripe.subscriptions.update(stripeSubscriptionId, { description: `${courseRow2.title} \u2014 Monthly Subscription` });
+          console.log(`[Stripe] LMS checkout: set subscription ${stripeSubscriptionId} description: "${courseRow2.title}"`);
+        }
+      } catch (descErr) {
+        console.error("[Stripe] LMS checkout: failed to set subscription description:", descErr);
+      }
+    }
     console.log(`[Stripe] LMS checkout fulfilled: user ${userId}, course ${courseId}, ${result.notes.join(", ")}`);
   } catch (err) {
     console.error(`[Stripe] LMS checkout fulfillment error for session ${session.id}:`, err);
@@ -936,11 +951,22 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
     console.error(`[Stripe] Brand membership: failed to record funnel_purchase:`, purchaseErr);
   }
 
+  // ── Set subscription description so future renewal invoices show the product name ──
+  if (subscriptionId && !isLifetime) {
+    try {
+      const brandLabel = brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
+      const subDescription = `${brandLabel} Premium Membership \u2014 Monthly Subscription`;
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      await stripe.subscriptions.update(subscriptionId, { description: subDescription });
+      console.log(`[Stripe] Brand membership: set subscription ${subscriptionId} description: "${subDescription}"`);
+    } catch (descErr) {
+      console.error("[Stripe] Brand membership: failed to set subscription description:", descErr);
+    }
+  }
   await notifyOwner({
     title: `\u2b50 New ${brand === "iheartecho" ? "EchoAssist" : "UltrasoundAssist"} Premium Subscription`,
-    content: `User ID ${userId} (${customerEmail ?? meta.customer_email}) upgraded to ${brand} premium via Stripe.${
-      isNewUser ? " [NEW ACCOUNT AUTO-CREATED]" : ""
-    } Subscription: ${subscriptionId ?? "N/A"}.`,
+    content: `User ID ${userId} (${customerEmail ?? meta.customer_email}) upgraded to ${brand} premium via Stripe.${isNewUser ? " [NEW ACCOUNT AUTO-CREATED]" : ""} Subscription: ${subscriptionId ?? "N/A"}.`,
   });
 
   console.log(`[Stripe] Brand membership upgrade recorded: user ${userId}, brand ${brand}, subscription ${subscriptionId}`);
@@ -1154,6 +1180,17 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
     console.error(`[Stripe] Dual membership: failed to record funnel_purchase:`, purchaseErr);
   }
 
+  // ── Set subscription description so future renewal invoices show the product name ──
+  if (subscriptionId && !isLifetime) {
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      await stripe.subscriptions.update(subscriptionId, { description: "All Access Dual Membership \u2014 Monthly Subscription" });
+      console.log(`[Stripe] Dual membership: set subscription ${subscriptionId} description`);
+    } catch (descErr) {
+      console.error("[Stripe] Dual membership: failed to set subscription description:", descErr);
+    }
+  }
   const planDescription = isLifetime
     ? "All Access Dual Lifetime Membership ($147 one-time)"
     : "All Access Dual Membership ($12.99/mo)";
@@ -1819,6 +1856,44 @@ async function handleInvoicePaid(invoice: Record<string, unknown>) {
       console.log(`[Stripe] invoice.paid — LMS enrollment ${enr.id} expiry extended to ${expiresAt.toISOString()}`);
     }
   }
+  // ── Update payment intent description so Stripe dashboard shows the product name ──
+  // Build a human-readable description from the subscription we just identified.
+  try {
+    const paymentIntentId = invoice.payment_intent as string | null;
+    if (paymentIntentId) {
+      let renewalDescription: string | null = null;
+      if (membership) {
+        const brandLabel = membership.brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
+        renewalDescription = `${brandLabel} Premium Membership \u2014 Subscription Renewal`;
+      } else if (memSub) {
+        const [planRow] = await db.select({ title: membershipPlans.title })
+          .from(membershipPlans).where(eq(membershipPlans.id, memSub.planId)).limit(1);
+        if (planRow) renewalDescription = `${planRow.title} \u2014 Subscription Renewal`;
+      } else if (diySub) {
+        const planLabel = diySub.plan
+          ? diySub.plan.charAt(0).toUpperCase() + diySub.plan.slice(1)
+          : "DIY Accreditation";
+        renewalDescription = `${planLabel} DIY Accreditation \u2014 Subscription Renewal`;
+      } else {
+        // LMS subscription renewal — find course title
+        const [lmsEnrRow] = await db.select({ courseId: lmsEnrollments.courseId })
+          .from(lmsEnrollments).where(eq(lmsEnrollments.stripeSubscriptionId, subscriptionId)).limit(1);
+        if (lmsEnrRow) {
+          const [courseRow] = await db.select({ title: lmsCourses.title })
+            .from(lmsCourses).where(eq(lmsCourses.id, lmsEnrRow.courseId)).limit(1);
+          if (courseRow) renewalDescription = `${courseRow.title} \u2014 Subscription Renewal`;
+        }
+      }
+      if (renewalDescription) {
+        const Stripe = (await import("stripe")).default;
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+        await stripe.paymentIntents.update(paymentIntentId, { description: renewalDescription });
+        console.log(`[Stripe] invoice.paid — updated payment intent ${paymentIntentId} description: "${renewalDescription}"`);
+      }
+    }
+  } catch (descErr) {
+    console.error("[Stripe] invoice.paid — failed to update payment intent description:", descErr);
+  }
 }
 
 // DIY plan config (mirrors diyRouter.ts DIY_PLANS)
@@ -1901,6 +1976,18 @@ async function handleDiyCheckoutCompleted(session: Record<string, unknown>) {
   } else if (existingMem.tier !== "premium") {
     await db.update(brandMemberships).set({ tier: "premium", status: "active", source: "diy_accreditation" })
       .where(eq(brandMemberships.id, existingMem.id));
+  }
+  // ── Set subscription description so future renewal invoices show the product name ──
+  if (subscriptionId) {
+    try {
+      const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      await stripe.subscriptions.update(subscriptionId, { description: `${planLabel} DIY Accreditation \u2014 Monthly Subscription` });
+      console.log(`[Stripe] DIY checkout: set subscription ${subscriptionId} description`);
+    } catch (descErr) {
+      console.error("[Stripe] DIY checkout: failed to set subscription description:", descErr);
+    }
   }
   await notifyOwner({
     title: `New DIY Accreditation Org: ${orgName}`,
