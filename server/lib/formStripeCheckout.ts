@@ -79,6 +79,9 @@ export async function createFormStripeCheckout(input: FormStripeCheckoutInput): 
       submission_id: String(submissionId),
       source: "form_submission",
     },
+    ...(mode === "payment"
+      ? { payment_intent_data: { description: `${config.formName} — Form Payment` } }
+      : { subscription_data: { description: `${config.formName} — Form Subscription — Initial` } }),
   });
 
   return session.url;

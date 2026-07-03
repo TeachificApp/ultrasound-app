@@ -197,6 +197,7 @@ export const productsLearnerRouter = router({
           quantity: 1,
         }],
         metadata: { type: "physical_product", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        payment_intent_data: { description: `${product.title} — Physical Product` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=physical`,
         ...shippingOpts,
       });
@@ -348,6 +349,7 @@ export const productsLearnerRouter = router({
           user_id: ctx.user.id.toString(),
           customer_email: ctx.user.email ?? "",
         },
+        payment_intent_data: { description: `${pricingLabel} — Physical Product` },
         success_url: `${origin}/product/${product.slug}?success=1`,
         cancel_url: `${origin}/product/${product.slug}`,
       });
@@ -1287,6 +1289,7 @@ Make ALL content specific and compelling based on the product title and descript
           quantity: 1,
         }],
         metadata: { type: "physical_product", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        payment_intent_data: { description: `${product.title} — Physical Product` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=physical`,
         ...shippingOpts,
       });

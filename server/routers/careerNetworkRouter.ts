@@ -838,6 +838,7 @@ Return a JSON object with this exact structure:
         customer_email: ctx.user.email ?? "",
         customer_name: ctx.user.name ?? "",
       },
+      payment_intent_data: { description: "Job Post — Ultrasound Career Network" },
       success_url: `${origin}/employer/dashboard?success=job_post`,
       cancel_url: `${origin}/career-network`,
     });
@@ -873,7 +874,7 @@ Return a JSON object with this exact structure:
         customer_name: ctx.user.name ?? "",
       },
       subscription_data: {
-        description: "Employer Subscription — Ultrasound Career Network",
+        description: "Employer Subscription — Ultrasound Career Network — Monthly Subscription — Initial",
         metadata: { user_id: ctx.user.id.toString(), type: "employer_subscription" },
       },
       success_url: `${origin}/employer/dashboard?success=subscription`,

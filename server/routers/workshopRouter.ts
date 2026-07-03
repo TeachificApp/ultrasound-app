@@ -621,6 +621,7 @@ export const workshopLearnerRouter = router({
           ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}),
           ...orderBumpCheckout?.metadata,
         },
+        payment_intent_data: { description: `${workshop.title} — Workshop Registration` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=workshop`,
       }, { idempotencyKey: `workshop-checkout-${ctx.user.id}-${workshop.id}-${instance.id}-${workshopIdempotencyDate}` });
 
@@ -1457,6 +1458,7 @@ export const workshopAdminRouter = router({
           success_url: `${input.origin}/workshops/${workshop.slug}?enrolled=1`,
           cancel_url: `${input.origin}/workshops/${workshop.slug}`,
           metadata: { workshopId: String(input.workshopId), waitlistEntryId: String(input.entryId), grantedByAdminId: String(ctx.user.id) },
+          payment_intent_data: { description: `${workshop.title} — Workshop Registration` },
           client_reference_id: String(userId),
           allow_promotion_codes: true,
         });

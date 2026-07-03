@@ -1535,6 +1535,7 @@ export const lmsLearnerRouter = router({
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
           metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}) },
+          payment_intent_data: { description: `${productName} — One-Time Purchase` },
           ...shippingOptions,
         }, { idempotencyKey: `${idempotencyBase}-one-time` });
 
@@ -1575,7 +1576,7 @@ export const lmsLearnerRouter = router({
           client_reference_id: ctx.user.id.toString(),
           metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
           subscription_data: {
-            description: productName,
+            description: `${productName} — Subscription — Initial`,
             metadata: { user_id: ctx.user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() },
           },
           ...shippingOptions,
@@ -1630,7 +1631,9 @@ export const lmsLearnerRouter = router({
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
           metadata: { ...commonMeta, installment_count: installmentCount.toString(), pricing_option_id: input.pricingOptionId?.toString() ?? "" },
-          ...(hasInstallments ? { subscription_data: { description: productName, metadata: { user_id: ctx.user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() } } } : {}),
+          ...(hasInstallments
+            ? { subscription_data: { description: `${productName} — Payment Plan — Installments`, metadata: { user_id: ctx.user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() } } }
+            : { payment_intent_data: { description: `${productName} — Payment Plan — Down Payment` } }),
           ...shippingOptions,
         }, { idempotencyKey: `${idempotencyBase}-payment-plan` });
       } else {
@@ -1822,6 +1825,7 @@ export const lmsLearnerRouter = router({
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: user.id.toString(),
           metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump2 ? { bump_mode: "upgrade" } : {}) },
+          payment_intent_data: { description: `${productName} — One-Time Purchase` },
           ...shippingOptions,
         }, { idempotencyKey: `${guestIdempotencyBase}-one-time` });
       } else if (pricingType === "subscription") {
@@ -1844,7 +1848,7 @@ export const lmsLearnerRouter = router({
           client_reference_id: user.id.toString(),
           metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
           subscription_data: {
-            description: productName,
+            description: `${productName} — Subscription — Initial`,
             metadata: { user_id: user.id.toString(), course_id: course.id.toString(), order_id: orderResult.id.toString() },
           },
           ...shippingOptions,
@@ -1906,6 +1910,7 @@ export const lmsLearnerRouter = router({
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
           line_items: [{ price_data: { currency: course.currency ?? "usd", product_data: { name: course.title, images: course.coverImageUrl ? [course.coverImageUrl] : undefined }, unit_amount: Math.round(Number(course.price) * 100) }, quantity: 1 }],
           metadata: { type: "lms_course", course_id: course.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
+          payment_intent_data: { description: `${course.title} — Course Purchase` },
           success_url: `${origin}/courses/${course.slug}?success=1`,
           cancel_url: `${origin}/courses/${course.slug}`,
         });
@@ -1931,6 +1936,7 @@ export const lmsLearnerRouter = router({
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
           line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: Math.round(Number(product.price) * 100) }, quantity: 1 }],
           metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
+          payment_intent_data: { description: `${product.title} — Digital Download` },
           success_url: `${origin}/downloads/${product.slug}/files?success=1`,
           cancel_url: `${origin}/downloads/${product.slug}`,
         });
@@ -1954,6 +1960,7 @@ export const lmsLearnerRouter = router({
           shipping_address_collection: { allowed_countries: allowedCountries as any },
           line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: Math.round(Number(product.price) * 100) }, quantity: 1 }],
           metadata: { type: "physical_product", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
+          payment_intent_data: { description: `${product.title} — Physical Product` },
           success_url: `${origin}/product/${product.slug}?success=1`,
           cancel_url: `${origin}/product/${product.slug}`,
         });
@@ -2989,6 +2996,7 @@ export const lmsLearnerRouter = router({
           customer_email: ctx.user?.email ?? undefined,
           allow_promotion_codes: true,
           metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: String(requestedSeats), ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
+          payment_intent_data: { description: `${course.title} — Team License — ${requestedSeats} seats` },
         });
         return {
           clientSecret: session.client_secret!,
@@ -3067,6 +3075,9 @@ export const lmsLearnerRouter = router({
           customer_email: ctx.user?.email ?? undefined,
           allow_promotion_codes: true,
           metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
+          ...(sessionMode === "payment"
+            ? { payment_intent_data: { description: `${course.title} — One-Time Purchase` } }
+            : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
         });
         return {
           clientSecret: session.client_secret!,
@@ -3145,6 +3156,9 @@ export const lmsLearnerRouter = router({
         customer_email: ctx.user?.email ?? undefined,
         allow_promotion_codes: true,
           metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
+          ...(sessionMode === "payment"
+            ? { payment_intent_data: { description: `${course.title} — One-Time Purchase` } }
+            : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
       });
       return {
         clientSecret: session.client_secret!,

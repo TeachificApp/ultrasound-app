@@ -208,7 +208,7 @@ export const teamRouter = router({
         line_items: [lineItem],
         ...(plan === "monthly" ? {
           subscription_data: {
-            description: `${productName} — ${seatCount} seats`,
+            description: `${productName} — ${seatCount} seats — Monthly Subscription — Initial`,
             metadata: {
               user_id: ctx.user.id.toString(),
               type: "team_subscription",
@@ -220,7 +220,7 @@ export const teamRouter = router({
               price_per_seat: pricePerSeat.toString(),
             },
           },
-        } : {}),
+        } : { payment_intent_data: { description: `${productName} — ${seatCount} seats — One-Time Purchase` } }),
         success_url: `${origin}/team/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/team/subscribe`,
         client_reference_id: ctx.user.id.toString(),

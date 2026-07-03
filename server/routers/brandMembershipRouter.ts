@@ -394,6 +394,7 @@ export const brandMembershipRouter = router({
               type: "brand_membership_upgrade",
               interval: "lifetime",
             },
+            payment_intent_data: { description: `${productConfig.name} — Lifetime Membership` },
           }, { idempotencyKey: `brand-lifetime-${ctx.user.id}-${brand}-${new Date().toISOString().slice(0, 10)}` });
           if (!session.url) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
@@ -410,7 +411,7 @@ export const brandMembershipRouter = router({
           ...promoOpts,
           line_items: [recurringLineItem],
           subscription_data: {
-            description: `${productConfig.name} — ${input.interval === "annual" ? "Annual" : "Monthly"} Subscription`,
+            description: `${productConfig.name} — ${input.interval === "annual" ? "Annual" : "Monthly"} Subscription — Initial`,
             metadata: { user_id: ctx.user.id.toString(), brand, type: "brand_membership_upgrade" },
           },
           success_url: `${input.origin}/upgrade-success?brand=${brand}&session_id={CHECKOUT_SESSION_ID}`,
@@ -454,7 +455,7 @@ export const brandMembershipRouter = router({
           allow_promotion_codes: true,
           line_items: [dualMonthlyLineItem],
           subscription_data: {
-            description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Monthly Subscription`,
+            description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Monthly Subscription — Initial`,
             metadata: { user_id: ctx.user.id.toString(), type: "dual_membership" },
           },
           success_url: `${input.origin}/upgrade-success?dual=1&session_id={CHECKOUT_SESSION_ID}`,
@@ -504,6 +505,7 @@ export const brandMembershipRouter = router({
             customer_name: ctx.user.name ?? "",
             type: "dual_membership_lifetime",
           },
+          payment_intent_data: { description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Lifetime Membership` },
         }, { idempotencyKey: `dual-lifetime-${ctx.user.id}-${new Date().toISOString().slice(0, 10)}` });
         if (!session.url) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
@@ -534,7 +536,7 @@ export const brandMembershipRouter = router({
           allow_promotion_codes: true,
           line_items: [dualAnnualLineItem],
           subscription_data: {
-            description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Annual Subscription`,
+            description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Annual Subscription — Initial`,
             metadata: { user_id: ctx.user.id.toString(), type: "dual_membership" },
           },
           success_url: `${input.origin}/upgrade-success?dual=1&session_id={CHECKOUT_SESSION_ID}`,

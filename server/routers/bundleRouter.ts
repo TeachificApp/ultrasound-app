@@ -293,6 +293,9 @@ export const bundleLearnerRouter = router({
           pricing_option_id: input.pricingOptionId || "",
           purchase_type: "bundle_purchase",
         },
+        ...(isSubscription
+          ? { subscription_data: { description: `${bundle.title} — Bundle — Subscription — Initial`, metadata: { user_id: ctx.user.id.toString(), bundle_id: input.bundleId.toString() } } }
+          : { payment_intent_data: { description: `${bundle.title} — Bundle — One-Time Purchase` } }),
         line_items: [lineItem],
         success_url: `${origin}/bundles/${bundle.slug}?success=1`,
         cancel_url: `${origin}/bundles/${bundle.slug}?cancelled=1`,

@@ -445,6 +445,7 @@ export const webinarSessionRouter = router({
           quantity: 1,
         }],
         metadata: { type: "webinar", webinar_id: webinar.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        payment_intent_data: { description: `${webinar.title} — Webinar Registration` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=webinar`,
       } as any);
       return {

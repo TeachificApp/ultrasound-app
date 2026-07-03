@@ -756,6 +756,7 @@ export const funnelRouter = router({
           user_id: ctx.user.id.toString(),
           customer_email: ctx.user.email ?? "",
         },
+        payment_intent_data: { description: `${funnel.title} — Funnel Purchase` },
         success_url: successUrl,
         cancel_url: cancelUrl,
       });
@@ -1287,7 +1288,7 @@ export const funnelPublicRouter = router({
         allow_promotion_codes: true,
         line_items: lineItems,
         metadata: funnelCheckoutMetadata,
-        payment_intent_data: { metadata: funnelCheckoutMetadata },
+        payment_intent_data: { metadata: funnelCheckoutMetadata, description: `${funnelCheckoutMetadata.product_name || "Funnel Product"} — Funnel Purchase` },
         success_url: successUrl,
         cancel_url: cancelUrl,
       });

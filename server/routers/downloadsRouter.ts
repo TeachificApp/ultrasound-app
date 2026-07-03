@@ -326,6 +326,7 @@ export const downloadsLearnerRouter = router({
           ...(isUpgradeBumpDl ? { bump_mode: "upgrade" } : {}),
           ...orderBumpCheckout?.metadata,
         },
+        payment_intent_data: { description: `${product.title} — Digital Download` },
         success_url: `${origin}/downloads/${product.slug}/files?success=1`,
         cancel_url: `${origin}/downloads/${product.slug}`,
         ...shippingOptions,
@@ -479,7 +480,7 @@ export const downloadsLearnerRouter = router({
           line_items: [{ price: stripePriceId, quantity: 1 }],
           metadata: commonMeta,
           subscription_data: {
-            description: bundle.title,
+            description: `${bundle.title} — Digital Bundle — Subscription — Initial`,
             metadata: { user_id: ctx.user.id.toString(), bundle_id: bundle.id.toString(), type: "digital_bundle" },
           },
           success_url: `${origin}/my-downloads?success=1`,
@@ -505,6 +506,7 @@ export const downloadsLearnerRouter = router({
             quantity: 1,
           }],
           metadata: commonMeta,
+          payment_intent_data: { description: `${bundle.title} — Digital Bundle — One-Time Purchase` },
           success_url: `${origin}/my-downloads?success=1`,
           cancel_url: `${origin}/bundles/${bundle.slug}`,
         });
@@ -624,6 +626,7 @@ export const downloadsLearnerRouter = router({
           quantity: 1,
         }],
         metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        payment_intent_data: { description: `${product.title} — Digital Download` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=download`,
       }, { idempotencyKey: `download-embedded-${ctx.user.id}-${product.id}-${new Date().toISOString().slice(0, 10)}` });
       return {
@@ -2104,6 +2107,7 @@ Make ALL content specific and compelling based on the product title and descript
           quantity: 1,
         }],
         metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        payment_intent_data: { description: `${product.title} — Digital Download` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=download`,
       }, { idempotencyKey: `download-embedded-${ctx.user.id}-${product.id}-${new Date().toISOString().slice(0, 10)}` });
       return {

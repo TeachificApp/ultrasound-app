@@ -828,7 +828,9 @@ const createMembershipCheckout = protectedProcedure
         customer_name: ctx.user.name ?? "",
         type: "membership",
       },
-      ...(isRecurring ? { subscription_data: { description: plan.title, metadata: { user_id: ctx.user.id.toString(), plan_id: plan.id.toString(), type: "membership" } } } : {}),
+      ...(isRecurring
+        ? { subscription_data: { description: `${plan.title} — Membership — Subscription — Initial`, metadata: { user_id: ctx.user.id.toString(), plan_id: plan.id.toString(), type: "membership" } } }
+        : { payment_intent_data: { description: `${plan.title} — Membership — One-Time` } }),
       success_url: `${input.origin}/memberships/${plan.slug}?success=1`,
       cancel_url: `${input.origin}/memberships/${plan.slug}`,
     }, { idempotencyKey: `membership-checkout-${ctx.user.id}-${plan.id}-${new Date().toISOString().slice(0, 10)}` });
@@ -967,7 +969,9 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
         customer_name: ctx.user.name ?? "",
         ...(input.discountCodeId ? { discount_code_id: input.discountCodeId.toString() } : {}),
       },
-      ...(isRecurring ? { subscription_data: { description: plan.title, metadata: { user_id: ctx.user.id.toString(), plan_id: plan.id.toString(), type: "membership" } } } : {}),
+      ...(isRecurring
+        ? { subscription_data: { description: `${plan.title} — Membership — Subscription — Initial`, metadata: { user_id: ctx.user.id.toString(), plan_id: plan.id.toString(), type: "membership" } } }
+        : { payment_intent_data: { description: `${plan.title} — Membership — One-Time` } }),
       return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=membership`,
     }, { idempotencyKey: `membership-embedded-${ctx.user.id}-${plan.id}-${new Date().toISOString().slice(0, 10)}` });
     const billingLabel = isRecurring ? (plan.billingInterval === "annual" ? "per year" : "per month") : null;

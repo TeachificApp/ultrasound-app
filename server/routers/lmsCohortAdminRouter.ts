@@ -1652,6 +1652,7 @@ export const lmsCohortAdminRouter = router({
             waitlistEntryId: String(input.entryId),
             grantedByAdminId: String(ctx.user.id),
           },
+          payment_intent_data: { description: `${course.title} — Course Purchase` },
           client_reference_id: String(userId),
           allow_promotion_codes: true,
         });

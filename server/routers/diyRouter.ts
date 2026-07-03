@@ -788,7 +788,7 @@ export const diyRouter = router({
           quantity: 1,
         }],
         subscription_data: {
-          description: `${planConfig.name} — Monthly Subscription`,
+          description: `${planConfig.name} — Monthly Subscription — Initial`,
           metadata: { user_id: ctx.user.id.toString(), diy_plan: input.plan, product_type: "diy_accreditation" },
         },
         success_url: `${input.origin}/diy-accreditation/welcome?plan=${input.plan}&session_id={CHECKOUT_SESSION_ID}`,
