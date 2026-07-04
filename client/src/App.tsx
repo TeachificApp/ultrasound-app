@@ -236,6 +236,8 @@ const EmailAdmin = lazy(() => import("./pages/EmailAdmin"));
 const EmailCampaignDashboard = lazy(() => import("./pages/EmailCampaignDashboard"));
 const EducatorAssist = lazy(() => import("./pages/EducatorAssist"));
 const EducatorLeadForm = lazy(() => import("./pages/EducatorLeadForm"));
+const SonoTravelers = lazy(() => import("./pages/SonoTravelers"));
+const AdminSonoTravelers = lazy(() => import("./pages/admin/AdminSonoTravelers"));
 const SonoQuizCreator = lazy(() => import("./pages/SonoQuizCreator"));
 const SonoQuizHost = lazy(() => import("./pages/SonoQuizHost"));
 const SonoQuizPlay = lazy(() => import("./pages/SonoQuizPlay"));
@@ -599,6 +601,9 @@ function Router() {
         <Route path="/admin">{() => { window.location.replace("/platform-admin"); return null; }}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <EducatorAssist />}</Route>
+        {/* ── Sono Travelers ────────────────────────────────────────────── */}
+        <Route path="/sono-travelers">{() => <Suspense fallback={pageFallback}><SonoTravelers /></Suspense>}</Route>
+        <Route path="/admin/sono-travelers">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><AdminSonoTravelers /></Suspense></RoleGuard>}</Route>
         {/* ── SonoQuiz (admin-only during testing) ──────────────────────── */}
         <Route path="/admin/sonoquiz">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizCreator /></RoleGuard>}</Route>
         <Route path="/admin/sonoquiz/host/:sessionId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizHost /></RoleGuard>}</Route>

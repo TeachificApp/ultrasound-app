@@ -7479,3 +7479,37 @@ export const educatorLeads = mysqlTable("educator_leads", {
 });
 export type EducatorLead = typeof educatorLeads.$inferSelect;
 export type InsertEducatorLead = typeof educatorLeads.$inferInsert;
+
+// ── Sono Travelers Lead Capture ───────────────────────────────────────────────
+// Stores intake form submissions from travel sonographers joining the
+// Sono Travelers community. Grants immediate community access on submission.
+export const sonoTravelersLeads = mysqlTable("sono_travelers_leads", {
+  id: int("id").primaryKey().autoincrement(),
+  // Basic contact
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  // Registry credentials (e.g. RDMS, RVT, RDCS, CCI, etc.)
+  registryCredentials: varchar("registry_credentials", { length: 300 }),
+  // Travel type: short_term = <13 weeks, long_term = 13+ weeks, both
+  travelType: mysqlEnum("travel_type", ["short_term", "long_term", "both"]).notNull(),
+  // Current travel assignment / location / agency info
+  currentLocation: varchar("current_location", { length: 200 }),
+  travelAgency: varchar("travel_agency", { length: 200 }),
+  yearsTravel: varchar("years_travel", { length: 50 }),
+  // Specialties they scan while traveling
+  scanSpecialties: varchar("scan_specialties", { length: 500 }),
+  // Any additional info the traveler wants to share
+  additionalInfo: text("additional_info"),
+  // Linked user account (if they were logged in or auto-created)
+  userId: int("user_id"),
+  // Community access
+  communityAccessGranted: boolean("community_access_granted").default(false).notNull(),
+  communityMemberId: int("community_member_id"),
+  // Admin review
+  status: varchar("status", { length: 30 }).notNull().default("new"),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SonoTravelersLead = typeof sonoTravelersLeads.$inferSelect;
+export type InsertSonoTravelersLead = typeof sonoTravelersLeads.$inferInsert;
