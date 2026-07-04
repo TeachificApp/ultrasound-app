@@ -39,7 +39,7 @@ const shippingAddressSchema = z.object({
 
 const orderBumpInputSchema = z.object({
   title: z.string(),
-  price: z.number(), // cents
+  price: z.number(), // dollars
   productType: z.string().optional(),
 });
 
@@ -58,7 +58,7 @@ export const embeddedCheckoutRouter = router({
         phone: z.string().optional(),
         // Primary product
         productName: z.string(),
-        productPrice: z.number().int().min(50), // cents, min $0.50
+        productPrice: z.number().min(0.5), // dollars, min $0.50
         productType: z.enum(["course", "download", "physical", "membership", "bundle", "other"]).default("other"),
         // Order bumps selected by the user
         selectedBumps: z.array(orderBumpInputSchema).default([]),

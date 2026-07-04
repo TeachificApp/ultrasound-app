@@ -70,14 +70,15 @@ export const funnelRouter = router({
       { id: 1005, type: "app" as const, name: "UltrasoundAssist™ + EchoAssist™ — Bundle", price: 12.99, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "UltrasoundAssist™ + EchoAssist™", priceLabel: "$12.99/mo" },
     ];
     return [
-      ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
-      ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, price: d.price ?? 0, imageUrl: d.thumbnailUrl ?? "" })),
-      ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, price: b.price ?? 0, imageUrl: b.thumbnailUrl ?? "" })),
-      ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, price: p.price ?? 0, imageUrl: p.thumbnailUrl ?? "" })),
-      ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, price: w.price ?? 0, imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
+      // All prices returned in DOLLARS (DB stores cents for courses/downloads/bundles/physical/webinars)
+      ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: Number(c.price ?? 0) / 100, imageUrl: c.thumbnailUrl ?? "" })),
+      ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, price: Number(d.price ?? 0) / 100, imageUrl: d.thumbnailUrl ?? "" })),
+      ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, price: Number(b.price ?? 0) / 100, imageUrl: b.thumbnailUrl ?? "" })),
+      ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, price: Number(p.price ?? 0) / 100, imageUrl: p.thumbnailUrl ?? "" })),
+      ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, price: Number(w.price ?? 0) / 100, imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
       ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, price: 0, imageUrl: c.coverImage ?? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp", isFree: c.accessType === "free" })),
-      ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: (w.price ?? 0) / 100, imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
-      ...APP_PRODUCTS,
+      ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: Number(w.price ?? 0) / 100, imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
+      ...APP_PRODUCTS, // App products already in dollars (9.97, 12.99, etc.)
     ];
   }),
 
@@ -1225,7 +1226,7 @@ export const funnelPublicRouter = router({
           price_data: {
             currency: "usd",
             product_data: { name: selectedProduct.name, description: selectedProduct.description || undefined },
-            unit_amount: Math.round(Number(selectedProduct.price)),
+            unit_amount: Math.round(Number(selectedProduct.price) * 100),
           },
           quantity: 1,
         },
@@ -1239,7 +1240,7 @@ export const funnelPublicRouter = router({
             price_data: {
               currency: "usd",
               product_data: { name: bump.title, description: bump.headline || undefined },
-              unit_amount: Math.round(Number(bump.price)),
+              unit_amount: Math.round(Number(bump.price) * 100),
             },
             quantity: 1,
           });

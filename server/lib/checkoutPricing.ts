@@ -52,11 +52,11 @@ export function computeFunnelCheckoutTotalCents(
     throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid product selection" });
   }
 
-  let totalCents = Math.round(Number(selectedProduct.price ?? 0));
+  let totalCents = Math.round(Number(selectedProduct.price ?? 0) * 100);
   for (const idx of selection.addedBumpIndexes) {
     const bump = orderBumps[idx];
     if (bump && Number(bump.price) > 0) {
-      totalCents += Math.round(Number(bump.price));
+      totalCents += Math.round(Number(bump.price) * 100);
     }
   }
 
@@ -121,7 +121,7 @@ function findBlockProductPriceCents(
     if (productId != null && p.productId != null && Number(p.productId) === productId) return true;
     return p.name === productName;
   });
-  return match ? Math.round(Number(match.price ?? 0)) : null;
+  return match ? Math.round(Number(match.price ?? 0) * 100) : null;
 }
 
 function validateSelectedBumps(
@@ -133,7 +133,7 @@ function validateSelectedBumps(
     if (!serverBump) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid order bump selection" });
     }
-    assertClientPriceMatches(bump.price, Number(serverBump.price ?? 0), "order bump price");
+    assertClientPriceMatches(Math.round(bump.price * 100), Math.round(Number(serverBump.price ?? 0) * 100), "order bump price");
   }
 }
 
@@ -195,14 +195,14 @@ export async function resolveEmbeddedCheckoutExpectedCents(
     });
   }
 
-  assertClientPriceMatches(input.productPrice, baseCents, "product price");
+  assertClientPriceMatches(Math.round(input.productPrice * 100), baseCents, "product price");
   if (blockOrderBumps.length > 0) {
     validateSelectedBumps(blockOrderBumps, input.selectedBumps);
   }
 
   let totalCents = baseCents;
   for (const bump of input.selectedBumps) {
-    if (bump.price > 0) totalCents += Math.round(Number(bump.price));
+    if (bump.price > 0) totalCents += Math.round(Number(bump.price) * 100);
   }
   return totalCents;
 }

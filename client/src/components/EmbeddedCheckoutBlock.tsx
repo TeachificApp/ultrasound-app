@@ -63,7 +63,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 
 export interface EmbeddedCheckoutProduct {
   name: string;
   description?: string;
-  price: number; // cents
+  price: number; // dollars
   imageUrl?: string;
   type: "course" | "download" | "physical" | "membership" | "bundle" | "other" | "subscription";
   strikethroughPrice?: string; // display-only, e.g. "$197"
@@ -79,7 +79,7 @@ export interface EmbeddedCheckoutOrderBump {
   title: string;
   headline?: string;
   description?: string;
-  price: number; // cents
+  price: number; // dollars
   imageUrl?: string;
   ctaText?: string;
   animationStyle?: "pulse" | "glow" | "shake" | "bounce" | "none";

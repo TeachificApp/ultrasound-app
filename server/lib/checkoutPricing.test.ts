@@ -6,7 +6,7 @@ import {
 } from "./checkoutPricing";
 
 describe("checkoutPricing", () => {
-  it("assertClientPriceMatches accepts matching cents", () => {
+  it("assertClientPriceMatches accepts matching values", () => {
     expect(() => assertClientPriceMatches(9700, 9700)).not.toThrow();
   });
 
@@ -14,11 +14,11 @@ describe("checkoutPricing", () => {
     expect(() => assertClientPriceMatches(100, 9700)).toThrow(TRPCError);
   });
 
-  it("computeFunnelCheckoutTotalCents sums product and bumps in cents", () => {
+  it("computeFunnelCheckoutTotalCents sums product and bumps stored as dollars, returns cents", () => {
     const block = {
       data: {
-        products: [{ name: "Course", price: 9700 }],
-        orderBumps: [{ title: "Bump", price: 2700 }],
+        products: [{ name: "Course", price: 97 }],
+        orderBumps: [{ title: "Bump", price: 27 }],
       },
     };
     const { totalCents } = computeFunnelCheckoutTotalCents(block, {

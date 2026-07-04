@@ -52,7 +52,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 
 interface CheckoutProduct {
   name: string;
   description: string;
-  price: number; // cents
+  price: number; // dollars
   imageUrl: string;
   type: string; // "course" | "quiz" | "product" | "external"
   strikethroughPrice?: string; // display-only original price, e.g. "$97"
@@ -62,7 +62,7 @@ interface OrderBump {
   title: string;
   headline: string;
   description: string;
-  price: number; // cents
+  price: number; // dollars
   imageUrl: string;
   ctaText: string;
   ctaEmoji: string;

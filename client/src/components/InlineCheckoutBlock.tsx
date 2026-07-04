@@ -36,7 +36,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 
 export interface InlineCheckoutProduct {
   name: string;
   description: string;
-  price: number;          // cents
+  price: number;          // dollars
   imageUrl?: string;
   type?: string;          // "course" | "download" | "physical" | "membership" | "other"
 }
@@ -45,7 +45,7 @@ export interface InlineCheckoutOrderBump {
   title: string;
   headline: string;
   description: string;
-  price: number;          // cents
+  price: number;          // dollars
   imageUrl?: string;
   ctaText?: string;
   ctaEmoji?: string;
@@ -210,7 +210,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
     addedBumps.forEach(i => { if (orderBumps[i]) t += orderBumps[i].price; });
     return t;
   }, [selectedIdx, addedBumps, products, orderBumps]);
-  const totalCents = totalAmount; // alias kept for Stripe (dollars stored, multiply at API call)
+  const totalCents = Math.round(totalAmount * 100); // convert dollars to cents for Stripe (unused here, prices sent as dollars to server)
 
   const fmt = (dollars: number) => `$${Number(dollars).toFixed(2)}`;
 
@@ -817,7 +817,7 @@ export const INLINE_CHECKOUT_DEFAULTS: InlineCheckoutBlockData = {
     {
       name:        "Example Course",
       description: "Full online access",
-      price:       99700,
+      price:       997,
       imageUrl:    "",
       type:        "course",
     },
