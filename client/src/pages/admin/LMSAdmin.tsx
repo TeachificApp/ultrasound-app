@@ -9870,6 +9870,8 @@ function QuestionBankAdmin() {
   const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
   const [scormExtraTagIds, setScormExtraTagIds] = useState<number[]>([]);
   const [scormGroupPrefix, setScormGroupPrefix] = useState("");
+  const [scormFolderId, setScormFolderId] = useState<number | null>(null);
+  const [scormNewFolderName, setScormNewFolderName] = useState("");
 
   // Debounce search
   useEffect(() => {
@@ -10119,16 +10121,29 @@ function QuestionBankAdmin() {
                 ))}
               </div>
 
-              <div>
-                <Label className="text-xs font-medium text-orange-700 mb-1 block">Additional Tags (optional)</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {tags.map(tag => (
-                    <button key={tag.id} onClick={() => setScormExtraTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
-                      className={cn("px-2 py-0.5 rounded-full text-xs font-medium border transition-all", scormExtraTagIds.includes(tag.id) ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200")}
-                      style={scormExtraTagIds.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color } : {}}>
-                      {tag.name}
-                    </button>
-                  ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-medium text-orange-700 mb-1 block">Save to Folder <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <select value={scormFolderId ?? ""} onChange={e => { setScormFolderId(e.target.value ? Number(e.target.value) : null); setScormNewFolderName(""); }} className="w-full h-8 rounded-md border border-orange-200 bg-white px-2 text-sm">
+                    <option value="">No folder (root)</option>
+                    {folders.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    <option value="__new__">+ Create new folder...</option>
+                  </select>
+                  {(scormFolderId as any) === "__new__" && (
+                    <Input value={scormNewFolderName} onChange={e => setScormNewFolderName(e.target.value)} placeholder="New folder name..." className="mt-1.5 h-8 text-sm border-orange-200" />
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-orange-700 mb-1 block">Additional Tags <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.map((tag: any) => (
+                      <button key={tag.id} onClick={() => setScormExtraTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                        className={cn("px-2 py-0.5 rounded-full text-xs font-medium border transition-all", scormExtraTagIds.includes(tag.id) ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200")}
+                        style={scormExtraTagIds.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color } : {}}>
+                        {tag.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -10140,6 +10155,8 @@ function QuestionBankAdmin() {
                     groupIds: Array.from(scormSelectedGroups),
                     extraTagIds: scormExtraTagIds.length > 0 ? scormExtraTagIds : undefined,
                     groupPrefix: scormGroupPrefix.trim() || undefined,
+                    folderId: (scormFolderId as any) !== "__new__" && scormFolderId ? scormFolderId : undefined,
+                    newFolderName: (scormFolderId as any) === "__new__" && scormNewFolderName.trim() ? scormNewFolderName.trim() : undefined,
                   })}>
                   {scormConfirmMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing...</> : <><Upload className="w-3.5 h-3.5" /> Import {Array.from(scormSelectedGroups).reduce((sum, gid) => sum + (scormPreview.groups.find((g: any) => g.id === gid)?.questionCount ?? 0), 0)} Questions</>}
                 </Button>

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Plane, MapPin, Award, Users, CheckCircle, ArrowRight, Stethoscope, Globe } from "lucide-react";
 
 const REGISTRY_OPTIONS = [
@@ -22,7 +22,6 @@ const SPECIALTY_OPTIONS = [
 
 export default function SonoTravelers() {
   const [, navigate] = useLocation();
-  const { toast } = useToast();
   const [submitted, setSubmitted] = useState(false);
   const [communitySlug, setCommunitySlug] = useState<string | null>(null);
 
@@ -45,11 +44,7 @@ export default function SonoTravelers() {
       setCommunitySlug(data.communitySlug);
     },
     onError: (err) => {
-      toast({
-        title: "Submission failed",
-        description: err.message || "Please try again.",
-        variant: "destructive",
-      });
+      toast.error(err.message || "Please try again.");
     },
   });
 
@@ -65,7 +60,7 @@ export default function SonoTravelers() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.travelType) {
-      toast({ title: "Please select your travel type.", variant: "destructive" });
+      toast.error("Please select your travel type.");
       return;
     }
     submitMutation.mutate({

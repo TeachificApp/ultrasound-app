@@ -17,8 +17,8 @@
  */
 
 import { getDb } from "../db";
-import { quickfireChallenges, users } from "../../drizzle/schema";
-import { eq, and, asc, or, isNull, lte, sql } from "drizzle-orm";
+import { quickfireChallenges, users, brandMemberships } from "../../drizzle/schema";
+import { eq, and, asc, or, isNull, lte, sql, inArray } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
 import crypto from "crypto";
 import { ENV } from "../_core/env";
@@ -45,6 +45,9 @@ const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? "";
 const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL ?? "noreply@allaboutultrasound.com";
 const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME ?? "All About Ultrasound™";
 const APP_URL = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
+const IHE_APP_URL = process.env.IHE_APP_URL ?? "https://app.iheartecho.com";
+const IHE_FROM_EMAIL = process.env.IHE_FROM_EMAIL ?? "noreply@iheartecho.com";
+const IHE_FROM_NAME = process.env.IHE_FROM_NAME ?? "iHeartEcho";
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
@@ -235,6 +238,23 @@ async function sendChallengeNotifications(
     return;
   }
 
+  // ── Brand-specific user targeting ──────────────────────────────────────────
+  // IHE brand → only users with an active iHeartEcho brandMembership
+  // AAUS brand → all users EXCEPT those who are IHE-only (no AAUS membership)
+  // Each brand uses its own dedup date field so both can notify on the same day.
+
+  // Get all users with an active IHE brandMembership
+  const iheMemberRows = await db
+    .select({ userId: brandMemberships.userId })
+    .from(brandMemberships)
+    .where(
+      and(
+        eq(brandMemberships.brand, "iheartecho"),
+        eq(brandMemberships.status, "active")
+      )
+    );
+  const iheUserIdSet = new Set(iheMemberRows.map(r => r.userId));
+
   // Get users who opted in and haven't been notified today
   const eligibleUsers = await db
     .select({
@@ -243,6 +263,7 @@ async function sendChallengeNotifications(
       displayName: users.displayName,
       name: users.name,
       lastChallengeNotifDate: users.lastChallengeNotifDate,
+      lastIheChallengeNotifDate: users.lastIheChallengeNotifDate,
       notificationPrefs: users.notificationPrefs,
     })
     .from(users)
@@ -256,7 +277,17 @@ async function sendChallengeNotifications(
 
   const usersToNotify = eligibleUsers.filter((u) => {
     if (!u.email) return false;
-    if (u.lastChallengeNotifDate === todayStr) return false;
+
+    // Brand-specific dedup: use separate date fields per brand
+    if (brand === "iheartecho") {
+      // Only send IHE challenges to users with an active IHE membership
+      if (!iheUserIdSet.has(u.id)) return false;
+      if (u.lastIheChallengeNotifDate === todayStr) return false;
+    } else {
+      // AAUS: send to all users (IHE members also get AAUS challenges — they are separate brands)
+      if (u.lastChallengeNotifDate === todayStr) return false;
+    }
+
     // Check notification prefs — default to opted in if not set
     if (u.notificationPrefs) {
       try {
@@ -289,24 +320,32 @@ async function sendChallengeNotifications(
       const userName = user.displayName || user.name || "Ultrasound Enthusiast";
       // Use HMAC-signed token — no DB write needed, verified at /api/unsubscribe
       const unsubToken = generateUnsubscribeToken(user.id);
-      const unsubscribeUrl = `${APP_URL}/api/unsubscribe?token=${unsubToken}`;
-      const challengeUrl = `${APP_URL}/quickfire`;
+      // Brand-specific URLs and sender
+      const isIhe = brand === "iheartecho";
+      const brandAppUrl = isIhe ? IHE_APP_URL : APP_URL;
+      const unsubscribeUrl = `${brandAppUrl}/api/unsubscribe?token=${unsubToken}`;
+      const challengeUrl = `${brandAppUrl}/quickfire`;
 
       const html = buildEmailHtml({
         userName,
         challengeCount: publishedChallenges.length,
         challengeSummary,
         primaryTitle: primaryChallenge.title,
-        primaryCategory: primaryChallenge.category || "Ultrasound",
+        primaryCategory: primaryChallenge.category || (isIhe ? "Echocardiography" : "Ultrasound"),
         challengeUrl,
-        appUrl: APP_URL,
+        appUrl: brandAppUrl,
         unsubscribeUrl,
+        brand,
       });
 
       await sgMail.send({
         to: user.email!,
-        from: { email: SENDGRID_FROM_EMAIL, name: SENDGRID_FROM_NAME },
-        subject: `🔥 Today's Ultrasound Challenges Are Live — ${todayETLong()}`,
+        from: isIhe
+          ? { email: IHE_FROM_EMAIL, name: IHE_FROM_NAME }
+          : { email: SENDGRID_FROM_EMAIL, name: SENDGRID_FROM_NAME },
+        subject: isIhe
+          ? `🫀 Today's Echo Challenges Are Live — ${todayETLong()}`
+          : `🔥 Today's Ultrasound Challenges Are Live — ${todayETLong()}`,
         html,
         // Disable click tracking so SendGrid does not wrap/mangle the HMAC-signed
         // unsubscribe token URL — a wrapped URL breaks token verification.
@@ -316,10 +355,10 @@ async function sendChallengeNotifications(
         },
       });
 
-      // Mark as notified
+      // Mark as notified — use brand-specific dedup field
       await db
         .update(users)
-        .set({ lastChallengeNotifDate: todayStr })
+        .set(isIhe ? { lastIheChallengeNotifDate: todayStr } : { lastChallengeNotifDate: todayStr })
         .where(eq(users.id, user.id));
 
       notifiedCount++;
@@ -342,6 +381,7 @@ function buildEmailHtml({
   challengeUrl,
   appUrl,
   unsubscribeUrl,
+  brand = "aaus",
 }: {
   userName: string;
   challengeCount: number;
@@ -351,13 +391,27 @@ function buildEmailHtml({
   challengeUrl: string;
   appUrl: string;
   unsubscribeUrl: string;
+  brand?: "aaus" | "iheartecho";
 }) {
+  const isIhe = brand === "iheartecho";
+  const brandName = isIhe ? "iHeartEcho" : "All About Ultrasound™";
+  const brandSubtitle = isIhe ? "Daily Echo Challenges" : "Daily Challenges";
+  const brandAccentColor = isIhe ? "#c084fc" : "#4ad9e0";
+  const brandPrimaryColor = isIhe ? "#7c3aed" : "#189aa1";
+  const brandGradient = isIhe
+    ? "linear-gradient(135deg,#1a0533 0%,#3b1278 60%,#7c3aed 100%)"
+    : "linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%)";
+  const premiumNote = isIhe
+    ? "<strong>Premium members</strong> can replay all past echo challenges in the archive — free members access today's challenges only."
+    : "<strong>Premium members</strong> can replay all past challenges in the archive — free members access today's challenges only.";
+  const ctaText = isIhe ? "Take Today's Echo Challenges →" : "Take Today's Challenges →";
+  const footerBrandLink = isIhe ? "iHeartEcho" : "All About Ultrasound™";
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily Ultrasound Challenges</title>
+  <title>Daily ${isIhe ? "Echo" : "Ultrasound"} Challenges</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f7f9;font-family:'Helvetica Neue',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f9;padding:32px 0;">
@@ -366,9 +420,9 @@ function buildEmailHtml({
         <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:32px 40px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:900;letter-spacing:-0.5px;">All About Ultrasound™</h1>
-              <p style="margin:4px 0 0;color:#4ad9e0;font-size:14px;font-weight:600;">Daily Challenges</p>
+            <td style="background:${brandGradient};padding:32px 40px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:900;letter-spacing:-0.5px;">${brandName}</h1>
+              <p style="margin:4px 0 0;color:${brandAccentColor};font-size:14px;font-weight:600;">${brandSubtitle}</p>
             </td>
           </tr>
           <!-- Body -->
@@ -377,19 +431,19 @@ function buildEmailHtml({
               <p style="margin:0 0 8px;color:#6b7280;font-size:14px;">Hi ${userName},</p>
               <h2 style="margin:0 0 16px;color:#0e1e2e;font-size:22px;font-weight:800;">🔥 ${challengeCount} new challenge${challengeCount > 1 ? 's are' : ' is'} live today!</h2>
               <!-- Challenge summary card -->
-              <div style="background:#f0fbfc;border:1px solid #4ad9e0;border-radius:10px;padding:20px 24px;margin-bottom:24px;">
-                <div style="display:inline-block;background:#189aa1;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px;letter-spacing:0.5px;">${primaryCategory.toUpperCase()}</div>
+              <div style="background:${isIhe ? '#f5f0ff' : '#f0fbfc'};border:1px solid ${brandAccentColor};border-radius:10px;padding:20px 24px;margin-bottom:24px;">
+                <div style="display:inline-block;background:${brandPrimaryColor};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px;letter-spacing:0.5px;">${primaryCategory.toUpperCase()}</div>
                 <h3 style="margin:0 0 8px;color:#0e1e2e;font-size:18px;font-weight:800;">${primaryTitle}</h3>
                 ${challengeCount > 1 ? `<p style="margin:0;color:#4b5563;font-size:13px;line-height:1.6;">Also today: ${challengeSummary}</p>` : ""}
               </div>
               <p style="margin:0 0 8px;color:#4b5563;font-size:14px;">You have <strong>24 hours</strong> to complete today's challenges and make the leaderboard.</p>
-              <p style="margin:0 0 24px;color:#4b5563;font-size:14px;"><strong>Premium members</strong> can replay all past challenges in the archive — free members access today's challenges only.</p>
+              <p style="margin:0 0 24px;color:#4b5563;font-size:14px;">${premiumNote}</p>
               <!-- CTA -->
               <table cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="border-radius:8px;background:#189aa1;">
+                  <td style="border-radius:8px;background:${brandPrimaryColor};">
                     <a href="${challengeUrl}" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;" target="_blank" rel="noopener noreferrer">
-                      Take Today's Challenges →
+                      ${ctaText}
                     </a>
                   </td>
                 </tr>
@@ -401,11 +455,11 @@ function buildEmailHtml({
             <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
               <p style="margin:0;color:#9ca3af;font-size:12px;">
                 You're receiving this because you opted in to Daily Challenge notifications.<br/>
-                <a href="${appUrl}/profile#notifications" style="color:#189aa1;text-decoration:none;" target="_blank" rel="noopener noreferrer">Manage notification preferences</a>
+                <a href="${appUrl}/profile#notifications" style="color:${brandPrimaryColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">Manage notification preferences</a>
                 &nbsp;·&nbsp;
                 <a href="${unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline;" target="_blank" rel="noopener noreferrer">Unsubscribe</a>
                 &nbsp;·&nbsp;
-                <a href="${appUrl}" style="color:#189aa1;text-decoration:none;" target="_blank" rel="noopener noreferrer">All About Ultrasound™</a>
+                <a href="${appUrl}" style="color:${brandPrimaryColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">${footerBrandLink}</a>
               </p>
             </td>
           </tr>

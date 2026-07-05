@@ -542,6 +542,16 @@ function AddQuestionsDialog({
   const [csvNewFolderName, setCsvNewFolderName] = useState("");
   const [csvTagIds, setCsvTagIds] = useState<number[]>([]);
   const csvFileRef = useRef<HTMLInputElement>(null);
+  // ── From Media Library ──
+  const [mlSearch, setMlSearch] = useState("");
+  const [mlSelectedAssetId, setMlSelectedAssetId] = useState<number | null>(null);
+  const [mlPreview, setMlPreview] = useState<any>(null);
+  const [mlSelectedGroups, setMlSelectedGroups] = useState<Set<string>>(new Set());
+  const [mlGroupPrefix, setMlGroupPrefix] = useState("");
+  const [mlFolderId, setMlFolderId] = useState<number | null>(null);
+  const [mlNewFolderName, setMlNewFolderName] = useState("");
+  const [mlTagIds, setMlTagIds] = useState<number[]>([]);
+  const [mlPreviewing, setMlPreviewing] = useState(false);
 
   const { data: bankData } = trpc.questionBank.listQuestions.useQuery(
     { search: qSearch || undefined, page: qPage, pageSize: 20, folderId: bankFolderId ? Number(bankFolderId) : undefined, tagIds: bankTagId ? [Number(bankTagId)] : undefined },
@@ -551,6 +561,24 @@ function AddQuestionsDialog({
   const { data: tagsData } = trpc.questionBank.listTags.useQuery(undefined, { enabled: open });
   const folders = foldersData ?? [];
   const tags = tagsData ?? [];
+
+  // Media library assets (SCORM/ZIP files)
+  const { data: mlAssetsData } = trpc.questionBank.listMediaLibraryQuizFiles.useQuery(
+    { search: mlSearch || undefined, limit: 50 },
+    { enabled: open && tab === "media_library" }
+  );
+  const mlAssets = mlAssetsData ?? [];
+
+  const mlConfirmMut = trpc.questionBank.confirmScormImport.useMutation({
+    onSuccess: async (res) => {
+      toast.success(`Imported ${res.totalInserted} questions to bank`);
+      if (res.questionBankIds.length > 0) {
+        await addQMutation.mutateAsync({ quizId, questionBankIds: res.questionBankIds });
+      }
+      onAdded(); onClose(); resetAll();
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const addQMutation = trpc.standaloneQuizAdmin.addQuestions.useMutation({
     onSuccess: (res) => { toast.success(`${res.added} question(s) added`); onAdded(); onClose(); resetAll(); },
@@ -593,6 +621,8 @@ function AddQuestionsDialog({
     setScormFile(null); setScormPreview(null); setScormSelectedGroups(new Set()); setScormGroupPrefix("");
     setScormFolderId(null); setScormNewFolderName(""); setScormTagIds([]);
     setCsvFile(null); setCsvPreview(null); setCsvFolderId(null); setCsvNewFolderName(""); setCsvTagIds([]);
+    setMlSearch(""); setMlSelectedAssetId(null); setMlPreview(null); setMlSelectedGroups(new Set());
+    setMlGroupPrefix(""); setMlFolderId(null); setMlNewFolderName(""); setMlTagIds([]); setMlPreviewing(false);
   };
 
   const handleScormUpload = async (f: File) => {

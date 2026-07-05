@@ -72,6 +72,9 @@ export const users = mysqlTable("users", {
   // Last date (YYYY-MM-DD ET) a daily challenge notification email was sent to this user.
   // DB-backed deduplication so server restarts within the 9am ET window don't re-send.
   lastChallengeNotifDate: varchar("lastChallengeNotifDate", { length: 10 }),
+  // Last date (YYYY-MM-DD ET) an iHeartEcho daily challenge notification was sent to this user.
+  // Separate from lastChallengeNotifDate so both brands can notify on the same day.
+  lastIheChallengeNotifDate: varchar("lastIheChallengeNotifDate", { length: 10 }),
   // Demo/test account flag — marks seeded demo users so they are visually distinguished in admin UI
   isDemo: boolean("isDemo").default(false).notNull(),
   // JSON: {acs:bool, adultEcho:bool, pediatricEcho:bool, fetalEcho:bool} — false means opted out of that category

@@ -880,6 +880,77 @@ export const questionBankRouter = router({
         .where(inArray(questionBank.id, input.questionIds));
       return { moved: input.questionIds.length };
     }),
+
+  /**
+   * listMediaLibraryQuizFiles — browse media library assets that are SCORM/ZIP files
+   * so admins can import questions directly from already-uploaded packages.
+   */
+  listMediaLibraryQuizFiles: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      limit: z.number().int().min(1).max(100).default(50),
+      offset: z.number().int().min(0).default(0),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const searchFilter = input.search?.trim()
+        ? or(
+            like(mediaAssets.title, `%${input.search.trim()}%`),
+            like(mediaAssets.folder, `%${input.search.trim()}%`),
+          )
+        : undefined;
+      const typeFilter = or(
+        eq(mediaAssets.mediaType, "scorm"),
+        eq(mediaAssets.mediaType, "zip"),
+        eq(mediaAssets.mediaType, "lms"),
+      );
+      const whereClause = searchFilter
+        ? and(typeFilter, searchFilter, sql`${mediaAssets.deletedAt} IS NULL`)
+        : and(typeFilter, sql`${mediaAssets.deletedAt} IS NULL`);
+      const assets = await db
+        .select({
+          id: mediaAssets.id,
+          slug: mediaAssets.slug,
+          title: mediaAssets.title,
+          mediaType: mediaAssets.mediaType,
+          folder: mediaAssets.folder,
+          thumbnailUrl: mediaAssets.thumbnailUrl,
+          createdAt: mediaAssets.createdAt,
+        })
+        .from(mediaAssets)
+        .where(whereClause)
+        .orderBy(desc(mediaAssets.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+      // Enrich each asset with its latest version's file metadata
+      const enriched = await Promise.all(assets.map(async (asset) => {
+        const [version] = await db
+          .select({
+            fileName: mediaVersions.fileName,
+            fileSize: mediaVersions.fileSize,
+            mimeType: mediaVersions.mimeType,
+          })
+          .from(mediaVersions)
+          .where(eq(mediaVersions.assetId, asset.id))
+          .orderBy(desc(mediaVersions.versionNumber))
+          .limit(1);
+        const fileName = version?.fileName ?? null;
+        const isQuizFile =
+          fileName?.toLowerCase().endsWith(".quiz") ||
+          version?.mimeType?.includes("quiz") ||
+          false;
+        return {
+          ...asset,
+          fileName,
+          fileSize: version?.fileSize ?? null,
+          mimeType: version?.mimeType ?? null,
+          isQuizFile,
+        };
+      }));
+      return enriched;
+    }),
 });
 
 // ─── Download helper ──────────────────────────────────────────────────────────
