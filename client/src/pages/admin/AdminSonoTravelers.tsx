@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Plane, Search, Users, MapPin, Award, Clock, CheckCircle, ExternalLink } from "lucide-react";
 
 const TRAVEL_TYPE_LABELS: Record<string, string> = {
@@ -40,7 +40,6 @@ interface Lead {
 }
 
 export default function AdminSonoTravelers() {
-  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<"all" | "new" | "contacted" | "closed">("all");
   const [search, setSearch] = useState("");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -55,12 +54,12 @@ export default function AdminSonoTravelers() {
 
   const updateMutation = trpc.sonoTravelers.adminUpdateLead.useMutation({
     onSuccess: () => {
-      toast({ title: "Lead updated successfully." });
+      toast.success("Lead updated successfully.");
       setSelectedLead(null);
       refetch();
     },
     onError: (err) => {
-      toast({ title: "Update failed", description: err.message, variant: "destructive" });
+      toast.error(err.message || "Update failed.");
     },
   });
 
