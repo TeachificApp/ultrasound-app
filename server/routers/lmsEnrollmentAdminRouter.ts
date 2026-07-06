@@ -157,7 +157,7 @@ export const lmsEnrollmentAdminRouter = router({
           const platformEnabled = settings?.enrollmentEmailEnabled !== false;
           if (!platformEnabled) return;
           const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
-          if (!course?.sendEnrollmentEmail) return;
+          if (course?.sendEnrollmentEmail === false) return;
           const [user] = await db.select({ name: users.name, displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
           if (!user?.email) return;
           const accessToken = await getOrCreateAccessToken(input.userId);
@@ -1609,7 +1609,7 @@ CRITICAL REQUIREMENTS:
           const platformEnabled = settings?.enrollmentEmailEnabled !== false;
           if (!platformEnabled) return;
           const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
-          if (!course?.sendEnrollmentEmail) return;
+          if (course?.sendEnrollmentEmail === false) return;
           // Look up userId for the new user to get/create their access token
           const [newUser] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email.trim().toLowerCase())).limit(1);
           const accessToken2 = newUser ? await getOrCreateAccessToken(newUser.id) : null;

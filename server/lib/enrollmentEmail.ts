@@ -8,15 +8,11 @@
  * automatically when they click the link — no separate login required.
  */
 
-const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
+import { sendEmail } from "../_core/email";
 const brandColor = "#0d9488";
 const brandDark = "#0e4a50";
 
-// LMS emails use a dedicated from address so recipients can identify the source
-// as the learning platform. Falls back to the platform-wide SENDGRID_FROM_EMAIL.
-const LMS_FROM_EMAIL = process.env.LMS_FROM_EMAIL
-  || process.env.SENDGRID_FROM_EMAIL
-  || "learn@allaboutultrasound.com";
+// LMS sender name shown in email clients
 const LMS_FROM_NAME = process.env.LMS_FROM_NAME
   || process.env.SENDGRID_FROM_NAME
   || "All About Ultrasound™ Learning";
@@ -82,37 +78,14 @@ async function deliverEmail(opts: {
   subject: string;
   htmlBody: string;
 }): Promise<boolean> {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  const senderEmail = LMS_FROM_EMAIL;
-  const senderName = LMS_FROM_NAME;
-  if (!apiKey) {
-    console.warn("[enrollment-email] SENDGRID_API_KEY not set — skipping email");
-    return false;
-  }
-  const payload = {
-    personalizations: [{ to: [{ name: opts.to.name, email: opts.to.email }], subject: opts.subject }],
-    from: { name: senderName, email: senderEmail },
-    reply_to: { name: senderName, email: senderEmail },
-    content: [{ type: "text/html", value: opts.htmlBody }],
-    tracking_settings: { click_tracking: { enable: false }, open_tracking: { enable: false } },
-  };
-  try {
-    const res = await fetch(SENDGRID_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      console.error(`[enrollment-email] SendGrid error ${res.status}: ${text}`);
-      return false;
-    }
-    console.log(`[enrollment-email] Sent enrollment email to ${opts.to.email}`);
-    return true;
-  } catch (err) {
-    console.error("[enrollment-email] Failed:", err);
-    return false;
-  }
+  // Use the shared sendEmail() so all enrollment emails go through the verified
+  // SendGrid sender (SENDGRID_FROM_EMAIL) and are logged to email_send_log.
+  return sendEmail({
+    to: opts.to,
+    subject: opts.subject,
+    htmlBody: opts.htmlBody,
+    fromName: LMS_FROM_NAME,
+  });
 }
 
 // ─── Course Enrollment Email ──────────────────────────────────────────────────

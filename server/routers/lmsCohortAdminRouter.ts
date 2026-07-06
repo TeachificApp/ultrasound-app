@@ -1041,7 +1041,7 @@ export const lmsCohortAdminRouter = router({
             const platformEnabled = settings?.enrollmentEmailEnabled !== false;
             if (!platformEnabled) return;
             const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
-            if (!course?.sendEnrollmentEmail) return;
+            if (course?.sendEnrollmentEmail === false) return;
             const [user] = await db.select({ name: users.name, displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
             if (!user?.email) return;
             const accessToken = await getOrCreateAccessToken(input.userId);
