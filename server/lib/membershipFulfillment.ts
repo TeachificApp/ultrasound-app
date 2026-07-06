@@ -756,7 +756,7 @@ export async function cancelDuplicateStripeSubscriptions(opts: {
       await notifyOwner({
         title: "⚠️ Duplicate Stripe Subscription Detected — Action Required",
         content: `Customer ${opts.stripeCustomerId} (${opts.customerEmail ?? "unknown"}) has multiple active subscriptions for the same plan.\n\nKept (newest): ${opts.keepSubscriptionId}\nDuplicates: ${duplicates.join(", ")}\n\nAction required: Review in Stripe Dashboard and cancel the duplicate(s) manually.`,
-      }).catch(() => {});
+      }, { skipAdminEmail: true }).catch(() => {});
       // Admin email with instructions
       const { sendEmail } = await import("../_core/email");
       await sendEmail({

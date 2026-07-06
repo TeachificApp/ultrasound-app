@@ -486,7 +486,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
     await notifyOwner({
       title: "⚠️ Duplicate LMS Payment — Action Required",
       content: `User ${userId} (${customerEmail}) was already enrolled in "${courseTitle}" but submitted a second payment.\n\nPayment Intent: ${paymentIntentFromSession}\nOrder ID: ${orderId ?? "N/A"}\n\nAction required: Review in Stripe Dashboard and issue a manual refund if appropriate.\nStripe link: ${stripeLink}`,
-    }).catch(() => {});
+    }, { skipAdminEmail: true }).catch(() => {});
     // Send admin email with full details and instructions
     const { sendEmail } = await import("../_core/email");
     await sendEmail({

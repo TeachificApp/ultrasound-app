@@ -112,7 +112,8 @@ async function sendAdminEmail(title: string, content: string): Promise<void> {
  * errors so callers can fix the payload.
  */
 export async function notifyOwner(
-  payload: NotificationPayload
+  payload: NotificationPayload,
+  options?: { skipAdminEmail?: boolean }
 ): Promise<boolean> {
   const { title, content } = validatePayload(payload);
 
@@ -132,9 +133,11 @@ export async function notifyOwner(
 
   const endpoint = buildEndpointUrl(ENV.forgeApiUrl);
 
-  // NOTE: We do NOT call sendAdminEmail here anymore.
-  // Fulfillment code that needs an admin email sends it explicitly via sendEmail().
-  // Calling it here caused duplicate emails for every transaction.
+  // Send admin email via SendGrid unless the caller is already sending its own
+  // admin email (to avoid duplicates). Pass { skipAdminEmail: true } in those cases.
+  if (!options?.skipAdminEmail) {
+    sendAdminEmail(title, content).catch(() => {});
+  }
 
   // Log to the in-app admin notifications DB (fire-and-forget, never throws)
   logAdminNotification({ title, content, source: "system" }).catch(() => {});
