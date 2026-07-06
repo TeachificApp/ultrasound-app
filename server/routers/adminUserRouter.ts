@@ -56,7 +56,7 @@ import { storagePut } from "../storage";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail, emailWrapper } from "../_core/email";
-import { sendEnrollmentEmail, sendDownloadAccessEmail } from "../lib/enrollmentEmail";
+import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail } from "../lib/enrollmentEmail";
 import { getOrCreateAccessToken } from "../db";
 import { getBrandDisplayConfig } from "../../shared/brands";
 import { generateAutoLoginToken } from "../routes/autoLogin";
@@ -2837,11 +2837,20 @@ export const adminUserRouter = router({
       const accessToken = await getOrCreateAccessToken(userId);
 
       let sent = false;
-      if (enrollment.courseType === "download") {
+      const courseType = String(enrollment.courseType ?? "course");
+      if (courseType === "download") {
         sent = await sendDownloadAccessEmail({
           to: { name: String(enrollment.userName), email: String(enrollment.userEmail) },
           productTitle: String(enrollment.courseTitle),
           productSlug: String(enrollment.courseSlug),
+          customSubject: settings?.enrollmentEmailSubject,
+          customIntro: settings?.enrollmentEmailIntro,
+          accessToken,
+        });
+      } else if (courseType === "quiz") {
+        sent = await sendQuizAccessEmail({
+          to: { name: String(enrollment.userName), email: String(enrollment.userEmail) },
+          quizTitle: String(enrollment.courseTitle),
           customSubject: settings?.enrollmentEmailSubject,
           customIntro: settings?.enrollmentEmailIntro,
           accessToken,

@@ -632,6 +632,36 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
     content: `User ID ${userId} (${meta.customer_email}) ordered physical product ID ${productId}. Amount: $${(amountPaid / 100).toFixed(2)}. Shipping: ${shippingAddress ? JSON.parse(shippingAddress).line1 + ", " + JSON.parse(shippingAddress).city : "N/A"}.`,
   });
 
+  // Send order confirmation email to customer
+  const customerEmailForConfirmation = meta.customer_email ?? (session.customer_email as string) ?? (session.customer_details as Record<string, string>)?.email ?? null;
+  if (customerEmailForConfirmation) {
+    try {
+      const { physicalProducts } = await import("../../drizzle/schema");
+      const [product] = await db.select({ title: physicalProducts.title }).from(physicalProducts).where(eq(physicalProducts.id, productId)).limit(1);
+      const productTitle = product?.title ?? `Order #${orderId}`;
+      const customerName = meta.customer_name ?? shippingDetails?.name ?? customerEmailForConfirmation.split("@")[0];
+      const appUrl = "https://app.allaboutultrasound.com";
+      let accessUrl = `${appUrl}/my-orders`;
+      try {
+        const token = await generateAutoLoginToken(userId!, `${appUrl}/my-orders`);
+        accessUrl = `${appUrl}/api/auth/auto-login?token=${token}`;
+      } catch { /* keep plain URL */ }
+      const shippingHtml = shippingAddress ? (() => {
+        const a = JSON.parse(shippingAddress);
+        return `<p style="margin:0 0 4px;font-size:13px;color:#475569;"><strong>Ship to:</strong> ${a.name || customerName}<br/>${a.line1}${a.line2 ? ", " + a.line2 : ""}<br/>${a.city}, ${a.state} ${a.postalCode}<br/>${a.country}</p>`;
+      })() : "";
+      await sendEmail({
+        to: { name: customerName, email: customerEmailForConfirmation },
+        subject: `Order confirmed: ${productTitle}`,
+        previewText: `Your order for ${productTitle} has been received and is being processed.`,
+        htmlBody: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f0fbfc;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fbfc;padding:32px 16px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;text-align:center;"><img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp" alt="All About Ultrasound" width="60" height="60" style="border-radius:50%;display:block;margin:0 auto 12px;"/><div style="font-size:18px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">Order Confirmed</div></td></tr><tr><td style="padding:32px;"><h2 style="margin:0 0 8px;font-size:20px;color:#0e1e2e;font-family:Georgia,serif;">Thank you for your order!</h2><p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Hi ${customerName}, your order has been received and is being processed.</p><div style="background:#f0fbfc;border-left:3px solid #189aa1;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;"><p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#189aa1;">📦 ${productTitle}</p><p style="margin:0;font-size:13px;color:#475569;">Amount paid: <strong>$${(amountPaid / 100).toFixed(2)}</strong></p></div>${shippingHtml}<div style="text-align:center;margin:28px 0;"><a href="${accessUrl}" style="display:inline-block;background:linear-gradient(135deg,#189aa1,#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">View My Orders</a></div><p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">Questions? Contact us at <a href="mailto:support@allaboutultrasound.com" style="color:#189aa1;">support@allaboutultrasound.com</a>.</p></td></tr><tr><td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">© All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:#189aa1;text-decoration:none;">www.allaboutultrasound.com</a></p></td></tr></table></td></tr></table></body></html>`,
+      });
+      console.log(`[Stripe] Order confirmation email sent to ${customerEmailForConfirmation} for product ${productId}`);
+    } catch (emailErr) {
+      console.error(`[Stripe] Failed to send order confirmation email for product ${productId}:`, emailErr);
+    }
+  }
+
   console.log(`[Stripe] Physical product order recorded: user ${userId}, product ${productId}, session ${session.id}`);
 }
 

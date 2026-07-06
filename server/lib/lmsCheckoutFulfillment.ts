@@ -14,7 +14,7 @@ import {
   platformSettings,
 } from "../../drizzle/schema";
 import { getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { sendEnrollmentEmail } from "./enrollmentEmail";
+import { sendEnrollmentEmail, sendQuizAccessEmail } from "./enrollmentEmail";
 import { notifyOwner } from "../_core/notification";
 import { isEnrollmentAccessActive } from "./enrollmentAccess";
 
@@ -447,7 +447,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
   }
 
   const [course] = await db
-    .select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail })
+    .select({ title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail })
     .from(lmsCourses)
     .where(eq(lmsCourses.id, courseId))
     .limit(1);
@@ -580,13 +580,22 @@ export async function reconcileLmsCheckoutFromStripeSession(
         try {
           accessToken = await getOrCreateAccessToken(userId);
         } catch { /* optional */ }
-        await sendEnrollmentEmail({
-          to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
-          courseTitle: course.title,
-          courseSlug: course.slug,
-          accessToken,
-        });
-        notes.push("Enrollment email sent");
+        if (course.type === "quiz") {
+          await sendQuizAccessEmail({
+            to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
+            quizTitle: course.title,
+            accessToken,
+          });
+          notes.push("Quiz access email sent");
+        } else {
+          await sendEnrollmentEmail({
+            to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
+            courseTitle: course.title,
+            courseSlug: course.slug,
+            accessToken,
+          });
+          notes.push("Enrollment email sent");
+        }
       } else {
         notes.push(`Enrollment email skipped (course=${courseEmailEnabled}, platform=${platformEmailEnabled})`);
       }
