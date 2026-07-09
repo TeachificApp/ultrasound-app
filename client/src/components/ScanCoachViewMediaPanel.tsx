@@ -289,6 +289,9 @@ export function ScanCoachViewMediaPanel({
   const pair2 = mediaPairs >= 2 ? itemsFromPair2Fields(view) : { clinical: [], reference: [] };
   const hasPair2 = pair2.clinical.length > 0 || pair2.reference.length > 0;
   const hasAnything = hasAny || hasPair2;
+
+  // Public UI: never show placeholder slots — only show the admin placeholder
+  // when showPlaceholder is explicitly set (i.e. in the editor/admin context).
   if (!hasAnything && !showPlaceholder) return null;
 
   if (!hasAnything && showPlaceholder) {
@@ -318,15 +321,20 @@ export function ScanCoachViewMediaPanel({
     );
   }
 
-  // For single-pair views with hideEmptyColumns, determine grid width dynamically
+  // Determine per-pair grid layout:
+  // - Both images present → 2-column side-by-side
+  // - Only one present   → single centered column (no placeholder for the missing one)
+  // - Neither present    → skip the pair entirely
   const pair1HasClinical = clinicalItems.length > 0;
   const pair1HasReference = referenceItems.length > 0;
   const pair1BothPresent = pair1HasClinical && pair1HasReference;
-  const pair1GridClass = (hideEmptyColumns && !pair1BothPresent) ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2";
+  // Always hide empty columns on public UI (hideEmptyColumns prop OR default public behaviour)
+  const alwaysHideEmpty = true;
+  const pair1GridClass = pair1BothPresent ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1";
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Pair 1 */}
+      {/* Pair 1 — only rendered when at least one image is present */}
       {hasAny && (
         <div className={`grid gap-4 ${pair1GridClass}`}>
           <MediaColumn
@@ -334,40 +342,43 @@ export function ScanCoachViewMediaPanel({
             items={clinicalItems}
             emptyHint="No clinical image or clip"
             darkLabels={darkLabels}
-            hideLabel={hideColumnLabels}
-            hideIfEmpty={hideEmptyColumns}
+            hideLabel={hideColumnLabels || (!pair1BothPresent)}
+            hideIfEmpty={alwaysHideEmpty}
           />
           <MediaColumn
             title={mediaPairs >= 2 ? "Reference 1" : "Reference"}
             items={referenceItems}
             emptyHint="No reference image or diagram"
             darkLabels={darkLabels}
-            hideLabel={hideColumnLabels}
-            hideIfEmpty={hideEmptyColumns}
+            hideLabel={hideColumnLabels || (!pair1BothPresent)}
+            hideIfEmpty={alwaysHideEmpty}
           />
         </div>
       )}
       {/* Pair 2 — only rendered when mediaPairs >= 2 and at least one image is present */}
-      {mediaPairs >= 2 && hasPair2 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <MediaColumn
-            title="Clinical 2"
-            items={pair2.clinical}
-            emptyHint="No second clinical image"
-            darkLabels={darkLabels}
-            hideLabel={hideColumnLabels}
-            hideIfEmpty={hideEmptyColumns}
-          />
-          <MediaColumn
-            title="Reference 2"
-            items={pair2.reference}
-            emptyHint="No second reference image"
-            darkLabels={darkLabels}
-            hideLabel={hideColumnLabels}
-            hideIfEmpty={hideEmptyColumns}
-          />
-        </div>
-      )}
+      {mediaPairs >= 2 && hasPair2 && (() => {
+        const p2BothPresent = pair2.clinical.length > 0 && pair2.reference.length > 0;
+        return (
+          <div className={`grid gap-4 ${p2BothPresent ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+            <MediaColumn
+              title="Clinical 2"
+              items={pair2.clinical}
+              emptyHint="No second clinical image"
+              darkLabels={darkLabels}
+              hideLabel={hideColumnLabels || !p2BothPresent}
+              hideIfEmpty={alwaysHideEmpty}
+            />
+            <MediaColumn
+              title="Reference 2"
+              items={pair2.reference}
+              emptyHint="No second reference image"
+              darkLabels={darkLabels}
+              hideLabel={hideColumnLabels || !p2BothPresent}
+              hideIfEmpty={alwaysHideEmpty}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }
