@@ -309,6 +309,7 @@ export const adminUserRouter = router({
           enrollmentId: Number(r.enrollmentId),
           enrolledAt: r.enrolledAt,
           completedAt: r.completedAt ?? null,
+          accessExpiresAt: r.accessExpiresAt ?? null,
           progressPct: Number(r.progressPct ?? 0),
           courseId: Number(r.courseId),
           courseTitle: String(r.courseTitle),
@@ -320,6 +321,7 @@ export const adminUserRouter = router({
           videosCompleted: Number(r.videosCompleted ?? 0),
           quizAttempts: Number(r.quizAttempts ?? 0),
           avgQuizScore: r.avgQuizScore != null ? Number(r.avgQuizScore) : null,
+          stripeSubscriptionId: r.stripeSubscriptionId ? String(r.stripeSubscriptionId) : null,
         })),
         certificates: (certs as any[]).map(r => ({
           id: Number(r.id),
