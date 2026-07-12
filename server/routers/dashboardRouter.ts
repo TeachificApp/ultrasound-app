@@ -788,7 +788,7 @@ export const dashboardRouter = router({
       if (!order.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found for this order" });
 
       // Cancel at period end — student keeps access until billing period ends
-      await stripe.subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: true });
+      await getStripeClient().subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: true });
 
       return { success: true, message: "Your subscription will be cancelled at the end of the current billing period. You will retain access until then." };
     }),
@@ -810,7 +810,7 @@ export const dashboardRouter = router({
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
       if (!order.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found" });
 
-      await stripe.subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: false });
+      await getStripeClient().subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: false });
 
       return { success: true, message: "Your subscription has been reactivated." };
     }),
