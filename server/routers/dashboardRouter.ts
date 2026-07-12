@@ -116,6 +116,7 @@ export const dashboardRouter = router({
         completedAt: lmsEnrollments.completedAt,
         progressPct: lmsEnrollments.progressPct,
         accessExpiresAt: lmsEnrollments.accessExpiresAt,
+        stripeSubscriptionId: lmsEnrollments.stripeSubscriptionId,
         enrollmentSource: lmsEnrollments.source,
         courseTitle: lmsCourses.title,
         courseSlug: lmsCourses.slug,

@@ -702,14 +702,22 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     >
                       {resendEnrollmentEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
                     </button>
-                    {e.stripeSubscriptionId && (
-                      <button
-                        onClick={() => setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
-                      >
-                        <XCircle className="w-3 h-3" /> Cancel Subscription
-                      </button>
-                    )}
+                    {e.stripeSubscriptionId && (() => {
+                      const isCancelledAtPeriodEnd = !!(e.stripeSubscriptionId && e.accessExpiresAt);
+                      return (
+                        <button
+                          disabled={isCancelledAtPeriodEnd}
+                          onClick={() => !isCancelledAtPeriodEnd && setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                            isCancelledAtPeriodEnd
+                              ? "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
+                              : "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200"
+                          }`}
+                        >
+                          <XCircle className="w-3 h-3" /> Cancel Subscription
+                        </button>
+                      );
+                    })()}
                     <button
                       onClick={() => setUnenrollConfirm(e.enrollmentId)}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
@@ -717,6 +725,11 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       <Trash2 className="w-3 h-3" /> Unenroll
                     </button>
                   </div>
+                  {e.stripeSubscriptionId && e.accessExpiresAt && (
+                    <p className="text-xs text-orange-600 mt-2 flex items-center gap-1 font-medium">
+                      <XCircle className="w-3 h-3 flex-shrink-0" />
+                      Subscription cancelled — access ends {new Date(e.accessExpiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                    </p>
                   )}
                 </div>
               </div>
@@ -826,14 +839,22 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     >
                       {resendEnrollmentEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
                     </button>
-                    {e.stripeSubscriptionId && (
-                      <button
-                        onClick={() => setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
-                      >
-                        <XCircle className="w-3 h-3" /> Cancel Subscription
-                      </button>
-                    )}
+                    {e.stripeSubscriptionId && (() => {
+                      const isCancelledAtPeriodEnd = !!(e.stripeSubscriptionId && e.accessExpiresAt);
+                      return (
+                        <button
+                          disabled={isCancelledAtPeriodEnd}
+                          onClick={() => !isCancelledAtPeriodEnd && setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                            isCancelledAtPeriodEnd
+                              ? "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
+                              : "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200"
+                          }`}
+                        >
+                          <XCircle className="w-3 h-3" /> Cancel Subscription
+                        </button>
+                      );
+                    })()}
                     <button
                       onClick={() => setUnenrollConfirm(e.enrollmentId)}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
@@ -841,6 +862,11 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       <Trash2 className="w-3 h-3" /> Remove
                     </button>
                   </div>
+                  {e.stripeSubscriptionId && e.accessExpiresAt && (
+                    <p className="text-xs text-orange-600 mt-2 flex items-center gap-1 font-medium">
+                      <XCircle className="w-3 h-3 flex-shrink-0" />
+                      Subscription cancelled — access ends {new Date(e.accessExpiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                    </p>
                   )}
                 </div>
               </div>

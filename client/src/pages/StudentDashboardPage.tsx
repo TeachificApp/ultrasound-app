@@ -905,6 +905,7 @@ function MyContentTab() {
                   completed={!!c.completedAt}
                   accessSource={(c as any).accessSource ?? null}
                   expiresAt={(c as any).accessExpiresAt ?? null}
+                  subscriptionCancelledAt={(c as any).stripeSubscriptionId && (c as any).accessExpiresAt ? new Date((c as any).accessExpiresAt) : null}
                   actions={[
                     { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${c.courseSlug}/player` },
                     { label: "Overview", icon: FileText, href: `/courses/${c.courseSlug}/overview`, secondary: true },
@@ -936,6 +937,7 @@ function MyContentTab() {
                   completed={!!q.completedAt}
                   accessSource={(q as any).accessSource ?? null}
                   expiresAt={(q as any).accessExpiresAt ?? null}
+                  subscriptionCancelledAt={(q as any).stripeSubscriptionId && (q as any).accessExpiresAt ? new Date((q as any).accessExpiresAt) : null}
                   actions={[
                     { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
                   ]}
@@ -1670,7 +1672,7 @@ function EmptyState({
 }
 
 function ContentCard({
-  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed, accessSource, expiresAt,
+  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed, accessSource, expiresAt, subscriptionCancelledAt,
 }: {
   thumbnail?: string | null;
   title: string;
@@ -1683,6 +1685,7 @@ function ContentCard({
   completed?: boolean;
   accessSource?: string | null;
   expiresAt?: Date | null;
+  subscriptionCancelledAt?: Date | null;
   actions: { label: string; icon: React.ElementType; href: string; secondary?: boolean }[];
 }) {
   const colorMap = {
@@ -1739,7 +1742,7 @@ function ContentCard({
             {completed ? "Completed" : `${pct}% complete`}
           </p>
         )}
-        {expiresAt && (
+        {expiresAt && !subscriptionCancelledAt && (
           <p className="text-xs text-amber-600 mb-1 flex items-center gap-1">
             <Clock className="w-3 h-3" />
             Access until {new Date(expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -1766,6 +1769,12 @@ function ContentCard({
             </a>
           ))}
         </div>
+        {subscriptionCancelledAt && (
+          <p className="text-xs text-orange-600 mt-2 flex items-center gap-1 font-medium">
+            <XCircle className="w-3 h-3 flex-shrink-0" />
+            Subscription cancelled — access ends {new Date(subscriptionCancelledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+          </p>
+        )}
       </div>
     </div>
   );
