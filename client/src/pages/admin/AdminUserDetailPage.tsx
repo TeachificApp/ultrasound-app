@@ -724,13 +724,15 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     >
                       <Trash2 className="w-3 h-3" /> Unenroll
                     </button>
+                    {e.stripeSubscriptionId && e.accessExpiresAt && (
+                      <p className="w-full text-xs text-orange-600 mt-1 flex items-center gap-1 font-medium">
+                        <XCircle className="w-3 h-3 flex-shrink-0" />
+                        Subscription cancelled{" — "}access ends {new Date(e.accessExpiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      </p>
+                    )}
                   </div>
-                  {e.stripeSubscriptionId && e.accessExpiresAt && (
-                    <p className="text-xs text-orange-600 mt-2 flex items-center gap-1 font-medium">
-                      <XCircle className="w-3 h-3 flex-shrink-0" />
-                      Subscription cancelled — access ends {new Date(e.accessExpiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                    </p>
-                  )}
+                  )
+                  }
                 </div>
               </div>
             ))
@@ -861,13 +863,15 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     >
                       <Trash2 className="w-3 h-3" /> Remove
                     </button>
+                    {e.stripeSubscriptionId && e.accessExpiresAt && (
+                      <p className="w-full text-xs text-orange-600 mt-1 flex items-center gap-1 font-medium">
+                        <XCircle className="w-3 h-3 flex-shrink-0" />
+                        Subscription cancelled{" — "}access ends {new Date(e.accessExpiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      </p>
+                    )}
                   </div>
-                  {e.stripeSubscriptionId && e.accessExpiresAt && (
-                    <p className="text-xs text-orange-600 mt-2 flex items-center gap-1 font-medium">
-                      <XCircle className="w-3 h-3 flex-shrink-0" />
-                      Subscription cancelled — access ends {new Date(e.accessExpiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                    </p>
-                  )}
+                  )
+                  }
                 </div>
               </div>
             ))
