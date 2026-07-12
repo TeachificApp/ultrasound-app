@@ -725,7 +725,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
         </div>
       )}
 
-      {/* Quizzes */
+      {/* Quizzes */}
       {contentTab === "quizzes" && (
         <div className="space-y-3">
           <SectionHeader
