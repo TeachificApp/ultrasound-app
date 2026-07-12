@@ -3235,7 +3235,10 @@ export const lmsEnrollments = mysqlTable("lms_enrollments", {
   source: varchar("source", { length: 32 }).default("manual").notNull(),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  /** Prevent duplicate enrollments for the same user+course (webhook double-fire guard) */
+  uqUserCourse: uniqueIndex("uq_user_course").on(t.userId, t.courseId),
+}));
 export type LmsEnrollment = typeof lmsEnrollments.$inferSelect;
 
 export const lmsLessonProgress = mysqlTable("lms_lesson_progress", {
