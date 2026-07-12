@@ -495,6 +495,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [enrollNote, setEnrollNote] = useState("");
   const [enrollExpiresAt, setEnrollExpiresAt] = useState("");
   const [unenrollConfirm, setUnenrollConfirm] = useState<number | null>(null);
+  const [cancelEnrollSubConfirm, setCancelEnrollSubConfirm] = useState<{ enrollmentId: number; title: string } | null>(null);
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
   const [cancelNativeConfirm, setCancelNativeConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
   const [revokeNativeConfirm, setRevokeNativeConfirm] = useState<number | null>(null);
@@ -527,6 +528,10 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const unenroll = trpc.adminUser.unenrollFromCourse.useMutation({
     onSuccess: () => { toast.success("Unenrolled."); refetch(); setUnenrollConfirm(null); },
     onError: (e) => toast.error(e.message),
+  });
+  const cancelEnrollSub = trpc.adminUser.cancelLmsEnrollmentSubscription.useMutation({
+    onSuccess: () => { toast.success("Subscription cancelled at period end. Access expiry set to billing period end."); refetch(); setCancelEnrollSubConfirm(null); },
+    onError: (e) => { toast.error(e.message); setCancelEnrollSubConfirm(null); },
   });
 
   const refundPayment = trpc.adminUser.refundPayment.useMutation({
@@ -697,6 +702,14 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     >
                       {resendEnrollmentEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
                     </button>
+                    {e.stripeSubscriptionId && (
+                      <button
+                        onClick={() => setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
+                      >
+                        <XCircle className="w-3 h-3" /> Cancel Subscription
+                      </button>
+                    )}
                     <button
                       onClick={() => setUnenrollConfirm(e.enrollmentId)}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
@@ -712,7 +725,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
         </div>
       )}
 
-      {/* Quizzes */}
+      {/* Quizzes */
       {contentTab === "quizzes" && (
         <div className="space-y-3">
           <SectionHeader
@@ -813,6 +826,14 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     >
                       {resendEnrollmentEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
                     </button>
+                    {e.stripeSubscriptionId && (
+                      <button
+                        onClick={() => setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
+                      >
+                        <XCircle className="w-3 h-3" /> Cancel Subscription
+                      </button>
+                    )}
                     <button
                       onClick={() => setUnenrollConfirm(e.enrollmentId)}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
@@ -1268,6 +1289,28 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel enrollment subscription confirm */}
+      <AlertDialog open={cancelEnrollSubConfirm !== null} onOpenChange={open => !open && setCancelEnrollSubConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will cancel the Stripe renewal for <strong>{cancelEnrollSubConfirm?.title}</strong> and set the access expiry to the end of the current billing period. The student will keep access until then and will not be charged again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancelEnrollSubConfirm && cancelEnrollSub.mutate({ enrollmentId: cancelEnrollSubConfirm.enrollmentId })}
+              disabled={cancelEnrollSub.isPending}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {cancelEnrollSub.isPending ? "Cancelling..." : "Cancel Subscription"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

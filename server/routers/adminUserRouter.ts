@@ -106,6 +106,7 @@ export const adminUserRouter = router({
           e.completed_at AS completedAt,
           e.progress_pct AS progressPct,
           e.access_expires_at AS accessExpiresAt,
+          COALESCE(e.stripe_subscription_id, o.stripe_subscription_id) AS stripeSubscriptionId,
           c.id AS courseId,
           c.title AS courseTitle,
           c.slug AS courseSlug,
@@ -118,6 +119,7 @@ export const adminUserRouter = router({
           (SELECT ROUND(AVG(score),1) FROM lms_quiz_attempts WHERE user_id = ${input.userId} AND course_id = c.id) AS avgQuizScore
         FROM lms_enrollments e
         JOIN lms_courses c ON c.id = e.course_id
+        LEFT JOIN lms_orders o ON o.id = e.order_id
         WHERE e.user_id = ${input.userId}
         ORDER BY e.enrolled_at DESC
       `);
@@ -2699,10 +2701,70 @@ export const adminUserRouter = router({
           const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
           if (input.immediately) {
             await stripe.subscriptions.cancel(order.stripeSubscriptionId);
+            // Immediately expired — clear access
+            await db.update(lmsEnrollments)
+              .set({ accessExpiresAt: new Date() })
+              .where(eq(lmsEnrollments.orderId, input.orderId));
           } else {
-            await stripe.subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: true });
+            const updatedSub = await stripe.subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: true });
+            // Set access_expires_at to the Stripe period end date
+            const periodEnd = new Date(updatedSub.current_period_end * 1000);
+            await db.update(lmsEnrollments)
+              .set({ accessExpiresAt: periodEnd })
+              .where(eq(lmsEnrollments.orderId, input.orderId));
           }
         }
+      }
+
+      return { success: true };
+    }),
+
+  /** Cancel a subscription by enrollment ID (admin) — sets cancel_at_period_end on Stripe and access_expires_at on the enrollment */
+  cancelLmsEnrollmentSubscription: protectedProcedure
+    .input(z.object({
+      enrollmentId: z.number().int(),
+      immediately: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [enrollment] = await db
+        .select()
+        .from(lmsEnrollments)
+        .where(eq(lmsEnrollments.id, input.enrollmentId))
+        .limit(1);
+
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+
+      // Resolve stripeSubscriptionId — from enrollment directly, or via linked order
+      let stripeSubId = enrollment.stripeSubscriptionId;
+      if (!stripeSubId && enrollment.orderId) {
+        const [order] = await db.select({ stripeSubscriptionId: lmsOrders.stripeSubscriptionId })
+          .from(lmsOrders).where(eq(lmsOrders.id, enrollment.orderId)).limit(1);
+        stripeSubId = order?.stripeSubscriptionId ?? null;
+      }
+
+      if (!stripeSubId) throw new TRPCError({ code: "BAD_REQUEST", message: "No Stripe subscription linked to this enrollment" });
+
+      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+
+      if (input.immediately) {
+        await stripe.subscriptions.cancel(stripeSubId);
+        await db.update(lmsEnrollments)
+          .set({ accessExpiresAt: new Date() })
+          .where(eq(lmsEnrollments.id, input.enrollmentId));
+      } else {
+        const updatedSub = await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: true });
+        const periodEnd = new Date(updatedSub.current_period_end * 1000);
+        await db.update(lmsEnrollments)
+          .set({ accessExpiresAt: periodEnd })
+          .where(eq(lmsEnrollments.id, input.enrollmentId));
       }
 
       return { success: true };

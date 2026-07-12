@@ -788,7 +788,13 @@ export const dashboardRouter = router({
       if (!order.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found for this order" });
 
       // Cancel at period end — student keeps access until billing period ends
-      await getStripeClient().subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: true });
+      const updatedSub = await getStripeClient().subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: true });
+
+      // Set access_expires_at on the enrollment to the Stripe period end date
+      const periodEnd = new Date(updatedSub.current_period_end * 1000);
+      await db.update(lmsEnrollments)
+        .set({ accessExpiresAt: periodEnd })
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.orderId, input.orderId)));
 
       return { success: true, message: "Your subscription will be cancelled at the end of the current billing period. You will retain access until then." };
     }),
