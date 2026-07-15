@@ -1327,8 +1327,16 @@ export default function CoursePlayer() {
         const paramId = parseInt(lessonParam);
         const found = allL.find((l: any) => l.id === paramId);
         if (found) {
-          // If not enrolled and lesson is not accessible, redirect to first accessible preview lesson
           const foundPm = found.previewMode ?? (found.isPreview ? "preview" : "none");
+          // Enrolled users: if the requested lesson is hide-after-purchase, redirect to first visible lesson
+          if (isEnrolled && foundPm === "preview_hide_after_purchase" && !adminBypass) {
+            const firstVisible = allL.find((l: any) => {
+              const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+              return pm !== "preview_hide_after_purchase";
+            });
+            if (firstVisible) { setSelectedLessonId(firstVisible.id); return; }
+          }
+          // Unenrolled users: if the requested lesson is not accessible, redirect to first accessible preview lesson
           const foundAccessible = foundPm === "preview" || (foundPm === "preview_hide_after_purchase" && !isEnrolled);
           if (!isEnrolled && !foundAccessible && !adminBypass) {
             const firstPreview = allL.find((l: any) => {
@@ -1354,7 +1362,14 @@ export default function CoursePlayer() {
           return;
         }
       }
-      const first = topLevel[0] ?? data.sections[0]?.lessons[0];
+      // For enrolled users: skip lessons set to hide-after-purchase (free preview only)
+      // — these lessons are hidden once the user has purchased, so never land on them.
+      const isHiddenAfterPurchase = (l: any) => {
+        const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+        return pm === "preview_hide_after_purchase";
+      };
+      const firstVisible = allL.find((l: any) => isEnrolled ? !isHiddenAfterPurchase(l) : true);
+      const first = firstVisible ?? topLevel[0] ?? data.sections[0]?.lessons[0];
       if (first) setSelectedLessonId(first.id);
     }
   }, [data]);
@@ -1592,6 +1607,10 @@ export default function CoursePlayer() {
       setShowUpgradePrompt(true);
       return;
     }
+    // Enrolled users: block hide-after-purchase lessons (they are hidden post-purchase)
+    if (isEnrolled && !adminBypass && pm === "preview_hide_after_purchase") {
+      return; // Silently ignore — lesson is hidden from sidebar so this shouldn't be reachable
+    }
     // Free preview enrollees: block non-preview lessons (they have limited enrollment)
     if (isFreePreviewEnrollment && !adminBypass && lesson && pm === "none") {
       setUpgradePromptReason("locked_lesson");
@@ -1602,8 +1621,25 @@ export default function CoursePlayer() {
   };
 
   const currentIdx = allLessons.findIndex((l: any) => l.id === selectedLessonId);
-  const prevLesson = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
-  const nextLesson = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
+  // Helper: check if a lesson is hidden for enrolled users
+  const isHiddenForEnrolled = (l: any) => {
+    if (!isEnrolled || adminBypass) return false;
+    const pm = l?.previewMode ?? (l?.isPreview ? "preview" : "none");
+    return pm === "preview_hide_after_purchase";
+  };
+  // Find prev/next skipping hide-after-purchase lessons for enrolled users
+  const prevLesson = (() => {
+    for (let i = currentIdx - 1; i >= 0; i--) {
+      if (!isHiddenForEnrolled(allLessons[i])) return allLessons[i];
+    }
+    return null;
+  })();
+  const nextLesson = (() => {
+    for (let i = currentIdx + 1; i < allLessons.length; i++) {
+      if (!isHiddenForEnrolled(allLessons[i])) return allLessons[i];
+    }
+    return null;
+  })();
 
   const currentSection = sections.find((s: any) => s.lessons.some((l: any) => l.id === selectedLessonId));
   const currentSectionIdx = currentSection ? sections.indexOf(currentSection) : -1;
