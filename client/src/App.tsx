@@ -18,6 +18,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
 import MembersLayout from "./components/MembersLayout";
 import { isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain, isMarketingStagingDomain, LEARN_APP_URL, MEMBERS_APP_URL, ROOT_DOMAIN_URL } from "./hooks/useSubdomain";
+import { MetaPixel } from "./components/MetaPixel";
 import UpgradePrompt from "./components/UpgradePrompt";
 import { SsoRedirect } from "./components/SsoRedirect";
 import { useAuth } from "./_core/hooks/useAuth";
@@ -1388,6 +1389,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
+          <MetaPixel />
           <Toaster />
           {onMarketingStaging ? (
             <MarketingSiteRouter />

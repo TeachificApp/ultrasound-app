@@ -7519,3 +7519,14 @@ export const sonoTravelersLeads = mysqlTable("sono_travelers_leads", {
 });
 export type SonoTravelersLead = typeof sonoTravelersLeads.$inferSelect;
 export type InsertSonoTravelersLead = typeof sonoTravelersLeads.$inferInsert;
+
+// ─── Site Settings ────────────────────────────────────────────────────────────
+export const siteSettings = mysqlTable("site_settings", {
+  id: int("id").primaryKey().autoincrement(),
+  settingKey: varchar("setting_key", { length: 100 }).notNull().unique(),
+  settingValue: text("setting_value"),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull().default(0),
+  updatedBy: int("updated_by"),
+});
+export type SiteSetting = typeof siteSettings.$inferSelect;
+export type InsertSiteSetting = typeof siteSettings.$inferInsert;

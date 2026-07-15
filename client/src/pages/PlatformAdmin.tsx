@@ -98,6 +98,7 @@ import {
   FileQuestion,
   AlertTriangle,
   Bell,
+  Radio,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1257,6 +1258,96 @@ function SortableToolCard({ card }: { card: ToolCard }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+
+// ─── Tracking Pixels Panel ───────────────────────────────────────────────────
+function TrackingPixelsPanel() {
+  const { data: pixels, refetch } = trpc.siteSettings.getPixelIds.useQuery();
+  const updatePixel = trpc.siteSettings.updatePixelId.useMutation({
+    onSuccess: () => {
+      toast.success("Pixel ID saved.");
+      refetch();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const BRANDS: { key: "aaus" | "ihe" | "learn"; label: string; domain: string }[] = [
+    { key: "aaus", label: "All About Ultrasound", domain: "app.allaboutultrasound.com" },
+    { key: "ihe", label: "iHeartEcho", domain: "app.iheartecho.com" },
+    { key: "learn", label: "Learn (AAUS)", domain: "learn.allaboutultrasound.com" },
+  ];
+
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  // Initialise drafts once pixels load
+  useEffect(() => {
+    if (pixels) {
+      setDrafts({
+        aaus: pixels.aaus ?? "",
+        ihe: pixels.ihe ?? "",
+        learn: pixels.learn ?? "",
+      });
+    }
+  }, [pixels]);
+
+  return (
+    <Card className="mb-6 border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <Radio className="w-4 h-4 text-[#189aa1]" />
+          Meta Pixel IDs
+        </CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Enter a Meta Pixel ID for each brand. Leave blank to disable tracking for that domain. Changes take effect immediately on the live site.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-4">
+        {BRANDS.map(({ key, label, domain }) => (
+          <div key={key} className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="sm:w-56 flex-shrink-0">
+              <p className="text-sm font-medium text-gray-800">{label}</p>
+              <p className="text-xs text-gray-400">{domain}</p>
+            </div>
+            <div className="flex gap-2 flex-1">
+              <Input
+                placeholder="e.g. 1234567890123456"
+                value={drafts[key] ?? ""}
+                onChange={e => setDrafts(prev => ({ ...prev, [key]: e.target.value }))}
+                className="flex-1 font-mono text-sm"
+              />
+              <Button
+                size="sm"
+                disabled={updatePixel.isPending || drafts[key] === (pixels?.[key] ?? "")}
+                onClick={() => updatePixel.mutate({ brand: key, pixelId: drafts[key] || null })}
+                style={{ background: "#189aa1" }}
+                className="text-white flex-shrink-0"
+              >
+                Save
+              </Button>
+              {pixels?.[key] && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={updatePixel.isPending}
+                  onClick={() => {
+                    setDrafts(prev => ({ ...prev, [key]: "" }));
+                    updatePixel.mutate({ brand: key, pixelId: null });
+                  }}
+                  className="text-red-500 border-red-200 hover:bg-red-50 flex-shrink-0"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+            {pixels?.[key] && (
+              <span className="text-xs text-green-600 font-medium flex-shrink-0">Active</span>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PlatformAdmin() {
   const { user, isAuthenticated, loading } = useAuth();
   const isIHE = isIHeartEchoDomain();
@@ -1770,6 +1861,9 @@ export default function PlatformAdmin() {
             />
           </CardContent>
         </Card>
+
+        {/* Tracking Pixels */}
+        <TrackingPixelsPanel />
 
         {/* Sync CME Courses */}
         <Card className="mb-6 border-0 shadow-sm">

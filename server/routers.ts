@@ -67,6 +67,7 @@ import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuiz
 import { teamRouter } from "./routers/teamRouter";
 import { adminNotificationsRouter } from "./routers/adminNotificationsRouter";
 import { sonoTravelersRouter } from "./routers/sonoTravelersRouter";
+import { siteSettingsRouter } from "./routers/siteSettingsRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -2705,6 +2706,7 @@ export const appRouter = router({
   team: teamRouter,
   adminNotifications: adminNotificationsRouter,
   sonoTravelers: sonoTravelersRouter,
+  siteSettings: siteSettingsRouter,
   mirrorSync: router({
     /** Get the status of the last mirror sync run */
     status: protectedProcedure.query(async ({ ctx }) => {
