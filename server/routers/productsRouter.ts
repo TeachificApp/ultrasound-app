@@ -148,7 +148,8 @@ export const productsLearnerRouter = router({
     }),
 
   /** Create an embedded Stripe Checkout session for a physical product (learner-facing). */
-  createEmbeddedCheckoutSession: protectedProcedure
+  // NOTE: publicProcedure — guest checkout is allowed, no sign-in required.
+  createEmbeddedCheckoutSession: publicProcedure
     .input(z.object({ productSlug: z.string(), origin: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -158,15 +159,18 @@ export const productsLearnerRouter = router({
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
       if (product.status !== "published" && !product.isFree) throw new TRPCError({ code: "FORBIDDEN", message: "This product is not available." });
       if (product.checkoutMode !== "native") throw new TRPCError({ code: "BAD_REQUEST", message: "This product uses an external checkout." });
+      const userId = ctx.user?.id ?? 0;
       if (product.isFree || Number(product.price) === 0) {
-        // Auto-grant free product
-        await db.insert(physicalProductOrders).values({
-          userId: ctx.user.id,
-          productId: product.id,
-          pricingOptionId: null,
-          amountPaid: 0,
-          currency: product.currency,
-        }).onDuplicateKeyUpdate({ set: { userId: ctx.user.id } }).catch(() => {});
+        // Auto-grant free product (only if user is logged in)
+        if (userId) {
+          await db.insert(physicalProductOrders).values({
+            userId,
+            productId: product.id,
+            pricingOptionId: null,
+            amountPaid: 0,
+            currency: product.currency,
+          }).onDuplicateKeyUpdate({ set: { userId } }).catch(() => {});
+        }
         const { platformSettings } = await import("../../drizzle/schema");
         const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
         return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: settings?.termsUrl ?? "", privacyUrl: settings?.privacyUrl ?? "", productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null };
@@ -181,8 +185,8 @@ export const productsLearnerRouter = router({
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
-        customer_email: ctx.user.email ?? undefined,
-        client_reference_id: ctx.user.id.toString(),
+        customer_email: ctx.user?.email ?? undefined,
+        client_reference_id: userId ? userId.toString() : undefined,
         allow_promotion_codes: true,
         line_items: [{
           price_data: {
@@ -196,7 +200,7 @@ export const productsLearnerRouter = router({
           },
           quantity: 1,
         }],
-        metadata: { type: "physical_product", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        metadata: { type: "physical_product", product_id: product.id.toString(), user_id: userId.toString(), customer_email: ctx.user?.email ?? "" },
         payment_intent_data: { description: `${product.title} — Physical Product` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=physical`,
         ...shippingOpts,

@@ -391,7 +391,7 @@ export const webinarSessionRouter = router({
     }),
 
   // ─── Embedded Checkout Session ────────────────────────────────────────────
-  createEmbeddedCheckoutSession: protectedProcedure
+  createEmbeddedCheckoutSession: publicProcedure
     .input(z.object({ webinarSlug: z.string(), origin: z.string(), pricingOptionId: z.string().optional(), promoCode: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -399,6 +399,7 @@ export const webinarSessionRouter = router({
       if (!webinar) throw new TRPCError({ code: "NOT_FOUND", message: "Webinar not found" });
       const { isFree, priceCents } = resolveWebinarPricing(webinar, input.pricingOptionId);
       const subtitle = webinar.hostTitle ?? null;
+      const userId = ctx.user?.id ?? 0;
       if (isFree) {
         return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: subtitle, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: null, brand: webinar.brand ?? "all_about_ultrasound" };
       }
@@ -416,10 +417,12 @@ export const webinarSessionRouter = router({
             if (coupon.percent_off) discountedCents -= Math.round(priceCents * (coupon.percent_off / 100));
             else if (coupon.amount_off) discountedCents -= Math.min(coupon.amount_off, priceCents);
             if (discountedCents <= 0) {
-              // 100% off — register directly without Stripe
-              const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
-                .where(and(eq(webinarRegistrations.webinarId, webinar.id), eq(webinarRegistrations.userId, ctx.user.id))).limit(1);
-              if (!ex) await db.insert(webinarRegistrations).values({ webinarId: webinar.id, userId: ctx.user.id, registrationSource: "promo_free", email: ctx.user.email ?? "" });
+              // 100% off — register directly without Stripe (only if user is logged in)
+              if (userId) {
+                const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
+                  .where(and(eq(webinarRegistrations.webinarId, webinar.id), eq(webinarRegistrations.userId, userId))).limit(1);
+                if (!ex) await db.insert(webinarRegistrations).values({ webinarId: webinar.id, userId, registrationSource: "promo_free", email: ctx.user?.email ?? "" });
+              }
               return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: subtitle, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: 100, brand: webinar.brand ?? "all_about_ultrasound" };
             }
           }
@@ -429,8 +432,8 @@ export const webinarSessionRouter = router({
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
-        customer_email: ctx.user.email ?? undefined,
-        client_reference_id: ctx.user.id.toString(),
+        customer_email: ctx.user?.email ?? undefined,
+        client_reference_id: userId ? userId.toString() : undefined,
         allow_promotion_codes: true,
         line_items: [{
           price_data: {
@@ -444,7 +447,7 @@ export const webinarSessionRouter = router({
           },
           quantity: 1,
         }],
-        metadata: { type: "webinar", webinar_id: webinar.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        metadata: { type: "webinar", webinar_id: webinar.id.toString(), user_id: userId.toString(), customer_email: ctx.user?.email ?? "" },
         payment_intent_data: { description: `${webinar.title} — Webinar Registration` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=webinar`,
       } as any);

@@ -443,7 +443,8 @@ export default function Checkout() {
   const createCourseSession = trpc.lmsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
   const createDownloadSession = trpc.downloadsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
   const createPhysicalSession = trpc.productsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
-  const createWebinarSession = trpc.webinarAdmin.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
+  // NOTE: webinarSession (not webinarAdmin) — publicProcedure, no sign-in required
+  const createWebinarSession = trpc.webinarSession.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
   const createMembershipSession = trpc.membership.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
 
   // ── Guest registration for unauthenticated membership checkout ────────────
@@ -537,41 +538,10 @@ export default function Checkout() {
 
   // ── Error state ───────────────────────────────────────────────────────────
   if (createSession.isError) {
-    // Special case: unauthenticated user — show sign-in prompt for all entity types
-    // For memberships, also offer a guest registration form
-    if (isUnauthorizedError && !isUnauthorizedMembershipError) {
-      // Non-membership checkout: just prompt to sign in
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full">
-            <div className="text-center mb-6">
-              <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-3">
-                <Lock className="h-6 w-6 text-teal-600" />
-              </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-1">Sign in to continue</h2>
-              <p className="text-gray-500 text-sm">You need to be signed in to complete your purchase.</p>
-            </div>
-            <div className="space-y-3">
-              <a
-                href={`/api/oauth/login?returnPath=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="flex items-center justify-center w-full py-2.5 px-4 rounded-lg font-medium text-sm text-white bg-teal-600 hover:bg-teal-700 transition-colors"
-              >
-                Sign In
-              </a>
-              <a
-                href={`/register?returnPath=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="flex items-center justify-center w-full py-2.5 px-4 rounded-lg font-medium text-sm text-teal-700 border border-teal-200 hover:bg-teal-50 transition-colors"
-              >
-                Create Account
-              </a>
-              <p className="text-center text-xs text-gray-400 pt-1">
-                <Link href={backHref} className="text-teal-600 hover:underline">{backLabel}</Link>
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
+    // NOTE: All checkout flows (course, download, physical, webinar) support guest
+    // checkout — sign-in is NEVER required before payment. Only membership checkout
+    // has a special guest registration form. For all other errors, show a clear
+    // message with a retry option so the user can try again without signing in.
     if (isUnauthorizedMembershipError) {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -639,11 +609,19 @@ export default function Checkout() {
           <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Checkout Unavailable</h2>
           <p className="text-gray-500 text-sm mb-6">
-            {(createSession.error as any)?.message ?? "This course is not available for purchase right now."}
+            Something went wrong loading the checkout. Please try again — no sign-in required.
           </p>
-          <Link href={backHref} className="inline-flex items-center gap-2 font-medium text-sm" style={linkStyle}>
-            <ArrowLeft className="h-4 w-4" /> {backLabel}
-          </Link>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => { window.location.reload(); }}
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg font-medium text-sm text-white bg-teal-600 hover:bg-teal-700 transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" /> Try Again
+            </button>
+            <Link href={backHref} className="inline-flex items-center justify-center gap-2 font-medium text-sm text-gray-500 hover:text-gray-700" style={linkStyle}>
+              <ArrowLeft className="h-4 w-4" /> {backLabel}
+            </Link>
+          </div>
         </div>
       </div>
     );

@@ -583,7 +583,8 @@ export const downloadsLearnerRouter = router({
     }),
 
   // ─── Embedded Checkout Session (for /checkout/{slug}?type=download) ────────
-  createEmbeddedCheckoutSession: protectedProcedure
+  // NOTE: publicProcedure — guest checkout is allowed, no sign-in required.
+  createEmbeddedCheckoutSession: publicProcedure
     .input(z.object({ productSlug: z.string(), origin: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -592,17 +593,22 @@ export const downloadsLearnerRouter = router({
         .where(eq(digitalProducts.slug, input.productSlug)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
       if ((product as any).bundleOnly) throw new TRPCError({ code: "FORBIDDEN", message: "This product is only available as part of a bundle." });
+      const userId = ctx.user?.id ?? 0;
       if (product.isFree) {
-        const [existing] = await db.select().from(digitalPurchases)
-          .where(and(eq(digitalPurchases.userId, ctx.user.id), eq(digitalPurchases.productId, product.id))).limit(1);
-        if (!existing) {
-          await db.insert(digitalPurchases).values({ userId: ctx.user.id, productId: product.id });
+        if (userId) {
+          const [existing] = await db.select().from(digitalPurchases)
+            .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, product.id))).limit(1);
+          if (!existing) {
+            await db.insert(digitalPurchases).values({ userId, productId: product.id });
+          }
         }
         return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null, brand: "aaus" };
       }
-      const [existing] = await db.select().from(digitalPurchases)
-        .where(and(eq(digitalPurchases.userId, ctx.user.id), eq(digitalPurchases.productId, product.id))).limit(1);
-      if (existing) throw new TRPCError({ code: "CONFLICT", message: "You already own this product." });
+      if (userId) {
+        const [existing] = await db.select().from(digitalPurchases)
+          .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, product.id))).limit(1);
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: "You already own this product." });
+      }
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
       const Stripe = (await import("stripe")).default;
@@ -610,8 +616,8 @@ export const downloadsLearnerRouter = router({
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
-        customer_email: ctx.user.email ?? undefined,
-        client_reference_id: ctx.user.id.toString(),
+        customer_email: ctx.user?.email ?? undefined,
+        client_reference_id: userId ? userId.toString() : undefined,
         allow_promotion_codes: true,
         line_items: [{
           price_data: {
@@ -625,10 +631,10 @@ export const downloadsLearnerRouter = router({
           },
           quantity: 1,
         }],
-        metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "" },
+        metadata: { type: "digital_download", product_id: product.id.toString(), user_id: userId.toString(), customer_email: ctx.user?.email ?? "" },
         payment_intent_data: { description: `${product.title} — Digital Download` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=download`,
-      }, { idempotencyKey: `download-embedded-${ctx.user.id}-${product.id}-${new Date().toISOString().slice(0, 10)}` });
+      }, { idempotencyKey: `download-embedded-${userId}-${product.id}-${new Date().toISOString().slice(0, 10)}` });
       return {
         clientSecret: session.client_secret!,
         free: false,
