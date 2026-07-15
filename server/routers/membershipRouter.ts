@@ -872,7 +872,7 @@ const getPublicMembershipCheckoutPageConfig = publicProcedure
     return { config: plan.checkoutPageConfig ?? null, courseStats: { totalLessons: 0, totalSections: 0, hasCertificate: false } };
   });
 
-const createMembershipEmbeddedCheckoutSession = protectedProcedure
+const createMembershipEmbeddedCheckoutSession = publicProcedure
   .input(z.object({ planSlug: z.string(), origin: z.string(), discountCodeId: z.number().optional() }))
   .mutation(async ({ ctx, input }) => {
     const db = await getDb();
@@ -880,10 +880,20 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
     const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
 
-    await assertCanPurchaseMembership(db, ctx.user.id, plan, ctx.user.email);
+    // Only check for duplicate purchase if user is already logged in
+    if (ctx.user) await assertCanPurchaseMembership(db, ctx.user.id, plan, ctx.user.email);
+
+    // Resolve user info — may be null for guest checkout
+    const userId = ctx.user?.id ?? 0;
+    const userEmail = ctx.user?.email ?? null;
+    const userName = ctx.user?.name ?? null;
 
     const isFree = !plan.price || Number(plan.price) === 0;
     if (isFree) {
+      if (!ctx.user) {
+        // Guest cannot enroll in a free membership without an account — require sign-in
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Please sign in to enroll in a free membership." });
+      }
       // Enroll user in the free membership directly (idempotent)
       try {
         const { fulfillMembershipPurchase } = await import("../lib/membershipFulfillment");
@@ -946,8 +956,8 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
           const db2 = await getDb();
           if (db2) {
             const [ex] = await db2.select({ id: membershipEnrollments.id }).from(membershipEnrollments)
-              .where(and(eq(membershipEnrollments.userId, ctx.user.id), eq(membershipEnrollments.planId, plan.id))).limit(1);
-            if (!ex) await db2.insert(membershipEnrollments).values({ userId: ctx.user.id, planId: plan.id, status: "active", source: "promo_free" });
+              .where(and(eq(membershipEnrollments.userId, userId), eq(membershipEnrollments.planId, plan.id))).limit(1);
+            if (!ex && userId) await db2.insert(membershipEnrollments).values({ userId, planId: plan.id, status: "active", source: "promo_free" });
           }
           return { clientSecret: null, free: true, courseTitle: plan.title, courseSubtitle: null, courseDescription: plan.description ?? null, courseThumbnail: plan.coverImage ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: plan.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: plan.currency ?? "usd", minSeats: null, discountPercent: null };
         }
@@ -957,23 +967,23 @@ const createMembershipEmbeddedCheckoutSession = protectedProcedure
       ui_mode: "embedded",
       mode: isRecurring ? "subscription" : "payment",
       line_items: [lineItem],
-      customer_email: ctx.user.email ?? undefined,
+      customer_email: userEmail ?? undefined,
       allow_promotion_codes: discounts.length === 0,
       ...(discounts.length > 0 ? { discounts } : {}),
-      client_reference_id: ctx.user.id.toString(),
+      client_reference_id: userId ? userId.toString() : undefined,
       metadata: {
         type: "membership",
         plan_id: plan.id.toString(),
-        user_id: ctx.user.id.toString(),
-        customer_email: ctx.user.email ?? "",
-        customer_name: ctx.user.name ?? "",
+        user_id: userId ? userId.toString() : "0",
+        customer_email: userEmail ?? "",
+        customer_name: userName ?? "",
         ...(input.discountCodeId ? { discount_code_id: input.discountCodeId.toString() } : {}),
       },
       ...(isRecurring
-        ? { subscription_data: { description: `${plan.title} — Membership — Subscription — Initial`, metadata: { user_id: ctx.user.id.toString(), plan_id: plan.id.toString(), type: "membership" } } }
+        ? { subscription_data: { description: `${plan.title} — Membership — Subscription — Initial`, metadata: { user_id: userId ? userId.toString() : "0", plan_id: plan.id.toString(), type: "membership" } } }
         : { payment_intent_data: { description: `${plan.title} — Membership — One-Time` } }),
       return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=membership`,
-    }, { idempotencyKey: `membership-embedded-${ctx.user.id}-${plan.id}-${new Date().toISOString().slice(0, 10)}` });
+    }, { idempotencyKey: `membership-embedded-${userId || "guest"}-${plan.id}-${new Date().toISOString().slice(0, 10)}` });
     const billingLabel = isRecurring ? (plan.billingInterval === "annual" ? "per year" : "per month") : null;
     return {
       clientSecret: session.client_secret!,

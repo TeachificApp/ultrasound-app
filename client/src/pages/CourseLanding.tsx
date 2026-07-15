@@ -1829,7 +1829,17 @@ export default function CourseLanding() {
 
   const handleEnroll = async () => {
     if (!user) {
-      openGuestCheckoutModal(selectedPricingOptionId);
+      // Guest: for paid courses, go directly to /checkout/:slug — Stripe collects email,
+      // webhook auto-creates account after payment. No pre-payment account creation.
+      // For free courses, show the lightweight guest registration form.
+      const resolvedPricingTypeGuest = selectedPricingOptionId
+        ? (course?.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.pricingType ?? course?.pricingType)
+        : (course?.pricingType ?? (course?.isFree ? "free" : "one_time"));
+      if (resolvedPricingTypeGuest === "free") {
+        openGuestCheckoutModal(selectedPricingOptionId);
+      } else {
+        handleGoToCheckoutPage(selectedPricingOptionId);
+      }
       return;
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
@@ -1849,7 +1859,15 @@ export default function CourseLanding() {
   /** Enroll with a specific pricing option ID — avoids React state closure timing issues */
   const handleEnrollWithOption = async (pricingOptionId: number | undefined) => {
     if (!user) {
-      openGuestCheckoutModal(pricingOptionId);
+      // Guest: for paid courses, go directly to /checkout/:slug — no pre-payment account creation.
+      const resolvedPricingTypeGuest = pricingOptionId
+        ? (course?.pricingOptions?.find((o: any) => o.id === pricingOptionId)?.pricingType ?? course?.pricingType)
+        : (course?.pricingType ?? (course?.isFree ? "free" : "one_time"));
+      if (resolvedPricingTypeGuest === "free") {
+        openGuestCheckoutModal(pricingOptionId);
+      } else {
+        handleGoToCheckoutPage(pricingOptionId);
+      }
       return;
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
