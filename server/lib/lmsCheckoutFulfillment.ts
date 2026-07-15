@@ -605,10 +605,14 @@ export async function reconcileLmsCheckoutFromStripeSession(
     }
   }
 
-  await notifyOwner({
-    title: "🎓 LMS Checkout Fulfilled",
-    content: `User ${userId} (${customerEmail}) — ${course?.title ?? courseId}. ${notes.join("; ")}`,
-  }).catch(() => {});
+  // Only notify when enrollment was newly created or renewed — not on idempotent re-runs
+  // (prevents duplicate notifications when both webhook and frontend polling call this function)
+  if (shouldRenew || !existingEnrollment) {
+    await notifyOwner({
+      title: "🎓 LMS Checkout Fulfilled",
+      content: `User ${userId} (${customerEmail}) — ${course?.title ?? courseId}. ${notes.join("; ")}`,
+    }).catch(() => {});
+  }
 
   if (userId && courseId && (shouldRenew || !existingEnrollment)) {
     const { onCourseEnrollment } = await import("./communityAutoJoin");

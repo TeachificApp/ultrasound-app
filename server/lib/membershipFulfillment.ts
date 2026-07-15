@@ -711,7 +711,10 @@ export async function reconcileMembershipFromStripeSession(
     }
   }
 
-  if (result.success) {
+  // Only notify when membership was newly created or renewed — not on idempotent re-runs
+  // (prevents duplicate notifications when both webhook and frontend polling call this function)
+  const isNewOrRenewed = result.success && result.notes.some(n => n === "Subscription created" || n.startsWith("Renewed"));
+  if (isNewOrRenewed) {
     await notifyOwner({
       title: "🎫 Membership Fulfilled",
       content: `User ${result.userId} (${customerEmail}) — plan ${planId}. ${result.notes.join("; ")}`,
