@@ -10609,6 +10609,10 @@ function GlobalUnassignedPanel({ unassignedStudents, cohortGroups, courseId, onA
 
 function CohortTab({ courseId }: { courseId: number }) {
   const [activeTab, setActiveTab] = useState<"settings" | "groups" | "sessions" | "assignments" | "recordings" | "resources" | "discussions">("settings");
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
   // Multi-cohort mode toggle
   const { data: courseData, refetch: refetchCourse } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
   const updateCourse = trpc.lmsAdmin.updateCourse.useMutation({ onSuccess: () => { refetchCourse(); toast.success("Cohort settings saved"); }, onError: (e) => toast.error(e.message) });
