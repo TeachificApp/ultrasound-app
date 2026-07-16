@@ -770,6 +770,8 @@ function MembersRouter() {
               <Route path="/downloads" component={DownloadsBrowse} />
               {/* Auth */}
               <Route path="/login" component={Login} />
+              <Route path="/forgot-password" component={ForgotPassword} />
+              <Route path="/reset-password" component={ResetPassword} />
               <Route path="/magic-link" component={MagicLinkRequest} />
               <Route path="/auth/magic" component={MagicLinkCallback} />
               <Route path="/auth/access" component={AccessLinkCallback} />
@@ -918,6 +920,8 @@ function LMSRouter() {
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         {/* Auth pages (needed for login flow) */}
         <Route path="/login" component={Login} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/auth/access" component={AccessLinkCallback} />
