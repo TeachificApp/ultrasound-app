@@ -453,6 +453,70 @@ export const lmsCohortAdminRouter = router({
       return { success: true };
     }),
 
+  // ── Cohort Recording Order ──────────────────────────────────────────────────────
+
+  /** Bulk-update positions for recordings in the given order (drag-and-drop reorder). */
+  reorderCohortRecordings: protectedProcedure
+    .input(z.object({
+      /** Ordered array of recording IDs — position is set to array index + 1 */
+      orderedIds: z.array(z.number()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(
+        input.orderedIds.map((id, idx) =>
+          db.update(lmsCohortRecordings)
+            .set({ position: idx + 1 })
+            .where(eq(lmsCohortRecordings.id, id))
+        )
+      );
+      return { success: true };
+    }),
+
+  /**
+   * Auto-sort recordings by their linked session's sessionDate.
+   * Recordings without a linked session are placed at the end, preserving their
+   * relative order among themselves.
+   */
+  sortRecordingsBySessionDate: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      cohortGroupId: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const whereClause = input.cohortGroupId
+        ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.cohortGroupId, input.cohortGroupId))
+        : eq(lmsCohortRecordings.courseId, input.courseId);
+      // Fetch all recordings for this course/group
+      const recs = await db.select().from(lmsCohortRecordings).where(whereClause);
+      // Fetch all sessions for this course so we can look up sessionDate by id
+      const sessions = await db.select({ id: lmsCohortSessions.id, sessionDate: lmsCohortSessions.sessionDate })
+        .from(lmsCohortSessions)
+        .where(eq(lmsCohortSessions.courseId, input.courseId));
+      const sessionDateMap = new Map(sessions.map(s => [s.id, new Date(s.sessionDate).getTime()]));
+      // Sort: linked recordings first (by session date ASC), unlinked last (by current position)
+      const linked = recs
+        .filter(r => r.sessionId !== null && sessionDateMap.has(r.sessionId!))
+        .sort((a, b) => (sessionDateMap.get(a.sessionId!)! - sessionDateMap.get(b.sessionId!)!));
+      const unlinked = recs
+        .filter(r => r.sessionId === null || !sessionDateMap.has(r.sessionId!))
+        .sort((a, b) => a.position - b.position);
+      const ordered = [...linked, ...unlinked];
+      await Promise.all(
+        ordered.map((r, idx) =>
+          db.update(lmsCohortRecordings)
+            .set({ position: idx + 1 })
+            .where(eq(lmsCohortRecordings.id, r.id))
+        )
+      );
+      return { success: true, sorted: ordered.length };
+    }),
+
   // ── Cohort Resources ───────────────────────────────────────────────────────────
   listCohortResources: protectedProcedure
     .input(z.object({ courseId: z.number(), cohortGroupId: z.number().optional() }))

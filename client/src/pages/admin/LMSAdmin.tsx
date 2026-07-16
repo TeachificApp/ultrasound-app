@@ -155,6 +155,57 @@ function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: 
   );
 }
 
+function SortableRecordingRow({
+  recording, position, linkedSession, onEdit, onDelete, statusBadge, fmtDate, isDragging,
+}: {
+  recording: { id: number; title: string; status: "draft" | "published"; durationSeconds: number | null; videoUrl: string | null; description: string | null; sessionId: number | null };
+  position: number;
+  linkedSession: { title: string; sessionDate: Date | string } | null;
+  onEdit: () => void;
+  onDelete: () => void;
+  statusBadge: (status: string) => React.ReactNode;
+  fmtDate: (d: Date | string | null) => string;
+  isDragging: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: recording.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start gap-3">
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none mt-0.5 flex-shrink-0" title="Drag to reorder">
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <div className="w-7 h-7 rounded bg-teal-50 flex items-center justify-center flex-shrink-0 text-xs font-bold text-teal-600">{position}</div>
+      <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
+        <Film className="w-4 h-4 text-teal-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-gray-900 text-sm">{recording.title}</span>
+          {statusBadge(recording.status)}
+          {recording.durationSeconds ? <span className="text-xs text-gray-400">{Math.floor(recording.durationSeconds / 60)}m {recording.durationSeconds % 60}s</span> : null}
+        </div>
+        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
+          {recording.videoUrl && <a href={recording.videoUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />Watch Video</a>}
+          {linkedSession ? (
+            <span className="flex items-center gap-1 text-gray-500">
+              <CalendarRange className="w-3 h-3 text-teal-500" />
+              <span className="font-medium text-teal-700">{linkedSession.title}</span>
+              <span className="text-gray-400">· {fmtDate(linkedSession.sessionDate)}</span>
+            </span>
+          ) : recording.sessionId ? (
+            <span className="text-gray-400">Linked to session #{recording.sessionId}</span>
+          ) : null}
+        </div>
+        {recording.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{recording.description}</p>}
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onEdit}><Pencil className="w-3.5 h-3.5" /></Button>
+        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-600" onClick={onDelete}><Trash2 className="w-3.5 h-3.5" /></Button>
+      </div>
+    </div>
+  );
+}
+
 function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) => void; typeFilter?: "course" | "quiz" | "download" | "cohort" }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -10777,6 +10828,34 @@ function CohortTab({ courseId }: { courseId: number }) {
     onSuccess: () => { utils.lmsAdmin.listCohortRecordings.invalidate({ courseId }); toast.success("Recording deleted"); },
     onError: (e) => toast.error(e.message),
   });
+  const reorderRecordings = trpc.lmsAdmin.reorderCohortRecordings.useMutation({
+    onSuccess: () => utils.lmsAdmin.listCohortRecordings.invalidate({ courseId }),
+    onError: (e) => toast.error(e.message),
+  });
+  const sortBySessionDate = trpc.lmsAdmin.sortRecordingsBySessionDate.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortRecordings.invalidate({ courseId }); toast.success("Recordings sorted by session date"); },
+    onError: (e) => toast.error(e.message),
+  });
+  // Local ordered list for optimistic drag-and-drop reordering
+  const [localRecordings, setLocalRecordings] = useState<CohortRecording[]>([]);
+  const [recordingActiveDragId, setRecordingActiveDragId] = useState<number | null>(null);
+  // Sync local list whenever server data changes
+  useEffect(() => { setLocalRecordings(recordings as CohortRecording[]); }, [recordings]);
+  const handleRecordingDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setRecordingActiveDragId(null);
+    if (!over || active.id === over.id) return;
+    setLocalRecordings(prev => {
+      const oldIdx = prev.findIndex(r => r.id === active.id);
+      const newIdx = prev.findIndex(r => r.id === over.id);
+      if (oldIdx === -1 || newIdx === -1) return prev;
+      const reordered = arrayMove(prev, oldIdx, newIdx);
+      reorderRecordings.mutate({ orderedIds: reordered.map(r => r.id) });
+      return reordered;
+    });
+  };
+  // Build a map of sessionId → session for quick lookup in the recordings list
+  const sessionMap = new Map((sessions as CohortSession[]).map(s => [s.id, s]));
 
   // Recording dialog state
   const [recordingDialog, setRecordingDialog] = useState<{ open: boolean; recording?: CohortRecording }>({ open: false });
@@ -11312,51 +11391,59 @@ function CohortTab({ courseId }: { courseId: number }) {
               <span className="text-xs text-teal-500 ml-auto">Recordings added here will be assigned to this group</span>
             </div>
           )}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">Upload and manage recorded session replays for enrolled students.</p>
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openRecordingDialog()}>
-              <Plus className="w-3.5 h-3.5 mr-1" /> Add Recording
-            </Button>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm text-gray-500">Upload and manage recorded session replays. Drag to reorder, or auto-sort by session date.</p>
+            <div className="flex items-center gap-2">
+              {localRecordings.length > 1 && (
+                <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-50" onClick={() => sortBySessionDate.mutate({ courseId, cohortGroupId: effectiveGroupId })} disabled={sortBySessionDate.isPending}>
+                  {sortBySessionDate.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <CalendarRange className="w-3.5 h-3.5 mr-1" />}
+                  Sort by Session Date
+                </Button>
+              )}
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openRecordingDialog()}>
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Recording
+              </Button>
+            </div>
           </div>
+          {localRecordings.length > 1 && (
+            <p className="text-xs text-gray-400 flex items-center gap-1"><GripVertical className="w-3 h-3" /> Drag the handle on the left to manually reorder recordings.</p>
+          )}
           {recordingsLoading ? (
             <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
-          ) : recordings.length === 0 ? (
+          ) : localRecordings.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <Film className="w-8 h-8 mx-auto mb-2 opacity-40" />
               <p className="text-sm">No recordings yet — add your first replay above.</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {(recordings as CohortRecording[]).map(r => (
-                <div key={r.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
-                    <Film className="w-5 h-5 text-teal-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-gray-900 text-sm">{r.title}</span>
-                      {statusBadge(r.status)}
-                      {r.durationSeconds && <span className="text-xs text-gray-400">{Math.floor(r.durationSeconds / 60)}m {r.durationSeconds % 60}s</span>}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
-                      {r.videoUrl && <a href={r.videoUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />Watch Video</a>}
-                      {r.sessionId && <span className="text-gray-400">Linked to session #{r.sessionId}</span>}
-                    </div>
-                    {r.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{r.description}</p>}
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openRecordingDialog(r)}>
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-600" onClick={() => {
-                      if (confirm("Delete this recording?")) deleteRecording.mutate({ id: r.id });
-                    }}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={({ active }) => setRecordingActiveDragId(active.id as number)}
+              onDragEnd={handleRecordingDragEnd}
+              onDragCancel={() => setRecordingActiveDragId(null)}
+            >
+              <SortableContext items={localRecordings.map(r => r.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {localRecordings.map((r, idx) => {
+                    const linkedSession = r.sessionId ? sessionMap.get(r.sessionId) : null;
+                    return (
+                      <SortableRecordingRow
+                        key={r.id}
+                        recording={r}
+                        position={idx + 1}
+                        linkedSession={linkedSession ?? null}
+                        onEdit={() => openRecordingDialog(r)}
+                        onDelete={() => { if (confirm("Delete this recording?")) deleteRecording.mutate({ id: r.id }); }}
+                        statusBadge={statusBadge}
+                        fmtDate={fmtDate}
+                        isDragging={recordingActiveDragId === r.id}
+                      />
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       )}
@@ -13063,3 +13150,4 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
     </div>
   );
 }
+
