@@ -389,13 +389,10 @@ export default function WorkshopLanding() {
     if (!opt || opt.price === 0) {
       enrollMutation.mutate({ workshopId: workshop!.id });
     } else {
+      // Navigate to dedicated workshop checkout page (handles embedded Stripe checkout)
       const firstInstance = availableInstances[0];
       if (firstInstance) {
-        checkoutMutation.mutate({
-          workshopSlug: workshop!.slug,
-          instanceId: firstInstance.id,
-          origin: window.location.origin,
-        });
+        window.location.href = `/checkout/workshop/${workshop!.slug}?instance=${firstInstance.id}`;
       } else {
         toast.error("No available workshop dates. Please check back later.");
       }

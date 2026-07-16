@@ -520,20 +520,23 @@ export const workshopLearnerRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "This workshop is no longer available for purchase." });
       }
 
-      // Check for existing enrollment
-      const [existing] = await db
-        .select()
-        .from(workshopEnrollments)
-        .where(
-          and(
-            eq(workshopEnrollments.workshopId, workshop.id),
-            eq(workshopEnrollments.instanceId, instance.id),
-            ...(userId ? [eq(workshopEnrollments.userId, userId)] : []),
-            eq(workshopEnrollments.status, "active")
+      // Check for existing enrollment (only for authenticated users — guests have userId=0
+      // and we must not block them with a false "already enrolled" match)
+      if (userId) {
+        const [existing] = await db
+          .select()
+          .from(workshopEnrollments)
+          .where(
+            and(
+              eq(workshopEnrollments.workshopId, workshop.id),
+              eq(workshopEnrollments.instanceId, instance.id),
+              eq(workshopEnrollments.userId, userId),
+              eq(workshopEnrollments.status, "active")
+            )
           )
-        )
-        .limit(1);
-      if (existing) throw new TRPCError({ code: "CONFLICT", message: "You are already enrolled in this workshop." });
+          .limit(1);
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: "You are already enrolled in this workshop." });
+      }
 
       // Determine price (instance override or workshop default)
       // Both instance.price and workshop.price are stored in cents (int)
