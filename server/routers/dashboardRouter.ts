@@ -37,9 +37,12 @@ import {
   workshopEnrollments,
   workshopInstances,
   workshops,
+  workshopPricingOptions,
   membershipSubscriptions,
   membershipPlans,
   membershipPlanAccess,
+  digitalBundlePurchases,
+  digitalBundles,
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
@@ -917,6 +920,7 @@ export const dashboardRouter = router({
   getMyPurchases: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const userId = ctx.user.id;
 
     // 1. Funnel / embedded-checkout purchases (one-time)
     const funnelRows = await db
@@ -932,10 +936,10 @@ export const dashboardRouter = router({
         sourceType: funnelPurchases.sourceType,
       })
       .from(funnelPurchases)
-      .where(eq(funnelPurchases.userId, ctx.user.id))
+      .where(eq(funnelPurchases.userId, userId))
       .orderBy(desc(funnelPurchases.purchasedAt));
 
-    // 2. LMS orders (one-time course purchases — exclude subscription orders)
+    // 2. LMS orders (one-time course purchases)
     const oneTimeOrders = await db
       .select({
         id: lmsOrders.id,
@@ -947,21 +951,123 @@ export const dashboardRouter = router({
       })
       .from(lmsOrders)
       .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
-      .where(and(eq(lmsOrders.userId, ctx.user.id), eq(lmsOrders.status, "paid")))
+      .where(and(eq(lmsOrders.userId, userId), eq(lmsOrders.status, "paid")))
       .orderBy(desc(lmsOrders.createdAt));
 
-    // 3. Fetch Stripe payment history for subscription invoices
-    // Find all stripeCustomerIds associated with this user
-    const membershipRows = await db
+    // 3. Digital download purchases
+    const downloadRows = await db
+      .select({
+        id: digitalPurchases.id,
+        productTitle: digitalProducts.title,
+        amount: digitalPurchases.amount,
+        currency: digitalPurchases.currency,
+        purchasedAt: digitalPurchases.purchasedAt,
+      })
+      .from(digitalPurchases)
+      .leftJoin(digitalProducts, eq(digitalPurchases.productId, digitalProducts.id))
+      .where(eq(digitalPurchases.userId, userId))
+      .orderBy(desc(digitalPurchases.purchasedAt));
+
+    // 4. Digital bundle purchases
+    const bundlePurchaseRows = await db
+      .select({
+        id: digitalBundlePurchases.id,
+        bundleTitle: digitalBundles.title,
+        discountPrice: digitalBundles.discountPrice,
+        originalPrice: digitalBundles.originalPrice,
+        currency: digitalBundles.currency,
+        purchasedAt: digitalBundlePurchases.purchasedAt,
+      })
+      .from(digitalBundlePurchases)
+      .leftJoin(digitalBundles, eq(digitalBundlePurchases.bundleId, digitalBundles.id))
+      .where(eq(digitalBundlePurchases.userId, userId))
+      .orderBy(desc(digitalBundlePurchases.purchasedAt));
+
+    // 5. Workshop enrollments (paid)
+    const workshopRows = await db
+      .select({
+        id: workshopEnrollments.id,
+        workshopTitle: workshops.title,
+        amountPaid: workshopEnrollments.amountPaid,
+        currency: workshopEnrollments.currency,
+        createdAt: workshopEnrollments.createdAt,
+        status: workshopEnrollments.status,
+      })
+      .from(workshopEnrollments)
+      .leftJoin(workshops, eq(workshopEnrollments.workshopId, workshops.id))
+      .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.status, "active")))
+      .orderBy(desc(workshopEnrollments.createdAt));
+
+    // 6. Webinar registrations (paid — filter by stripePaymentIntentId present)
+    const webinarRows = await db
+      .select({
+        id: webinarRegistrations.id,
+        webinarTitle: webinars.title,
+        webinarPrice: webinars.price,
+        registeredAt: webinarRegistrations.registeredAt,
+        stripePaymentIntentId: webinarRegistrations.stripePaymentIntentId,
+      })
+      .from(webinarRegistrations)
+      .leftJoin(webinars, eq(webinarRegistrations.webinarId, webinars.id))
+      .where(eq(webinarRegistrations.userId, userId))
+      .orderBy(desc(webinarRegistrations.registeredAt));
+
+    // 7. Physical product orders
+    const physicalRows = await db
+      .select({
+        id: physicalProductOrders.id,
+        productTitle: physicalProducts.title,
+        amountPaid: physicalProductOrders.amountPaid,
+        currency: physicalProductOrders.currency,
+        orderedAt: physicalProductOrders.orderedAt,
+        fulfillmentStatus: physicalProductOrders.fulfillmentStatus,
+      })
+      .from(physicalProductOrders)
+      .leftJoin(physicalProducts, eq(physicalProductOrders.productId, physicalProducts.id))
+      .where(eq(physicalProductOrders.userId, userId))
+      .orderBy(desc(physicalProductOrders.orderedAt));
+
+    // 8. Membership subscriptions (native membership plans)
+    const membershipSubRows = await db
+      .select({
+        id: membershipSubscriptions.id,
+        planTitle: membershipPlans.title,
+        planPrice: membershipPlans.price,
+        planCurrency: membershipPlans.currency,
+        createdAt: membershipSubscriptions.createdAt,
+        status: membershipSubscriptions.status,
+        stripeCustomerId: membershipSubscriptions.stripeCustomerId,
+      })
+      .from(membershipSubscriptions)
+      .leftJoin(membershipPlans, eq(membershipSubscriptions.planId, membershipPlans.id))
+      .where(eq(membershipSubscriptions.userId, userId));
+
+    // 9. Collect ALL Stripe customer IDs across all subscription sources
+    const brandMembershipRows = await db
       .select({ stripeCustomerId: brandMemberships.stripeCustomerId })
       .from(brandMemberships)
-      .where(eq(brandMemberships.userId, ctx.user.id));
+      .where(eq(brandMemberships.userId, userId));
 
-    const customerIds = [...new Set(
-      membershipRows.map(m => m.stripeCustomerId).filter(Boolean) as string[]
+    // Also look up Stripe customer ID from lms_orders subscription charges
+    // (course subscriptions store stripeSubscriptionId but not customerId directly;
+    //  we retrieve the customer from Stripe using the subscription ID)
+    const courseSubOrders = await db
+      .select({ stripeSubscriptionId: lmsOrders.stripeSubscriptionId })
+      .from(lmsOrders)
+      .where(and(eq(lmsOrders.userId, userId), eq(lmsOrders.status, "paid")))
+      .orderBy(desc(lmsOrders.createdAt));
+
+    const allCustomerIds = [...new Set([
+      ...brandMembershipRows.map(m => m.stripeCustomerId),
+      ...membershipSubRows.map(m => m.stripeCustomerId),
+    ].filter(Boolean) as string[])];
+
+    // For course subscriptions, fetch invoices directly via subscription ID
+    const courseSubIds = [...new Set(
+      courseSubOrders.map(o => o.stripeSubscriptionId).filter(Boolean) as string[]
     )];
 
-    // Fetch recent paid invoices from Stripe for these customers
+    // Fetch recent paid invoices from Stripe for all subscription customers
     let stripeInvoices: Array<{
       id: string;
       description: string;
@@ -972,7 +1078,7 @@ export const dashboardRouter = router({
       invoiceUrl: string | null;
     }> = [];
 
-    for (const custId of customerIds) {
+    for (const custId of allCustomerIds) {
       try {
         const invoices = await stripe.invoices.list({
           customer: custId,
@@ -995,13 +1101,40 @@ export const dashboardRouter = router({
       }
     }
 
+    // Also fetch invoices for course subscriptions by subscription ID
+    for (const subId of courseSubIds) {
+      try {
+        const invoices = await stripe.invoices.list({
+          subscription: subId,
+          status: "paid",
+          limit: 50,
+        });
+        for (const inv of invoices.data) {
+          // Avoid duplicates if customer was already fetched above
+          if (!stripeInvoices.find(i => i.id === inv.id)) {
+            stripeInvoices.push({
+              id: inv.id,
+              description: inv.lines?.data?.[0]?.description ?? inv.description ?? "Course subscription renewal",
+              amount: inv.amount_paid,
+              currency: inv.currency,
+              date: new Date((inv.status_transitions?.paid_at ?? inv.created) * 1000),
+              type: "subscription_payment",
+              invoiceUrl: inv.hosted_invoice_url ?? null,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[Dashboard] Failed to fetch Stripe invoices for subscription:", subId, err);
+      }
+    }
+
     // Combine all into a unified timeline
     const allPurchases = [
       ...funnelRows.map(p => ({
         id: `funnel-${p.id}`,
         description: p.productName,
         type: "one_time" as const,
-        productType: p.productType,
+        productType: p.productType ?? "other",
         amount: p.amountPaid,
         currency: p.currency,
         date: p.purchasedAt,
@@ -1010,26 +1143,95 @@ export const dashboardRouter = router({
         orderBumps: p.orderBumps,
         invoiceUrl: null as string | null,
       })),
-      ...oneTimeOrders
-        .filter(o => !membershipRows.length || true) // include all one-time orders
-        .map(o => ({
-          id: `order-${o.id}`,
-          description: o.courseTitle ?? "Course Purchase",
+      ...oneTimeOrders.map(o => ({
+        id: `order-${o.id}`,
+        description: o.courseTitle ?? "Course Purchase",
+        type: "one_time" as const,
+        productType: "course",
+        amount: o.amount,
+        currency: o.currency,
+        date: o.createdAt,
+        status: o.status,
+        sourceType: null as string | null,
+        orderBumps: null as string | null,
+        invoiceUrl: null as string | null,
+      })),
+      ...downloadRows
+        .filter(d => (d.amount ?? 0) > 0) // only paid downloads
+        .map(d => ({
+          id: `download-${d.id}`,
+          description: d.productTitle ?? "Download Purchase",
           type: "one_time" as const,
-          productType: "course" as const,
-          amount: o.amount,
-          currency: o.currency,
-          date: o.createdAt,
-          status: o.status,
+          productType: "download",
+          amount: d.amount ?? 0,
+          currency: d.currency,
+          date: d.purchasedAt,
+          status: "paid" as const,
           sourceType: null as string | null,
           orderBumps: null as string | null,
           invoiceUrl: null as string | null,
         })),
+      ...bundlePurchaseRows.map(b => ({
+        id: `bundle-${b.id}`,
+        description: b.bundleTitle ?? "Bundle Purchase",
+        type: "one_time" as const,
+        productType: "bundle",
+        amount: b.discountPrice ?? b.originalPrice ?? 0,
+        currency: b.currency ?? "usd",
+        date: b.purchasedAt,
+        status: "paid" as const,
+        sourceType: null as string | null,
+        orderBumps: null as string | null,
+        invoiceUrl: null as string | null,
+      })),
+      ...workshopRows
+        .filter(w => w.amountPaid > 0) // only paid workshops
+        .map(w => ({
+          id: `workshop-${w.id}`,
+          description: w.workshopTitle ?? "Workshop",
+          type: "one_time" as const,
+          productType: "workshop",
+          amount: w.amountPaid,
+          currency: w.currency,
+          date: w.createdAt,
+          status: w.status === "active" ? "paid" : w.status,
+          sourceType: null as string | null,
+          orderBumps: null as string | null,
+          invoiceUrl: null as string | null,
+        })),
+      ...webinarRows
+        .filter(w => !!w.stripePaymentIntentId && (w.webinarPrice ?? 0) > 0) // only paid webinars
+        .map(w => ({
+          id: `webinar-${w.id}`,
+          description: w.webinarTitle ?? "Webinar",
+          type: "one_time" as const,
+          productType: "webinar",
+          amount: w.webinarPrice ?? 0,
+          currency: "usd",
+          date: w.registeredAt,
+          status: "paid" as const,
+          sourceType: null as string | null,
+          orderBumps: null as string | null,
+          invoiceUrl: null as string | null,
+        })),
+      ...physicalRows.map(p => ({
+        id: `physical-${p.id}`,
+        description: p.productTitle ?? "Physical Product",
+        type: "one_time" as const,
+        productType: "physical",
+        amount: p.amountPaid,
+        currency: p.currency,
+        date: p.orderedAt,
+        status: p.fulfillmentStatus === "cancelled" || p.fulfillmentStatus === "refunded" ? p.fulfillmentStatus : "paid",
+        sourceType: null as string | null,
+        orderBumps: null as string | null,
+        invoiceUrl: null as string | null,
+      })),
       ...stripeInvoices.map(inv => ({
         id: `invoice-${inv.id}`,
         description: inv.description,
         type: "subscription_payment" as const,
-        productType: "subscription" as const,
+        productType: "subscription",
         amount: inv.amount,
         currency: inv.currency,
         date: inv.date,

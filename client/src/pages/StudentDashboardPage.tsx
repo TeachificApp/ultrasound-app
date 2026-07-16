@@ -1177,12 +1177,21 @@ function PurchasesTab() {
               <div className="flex items-center gap-3 ml-4 shrink-0">
                 <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amount, p.currency)}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  p.type === "subscription_payment" ? "bg-purple-50 text-purple-700" : "bg-teal-50 text-teal-700"
+                  p.type === "subscription_payment" ? "bg-purple-50 text-purple-700" :
+                  p.productType === "workshop" ? "bg-orange-50 text-orange-700" :
+                  p.productType === "webinar" ? "bg-blue-50 text-blue-700" :
+                  p.productType === "physical" ? "bg-amber-50 text-amber-700" :
+                  "bg-teal-50 text-teal-700"
                 }`}>
-                  {p.type === "subscription_payment" ? "Subscription" :
+                  {p.type === "subscription_payment" ? "Subscription Renewal" :
                     p.productType === "download" ? "Digital Download" :
                     p.productType === "course" ? "Course" :
                     p.productType === "quiz" ? "Quiz" :
+                    p.productType === "bundle" ? "Bundle" :
+                    p.productType === "workshop" ? "Workshop" :
+                    p.productType === "webinar" ? "Webinar" :
+                    p.productType === "physical" ? "Physical Product" :
+                    p.productType === "membership" ? "Membership" :
                     p.productType ? p.productType.charAt(0).toUpperCase() + p.productType.slice(1) : "Purchase"}
                 </span>
                 {p.invoiceUrl && (
@@ -1224,7 +1233,7 @@ function PurchasesTab() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-semibold text-gray-900">{receiptPurchase.description}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{receiptPurchase.productType === "download" ? "Digital Download" : receiptPurchase.productType === "course" ? "Course" : receiptPurchase.productType === "quiz" ? "Quiz" : receiptPurchase.productType ? receiptPurchase.productType.charAt(0).toUpperCase() + receiptPurchase.productType.slice(1) : "Purchase"}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{receiptPurchase.productType === "download" ? "Digital Download" : receiptPurchase.productType === "course" ? "Course" : receiptPurchase.productType === "quiz" ? "Quiz" : receiptPurchase.productType === "bundle" ? "Bundle" : receiptPurchase.productType === "workshop" ? "Workshop" : receiptPurchase.productType === "webinar" ? "Webinar" : receiptPurchase.productType === "physical" ? "Physical Product" : receiptPurchase.productType === "membership" ? "Membership" : receiptPurchase.productType ? receiptPurchase.productType.charAt(0).toUpperCase() + receiptPurchase.productType.slice(1) : "Purchase"}</p>
                   </div>
                   <span className="text-sm font-bold text-gray-900">{formatCurrency(receiptPurchase.amount, receiptPurchase.currency)}</span>
                 </div>

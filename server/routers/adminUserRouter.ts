@@ -1028,7 +1028,7 @@ export const adminUserRouter = router({
       // Build a UNION across all purchase tables using raw SQL for flexibility
       const rows = await db.execute(sql`
         SELECT * FROM (
-          -- 1. Funnel purchases (already has all fields)
+          -- 1. Funnel purchases
           SELECT
             CONCAT('fp-', fp.id) AS uid,
             fp.id AS sourceId,
@@ -1069,7 +1069,7 @@ export const adminUserRouter = router({
 
           UNION ALL
 
-          -- 3. Digital product (download) purchases
+          -- 3. Digital product (download) purchases — use actual amount paid, not catalog price
           SELECT
             CONCAT('dp-', dp.id) AS uid,
             dp.id AS sourceId,
@@ -1079,8 +1079,8 @@ export const adminUserRouter = router({
             COALESCE(u.name, '') AS name,
             COALESCE(prod.title, 'Download') AS productName,
             'download' AS productType,
-            COALESCE(prod.price, 0) AS amountPaid,
-            COALESCE(prod.currency, 'usd') AS currency,
+            COALESCE(dp.amount, prod.price, 0) AS amountPaid,
+            COALESCE(dp.currency, prod.currency, 'usd') AS currency,
             'paid' AS status,
             dp.stripe_payment_intent_id AS stripePaymentIntentId,
             dp.purchased_at AS purchasedAt
@@ -1090,7 +1090,7 @@ export const adminUserRouter = router({
 
           UNION ALL
 
-          -- 4. Bundle purchases
+          -- 4. Digital bundle purchases — use catalog price (no amount_paid column)
           SELECT
             CONCAT('bp-', dbp.id) AS uid,
             dbp.id AS sourceId,
@@ -1111,7 +1111,7 @@ export const adminUserRouter = router({
 
           UNION ALL
 
-          -- 5. Membership subscriptions
+          -- 5. Membership subscriptions (initial charge only; renewals appear via Stripe invoices in analytics)
           SELECT
             CONCAT('ms-', ms.id) AS uid,
             ms.id AS sourceId,
@@ -1129,6 +1129,71 @@ export const adminUserRouter = router({
           FROM membership_subscriptions ms
           LEFT JOIN users u ON ms.user_id = u.id
           LEFT JOIN membership_plans mp ON ms.plan_id = mp.id
+
+          UNION ALL
+
+          -- 6. Workshop enrollments (paid)
+          SELECT
+            CONCAT('we-', we.id) AS uid,
+            we.id AS sourceId,
+            'workshop' AS sourceTable,
+            we.user_id AS userId,
+            COALESCE(u.email, '') AS email,
+            COALESCE(u.name, '') AS name,
+            COALESCE(w.title, 'Workshop') AS productName,
+            'workshop' AS productType,
+            we.amount_paid AS amountPaid,
+            we.currency,
+            CASE we.status WHEN 'active' THEN 'paid' WHEN 'refunded' THEN 'refunded' ELSE we.status END AS status,
+            we.stripe_payment_intent_id AS stripePaymentIntentId,
+            we.created_at AS purchasedAt
+          FROM workshop_enrollments we
+          LEFT JOIN users u ON we.user_id = u.id
+          LEFT JOIN workshops w ON we.workshop_id = w.id
+          WHERE we.amount_paid > 0
+
+          UNION ALL
+
+          -- 7. Webinar registrations (paid — has stripePaymentIntentId)
+          SELECT
+            CONCAT('wr-', wr.id) AS uid,
+            wr.id AS sourceId,
+            'webinar' AS sourceTable,
+            wr.user_id AS userId,
+            COALESCE(u.email, wr.email, '') AS email,
+            COALESCE(u.name, CONCAT(wr.first_name, ' ', wr.last_name), '') AS name,
+            COALESCE(wb.title, 'Webinar') AS productName,
+            'webinar' AS productType,
+            COALESCE(wb.price, 0) AS amountPaid,
+            'usd' AS currency,
+            'paid' AS status,
+            wr.stripe_payment_intent_id AS stripePaymentIntentId,
+            wr.registered_at AS purchasedAt
+          FROM webinar_registrations wr
+          LEFT JOIN users u ON wr.user_id = u.id
+          LEFT JOIN webinars wb ON wr.webinar_id = wb.id
+          WHERE wr.stripe_payment_intent_id IS NOT NULL AND COALESCE(wb.price, 0) > 0
+
+          UNION ALL
+
+          -- 8. Physical product orders
+          SELECT
+            CONCAT('po-', po.id) AS uid,
+            po.id AS sourceId,
+            'physical' AS sourceTable,
+            po.user_id AS userId,
+            COALESCE(u.email, '') AS email,
+            COALESCE(u.name, '') AS name,
+            COALESCE(pp.title, 'Physical Product') AS productName,
+            'physical' AS productType,
+            po.amount_paid AS amountPaid,
+            po.currency,
+            CASE po.fulfillment_status WHEN 'cancelled' THEN 'failed' WHEN 'refunded' THEN 'refunded' ELSE 'paid' END AS status,
+            po.stripe_payment_intent_id AS stripePaymentIntentId,
+            po.ordered_at AS purchasedAt
+          FROM physical_product_orders po
+          LEFT JOIN users u ON po.user_id = u.id
+          LEFT JOIN physical_products pp ON po.product_id = pp.id
         ) AS all_sales
         WHERE 1=1
           ${statusFilter ? sql`AND status = ${statusFilter}` : sql``}
@@ -1156,6 +1221,14 @@ export const adminUserRouter = router({
           SELECT id FROM digital_bundle_purchases
           UNION ALL
           SELECT id FROM membership_subscriptions
+          UNION ALL
+          SELECT id FROM workshop_enrollments WHERE amount_paid > 0
+          UNION ALL
+          SELECT wr.id FROM webinar_registrations wr
+            LEFT JOIN webinars wb ON wr.webinar_id = wb.id
+            WHERE wr.stripe_payment_intent_id IS NOT NULL AND COALESCE(wb.price, 0) > 0
+          UNION ALL
+          SELECT id FROM physical_product_orders
         ) AS t
       `) as any;
 
@@ -1304,6 +1377,16 @@ export const adminUserRouter = router({
           UNION ALL
           SELECT COALESCE(mp.title,'Membership'), 'membership', COALESCE(mp.price,0)/100.0, ms.created_at
           FROM membership_subscriptions ms LEFT JOIN membership_plans mp ON ms.plan_id = mp.id WHERE ms.status IN ('active','trialing')
+          UNION ALL
+          SELECT COALESCE(w.title,'Workshop'), 'workshop', COALESCE(we.amount_paid,0)/100.0, we.enrolled_at
+          FROM workshop_enrollments we LEFT JOIN workshops w ON we.workshop_id = w.id WHERE we.amount_paid > 0
+          UNION ALL
+          SELECT COALESCE(wb.title,'Webinar'), 'webinar', COALESCE(wb.price,0)/100.0, wr.registered_at
+          FROM webinar_registrations wr LEFT JOIN webinars wb ON wr.webinar_id = wb.id
+          WHERE wr.stripe_payment_intent_id IS NOT NULL AND COALESCE(wb.price,0) > 0
+          UNION ALL
+          SELECT COALESCE(pp.title,'Physical Product'), 'physical', COALESCE(po.amount_paid,0)/100.0, po.ordered_at
+          FROM physical_product_orders po LEFT JOIN physical_products pp ON po.product_id = pp.id
         ) AS all_sales
         WHERE 1=1
           ${dateFrom ? sql`AND purchasedAt >= ${dateFrom}` : sql``}
