@@ -38,14 +38,17 @@ function fmtDuration(mins: number) {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-function isUpcoming(d: Date | string | null | undefined) {
+function isUpcoming(d: Date | string | null | undefined, durationMinutes?: number | null) {
   if (!d) return false;
-  return new Date(d) > new Date();
+  // A session is "upcoming/active" until it ends (start + duration)
+  const endMs = new Date(d).getTime() + ((durationMinutes ?? 60) * 60 * 1000);
+  return endMs > Date.now();
 }
 
-function isPast(d: Date | string | null | undefined) {
+function isPast(d: Date | string | null | undefined, durationMinutes?: number | null) {
   if (!d) return false;
-  return new Date(d) < new Date();
+  const endMs = new Date(d).getTime() + ((durationMinutes ?? 60) * 60 * 1000);
+  return endMs < Date.now();
 }
 
 function isDueSoon(d: Date | string | null | undefined) {
@@ -593,8 +596,8 @@ export default function CohortSchedule() {
   }
 
   const { course, sessions, assignments, recordings, resources = [], mySubmissions, myGroup } = data as any;
-  const upcomingSessions = sessions.filter((s: any) => isUpcoming(s.sessionDate));
-  const pastSessions = sessions.filter((s: any) => isPast(s.sessionDate));
+  const upcomingSessions = sessions.filter((s: any) => isUpcoming(s.sessionDate, s.durationMinutes));
+  const pastSessions = sessions.filter((s: any) => isPast(s.sessionDate, s.durationMinutes));
   const pendingAssignments = assignments.filter((a: any) => a.dueDate && isUpcoming(a.dueDate));
   const overdueAssignments = assignments.filter((a: any) => a.dueDate && isPast(a.dueDate));
   const noDeadlineAssignments = assignments.filter((a: any) => !a.dueDate);
