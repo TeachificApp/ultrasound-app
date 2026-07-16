@@ -54,6 +54,19 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
+  // Never redirect to /login from checkout or purchase pages — these support guest checkout.
+  // Stripe collects the buyer's email; the webhook auto-creates the account after payment.
+  const path = window.location.pathname;
+  const isCheckoutPage = path.startsWith("/checkout") ||
+    path.startsWith("/memberships/") ||
+    path.startsWith("/courses/") ||
+    path.startsWith("/bundles/") ||
+    path.startsWith("/workshops/") ||
+    path.startsWith("/downloads/") ||
+    path.startsWith("/product/") ||
+    path.startsWith("/diy-accreditation-plans");
+  if (isCheckoutPage) return;
+
   window.location.href = "/login";
 };
 

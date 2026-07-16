@@ -2252,12 +2252,7 @@ export default function CourseLanding() {
                 <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Course Overview
               </Button>
             )}
-            {!user && (
-              <p className="text-xs text-gray-500 text-center">
-                <button className="text-teal-600 underline" onClick={() => navigate("/login")}>Sign in</button> or{" "}
-                <button className="text-teal-600 underline" onClick={() => navigate("/register")}>create an account</button> to enroll
-              </p>
-            )}
+
             {course.hasCertificate && <div className="flex items-center gap-2 text-sm text-gray-600 border-t pt-3"><Star className="w-4 h-4 text-yellow-500" />Certificate of completion included</div>}
           </div>
         </div>

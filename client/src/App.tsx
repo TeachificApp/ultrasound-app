@@ -723,6 +723,16 @@ function MembersRouter() {
       <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><DownloadLandingPageBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductLandingPageBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
+      {/* ── Hosted checkout pages — outside MembersLayout (full-screen, no nav) ── */}
+      <Route path="/checkout/complete">
+        <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
+      </Route>
+      <Route path="/checkout/workshop/:slug">
+        <Suspense fallback={pageFallback}><WorkshopCheckout /></Suspense>
+      </Route>
+      <Route path="/checkout/:slug">
+        <Suspense fallback={pageFallback}><Checkout /></Suspense>
+      </Route>
       {/* ── Public Form Renderer — outside MembersLayout (full-screen, no nav) ── */}
       <Route path="/forms/:slug">{() => <PublicFormRenderer />}</Route>
       <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
@@ -735,6 +745,12 @@ function MembersRouter() {
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
       <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
       <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
+      {/* ── Public purchase pages — outside MembersLayout (no auth required) ── */}
+      <Route path="/memberships/:slug">{() => <Suspense fallback={pageFallback}><MembershipPage /></Suspense>}</Route>
+      <Route path="/bundles/:slug" component={BundleLanding} />
+      <Route path="/workshops/:slug" component={WorkshopLanding} />
+      <Route path="/downloads/:slug" component={DownloadLanding} />
+      <Route path="/product/:slug" component={ProductLanding} />
       {/* ── Members-only routes (user profile / dashboard hub) ─────────── */}
       <Route>
         <MembersLayout>
