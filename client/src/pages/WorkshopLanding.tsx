@@ -950,7 +950,7 @@ export default function WorkshopLanding() {
 // Renders a landing block for a public page. Unlike BlockPreview, it renders
 // remaining_seats with live data (no preview flag), auto-binding the current
 // workshop instance id from context when no sourceId is saved on the block.
-function PublicLandingBlock({ block, instanceId }: { block: any; instanceId: number | null }) {
+function PublicLandingBlock({ block, instanceId, onRegister }: { block: any; instanceId: number | null; onRegister?: () => void }) {
   if (block.type === "remaining_seats") {
     const rsData = { ...block.data };
     if (instanceId && (!rsData.sourceId || Number(rsData.sourceId) === 0)) {
@@ -959,7 +959,9 @@ function PublicLandingBlock({ block, instanceId }: { block: any; instanceId: num
     }
     return <RemainingSeatsBlock data={rsData} />;
   }
-  return <BlockPreview block={block} />;
+  // Pass onRegister as both onEnroll and onCheckoutPage so CTA buttons
+  // inside instance landing blocks (e.g. "Save My Seat") trigger checkout
+  return <BlockPreview block={block} onEnroll={onRegister} onCheckoutPage={onRegister} />;
 }
 // ─── Workshop Instance Detail Modal ──────────────────────────────────────────
 // Full-page modal that fetches and renders a workshop instance's landing blocks.
@@ -1109,9 +1111,9 @@ function WorkshopInstanceDetailModal({
                 </div>
               ) : (
                 <div>
-                  {(data.landingBlocks as any[]).map((block: any) => (
-                    <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} />
-                  ))}
+          {(data.landingBlocks as any[]).map((block: any) => (
+            <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} onRegister={onRegister} />
+          ))}
                 </div>
               )}
             </>
@@ -1257,7 +1259,7 @@ function WorkshopInstanceEmbedSection({
       ) : (
         <div>
           {(data.landingBlocks as any[]).map((block: any) => (
-            <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} />
+            <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} onRegister={onRegister} />
           ))}
           {showEnrollNow && !instanceIsSoldOut && (
             <div className="text-center py-6">
