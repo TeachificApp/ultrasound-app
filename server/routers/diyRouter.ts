@@ -25,7 +25,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { eq, and, count, sql } from "drizzle-orm";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   diyOrganizations,
@@ -760,7 +760,7 @@ export const diyRouter = router({
     }),
 
   // ── Create Stripe Checkout for DIY Accreditation plan ───────────────────────
-  createDiyCheckout: protectedProcedure
+  createDiyCheckout: publicProcedure
     .input(z.object({
       plan: z.enum(["starter", "professional", "advanced", "partner"]),
       orgName: z.string().min(2).max(300).optional(),
@@ -768,11 +768,12 @@ export const diyRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const planConfig = DIY_PLANS[input.plan];
+      const userId = ctx.user?.id ?? 0;
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
-        customer_email: ctx.user.email ?? undefined,
+        customer_email: ctx.user?.email ?? undefined,
         allow_promotion_codes: true,
         line_items: [{
           price_data: {
@@ -789,15 +790,15 @@ export const diyRouter = router({
         }],
         subscription_data: {
           description: `${planConfig.name} — Monthly Subscription — Initial`,
-          metadata: { user_id: ctx.user.id.toString(), diy_plan: input.plan, product_type: "diy_accreditation" },
+          metadata: { user_id: userId.toString(), diy_plan: input.plan, product_type: "diy_accreditation" },
         },
         success_url: `${input.origin}/diy-accreditation/welcome?plan=${input.plan}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${input.origin}/diy-accreditation/plans`,
-        client_reference_id: ctx.user.id.toString(),
+        client_reference_id: userId.toString(),
         metadata: {
-          user_id: ctx.user.id.toString(),
-          customer_email: ctx.user.email ?? "",
-          customer_name: ctx.user.name ?? "",
+          user_id: userId.toString(),
+          customer_email: ctx.user?.email ?? "",
+          customer_name: ctx.user?.name ?? "",
           diy_plan: input.plan,
           org_name: input.orgName ?? "My Organization",
           product_type: "diy_accreditation",

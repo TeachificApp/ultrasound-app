@@ -382,10 +382,7 @@ export default function WorkshopLanding() {
       openWaitlistOrNotify();
       return;
     }
-    if (!user) {
-      window.location.href = getLoginUrl(window.location.pathname + window.location.search);
-      return;
-    }
+    // Guest checkout allowed — no sign-in required before payment
     const opt = pricingOptionId
       ? pricingOptions.find((p: any) => p.id === pricingOptionId)
       : pricingOptions[0];
@@ -410,10 +407,7 @@ export default function WorkshopLanding() {
       openWaitlistOrNotify();
       return;
     }
-    if (!user) {
-      window.location.href = getLoginUrl(window.location.pathname + window.location.search);
-      return;
-    }
+    // Guest checkout allowed — no sign-in required before payment
     const isFree = workshop!.isFree || workshop!.price === 0;
     if (isFree) {
       enrollMutation.mutate({ workshopId: workshop!.id });

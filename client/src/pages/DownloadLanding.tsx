@@ -745,10 +745,6 @@ export default function DownloadLanding() {
   // MUST be before early returns to comply with React Rules of Hooks
   useEffect(() => {
     if (autoCheckout && product && !isLoading) {
-      if (!user) {
-        window.location.href = getLoginUrl();
-        return;
-      }
       checkoutMut.mutate({ productId: product.id, orderBumpId: undefined, affiliateCode: getStoredAffiliateCode() ?? undefined });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -785,10 +781,6 @@ export default function DownloadLanding() {
   const handleBuy = () => {
     if (hasPurchased && slug) {
       window.location.href = `/downloads/${slug}/files`;
-      return;
-    }
-    if (!user) {
-      window.location.href = getLoginUrl();
       return;
     }
     runGuarded(() => {

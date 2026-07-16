@@ -446,11 +446,7 @@ export default function ProductLanding() {
       window.open(product.externalCheckoutUrl, "_blank");
       return;
     }
-    // Native Stripe checkout
-    if (!user) {
-      window.location.href = getLoginUrl();
-      return;
-    }
+    // Native Stripe checkout — guest checkout allowed, no sign-in required
     runGuarded(() => {
       checkoutMut.mutate({
         productId: product.id,

@@ -143,37 +143,42 @@ export const bundleLearnerRouter = router({
       return { success: true };
     }),
 
-  createCheckout: protectedProcedure
+  createCheckout: publicProcedure
     .input(z.object({ bundleId: z.number(), pricingOptionId: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
+      const userId = ctx.user?.id ?? 0;
+      const userEmail = ctx.user?.email ?? undefined;
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [bundle] = await db.select().from(bundles).where(eq(bundles.id, input.bundleId)).limit(1);
       if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
-      // If free bundle, just enroll directly
+      // If free bundle, just enroll directly (requires login)
       if (bundle.accessType === "free") {
+        if (!userId) throw new TRPCError({ code: "UNAUTHORIZED", message: "Please sign in to enroll in this free bundle." });
         const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
-          .where(and(eq(bundleEnrollments.bundleId, input.bundleId), eq(bundleEnrollments.userId, ctx.user.id))).limit(1);
+          .where(and(eq(bundleEnrollments.bundleId, input.bundleId), eq(bundleEnrollments.userId, userId))).limit(1);
         if (ex) return { alreadyEnrolled: true, checkoutUrl: null };
-        await db.insert(bundleEnrollments).values({ bundleId: input.bundleId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId });
+        await db.insert(bundleEnrollments).values({ bundleId: input.bundleId, userId, pricingOptionId: input.pricingOptionId });
         // Auto-enroll in courses
         const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, input.bundleId));
         for (const item of items) {
           if (item.itemType === "course") {
             const [courseEnr] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
-              .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, ctx.user.id))).limit(1);
-            if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId: ctx.user.id, source: "bundle" });
+              .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, userId))).limit(1);
+            if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId, source: "bundle" });
           }
         }
         (await import("../_core/notification")).notifyOwner({
           title: `🎁 Free Bundle Enrollment`,
-          content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in free bundle: ${bundle.title} (ID: ${input.bundleId}).`,
+          content: `User ${userId} (${userEmail}) enrolled in free bundle: ${bundle.title} (ID: ${input.bundleId}).`,
         }).catch(() => {});
         return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
       }
-      // Paid bundle — create Stripe Checkout
-      const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
-        .where(and(eq(bundleEnrollments.bundleId, input.bundleId), eq(bundleEnrollments.userId, ctx.user.id))).limit(1);
-      if (ex) return { alreadyEnrolled: true, checkoutUrl: null };
+      // Paid bundle — create Stripe Checkout (guest checkout allowed)
+      if (userId) {
+        const [ex] = await db.select({ id: bundleEnrollments.id }).from(bundleEnrollments)
+          .where(and(eq(bundleEnrollments.bundleId, input.bundleId), eq(bundleEnrollments.userId, userId))).limit(1);
+        if (ex) return { alreadyEnrolled: true, checkoutUrl: null };
+      }
       // Parse pricing options — prefer structured table, fall back to legacy JSON column
       const structuredOpts = await db.select().from(bundlePricingOptions)
         .where(and(eq(bundlePricingOptions.bundleId, input.bundleId), eq(bundlePricingOptions.isActive, true)))
@@ -240,18 +245,20 @@ export const bundleLearnerRouter = router({
             const priceCents = Math.round(price * 100);
             const discountedCents = coupon.percent_off === 100 ? 0 : coupon.amount_off ? Math.max(0, priceCents - coupon.amount_off) : priceCents;
             if (discountedCents === 0) {
-              await db.insert(bundleEnrollments).values({ bundleId: input.bundleId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId });
-              const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, input.bundleId));
-              for (const item of items) {
-                if (item.itemType === "course") {
-                  const [courseEnr] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
-                    .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, ctx.user.id))).limit(1);
-                  if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId: ctx.user.id, source: "bundle" });
+              if (userId) {
+                await db.insert(bundleEnrollments).values({ bundleId: input.bundleId, userId, pricingOptionId: input.pricingOptionId });
+                const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, input.bundleId));
+                for (const item of items) {
+                  if (item.itemType === "course") {
+                    const [courseEnr] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+                      .where(and(eq(lmsEnrollments.courseId, item.itemId), eq(lmsEnrollments.userId, userId))).limit(1);
+                    if (!courseEnr) await db.insert(lmsEnrollments).values({ courseId: item.itemId, userId, source: "bundle" });
+                  }
                 }
               }
               (await import("../_core/notification")).notifyOwner({
                 title: `🎉 Bundle Enrolled via 100% Promo`,
-                content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in bundle: ${bundle.title} (ID: ${input.bundleId}) using 100% promo code.`,
+                content: `User ${userId} (${userEmail}) enrolled in bundle: ${bundle.title} (ID: ${input.bundleId}) using 100% promo code.`,
               }).catch(() => {});
               return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
             }
@@ -283,24 +290,24 @@ export const bundleLearnerRouter = router({
 
       const session = await stripe.checkout.sessions.create({
         mode: isSubscription ? "subscription" : "payment",
-        customer_email: ctx.user.email || undefined,
-        client_reference_id: ctx.user.id.toString(),
+        customer_email: userEmail,
+        client_reference_id: userId ? userId.toString() : undefined,
         allow_promotion_codes: true,
         ...(bundle.collectShippingAddress ? { shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "AU", "NZ", "IE"] } } : {}),
         metadata: {
-          user_id: ctx.user.id.toString(),
+          user_id: userId ? userId.toString() : "",
           bundle_id: input.bundleId.toString(),
           pricing_option_id: input.pricingOptionId || "",
           purchase_type: "bundle_purchase",
         },
         ...(isSubscription
-          ? { subscription_data: { description: `${bundle.title} — Bundle — Subscription — Initial`, metadata: { user_id: ctx.user.id.toString(), bundle_id: input.bundleId.toString() } } }
+          ? { subscription_data: { description: `${bundle.title} — Bundle — Subscription — Initial`, metadata: { user_id: userId ? userId.toString() : "", bundle_id: input.bundleId.toString() } } }
           : { payment_intent_data: { description: `${bundle.title} — Bundle — One-Time Purchase` } }),
         line_items: [lineItem],
         success_url: `${origin}/bundles/${bundle.slug}?success=1`,
         cancel_url: `${origin}/bundles/${bundle.slug}?cancelled=1`,
-        ...(isSubscription ? {} : { payment_intent_data: { metadata: { user_id: ctx.user.id.toString(), bundle_id: input.bundleId.toString(), purchase_type: "bundle_purchase" } } }),
-      }, { idempotencyKey: `bundle-checkout-${ctx.user.id}-${input.bundleId}-${input.pricingOptionId ?? 0}-${new Date().toISOString().slice(0, 10)}` });
+        ...(isSubscription ? {} : { payment_intent_data: { metadata: { user_id: userId ? userId.toString() : "", bundle_id: input.bundleId.toString(), purchase_type: "bundle_purchase" } } }),
+      }, { idempotencyKey: `bundle-checkout-${userId}-${input.bundleId}-${input.pricingOptionId ?? 0}-${new Date().toISOString().slice(0, 10)}` });
       return { alreadyEnrolled: false, checkoutUrl: session.url, enrolled: false };
     }),
 

@@ -83,44 +83,6 @@ export default function WorkshopCheckout() {
 
   // ── Error state ───────────────────────────────────────────────────────────
   if (createSession.isError) {
-    const isUnauthorized =
-      (createSession.error as any)?.data?.code === "UNAUTHORIZED" ||
-      (createSession.error as any)?.message?.toLowerCase().includes("unauthorized") ||
-      (createSession.error as any)?.message?.toLowerCase().includes("not authenticated");
-
-    if (isUnauthorized) {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full">
-            <div className="text-center mb-6">
-              <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-3">
-                <Lock className="h-6 w-6 text-teal-600" />
-              </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-1">Sign in to continue</h2>
-              <p className="text-gray-500 text-sm">You need to be signed in to complete your registration.</p>
-            </div>
-            <div className="space-y-3">
-              <a
-                href={`/api/oauth/login?returnPath=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="flex items-center justify-center w-full py-2.5 px-4 rounded-lg font-medium text-sm text-white bg-teal-600 hover:bg-teal-700 transition-colors"
-              >
-                Sign In
-              </a>
-              <a
-                href={`/register?returnPath=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="flex items-center justify-center w-full py-2.5 px-4 rounded-lg font-medium text-sm text-teal-700 border border-teal-200 hover:bg-teal-50 transition-colors"
-              >
-                Create Account
-              </a>
-              <p className="text-center text-xs text-gray-400 pt-1">
-                <Link href={backHref} className="text-teal-600 hover:underline">Back to Workshop</Link>
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     const msg = (createSession.error as any)?.message ?? "This workshop is not available for purchase right now.";
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

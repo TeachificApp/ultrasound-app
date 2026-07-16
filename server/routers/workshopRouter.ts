@@ -482,7 +482,7 @@ export const workshopLearnerRouter = router({
     }),
 
   /** Create an embedded checkout session for a workshop instance */
-  createEmbeddedCheckoutSession: protectedProcedure
+  createEmbeddedCheckoutSession: publicProcedure
     .input(
       z.object({
         workshopSlug: z.string(),
@@ -492,6 +492,8 @@ export const workshopLearnerRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id ?? 0;
+      const userEmail = ctx.user?.email ?? undefined;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -526,7 +528,7 @@ export const workshopLearnerRouter = router({
           and(
             eq(workshopEnrollments.workshopId, workshop.id),
             eq(workshopEnrollments.instanceId, instance.id),
-            eq(workshopEnrollments.userId, ctx.user.id),
+            ...(userId ? [eq(workshopEnrollments.userId, userId)] : []),
             eq(workshopEnrollments.status, "active")
           )
         )
@@ -547,17 +549,16 @@ export const workshopLearnerRouter = router({
         .limit(1);
 
       if (priceInCents === 0 || workshop.isFree) {
-        // Free enrollment
-        await db.insert(workshopEnrollments).values({
+        // Free enrollment — only if user is logged in
+        if (userId) await db.insert(workshopEnrollments).values({
           workshopId: workshop.id,
           instanceId: instance.id,
-          userId: ctx.user.id,
+          userId,
           amountPaid: 0,
           currency: workshop.currency,
           status: "active",
         });
-        // Increment enrolled count
-        await db
+        if (userId) await db
           .update(workshopInstances)
           .set({ enrolledCount: sql`enrolled_count + 1` })
           .where(eq(workshopInstances.id, instance.id));
@@ -606,8 +607,8 @@ export const workshopLearnerRouter = router({
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
-        customer_email: ctx.user.email ?? undefined,
-        client_reference_id: ctx.user.id.toString(),
+        customer_email: userEmail,
+        client_reference_id: userId ? userId.toString() : undefined,
         allow_promotion_codes: true,
         line_items: isUpgradeBump
           ? [orderBumpCheckout!.lineItem]
@@ -616,14 +617,14 @@ export const workshopLearnerRouter = router({
           type: "workshop",
           workshop_id: workshop.id.toString(),
           instance_id: instance.id.toString(),
-          user_id: ctx.user.id.toString(),
-          customer_email: ctx.user.email ?? "",
+          user_id: userId ? userId.toString() : "",
+          customer_email: userEmail ?? "",
           ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}),
           ...orderBumpCheckout?.metadata,
         },
         payment_intent_data: { description: `${workshop.title} — Workshop Registration` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=workshop`,
-      }, { idempotencyKey: `workshop-checkout-${ctx.user.id}-${workshop.id}-${instance.id}-${workshopIdempotencyDate}` });
+      }, { idempotencyKey: `workshop-checkout-${userId}-${workshop.id}-${instance.id}-${workshopIdempotencyDate}` });
 
       return {
         clientSecret: session.client_secret!,

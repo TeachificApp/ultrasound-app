@@ -253,13 +253,15 @@ export const productsLearnerRouter = router({
 
   /** Create a Stripe Checkout session for a physical product (native mode).
    *  Shipping address collection is always enabled for native physical products. */
-  createCheckout: protectedProcedure
+  createCheckout: publicProcedure
     .input(z.object({
       productId: z.number(),
       pricingOptionId: z.number().optional(),
       promoCode: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id ?? 0;
+      const userEmail = ctx.user?.email ?? undefined;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [product] = await db.select().from(physicalProducts)
@@ -288,13 +290,15 @@ export const productsLearnerRouter = router({
 
       // Free product — auto-grant
       if (product.isFree || unitAmount === 0) {
-        await db.insert(physicalProductOrders).values({
-          userId: ctx.user.id,
-          productId: product.id,
-          pricingOptionId: input.pricingOptionId ?? null,
-          amountPaid: 0,
-          currency: product.currency,
-        });
+        if (userId) {
+          await db.insert(physicalProductOrders).values({
+            userId,
+            productId: product.id,
+            pricingOptionId: input.pricingOptionId ?? null,
+            amountPaid: 0,
+            currency: product.currency,
+          });
+        }
         return { checkoutUrl: null, free: true };
       }
 
@@ -319,7 +323,7 @@ export const productsLearnerRouter = router({
             const priceCents = unitAmount;
             const discountedCents = coupon.percent_off === 100 ? 0 : coupon.amount_off ? Math.max(0, priceCents - coupon.amount_off) : priceCents;
             if (discountedCents === 0) {
-              await db.insert(productOrders).values({ userId: ctx.user.id, productId: product.id, quantity: input.quantity ?? 1, totalAmountCents: 0, status: "pending", stripeCheckoutSessionId: `free_promo_${Date.now()}` });
+              if (userId) await db.insert(physicalProductOrders).values({ userId, productId: product.id, pricingOptionId: input.pricingOptionId ?? null, amountPaid: 0, currency: product.currency });
               return { checkoutUrl: null, free: true };
             }
           }
@@ -327,8 +331,8 @@ export const productsLearnerRouter = router({
       }
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
-        customer_email: ctx.user.email ?? undefined,
-        client_reference_id: ctx.user.id.toString(),
+        customer_email: userEmail,
+        client_reference_id: userId ? userId.toString() : undefined,
         ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         // Always collect shipping address for native physical products
         shipping_address_collection: {
@@ -350,8 +354,8 @@ export const productsLearnerRouter = router({
           type: "physical_product",
           product_id: product.id.toString(),
           pricing_option_id: input.pricingOptionId?.toString() ?? "",
-          user_id: ctx.user.id.toString(),
-          customer_email: ctx.user.email ?? "",
+          user_id: userId ? userId.toString() : "",
+          customer_email: userEmail ?? "",
         },
         payment_intent_data: { description: `${pricingLabel} — Physical Product` },
         success_url: `${origin}/product/${product.slug}?success=1`,

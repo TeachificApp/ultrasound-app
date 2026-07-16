@@ -230,9 +230,11 @@ export const downloadsLearnerRouter = router({
     }),
 
   /** Create Stripe checkout session for a digital product */
-  createCheckout: protectedProcedure
+  createCheckout: publicProcedure
     .input(z.object({ productId: z.number(), orderBumpId: z.number().optional(), promoCode: z.string().optional(), affiliateCode: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id ?? 0;
+      const userEmail = ctx.user?.email ?? undefined;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -310,8 +312,8 @@ export const downloadsLearnerRouter = router({
       const isUpgradeBumpDl = orderBumpCheckout?.bumpMode === "upgrade";
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
-        customer_email: ctx.user.email ?? undefined,
-        client_reference_id: ctx.user.id.toString(),
+        customer_email: userEmail,
+        client_reference_id: userId ? userId.toString() : undefined,
         ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         line_items: isUpgradeBumpDl
           ? [orderBumpCheckout!.lineItem]
@@ -319,8 +321,8 @@ export const downloadsLearnerRouter = router({
         metadata: {
           type: "digital_download",
           product_id: product.id.toString(),
-          user_id: ctx.user.id.toString(),
-          customer_email: ctx.user.email ?? "",
+          user_id: userId ? userId.toString() : "",
+          customer_email: userEmail ?? "",
           trigger_order_type: "download",
           affiliate_code: input.affiliateCode ?? "",
           ...(isUpgradeBumpDl ? { bump_mode: "upgrade" } : {}),
@@ -330,7 +332,7 @@ export const downloadsLearnerRouter = router({
         success_url: `${origin}/downloads/${product.slug}/files?success=1`,
         cancel_url: `${origin}/downloads/${product.slug}`,
         ...shippingOptions,
-      }, { idempotencyKey: `download-checkout-${ctx.user.id}-${product.id}-${new Date().toISOString().slice(0, 10)}` });
+      }, { idempotencyKey: `download-checkout-${userId}-${product.id}-${new Date().toISOString().slice(0, 10)}` });
 
       return { checkoutUrl: session.url, free: false };
     }),

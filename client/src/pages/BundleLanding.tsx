@@ -195,7 +195,15 @@ export default function BundleLanding() {
                   <Check className="w-5 h-5" /> {PURCHASE_ACCESS_LABEL}
                 </Button>
               </Link>
-            ) : user ? (
+            ) : bundle.accessType === "free" && !user ? (
+              // Free bundles require sign-in (no payment to create account through)
+              <a href={getLoginUrl(`/bundles/${slug}`)}>
+                <Button size="lg" className="bg-teal-500 hover:bg-teal-600 gap-2">
+                  Sign In to Enroll
+                </Button>
+              </a>
+            ) : (
+              // Paid bundles — guest checkout allowed, no sign-in required
               <>
                 {pricingOptions.length > 0 ? (
                   pricingOptions.map((opt: any, i: number) => (
@@ -221,20 +229,10 @@ export default function BundleLanding() {
                     onClick={() => runCheckout(bundle.id)}
                     disabled={checkoutBusy}
                   >
-                    {bundle.accessType === "free" ? (
-                      <><Check className="w-5 h-5" /> {checkoutBusy ? "Enrolling..." : "Enroll for Free"}</>
-                    ) : (
-                      <><ShoppingCart className="w-5 h-5" /> {checkoutBusy ? "Processing..." : "Get Access"}</>
-                    )}
+                    <><ShoppingCart className="w-5 h-5" /> {checkoutBusy ? "Processing..." : "Get Access"}</>
                   </Button>
                 )}
               </>
-            ) : (
-              <a href={getLoginUrl(`/bundles/${slug}`)}>
-                <Button size="lg" className="bg-teal-500 hover:bg-teal-600 gap-2">
-                  Sign In to {bundle.accessType === "free" ? "Enroll" : "Purchase"}
-                </Button>
-              </a>
             )}
           </div>
         </div>

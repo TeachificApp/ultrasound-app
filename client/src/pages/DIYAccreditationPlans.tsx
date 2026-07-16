@@ -186,10 +186,8 @@ export default function DIYAccreditationPlans() {
   });
 
   function handleGetStarted(planId: string) {
-    if (!isAuthenticated) {
-      window.location.href = "/login?returnTo=/diy-accreditation/plans";
-      return;
-    }
+    // No auth required — guest checkout is supported.
+    // Stripe collects the buyer's email; the webhook creates the account automatically.
     setLoadingPlan(planId);
     createDiyCheckout.mutate({
       plan: planId as "starter" | "professional" | "advanced" | "partner",
