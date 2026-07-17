@@ -1010,14 +1010,21 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                 <div key={m.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <div>
-                      <p className="font-semibold text-gray-800 text-sm">{m.planTitle ?? "Membership"}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-gray-800 text-sm">{m.planTitle ?? "Membership"}</p>
+                        <StatusBadge status={m.status ?? "active"} />
+                        {m.cancelAtPeriodEnd && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                            <XCircle className="w-3 h-3" /> Cancels at period end
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {m.price > 0 ? `${formatCurrency(m.price, m.currency)} / ${m.billingInterval}` : "Free / Comp"}
-                        {m.currentPeriodEnd ? ` · Expires ${formatDate(new Date(m.currentPeriodEnd))}` : " · No expiry"}
+                        {m.currentPeriodEnd ? ` · ${m.cancelAtPeriodEnd ? "Access until" : "Expires"} ${formatDate(new Date(m.currentPeriodEnd))}` : " · No expiry"}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">Granted {formatDate(m.createdAt)}</p>
                     </div>
-                    <StatusBadge status={m.status ?? "active"} />
                   </div>
                 </div>
               ))
@@ -1513,10 +1520,15 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                           {m.source === "admin" && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200">Admin granted</span>
                           )}
+                          {m.cancelAtPeriodEnd && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                              <XCircle className="w-3 h-3" /> Cancels at period end
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-gray-500 space-y-0.5">
                           <p>Granted: {formatDate(m.grantedAt ?? m.createdAt)}</p>
-                          {m.expiresAt && <p>Expires: {formatDate(m.expiresAt)}</p>}
+                          {m.expiresAt && <p>{m.cancelAtPeriodEnd ? "Access until" : "Expires"}: {formatDate(m.expiresAt)}</p>}
                           {m.stripeSubscriptionId && (
                             <p className="font-mono text-gray-400">{m.stripeSubscriptionId}</p>
                           )}
@@ -1642,10 +1654,15 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-gray-800">{m.planTitle ?? "Membership"}</span>
                       <StatusBadge status={m.status ?? "active"} />
+                      {m.cancelAtPeriodEnd && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                          <XCircle className="w-3 h-3" /> Cancels at period end
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500 space-y-0.5">
                       <p>Since: {formatDate(m.createdAt)}</p>
-                      {m.currentPeriodEnd && <p>Renews: {formatDate(new Date(m.currentPeriodEnd * 1000))}</p>}
+                      {m.currentPeriodEnd && <p>{m.cancelAtPeriodEnd ? "Access until" : "Renews"}: {formatDate(new Date(m.currentPeriodEnd * 1000))}</p>}
                       {m.price > 0 && <p>{formatCurrency(m.price, m.currency)} / {m.billingInterval}</p>}
                       {m.stripeSubscriptionId && <p className="font-mono text-gray-400">{m.stripeSubscriptionId}</p>}
                     </div>
