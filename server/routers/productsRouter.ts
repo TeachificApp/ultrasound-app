@@ -178,7 +178,6 @@ export const productsLearnerRouter = router({
       }
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       const shippingOpts = product.requiresShipping
         ? { shipping_address_collection: { allowed_countries: ["US", "CA", "AU", "GB"] as any } }
@@ -303,7 +302,6 @@ export const productsLearnerRouter = router({
         return { checkoutUrl: null, free: true };
       }
 
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
 
@@ -1274,7 +1272,6 @@ Make ALL content specific and compelling based on the product title and descript
       }
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       const shippingOpts = product.requiresShipping
         ? { shipping_address_collection: { allowed_countries: ["US", "CA", "AU", "GB"] as any } }

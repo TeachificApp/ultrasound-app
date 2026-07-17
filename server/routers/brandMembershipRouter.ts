@@ -311,7 +311,6 @@ export const brandMembershipRouter = router({
       }
 
       assertStripeConfigured();
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
 
       const isLifetime = input.interval === "lifetime";
@@ -445,7 +444,6 @@ export const brandMembershipRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       assertStripeConfigured();
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
 
       try {
@@ -487,7 +485,6 @@ export const brandMembershipRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       assertStripeConfigured();
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
 
       try {
@@ -526,7 +523,6 @@ export const brandMembershipRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       assertStripeConfigured();
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
 
       try {
@@ -657,7 +653,6 @@ export const brandMembershipRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
 
       // ── Known brand price IDs ────────────────────────────────────────────────

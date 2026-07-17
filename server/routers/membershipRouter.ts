@@ -47,7 +47,6 @@ async function assertCanPurchaseMembership(
 
   if (!plan.stripePriceId || !email || !process.env.STRIPE_SECRET_KEY) return;
 
-  const Stripe = (await import("stripe")).default;
   const stripe = getStripeClient();
   const customers = await stripe.customers.list({ email: email.trim().toLowerCase(), limit: 1 });
   const customerId = customers.data[0]?.id;
@@ -692,7 +691,6 @@ const cancelMembershipSubscription = protectedProcedure
 
     if (sub.stripeSubscriptionId) {
       // Cancel at period end via Stripe so student keeps access until billing period ends
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       await stripe.subscriptions.update(sub.stripeSubscriptionId, { cancel_at_period_end: true });
       // Update local record
@@ -724,7 +722,6 @@ const reactivateMembershipSubscription = protectedProcedure
     if (!sub) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
     if (!sub.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "This subscription cannot be reactivated here." });
 
-    const Stripe = (await import("stripe")).default;
     const stripe = getStripeClient();
     await stripe.subscriptions.update(sub.stripeSubscriptionId, { cancel_at_period_end: false });
     await db.update(membershipSubscriptions)
@@ -770,7 +767,6 @@ const createMembershipCheckout = protectedProcedure
     await assertCanPurchaseMembership(db, ctx.user.id, plan, ctx.user.email);
 
     // Dynamic import to avoid issues if Stripe not configured
-    const Stripe = (await import("stripe")).default;
     const stripe = getStripeClient();
     const validatePriceId = async (priceId: string | null | undefined): Promise<string | null> => { if (!priceId) return null; try { await stripe.prices.retrieve(priceId); return priceId; } catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; } };
 
@@ -919,7 +915,6 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
     }
     const { platformSettings } = await import("../../drizzle/schema");
     const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
-    const Stripe = (await import("stripe")).default;
     const stripe = getStripeClient();
     const validatePriceId2 = async (priceId: string | null | undefined): Promise<string | null> => { if (!priceId) return null; try { await stripe.prices.retrieve(priceId); return priceId; } catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; } };
     const isRecurring = plan.billingInterval !== "one_time" && plan.billingInterval !== "lifetime";
@@ -1074,7 +1069,6 @@ const guestMembershipCheckoutRegister = publicProcedure
 const getMembershipCheckoutSessionStatus = publicProcedure
   .input(z.object({ sessionId: z.string() }))
   .query(async ({ ctx, input }) => {
-    const Stripe = (await import("stripe")).default;
     const stripe = getStripeClient();
     const session = await stripe.checkout.sessions.retrieve(input.sessionId, {
       expand: ["line_items"],
@@ -1155,7 +1149,6 @@ const reconcileStripeMembership = adminProcedure
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-    const Stripe = (await import("stripe")).default;
     const stripe = getStripeClient();
 
     let session: Record<string, unknown> | null = null;
@@ -1284,7 +1277,6 @@ const bulkReconcileStripeSubscriptions = adminProcedure
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-    const Stripe = (await import("stripe")).default;
     const stripe = getStripeClient();
     const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
 

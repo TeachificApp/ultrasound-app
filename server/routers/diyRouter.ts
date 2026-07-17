@@ -770,7 +770,6 @@ export const diyRouter = router({
     .mutation(async ({ ctx, input }) => {
       const planConfig = DIY_PLANS[input.plan];
       const userId = ctx.user?.id ?? 0;
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",

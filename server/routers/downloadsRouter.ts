@@ -204,7 +204,6 @@ export const downloadsLearnerRouter = router({
   validatePromoCode: publicProcedure
     .input(z.object({ code: z.string().min(1) }))
     .query(async ({ input }) => {
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       try {
         const promoCodes = await stripe.promotionCodes.list({ code: input.code.toUpperCase(), active: true, limit: 1 });
@@ -269,7 +268,6 @@ export const downloadsLearnerRouter = router({
         return { checkoutUrl: null, free: false, alreadyPurchased: true };
       }
 
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
 
       const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
@@ -436,7 +434,6 @@ export const downloadsLearnerRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Subscription billing is not enabled for this bundle" });
       }
 
-      const Stripe = (await import("stripe")).default;
       const validatePriceId = async (priceId: string | null | undefined): Promise<string | null> => { if (!priceId) return null; try { await stripe.prices.retrieve(priceId); return priceId; } catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; } };
       const stripe = getStripeClient();
 
@@ -614,7 +611,6 @@ export const downloadsLearnerRouter = router({
       }
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
@@ -1880,7 +1876,6 @@ Make ALL content specific and compelling based on the product title and descript
       if (!purchase) throw new Error("Purchase not found");
       if (!purchase.stripePaymentIntentId) throw new Error("No Stripe payment intent on this purchase");
 
-      const { default: Stripe } = await import("stripe");
       const stripe = getStripeClient();
 
       const refund = await stripe.refunds.create({
@@ -2095,7 +2090,6 @@ Make ALL content specific and compelling based on the product title and descript
       // Fetch platform settings for terms/privacy URLs
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",

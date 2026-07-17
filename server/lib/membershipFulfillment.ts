@@ -672,7 +672,6 @@ export async function reconcileMembershipFromStripeSession(
 
   if (stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
     try {
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
       if (sub.current_period_end) {
@@ -736,7 +735,6 @@ export async function cancelDuplicateStripeSubscriptions(opts: {
   customerEmail?: string | null;
 }): Promise<string[]> {
   if (!process.env.STRIPE_SECRET_KEY) return [];
-  const Stripe = (await import("stripe")).default;
   const stripe = getStripeClient();
   const duplicates: string[] = [];
   try {

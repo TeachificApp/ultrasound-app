@@ -14,6 +14,7 @@
  *  - listAllCourses: for the enroll dropdown
  */
 import { z } from "zod";
+import { getStripeClient } from "../lib/stripeClient";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
@@ -630,13 +631,10 @@ export const adminUserRouter = router({
       let resolvedPaymentIntentId: string | undefined;
 
       if (input.paymentMode === "link" && input.stripePaymentIntentId) {
-        resolvedPaymentIntentId = input.stripePaymentIntentId;
-        const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-        let amount = 0;
+        resolvedPaymentIntentId = input.stripePaymentIntentId;        let amount = 0;
         if (STRIPE_SECRET_KEY) {
           try {
-            const Stripe = (await import("stripe")).default;
-            const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+            const stripe = getStripeClient();
             const pi = await stripe.paymentIntents.retrieve(input.stripePaymentIntentId);
             amount = pi.amount;
           } catch {}
@@ -652,11 +650,7 @@ export const adminUserRouter = router({
         orderId = order.id;
         await db.update(lmsEnrollments).set({ orderId }).where(eq(lmsEnrollments.id, enrollmentId));
 
-      } else if (input.paymentMode === "charge" && input.stripeCardToken && input.amountCents) {
-        const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-        if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
-        const Stripe = (await import("stripe")).default;
-        const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      } else if (input.paymentMode === "charge" && input.stripeCardToken && input.amountCents) {        const stripe = getStripeClient();
         const [user] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, input.userId)).limit(1);
         const pi = await stripe.paymentIntents.create({
           amount: input.amountCents,
@@ -900,12 +894,7 @@ export const adminUserRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
-
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      const stripe = getStripeClient();
 
       if (input.immediately) {
         await stripe.subscriptions.cancel(input.stripeSubscriptionId);
@@ -933,12 +922,7 @@ export const adminUserRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
-
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      const stripe = getStripeClient();
 
       // Fetch live subscription from Stripe
       let sub: any;
@@ -1037,12 +1021,7 @@ export const adminUserRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
-
-      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
-
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      const stripe = getStripeClient();
 
       const refund = await stripe.refunds.create({
         payment_intent: input.stripePaymentIntentId,
@@ -1380,11 +1359,7 @@ export const adminUserRouter = router({
       promoCode: z.string().min(1).max(50).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      await assertAdmin(ctx);      const stripe = getStripeClient();
       const couponParams: Record<string, unknown> = {
         name: input.name,
         duration: "once",
@@ -1411,11 +1386,7 @@ export const adminUserRouter = router({
       startingAfter: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      await assertAdmin(ctx);      const stripe = getStripeClient();
       const params: Record<string, unknown> = { limit: input.limit };
       if (input.startingAfter) params.starting_after = input.startingAfter;
       const coupons = await (stripe.coupons as any).list(params);
@@ -1433,11 +1404,7 @@ export const adminUserRouter = router({
   deactivateCoupon: protectedProcedure
     .input(z.object({ couponId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      await assertAdmin(ctx);      const stripe = getStripeClient();
       await (stripe.coupons as any).del(input.couponId);
       return { success: true };
     }),
@@ -1445,11 +1412,7 @@ export const adminUserRouter = router({
   deactivatePromoCode: protectedProcedure
     .input(z.object({ promoCodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      await assertAdmin(ctx);      const stripe = getStripeClient();
       await (stripe.promotionCodes as any).update(input.promoCodeId, { active: false });
       return { success: true };
     }),
@@ -2678,11 +2641,8 @@ export const adminUserRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      if (input.stripeSubscriptionId) {
-        const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-        if (STRIPE_SECRET_KEY) {
-          const Stripe = (await import("stripe")).default;
-          const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      if (input.stripeSubscriptionId) {        if (STRIPE_SECRET_KEY) {
+          const stripe = getStripeClient();
           if (input.immediately) {
             await stripe.subscriptions.cancel(input.stripeSubscriptionId);
           } else {
@@ -2887,11 +2847,8 @@ export const adminUserRouter = router({
 
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
 
-      if (order.stripeSubscriptionId) {
-        const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-        if (STRIPE_SECRET_KEY) {
-          const Stripe = (await import("stripe")).default;
-          const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      if (order.stripeSubscriptionId) {        if (STRIPE_SECRET_KEY) {
+          const stripe = getStripeClient();
           if (input.immediately) {
             await stripe.subscriptions.cancel(order.stripeSubscriptionId);
             // Immediately expired — clear access
@@ -2940,12 +2897,7 @@ export const adminUserRouter = router({
       }
 
       if (!stripeSubId) throw new TRPCError({ code: "BAD_REQUEST", message: "No Stripe subscription linked to this enrollment" });
-
-      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
-
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      const stripe = getStripeClient();
 
       if (input.immediately) {
         await stripe.subscriptions.cancel(stripeSubId);

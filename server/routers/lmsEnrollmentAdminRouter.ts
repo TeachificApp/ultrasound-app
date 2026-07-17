@@ -1767,7 +1767,6 @@ CRITICAL REQUIREMENTS:
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
       if (order.status === "refunded") throw new TRPCError({ code: "BAD_REQUEST", message: "Order already refunded" });
       if (order.status !== "paid") throw new TRPCError({ code: "BAD_REQUEST", message: "Only paid orders can be refunded" });
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       // Retrieve the payment intent or session to get the charge
       let chargeId: string | null = null;
@@ -1802,7 +1801,6 @@ CRITICAL REQUIREMENTS:
       if (!order.stripeSubscriptionId) {
         // Try to find subscription from session
         if (order.stripeSessionId) {
-          const Stripe = (await import("stripe")).default;
           const stripe = getStripeClient();
           const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
           if (session.subscription) {
@@ -1814,7 +1812,6 @@ CRITICAL REQUIREMENTS:
         }
         throw new TRPCError({ code: "BAD_REQUEST", message: "No subscription found for this order" });
       }
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       await stripe.subscriptions.cancel(order.stripeSubscriptionId);
       await db.update(lmsOrders).set({ status: "refunded" }).where(eq(lmsOrders.id, input.orderId));
@@ -3317,7 +3314,6 @@ CRITICAL REQUIREMENTS:
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
 
       let session: Record<string, unknown> | null = null;

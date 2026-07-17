@@ -75,7 +75,6 @@ export async function fetchStripeSubscriptionDetails(
   };
   if (!process.env.STRIPE_SECRET_KEY) return empty;
   try {
-    const Stripe = (await import("stripe")).default;
     const stripe = getStripeClient();
     const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
       expand: ["latest_invoice.payment_intent"],

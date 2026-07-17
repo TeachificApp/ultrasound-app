@@ -814,7 +814,6 @@ Return a JSON object with this exact structure:
 
   // ── Employer: create checkout for single job post ($39) ─────────────────────
   createJobPostCheckout: protectedProcedure.mutation(async ({ ctx }) => {
-    const Stripe = (await import("stripe")).default;
     const stripe = getStripeClient();
     const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
     const session = await stripe.checkout.sessions.create({
@@ -848,7 +847,6 @@ Return a JSON object with this exact structure:
 
   // ── Employer: create checkout for monthly subscription ($199/mo) ─────────────
   createEmployerSubscriptionCheckout: protectedProcedure.mutation(async ({ ctx }) => {
-    const Stripe = (await import("stripe")).default;
     const stripe = getStripeClient();
     const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
     const session = await stripe.checkout.sessions.create({

@@ -1683,7 +1683,6 @@ export const lmsCohortAdminRouter = router({
         notifyOwner({ title: `🎓 Admin Free Enrollment`, content: `Admin granted free access to ${entry.email} for "${course.title}" (Course #${input.courseId}).` }).catch(() => {});
         return { success: true, type: "free", message: `Free access granted and enrollment email sent to ${entry.email}` };
       } else {
-        const Stripe = (await import("stripe")).default;
         const stripe = getStripeClient();
         const priceInCents = input.priceOverrideCents !== undefined
           ? input.priceOverrideCents

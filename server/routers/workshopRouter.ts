@@ -582,7 +582,6 @@ export const workshopLearnerRouter = router({
         };
       }
 
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
 
       // Build order bump line item if provided
@@ -657,7 +656,6 @@ export const workshopLearnerRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.retrieve(input.sessionId);
 
@@ -1440,7 +1438,6 @@ export const workshopAdminRouter = router({
         });
         return { success: true, type: "free", message: `Free access granted and email sent to ${entry.email}` };
       } else {
-        const Stripe = (await import("stripe")).default;
         const stripe = getStripeClient();
         const priceInCents = input.priceOverrideCents !== undefined ? input.priceOverrideCents : (workshop.price ?? 0);
         if (priceInCents === 0) {

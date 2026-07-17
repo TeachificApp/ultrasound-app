@@ -406,7 +406,6 @@ export const webinarSessionRouter = router({
       }
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
       // ── 100% promo intercept for webinars ────────────────────────────────
       if (input.promoCode) {

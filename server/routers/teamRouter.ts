@@ -176,7 +176,6 @@ export const teamRouter = router({
       const { brand, plan, seatCount, orgName, origin } = input;
       const { discountPct, pricePerSeat, total } = calcTeamPrice(brand, plan, seatCount);
 
-      const Stripe = (await import("stripe")).default;
       const stripe = getStripeClient();
 
       const unitAmountCents = pricePerSeat;
@@ -602,7 +601,6 @@ export const teamRouter = router({
       // Update Stripe subscription quantity for monthly plans
       if (team.plan === "monthly" && team.stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
         try {
-          const Stripe = (await import("stripe")).default;
           const stripe = getStripeClient();
           const sub = await stripe.subscriptions.retrieve(team.stripeSubscriptionId);
           const itemId = sub.items.data[0]?.id;
