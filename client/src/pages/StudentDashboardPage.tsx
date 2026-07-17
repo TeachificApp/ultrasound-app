@@ -905,7 +905,7 @@ function MyContentTab() {
                   completed={!!c.completedAt}
                   accessSource={(c as any).accessSource ?? null}
                   expiresAt={(c as any).accessExpiresAt ?? null}
-                  subscriptionCancelledAt={(c as any).stripeSubscriptionId && (c as any).accessExpiresAt ? new Date((c as any).accessExpiresAt) : null}
+                  subscriptionCancelledAt={(c as any).stripeSubscriptionId && (c as any).accessExpiresAt && new Date((c as any).accessExpiresAt) < new Date() ? new Date((c as any).accessExpiresAt) : null}
                   actions={[
                     { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${c.courseSlug}/player` },
                     { label: "Overview", icon: FileText, href: `/courses/${c.courseSlug}/overview`, secondary: true },
@@ -937,7 +937,7 @@ function MyContentTab() {
                   completed={!!q.completedAt}
                   accessSource={(q as any).accessSource ?? null}
                   expiresAt={(q as any).accessExpiresAt ?? null}
-                  subscriptionCancelledAt={(q as any).stripeSubscriptionId && (q as any).accessExpiresAt ? new Date((q as any).accessExpiresAt) : null}
+                  subscriptionCancelledAt={(q as any).stripeSubscriptionId && (q as any).accessExpiresAt && new Date((q as any).accessExpiresAt) < new Date() ? new Date((q as any).accessExpiresAt) : null}
                   actions={[
                     { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
                   ]}

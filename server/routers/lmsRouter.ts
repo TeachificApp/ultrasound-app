@@ -1,3 +1,4 @@
+import { getStripeClient } from "../lib/stripeClient";
 /**
  * lmsRouter.ts
  * All About Ultrasound™ LMS — Router Aggregator
@@ -1423,7 +1424,7 @@ export const lmsLearnerRouter = router({
       }
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       // Helper: validate a stored stripe price ID exists in the current Stripe account
       const validatePriceId = async (priceId: string | null | undefined): Promise<string | null> => {
         if (!priceId) return null;
@@ -1761,7 +1762,7 @@ export const lmsLearnerRouter = router({
       }
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
         orderBumpId: input.orderBumpId,
@@ -1875,7 +1876,7 @@ export const lmsLearnerRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const origin = input.origin || ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
 
       // Resolve promo code → Stripe promotion_code ID
@@ -2814,7 +2815,7 @@ export const lmsLearnerRouter = router({
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       // Always use the learn subdomain for Stripe redirects (not the main app domain)
       const learnDomain = "https://learn.allaboutultrasound.com";
 
@@ -2915,7 +2916,7 @@ export const lmsLearnerRouter = router({
       const privacyUrl = orgSettings?.privacyUrl ?? "https://www.allaboutultrasound.com/privacy-policy.html";
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       // Helper: validate a stored stripe price ID exists in the current Stripe account
       const validatePriceId = async (priceId: string | null): Promise<string | null> => {
@@ -3194,7 +3195,7 @@ export const lmsLearnerRouter = router({
     .input(z.object({ sessionId: z.string() }))
     .query(async ({ ctx, input }) => {
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.retrieve(input.sessionId, {
         expand: ["line_items"],
       });
@@ -3486,7 +3487,7 @@ export const lmsGroupRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       // Always use the learn subdomain for Stripe redirects (not the main app domain)
       const learnDomain = "https://learn.allaboutultrasound.com";
 
@@ -4383,7 +4384,7 @@ export const lmsGroupRouter = router({
 
       const Stripe = (await import("stripe")).default;
       const validatePriceId = async (priceId: string | null | undefined): Promise<string | null> => { if (!priceId) return null; try { await stripe.prices.retrieve(priceId); return priceId; } catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; } };
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const learnDomain = "https://learn.allaboutultrasound.com";
 
       // Return cached link if still active

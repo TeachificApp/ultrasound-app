@@ -1,3 +1,4 @@
+import { getStripeClient } from "../lib/stripeClient";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, sql, asc } from "drizzle-orm";
@@ -178,7 +179,7 @@ export const productsLearnerRouter = router({
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const shippingOpts = product.requiresShipping
         ? { shipping_address_collection: { allowed_countries: ["US", "CA", "AU", "GB"] as any } }
         : {};
@@ -303,7 +304,7 @@ export const productsLearnerRouter = router({
       }
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
 
       // Allowed shipping countries (default to US + CA if not specified)
@@ -1274,7 +1275,7 @@ Make ALL content specific and compelling based on the product title and descript
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const shippingOpts = product.requiresShipping
         ? { shipping_address_collection: { allowed_countries: ["US", "CA", "AU", "GB"] as any } }
         : {};

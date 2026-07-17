@@ -742,7 +742,7 @@ export const dashboardRouter = router({
 
           if (o.stripeSubscriptionId) {
             try {
-              const sub = await stripe.subscriptions.retrieve(o.stripeSubscriptionId) as any;
+              const sub = await getStripeClient().subscriptions.retrieve(o.stripeSubscriptionId) as any;
               const item = sub.items?.data?.[0];
               stripeData = {
                 status: sub.status,
@@ -1080,7 +1080,7 @@ export const dashboardRouter = router({
 
     for (const custId of allCustomerIds) {
       try {
-        const invoices = await stripe.invoices.list({
+        const invoices = await getStripeClient().invoices.list({
           customer: custId,
           status: "paid",
           limit: 50,
@@ -1104,7 +1104,7 @@ export const dashboardRouter = router({
     // Also fetch invoices for course subscriptions by subscription ID
     for (const subId of courseSubIds) {
       try {
-        const invoices = await stripe.invoices.list({
+        const invoices = await getStripeClient().invoices.list({
           subscription: subId,
           status: "paid",
           limit: 50,

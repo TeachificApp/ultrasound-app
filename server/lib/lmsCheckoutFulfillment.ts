@@ -1,3 +1,4 @@
+import { getStripeClient } from "./stripeClient";
 /**
  * LMS hosted checkout fulfillment — enrolls users after Stripe payment.
  * Handles guest buyers (no user_id / order_id in metadata).
@@ -75,7 +76,7 @@ export async function fetchStripeSubscriptionDetails(
   if (!process.env.STRIPE_SECRET_KEY) return empty;
   try {
     const Stripe = (await import("stripe")).default;
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" as any });
+    const stripe = getStripeClient();
     const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
       expand: ["latest_invoice.payment_intent"],
     });

@@ -15,6 +15,7 @@
  *  5. Logs the event to webhookEvents table
  */
 import type { Express, Request, Response } from "express";
+import { getStripeClient } from "../lib/stripeClient";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
 import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, teamSubscriptions, teamMembers } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
@@ -253,7 +254,7 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
         const [courseRow2] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
         if (courseRow2?.title) {
           const Stripe = (await import("stripe")).default;
-          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+          const stripe = getStripeClient();
           await stripe.subscriptions.update(stripeSubscriptionId, { description: `${courseRow2.title} \u2014 Monthly Subscription` });
           console.log(`[Stripe] LMS checkout: set subscription ${stripeSubscriptionId} description: "${courseRow2.title}"`);
         }
@@ -987,7 +988,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
       const brandLabel = brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
       const subDescription = `${brandLabel} Premium Membership \u2014 Monthly Subscription`;
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       await stripe.subscriptions.update(subscriptionId, { description: subDescription });
       console.log(`[Stripe] Brand membership: set subscription ${subscriptionId} description: "${subDescription}"`);
     } catch (descErr) {
@@ -1214,7 +1215,7 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
   if (subscriptionId && !isLifetime) {
     try {
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       await stripe.subscriptions.update(subscriptionId, { description: "All Access Dual Membership \u2014 Monthly Subscription" });
       console.log(`[Stripe] Dual membership: set subscription ${subscriptionId} description`);
     } catch (descErr) {
@@ -1928,7 +1929,7 @@ async function handleInvoicePaid(invoice: Record<string, unknown>) {
       }
       if (renewalDescription) {
         const Stripe = (await import("stripe")).default;
-        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+        const stripe = getStripeClient();
         await stripe.paymentIntents.update(paymentIntentId, { description: renewalDescription });
         console.log(`[Stripe] invoice.paid — updated payment intent ${paymentIntentId} description: "${renewalDescription}"`);
       }
@@ -2024,7 +2025,7 @@ async function handleDiyCheckoutCompleted(session: Record<string, unknown>) {
     try {
       const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       await stripe.subscriptions.update(subscriptionId, { description: `${planLabel} DIY Accreditation \u2014 Monthly Subscription` });
       console.log(`[Stripe] DIY checkout: set subscription ${subscriptionId} description`);
     } catch (descErr) {
@@ -2324,7 +2325,7 @@ async function handleTeamCheckoutCompleted(session: Record<string, unknown>) {
   if (plan === "monthly" && stripeSubscriptionId) {
     try {
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
       currentPeriodEnd = new Date((sub as any).current_period_end * 1000);
     } catch (e) {

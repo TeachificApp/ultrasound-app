@@ -1,3 +1,4 @@
+import { getStripeClient } from "../lib/stripeClient";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, like, lte, or, sql, isNull } from "drizzle-orm";
@@ -582,7 +583,7 @@ export const workshopLearnerRouter = router({
       }
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       // Build order bump line item if provided
       const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
@@ -657,7 +658,7 @@ export const workshopLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.retrieve(input.sessionId);
 
       if (session.payment_status !== "paid") {
@@ -1440,7 +1441,7 @@ export const workshopAdminRouter = router({
         return { success: true, type: "free", message: `Free access granted and email sent to ${entry.email}` };
       } else {
         const Stripe = (await import("stripe")).default;
-        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+        const stripe = getStripeClient();
         const priceInCents = input.priceOverrideCents !== undefined ? input.priceOverrideCents : (workshop.price ?? 0);
         if (priceInCents === 0) {
           const [existing] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)

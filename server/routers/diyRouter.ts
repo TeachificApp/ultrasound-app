@@ -1,3 +1,4 @@
+import { getStripeClient } from "../lib/stripeClient";
 /**
  * DIY Accreditation Router
  *
@@ -770,7 +771,7 @@ export const diyRouter = router({
       const planConfig = DIY_PLANS[input.plan];
       const userId = ctx.user?.id ?? 0;
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer_email: ctx.user?.email ?? undefined,

@@ -1,3 +1,4 @@
+import { getStripeClient } from "../lib/stripeClient";
 /**
  * careerNetworkRouter.ts
  * Career Network module — job listings, RSS/URL scraping, candidate profiles,
@@ -814,7 +815,7 @@ Return a JSON object with this exact structure:
   // ── Employer: create checkout for single job post ($39) ─────────────────────
   createJobPostCheckout: protectedProcedure.mutation(async ({ ctx }) => {
     const Stripe = (await import("stripe")).default;
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+    const stripe = getStripeClient();
     const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -848,7 +849,7 @@ Return a JSON object with this exact structure:
   // ── Employer: create checkout for monthly subscription ($199/mo) ─────────────
   createEmployerSubscriptionCheckout: protectedProcedure.mutation(async ({ ctx }) => {
     const Stripe = (await import("stripe")).default;
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+    const stripe = getStripeClient();
     const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",

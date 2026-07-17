@@ -1,3 +1,4 @@
+import { getStripeClient } from "./stripeClient";
 /**
  * Membership fulfillment — grants membership_subscriptions + plan access items
  * after Stripe checkout (webhook, checkout-complete fallback, or admin reconcile).
@@ -672,7 +673,7 @@ export async function reconcileMembershipFromStripeSession(
   if (stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
     try {
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
       const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
       if (sub.current_period_end) {
         accessExpiresAt = new Date(sub.current_period_end * 1000);
@@ -736,7 +737,7 @@ export async function cancelDuplicateStripeSubscriptions(opts: {
 }): Promise<string[]> {
   if (!process.env.STRIPE_SECRET_KEY) return [];
   const Stripe = (await import("stripe")).default;
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" as any });
+  const stripe = getStripeClient();
   const duplicates: string[] = [];
   try {
     const subs = await stripe.subscriptions.list({

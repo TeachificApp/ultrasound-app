@@ -1,3 +1,4 @@
+import { getStripeClient } from "../lib/stripeClient";
 /**
  * Team / University Subscription Router
  *
@@ -176,7 +177,7 @@ export const teamRouter = router({
       const { discountPct, pricePerSeat, total } = calcTeamPrice(brand, plan, seatCount);
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       const unitAmountCents = pricePerSeat;
       const productName = `${brandLabel(brand)} — Team/University ${plan === "lifetime" ? "Lifetime" : "Monthly"} Access`;
@@ -602,7 +603,7 @@ export const teamRouter = router({
       if (team.plan === "monthly" && team.stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
         try {
           const Stripe = (await import("stripe")).default;
-          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+          const stripe = getStripeClient();
           const sub = await stripe.subscriptions.retrieve(team.stripeSubscriptionId);
           const itemId = sub.items.data[0]?.id;
           if (itemId) {

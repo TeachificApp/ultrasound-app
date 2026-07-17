@@ -1,3 +1,4 @@
+import { getStripeClient } from "../lib/stripeClient";
 /**
  * Brand Membership Router — Multi-tenant premium subscription management.
  *
@@ -311,7 +312,7 @@ export const brandMembershipRouter = router({
 
       assertStripeConfigured();
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       const isLifetime = input.interval === "lifetime";
 
@@ -445,7 +446,7 @@ export const brandMembershipRouter = router({
     .mutation(async ({ ctx, input }) => {
       assertStripeConfigured();
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       try {
         const dualMonthlyLineItem = await buildDualMonthlyLineItem(stripe);
@@ -487,7 +488,7 @@ export const brandMembershipRouter = router({
     .mutation(async ({ ctx, input }) => {
       assertStripeConfigured();
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       try {
         const dualLifetimeLineItem = await buildDualLifetimeLineItem(stripe);
@@ -526,7 +527,7 @@ export const brandMembershipRouter = router({
     .mutation(async ({ ctx, input }) => {
       assertStripeConfigured();
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       try {
         const dualAnnualLineItem = await buildDualAnnualLineItem(stripe);
@@ -657,7 +658,7 @@ export const brandMembershipRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const stripe = getStripeClient();
 
       // ── Known brand price IDs ────────────────────────────────────────────────
       // Collect all configured price IDs from BRAND_PRODUCTS + DUAL_MEMBERSHIP_PRODUCT.

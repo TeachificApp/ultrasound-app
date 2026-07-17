@@ -1,3 +1,4 @@
+import { getStripeClient } from "../lib/stripeClient";
 /**
  * bundleRouter.ts — Bundles: sell multiple items as one package
  */
@@ -230,7 +231,7 @@ export const bundleLearnerRouter = router({
         return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
       }
       const { default: Stripe } = await import("stripe");
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-12-18.acacia" as any });
+      const stripe = getStripeClient();
       const origin = ctx.req.headers.origin || "https://app.allaboutultrasound.com";
       const isSubscription = isStructured
         ? selectedOption.pricingType === "subscription"
@@ -504,7 +505,7 @@ export const bundleAdminRouter = router({
       if (!purchase) throw new TRPCError({ code: "NOT_FOUND" });
       if (!purchase.stripePaymentIntentId) throw new TRPCError({ code: "BAD_REQUEST", message: "No Stripe payment intent" });
       const { default: Stripe } = await import("stripe");
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-12-18.acacia" });
+      const stripe = getStripeClient();
       const refund = await stripe.refunds.create({ payment_intent: purchase.stripePaymentIntentId, reason: input.reason as any });
       await db.update(digitalBundlePurchases).set({ status: "refunded" }).where(eq(digitalBundlePurchases.id, input.purchaseId));
       return { refundId: refund.id, status: refund.status };

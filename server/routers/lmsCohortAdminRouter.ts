@@ -1,3 +1,4 @@
+import { getStripeClient } from "../lib/stripeClient";
 /**
  * lmsCohortAdminRouter.ts
  * All About Ultrasound™ LMS — Cohort Sessions, Assignments, Recordings (admin)
@@ -1683,7 +1684,7 @@ export const lmsCohortAdminRouter = router({
         return { success: true, type: "free", message: `Free access granted and enrollment email sent to ${entry.email}` };
       } else {
         const Stripe = (await import("stripe")).default;
-        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+        const stripe = getStripeClient();
         const priceInCents = input.priceOverrideCents !== undefined
           ? input.priceOverrideCents
           : (course.price ?? 0);
