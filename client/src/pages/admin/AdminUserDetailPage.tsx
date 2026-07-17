@@ -1414,6 +1414,17 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
     onSuccess: () => { toast.success("Course subscription cancelled at period end."); refetch(); setCancelLmsOrderConfirm(null); },
     onError: (e) => toast.error(e.message),
   });
+  const syncSub = trpc.adminUser.syncStripeSubscription.useMutation({
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(`Synced from Stripe (${res.stripeStatus}). Updated: ${res.updated?.join("; ") || "none"}`);
+      } else {
+        toast.warning(res.message ?? "No records updated.");
+      }
+      refetch();
+    },
+    onError: (e) => toast.error(`Sync failed: ${e.message}`),
+  });
   const addSubscription = trpc.membership.reconcileStripeMembership.useMutation({
     onSuccess: (res) => {
       toast.success(`Subscription synced. Notes: ${res.notes?.join(", ") || "done"}.`);
@@ -1514,6 +1525,15 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                             <RefreshCw className="w-3 h-3" /> Reinstate
                           </button>
                         )}
+                        {m.stripeSubscriptionId && (m.status === "cancelled" || m.status === "expired") && (
+                          <button
+                            onClick={() => syncSub.mutate({ stripeSubscriptionId: m.stripeSubscriptionId })}
+                            disabled={syncSub.isPending}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 disabled:opacity-50"
+                          >
+                            <RefreshCw className="w-3 h-3" /> Sync from Stripe
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1555,6 +1575,15 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
                       >
                         <XCircle className="w-3 h-3" /> Cancel
+                      </button>
+                    )}
+                    {o.stripeSubscriptionId && (
+                      <button
+                        onClick={() => syncSub.mutate({ stripeSubscriptionId: o.stripeSubscriptionId })}
+                        disabled={syncSub.isPending}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 disabled:opacity-50"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Sync from Stripe
                       </button>
                     )}
                   </div>
@@ -1614,6 +1643,15 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                       >
                         <ShieldOff className="w-3 h-3" /> Revoke
+                      </button>
+                    )}
+                    {m.stripeSubscriptionId && (m.status === "cancelled" || m.status === "past_due" || m.status === "expired") && (
+                      <button
+                        onClick={() => syncSub.mutate({ stripeSubscriptionId: m.stripeSubscriptionId })}
+                        disabled={syncSub.isPending}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 disabled:opacity-50"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Sync from Stripe
                       </button>
                     )}
                   </div>

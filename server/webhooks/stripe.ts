@@ -1324,24 +1324,36 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
   }
 
   const status = subscription.status as string;
+  const periodEnd = subscription.current_period_end as number | undefined;
+  const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
+  const cancelAtPeriodEnd = (subscription.cancel_at_period_end as boolean) ?? false;
 
-  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
+  // Only cancel when Stripe definitively deletes the subscription.
+  // Do NOT cancel on customer.subscription.updated even if status is "canceled" —
+  // Stripe always follows a deleted subscription with a customer.subscription.deleted event.
+  if (eventType === "customer.subscription.deleted") {
     await db.update(brandMemberships)
       .set({ status: "cancelled", tier: "free" })
       .where(eq(brandMemberships.id, membership.id));
     console.log(`[Stripe] Brand membership cancelled: user ${membership.userId}, brand ${membership.brand}`);
-  } else if (status === "past_due") {
-    // Keep premium but mark as past_due for grace period
+  } else if (status === "past_due" || status === "unpaid") {
+    // Keep premium but mark as expired for grace period
     await db.update(brandMemberships)
-      .set({ status: "expired" })
+      .set({ status: "expired", ...(currentPeriodEnd ? { expiresAt: currentPeriodEnd } : {}) })
       .where(eq(brandMemberships.id, membership.id));
-    console.log(`[Stripe] Brand membership past_due: user ${membership.userId}, brand ${membership.brand}`);
-  } else if (status === "active") {
-    // Reactivated
+    console.log(`[Stripe] Brand membership past_due/unpaid: user ${membership.userId}, brand ${membership.brand}`);
+  } else if (status === "active" || status === "trialing") {
+    // Active or reactivated — update expiry and cancel_at_period_end flag
+    const updates: Record<string, unknown> = { status: "active", tier: "premium" };
+    if (currentPeriodEnd) updates.expiresAt = currentPeriodEnd;
+    if (cancelAtPeriodEnd) {
+      // Scheduled to cancel at period end — keep active but note it
+      console.log(`[Stripe] Brand membership cancel_at_period_end=true: user ${membership.userId}, brand ${membership.brand}, expires ${currentPeriodEnd?.toISOString()}`);
+    }
     await db.update(brandMemberships)
-      .set({ status: "active", tier: "premium" })
+      .set(updates as any)
       .where(eq(brandMemberships.id, membership.id));
-    console.log(`[Stripe] Brand membership reactivated: user ${membership.userId}, brand ${membership.brand}`);
+    console.log(`[Stripe] Brand membership updated: user ${membership.userId}, brand ${membership.brand}, status=${status}, cancelAtPeriodEnd=${cancelAtPeriodEnd}`);
   }
 }
 
@@ -2043,13 +2055,24 @@ async function handleLmsSubscriptionLifecycle(subscription: Record<string, unkno
   const periodEnd = subscription.current_period_end as number | undefined;
   const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
 
-  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
+  // Only expire enrollment when Stripe definitively deletes the subscription.
+  // Do NOT expire on customer.subscription.updated with status=canceled —
+  // Stripe always follows with a customer.subscription.deleted event.
+  if (eventType === "customer.subscription.deleted") {
     // Expire enrollment immediately
     for (const enr of enrollments) {
       await db.update(lmsEnrollments)
         .set({ accessExpiresAt: new Date() })
         .where(eq(lmsEnrollments.id, enr.id));
-      console.log(`[Stripe] LMS enrollment ${enr.id} expired (subscription ${subscriptionId} ${eventType})`);
+      console.log(`[Stripe] LMS enrollment ${enr.id} expired (subscription ${subscriptionId} deleted)`);
+    }
+  } else if (status === "unpaid") {
+    // Unpaid after retries — expire access
+    for (const enr of enrollments) {
+      await db.update(lmsEnrollments)
+        .set({ accessExpiresAt: new Date() })
+        .where(eq(lmsEnrollments.id, enr.id));
+      console.log(`[Stripe] LMS enrollment ${enr.id} expired (subscription ${subscriptionId} unpaid)`);
     }
   } else if ((status === "active" || status === "trialing") && currentPeriodEnd) {
     // Extend enrollment expiry to new period end
@@ -2084,11 +2107,19 @@ async function handleMembershipSubscriptionLifecycle(subscription: Record<string
   const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
   const cancelAtPeriodEnd = (subscription.cancel_at_period_end as boolean) ?? false;
 
-  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
+  // Only cancel when Stripe definitively deletes the subscription.
+  // For customer.subscription.updated, trust the status field but never cancel solely
+  // because status=="canceled" on an update event (Stripe will send a deleted event).
+  if (eventType === "customer.subscription.deleted") {
     await db.update(membershipSubscriptions)
       .set({ status: "cancelled", cancelAtPeriodEnd: false })
       .where(eq(membershipSubscriptions.id, sub.id));
     console.log(`[Stripe] Membership subscription cancelled: sub ${sub.id}, plan ${sub.planId}`);
+  } else if (status === "unpaid") {
+    await db.update(membershipSubscriptions)
+      .set({ status: "past_due", ...(currentPeriodEnd ? { currentPeriodEnd } : {}), cancelAtPeriodEnd })
+      .where(eq(membershipSubscriptions.id, sub.id));
+    console.log(`[Stripe] Membership subscription unpaid: sub ${sub.id}`);
   } else if (status === "past_due") {
     await db.update(membershipSubscriptions)
       .set({ status: "past_due", ...(currentPeriodEnd ? { currentPeriodEnd } : {}), cancelAtPeriodEnd })
@@ -2120,11 +2151,17 @@ async function handleDiySubscriptionLifecycle(subscription: Record<string, unkno
   const status = subscription.status as string;
   const periodEnd = subscription.current_period_end as number | undefined;
   const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
-  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
+  // Only cancel when Stripe definitively deletes the subscription.
+  if (eventType === "customer.subscription.deleted") {
     await db.update(diySubscriptions)
       .set({ status: "canceled" })
       .where(eq(diySubscriptions.id, diySub.id));
     console.log(`[Stripe] DIY subscription cancelled: sub ${diySub.id}`);
+  } else if (status === "unpaid") {
+    await db.update(diySubscriptions)
+      .set({ status: "past_due" })
+      .where(eq(diySubscriptions.id, diySub.id));
+    console.log(`[Stripe] DIY subscription unpaid: sub ${diySub.id}`);
   } else if (status === "past_due") {
     await db.update(diySubscriptions)
       .set({ status: "past_due" })

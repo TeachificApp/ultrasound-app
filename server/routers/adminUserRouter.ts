@@ -920,6 +920,114 @@ export const adminUserRouter = router({
       return { success: true };
     }),
 
+  /**
+   * Re-sync a user's subscription status from Stripe.
+   * Use when the platform shows a subscription as cancelled/expired but Stripe shows it as active.
+   * Supports: lmsEnrollments (quiz/course subscriptions), membershipSubscriptions, brandMemberships.
+   */
+  syncStripeSubscription: protectedProcedure
+    .input(z.object({
+      stripeSubscriptionId: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+
+      // Fetch live subscription from Stripe
+      let sub: any;
+      try {
+        sub = await stripe.subscriptions.retrieve(input.stripeSubscriptionId);
+      } catch (e: any) {
+        throw new TRPCError({ code: "NOT_FOUND", message: `Stripe subscription not found: ${e.message}` });
+      }
+
+      const stripeStatus = sub.status as string; // active | trialing | past_due | unpaid | canceled | paused | incomplete | incomplete_expired
+      const currentPeriodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
+      const cancelAtPeriodEnd = sub.cancel_at_period_end as boolean;
+      const isActive = stripeStatus === "active" || stripeStatus === "trialing";
+      const isDeleted = stripeStatus === "canceled" || stripeStatus === "incomplete_expired";
+
+      let updated: string[] = [];
+
+      // 1. Sync lmsEnrollments (quiz/course subscriptions)
+      const lmsEnrs = await db.select().from(lmsEnrollments)
+        .where(eq(lmsEnrollments.stripeSubscriptionId, input.stripeSubscriptionId));
+      for (const enr of lmsEnrs) {
+        if (isActive && currentPeriodEnd) {
+          await db.update(lmsEnrollments)
+            .set({ accessExpiresAt: currentPeriodEnd })
+            .where(eq(lmsEnrollments.id, enr.id));
+          updated.push(`lmsEnrollment #${enr.id}: expiry → ${currentPeriodEnd.toISOString()}`);
+        } else if (isDeleted) {
+          await db.update(lmsEnrollments)
+            .set({ accessExpiresAt: new Date() })
+            .where(eq(lmsEnrollments.id, enr.id));
+          updated.push(`lmsEnrollment #${enr.id}: expired (subscription ${stripeStatus})`);
+        }
+      }
+
+      // 2. Sync membershipSubscriptions
+      const memSubs = await db.select().from(membershipSubscriptions)
+        .where(eq(membershipSubscriptions.stripeSubscriptionId, input.stripeSubscriptionId));
+      for (const ms of memSubs) {
+        if (isActive) {
+          await db.update(membershipSubscriptions)
+            .set({
+              status: "active",
+              cancelAtPeriodEnd,
+              ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
+            })
+            .where(eq(membershipSubscriptions.id, ms.id));
+          updated.push(`membershipSubscription #${ms.id}: restored to active`);
+        } else if (isDeleted) {
+          await db.update(membershipSubscriptions)
+            .set({ status: "cancelled", cancelAtPeriodEnd: false })
+            .where(eq(membershipSubscriptions.id, ms.id));
+          updated.push(`membershipSubscription #${ms.id}: cancelled`);
+        } else if (stripeStatus === "past_due" || stripeStatus === "unpaid") {
+          await db.update(membershipSubscriptions)
+            .set({ status: "past_due" })
+            .where(eq(membershipSubscriptions.id, ms.id));
+          updated.push(`membershipSubscription #${ms.id}: past_due`);
+        }
+      }
+
+      // 3. Sync brandMemberships
+      const brandMems = await db.select().from(brandMemberships)
+        .where(eq(brandMemberships.stripeSubscriptionId, input.stripeSubscriptionId));
+      for (const bm of brandMems) {
+        if (isActive) {
+          await db.update(brandMemberships)
+            .set({ status: "active", tier: "premium" })
+            .where(eq(brandMemberships.id, bm.id));
+          updated.push(`brandMembership #${bm.id} (${bm.brand}): restored to active/premium`);
+        } else if (isDeleted) {
+          await db.update(brandMemberships)
+            .set({ status: "cancelled", tier: "free" })
+            .where(eq(brandMemberships.id, bm.id));
+          updated.push(`brandMembership #${bm.id} (${bm.brand}): cancelled`);
+        } else if (stripeStatus === "past_due" || stripeStatus === "unpaid") {
+          await db.update(brandMemberships)
+            .set({ status: "expired" })
+            .where(eq(brandMemberships.id, bm.id));
+          updated.push(`brandMembership #${bm.id} (${bm.brand}): expired (past_due)`);
+        }
+      }
+
+      if (updated.length === 0) {
+        return { success: false, message: `No platform records found for subscription ${input.stripeSubscriptionId}. Check the subscription ID.`, stripeStatus, updated };
+      }
+
+      return { success: true, stripeStatus, cancelAtPeriodEnd, currentPeriodEnd: currentPeriodEnd?.toISOString(), updated };
+    }),
+
   /** Issue a full refund on a Stripe payment intent */
   refundPayment: protectedProcedure
     .input(z.object({
