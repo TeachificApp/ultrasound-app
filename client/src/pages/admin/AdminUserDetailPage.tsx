@@ -481,7 +481,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
 }
 
 // ─── Content Tab ──────────────────────────────────────────────────────────────
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "products" | "bundles" | "memberships" | "communities";
+type ContentSubTab = "courses" | "cohorts" | "quizzes" | "downloads" | "workshops" | "webinars" | "products" | "bundles" | "memberships" | "communities";
 
 function ContentTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
@@ -562,11 +562,34 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: (res) => { toast.success(`Synced from Stripe (${res.stripeStatus}). Updated: ${res.updated?.join("; ") || "none"}`); refetch(); },
     onError: (e) => toast.error(`Sync failed: ${e.message}`),
   });
+  // Cohort group assignment
+  const [cohortGroupAssignId, setCohortGroupAssignId] = useState<number | null>(null); // courseId being assigned
+  const { data: cohortGroups } = trpc.adminUser.listCohortGroups.useQuery(
+    { courseId: cohortGroupAssignId! },
+    { enabled: cohortGroupAssignId !== null }
+  );
+  const assignCohortGroup = trpc.adminUser.assignCohortGroup.useMutation({
+    onSuccess: (res) => { toast.success(`Assigned to group: ${res.groupName}`); refetch(); setCohortGroupAssignId(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  // Workshop instance assignment
+  const [workshopAssignEnrollId, setWorkshopAssignEnrollId] = useState<number | null>(null); // enrollmentId being assigned
+  const [workshopAssignWorkshopId, setWorkshopAssignWorkshopId] = useState<number | null>(null);
+  const { data: workshopInstances } = trpc.adminUser.listWorkshopInstances.useQuery(
+    { workshopId: workshopAssignWorkshopId! },
+    { enabled: workshopAssignWorkshopId !== null }
+  );
+  const assignWorkshopInstance = trpc.adminUser.assignWorkshopInstance.useMutation({
+    onSuccess: (res) => { toast.success(`Assigned to instance: ${res.instanceTitle}`); refetch(); setWorkshopAssignEnrollId(null); setWorkshopAssignWorkshopId(null); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const enrollments = data.enrollments ?? [];
-  const courses   = enrollments.filter((e: any) => !e.isQuiz && !e.isDownload);
+  const courses   = enrollments.filter((e: any) => !e.isQuiz && !e.isDownload && e.courseType !== 'cohort');
+  const cohorts   = enrollments.filter((e: any) => e.courseType === 'cohort');
   const quizzes   = enrollments.filter((e: any) => e.isQuiz);
   const downloads = enrollments.filter((e: any) => e.isDownload);
+  const workshopEnrollmentsList = data.workshopEnrollments ?? [];
   const physOrders = data.physicalOrders ?? [];
   const bundleEnrollments = data.bundleEnrollments ?? [];
   const nativeMemberships = data.nativeMemberships ?? [];
@@ -576,8 +599,10 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
 
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: courses.length },
+    { key: "cohorts",      label: "Cohorts",      icon: Users,          count: cohorts.length },
     { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: quizzes.length },
     { key: "downloads",    label: "Downloads",    icon: Download,       count: downloads.length },
+    { key: "workshops",    label: "Workshops",    icon: Calendar,       count: workshopEnrollmentsList.length },
     { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
     { key: "products",     label: "Products",     icon: Package,        count: physOrders.length },
     { key: "bundles",      label: "Bundles",      icon: Layers,         count: bundleEnrollments.length },
@@ -753,6 +778,103 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
         </div>
       )}
 
+      {/* Cohorts */}
+      {contentTab === "cohorts" && (
+        <div className="space-y-3">
+          <SectionHeader
+            title={`Cohort Enrollments (${cohorts.length})`}
+            action={
+              <Button size="sm" onClick={() => setEnrollOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
+                <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant Access
+              </Button>
+            }
+          />
+          {cohorts.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No cohort enrollments yet.</p>
+          ) : (
+            cohorts.map((e: any) => (
+              <div key={e.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex gap-4 items-start">
+                {e.thumbnailUrl ? (
+                  <img src={e.thumbnailUrl} alt={e.courseTitle} className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-gray-100" />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg flex-shrink-0 flex items-center justify-center bg-teal-50">
+                    <Users className="w-6 h-6 text-[#189aa1]" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <h4 className="font-semibold text-gray-800 text-sm">{e.courseTitle}</h4>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-teal-100 text-teal-700 border-teal-200">
+                      {e.completedAt ? "Completed" : `${e.progressPct ?? 0}% complete`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">Enrolled {formatDate(e.enrolledAt)}</p>
+                  {/* Cohort group assignment */}
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    {cohortGroupAssignId === e.courseId ? (
+                      <>
+                        <select
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700"
+                          defaultValue=""
+                          onChange={ev => {
+                            if (ev.target.value) {
+                              assignCohortGroup.mutate({ userId, courseId: e.courseId, cohortGroupId: Number(ev.target.value) });
+                            }
+                          }}
+                        >
+                          <option value="">Select group...</option>
+                          {(cohortGroups ?? []).map((g: any) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}{g.isFeaturedOnLanding ? " ★" : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => setCohortGroupAssignId(null)}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setCohortGroupAssignId(e.courseId)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                          e.cohortGroupId
+                            ? "bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100"
+                            : "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
+                        }`}
+                      >
+                        <Users className="w-3 h-3" />
+                        {e.cohortGroupName ? `Group: ${e.cohortGroupName}` : "Unassigned — Assign Group"}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    <a href={`/courses/${e.courseSlug}/overview`} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                      <ExternalLink className="w-3 h-3" /> View Course
+                    </a>
+                    <button
+                      onClick={() => { setExpiryEditId(e.enrollmentId); setExpiryEditValue(e.accessExpiresAt ? new Date(e.accessExpiresAt).toISOString().slice(0,10) : ""); }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                    >
+                      <Calendar className="w-3 h-3" /> Edit Expiry
+                    </button>
+                    <button
+                      onClick={() => setUnenrollConfirm(e.enrollmentId)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                    >
+                      <Trash2 className="w-3 h-3" /> Unenroll
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* Quizzes */}
       {contentTab === "quizzes" && (
         <div className="space-y-3">
@@ -918,6 +1040,90 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200">
                   <Download className="w-3 h-3" /> Files
                 </a>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Workshops */}
+      {contentTab === "workshops" && (
+        <div className="space-y-3">
+          <SectionHeader title={`Workshop Enrollments (${workshopEnrollmentsList.length})`} />
+          {workshopEnrollmentsList.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No workshop enrollments.</p>
+          ) : (
+            workshopEnrollmentsList.map((we: any) => (
+              <div key={we.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex gap-4 items-start">
+                {we.thumbnailUrl ? (
+                  <img src={we.thumbnailUrl} alt={we.workshopTitle} className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-gray-100" />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg flex-shrink-0 flex items-center justify-center bg-purple-50">
+                    <Calendar className="w-6 h-6 text-purple-500" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <h4 className="font-semibold text-gray-800 text-sm">{we.workshopTitle}</h4>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0 ${
+                      we.attended ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-purple-100 text-purple-700 border-purple-200"
+                    }`}>
+                      {we.attended ? "Attended" : "Registered"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">Enrolled {formatDate(we.accessGrantedAt)}</p>
+                  {/* Instance assignment */}
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    {workshopAssignEnrollId === we.id ? (
+                      <>
+                        <select
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700"
+                          defaultValue=""
+                          onChange={ev => {
+                            if (ev.target.value) {
+                              assignWorkshopInstance.mutate({ enrollmentId: we.id, instanceId: Number(ev.target.value) });
+                            }
+                          }}
+                        >
+                          <option value="">Select instance...</option>
+                          {(workshopInstances ?? []).map((inst: any) => (
+                            <option key={inst.id} value={inst.id}>
+                              {inst.title || (inst.startDate ? new Date(inst.startDate).toLocaleDateString() : `Instance #${inst.id}`)}
+                              {inst.venueCity ? ` — ${inst.venueCity}` : ""}
+                              {inst.locationType === "virtual" ? " (Virtual)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => { setWorkshopAssignEnrollId(null); setWorkshopAssignWorkshopId(null); }}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => { setWorkshopAssignEnrollId(we.id); setWorkshopAssignWorkshopId(we.workshopId); }}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                          we.instanceId
+                            ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                            : "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
+                        }`}
+                      >
+                        <Calendar className="w-3 h-3" />
+                        {we.instanceTitle
+                          ? `Instance: ${we.instanceTitle}${we.instanceCity ? ` — ${we.instanceCity}` : ""}`
+                          : "Unassigned — Assign Instance"}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    <a href={`/workshops/${we.workshopSlug}`} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                      <ExternalLink className="w-3 h-3" /> View Workshop
+                    </a>
+                  </div>
+                </div>
               </div>
             ))
           )}

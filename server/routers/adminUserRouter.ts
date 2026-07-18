@@ -51,6 +51,11 @@ import {
   lmsLessonProgress,
   lmsLessons,
   platformSettings,
+  lmsCohortGroups,
+  lmsCohortGroupEnrollments,
+  workshopEnrollments,
+  workshopInstances,
+  workshops,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { storagePut } from "../storage";
@@ -99,7 +104,7 @@ export const adminUserRouter = router({
         .limit(1);
       if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
-      // LMS enrollments with progress
+      // LMS enrollments with progress + cohort group assignment
       const [enrollments] = await db.execute(sql`
         SELECT
           e.id AS enrollmentId,
@@ -117,12 +122,40 @@ export const adminUserRouter = router({
           (c.type = 'download') AS isDownload,
           (SELECT COUNT(*) FROM lms_video_events WHERE user_id = ${input.userId} AND course_id = c.id AND event_type = 'complete') AS videosCompleted,
           (SELECT COUNT(*) FROM lms_quiz_attempts WHERE user_id = ${input.userId} AND course_id = c.id) AS quizAttempts,
-          (SELECT ROUND(AVG(score),1) FROM lms_quiz_attempts WHERE user_id = ${input.userId} AND course_id = c.id) AS avgQuizScore
+          (SELECT ROUND(AVG(score),1) FROM lms_quiz_attempts WHERE user_id = ${input.userId} AND course_id = c.id) AS avgQuizScore,
+          cge.cohort_group_id AS cohortGroupId,
+          cg.name AS cohortGroupName
         FROM lms_enrollments e
         JOIN lms_courses c ON c.id = e.course_id
         LEFT JOIN lms_orders o ON o.id = e.order_id
+        LEFT JOIN lms_cohort_group_enrollments cge ON cge.enrollment_id = e.id
+        LEFT JOIN lms_cohort_groups cg ON cg.id = cge.cohort_group_id
         WHERE e.user_id = ${input.userId}
         ORDER BY e.enrolled_at DESC
+      `);
+      // Workshop enrollments with instance info
+      const [workshopEnrollmentList] = await db.execute(sql`
+        SELECT
+          we.id,
+          we.workshop_id AS workshopId,
+          we.instance_id AS instanceId,
+          we.status,
+          we.amount_paid AS amountPaid,
+          we.access_granted_at AS accessGrantedAt,
+          we.access_expires_at AS accessExpiresAt,
+          we.attended,
+          w.title AS workshopTitle,
+          w.slug AS workshopSlug,
+          w.thumbnail_url AS thumbnailUrl,
+          wi.title AS instanceTitle,
+          wi.start_date AS instanceStartDate,
+          wi.venue_city AS instanceCity,
+          wi.location_type AS instanceLocationType
+        FROM workshop_enrollments we
+        JOIN workshops w ON w.id = we.workshop_id
+        LEFT JOIN workshop_instances wi ON wi.id = we.instance_id
+        WHERE we.user_id = ${input.userId}
+        ORDER BY we.access_granted_at DESC
       `);
 
       // Certificates
@@ -324,6 +357,25 @@ export const adminUserRouter = router({
           quizAttempts: Number(r.quizAttempts ?? 0),
           avgQuizScore: r.avgQuizScore != null ? Number(r.avgQuizScore) : null,
           stripeSubscriptionId: r.stripeSubscriptionId ? String(r.stripeSubscriptionId) : null,
+          cohortGroupId: r.cohortGroupId ? Number(r.cohortGroupId) : null,
+          cohortGroupName: r.cohortGroupName ? String(r.cohortGroupName) : null,
+        })),
+        workshopEnrollments: (workshopEnrollmentList as any[]).map(r => ({
+          id: Number(r.id),
+          workshopId: Number(r.workshopId),
+          instanceId: r.instanceId ? Number(r.instanceId) : null,
+          status: String(r.status ?? "active"),
+          amountPaid: Number(r.amountPaid ?? 0),
+          accessGrantedAt: r.accessGrantedAt,
+          accessExpiresAt: r.accessExpiresAt ?? null,
+          attended: Boolean(r.attended),
+          workshopTitle: String(r.workshopTitle ?? ""),
+          workshopSlug: String(r.workshopSlug ?? ""),
+          thumbnailUrl: r.thumbnailUrl ? String(r.thumbnailUrl) : null,
+          instanceTitle: r.instanceTitle ? String(r.instanceTitle) : null,
+          instanceStartDate: r.instanceStartDate ?? null,
+          instanceCity: r.instanceCity ? String(r.instanceCity) : null,
+          instanceLocationType: r.instanceLocationType ? String(r.instanceLocationType) : null,
         })),
         certificates: (certs as any[]).map(r => ({
           id: Number(r.id),
@@ -3164,5 +3216,117 @@ export const adminUserRouter = router({
 
       if (!sent) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Email delivery failed — check SendGrid configuration" });
       return { success: true, sentTo: user.email };
+    }),
+
+  /** Assign or change a student's cohort group for a given cohort course */
+  assignCohortGroup: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      courseId: z.number().int(),
+      cohortGroupId: z.number().int(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Get the enrollment
+      const [enrollment] = await db
+        .select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, input.courseId)))
+        .limit(1);
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found for this user/course" });
+      // Verify the cohort group belongs to this course
+      const [group] = await db
+        .select({ id: lmsCohortGroups.id, name: lmsCohortGroups.name })
+        .from(lmsCohortGroups)
+        .where(and(eq(lmsCohortGroups.id, input.cohortGroupId), eq(lmsCohortGroups.courseId, input.courseId)))
+        .limit(1);
+      if (!group) throw new TRPCError({ code: "NOT_FOUND", message: "Cohort group not found for this course" });
+      // Upsert: delete existing assignment then insert new one
+      await db.delete(lmsCohortGroupEnrollments)
+        .where(and(
+          eq(lmsCohortGroupEnrollments.userId, input.userId),
+          eq(lmsCohortGroupEnrollments.courseId, input.courseId),
+        ));
+      await db.insert(lmsCohortGroupEnrollments).values({
+        cohortGroupId: input.cohortGroupId,
+        enrollmentId: enrollment.id,
+        userId: input.userId,
+        courseId: input.courseId,
+      });
+      return { success: true, groupName: group.name };
+    }),
+
+  /** List all cohort groups for a given course (for the assignment dropdown) */
+  listCohortGroups: protectedProcedure
+    .input(z.object({ courseId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const groups = await db
+        .select({
+          id: lmsCohortGroups.id,
+          name: lmsCohortGroups.name,
+          status: lmsCohortGroups.status,
+          isFeaturedOnLanding: lmsCohortGroups.isFeaturedOnLanding,
+        })
+        .from(lmsCohortGroups)
+        .where(eq(lmsCohortGroups.courseId, input.courseId))
+        .orderBy(lmsCohortGroups.sortOrder, lmsCohortGroups.id);
+      return groups;
+    }),
+
+  /** Assign or change a student's workshop instance */
+  assignWorkshopInstance: protectedProcedure
+    .input(z.object({
+      enrollmentId: z.number().int(),
+      instanceId: z.number().int(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Verify the enrollment exists
+      const [enrollment] = await db
+        .select({ id: workshopEnrollments.id, workshopId: workshopEnrollments.workshopId })
+        .from(workshopEnrollments)
+        .where(eq(workshopEnrollments.id, input.enrollmentId))
+        .limit(1);
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop enrollment not found" });
+      // Verify the instance belongs to the same workshop
+      const [instance] = await db
+        .select({ id: workshopInstances.id, title: workshopInstances.title })
+        .from(workshopInstances)
+        .where(and(eq(workshopInstances.id, input.instanceId), eq(workshopInstances.workshopId, enrollment.workshopId)))
+        .limit(1);
+      if (!instance) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop instance not found for this workshop" });
+      // Update the enrollment's instance
+      await db.update(workshopEnrollments)
+        .set({ instanceId: input.instanceId })
+        .where(eq(workshopEnrollments.id, input.enrollmentId));
+      return { success: true, instanceTitle: instance.title };
+    }),
+
+  /** List all instances for a given workshop (for the assignment dropdown) */
+  listWorkshopInstances: protectedProcedure
+    .input(z.object({ workshopId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const instances = await db
+        .select({
+          id: workshopInstances.id,
+          title: workshopInstances.title,
+          startDate: workshopInstances.startDate,
+          venueCity: workshopInstances.venueCity,
+          locationType: workshopInstances.locationType,
+        })
+        .from(workshopInstances)
+        .where(eq(workshopInstances.workshopId, input.workshopId))
+        .orderBy(workshopInstances.startDate);
+      return instances;
     }),
 });
