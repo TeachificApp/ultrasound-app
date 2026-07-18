@@ -312,6 +312,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
 
   let userId = options.userId ?? parseMetadataUserId(meta);
   let isNewUser = false;
+  let newUserResetToken: string | null = null;
 
   if (options.linkOnly && options.enrollmentId) {
     const stripeSubscriptionId = (session.subscription as string) ?? null;
@@ -374,6 +375,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
     });
     userId = created.user.id;
     isNewUser = created.isNew;
+    newUserResetToken = created.isNew ? (created as any).resetToken ?? null : null;
     notes.push(isNewUser ? `Created account for ${customerEmail}` : `Resolved account ${customerEmail}`);
   }
 
@@ -580,11 +582,16 @@ export async function reconcileLmsCheckoutFromStripeSession(
         try {
           accessToken = await getOrCreateAccessToken(userId);
         } catch { /* optional */ }
+        // For new guest accounts, include a set-password URL so they can create a permanent login
+        const setPasswordUrl = newUserResetToken
+          ? `https://app.allaboutultrasound.com/auth/reset-password?token=${newUserResetToken}`
+          : null;
         if (course.type === "quiz") {
           await sendQuizAccessEmail({
             to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
             quizTitle: course.title,
             accessToken,
+            setPasswordUrl,
           });
           notes.push("Quiz access email sent");
         } else {
@@ -593,6 +600,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
             courseTitle: course.title,
             courseSlug: course.slug,
             accessToken,
+            setPasswordUrl,
           });
           notes.push("Enrollment email sent");
         }

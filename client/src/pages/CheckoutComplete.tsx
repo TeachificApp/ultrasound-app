@@ -27,6 +27,19 @@ export default function CheckoutComplete() {
     };
   }, []);
 
+  // Map content type to the correct My Content tab
+  const getMyContentUrl = (contentType: string, slug?: string | null) => {
+    switch (contentType) {
+      case "quiz": return "/my-dashboard/my-content?tab=quizzes";
+      case "download": return `/downloads/${slug}/files`;
+      case "cohort": return "/my-dashboard/my-content?tab=cohorts";
+      case "workshop": return "/my-dashboard/my-content?tab=workshops";
+      case "webinar": return "/my-dashboard/my-content?tab=webinars";
+      case "course":
+      default: return slug ? `/courses/${slug}/player` : "/my-dashboard/my-content?tab=courses";
+    }
+  };
+
   const isMembership = checkoutType === "membership";
 
   const lmsQuery = trpc.lmsLearner.getCheckoutSessionStatus.useQuery(
@@ -46,17 +59,13 @@ export default function CheckoutComplete() {
   const membershipPlanSlug = isMembership && data && "planSlug" in data ? data.planSlug : null;
   const autoLoginUrl = isMembership && data && "autoLoginUrl" in data ? data.autoLoginUrl : null;
 
+  const resolvedContentType = (!isMembership && data && "contentType" in data) ? (data as any).contentType as string : "course";
+
   useEffect(() => {
     if (data?.status !== "complete") return;
     if (autoLoginUrl) {
       window.location.href = autoLoginUrl;
       return;
-    }
-    if (courseSlug) {
-      const timer = setTimeout(() => {
-        navigate(`/courses/${courseSlug}/player`);
-      }, 4000);
-      return () => clearTimeout(timer);
     }
     if (isMembership) {
       const timer = setTimeout(() => {
@@ -64,7 +73,17 @@ export default function CheckoutComplete() {
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [data?.status, courseSlug, navigate, autoLoginUrl, isMembership]);
+    // Redirect to the correct My Content section based on content type
+    const timer = setTimeout(() => {
+      const dest = getMyContentUrl(resolvedContentType, courseSlug);
+      if (dest.startsWith("http") || dest.startsWith("/downloads")) {
+        window.location.href = dest.startsWith("/") ? `${window.location.origin}${dest}` : dest;
+      } else {
+        navigate(dest);
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [data?.status, courseSlug, resolvedContentType, navigate, autoLoginUrl, isMembership]);
 
   if (!sessionId) {
     return (
@@ -147,7 +166,11 @@ export default function CheckoutComplete() {
               ? "Signing you in now…"
               : isMembership
                 ? "Redirecting you to your dashboard in a moment…"
-                : "Redirecting you to the course in a moment…"}
+                : resolvedContentType === "quiz"
+                  ? "Redirecting you to My Content → Quizzes in a moment…"
+                  : resolvedContentType === "download"
+                    ? "Redirecting you to your download in a moment…"
+                    : "Redirecting you to the course in a moment…"}
           </p>
 
           <div className="flex flex-col gap-3">
@@ -160,11 +183,11 @@ export default function CheckoutComplete() {
                 </Button>
               </a>
             )}
-            {courseSlug && !isMembership && (
-              <Link href={`/courses/${courseSlug}/player`}>
+            {!isMembership && (
+              <Link href={getMyContentUrl(resolvedContentType, courseSlug)}>
                 <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2">
                   <BookOpen className="h-4 w-4" />
-                  Start Learning Now
+                  {resolvedContentType === "quiz" ? "Go to My Quizzes" : resolvedContentType === "download" ? "Access My Download" : "Start Learning Now"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>

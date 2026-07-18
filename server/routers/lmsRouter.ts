@@ -3212,15 +3212,17 @@ export const lmsLearnerRouter = router({
 
       const meta = (session.metadata ?? {}) as Record<string, string>;
       let courseSlug: string | null = meta.course_slug ?? null;
-      if (!courseSlug && meta.course_id) {
+      let contentType: string = meta.trigger_order_type ?? "course";
+      if (meta.course_id) {
         const db = await getDb();
         if (db) {
           const [course] = await db
-            .select({ slug: lmsCourses.slug })
+            .select({ slug: lmsCourses.slug, type: lmsCourses.type })
             .from(lmsCourses)
             .where(eq(lmsCourses.id, parseInt(meta.course_id, 10)))
             .limit(1);
-          courseSlug = course?.slug ?? null;
+          if (!courseSlug) courseSlug = course?.slug ?? null;
+          if (course?.type) contentType = course.type;
         }
       }
 
@@ -3229,6 +3231,7 @@ export const lmsLearnerRouter = router({
         paymentStatus: session.payment_status, // 'paid' | 'unpaid' | 'no_payment_required'
         customerEmail: session.customer_details?.email ?? null,
         courseSlug,
+        contentType, // 'course' | 'quiz' | 'download' | 'cohort' | 'workshop'
       };
     }),
 

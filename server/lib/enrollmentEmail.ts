@@ -97,6 +97,8 @@ export async function sendEnrollmentEmail(opts: {
   customIntro?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
+  /** For new guest accounts: URL to set a permanent password */
+  setPasswordUrl?: string | null;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Welcome to "${opts.courseTitle}" 🎉`;
@@ -105,6 +107,13 @@ export async function sendEnrollmentEmail(opts: {
   const courseUrl = buildAccessUrl(courseDestination, opts.accessToken);
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
+    : "";
+  const setPasswordHtml = opts.setPasswordUrl
+    ? `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:0 0 24px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#9a3412;font-weight:600;">⚠️ Set your password to keep access</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#7c2d12;line-height:1.5;">Your account was created automatically. Set a password so you can log back in anytime.</p>
+      <a href="${opts.setPasswordUrl}" style="display:inline-block;background:#ea580c;color:#ffffff;font-weight:600;font-size:13px;padding:10px 20px;border-radius:6px;text-decoration:none;">Set My Password</a>
+    </div>`
     : "";
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
@@ -115,6 +124,7 @@ export async function sendEnrollmentEmail(opts: {
       We're excited to have you on board!
     </p>
     ${introHtml}
+    ${setPasswordHtml}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">Getting started:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
@@ -299,34 +309,44 @@ export async function sendQuizAccessEmail(opts: {
   customIntro?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
+  /** For new guest accounts: URL to set a permanent password */
+  setPasswordUrl?: string | null;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
-  const subject = opts.customSubject || `You've been invited to "${opts.quizTitle}"`;
-  const appDestination = `https://app.allaboutultrasound.com`;
+  const subject = opts.customSubject || `Your access to "${opts.quizTitle}" is ready 🎯`;
+  const appDestination = `https://app.allaboutultrasound.com/dashboard/my-content?tab=quizzes`;
   const appUrl = buildAccessUrl(appDestination, opts.accessToken);
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
     : "";
+  const setPasswordHtml = opts.setPasswordUrl
+    ? `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:0 0 24px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#9a3412;font-weight:600;">⚠️ Set your password to keep access</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#7c2d12;line-height:1.5;">Your account was created automatically. Set a password so you can log back in anytime.</p>
+      <a href="${opts.setPasswordUrl}" style="display:inline-block;background:#ea580c;color:#ffffff;font-weight:600;font-size:13px;padding:10px 20px;border-radius:6px;text-decoration:none;">Set My Password</a>
+    </div>`
+    : "";
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
-      Hi ${firstName}, you've been invited! 🎯
+      Hi ${firstName}, your access is ready! 🎯
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
-      You've been invited to participate in <strong style="color:${brandDark};">${opts.quizTitle}</strong>.
+      You now have full access to <strong style="color:${brandDark};">${opts.quizTitle}</strong>.
     </p>
     ${introHtml}
+    ${setPasswordHtml}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
-      <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">How to join:</p>
+      <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">How to access:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
         <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
-        <li style="margin:4px 0;">Your instructor will share the session link</li>
-        <li style="margin:4px 0;">Compete in real-time with other participants</li>
+        <li style="margin:4px 0;">Go to My Dashboard → My Content → Quizzes</li>
+        <li style="margin:4px 0;">Start the quiz at any time during your access period</li>
       </ul>
     </div>
     <div style="text-align:center;margin:28px 0;">
       <a href="${appUrl}"
         style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
-        Go to Platform
+        Access My Quiz
       </a>
     </div>
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
