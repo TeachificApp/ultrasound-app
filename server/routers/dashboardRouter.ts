@@ -274,9 +274,27 @@ export const dashboardRouter = router({
     const activeEnrollments = enrollments.filter((e) =>
       isEnrollmentAccessActive({ enrollmentType: "full", accessExpiresAt: e.accessExpiresAt }),
     );
-    const courses = activeEnrollments.filter(e => e.courseType === "course" || e.courseType === "cohort");
-    const quizzes = activeEnrollments.filter(e => e.courseType === "quiz");
-    const downloads = activeEnrollments.filter(e => e.courseType === "download");
+
+    // Enrich enrollments that have a stripeSubscriptionId with live Stripe data (cancelAtPeriodEnd, currentPeriodEnd)
+    const enrichedEnrollments = await Promise.all(
+      activeEnrollments.map(async (e) => {
+        if (!e.stripeSubscriptionId) return { ...e, cancelAtPeriodEnd: false, stripePeriodEnd: null as Date | null };
+        try {
+          const sub = await getStripeClient().subscriptions.retrieve(e.stripeSubscriptionId) as any;
+          return {
+            ...e,
+            cancelAtPeriodEnd: sub.cancel_at_period_end as boolean,
+            stripePeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null as Date | null,
+          };
+        } catch {
+          return { ...e, cancelAtPeriodEnd: false, stripePeriodEnd: null as Date | null };
+        }
+      })
+    );
+
+    const courses = enrichedEnrollments.filter(e => e.courseType === "course" || e.courseType === "cohort");
+    const quizzes = enrichedEnrollments.filter(e => e.courseType === "quiz");
+    const downloads = enrichedEnrollments.filter(e => e.courseType === "download");
 
     // ── 9. Items from active membership subscriptions ─────────────────────────
     const activeMembershipSubs = await db

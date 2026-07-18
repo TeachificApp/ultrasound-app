@@ -905,6 +905,8 @@ function MyContentTab() {
                   completed={!!c.completedAt}
                   accessSource={(c as any).accessSource ?? null}
                   expiresAt={(c as any).accessExpiresAt ?? null}
+                  cancelAtPeriodEnd={(c as any).cancelAtPeriodEnd ?? false}
+                  stripePeriodEnd={(c as any).stripePeriodEnd ?? null}
                   subscriptionCancelledAt={(c as any).stripeSubscriptionId && (c as any).accessExpiresAt && new Date((c as any).accessExpiresAt) < new Date() ? new Date((c as any).accessExpiresAt) : null}
                   actions={[
                     { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${c.courseSlug}/player` },
@@ -937,6 +939,8 @@ function MyContentTab() {
                   completed={!!q.completedAt}
                   accessSource={(q as any).accessSource ?? null}
                   expiresAt={(q as any).accessExpiresAt ?? null}
+                  cancelAtPeriodEnd={(q as any).cancelAtPeriodEnd ?? false}
+                  stripePeriodEnd={(q as any).stripePeriodEnd ?? null}
                   subscriptionCancelledAt={(q as any).stripeSubscriptionId && (q as any).accessExpiresAt && new Date((q as any).accessExpiresAt) < new Date() ? new Date((q as any).accessExpiresAt) : null}
                   actions={[
                     { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
@@ -966,6 +970,8 @@ function MyContentTab() {
                   badgeColor="teal"
                   accessSource={d.accessSource ?? null}
                   expiresAt={d.accessExpiresAt ?? null}
+                  cancelAtPeriodEnd={d.cancelAtPeriodEnd ?? false}
+                  stripePeriodEnd={d.stripePeriodEnd ?? null}
                   actions={[
                     {
                       label: "Access Files",
@@ -1681,7 +1687,7 @@ function EmptyState({
 }
 
 function ContentCard({
-  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed, accessSource, expiresAt, subscriptionCancelledAt,
+  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed, accessSource, expiresAt, subscriptionCancelledAt, cancelAtPeriodEnd, stripePeriodEnd,
 }: {
   thumbnail?: string | null;
   title: string;
@@ -1695,6 +1701,8 @@ function ContentCard({
   accessSource?: string | null;
   expiresAt?: Date | null;
   subscriptionCancelledAt?: Date | null;
+  cancelAtPeriodEnd?: boolean;
+  stripePeriodEnd?: Date | null;
   actions: { label: string; icon: React.ElementType; href: string; secondary?: boolean }[];
 }) {
   const colorMap = {
@@ -1751,7 +1759,18 @@ function ContentCard({
             {completed ? "Completed" : `${pct}% complete`}
           </p>
         )}
-        {expiresAt && !subscriptionCancelledAt && (
+        {/* Renews / Cancels on date — shown when Stripe data is available */}
+        {stripePeriodEnd && !subscriptionCancelledAt && (
+          <p className={`text-xs mb-1 flex items-center gap-1 ${cancelAtPeriodEnd ? "text-orange-500" : "text-teal-600"}`}>
+            {cancelAtPeriodEnd ? <XCircle className="w-3 h-3 flex-shrink-0" /> : <Clock className="w-3 h-3 flex-shrink-0" />}
+            {cancelAtPeriodEnd
+              ? `Cancels ${new Date(stripePeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+              : `Renews ${new Date(stripePeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+            }
+          </p>
+        )}
+        {/* Fallback: plain expiry when no Stripe data */}
+        {expiresAt && !subscriptionCancelledAt && !stripePeriodEnd && (
           <p className="text-xs text-amber-600 mb-1 flex items-center gap-1">
             <Clock className="w-3 h-3" />
             Access until {new Date(expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
