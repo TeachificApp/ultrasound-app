@@ -18,7 +18,7 @@ import {
   RefreshCw, Loader2, ChevronRight, ChevronLeft, ShoppingCart,
   UserCog, PlusCircle, Trash2, Shield, ShieldOff, BadgeCheck,
   ClipboardCheck, RotateCcw, DollarSign, Edit3, GitMerge, Mail, X,
-  Users2, Building2, Star, Layers, KeyRound, Eye, EyeOff, Calendar,
+  Users2, Users, Building2, Star, Layers, KeyRound, Eye, EyeOff, Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
