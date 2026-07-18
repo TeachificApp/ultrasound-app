@@ -9,6 +9,8 @@ import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
 import {
   lmsCourses,
+  lmsCohortGroups,
+  lmsCohortGroupEnrollments,
   lmsEnrollments,
   lmsOrders,
   lmsPricingOptions,
@@ -625,6 +627,61 @@ export async function reconcileLmsCheckoutFromStripeSession(
   if (userId && courseId && (shouldRenew || !existingEnrollment)) {
     const { onCourseEnrollment } = await import("./communityAutoJoin");
     onCourseEnrollment(userId, courseId);
+  }
+
+  // ── Cohort group auto-assignment ──────────────────────────────────────────
+  // If this is a cohort course, auto-assign the student to the featured group.
+  // Only runs on new enrollment or renewal (not idempotent re-runs).
+  if (userId && courseId && course?.type === "cohort" && (shouldRenew || !existingEnrollment)) {
+    try {
+      // Find the featured cohort group (isFeaturedOnLanding = true), or fall back
+      // to the next upcoming open group ordered by start_date asc.
+      const [featuredGroup] = await db
+        .select({ id: lmsCohortGroups.id })
+        .from(lmsCohortGroups)
+        .where(and(eq(lmsCohortGroups.courseId, courseId), eq(lmsCohortGroups.isFeaturedOnLanding, true)))
+        .limit(1);
+
+      const cohortGroupId = featuredGroup?.id ?? null;
+
+      if (cohortGroupId) {
+        // Get the enrollment id we just created/updated
+        const [enrollment] = await db
+          .select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId)))
+          .limit(1);
+
+        if (enrollment) {
+          // Check if already assigned to avoid duplicates
+          const [existing] = await db
+            .select({ id: lmsCohortGroupEnrollments.id })
+            .from(lmsCohortGroupEnrollments)
+            .where(and(
+              eq(lmsCohortGroupEnrollments.userId, userId),
+              eq(lmsCohortGroupEnrollments.courseId, courseId),
+            ))
+            .limit(1);
+
+          if (!existing) {
+            await db.insert(lmsCohortGroupEnrollments).values({
+              cohortGroupId,
+              enrollmentId: enrollment.id,
+              userId,
+              courseId,
+            });
+            notes.push(`Auto-assigned to cohort group #${cohortGroupId}`);
+          } else {
+            notes.push(`Already assigned to cohort group #${existing.id}`);
+          }
+        }
+      } else {
+        notes.push("No featured cohort group found — skipping group assignment");
+      }
+    } catch (cohortErr) {
+      console.error("[LmsCheckoutFulfillment] Cohort group assignment failed:", cohortErr);
+      notes.push("Cohort group assignment failed (non-fatal)");
+    }
   }
 
   return { success: true, userId, courseId, orderId, isNewUser, notes };
