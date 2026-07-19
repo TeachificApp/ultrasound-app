@@ -475,6 +475,11 @@ export async function reconcileLmsCheckoutFromStripeSession(
   // ── Duplicate one-time payment guard ──────────────────────────────────────
   // If the user is already actively enrolled and this is a one-time payment
   // (not a subscription renewal), notify admin — do NOT auto-refund.
+  //
+  // IMPORTANT: Before firing the alert, check if this session was already
+  // processed (i.e. an order with this session ID exists). If so, this is a
+  // Stripe webhook retry — NOT a real duplicate payment — and we should skip
+  // the alert silently.
   const pricingType = meta.pricing_type ?? "one_time";
   const isDuplicateOneTimePayment =
     !shouldRenew &&
@@ -483,6 +488,17 @@ export async function reconcileLmsCheckoutFromStripeSession(
     paymentIntentFromSession;
 
   if (isDuplicateOneTimePayment) {
+    // Check if this session was already fulfilled (webhook retry guard)
+    const [alreadyProcessed] = await db
+      .select({ id: lmsOrders.id })
+      .from(lmsOrders)
+      .where(and(eq(lmsOrders.userId, userId), eq(lmsOrders.stripeSessionId, sessionId)))
+      .limit(1);
+    if (alreadyProcessed) {
+      console.log(`[LmsCheckoutFulfillment] Webhook retry detected for session ${sessionId} — enrollment already exists, skipping duplicate alert`);
+      notes.push("Webhook retry — enrollment already active, no action needed");
+      return { success: true, userId, courseId, orderId, isNewUser, notes };
+    }
     const courseTitle = course?.title ?? `Course #${courseId}`;
     const stripeLink = `https://dashboard.stripe.com/payments/${paymentIntentFromSession}`;
     const adminEmail = process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com";
