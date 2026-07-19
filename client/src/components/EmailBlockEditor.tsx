@@ -101,7 +101,12 @@ const EMAIL_SAFE_TYPES: BlockType[] = [
   "divider",
   "text",
   "image",
+  "video",       // renders as thumbnail + Watch Video link (email-safe)
+  "audio",       // renders as Listen link (email-safe)
   "gallery",
+  "carousel",    // renders as static image grid (email-safe)
+  "embed",       // renders as View Content link (email-safe)
+  "countdown",   // renders as static deadline text (email-safe)
   "bullets",
   "numbered_list",
   "checklist",
@@ -472,6 +477,98 @@ export function emailBlockToHtml(block: Block): string {
         `<tr><td style="padding:8px 0;"><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${accent};border-radius:8px;overflow:hidden;"><tr><td style="background:${accent};padding:12px 16px;color:#ffffff;font-weight:600;font-size:14px;">${card.front}</td></tr><tr><td style="padding:12px 16px;color:#1a2e3b;font-size:14px;line-height:1.6;">${card.back}</td></tr></table></td></tr>`
       ).join("");
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 16px;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${cardsHtml}</table></td></tr></table>`;
+    }
+    case "gallery": {
+      // Email-safe: static image grid
+      const images = (d.images as { url?: string; src?: string; alt?: string; caption?: string }[]) ?? [];
+      const headline = (d.headline as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const visibleImages = images.slice(0, 6);
+      if (!visibleImages.length) return "";
+      const cols = Math.min(visibleImages.length, 3);
+      const cellWidth = Math.floor(100 / cols);
+      const cellsHtml = visibleImages.map((img) => {
+        const src = img.url ?? img.src ?? "";
+        const alt = img.alt ?? img.caption ?? "";
+        return `<td width="${cellWidth}%" style="padding:4px;vertical-align:top;">${src ? `<img src="${src}" alt="${alt}" style="width:100%;border-radius:6px;display:block;" />` : ""}${alt ? `<p style="color:#4a6070;font-size:12px;margin:4px 0 0;text-align:center;">${alt}</p>` : ""}</td>`;
+      }).join("");
+      // Build rows of `cols` cells
+      const rows: string[] = [];
+      for (let i = 0; i < visibleImages.length; i += cols) {
+        const rowCells = visibleImages.slice(i, i + cols).map((img) => {
+          const src = img.url ?? img.src ?? "";
+          const alt = img.alt ?? img.caption ?? "";
+          return `<td width="${cellWidth}%" style="padding:4px;vertical-align:top;">${src ? `<img src="${src}" alt="${alt}" style="width:100%;border-radius:6px;display:block;" />` : ""}${alt ? `<p style="color:#4a6070;font-size:12px;margin:4px 0 0;text-align:center;">${alt}</p>` : ""}</td>`;
+        }).join("");
+        rows.push(`<tr>${rowCells}</tr>`);
+      }
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:16px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:18px;font-weight:700;margin:0 0 12px;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${rows.join("")}</table>${images.length > 6 ? `<p style="color:#9ca3af;font-size:12px;margin:8px 0 0;text-align:center;">+${images.length - 6} more</p>` : ""}</td></tr></table>`;
+    }
+    case "video": {
+      // Email-safe: static thumbnail + Watch Video button
+      const url = (d.url as string) ?? (d.embedUrl as string) ?? "";
+      const caption = (d.caption as string) ?? "";
+      const thumbnail = (d.thumbnailUrl as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#f8fafc";
+      const accent = "#189aa1";
+      if (!url) return "";
+      const thumbHtml = thumbnail
+        ? `<a href="${url}" style="display:block;text-decoration:none;"><img src="${thumbnail}" alt="${caption || "Watch video"}" style="max-width:100%;width:100%;border-radius:8px;display:block;margin-bottom:12px;" /></a>`
+        : `<table width="100%" cellpadding="0" cellspacing="0" style="background:#0e1e2e;border-radius:8px;margin-bottom:12px;"><tr><td style="padding:40px;text-align:center;"><span style="font-size:40px;">▶</span></td></tr></table>`;
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:20px;margin:12px 0;"><tr><td>${thumbHtml}${caption ? `<p style="color:#4a6070;font-size:13px;margin:0 0 12px;">${caption}</p>` : ""}<a href="${url}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;">▶ Watch Video</a></td></tr></table>`;
+    }
+    case "audio": {
+      // Email-safe: static "Listen" link
+      const url = (d.url as string) ?? "";
+      const title = (d.title as string) ?? "Audio";
+      const caption = (d.caption as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#f8fafc";
+      const accent = "#189aa1";
+      if (!url) return "";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:20px;margin:12px 0;"><tr><td><p style="color:#0e1e2e;font-size:16px;font-weight:600;margin:0 0 6px;">🎧 ${title}</p>${caption ? `<p style="color:#4a6070;font-size:13px;margin:0 0 12px;">${caption}</p>` : ""}<a href="${url}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;">🎧 Listen Now</a></td></tr></table>`;
+    }
+    case "carousel": {
+      // Email-safe: static image grid (first 4 images)
+      const items = (d.items as { url?: string; imageUrl?: string; caption?: string; headline?: string }[]) ?? [];
+      const headline = (d.headline as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#ffffff";
+      const visibleItems = items.slice(0, 4);
+      if (!visibleItems.length) return "";
+      const cols = visibleItems.length >= 3 ? 3 : visibleItems.length;
+      const cellWidth = Math.floor(100 / cols);
+      const cellsHtml = visibleItems.map((item) => {
+        const imgUrl = item.url ?? item.imageUrl ?? "";
+        const cap = item.caption ?? item.headline ?? "";
+        return `<td width="${cellWidth}%" style="padding:4px;vertical-align:top;">${imgUrl ? `<img src="${imgUrl}" alt="${cap}" style="width:100%;border-radius:6px;display:block;" />` : ""}${cap ? `<p style="color:#4a6070;font-size:12px;margin:4px 0 0;text-align:center;">${cap}</p>` : ""}</td>`;
+      }).join("");
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:16px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:18px;font-weight:700;margin:0 0 12px;">${headline}</h3>` : ""}<table width="100%" cellpadding="0" cellspacing="0"><tr>${cellsHtml}</tr></table>${items.length > 4 ? `<p style="color:#9ca3af;font-size:12px;margin:8px 0 0;text-align:center;">+${items.length - 4} more</p>` : ""}</td></tr></table>`;
+    }
+    case "embed": {
+      // Email-safe: static "View Content" link (iframes don't work in email)
+      const url = (d.url as string) ?? (d.embedUrl as string) ?? "";
+      const caption = (d.caption as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#f8fafc";
+      const accent = "#189aa1";
+      if (!url) return "";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:20px;margin:12px 0;"><tr><td>${caption ? `<p style="color:#0e1e2e;font-size:15px;font-weight:600;margin:0 0 10px;">${caption}</p>` : ""}<a href="${url}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;">🔗 View Content</a><p style="color:#9ca3af;font-size:11px;margin:8px 0 0;">Interactive content — click to view in browser</p></td></tr></table>`;
+    }
+    case "countdown": {
+      // Email-safe: static deadline text
+      const headline = (d.headline as string) ?? "Limited Time Offer";
+      const subtext = (d.subtext as string) ?? "";
+      const deadlineLabel = (d.deadlineLabel as string) ?? "";
+      const targetDate = (d.targetDate as string) ?? "";
+      const bg = (d.bgColor as string) ?? "#fff7ed";
+      const accent = (d.accentColor as string) ?? "#f59e0b";
+      const textColor = (d.textColor as string) ?? "#92400e";
+      let deadlineText = deadlineLabel || "";
+      if (!deadlineText && targetDate) {
+        try {
+          const dt = new Date(targetDate);
+          deadlineText = `Offer ends ${dt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`;
+        } catch { deadlineText = ""; }
+      }
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border:2px solid ${accent};border-radius:8px;margin:16px 0;"><tr><td style="padding:24px;text-align:center;"><p style="color:${accent};font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 6px;">⏰ Time-Sensitive</p><h3 style="color:${textColor};font-size:20px;font-weight:700;margin:0 0 8px;">${headline}</h3>${subtext ? `<p style="color:${textColor};font-size:14px;margin:0 0 8px;opacity:0.85;">${subtext}</p>` : ""}${deadlineText ? `<p style="color:${accent};font-size:14px;font-weight:600;margin:0;">${deadlineText}</p>` : ""}</td></tr></table>`;
     }
     default:
       return "";
