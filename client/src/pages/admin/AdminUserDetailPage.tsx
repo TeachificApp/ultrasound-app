@@ -2180,6 +2180,15 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
     paid: "bg-green-100 text-green-700", pending: "bg-yellow-100 text-yellow-700",
     refunded: "bg-gray-100 text-gray-600", failed: "bg-red-100 text-red-700",
     completed: "bg-green-100 text-green-700", fulfilled: "bg-green-100 text-green-700",
+    open: "bg-blue-50 text-blue-600",
+  };
+  const SOURCE_LABELS: Record<string, { label: string; cls: string }> = {
+    funnel: { label: 'Funnel', cls: 'bg-purple-50 text-purple-600 border-purple-100' },
+    course: { label: 'Course', cls: 'bg-blue-50 text-blue-600 border-blue-100' },
+    download: { label: 'Download', cls: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+    bundle: { label: 'Bundle', cls: 'bg-violet-50 text-violet-600 border-violet-100' },
+    physical: { label: 'Physical', cls: 'bg-orange-50 text-orange-600 border-orange-100' },
+    manual_invoice: { label: 'Manual Invoice', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   };
 
   const refundPayment = trpc.adminUser.refundPayment.useMutation({
@@ -2248,6 +2257,11 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-gray-900 text-sm">{t.productName}</div>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      {SOURCE_LABELS[t.sourceTable] && (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${SOURCE_LABELS[t.sourceTable].cls}`}>
+                          {SOURCE_LABELS[t.sourceTable].label}
+                        </span>
+                      )}
                       <span className="text-xs text-gray-400 capitalize">{t.productType}</span>
                       {t.orderType === "subscription" && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-purple-50 text-purple-600 border border-purple-100">subscription</span>

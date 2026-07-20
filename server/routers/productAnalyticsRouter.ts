@@ -410,7 +410,7 @@ export const productAnalyticsRouter = router({
   /**
    * Get user's transactions (for user profile page)
    */
-  getUserTransactions: protectedProcedure
+    getUserTransactions: protectedProcedure
     .input(z.object({
       userId: z.number().int(),
       page: z.number().int().min(1).default(1),
@@ -420,127 +420,195 @@ export const productAnalyticsRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) return { transactions: [], total: 0, totalSpent: 0 };
-
       console.log(`[getUserTransactions] userId=${input.userId} page=${input.page}`);
-      const offset = (input.page - 1) * input.pageSize;
-
       try {
-      const result = await db.execute(sql`
-        SELECT * FROM (
-          SELECT fp.id AS transactionId, 'funnel' AS sourceTable,
-            fp.product_name AS productName, fp.product_type AS productType,
-            fp.amount_paid AS amountPaid, fp.currency, fp.status,
-            fp.stripe_payment_intent_id AS stripePaymentIntentId,
-            fp.purchased_at AS purchasedAt,
-            'one_time' AS orderType
-          FROM funnel_purchases fp WHERE fp.user_id = ${input.userId}
-          UNION ALL
-          SELECT lo.id AS transactionId, 'course' AS sourceTable,
-            COALESCE(c.title, 'Course') AS productName, 'course' AS productType,
-            lo.amount AS amountPaid, lo.currency, lo.status,
-            lo.stripe_payment_intent_id AS stripePaymentIntentId,
-            lo.created_at AS purchasedAt,
-            CASE WHEN lo.stripe_subscription_id IS NOT NULL THEN 'subscription' ELSE 'one_time' END AS orderType
-          FROM lms_orders lo
-          LEFT JOIN lms_courses c ON lo.course_id = c.id
-          WHERE lo.user_id = ${input.userId}
-          UNION ALL
-          SELECT dp.id AS transactionId, 'download' AS sourceTable,
-            COALESCE(prod.title, 'Download') AS productName, 'download' AS productType,
-            COALESCE(dp.amount, 0) AS amountPaid, COALESCE(dp.currency, 'usd') AS currency, COALESCE(dp.status, 'paid') AS status,
-            dp.stripe_payment_intent_id AS stripePaymentIntentId,
-            dp.purchased_at AS purchasedAt,
-            'one_time' AS orderType
-          FROM digital_purchases dp
-          LEFT JOIN digital_products prod ON dp.product_id = prod.id
-          WHERE dp.user_id = ${input.userId}
-          UNION ALL
-          SELECT bp.id AS transactionId, 'bundle' AS sourceTable,
-            COALESCE(b.title, 'Bundle') AS productName, 'bundle' AS productType,
-            COALESCE(b.discount_price, b.original_price, 0) AS amountPaid, 'usd' AS currency, 'paid' AS status,
-            NULL AS stripePaymentIntentId,
-            bp.purchased_at AS purchasedAt,
-            'one_time' AS orderType
-          FROM digital_bundle_purchases bp
-          LEFT JOIN digital_bundles b ON bp.bundle_id = b.id
-          WHERE bp.user_id = ${input.userId}
-          UNION ALL
-          SELECT po.id AS transactionId, 'physical' AS sourceTable,
-            COALESCE(pp.title, 'Physical Product') AS productName, 'physical' AS productType,
-            po.amount_paid AS amountPaid, 'usd' AS currency, po.fulfillment_status AS status,
-            po.stripe_payment_intent_id AS stripePaymentIntentId,
-            po.ordered_at AS purchasedAt,
-            'one_time' AS orderType
-          FROM physical_product_orders po
-          LEFT JOIN physical_products pp ON po.product_id = pp.id
-          WHERE po.user_id = ${input.userId}
-          UNION ALL
-          SELECT mi.id AS transactionId, 'manual_invoice' AS sourceTable,
-            mi.description AS productName, 'manual' AS productType,
-            mi.amountPaid AS amountPaid, mi.currency, 'paid' AS status,
-            NULL AS stripePaymentIntentId,
-            mi.paidAt AS purchasedAt,
-            'one_time' AS orderType
-          FROM manualInvoices mi
-          WHERE mi.userId = ${input.userId}
-        ) AS user_txns
-        ORDER BY purchasedAt DESC
-        LIMIT ${input.pageSize} OFFSET ${offset}
-      `) as any;
+        // Fetch each source table individually using Drizzle ORM (avoids UNION ALL column-name issues)
+        const uid = input.userId;
 
-      const rows = Array.isArray(result) ? result : (result as any)[0] ?? [];
-      console.log(`[getUserTransactions] userId=${input.userId} rows=${rows.length}`);
+        // 1. Funnel purchases
+        const funnelRows = await db
+          .select({
+            id: funnelPurchases.id,
+            productName: funnelPurchases.productName,
+            productType: funnelPurchases.productType,
+            amountPaid: funnelPurchases.amountPaid,
+            currency: funnelPurchases.currency,
+            status: funnelPurchases.status,
+            stripePaymentIntentId: funnelPurchases.stripePaymentIntentId,
+            purchasedAt: funnelPurchases.purchasedAt,
+          })
+          .from(funnelPurchases)
+          .where(eq(funnelPurchases.userId, uid));
 
-      // Count total
-      const countResult = await db.execute(sql`
-        SELECT (
-          (SELECT COUNT(*) FROM funnel_purchases WHERE user_id = ${input.userId}) +
-          (SELECT COUNT(*) FROM lms_orders WHERE user_id = ${input.userId}) +
-          (SELECT COUNT(*) FROM digital_purchases WHERE user_id = ${input.userId}) +
-          (SELECT COUNT(*) FROM digital_bundle_purchases WHERE user_id = ${input.userId}) +
-          (SELECT COUNT(*) FROM physical_product_orders WHERE user_id = ${input.userId}) +
-          (SELECT COUNT(*) FROM manualInvoices WHERE userId = ${input.userId})
-        ) AS total
-      `) as any;
-      const countRows = Array.isArray(countResult) ? countResult : (countResult as any)[0] ?? [];
-      const total = Number(countRows[0]?.total ?? 0);
+        // 2. LMS course orders
+        const courseRows = await db
+          .select({
+            id: lmsOrders.id,
+            courseTitle: lmsCourses.title,
+            amountPaid: lmsOrders.amount,
+            currency: lmsOrders.currency,
+            status: lmsOrders.status,
+            stripePaymentIntentId: lmsOrders.stripePaymentIntentId,
+            stripeSubscriptionId: lmsOrders.stripeSubscriptionId,
+            purchasedAt: lmsOrders.createdAt,
+          })
+          .from(lmsOrders)
+          .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
+          .where(eq(lmsOrders.userId, uid));
 
-      // Total spent — normalize everything to cents before summing
-      // funnel_purchases.amount_paid is in cents (from Stripe amount_total), lms_orders.amount and physical_product_orders.amount_paid are also in cents
-      const spentResult = await db.execute(sql`
-        SELECT (
-          COALESCE((SELECT SUM(amount_paid) FROM funnel_purchases WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
-          COALESCE((SELECT SUM(amount) FROM lms_orders WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
-          COALESCE((SELECT SUM(amount_paid) FROM physical_product_orders WHERE user_id = ${input.userId} AND fulfillment_status = 'paid'), 0) +
-          COALESCE((SELECT SUM(amountPaid) FROM manualInvoices WHERE userId = ${input.userId}), 0)
-        ) AS totalSpent
-      `) as any;
-      const spentRows = Array.isArray(spentResult) ? spentResult : (spentResult as any)[0] ?? [];
-      const totalSpent = Number(spentRows[0]?.totalSpent ?? 0);
+        // 3. Digital download purchases
+        const downloadRows = await db
+          .select({
+            id: digitalPurchases.id,
+            productTitle: digitalProducts.title,
+            amountPaid: digitalPurchases.amount,
+            currency: digitalPurchases.currency,
+            status: digitalPurchases.status,
+            stripePaymentIntentId: digitalPurchases.stripePaymentIntentId,
+            purchasedAt: digitalPurchases.purchasedAt,
+          })
+          .from(digitalPurchases)
+          .leftJoin(digitalProducts, eq(digitalPurchases.productId, digitalProducts.id))
+          .where(eq(digitalPurchases.userId, uid));
 
-      // Normalize amounts: all sources store cents; frontend fmtCurrency divides by 100
-      const normalizeAmount = (r: any): number => {
-        return Number(r.amountPaid ?? 0); // all sources store cents
-      };
-      const txns = rows.map((r: any) => ({
-          transactionId: Number(r.transactionId),
-          sourceTable: r.sourceTable,
-          productName: r.productName ?? "",
-          productType: r.productType ?? "other",
-          amountPaid: normalizeAmount(r),
-          currency: r.currency ?? "usd",
-          status: r.status ?? "paid",
-          stripePaymentIntentId: r.stripePaymentIntentId ?? null,
-          purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
-          orderType: r.orderType ?? 'one_time',
-        }));
-      console.log(`[getUserTransactions] returning ${txns.length} txns, total=${total}, spent=${totalSpent}`);
-      return { transactions: txns, total, totalSpent };
-    } catch (err: any) {
-      console.error(`[getUserTransactions] Error for userId=${input.userId}:`, err?.message ?? err);
-      return { transactions: [], total: 0, totalSpent: 0 };
-    }
-  }),
+        // 4. Bundle purchases
+        const bundleRows = await db
+          .select({
+            id: digitalBundlePurchases.id,
+            bundleTitle: digitalBundles.title,
+            discountPrice: digitalBundles.discountPrice,
+            originalPrice: digitalBundles.originalPrice,
+            purchasedAt: digitalBundlePurchases.purchasedAt,
+          })
+          .from(digitalBundlePurchases)
+          .leftJoin(digitalBundles, eq(digitalBundlePurchases.bundleId, digitalBundles.id))
+          .where(eq(digitalBundlePurchases.userId, uid));
+
+        // 5. Physical product orders
+        const physicalRows = await db
+          .select({
+            id: physicalProductOrders.id,
+            productTitle: physicalProducts.title,
+            amountPaid: physicalProductOrders.amountPaid,
+            currency: physicalProductOrders.currency,
+            fulfillmentStatus: physicalProductOrders.fulfillmentStatus,
+            stripePaymentIntentId: physicalProductOrders.stripePaymentIntentId,
+            orderedAt: physicalProductOrders.orderedAt,
+          })
+          .from(physicalProductOrders)
+          .leftJoin(physicalProducts, eq(physicalProductOrders.productId, physicalProducts.id))
+          .where(eq(physicalProductOrders.userId, uid));
+
+        // 6. Manual invoices
+        const invoiceRows = await db
+          .select()
+          .from(manualInvoices)
+          .where(eq(manualInvoices.userId, uid));
+
+        // Normalize all rows into a unified shape
+        type TxnRow = {
+          transactionId: number;
+          sourceTable: string;
+          productName: string;
+          productType: string;
+          amountPaid: number;
+          currency: string;
+          status: string;
+          stripePaymentIntentId: string | null;
+          purchasedAt: Date;
+          orderType: string;
+        };
+
+        const allTxns: TxnRow[] = [
+          ...funnelRows.map(r => ({
+            transactionId: r.id,
+            sourceTable: 'funnel',
+            productName: r.productName || 'Purchase',
+            productType: r.productType || 'other',
+            amountPaid: Number(r.amountPaid ?? 0),
+            currency: r.currency || 'usd',
+            status: r.status || 'paid',
+            stripePaymentIntentId: r.stripePaymentIntentId ?? null,
+            purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
+            orderType: 'one_time',
+          })),
+          ...courseRows.map(r => ({
+            transactionId: r.id,
+            sourceTable: 'course',
+            productName: r.courseTitle || 'Course',
+            productType: 'course',
+            amountPaid: Number(r.amountPaid ?? 0),
+            currency: r.currency || 'usd',
+            status: r.status || 'paid',
+            stripePaymentIntentId: r.stripePaymentIntentId ?? null,
+            purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
+            orderType: r.stripeSubscriptionId ? 'subscription' : 'one_time',
+          })),
+          ...downloadRows.map(r => ({
+            transactionId: r.id,
+            sourceTable: 'download',
+            productName: r.productTitle || 'Download',
+            productType: 'download',
+            amountPaid: Number(r.amountPaid ?? 0),
+            currency: r.currency || 'usd',
+            status: r.status || 'paid',
+            stripePaymentIntentId: r.stripePaymentIntentId ?? null,
+            purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
+            orderType: 'one_time',
+          })),
+          ...bundleRows.map(r => ({
+            transactionId: r.id,
+            sourceTable: 'bundle',
+            productName: r.bundleTitle || 'Bundle',
+            productType: 'bundle',
+            amountPaid: Number(r.discountPrice ?? r.originalPrice ?? 0),
+            currency: 'usd',
+            status: 'paid',
+            stripePaymentIntentId: null,
+            purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
+            orderType: 'one_time',
+          })),
+          ...physicalRows.map(r => ({
+            transactionId: r.id,
+            sourceTable: 'physical',
+            productName: r.productTitle || 'Physical Product',
+            productType: 'physical',
+            amountPaid: Number(r.amountPaid ?? 0),
+            currency: r.currency || 'usd',
+            status: r.fulfillmentStatus || 'pending',
+            stripePaymentIntentId: r.stripePaymentIntentId ?? null,
+            purchasedAt: r.orderedAt ? new Date(r.orderedAt) : new Date(),
+            orderType: 'one_time',
+          })),
+          ...invoiceRows.map(r => ({
+            transactionId: r.id,
+            sourceTable: 'manual_invoice',
+            productName: r.description || 'Manual Invoice',
+            productType: 'manual',
+            amountPaid: Number(r.amountPaid ?? 0),
+            currency: r.currency || 'usd',
+            status: 'paid',
+            stripePaymentIntentId: null,
+            purchasedAt: r.paidAt ? new Date(r.paidAt) : new Date(),
+            orderType: 'one_time',
+          })),
+        ];
+
+        // Sort by purchasedAt desc
+        allTxns.sort((a, b) => b.purchasedAt.getTime() - a.purchasedAt.getTime());
+
+        const total = allTxns.length;
+        const totalSpent = allTxns.reduce((sum, t) => sum + t.amountPaid, 0);
+        const offset = (input.page - 1) * input.pageSize;
+        const txns = allTxns.slice(offset, offset + input.pageSize);
+
+        console.log(`[getUserTransactions] userId=${uid} total=${total} spent=${totalSpent} page=${input.page} returning=${txns.length}`);
+        return { transactions: txns, total, totalSpent };
+      } catch (err: any) {
+        console.error(`[getUserTransactions] Error for userId=${input.userId}:`, err?.message ?? err);
+        return { transactions: [], total: 0, totalSpent: 0 };
+      }
+    }),
 
   /**
    * Create a manual invoice for a user (admin only)
