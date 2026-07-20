@@ -471,6 +471,15 @@ export const productAnalyticsRouter = router({
           FROM physical_product_orders po
           LEFT JOIN physical_products pp ON po.product_id = pp.id
           WHERE po.user_id = ${input.userId}
+          UNION ALL
+          SELECT mi.id AS transactionId, 'manual_invoice' AS sourceTable,
+            mi.description AS productName, 'manual' AS productType,
+            mi.amount_paid AS amountPaid, mi.currency, 'paid' AS status,
+            NULL AS stripePaymentIntentId,
+            mi.paid_at AS purchasedAt,
+            'one_time' AS orderType
+          FROM manualInvoices mi
+          WHERE mi.user_id = ${input.userId}
         ) AS user_txns
         ORDER BY purchasedAt DESC
         LIMIT ${input.pageSize} OFFSET ${offset}
@@ -485,7 +494,8 @@ export const productAnalyticsRouter = router({
           (SELECT COUNT(*) FROM lms_orders WHERE user_id = ${input.userId}) +
           (SELECT COUNT(*) FROM digital_purchases WHERE user_id = ${input.userId}) +
           (SELECT COUNT(*) FROM digital_bundle_purchases WHERE user_id = ${input.userId}) +
-          (SELECT COUNT(*) FROM physical_product_orders WHERE user_id = ${input.userId})
+          (SELECT COUNT(*) FROM physical_product_orders WHERE user_id = ${input.userId}) +
+          (SELECT COUNT(*) FROM manualInvoices WHERE user_id = ${input.userId})
         ) AS total
       `) as any;
       const countRows = Array.isArray(countResult) ? countResult : (countResult as any)[0] ?? [];
@@ -497,7 +507,8 @@ export const productAnalyticsRouter = router({
         SELECT (
           COALESCE((SELECT SUM(amount_paid) FROM funnel_purchases WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
           COALESCE((SELECT SUM(amount) FROM lms_orders WHERE user_id = ${input.userId} AND status = 'paid'), 0) +
-          COALESCE((SELECT SUM(amount_paid) FROM physical_product_orders WHERE user_id = ${input.userId} AND fulfillment_status = 'paid'), 0)
+          COALESCE((SELECT SUM(amount_paid) FROM physical_product_orders WHERE user_id = ${input.userId} AND fulfillment_status = 'paid'), 0) +
+          COALESCE((SELECT SUM(amount_paid) FROM manualInvoices WHERE user_id = ${input.userId}), 0)
         ) AS totalSpent
       `) as any;
       const spentRows = Array.isArray(spentResult) ? spentResult : (spentResult as any)[0] ?? [];
