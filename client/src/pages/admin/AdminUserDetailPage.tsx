@@ -2147,12 +2147,115 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   );
 }
 
+// ─── Admin Invoice View Component ───────────────────────────────────────────
+function AdminInvoiceView({ t, fmtCurrency, fmtDate }: { t: any; fmtCurrency: (c: number, cur?: string) => string; fmtDate: (d: Date | string) => string }) {
+  const lineItems: Array<{ name: string; amount: number; qty: number }> = (() => {
+    if (Array.isArray(t.lineItems) && t.lineItems.length > 0) return t.lineItems;
+    return [{ name: t.productName || 'Purchase', amount: t.amountPaid, qty: 1 }];
+  })();
+  const sourceLabel = {
+    funnel: 'Funnel Purchase', course: 'Course', download: 'Digital Download',
+    bundle: 'Bundle', physical: 'Physical Product', workshop: 'Workshop',
+    webinar: 'Webinar', manual_invoice: 'Manual Invoice',
+  }[t.sourceTable as string] ?? 'Purchase';
+  return (
+    <div id="admin-invoice-print-area" className="rounded-xl border border-gray-200 overflow-hidden text-sm">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-[#0e4a50] to-[#189aa1] px-5 py-4 text-white">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-base font-bold tracking-tight">All About Ultrasound, Inc.</p>
+            <p className="text-xs text-teal-100 mt-0.5">dba iHeartEcho</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-teal-100">Receipt / Invoice</p>
+            {t.invoiceNumber && <p className="font-mono text-xs mt-0.5">{t.invoiceNumber}</p>}
+          </div>
+        </div>
+      </div>
+      {/* Bill To */}
+      <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+        <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Bill To</p>
+        <p className="font-semibold text-gray-800">{t.studentName}</p>
+        {t.studentEmail && <p className="text-xs text-gray-500">{t.studentEmail}</p>}
+      </div>
+      {/* Meta */}
+      <div className="px-5 py-3 border-b border-gray-100 grid grid-cols-2 gap-2">
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">Date</p>
+          <p className="text-gray-700">{fmtDate(t.purchasedAt)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">Type</p>
+          <p className="text-gray-700">{sourceLabel}</p>
+        </div>
+        {t.paymentSource && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">Payment Method</p>
+            <p className="text-gray-700 capitalize">{t.paymentSource}</p>
+          </div>
+        )}
+        {t.stripePaymentIntentId && (
+          <div className="col-span-2">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">Transaction ID</p>
+            <p className="font-mono text-xs text-gray-500 truncate">{t.stripePaymentIntentId}</p>
+          </div>
+        )}
+      </div>
+      {/* Line Items */}
+      <div className="px-5 py-3 border-b border-gray-100">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left pb-1.5 font-semibold text-gray-500">Description</th>
+              <th className="text-center pb-1.5 font-semibold text-gray-500 w-10">Qty</th>
+              <th className="text-right pb-1.5 font-semibold text-gray-500">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.map((li, i) => (
+              <tr key={i} className="border-b border-gray-50">
+                <td className="py-1.5 text-gray-700">{li.name}</td>
+                <td className="py-1.5 text-center text-gray-500">{li.qty ?? 1}</td>
+                <td className="py-1.5 text-right text-gray-700">{fmtCurrency(li.amount * (li.qty ?? 1), t.currency)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {/* Total */}
+      <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+        <span className="font-bold text-gray-700">Total Paid</span>
+        <span className="text-base font-bold text-[#0e4a50]">{fmtCurrency(t.amountPaid, t.currency)}</span>
+      </div>
+      {/* Status + Notes */}
+      <div className="px-5 py-3 space-y-1">
+        <div className="flex justify-between text-xs">
+          <span className="text-gray-400">Status</span>
+          <span className="font-medium text-green-600 capitalize">{t.status}</span>
+        </div>
+        {t.notes && (
+          <div className="mt-2 p-2 bg-amber-50 rounded text-xs text-amber-800 border border-amber-100">
+            <span className="font-semibold">Note: </span>{t.notes}
+          </div>
+        )}
+      </div>
+      {/* Footer */}
+      <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-center">
+        <p className="text-[10px] text-gray-400">All About Ultrasound, Inc. dba iHeartEcho &bull; allaboutultrasound.com</p>
+        <p className="text-[10px] text-gray-400 mt-0.5">For support, contact hello@allaboutultrasound.com</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Transactions Tab ─────────────────────────────────────────────────────────
 function TransactionsTab({ userId, data: userData, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [page, setPage] = useState(1);
   const { data, isLoading, refetch: refetchTxns } = trpc.productAnalytics.getUserTransactions.useQuery({ userId, page, pageSize: 50 });
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
   const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
+  const [viewInvoice, setViewInvoice] = useState<any | null>(null);
   const [invoiceForm, setInvoiceForm] = useState({
     description: '',
     lineItems: [{ name: '', amount: '', qty: '1' }],
@@ -2188,6 +2291,8 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
     download: { label: 'Download', cls: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
     bundle: { label: 'Bundle', cls: 'bg-violet-50 text-violet-600 border-violet-100' },
     physical: { label: 'Physical', cls: 'bg-orange-50 text-orange-600 border-orange-100' },
+    workshop: { label: 'Workshop', cls: 'bg-rose-50 text-rose-600 border-rose-100' },
+    webinar: { label: 'Webinar', cls: 'bg-sky-50 text-sky-600 border-sky-100' },
     manual_invoice: { label: 'Manual Invoice', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   };
 
@@ -2281,14 +2386,22 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    {t.stripePaymentIntentId && t.status !== "refunded" && (
+                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
                       <button
-                        onClick={() => setRefundOpen({ piId: t.stripePaymentIntentId })}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                        onClick={() => setViewInvoice({ ...t, studentName: userData?.user?.displayName ?? userData?.user?.name ?? 'Student', studentEmail: userData?.user?.email ?? '' })}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200"
                       >
-                        Refund
+                        <FileText className="w-3 h-3" /> Invoice
                       </button>
-                    )}
+                      {t.stripePaymentIntentId && t.status !== "refunded" && (
+                        <button
+                          onClick={() => setRefundOpen({ piId: t.stripePaymentIntentId })}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                        >
+                          Refund
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -2444,6 +2557,33 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
         </Dialog>
       )}
 
+      {/* View Invoice Modal */}
+      {viewInvoice && (
+        <Dialog open onOpenChange={() => setViewInvoice(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Invoice / Receipt</DialogTitle>
+              <DialogDescription>Official payment record</DialogDescription>
+            </DialogHeader>
+            <AdminInvoiceView t={viewInvoice} fmtCurrency={fmtCurrency} fmtDate={fmtDate} />
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => {
+                const el = document.getElementById('admin-invoice-print-area');
+                if (!el) return;
+                const win = window.open('', '_blank');
+                if (!win) return;
+                win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:32px;color:#1e293b}*{box-sizing:border-box}@media print{body{padding:0}}</style></head><body>${el.innerHTML}</body></html>`);
+                win.document.close();
+                win.focus();
+                setTimeout(() => { win.print(); win.close(); }, 400);
+              }} className="gap-1.5">
+                <Download className="w-3.5 h-3.5" /> Print / Save PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setViewInvoice(null)}>Close</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
       {/* Refund dialog */}
       {refundOpen && (
         <Dialog open onOpenChange={() => setRefundOpen(null)}>

@@ -16,7 +16,7 @@ import {
   funnelPurchases, lmsOrders, lmsCourses, lmsEnrollments,
   digitalProducts, digitalPurchases, digitalBundles, digitalBundlePurchases,
   physicalProducts, physicalProductOrders, users, funnels, funnelPages,
-  manualInvoices,
+  manualInvoices, workshopEnrollments, workshops, webinarRegistrations, webinars,
 } from "../../drizzle/schema";
 
 async function assertAdmin(ctx: any) {
@@ -499,7 +499,33 @@ export const productAnalyticsRouter = router({
           .leftJoin(physicalProducts, eq(physicalProductOrders.productId, physicalProducts.id))
           .where(eq(physicalProductOrders.userId, uid));
 
-        // 6. Manual invoices
+        // 6. Workshop enrollments
+        const workshopRows = await db
+          .select({
+            id: workshopEnrollments.id,
+            workshopTitle: workshops.title,
+            amountPaid: workshopEnrollments.amountPaid,
+            currency: workshopEnrollments.currency,
+            status: workshopEnrollments.status,
+            stripePaymentIntentId: workshopEnrollments.stripePaymentIntentId,
+            createdAt: workshopEnrollments.createdAt,
+          })
+          .from(workshopEnrollments)
+          .leftJoin(workshops, eq(workshopEnrollments.workshopId, workshops.id))
+          .where(eq(workshopEnrollments.userId, uid));
+        // 7. Webinar registrations (paid)
+        const webinarRows = await db
+          .select({
+            id: webinarRegistrations.id,
+            webinarTitle: webinars.title,
+            webinarPrice: webinars.price,
+            stripePaymentIntentId: webinarRegistrations.stripePaymentIntentId,
+            registeredAt: webinarRegistrations.registeredAt,
+          })
+          .from(webinarRegistrations)
+          .leftJoin(webinars, eq(webinarRegistrations.webinarId, webinars.id))
+          .where(eq(webinarRegistrations.userId, uid));
+        // 8. Manual invoices
         const invoiceRows = await db
           .select()
           .from(manualInvoices)
@@ -517,6 +543,11 @@ export const productAnalyticsRouter = router({
           stripePaymentIntentId: string | null;
           purchasedAt: Date;
           orderType: string;
+          // Extended fields for invoice/receipt
+          invoiceNumber: string | null;
+          paymentSource: string | null;
+          notes: string | null;
+          lineItems: Array<{ name: string; amount: number; qty: number }> | null;
         };
 
         const allTxns: TxnRow[] = [
@@ -531,6 +562,10 @@ export const productAnalyticsRouter = router({
             stripePaymentIntentId: r.stripePaymentIntentId ?? null,
             purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
             orderType: 'one_time',
+            invoiceNumber: null,
+            paymentSource: 'stripe',
+            notes: null,
+            lineItems: [{ name: r.productName || 'Purchase', amount: Number(r.amountPaid ?? 0), qty: 1 }],
           })),
           ...courseRows.map(r => ({
             transactionId: r.id,
@@ -543,6 +578,10 @@ export const productAnalyticsRouter = router({
             stripePaymentIntentId: r.stripePaymentIntentId ?? null,
             purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
             orderType: r.stripeSubscriptionId ? 'subscription' : 'one_time',
+            invoiceNumber: null,
+            paymentSource: 'stripe',
+            notes: null,
+            lineItems: [{ name: r.courseTitle || 'Course', amount: Number(r.amountPaid ?? 0), qty: 1 }],
           })),
           ...downloadRows.map(r => ({
             transactionId: r.id,
@@ -555,6 +594,10 @@ export const productAnalyticsRouter = router({
             stripePaymentIntentId: r.stripePaymentIntentId ?? null,
             purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
             orderType: 'one_time',
+            invoiceNumber: null,
+            paymentSource: 'stripe',
+            notes: null,
+            lineItems: [{ name: r.productTitle || 'Download', amount: Number(r.amountPaid ?? 0), qty: 1 }],
           })),
           ...bundleRows.map(r => ({
             transactionId: r.id,
@@ -567,6 +610,10 @@ export const productAnalyticsRouter = router({
             stripePaymentIntentId: null,
             purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
             orderType: 'one_time',
+            invoiceNumber: null,
+            paymentSource: 'stripe',
+            notes: null,
+            lineItems: [{ name: r.bundleTitle || 'Bundle', amount: Number(r.discountPrice ?? r.originalPrice ?? 0), qty: 1 }],
           })),
           ...physicalRows.map(r => ({
             transactionId: r.id,
@@ -579,6 +626,42 @@ export const productAnalyticsRouter = router({
             stripePaymentIntentId: r.stripePaymentIntentId ?? null,
             purchasedAt: r.orderedAt ? new Date(r.orderedAt) : new Date(),
             orderType: 'one_time',
+            invoiceNumber: null,
+            paymentSource: 'stripe',
+            notes: null,
+            lineItems: [{ name: r.productTitle || 'Physical Product', amount: Number(r.amountPaid ?? 0), qty: 1 }],
+          })),
+          ...workshopRows.map(r => ({
+            transactionId: r.id,
+            sourceTable: 'workshop',
+            productName: r.workshopTitle || 'Workshop',
+            productType: 'workshop',
+            amountPaid: Number(r.amountPaid ?? 0),
+            currency: r.currency || 'usd',
+            status: r.status || 'active',
+            stripePaymentIntentId: r.stripePaymentIntentId ?? null,
+            purchasedAt: r.createdAt ? new Date(r.createdAt) : new Date(),
+            orderType: 'one_time',
+            invoiceNumber: null,
+            paymentSource: 'stripe',
+            notes: null,
+            lineItems: [{ name: r.workshopTitle || 'Workshop', amount: Number(r.amountPaid ?? 0), qty: 1 }],
+          })),
+          ...webinarRows.filter(r => r.stripePaymentIntentId).map(r => ({
+            transactionId: r.id,
+            sourceTable: 'webinar',
+            productName: r.webinarTitle || 'Webinar',
+            productType: 'webinar',
+            amountPaid: Number(r.webinarPrice ?? 0),
+            currency: 'usd',
+            status: 'paid',
+            stripePaymentIntentId: r.stripePaymentIntentId ?? null,
+            purchasedAt: r.registeredAt ? new Date(r.registeredAt) : new Date(),
+            orderType: 'one_time',
+            invoiceNumber: null,
+            paymentSource: 'stripe',
+            notes: null,
+            lineItems: [{ name: r.webinarTitle || 'Webinar', amount: Number(r.webinarPrice ?? 0), qty: 1 }],
           })),
           ...invoiceRows.map(r => ({
             transactionId: r.id,
@@ -591,6 +674,10 @@ export const productAnalyticsRouter = router({
             stripePaymentIntentId: null,
             purchasedAt: r.paidAt ? new Date(r.paidAt) : new Date(),
             orderType: 'one_time',
+            invoiceNumber: r.invoiceNumber ?? null,
+            paymentSource: r.paymentSource ?? null,
+            notes: r.notes ?? null,
+            lineItems: Array.isArray(r.lineItems) ? r.lineItems as Array<{ name: string; amount: number; qty: number }> : null,
           })),
         ];
 
