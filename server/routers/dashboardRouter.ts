@@ -1098,6 +1098,15 @@ export const dashboardRouter = router({
       courseSubOrders.map(o => o.stripeSubscriptionId).filter(Boolean) as string[]
     )];
 
+    // Fetch manual invoices (admin-created off-platform records)
+    let manualInvoiceRows: typeof manualInvoices.$inferSelect[] = [];
+    try {
+      manualInvoiceRows = await db.select().from(manualInvoices).where(eq(manualInvoices.userId, ctx.user.id));
+      console.log(`[Dashboard] manualInvoices for user ${ctx.user.id}: ${manualInvoiceRows.length} rows`);
+    } catch (err) {
+      console.warn("[Dashboard] Failed to fetch manualInvoices:", err);
+    }
+
     // Fetch recent paid invoices from Stripe for all subscription customers
     let stripeInvoices: Array<{
       id: string;
@@ -1299,7 +1308,7 @@ export const dashboardRouter = router({
         fulfillmentStatus: null as string | null,
       })),
       // Manual invoices (admin-created records for off-platform payments)
-      ...(await db.select().from(manualInvoices).where(eq(manualInvoices.userId, ctx.user.id))).map(inv => ({
+      ...manualInvoiceRows.map(inv => ({
         id: `manual-${inv.id}`,
         description: inv.description,
         type: "manual_invoice" as const,
