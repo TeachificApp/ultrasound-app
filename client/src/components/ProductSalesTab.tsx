@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { DollarSign, Users, TrendingUp, RefreshCw, XCircle, ChevronLeft, ChevronRight, ShieldOff } from "lucide-react";
+import { DollarSign, Users, TrendingUp, RefreshCw, XCircle, ChevronLeft, ChevronRight, ShieldOff, Crown, Mail, Loader2 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtMoney(dollars: number, currency = "usd") {
@@ -37,6 +37,22 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${map[status] ?? "bg-gray-100 text-gray-600"}`}>
       {status}
     </span>
+  );
+}
+
+// ─── Resend Confirmation Button ──────────────────────────────────────────────
+function ResendConfirmationButton({ userId, brand }: { userId: number; brand: "aaus" | "iheartecho" }) {
+  const resend = trpc.adminUser.resendMembershipConfirmation.useMutation({
+    onSuccess: (res) => toast.success(`Confirmation sent to ${res.sentTo}`),
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <Button size="sm" variant="outline" className="h-7 text-xs text-teal-700 border-teal-200 hover:bg-teal-50"
+      disabled={resend.isPending}
+      onClick={() => resend.mutate({ userId, brand })}>
+      {resend.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Mail className="h-3 w-3 mr-1" />}
+      Resend
+    </Button>
   );
 }
 
@@ -353,12 +369,24 @@ function MembershipSalesTab({ brand }: { brand: "aaus" | "iheartecho" }) {
                   <div className="font-medium">{m.userName || "—"}</div>
                   <div className="text-xs text-muted-foreground">{m.userEmail || "—"}</div>
                 </td>
-                <td className="px-4 py-3 capitalize">{m.tier}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="capitalize">{m.tier}</span>
+                    {m.tier === "lifetime" && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200">
+                        <Crown className="h-2.5 w-2.5" /> Lifetime
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-muted-foreground capitalize">{m.source || "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{fmtDate(m.grantedAt)}</td>
                 <td className="px-4 py-3"><StatusBadge status={m.status} /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
+                    {m.status === "active" && (
+                      <ResendConfirmationButton userId={m.userId} brand={brand} />
+                    )}
                     {m.status === "active" && (
                       <Button size="sm" variant="outline" className="h-7 text-xs text-orange-600 border-orange-200 hover:bg-orange-50"
                         onClick={() => setRevokeTarget({ userId: m.userId, email: m.userEmail ?? "" })}>
@@ -392,3 +420,4 @@ function MembershipSalesTab({ brand }: { brand: "aaus" | "iheartecho" }) {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 export { DownloadSalesTab, BundleSalesTab, MembershipSalesTab };
+
