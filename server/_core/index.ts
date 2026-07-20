@@ -40,6 +40,7 @@ import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
 import { backfillAllContacts } from "../lib/emailListHelper";
 import { backfillUserOpenIds } from "../lib/backfillUserOpenIds";
 import { getDb } from "../db";
+import { sql as drizzleSql } from "drizzle-orm";
 import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
 import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
@@ -558,7 +559,7 @@ async function startServer() {
           '  INDEX idx_manualInvoices_userId (userId)',
           ')'
         ].join('\n');
-        await (db as any).execute(createSql);
+        await db.execute(drizzleSql.raw(createSql));
         console.log('[Startup] manualInvoices table ensured');
       } catch (err: any) {
         console.error('[Startup] manualInvoices migration error:', err?.message ?? err);

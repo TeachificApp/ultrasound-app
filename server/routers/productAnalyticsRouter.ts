@@ -447,7 +447,7 @@ export const productAnalyticsRouter = router({
           UNION ALL
           SELECT dp.id AS transactionId, 'download' AS sourceTable,
             COALESCE(prod.title, 'Download') AS productName, 'download' AS productType,
-            COALESCE(prod.price, 0) AS amountPaid, 'usd' AS currency, 'paid' AS status,
+            COALESCE(dp.amount, 0) AS amountPaid, COALESCE(dp.currency, 'usd') AS currency, COALESCE(dp.status, 'paid') AS status,
             dp.stripe_payment_intent_id AS stripePaymentIntentId,
             dp.purchased_at AS purchasedAt,
             'one_time' AS orderType
@@ -469,7 +469,7 @@ export const productAnalyticsRouter = router({
             COALESCE(pp.title, 'Physical Product') AS productName, 'physical' AS productType,
             po.amount_paid AS amountPaid, 'usd' AS currency, po.fulfillment_status AS status,
             po.stripe_payment_intent_id AS stripePaymentIntentId,
-            po.created_at AS purchasedAt,
+            po.ordered_at AS purchasedAt,
             'one_time' AS orderType
           FROM physical_product_orders po
           LEFT JOIN physical_products pp ON po.product_id = pp.id
