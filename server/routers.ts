@@ -206,8 +206,14 @@ export const appRouter = router({
         const brandDb = await (await import("./db")).getDb();
         if (brandDb) {
           const brand = opts.ctx.brand;
+          const { inArray } = await import("drizzle-orm");
           const [membership] = await brandDb.select().from(brandMemberships)
-            .where(and(eq(brandMemberships.userId, opts.ctx.user.id), eq(brandMemberships.brand, brand), eq(brandMemberships.tier, "premium"), eq(brandMemberships.status, "active")))
+            .where(and(
+              eq(brandMemberships.userId, opts.ctx.user.id),
+              eq(brandMemberships.brand, brand),
+              inArray(brandMemberships.tier, ["premium", "lifetime"]),
+              eq(brandMemberships.status, "active")
+            ))
             .limit(1);
           brandPremium = !!membership;
         }

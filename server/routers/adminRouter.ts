@@ -96,14 +96,14 @@ export const platformAdminRouter = router({
       const db = await getDb();
       if (!db) return { premiumCount: 0 };
       const { brandMemberships } = await import("../../drizzle/schema");
-      const { eq, and, count } = await import("drizzle-orm");
+      const { eq, and, count, inArray } = await import("drizzle-orm");
       const [row] = await db
         .select({ total: count() })
         .from(brandMemberships)
         .where(
           and(
             eq(brandMemberships.brand, input.brand),
-            eq(brandMemberships.tier, "premium"),
+            inArray(brandMemberships.tier, ["premium", "lifetime"]),
             eq(brandMemberships.status, "active")
           )
         );

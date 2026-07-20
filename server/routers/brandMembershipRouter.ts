@@ -17,7 +17,7 @@ import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { brandMemberships } from "../../drizzle/schema";
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, inArray } from "drizzle-orm";
 import type { Brand } from "../../shared/brands";
 
 /**
@@ -917,7 +917,7 @@ export const brandMembershipRouter = router({
         .leftJoin(users, eq(users.id, brandMemberships.userId))
         .where(and(
           eq(brandMemberships.brand, input.brand),
-          eq(brandMemberships.tier, "premium"),
+          inArray(brandMemberships.tier, ["premium", "lifetime"]),
         ))
         .orderBy(desc(brandMemberships.grantedAt));
 
