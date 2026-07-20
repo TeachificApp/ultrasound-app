@@ -420,8 +420,10 @@ export const productAnalyticsRouter = router({
       const db = await getDb();
       if (!db) return { transactions: [], total: 0, totalSpent: 0 };
 
+      console.log(`[getUserTransactions] userId=${input.userId} page=${input.page}`);
       const offset = (input.page - 1) * input.pageSize;
 
+      try {
       const result = await db.execute(sql`
         SELECT * FROM (
           SELECT fp.id AS transactionId, 'funnel' AS sourceTable,
@@ -486,6 +488,7 @@ export const productAnalyticsRouter = router({
       `) as any;
 
       const rows = Array.isArray(result) ? result : (result as any)[0] ?? [];
+      console.log(`[getUserTransactions] userId=${input.userId} rows=${rows.length}`);
 
       // Count total
       const countResult = await db.execute(sql`
@@ -518,8 +521,7 @@ export const productAnalyticsRouter = router({
       const normalizeAmount = (r: any): number => {
         return Number(r.amountPaid ?? 0); // all sources store cents
       };
-      return {
-        transactions: rows.map((r: any) => ({
+      const txns = rows.map((r: any) => ({
           transactionId: Number(r.transactionId),
           sourceTable: r.sourceTable,
           productName: r.productName ?? "",
@@ -530,10 +532,13 @@ export const productAnalyticsRouter = router({
           stripePaymentIntentId: r.stripePaymentIntentId ?? null,
           purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
           orderType: r.orderType ?? 'one_time',
-        })),
-        total,
-        totalSpent,
-      };
+        }));
+      console.log(`[getUserTransactions] returning ${txns.length} txns, total=${total}, spent=${totalSpent}`);
+      return { transactions: txns, total, totalSpent };
+      } catch (err: any) {
+        console.error(`[getUserTransactions] Error for userId=${input.userId}:`, err?.message ?? err);
+        return { transactions: [], total: 0, totalSpent: 0 };
+      }
     }),
 });
 
