@@ -43,6 +43,7 @@ import {
   membershipPlanAccess,
   digitalBundlePurchases,
   digitalBundles,
+  manualInvoices,
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
@@ -1294,6 +1295,23 @@ export const dashboardRouter = router({
         orderBumps: null as string | null,
         invoiceUrl: inv.invoiceUrl,
         transactionId: inv.paymentIntentId ?? inv.id ?? null as string | null,
+        brand: null as string | null,
+        fulfillmentStatus: null as string | null,
+      })),
+      // Manual invoices (admin-created records for off-platform payments)
+      ...(await db.select().from(manualInvoices).where(eq(manualInvoices.userId, ctx.user.id))).map(inv => ({
+        id: `manual-${inv.id}`,
+        description: inv.description,
+        type: "manual_invoice" as const,
+        productType: "manual",
+        amount: inv.amountPaid,
+        currency: inv.currency,
+        date: inv.paidAt,
+        status: "paid" as const,
+        sourceType: inv.paymentSource ?? null as string | null,
+        orderBumps: inv.lineItems ? JSON.stringify(inv.lineItems) : null as string | null,
+        invoiceUrl: null as string | null,
+        transactionId: inv.invoiceNumber ?? null as string | null,
         brand: null as string | null,
         fulfillmentStatus: null as string | null,
       })),

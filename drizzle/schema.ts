@@ -7530,3 +7530,24 @@ export const siteSettings = mysqlTable("site_settings", {
 });
 export type SiteSetting = typeof siteSettings.$inferSelect;
 export type InsertSiteSetting = typeof siteSettings.$inferInsert;
+
+// ─── Manual Invoices ──────────────────────────────────────────────────────────
+// Admin-created transaction records for payments processed outside the platform
+// (e.g., Thinkific, PayPal, check, wire transfer)
+export const manualInvoices = mysqlTable("manualInvoices", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("userId").notNull(),
+  invoiceNumber: varchar("invoiceNumber", { length: 64 }),       // e.g. INV-2026-001
+  description: text("description").notNull(),                     // product/service name
+  lineItems: json("lineItems"),                                   // [{name, amount, qty}]
+  amountPaid: int("amountPaid").notNull(),                        // in cents
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  paidAt: timestamp("paidAt").notNull(),
+  paymentSource: varchar("paymentSource", { length: 64 }),        // "thinkific" | "paypal" | "check" | "wire"
+  notes: text("notes"),                                           // internal admin notes
+  createdBy: int("createdBy"),                                    // admin userId who created it
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ManualInvoice = typeof manualInvoices.$inferSelect;
+export type InsertManualInvoice = typeof manualInvoices.$inferInsert;

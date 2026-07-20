@@ -1163,6 +1163,7 @@ function MyContentTab() {
 // Helper: human-readable product type label
 function productTypeLabel(p: any): string {
   if (p.type === "subscription_payment") return "Subscription Renewal";
+  if (p.type === "manual_invoice") return "Invoice";
   const map: Record<string, string> = {
     download: "Digital Download",
     course: "Course",
@@ -1172,6 +1173,7 @@ function productTypeLabel(p: any): string {
     webinar: "Webinar",
     physical: "Physical Product",
     membership: "Membership",
+    manual: "Invoice",
   };
   return map[p.productType] ?? (p.productType ? p.productType.charAt(0).toUpperCase() + p.productType.slice(1) : "Purchase");
 }
@@ -1216,6 +1218,7 @@ function PurchasesTab() {
                 <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amount, p.currency)}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                   p.type === "subscription_payment" ? "bg-purple-50 text-purple-700" :
+                  p.type === "manual_invoice" ? "bg-gray-100 text-gray-600" :
                   p.productType === "workshop" ? "bg-orange-50 text-orange-700" :
                   p.productType === "webinar" ? "bg-blue-50 text-blue-700" :
                   p.productType === "physical" ? "bg-amber-50 text-amber-700" :
@@ -1248,15 +1251,29 @@ function PurchasesTab() {
             <DialogDescription>Official payment receipt</DialogDescription>
           </DialogHeader>
           {receiptPurchase && (() => {
-            const bumps: any[] = (() => {
+            const isManualInvoice = receiptPurchase.type === "manual_invoice";
+            // For manual invoices, lineItems are stored in orderBumps as [{name, amount, qty}]
+            const manualLineItems: any[] = (() => {
+              if (!isManualInvoice) return [];
               try {
                 const raw = receiptPurchase.orderBumps;
                 const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
                 return Array.isArray(parsed) ? parsed : [];
               } catch { return []; }
             })();
-            const baseAmount = receiptPurchase.amount - bumps.reduce((s: number, b: any) => s + (b.price ?? 0), 0);
-            const txId = receiptPurchase.transactionId;
+            const bumps: any[] = (() => {
+              if (isManualInvoice) return [];
+              try {
+                const raw = receiptPurchase.orderBumps;
+                const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+                return Array.isArray(parsed) ? parsed : [];
+              } catch { return []; }
+            })();
+            const baseAmount = isManualInvoice
+              ? (manualLineItems.length > 0 ? manualLineItems[0].amount : receiptPurchase.amount)
+              : receiptPurchase.amount - bumps.reduce((s: number, b: any) => s + (b.price ?? 0), 0);
+            const txId = isManualInvoice ? null : receiptPurchase.transactionId;
+            const invoiceNumber = isManualInvoice ? receiptPurchase.transactionId : null;
             const orderId = receiptPurchase.id;
             return (
               <div className="space-y-4">
@@ -1280,31 +1297,49 @@ function PurchasesTab() {
                   </div>
                   {/* Line items */}
                   <div className="px-5 py-3 space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 pr-4">
-                        <p className="text-sm font-medium text-gray-900">{receiptPurchase.description}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{productTypeLabel(receiptPurchase)}</p>
-                      </div>
-                      <span className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(baseAmount, receiptPurchase.currency)}</span>
-                    </div>
-                    {bumps.length > 0 && (
-                      <>
-                        <div className="border-t border-dashed border-gray-200 pt-2">
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Add-ons</p>
-                          {bumps.map((b: any, i: number) => (
-                            <div key={i} className="flex justify-between text-sm py-0.5">
-                              <span className="text-gray-700">{b.title}</span>
-                              <span className="text-gray-700">{formatCurrency(b.price ?? 0, "usd")}</span>
-                            </div>
-                          ))}
+                    {isManualInvoice ? (
+                      // Manual invoice: render each line item from the lineItems array
+                      manualLineItems.length > 0 ? manualLineItems.map((item: any, i: number) => (
+                        <div key={i} className="flex justify-between items-start">
+                          <div className="flex-1 pr-4">
+                            <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                            {item.qty && item.qty > 1 && <p className="text-xs text-gray-500 mt-0.5">Qty: {item.qty}</p>}
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(item.amount ?? 0, receiptPurchase.currency)}</span>
                         </div>
+                      )) : (
+                        <div className="flex justify-between items-start">
+                          <p className="text-sm font-medium text-gray-900">{receiptPurchase.description}</p>
+                          <span className="text-sm font-semibold text-gray-900">{formatCurrency(receiptPurchase.amount, receiptPurchase.currency)}</span>
+                        </div>
+                      )
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 pr-4">
+                            <p className="text-sm font-medium text-gray-900">{receiptPurchase.description}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{productTypeLabel(receiptPurchase)}</p>
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(baseAmount, receiptPurchase.currency)}</span>
+                        </div>
+                        {bumps.length > 0 && (
+                          <div className="border-t border-dashed border-gray-200 pt-2">
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Add-ons</p>
+                            {bumps.map((b: any, i: number) => (
+                              <div key={i} className="flex justify-between text-sm py-0.5">
+                                <span className="text-gray-700">{b.title}</span>
+                                <span className="text-gray-700">{formatCurrency(b.price ?? 0, "usd")}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {receiptPurchase.fulfillmentStatus && receiptPurchase.fulfillmentStatus !== "paid" && (
+                          <div className="flex justify-between text-xs pt-1">
+                            <span className="text-gray-500">Fulfillment Status</span>
+                            <span className="capitalize font-medium text-gray-700">{receiptPurchase.fulfillmentStatus}</span>
+                          </div>
+                        )}
                       </>
-                    )}
-                    {receiptPurchase.fulfillmentStatus && receiptPurchase.fulfillmentStatus !== "paid" && (
-                      <div className="flex justify-between text-xs pt-1">
-                        <span className="text-gray-500">Fulfillment Status</span>
-                        <span className="capitalize font-medium text-gray-700">{receiptPurchase.fulfillmentStatus}</span>
-                      </div>
                     )}
                   </div>
                   {/* Total */}
@@ -1318,7 +1353,13 @@ function PurchasesTab() {
                       <span className="text-gray-400">Status</span>
                       <span className="font-medium text-green-600 capitalize">{receiptPurchase.status ?? "paid"}</span>
                     </div>
-                    {orderId && (
+                    {invoiceNumber && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Invoice #</span>
+                        <span className="font-mono text-gray-600">{invoiceNumber}</span>
+                      </div>
+                    )}
+                    {!isManualInvoice && orderId && (
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-400">Order ID</span>
                         <span className="font-mono text-gray-600">{orderId}</span>
@@ -1328,6 +1369,12 @@ function PurchasesTab() {
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-400">Transaction ID</span>
                         <span className="font-mono text-gray-600 truncate max-w-[200px]">{txId}</span>
+                      </div>
+                    )}
+                    {isManualInvoice && receiptPurchase.sourceType && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Payment Method</span>
+                        <span className="font-medium text-gray-600 capitalize">{receiptPurchase.sourceType}</span>
                       </div>
                     )}
                   </div>
