@@ -952,6 +952,8 @@ export const dashboardRouter = router({
         orderBumps: funnelPurchases.orderBumps,
         status: funnelPurchases.status,
         sourceType: funnelPurchases.sourceType,
+        stripePaymentIntentId: funnelPurchases.stripePaymentIntentId,
+        stripeCheckoutSessionId: funnelPurchases.stripeCheckoutSessionId,
       })
       .from(funnelPurchases)
       .where(eq(funnelPurchases.userId, userId))
@@ -962,10 +964,13 @@ export const dashboardRouter = router({
       .select({
         id: lmsOrders.id,
         courseTitle: lmsCourses.title,
+        courseBrand: lmsCourses.brand,
         amount: lmsOrders.amount,
         currency: lmsOrders.currency,
         status: lmsOrders.status,
         createdAt: lmsOrders.createdAt,
+        stripePaymentIntentId: lmsOrders.stripePaymentIntentId,
+        stripeSessionId: lmsOrders.stripeSessionId,
       })
       .from(lmsOrders)
       .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
@@ -980,6 +985,7 @@ export const dashboardRouter = router({
         amount: digitalPurchases.amount,
         currency: digitalPurchases.currency,
         purchasedAt: digitalPurchases.purchasedAt,
+        stripePaymentIntentId: digitalPurchases.stripePaymentIntentId,
       })
       .from(digitalPurchases)
       .leftJoin(digitalProducts, eq(digitalPurchases.productId, digitalProducts.id))
@@ -995,6 +1001,7 @@ export const dashboardRouter = router({
         originalPrice: digitalBundles.originalPrice,
         currency: digitalBundles.currency,
         purchasedAt: digitalBundlePurchases.purchasedAt,
+        stripeCheckoutSessionId: digitalBundlePurchases.stripeCheckoutSessionId,
       })
       .from(digitalBundlePurchases)
       .leftJoin(digitalBundles, eq(digitalBundlePurchases.bundleId, digitalBundles.id))
@@ -1006,10 +1013,13 @@ export const dashboardRouter = router({
       .select({
         id: workshopEnrollments.id,
         workshopTitle: workshops.title,
+        workshopBrand: workshops.brand,
         amountPaid: workshopEnrollments.amountPaid,
         currency: workshopEnrollments.currency,
         createdAt: workshopEnrollments.createdAt,
         status: workshopEnrollments.status,
+        stripePaymentIntentId: workshopEnrollments.stripePaymentIntentId,
+        stripeSessionId: workshopEnrollments.stripeSessionId,
       })
       .from(workshopEnrollments)
       .leftJoin(workshops, eq(workshopEnrollments.workshopId, workshops.id))
@@ -1021,6 +1031,7 @@ export const dashboardRouter = router({
       .select({
         id: webinarRegistrations.id,
         webinarTitle: webinars.title,
+        webinarBrand: webinars.brand,
         webinarPrice: webinars.price,
         registeredAt: webinarRegistrations.registeredAt,
         stripePaymentIntentId: webinarRegistrations.stripePaymentIntentId,
@@ -1039,6 +1050,7 @@ export const dashboardRouter = router({
         currency: physicalProductOrders.currency,
         orderedAt: physicalProductOrders.orderedAt,
         fulfillmentStatus: physicalProductOrders.fulfillmentStatus,
+        stripePaymentIntentId: physicalProductOrders.stripePaymentIntentId,
       })
       .from(physicalProductOrders)
       .leftJoin(physicalProducts, eq(physicalProductOrders.productId, physicalProducts.id))
@@ -1094,6 +1106,7 @@ export const dashboardRouter = router({
       date: Date;
       type: "subscription_payment";
       invoiceUrl: string | null;
+      paymentIntentId: string | null;
     }> = [];
 
     for (const custId of allCustomerIds) {
@@ -1112,6 +1125,7 @@ export const dashboardRouter = router({
             date: new Date((inv.status_transitions?.paid_at ?? inv.created) * 1000),
             type: "subscription_payment",
             invoiceUrl: inv.hosted_invoice_url ?? null,
+            paymentIntentId: typeof inv.payment_intent === "string" ? inv.payment_intent : (inv.payment_intent as any)?.id ?? null,
           });
         }
       } catch (err) {
@@ -1138,6 +1152,7 @@ export const dashboardRouter = router({
               date: new Date((inv.status_transitions?.paid_at ?? inv.created) * 1000),
               type: "subscription_payment",
               invoiceUrl: inv.hosted_invoice_url ?? null,
+              paymentIntentId: typeof inv.payment_intent === "string" ? inv.payment_intent : (inv.payment_intent as any)?.id ?? null,
             });
           }
         }
@@ -1160,6 +1175,9 @@ export const dashboardRouter = router({
         sourceType: p.sourceType,
         orderBumps: p.orderBumps,
         invoiceUrl: null as string | null,
+        transactionId: p.stripePaymentIntentId ?? p.stripeCheckoutSessionId ?? null as string | null,
+        brand: null as string | null,
+        fulfillmentStatus: null as string | null,
       })),
       ...oneTimeOrders.map(o => ({
         id: `order-${o.id}`,
@@ -1173,6 +1191,9 @@ export const dashboardRouter = router({
         sourceType: null as string | null,
         orderBumps: null as string | null,
         invoiceUrl: null as string | null,
+        transactionId: o.stripePaymentIntentId ?? o.stripeSessionId ?? null as string | null,
+        brand: o.courseBrand ?? null as string | null,
+        fulfillmentStatus: null as string | null,
       })),
       ...downloadRows
         .filter(d => (d.amount ?? 0) > 0) // only paid downloads
@@ -1188,6 +1209,9 @@ export const dashboardRouter = router({
           sourceType: null as string | null,
           orderBumps: null as string | null,
           invoiceUrl: null as string | null,
+          transactionId: d.stripePaymentIntentId ?? null as string | null,
+          brand: null as string | null,
+          fulfillmentStatus: null as string | null,
         })),
       ...bundlePurchaseRows.map(b => ({
         id: `bundle-${b.id}`,
@@ -1201,6 +1225,9 @@ export const dashboardRouter = router({
         sourceType: null as string | null,
         orderBumps: null as string | null,
         invoiceUrl: null as string | null,
+        transactionId: b.stripeCheckoutSessionId ?? null as string | null,
+        brand: null as string | null,
+        fulfillmentStatus: null as string | null,
       })),
       ...workshopRows
         .filter(w => w.amountPaid > 0) // only paid workshops
@@ -1216,6 +1243,9 @@ export const dashboardRouter = router({
           sourceType: null as string | null,
           orderBumps: null as string | null,
           invoiceUrl: null as string | null,
+          transactionId: w.stripePaymentIntentId ?? w.stripeSessionId ?? null as string | null,
+          brand: w.workshopBrand ?? null as string | null,
+          fulfillmentStatus: null as string | null,
         })),
       ...webinarRows
         .filter(w => !!w.stripePaymentIntentId && (w.webinarPrice ?? 0) > 0) // only paid webinars
@@ -1231,6 +1261,9 @@ export const dashboardRouter = router({
           sourceType: null as string | null,
           orderBumps: null as string | null,
           invoiceUrl: null as string | null,
+          transactionId: w.stripePaymentIntentId ?? null as string | null,
+          brand: w.webinarBrand ?? null as string | null,
+          fulfillmentStatus: null as string | null,
         })),
       ...physicalRows.map(p => ({
         id: `physical-${p.id}`,
@@ -1244,6 +1277,9 @@ export const dashboardRouter = router({
         sourceType: null as string | null,
         orderBumps: null as string | null,
         invoiceUrl: null as string | null,
+        transactionId: p.stripePaymentIntentId ?? null as string | null,
+        brand: null as string | null,
+        fulfillmentStatus: p.fulfillmentStatus ?? null as string | null,
       })),
       ...stripeInvoices.map(inv => ({
         id: `invoice-${inv.id}`,
@@ -1257,6 +1293,9 @@ export const dashboardRouter = router({
         sourceType: null as string | null,
         orderBumps: null as string | null,
         invoiceUrl: inv.invoiceUrl,
+        transactionId: inv.paymentIntentId ?? inv.id ?? null as string | null,
+        brand: null as string | null,
+        fulfillmentStatus: null as string | null,
       })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 

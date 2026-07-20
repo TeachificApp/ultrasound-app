@@ -1160,13 +1160,45 @@ function MyContentTab() {
 
 // ─── Purchases Tab (top-level) ───────────────────────────────────────────────
 
+// Helper: human-readable product type label
+function productTypeLabel(p: any): string {
+  if (p.type === "subscription_payment") return "Subscription Renewal";
+  const map: Record<string, string> = {
+    download: "Digital Download",
+    course: "Course",
+    quiz: "Quiz",
+    bundle: "Bundle",
+    workshop: "Workshop",
+    webinar: "Webinar",
+    physical: "Physical Product",
+    membership: "Membership",
+  };
+  return map[p.productType] ?? (p.productType ? p.productType.charAt(0).toUpperCase() + p.productType.slice(1) : "Purchase");
+}
+
 function PurchasesTab() {
   const { data, isLoading } = trpc.dashboard.getMyPurchases.useQuery();
   const [receiptPurchase, setReceiptPurchase] = useState<any | null>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   if (isLoading) return <LoadingSpinner />;
 
   const purchases = data ?? [];
+
+  function handlePrint() {
+    const el = receiptRef.current;
+    if (!el) return;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Receipt</title><style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 32px; color: #1e293b; }
+      * { box-sizing: border-box; }
+      @media print { body { padding: 0; } }
+    </style></head><body>${el.innerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 400);
+  }
 
   return (
     <div className="space-y-6">
@@ -1189,37 +1221,19 @@ function PurchasesTab() {
                   p.productType === "physical" ? "bg-amber-50 text-amber-700" :
                   "bg-teal-50 text-teal-700"
                 }`}>
-                  {p.type === "subscription_payment" ? "Subscription Renewal" :
-                    p.productType === "download" ? "Digital Download" :
-                    p.productType === "course" ? "Course" :
-                    p.productType === "quiz" ? "Quiz" :
-                    p.productType === "bundle" ? "Bundle" :
-                    p.productType === "workshop" ? "Workshop" :
-                    p.productType === "webinar" ? "Webinar" :
-                    p.productType === "physical" ? "Physical Product" :
-                    p.productType === "membership" ? "Membership" :
-                    p.productType ? p.productType.charAt(0).toUpperCase() + p.productType.slice(1) : "Purchase"}
+                  {productTypeLabel(p)}
                 </span>
                 {p.invoiceUrl && (
-                  <a
-                    href={p.invoiceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    Invoice
+                  <a href={p.invoiceUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline">
+                    <FileText className="w-3.5 h-3.5" /> Invoice
                   </a>
                 )}
-                {p.type === "one_time" && (
-                  <button
-                    onClick={() => setReceiptPurchase(p)}
-                    className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    Receipt
-                  </button>
-                )}
+                <button
+                  onClick={() => setReceiptPurchase(p)}
+                  className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline">
+                  <FileText className="w-3.5 h-3.5" /> Receipt
+                </button>
               </div>
             </div>
           ))}
@@ -1228,65 +1242,111 @@ function PurchasesTab() {
 
       {/* Receipt Modal */}
       <Dialog open={!!receiptPurchase} onOpenChange={(open) => { if (!open) setReceiptPurchase(null); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Purchase Receipt</DialogTitle>
-            <DialogDescription>Order details for your purchase</DialogDescription>
+            <DialogTitle>Receipt</DialogTitle>
+            <DialogDescription>Official payment receipt</DialogDescription>
           </DialogHeader>
-          {receiptPurchase && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-gray-900">{receiptPurchase.description}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{receiptPurchase.productType === "download" ? "Digital Download" : receiptPurchase.productType === "course" ? "Course" : receiptPurchase.productType === "quiz" ? "Quiz" : receiptPurchase.productType === "bundle" ? "Bundle" : receiptPurchase.productType === "workshop" ? "Workshop" : receiptPurchase.productType === "webinar" ? "Webinar" : receiptPurchase.productType === "physical" ? "Physical Product" : receiptPurchase.productType === "membership" ? "Membership" : receiptPurchase.productType ? receiptPurchase.productType.charAt(0).toUpperCase() + receiptPurchase.productType.slice(1) : "Purchase"}</p>
+          {receiptPurchase && (() => {
+            const bumps: any[] = (() => {
+              try {
+                const raw = receiptPurchase.orderBumps;
+                const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+                return Array.isArray(parsed) ? parsed : [];
+              } catch { return []; }
+            })();
+            const baseAmount = receiptPurchase.amount - bumps.reduce((s: number, b: any) => s + (b.price ?? 0), 0);
+            const txId = receiptPurchase.transactionId;
+            const orderId = receiptPurchase.id;
+            return (
+              <div className="space-y-4">
+                {/* Printable receipt area */}
+                <div ref={receiptRef} className="rounded-lg border border-gray-200 overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-[#0e4a50] px-5 py-4">
+                    <p className="text-white font-bold text-base leading-tight">All About Ultrasound, Inc.</p>
+                    <p className="text-teal-200 text-xs mt-0.5">dba iHeartEcho</p>
                   </div>
-                  <span className="text-sm font-bold text-gray-900">{formatCurrency(receiptPurchase.amount, receiptPurchase.currency)}</span>
-                </div>
-                {receiptPurchase.orderBumps && (() => {
-                  try {
-                    const bumps = typeof receiptPurchase.orderBumps === "string"
-                      ? JSON.parse(receiptPurchase.orderBumps)
-                      : receiptPurchase.orderBumps;
-                    if (Array.isArray(bumps) && bumps.length > 0) {
-                      return (
-                        <div className="border-t border-gray-200 pt-3 space-y-1.5">
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add-ons</p>
+                  {/* Receipt title + order ID */}
+                  <div className="px-5 pt-4 pb-2 flex items-start justify-between border-b border-gray-100">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Receipt</p>
+                      <p className="text-sm font-bold text-gray-900 mt-0.5">{productTypeLabel(receiptPurchase)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-400">Date</p>
+                      <p className="text-sm font-medium text-gray-700">{formatDate(receiptPurchase.date)}</p>
+                    </div>
+                  </div>
+                  {/* Line items */}
+                  <div className="px-5 py-3 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 pr-4">
+                        <p className="text-sm font-medium text-gray-900">{receiptPurchase.description}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{productTypeLabel(receiptPurchase)}</p>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(baseAmount, receiptPurchase.currency)}</span>
+                    </div>
+                    {bumps.length > 0 && (
+                      <>
+                        <div className="border-t border-dashed border-gray-200 pt-2">
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Add-ons</p>
                           {bumps.map((b: any, i: number) => (
-                            <div key={i} className="flex justify-between text-sm">
+                            <div key={i} className="flex justify-between text-sm py-0.5">
                               <span className="text-gray-700">{b.title}</span>
-                              <span className="text-gray-700">{formatCurrency(b.price, "usd")}</span>
+                              <span className="text-gray-700">{formatCurrency(b.price ?? 0, "usd")}</span>
                             </div>
                           ))}
                         </div>
-                      );
-                    }
-                  } catch { /* ignore */ }
-                  return null;
-                })()}
-                <div className="border-t border-gray-200 pt-3 flex justify-between">
-                  <span className="text-sm font-semibold text-gray-700">Total Paid</span>
-                  <span className="text-sm font-bold text-teal-700">{formatCurrency(receiptPurchase.amount, receiptPurchase.currency)}</span>
-                </div>
-              </div>
-              <div className="text-xs text-gray-500 space-y-1">
-                <div className="flex justify-between">
-                  <span>Date</span>
-                  <span>{formatDate(receiptPurchase.date)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Status</span>
-                  <span className="capitalize text-green-600 font-medium">{receiptPurchase.status ?? "paid"}</span>
-                </div>
-                {receiptPurchase.sourceType && (
-                  <div className="flex justify-between">
-                    <span>Source</span>
-                    <span className="capitalize">{receiptPurchase.sourceType}</span>
+                      </>
+                    )}
+                    {receiptPurchase.fulfillmentStatus && receiptPurchase.fulfillmentStatus !== "paid" && (
+                      <div className="flex justify-between text-xs pt-1">
+                        <span className="text-gray-500">Fulfillment Status</span>
+                        <span className="capitalize font-medium text-gray-700">{receiptPurchase.fulfillmentStatus}</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                  {/* Total */}
+                  <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                    <span className="text-sm font-bold text-gray-700">Total Paid</span>
+                    <span className="text-base font-bold text-[#0e4a50]">{formatCurrency(receiptPurchase.amount, receiptPurchase.currency)}</span>
+                  </div>
+                  {/* Meta */}
+                  <div className="px-5 py-3 space-y-1.5 border-t border-gray-100">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Status</span>
+                      <span className="font-medium text-green-600 capitalize">{receiptPurchase.status ?? "paid"}</span>
+                    </div>
+                    {orderId && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Order ID</span>
+                        <span className="font-mono text-gray-600">{orderId}</span>
+                      </div>
+                    )}
+                    {txId && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Transaction ID</span>
+                        <span className="font-mono text-gray-600 truncate max-w-[200px]">{txId}</span>
+                      </div>
+                    )}
+                  </div>
+                  {/* Footer */}
+                  <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-center">
+                    <p className="text-[10px] text-gray-400">All About Ultrasound, Inc. dba iHeartEcho &bull; allaboutultrasound.com</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Thank you for your purchase. For support, contact hello@allaboutultrasound.com</p>
+                  </div>
+                </div>
+                {/* Actions */}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
+                    <Download className="w-3.5 h-3.5" /> Print / Save PDF
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setReceiptPurchase(null)}>Close</Button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>
