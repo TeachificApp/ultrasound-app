@@ -2150,8 +2150,26 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
 // ─── Transactions Tab ─────────────────────────────────────────────────────────
 function TransactionsTab({ userId, data: userData, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [page, setPage] = useState(1);
-  const { data, isLoading } = trpc.productAnalytics.getUserTransactions.useQuery({ userId, page, pageSize: 50 });
+  const { data, isLoading, refetch: refetchTxns } = trpc.productAnalytics.getUserTransactions.useQuery({ userId, page, pageSize: 50 });
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
+  const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
+  const [invoiceForm, setInvoiceForm] = useState({
+    description: '',
+    lineItems: [{ name: '', amount: '', qty: '1' }],
+    paidAt: new Date().toISOString().slice(0, 10),
+    paymentSource: 'thinkific',
+    notes: '',
+    sendEmail: false,
+  });
+  const createInvoice = trpc.productAnalytics.createManualInvoice.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Invoice ${res.invoiceNumber} created.`);
+      setAddInvoiceOpen(false);
+      setInvoiceForm({ description: '', lineItems: [{ name: '', amount: '', qty: '1' }], paidAt: new Date().toISOString().slice(0, 10), paymentSource: 'thinkific', notes: '', sendEmail: false });
+      refetchTxns();
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const fmtCurrency = (cents: number, currency = "usd") =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
@@ -2169,10 +2187,22 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
     onError: (e) => toast.error(e.message),
   });
 
+  const totalLineItemsCents = invoiceForm.lineItems.reduce((sum, li) => sum + (parseFloat(li.amount) || 0) * 100 * (parseInt(li.qty) || 1), 0);
+
   return (
     <div className="space-y-4">
       {/* Unified transactions list */}
       {(<>
+      {/* Summary + Add Transaction button */}
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-semibold text-gray-700">Transaction History</span>
+        <button
+          onClick={() => setAddInvoiceOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700"
+        >
+          <PlusCircle className="w-3.5 h-3.5" /> Add Transaction
+        </button>
+      </div>
       {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
@@ -2270,6 +2300,135 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
         )}
       </div>
       </>)}
+
+      {/* Add Invoice dialog */}
+      {addInvoiceOpen && (
+        <Dialog open onOpenChange={() => setAddInvoiceOpen(false)}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Add Manual Transaction</DialogTitle>
+              <DialogDescription>Create a manual invoice record for this student. No Stripe payment is processed.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label className="text-xs font-semibold text-gray-700 mb-1 block">Description *</Label>
+                <input
+                  value={invoiceForm.description}
+                  onChange={e => setInvoiceForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="e.g. iHeartEcho Lifetime Premium Access"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-gray-700 mb-1 block">Line Items *</Label>
+                <div className="space-y-2">
+                  {invoiceForm.lineItems.map((li, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        value={li.name}
+                        onChange={e => setInvoiceForm(f => ({ ...f, lineItems: f.lineItems.map((l, i) => i === idx ? { ...l, name: e.target.value } : l) }))}
+                        placeholder="Item name"
+                        className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                      <input
+                        value={li.amount}
+                        onChange={e => setInvoiceForm(f => ({ ...f, lineItems: f.lineItems.map((l, i) => i === idx ? { ...l, amount: e.target.value } : l) }))}
+                        placeholder="$0.00"
+                        type="number" step="0.01" min="0"
+                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                      {invoiceForm.lineItems.length > 1 && (
+                        <button onClick={() => setInvoiceForm(f => ({ ...f, lineItems: f.lineItems.filter((_, i) => i !== idx) }))} className="text-red-400 hover:text-red-600">
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setInvoiceForm(f => ({ ...f, lineItems: [...f.lineItems, { name: '', amount: '', qty: '1' }] }))}
+                    className="text-xs text-teal-600 hover:text-teal-800 font-medium"
+                  >+ Add line item</button>
+                </div>
+                <div className="text-right text-sm font-semibold text-gray-800 mt-2">
+                  Total: {fmtCurrency(totalLineItemsCents)}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-semibold text-gray-700 mb-1 block">Payment Date *</Label>
+                  <input
+                    type="date"
+                    value={invoiceForm.paidAt}
+                    onChange={e => setInvoiceForm(f => ({ ...f, paidAt: e.target.value }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold text-gray-700 mb-1 block">Payment Source</Label>
+                  <Select value={invoiceForm.paymentSource} onValueChange={v => setInvoiceForm(f => ({ ...f, paymentSource: v }))}>
+                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="thinkific">Thinkific</SelectItem>
+                      <SelectItem value="stripe">Stripe</SelectItem>
+                      <SelectItem value="paypal">PayPal</SelectItem>
+                      <SelectItem value="check">Check</SelectItem>
+                      <SelectItem value="wire">Wire Transfer</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-gray-700 mb-1 block">Notes (optional)</Label>
+                <textarea
+                  value={invoiceForm.notes}
+                  onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Internal notes about this transaction..."
+                  rows={2}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="sendEmail"
+                  checked={invoiceForm.sendEmail}
+                  onCheckedChange={v => setInvoiceForm(f => ({ ...f, sendEmail: !!v }))}
+                />
+                <label htmlFor="sendEmail" className="text-sm text-gray-700 cursor-pointer">Send receipt email to student</label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddInvoiceOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  const validItems = invoiceForm.lineItems.filter(li => li.name.trim() && parseFloat(li.amount) > 0);
+                  if (!invoiceForm.description.trim() || validItems.length === 0 || !invoiceForm.paidAt) {
+                    toast.error('Please fill in description, at least one line item with amount, and payment date.');
+                    return;
+                  }
+                  createInvoice.mutate({
+                    userId,
+                    description: invoiceForm.description,
+                    lineItems: validItems.map(li => ({ name: li.name, amount: Math.round(parseFloat(li.amount) * 100), qty: parseInt(li.qty) || 1 })),
+                    amountPaid: Math.round(totalLineItemsCents),
+                    currency: 'usd',
+                    paidAt: invoiceForm.paidAt,
+                    paymentSource: invoiceForm.paymentSource || undefined,
+                    notes: invoiceForm.notes || undefined,
+                    sendEmail: invoiceForm.sendEmail,
+                  });
+                }}
+                disabled={createInvoice.isPending}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                {createInvoice.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Create Invoice
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Refund dialog */}
       {refundOpen && (

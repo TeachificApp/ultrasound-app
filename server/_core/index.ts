@@ -536,6 +536,34 @@ async function startServer() {
     getDb()
       .then((db) => (db ? backfillUserOpenIds(db) : null))
       .catch((err) => console.error("[backfillUserOpenIds] Error:", err));
+    // Auto-create manualInvoices table if it doesn't exist (production DB migration)
+    getDb().then(async (db) => {
+      if (!db) return;
+      try {
+        const createSql = [
+          'CREATE TABLE IF NOT EXISTS manualInvoices (',
+          '  id INT PRIMARY KEY AUTO_INCREMENT,',
+          '  userId INT NOT NULL,',
+          '  invoiceNumber VARCHAR(64),',
+          '  description TEXT NOT NULL,',
+          '  lineItems JSON,',
+          '  amountPaid INT NOT NULL,',
+          "  currency VARCHAR(8) NOT NULL DEFAULT 'usd',",
+          '  paidAt TIMESTAMP NOT NULL,',
+          '  paymentSource VARCHAR(64),',
+          '  notes TEXT,',
+          '  createdBy INT,',
+          '  createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,',
+          '  updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,',
+          '  INDEX idx_manualInvoices_userId (userId)',
+          ')'
+        ].join('\n');
+        await (db as any).execute(createSql);
+        console.log('[Startup] manualInvoices table ensured');
+      } catch (err: any) {
+        console.error('[Startup] manualInvoices migration error:', err?.message ?? err);
+      }
+    }).catch((err) => console.error('[Startup] manualInvoices getDb error:', err));
     // Auto-heal any SCORM versions stuck in processing/pending → serve via zip-stream
     healStuckScormVersions().then(({ healed }) => {
       if (healed > 0) console.log(`[Startup] Auto-healed ${healed} stuck SCORM version(s) → zip-stream`);

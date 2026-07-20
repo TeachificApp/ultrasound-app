@@ -16,6 +16,7 @@ import {
   funnelPurchases, lmsOrders, lmsCourses, lmsEnrollments,
   digitalProducts, digitalPurchases, digitalBundles, digitalBundlePurchases,
   physicalProducts, physicalProductOrders, users, funnels, funnelPages,
+  manualInvoices,
 } from "../../drizzle/schema";
 
 async function assertAdmin(ctx: any) {
@@ -535,10 +536,95 @@ export const productAnalyticsRouter = router({
         }));
       console.log(`[getUserTransactions] returning ${txns.length} txns, total=${total}, spent=${totalSpent}`);
       return { transactions: txns, total, totalSpent };
-      } catch (err: any) {
-        console.error(`[getUserTransactions] Error for userId=${input.userId}:`, err?.message ?? err);
-        return { transactions: [], total: 0, totalSpent: 0 };
+    } catch (err: any) {
+      console.error(`[getUserTransactions] Error for userId=${input.userId}:`, err?.message ?? err);
+      return { transactions: [], total: 0, totalSpent: 0 };
+    }
+  }),
+
+  /**
+   * Create a manual invoice for a user (admin only)
+   */
+  createManualInvoice: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      description: z.string().min(1),
+      lineItems: z.array(z.object({
+        name: z.string(),
+        amount: z.number().int(), // cents
+        qty: z.number().int().default(1),
+      })).min(1),
+      amountPaid: z.number().int(), // cents
+      currency: z.string().default('usd'),
+      paidAt: z.string(), // ISO date string
+      paymentSource: z.string().optional(),
+      notes: z.string().optional(),
+      sendEmail: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+
+      // Generate invoice number
+      const [countRow] = await db.select({ count: sql<number>`COUNT(*)` }).from(manualInvoices);
+      const invoiceNum = `INV-${new Date().getFullYear()}-${String(Number(countRow?.count ?? 0) + 1).padStart(4, '0')}`;
+
+      const [inserted] = await db.insert(manualInvoices).values({
+        userId: input.userId,
+        invoiceNumber: invoiceNum,
+        description: input.description,
+        lineItems: input.lineItems,
+        amountPaid: input.amountPaid,
+        currency: input.currency,
+        paidAt: new Date(input.paidAt),
+        paymentSource: input.paymentSource ?? null,
+        notes: input.notes ?? null,
+        createdBy: ctx.user.id,
+      });
+
+      // Optionally send email
+      if (input.sendEmail) {
+        try {
+          const [userRow] = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
+          if (userRow) {
+            const { sendEmail } = await import('../_core/email');
+            const fmtCurrency = (cents: number, currency = 'usd') =>
+              new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(cents / 100);
+            const lineItemsHtml = input.lineItems.map(li =>
+              `<tr><td style="padding:6px 0;border-bottom:1px solid #f0f0f0">${li.name}</td><td style="text-align:right;padding:6px 0;border-bottom:1px solid #f0f0f0">${fmtCurrency(li.amount * li.qty, input.currency)}</td></tr>`
+            ).join('');
+            await sendEmail({
+              to: { name: userRow.name ?? userRow.email, email: userRow.email },
+              subject: `Your Receipt — ${invoiceNum}`,
+              html: `
+                <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;background:#fff">
+                  <h2 style="color:#189aa1;margin-bottom:4px">Receipt</h2>
+                  <p style="color:#666;font-size:13px;margin-bottom:24px">All About Ultrasound, Inc. dba iHeartEcho</p>
+                  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+                    <tr><td style="color:#888;font-size:12px">Invoice #</td><td style="text-align:right;font-size:12px">${invoiceNum}</td></tr>
+                    <tr><td style="color:#888;font-size:12px">Date</td><td style="text-align:right;font-size:12px">${new Date(input.paidAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</td></tr>
+                    ${input.paymentSource ? `<tr><td style="color:#888;font-size:12px">Payment Method</td><td style="text-align:right;font-size:12px;text-transform:capitalize">${input.paymentSource}</td></tr>` : ''}
+                  </table>
+                  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+                    <thead><tr><th style="text-align:left;padding:6px 0;border-bottom:2px solid #e5e7eb;font-size:12px;color:#374151">Description</th><th style="text-align:right;padding:6px 0;border-bottom:2px solid #e5e7eb;font-size:12px;color:#374151">Amount</th></tr></thead>
+                    <tbody>${lineItemsHtml}</tbody>
+                    <tfoot><tr><td style="padding-top:12px;font-weight:bold">Total</td><td style="text-align:right;padding-top:12px;font-weight:bold;color:#189aa1">${fmtCurrency(input.amountPaid, input.currency)}</td></tr></tfoot>
+                  </table>
+                  ${input.notes ? `<p style="color:#888;font-size:12px;margin-top:16px">${input.notes}</p>` : ''}
+                  <p style="color:#aaa;font-size:11px;margin-top:32px">All About Ultrasound, Inc. dba iHeartEcho &bull; allaboutultrasound.com</p>
+                </div>
+              `,
+            });
+            console.log(`[createManualInvoice] Receipt email sent to ${userRow.email}`);
+          }
+        } catch (emailErr: any) {
+          console.error('[createManualInvoice] Email error:', emailErr?.message ?? emailErr);
+          // Don't fail the whole operation if email fails
+        }
       }
+
+      return { success: true, invoiceNumber: invoiceNum };
     }),
 });
 
