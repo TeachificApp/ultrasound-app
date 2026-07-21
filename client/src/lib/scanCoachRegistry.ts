@@ -36,7 +36,25 @@ export type ScanCoachModule =
   | "mcs_impella_ecp"
   | "mcs_impella_rp"
   | "mcs_lifevest"
-  | "mcs_icd";
+  | "mcs_icd"
+  // ─── AAUS modules ───────────────────────────────────────────────────────────
+  | "abdominal"
+  | "pelvic_gyn"
+  | "ob1"
+  | "ob23"
+  | "thyroid"
+  | "scrotum"
+  | "venous"
+  | "arterial"
+  | "abdominal_vascular"
+  | "aorta"
+  | "carotid"
+  | "tcd"
+  | "msk"
+  | "breast"
+  | "appendix"
+  | "invasive_procedures"
+  | "pediatric";
 
 export interface ScanCoachViewMeta {
   id: string;
@@ -54,12 +72,14 @@ export interface ScanCoachModuleMeta {
   label: string;
   path: string;
   views: ScanCoachViewMeta[];
+  brand: "iheartecho" | "aaus" | "both";
 }
 
 export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Adult TTE ────────────────────────────────────────────────────────────
   {
     key: "tte",
+    brand: "iheartecho",
     label: "Adult TTE ScanCoach",
     path: "/scan-coach?tab=tte",
     views: [
@@ -78,6 +98,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── TEE ──────────────────────────────────────────────────────────────────
   {
     key: "tee",
+    brand: "iheartecho",
     label: "TEE ScanCoach",
     path: "/tee-scan-coach",
     views: [
@@ -121,6 +142,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── ICE ──────────────────────────────────────────────────────────────────
   {
     key: "ice",
+    brand: "iheartecho",
     label: "ICE ScanCoach",
     path: "/ice-scan-coach",
     views: [
@@ -138,6 +160,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── UEA (Contrast Echo) ──────────────────────────────────────────────────
   {
     key: "uea",
+    brand: "iheartecho",
     label: "UEA ScanCoach",
     path: "/uea-scan-coach",
     views: [
@@ -153,6 +176,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Strain ───────────────────────────────────────────────────────────────
   {
     key: "strain",
+    brand: "iheartecho",
     label: "Strain ScanCoach",
     path: "/strain-scan-coach",
     views: [
@@ -167,6 +191,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── HOCM ─────────────────────────────────────────────────────────────────
   {
     key: "hocm",
+    brand: "iheartecho",
     label: "HOCM-Assist™ ScanCoach",
     path: "/hocm-scan-coach",
     views: [
@@ -189,6 +214,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Stress Echo ──────────────────────────────────────────────────────────
   {
     key: "stress",
+    brand: "iheartecho",
     label: "Stress Echo ScanCoach",
     path: "/stress-scan-coach",
     views: [
@@ -210,6 +236,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Structural Heart ─────────────────────────────────────────────────────
   {
     key: "structural",
+    brand: "iheartecho",
     label: "Structural Heart ScanCoach",
     path: "/structural-heart-scan-coach",
     views: [
@@ -228,6 +255,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Fetal Echo ───────────────────────────────────────────────────────────
   {
     key: "fetal",
+    brand: "iheartecho",
     label: "Fetal Echo ScanCoach",
     path: "/scan-coach?tab=fetal",
     views: [
@@ -249,7 +277,8 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Fetal Echo CHD ───────────────────────────────────────────────────────
   {
     key: "fetal_chd",
-    label: "Fetal Echo CHD ScanCoach",
+    brand: "iheartecho",
+    label: "Fetal CHD ScanCoach",
     path: "/fetal-scan-coach",
     views: [
       { id: "chd_vsd",               name: "Ventricular Septal Defect (VSD)",                group: "Septal Defects" },
@@ -272,6 +301,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Pediatric / CHD ──────────────────────────────────────────────────────
   {
     key: "chd",
+    brand: "iheartecho",
     label: "Pediatric CHD ScanCoach",
     path: "/scan-coach?tab=chd",
     views: [
@@ -343,6 +373,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Diastolic Function ───────────────────────────────────────────────────
   {
     key: "diastolic",
+    brand: "iheartecho",
     label: "Diastolic Function ScanCoach",
     path: "/scan-coach?tab=diastolic",
     views: [
@@ -358,6 +389,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Pulmonary HTN & PE ───────────────────────────────────────────────────
   {
     key: "pulm",
+    brand: "iheartecho",
     label: "Pulmonary HTN & PE ScanCoach",
     path: "/scan-coach?tab=pulm",
     views: [
@@ -374,6 +406,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── POCUS-Assist™ — eFAST ─────────────────────────────────────────────────
   {
     key: "pocus_efast",
+    brand: "iheartecho",
     label: "eFAST ScanCoach",
     path: "/pocus-efast-scan-coach",
     views: [
@@ -388,6 +421,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── POCUS-Assist™ — RUSH ──────────────────────────────────────────────────
   {
     key: "pocus_rush",
+    brand: "iheartecho",
     label: "RUSH ScanCoach",
     path: "/pocus-rush-scan-coach",
     views: [
@@ -407,6 +441,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── POCUS-Assist™ — Cardiac ────────────────────────────────────────────────
   {
     key: "pocus_cardiac",
+    brand: "iheartecho",
     label: "Cardiac POCUS ScanCoach",
     path: "/pocus-cardiac-scan-coach",
     views: [
@@ -421,6 +456,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── POCUS-Assist™ — Lung ───────────────────────────────────────────────────
   {
     key: "pocus_lung",
+    brand: "iheartecho",
     label: "Lung POCUS ScanCoach",
     path: "/pocus-lung-scan-coach",
     views: [
@@ -437,6 +473,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── ACHD ─────────────────────────────────────────────────────────────────────────────────
   {
     key: "achd",
+    brand: "iheartecho",
     label: "ACHD ScanCoach",
     path: "/scan-coach?tab=achd",
     views: [
@@ -456,6 +493,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── ECG ScanCoach (Lead Placement & Reference) ───────────────────────────────────────────
   {
     key: "ecg",
+    brand: "iheartecho",
     label: "ECG ScanCoach",
     path: "/ecg-navigator",
     views: [
@@ -474,6 +512,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Mechanical Circulatory Support ────────────────────────────────────────
   {
     key: "mcs_lvad",
+    brand: "iheartecho",
     label: "LVAD ScanCoach",
     path: "/mechanical-support-scan-coach?device=lvad",
     views: [
@@ -488,6 +527,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   },
   {
     key: "mcs_ecmo",
+    brand: "iheartecho",
     label: "ECMO ScanCoach",
     path: "/mechanical-support-scan-coach?device=ecmo",
     views: [
@@ -502,6 +542,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   },
   {
     key: "mcs_impella_25",
+    brand: "iheartecho",
     label: "Impella 2.5 ScanCoach",
     path: "/mechanical-support-scan-coach?device=impella",
     views: [
@@ -514,6 +555,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   },
   {
     key: "mcs_impella_cp",
+    brand: "iheartecho",
     label: "Impella CP ScanCoach",
     path: "/mechanical-support-scan-coach?device=impella",
     views: [
@@ -527,6 +569,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   },
   {
     key: "mcs_impella_55",
+    brand: "iheartecho",
     label: "Impella 5.5 ScanCoach",
     path: "/mechanical-support-scan-coach?device=impella",
     views: [
@@ -540,6 +583,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   },
   {
     key: "mcs_impella_ecp",
+    brand: "iheartecho",
     label: "Impella ECP ScanCoach",
     path: "/mechanical-support-scan-coach?device=impella",
     views: [
@@ -553,6 +597,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   },
   {
     key: "mcs_impella_rp",
+    brand: "iheartecho",
     label: "Impella RP ScanCoach",
     path: "/mechanical-support-scan-coach?device=impella",
     views: [
@@ -565,6 +610,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   },
   {
     key: "mcs_lifevest",
+    brand: "iheartecho",
     label: "LifeVest (WCD) ScanCoach",
     path: "/mechanical-support-scan-coach?device=lifevest",
     views: [
@@ -578,6 +624,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   },
   {
     key: "mcs_icd",
+    brand: "iheartecho",
     label: "ICD / CRT-D ScanCoach",
     path: "/mechanical-support-scan-coach?device=icd",
     views: [
@@ -588,6 +635,258 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
       { id: "pw_ivmd",         name: "PW Doppler — IVMD (CRT)",                 group: "CRT Eligibility" },
       { id: "subcostal_lead",  name: "Subcostal — Post-Implant Effusion",       group: "Post-Implant" },
       { id: "a4c_lead",        name: "A4C — RV Lead Position",                  group: "Post-Implant" },
+    ],
+  },
+
+  // ─── AAUS Modules ─────────────────────────────────────────────────────────
+  {
+    key: "abdominal",
+    brand: "aaus",
+    label: "Abdominal ScanCoach",
+    path: "/abdominal-scan-coach",
+    views: [
+      { id: "pancreas",     name: "Pancreas",                        group: "Abdominal" },
+      { id: "aorta",        name: "Aorta",                           group: "Abdominal" },
+      { id: "ivc",          name: "Inferior Vena Cava (IVC)",        group: "Abdominal" },
+      { id: "liver",        name: "Liver",                           group: "Abdominal" },
+      { id: "gallbladder",  name: "Gallbladder and Biliary Tract",   group: "Abdominal" },
+      { id: "kidneys",      name: "Kidneys",                         group: "Abdominal" },
+      { id: "spleen",       name: "Spleen",                          group: "Abdominal" },
+    ],
+  },
+  {
+    key: "pelvic_gyn",
+    brand: "aaus",
+    label: "Pelvic / Gyn ScanCoach",
+    path: "/pelvic-gyn-scan-coach",
+    views: [
+      { id: "uterus_sag",   name: "Uterus",                          group: "Pelvic" },
+      { id: "adnexa",       name: "Adnexa / Ovaries",                group: "Pelvic" },
+      { id: "cul_de_sac",   name: "Cul-de-Sac",                      group: "Pelvic" },
+      { id: "endometrium",  name: "Endometrium",                     group: "Pelvic" },
+    ],
+  },
+  {
+    key: "ob1",
+    brand: "aaus",
+    label: "OB First Trimester ScanCoach",
+    path: "/ob1-scan-coach",
+    views: [
+      { id: "gest_sac",     name: "Gestational Sac",                 group: "First Trimester" },
+      { id: "yolk_sac",     name: "Yolk Sac",                        group: "First Trimester" },
+      { id: "embryo",       name: "Embryo / CRL Measurement",        group: "First Trimester" },
+      { id: "nt",           name: "Nuchal Translucency (NT)",        group: "First Trimester" },
+      { id: "uterus",       name: "Uterus, Cervix & Adnexa",         group: "First Trimester" },
+      { id: "anatomy",      name: "Early Anatomy Survey (11-14 wks)",group: "First Trimester" },
+    ],
+  },
+  {
+    key: "ob23",
+    brand: "aaus",
+    label: "OB 2nd/3rd Trimester ScanCoach",
+    path: "/ob23-scan-coach",
+    views: [
+      { id: "head_neck",    name: "Head & Brain",                    group: "Anatomy Survey" },
+      { id: "face",         name: "Face",                            group: "Anatomy Survey" },
+      { id: "chest",        name: "Chest & Heart",                   group: "Anatomy Survey" },
+      { id: "abdomen",      name: "Abdomen",                         group: "Anatomy Survey" },
+      { id: "spine",        name: "Spine",                           group: "Anatomy Survey" },
+      { id: "extremities",  name: "Extremities",                     group: "Anatomy Survey" },
+      { id: "genitalia",    name: "Genitalia",                       group: "Anatomy Survey" },
+      { id: "placenta",     name: "Placenta",                        group: "Anatomy Survey" },
+      { id: "amniotic_fluid",name: "Amniotic Fluid",                 group: "Anatomy Survey" },
+      { id: "biometry",     name: "Biometry",                        group: "Biometry" },
+      { id: "maternal",     name: "Maternal Anatomy",                group: "Maternal" },
+    ],
+  },
+  {
+    key: "thyroid",
+    brand: "aaus",
+    label: "Thyroid ScanCoach",
+    path: "/thyroid-scan-coach",
+    views: [
+      { id: "trans_right",  name: "Transverse Survey - Right Lobe",  group: "Thyroid" },
+      { id: "long_right",   name: "Longitudinal Survey - Right Lobe",group: "Thyroid" },
+      { id: "trans_left",   name: "Transverse Survey - Left Lobe",   group: "Thyroid" },
+      { id: "long_left",    name: "Longitudinal Survey - Left Lobe", group: "Thyroid" },
+      { id: "isthmus",      name: "Isthmus",                         group: "Thyroid" },
+      { id: "nodule",       name: "Nodule Characterization (TI-RADS)",group: "Thyroid" },
+      { id: "lymph_nodes",  name: "Cervical Lymph Nodes",            group: "Thyroid" },
+      { id: "parathyroid",  name: "Parathyroid Glands",              group: "Thyroid" },
+      { id: "fna",          name: "Ultrasound-Guided FNA / Biopsy",  group: "Thyroid" },
+    ],
+  },
+  {
+    key: "scrotum",
+    brand: "aaus",
+    label: "Scrotum ScanCoach",
+    path: "/scrotum-scan-coach",
+    views: [
+      { id: "global",       name: "Survey - Both Testes",            group: "Scrotum" },
+      { id: "testis_r_trans",name: "Right Testis - Transverse",      group: "Scrotum" },
+      { id: "testis_r_long", name: "Right Testis - Longitudinal",    group: "Scrotum" },
+      { id: "testis_l",     name: "Left Testis - Trans & Long",      group: "Scrotum" },
+      { id: "epididymis",   name: "Epididymis",                      group: "Scrotum" },
+      { id: "spermatic_cord",name: "Spermatic Cord & Varicocele",    group: "Scrotum" },
+      { id: "scrotal_wall", name: "Scrotal Wall & Hydrocele",        group: "Scrotum" },
+    ],
+  },
+  {
+    key: "venous",
+    brand: "aaus",
+    label: "Venous ScanCoach",
+    path: "/venous-scan-coach",
+    views: [
+      { id: "cfv",          name: "Common Femoral Vein (CFV)",       group: "Lower Extremity DVT" },
+      { id: "fv",           name: "Femoral Vein (FV)",               group: "Lower Extremity DVT" },
+      { id: "dfv",          name: "Deep Femoral Vein (DFV)",         group: "Lower Extremity DVT" },
+      { id: "gsv",          name: "Great Saphenous Vein (GSV)",      group: "Lower Extremity DVT" },
+      { id: "popliteal",    name: "Popliteal Vein",                  group: "Lower Extremity DVT" },
+      { id: "ptv",          name: "Posterior Tibial Veins (PTV)",    group: "Lower Extremity DVT" },
+      { id: "peroneal",     name: "Peroneal Veins",                  group: "Lower Extremity DVT" },
+      { id: "gastro_soleal",name: "Gastrocnemius and Soleal Veins",  group: "Lower Extremity DVT" },
+    ],
+  },
+  {
+    key: "arterial",
+    brand: "aaus",
+    label: "Arterial ScanCoach",
+    path: "/arterial-scan-coach",
+    views: [
+      { id: "segmental",    name: "Segmental Limb Pressures",        group: "Arterial" },
+      { id: "cw_doppler",   name: "CW Doppler Waveforms",            group: "Arterial" },
+      { id: "pvr",          name: "Pulse Volume Recordings (PVRs)",  group: "Arterial" },
+      { id: "tcpo2",        name: "Transcutaneous Oxygen (tcPO2)",   group: "Arterial" },
+      { id: "ppg",          name: "Photoplethysmography (PPG)",      group: "Arterial" },
+    ],
+  },
+  {
+    key: "abdominal_vascular",
+    brand: "aaus",
+    label: "Abdominal Vascular ScanCoach",
+    path: "/abdominal-vascular-scan-coach",
+    views: [
+      { id: "portal_vein",  name: "Portal Vein - Main",              group: "Liver Vasculature" },
+      { id: "hepatic_veins",name: "Hepatic Veins",                   group: "Liver Vasculature" },
+      { id: "hepatic_artery",name: "Hepatic Artery",                 group: "Liver Vasculature" },
+      { id: "liver_parenchyma",name: "Liver Parenchyma",             group: "Liver Vasculature" },
+      { id: "sma",          name: "Superior Mesenteric Artery (SMA)",group: "Mesenteric" },
+      { id: "celiac",       name: "Celiac Axis (CA)",                group: "Mesenteric" },
+      { id: "ima",          name: "Inferior Mesenteric Artery (IMA)",group: "Mesenteric" },
+      { id: "renal_arteries",name: "Renal Arteries",                 group: "Renal" },
+    ],
+  },
+  {
+    key: "aorta",
+    brand: "aaus",
+    label: "Aorta ScanCoach",
+    path: "/aorta-scan-coach",
+    views: [
+      { id: "prox_long",    name: "Proximal Aorta - Long",           group: "Aorta" },
+      { id: "prox_trans",   name: "Proximal Aorta - Trans",          group: "Aorta" },
+      { id: "mid_long",     name: "Mid Aorta - Long",                group: "Aorta" },
+      { id: "mid_trans",    name: "Mid Aorta - Trans",               group: "Aorta" },
+      { id: "dist_long",    name: "Distal Aorta - Long",             group: "Aorta" },
+      { id: "dist_trans",   name: "Distal Aorta - Trans",            group: "Aorta" },
+      { id: "iliac_long",   name: "Common Iliac Arteries - Long",    group: "Aorta" },
+      { id: "iliac_trans",  name: "Common Iliac Arteries - Trans",   group: "Aorta" },
+    ],
+  },
+  {
+    key: "carotid",
+    brand: "aaus",
+    label: "Carotid ScanCoach",
+    path: "/carotid-scan-coach",
+    views: [
+      { id: "cca",          name: "Common Carotid Artery (CCA)",     group: "Carotid" },
+      { id: "bifurcation",  name: "Carotid Bifurcation",             group: "Carotid" },
+      { id: "ica",          name: "Internal Carotid Artery (ICA)",   group: "Carotid" },
+      { id: "eca",          name: "External Carotid Artery (ECA)",   group: "Carotid" },
+      { id: "vertebral",    name: "Vertebral Artery",                group: "Carotid" },
+      { id: "subclavian",   name: "Subclavian Artery",               group: "Carotid" },
+    ],
+  },
+  {
+    key: "tcd",
+    brand: "aaus",
+    label: "TCD ScanCoach",
+    path: "/tcd-scan-coach",
+    views: [
+      { id: "transtemporal",name: "Transtemporal - MCA/ACA/PCA",     group: "TCD" },
+      { id: "transorbital", name: "Transorbital - Ophthalmic / ICA", group: "TCD" },
+      { id: "post_circ",    name: "Suboccipital - Vertebral/Basilar",group: "TCD" },
+      { id: "submandibular",name: "Submandibular - Distal ICA",      group: "TCD" },
+      { id: "ant_fontanelle",name: "Anterior Fontanelle (Neonates)", group: "TCD" },
+    ],
+  },
+  {
+    key: "msk",
+    brand: "aaus",
+    label: "MSK ScanCoach",
+    path: "/msk-scan-coach",
+    views: [
+      { id: "shoulder",     name: "Shoulder",                        group: "MSK" },
+      { id: "elbow",        name: "Elbow",                           group: "MSK" },
+      { id: "wrist",        name: "Wrist",                           group: "MSK" },
+      { id: "hand",         name: "Hand",                            group: "MSK" },
+      { id: "hip",          name: "Hip",                             group: "MSK" },
+      { id: "knee",         name: "Knee",                            group: "MSK" },
+      { id: "ankle",        name: "Ankle",                           group: "MSK" },
+      { id: "foot",         name: "Foot",                            group: "MSK" },
+    ],
+  },
+  {
+    key: "breast",
+    brand: "aaus",
+    label: "Breast ScanCoach",
+    path: "/breast-scan-coach",
+    views: [
+      { id: "whole_breast", name: "Whole-Breast Survey (Bilateral)", group: "Breast" },
+      { id: "lesion_char",  name: "Breast Lesion Characterization",  group: "Breast" },
+      { id: "cyst",         name: "Cyst Assessment",                 group: "Breast" },
+      { id: "axillary_ln",  name: "Axillary Lymph Node Assessment",  group: "Breast" },
+      { id: "doppler",      name: "Doppler Assessment of Lesions",   group: "Breast" },
+      { id: "biopsy",       name: "Ultrasound-Guided Biopsy",        group: "Breast" },
+      { id: "localisation", name: "Pre-Surgical Lumpectomy Localisation",group: "Breast" },
+    ],
+  },
+  {
+    key: "appendix",
+    brand: "aaus",
+    label: "Appendix ScanCoach",
+    path: "/appendix-scan-coach",
+    views: [
+      { id: "rlq_survey",   name: "RLQ Survey - Graded Compression", group: "Appendix" },
+      { id: "appendix_id",  name: "Appendix Identification",         group: "Appendix" },
+      { id: "periappendiceal",name: "Periappendiceal Assessment",    group: "Appendix" },
+      { id: "alt_diagnoses",name: "Alternative RLQ Diagnoses",       group: "Appendix" },
+    ],
+  },
+  {
+    key: "invasive_procedures",
+    brand: "aaus",
+    label: "Invasive Procedures ScanCoach",
+    path: "/invasive-procedures-scan-coach",
+    views: [
+      { id: "thoracentesis_site",     name: "Thoracentesis - Site Selection",   group: "Procedures" },
+      { id: "thoracentesis_guidance", name: "Thoracentesis - Needle Guidance",  group: "Procedures" },
+      { id: "paracentesis_site",      name: "Paracentesis - Site Selection",    group: "Procedures" },
+      { id: "paracentesis_guidance",  name: "Paracentesis - Needle Guidance",   group: "Procedures" },
+    ],
+  },
+  {
+    key: "pediatric",
+    brand: "aaus",
+    label: "Pediatric ScanCoach",
+    path: "/pediatric-scan-coach",
+    views: [
+      { id: "appendix",        name: "Appendix",          group: "Pediatric" },
+      { id: "intussusception", name: "Intussusception",   group: "Pediatric" },
+      { id: "pyloric",         name: "Pyloric Stenosis",  group: "Pediatric" },
+      { id: "kidneys",         name: "Kidneys",           group: "Pediatric" },
+      { id: "spine",           name: "Spine",             group: "Pediatric" },
+      { id: "hips",            name: "Hips",              group: "Pediatric" },
+      { id: "neuro",           name: "Neuro",             group: "Pediatric" },
     ],
   },
 ];

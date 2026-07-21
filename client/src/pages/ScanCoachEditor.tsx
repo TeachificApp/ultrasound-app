@@ -27,7 +27,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { detectBrandFromPath } from "@shared/brandScopedRoutes";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -978,7 +979,14 @@ function ChdImageSlotAdmin({
 
 export default function ScanCoachEditor() {
   const { user } = useAuth();
-  const [selectedModule, setSelectedModule] = useState<ScanCoachModule>("fetal");
+  const [location] = useLocation();
+  // Detect brand from URL path (-aaus or -ihe suffix)
+  const editorBrand = detectBrandFromPath(location) ?? "iheartecho";
+  const visibleModules = SCANCOACH_MODULES.filter(
+    (m) => m.brand === editorBrand || m.brand === "both"
+  );
+  const defaultModule = (visibleModules[0]?.key ?? "fetal") as ScanCoachModule;
+  const [selectedModule, setSelectedModule] = useState<ScanCoachModule>(defaultModule);
   const [selectedViewId, setSelectedViewId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState | null>(null);
   // Structured tips state (for modules using {category, text}[] format)
@@ -1335,7 +1343,7 @@ export default function ScanCoachEditor() {
         <div className="container py-5">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Select a Module to Edit</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {SCANCOACH_MODULES.map((mod) => {
+            {visibleModules.map((mod) => {
               const overrideCount = overrides.filter((o: Override) => o.module === mod.key).length;
               const isActive = selectedModule === mod.key;
               return (
