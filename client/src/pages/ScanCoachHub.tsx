@@ -15,9 +15,9 @@ import {
 const BRAND = "#189aa1";
 
 const freeCoaches = [
-  { tab: "tte",       icon: Stethoscope, label: "Adult TTE",          views: 10 },
-  { tab: "chd",       icon: Users,       label: "Pediatric CHD",      views: 14 },
-  { tab: "fetal",     icon: Baby,        label: "Fetal Echo",         views: 13 },
+  { tab: "tte",       icon: Stethoscope, label: "Adult TTE",          views: 10, route: null as string | null },
+  { tab: "chd",       icon: Users,       label: "Pediatric CHD",      views: 14, route: null as string | null },
+  { tab: "fetal",     icon: Baby,        label: "Fetal Echo",         views: 13, route: "/fetal-scan-coach" },
 ];
 
 const premiumCoaches = [
@@ -82,10 +82,10 @@ export default function ScanCoachHub() {
             </div>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-            {freeCoaches.map(({ tab, icon: Icon, label, views }) => (
+            {freeCoaches.map(({ tab, icon: Icon, label, views, route }) => (
               <button
                 key={tab}
-                onClick={() => navigate(`/scan-coach?tab=${tab}`)}
+                onClick={() => navigate(route ?? `/scan-coach?tab=${tab}`)}
                 className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-100 bg-white hover:border-[#189aa1]/50 hover:shadow-md transition-all text-center cursor-pointer group"
                 style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}
               >
