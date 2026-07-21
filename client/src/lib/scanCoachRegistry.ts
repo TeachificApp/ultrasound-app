@@ -255,7 +255,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
   // ─── Fetal Echo ───────────────────────────────────────────────────────────
   {
     key: "fetal",
-    brand: "iheartecho",
+    brand: "both",
     label: "Fetal Echo ScanCoach",
     path: "/scan-coach?tab=fetal",
     views: [
