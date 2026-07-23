@@ -31,6 +31,7 @@ import type { Block } from "@/components/BlockPreview";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { SUBSCRIPTION_RESUME_LABEL } from "@/lib/accessCta";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
+import { PublicLandingBlock } from "@/components/PublicLandingBlock";
 import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
@@ -2748,10 +2749,10 @@ function CohortGroupDetailModal({
                   </div>
                 </div>
               ) : (
-                /* Render landing blocks via BlockPreview */
+                /* Render landing blocks with live data for remaining_seats */
                 <div>
                   {(data.landingBlocks as any[]).map((block: any) => (
-                    <BlockPreview key={block.id} block={block} />
+                    <PublicLandingBlock key={block.id} block={block} context={{ cohortGroupId: groupId }} />
                   ))}
                 </div>
               )}
@@ -2896,7 +2897,7 @@ function CohortGroupEmbedSection({
       ) : (
         <div>
           {(data.landingBlocks as any[]).map((block: any) => (
-            <BlockPreview key={block.id} block={block} />
+            <PublicLandingBlock key={block.id} block={block} context={{ cohortGroupId: groupId }} />
           ))}
           {showEnrollNow && !isSoldOutCG && (
             <div className="text-center py-6">
@@ -3165,7 +3166,7 @@ function WorkshopInstanceEmbedSection({
         {(data.landingBlocks as any[])?.length > 0 && (
           <div>
             {(data.landingBlocks as any[]).map((block: any) => (
-              <BlockPreview key={block.id} block={block} />
+              <PublicLandingBlock key={block.id} block={block} context={{ workshopInstanceId: instanceId }} />
             ))}
           </div>
         )}
