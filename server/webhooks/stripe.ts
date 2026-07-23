@@ -17,7 +17,7 @@
 import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, teamSubscriptions, teamMembers } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, teamSubscriptions, teamMembers, deferredCheckoutSessions } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -2479,6 +2479,36 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
   try {
     const sessionObj = (event.data as { object: Record<string, unknown> }).object;
     if (eventType === "checkout.session.completed") {
+      // ── Payment-status gate ───────────────────────────────────────────────────────────────────────────────────────
+      // For delayed payment methods (ACH, SEPA, BECS, bank debits) the
+      // checkout.session.completed event fires before the payment clears.
+      // payment_status will be "unpaid" instead of "paid" in those cases.
+      // We MUST NOT grant access yet — store the session and wait for
+      // payment_intent.succeeded to confirm the payment before fulfilling.
+      const sessionPaymentStatus = (sessionObj.payment_status as string) ?? "";
+      if (sessionPaymentStatus !== "paid") {
+        const sessionId = (sessionObj.id as string) ?? "";
+        const piId = (sessionObj.payment_intent as string) ?? null;
+        console.log(`[Stripe] checkout.session.completed with payment_status="${sessionPaymentStatus}" (session=${sessionId}) — deferring fulfillment until payment_intent.succeeded`);
+        try {
+          const deferDb = await getDb();
+          if (deferDb && sessionId) {
+            await deferDb.insert(deferredCheckoutSessions).values({
+              stripeSessionId: sessionId,
+              stripePaymentIntentId: piId,
+              paymentStatus: sessionPaymentStatus,
+              rawSessionJson: JSON.stringify(sessionObj),
+              status: "pending",
+            }).onDuplicateKeyUpdate({ set: { updatedAt: new Date() } });
+          }
+        } catch (deferErr) {
+          console.error(`[Stripe] Failed to store deferred checkout session ${sessionId}:`, deferErr);
+        }
+        // Do NOT run any fulfillment handlers — return early
+        res.json({ received: true });
+        return;
+      }
+      // payment_status === "paid" — safe to grant access immediately
       await handleFunnelCheckoutSessionCompleted(sessionObj);
       await handleCheckoutSessionCompleted(sessionObj);
       await handleEmployerCheckoutCompleted(sessionObj);
@@ -2505,6 +2535,68 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
         }
       } catch (_) {}
     } else if (eventType === "payment_intent.succeeded") {
+      // ── Deferred session fulfillment ────────────────────────────────────────────────────────────────────────────────────
+      // If this payment intent corresponds to a deferred checkout session
+      // (delayed payment method that was not "paid" at session.completed time),
+      // run all fulfillment handlers now that the payment has cleared.
+      const piId = (sessionObj.id as string) ?? "";
+      const deferDb = await getDb();
+      if (deferDb && piId) {
+        try {
+          const [deferred] = await deferDb
+            .select()
+            .from(deferredCheckoutSessions)
+            .where(and(
+              eq(deferredCheckoutSessions.stripePaymentIntentId, piId),
+              eq(deferredCheckoutSessions.status, "pending")
+            ))
+            .limit(1);
+          if (deferred) {
+            console.log(`[Stripe] payment_intent.succeeded: found deferred checkout session ${deferred.stripeSessionId} — running fulfillment handlers now`);
+            try {
+              const storedSession = JSON.parse(deferred.rawSessionJson) as Record<string, unknown>;
+              // Mark as completed before running handlers to prevent duplicate processing
+              await deferDb.update(deferredCheckoutSessions)
+                .set({ status: "completed", completedAt: new Date() })
+                .where(eq(deferredCheckoutSessions.id, deferred.id));
+              // Run all fulfillment handlers with the stored session object
+              await handleFunnelCheckoutSessionCompleted(storedSession);
+              await handleCheckoutSessionCompleted(storedSession);
+              await handleEmployerCheckoutCompleted(storedSession);
+              await handleLmsCheckoutCompleted(storedSession);
+              await handleDigitalDownloadCheckoutCompleted(storedSession);
+              await handleDigitalBundleCheckoutCompleted(storedSession);
+              await handleBrandMembershipCheckoutCompleted(storedSession);
+              await handleDualMembershipCheckoutCompleted(storedSession);
+              await handlePhysicalProductCheckoutCompleted(storedSession);
+              await handleWorkshopCheckoutCompleted(storedSession);
+              await handleMembershipCheckoutCompleted(storedSession);
+              await handleDiyCheckoutCompleted(storedSession);
+              await handleTeamCheckoutCompleted(storedSession);
+              // Fire community workflow rules
+              try {
+                const meta = (storedSession.metadata as Record<string, string>) ?? {};
+                const purchaseUserId = meta.user_id ? parseInt(meta.user_id) : null;
+                if (purchaseUserId) {
+                  fireCommunityWorkflowRules(purchaseUserId, { type: "any_purchase" }).catch(() => {});
+                  import("../lib/ensureFreeMembership").then(({ ensureFreeMembership }) => {
+                    ensureFreeMembership(purchaseUserId).catch(() => {});
+                  }).catch(() => {});
+                }
+              } catch (_) {}
+              console.log(`[Stripe] Deferred fulfillment completed for session ${deferred.stripeSessionId}`);
+            } catch (fulfillErr) {
+              console.error(`[Stripe] Deferred fulfillment failed for session ${deferred.stripeSessionId}:`, fulfillErr);
+              await deferDb.update(deferredCheckoutSessions)
+                .set({ status: "failed", errorMessage: String(fulfillErr) })
+                .where(eq(deferredCheckoutSessions.id, deferred.id));
+            }
+          }
+        } catch (lookupErr) {
+          console.error(`[Stripe] Failed to look up deferred checkout session for PI ${piId}:`, lookupErr);
+        }
+      }
+      // Always run the funnel handler (handles inline funnel form payments)
       await handleFunnelPaymentIntentSucceeded(sessionObj);
     } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
       await handleBrandSubscriptionLifecycle(sessionObj, eventType);

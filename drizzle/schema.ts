@@ -1239,8 +1239,10 @@ export type InsertScanCoachOverride = typeof scanCoachOverrides.$inferInsert;
 // ─── Webhook Events Log ────────────────────────────────────────────────────────
 export const webhookEvents = mysqlTable("webhookEvents", {
   id: int("id").autoincrement().primaryKey(),
-  /** Source system — e.g. "thinkific" */
+  /** Source system — e.g. "thinkific" or "stripe" */
   source: varchar("source", { length: 64 }).notNull().default("thinkific"),
+  /** Stripe event ID — used for idempotency deduplication */
+  stripeEventId: varchar("stripeEventId", { length: 128 }),
   /** Thinkific resource type — e.g. "order", "subscription" */
   resource: varchar("resource", { length: 64 }).notNull(),
   /** Thinkific action — e.g. "created", "cancelled" */
@@ -7551,3 +7553,29 @@ export const manualInvoices = mysqlTable("manualInvoices", {
 });
 export type ManualInvoice = typeof manualInvoices.$inferSelect;
 export type InsertManualInvoice = typeof manualInvoices.$inferInsert;
+
+// ─── Deferred Checkout Sessions ───────────────────────────────────────────────
+// Stores checkout sessions where payment_status !== "paid" at the time of
+// checkout.session.completed (e.g., ACH, SEPA, bank debits). Access is
+// granted when payment_intent.succeeded fires and this record is processed.
+export const deferredCheckoutSessions = mysqlTable("deferred_checkout_sessions", {
+  id: int("id").primaryKey().autoincrement(),
+  /** Stripe checkout session ID (cs_...) */
+  stripeSessionId: varchar("stripe_session_id", { length: 128 }).notNull().unique(),
+  /** Stripe payment intent ID (pi_...) — used to match payment_intent.succeeded */
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  /** payment_status at time of checkout.session.completed ("unpaid", "no_payment_required") */
+  paymentStatus: varchar("payment_status", { length: 32 }).notNull(),
+  /** Full session object stored as JSON for re-processing */
+  rawSessionJson: text("raw_session_json").notNull(),
+  /** Fulfillment status */
+  status: mysqlEnum("status", ["pending", "completed", "failed"]).notNull().default("pending"),
+  /** Error message if fulfillment failed */
+  errorMessage: text("error_message"),
+  /** When fulfillment was completed */
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type DeferredCheckoutSession = typeof deferredCheckoutSessions.$inferSelect;
+export type InsertDeferredCheckoutSession = typeof deferredCheckoutSessions.$inferInsert;

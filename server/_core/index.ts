@@ -565,6 +565,35 @@ async function startServer() {
         console.error('[Startup] manualInvoices migration error:', err?.message ?? err);
       }
     }).catch((err) => console.error('[Startup] manualInvoices getDb error:', err));
+    // Auto-create deferred_checkout_sessions table (payment_status gating for delayed payment methods)
+    getDb().then(async (db) => {
+      if (!db) return;
+      try {
+        await db.execute(drizzleSql.raw([
+          'CREATE TABLE IF NOT EXISTS deferred_checkout_sessions (',
+          '  id INT PRIMARY KEY AUTO_INCREMENT,',
+          '  stripe_session_id VARCHAR(128) NOT NULL UNIQUE,',
+          '  stripe_payment_intent_id VARCHAR(128),',
+          '  payment_status VARCHAR(32) NOT NULL,',
+          '  raw_session_json TEXT NOT NULL,',
+          "  status ENUM('pending','completed','failed') NOT NULL DEFAULT 'pending',",
+          '  error_message TEXT,',
+          '  completed_at TIMESTAMP NULL,',
+          '  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,',
+          '  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,',
+          '  INDEX idx_deferred_checkout_pi (stripe_payment_intent_id),',
+          '  INDEX idx_deferred_checkout_status (status)',
+          ')'
+        ].join('\n')));
+        // Ensure stripeEventId column exists on webhookEvents for idempotency deduplication
+        await db.execute(drizzleSql.raw(
+          'ALTER TABLE webhookEvents ADD COLUMN IF NOT EXISTS stripeEventId VARCHAR(128) AFTER source'
+        ));
+        console.log('[Startup] deferred_checkout_sessions and webhookEvents.stripeEventId ensured');
+      } catch (err: any) {
+        console.error('[Startup] deferred_checkout_sessions migration error:', err?.message ?? err);
+      }
+    }).catch((err) => console.error('[Startup] deferred_checkout_sessions getDb error:', err));
     // Auto-heal any SCORM versions stuck in processing/pending → serve via zip-stream
     healStuckScormVersions().then(({ healed }) => {
       if (healed > 0) console.log(`[Startup] Auto-healed ${healed} stuck SCORM version(s) → zip-stream`);
