@@ -7564,6 +7564,10 @@ export const deferredCheckoutSessions = mysqlTable("deferred_checkout_sessions",
   stripeSessionId: varchar("stripe_session_id", { length: 128 }).notNull().unique(),
   /** Stripe payment intent ID (pi_...) — used to match payment_intent.succeeded */
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  /** Resolved user ID (from metadata.user_id or client_reference_id) — nullable for guest checkouts */
+  userId: int("user_id"),
+  /** Human-readable product name extracted from metadata for display in purchase history */
+  productName: varchar("product_name", { length: 512 }),
   /** payment_status at time of checkout.session.completed ("unpaid", "no_payment_required") */
   paymentStatus: varchar("payment_status", { length: 32 }).notNull(),
   /** Full session object stored as JSON for re-processing */

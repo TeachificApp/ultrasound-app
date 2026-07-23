@@ -11,7 +11,7 @@
 import { useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, XCircle, Clock, ArrowRight, BookOpen, Award } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, ArrowRight, BookOpen, Award, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
@@ -61,8 +61,13 @@ export default function CheckoutComplete() {
 
   const resolvedContentType = (!isMembership && data && "contentType" in data) ? (data as any).contentType as string : "course";
 
+  // Do NOT auto-redirect if payment is still pending — user needs to see the pending message
+  // Only treat 'unpaid' as pending — 'no_payment_required' (free items, 100% discounts) should proceed normally
+  const isPaymentPending = data?.status === "complete" && data?.paymentStatus === "unpaid";
+
   useEffect(() => {
     if (data?.status !== "complete") return;
+    if (isPaymentPending) return; // stay on page, show pending message
     if (autoLoginUrl) {
       window.location.href = autoLoginUrl;
       return;
@@ -135,6 +140,55 @@ export default function CheckoutComplete() {
             <Link href={isMembership ? "/my-dashboard" : "/library"}>
               <Button className="bg-teal-600 hover:bg-teal-700 text-white">
                 {isMembership ? "My Dashboard" : "My Library"}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (data.status === "complete" && isPaymentPending) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-amber-200 p-8 max-w-md w-full text-center">
+          <div className="relative inline-block mb-5">
+            <Clock className="h-16 w-16 text-amber-500 mx-auto" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Pending</h2>
+          <p className="text-gray-600 text-sm mb-4">
+            {data.customerEmail ? (
+              <>Your order has been received and a confirmation has been sent to <strong>{data.customerEmail}</strong>.</>
+            ) : (
+              "Your order has been received."
+            )}
+          </p>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
+            <div className="flex gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900 mb-1">Awaiting bank confirmation</p>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Your payment method (e.g., ACH bank transfer or direct debit) requires additional processing time.
+                  Access to your {isMembership ? "membership" : "content"} will be granted <strong>automatically</strong> once your bank confirms the payment — typically within <strong>1–5 business days</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mb-6">
+            You can check the status of your payment in <strong>My Dashboard → Purchases</strong>. No action is required from you.
+          </p>
+          <div className="flex flex-col gap-3">
+            <Link href="/my-dashboard?tab=purchases">
+              <Button className="w-full bg-amber-600 hover:bg-amber-700 text-white gap-2">
+                <Clock className="h-4 w-4" />
+                View Purchase Status
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link href={isMembership ? "/my-dashboard" : "/library"}>
+              <Button variant="outline" className="w-full border-gray-200 text-gray-600 hover:bg-gray-50">
+                {isMembership ? "Go to My Dashboard" : "Back to Library"}
               </Button>
             </Link>
           </div>

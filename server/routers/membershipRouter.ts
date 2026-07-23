@@ -1074,7 +1074,10 @@ const getMembershipCheckoutSessionStatus = publicProcedure
       expand: ["line_items"],
     });
 
-    if (session.status === "complete") {
+    // IMPORTANT: Only run fulfillment when payment is confirmed — skip delayed-payment methods
+    // (ACH, bank debit) where payment_status is 'unpaid' until the bank clears the payment.
+    // 'no_payment_required' is valid for free items / 100% discounts and should proceed.
+    if (session.status === "complete" && (session.payment_status === "paid" || session.payment_status === "no_payment_required")) {
       const db = await getDb();
       if (db) {
         try {

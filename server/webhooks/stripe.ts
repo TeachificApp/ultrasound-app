@@ -2493,9 +2493,20 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
         try {
           const deferDb = await getDb();
           if (deferDb && sessionId) {
+            // Extract user ID and product name from session metadata for dashboard display
+            const sessionMeta = (sessionObj.metadata as Record<string, string>) ?? {};
+            const rawUserId = sessionMeta.user_id ||
+              (sessionObj.client_reference_id as string | undefined) || "";
+            const resolvedUserId = rawUserId ? parseInt(rawUserId, 10) : null;
+            const resolvedProductName = sessionMeta.product_name ||
+              sessionMeta.course_title ||
+              sessionMeta.plan_name ||
+              null;
             await deferDb.insert(deferredCheckoutSessions).values({
               stripeSessionId: sessionId,
               stripePaymentIntentId: piId,
+              userId: resolvedUserId && !isNaN(resolvedUserId) ? resolvedUserId : null,
+              productName: resolvedProductName ? String(resolvedProductName).slice(0, 512) : null,
               paymentStatus: sessionPaymentStatus,
               rawSessionJson: JSON.stringify(sessionObj),
               status: "pending",

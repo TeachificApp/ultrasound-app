@@ -585,6 +585,18 @@ async function startServer() {
           '  INDEX idx_deferred_checkout_status (status)',
           ')'
         ].join('\n')));
+        // Ensure optional columns exist (idempotent — ADD COLUMN IF NOT EXISTS is safe to re-run)
+        await db.execute(drizzleSql.raw(
+          'ALTER TABLE deferred_checkout_sessions ADD COLUMN IF NOT EXISTS user_id INT AFTER stripe_payment_intent_id'
+        ));
+        await db.execute(drizzleSql.raw(
+          'ALTER TABLE deferred_checkout_sessions ADD COLUMN IF NOT EXISTS product_name VARCHAR(512) AFTER user_id'
+        ));
+        try {
+          await db.execute(drizzleSql.raw(
+            'ALTER TABLE deferred_checkout_sessions ADD INDEX idx_deferred_checkout_user (user_id)'
+          ));
+        } catch { /* index may already exist */ }
         // Ensure stripeEventId column exists on webhookEvents for idempotency deduplication
         await db.execute(drizzleSql.raw(
           'ALTER TABLE webhookEvents ADD COLUMN IF NOT EXISTS stripeEventId VARCHAR(128) AFTER source'

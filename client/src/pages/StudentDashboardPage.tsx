@@ -1164,6 +1164,7 @@ function MyContentTab() {
 function productTypeLabel(p: any): string {
   if (p.type === "subscription_payment") return "Subscription Renewal";
   if (p.type === "manual_invoice") return "Invoice";
+  if (p.productType === "pending" || p.status === "payment_pending") return "Payment Pending";
   const map: Record<string, string> = {
     download: "Digital Download",
     course: "Course",
@@ -1208,38 +1209,56 @@ function PurchasesTab() {
         <EmptyState icon={ShoppingCart} title="No purchases yet" description="Your payment history will appear here." />
       ) : (
         <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
-          {purchases.map((p: any) => (
-            <div key={p.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm text-gray-900 truncate">{p.description}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{formatDate(p.date)}</p>
+          {purchases.map((p: any) => {
+            const isPending = p.status === "payment_pending" || p.productType === "pending";
+            return (
+              <div key={p.id} className={`flex items-start justify-between px-4 py-3 transition-colors ${
+                isPending ? "bg-amber-50/60 hover:bg-amber-50" : "hover:bg-gray-50"
+              }`}>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-gray-900 truncate">{p.description}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{formatDate(p.date)}</p>
+                  {isPending && (
+                    <p className="text-xs text-amber-700 mt-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3 shrink-0" />
+                      Payment is being processed by your bank. Access will be granted automatically once confirmed (typically 1–5 business days).
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 ml-4 shrink-0">
+                  {!isPending && (
+                    <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amount, p.currency)}</span>
+                  )}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    isPending ? "bg-amber-100 text-amber-800" :
+                    p.type === "subscription_payment" ? "bg-purple-50 text-purple-700" :
+                    p.type === "manual_invoice" ? "bg-gray-100 text-gray-600" :
+                    p.productType === "workshop" ? "bg-orange-50 text-orange-700" :
+                    p.productType === "webinar" ? "bg-blue-50 text-blue-700" :
+                    p.productType === "physical" ? "bg-amber-50 text-amber-700" :
+                    "bg-teal-50 text-teal-700"
+                  }`}>
+                    {isPending ? (
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Payment Pending</span>
+                    ) : productTypeLabel(p)}
+                  </span>
+                  {!isPending && p.invoiceUrl && (
+                    <a href={p.invoiceUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline">
+                      <FileText className="w-3.5 h-3.5" /> Invoice
+                    </a>
+                  )}
+                  {!isPending && (
+                    <button
+                      onClick={() => setReceiptPurchase(p)}
+                      className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline">
+                      <FileText className="w-3.5 h-3.5" /> Receipt
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3 ml-4 shrink-0">
-                <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amount, p.currency)}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  p.type === "subscription_payment" ? "bg-purple-50 text-purple-700" :
-                  p.type === "manual_invoice" ? "bg-gray-100 text-gray-600" :
-                  p.productType === "workshop" ? "bg-orange-50 text-orange-700" :
-                  p.productType === "webinar" ? "bg-blue-50 text-blue-700" :
-                  p.productType === "physical" ? "bg-amber-50 text-amber-700" :
-                  "bg-teal-50 text-teal-700"
-                }`}>
-                  {productTypeLabel(p)}
-                </span>
-                {p.invoiceUrl && (
-                  <a href={p.invoiceUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline">
-                    <FileText className="w-3.5 h-3.5" /> Invoice
-                  </a>
-                )}
-                <button
-                  onClick={() => setReceiptPurchase(p)}
-                  className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline">
-                  <FileText className="w-3.5 h-3.5" /> Receipt
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

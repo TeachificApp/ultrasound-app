@@ -44,6 +44,7 @@ import {
   digitalBundlePurchases,
   digitalBundles,
   manualInvoices,
+  deferredCheckoutSessions,
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
@@ -1107,6 +1108,35 @@ export const dashboardRouter = router({
       console.warn("[Dashboard] Failed to fetch manualInvoices:", err);
     }
 
+    // Fetch deferred checkout sessions (pending delayed-payment methods — ACH, bank debit, etc.)
+    let deferredRows: Array<{
+      id: number;
+      stripeSessionId: string;
+      productName: string | null;
+      paymentStatus: string;
+      status: "pending" | "completed" | "failed";
+      createdAt: Date;
+    }> = [];
+    try {
+      deferredRows = await db
+        .select({
+          id: deferredCheckoutSessions.id,
+          stripeSessionId: deferredCheckoutSessions.stripeSessionId,
+          productName: deferredCheckoutSessions.productName,
+          paymentStatus: deferredCheckoutSessions.paymentStatus,
+          status: deferredCheckoutSessions.status,
+          createdAt: deferredCheckoutSessions.createdAt,
+        })
+        .from(deferredCheckoutSessions)
+        .where(and(
+          eq(deferredCheckoutSessions.userId, userId),
+          eq(deferredCheckoutSessions.status, "pending"),
+        ))
+        .orderBy(desc(deferredCheckoutSessions.createdAt));
+    } catch (err) {
+      console.warn("[Dashboard] Failed to fetch deferredCheckoutSessions:", err);
+    }
+
     // Fetch recent paid invoices from Stripe for all subscription customers
     let stripeInvoices: Array<{
       id: string;
@@ -1306,6 +1336,23 @@ export const dashboardRouter = router({
         transactionId: inv.paymentIntentId ?? inv.id ?? null as string | null,
         brand: null as string | null,
         fulfillmentStatus: null as string | null,
+      })),
+      // Pending delayed-payment sessions (ACH, bank debit — awaiting payment confirmation)
+      ...deferredRows.map(d => ({
+        id: `deferred-${d.id}`,
+        description: d.productName ?? "Purchase (payment pending)",
+        type: "one_time" as const,
+        productType: "pending" as string,
+        amount: 0,
+        currency: "usd",
+        date: d.createdAt,
+        status: "payment_pending" as string,
+        sourceType: null as string | null,
+        orderBumps: null as string | null,
+        invoiceUrl: null as string | null,
+        transactionId: d.stripeSessionId ?? null as string | null,
+        brand: null as string | null,
+        fulfillmentStatus: "awaiting_payment" as string | null,
       })),
       // Manual invoices (admin-created records for off-platform payments)
       ...manualInvoiceRows.map(inv => ({
