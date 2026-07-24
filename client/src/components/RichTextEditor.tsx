@@ -7,7 +7,7 @@
  *  - Text alignment: left, center, right, justify
  *  - Text color picker (12 preset colors + reset)
  *  - Bullet and numbered lists, blockquote, horizontal rule
- *  - Image insertion: URL or local file upload (base64 preview)
+ *  - Image insertion: URL or local file upload (hosted in storage)
  *  - Video upload: direct file upload → auto-saved to Media Repository → inline <video>
  *  - YouTube / video URL embedding
  *  - Raw HTML code insert dialog
@@ -598,6 +598,7 @@ export default function RichTextEditor({
   disabled = false,
   courseId,
 }: RichTextEditorProps) {
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
@@ -715,6 +716,24 @@ export default function RichTextEditor({
         }
       },
       handlePaste: (view, event) => {
+        const pastedHtml = event.clipboardData?.getData("text/html");
+        if (pastedHtml?.includes("data:image")) {
+          event.preventDefault();
+          toast.info("Uploading pasted images...");
+          fetch("/api/process-rich-text-html", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ html: pastedHtml, context: "rich-text" }),
+          })
+            .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(new Error(e.error || "Upload failed"))))
+            .then(({ html }) => {
+              editorRef.current?.chain().focus().insertContent(html).run();
+              toast.success("Images uploaded");
+            })
+            .catch((err: any) => toast.error(`Image upload failed: ${err.message}`));
+          return true;
+        }
         const items = event.clipboardData?.items;
         if (!items) return false;
         for (const item of Array.from(items)) {
@@ -761,6 +780,10 @@ export default function RichTextEditor({
       },
     },
   });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   // Track whether the last value change came from the editor itself
   const isInternalUpdate = useRef(false);
