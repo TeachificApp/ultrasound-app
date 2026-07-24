@@ -5708,7 +5708,7 @@ export const lmsCohortSessions = mysqlTable("lms_cohort_sessions", {
   id: int("id").autoincrement().primaryKey(),
   courseId: int("course_id").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
+  description: longtext("description"),
   sessionDate: timestamp("session_date").notNull(),
   durationMinutes: int("duration_minutes").default(60).notNull(),
   meetingUrl: text("meeting_url"),
@@ -5740,7 +5740,7 @@ export const lmsCohortAssignments = mysqlTable("lms_cohort_assignments", {
   id: int("id").autoincrement().primaryKey(),
   courseId: int("course_id").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
+  description: longtext("description"),
   contentBlocks: json("content_blocks").$type<any[]>(),  // page-builder blocks
   dueDate: timestamp("due_date"),
   maxPoints: int("max_points").default(100).notNull(),
@@ -5763,7 +5763,7 @@ export const lmsCohortRecordings = mysqlTable("lms_cohort_recordings", {
   courseId: int("course_id").notNull(),
   sessionId: int("session_id"),           // optional link to a live session
   title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
+  description: longtext("description"),
   videoUrl: text("video_url"),
   thumbnailUrl: text("thumbnail_url"),
   durationSeconds: int("duration_seconds"),

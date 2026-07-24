@@ -32,6 +32,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
+import { processRichTextHtml } from "../lib/processRichTextHtml";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
   lmsCourses,
@@ -131,11 +132,14 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const description = input.description != null
+        ? (await processRichTextHtml(input.description, "cohort-session")) ?? null
+        : null;
       const [result] = await db.insert(lmsCohortSessions).values({
         courseId: input.courseId,
         cohortGroupId: input.cohortGroupId ?? null,
         title: input.title,
-        description: input.description ?? null,
+        description,
         sessionDate: new Date(input.sessionDate),
         durationMinutes: input.durationMinutes,
         meetingUrl: input.meetingUrl ?? null,
@@ -207,8 +211,13 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, sessionDate, recurrenceEndDate, ...rest } = input;
+      const { id, sessionDate, recurrenceEndDate, description, ...rest } = input;
       const updates: Record<string, any> = { ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) };
+      if (description !== undefined) {
+        updates.description = description != null
+          ? (await processRichTextHtml(description, "cohort-session")) ?? null
+          : null;
+      }
       if (sessionDate) updates.sessionDate = new Date(sessionDate);
       if (recurrenceEndDate !== undefined) updates.recurrenceEndDate = recurrenceEndDate ? new Date(recurrenceEndDate) : null;
       if (Object.keys(updates).length > 0) {
@@ -281,13 +290,16 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const description = input.description != null
+        ? (await processRichTextHtml(input.description, "cohort-assignment")) ?? null
+        : null;
       const [{ maxPos }] = await db.select({ maxPos: sql<number>`COALESCE(MAX(position),0)` })
         .from(lmsCohortAssignments).where(eq(lmsCohortAssignments.courseId, input.courseId));
       const [result] = await db.insert(lmsCohortAssignments).values({
         courseId: input.courseId,
         cohortGroupId: input.cohortGroupId ?? null,
         title: input.title,
-        description: input.description ?? null,
+        description,
         contentBlocks: input.contentBlocks ?? null,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
         maxPoints: input.maxPoints,
@@ -350,8 +362,13 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, dueDate, ...rest } = input;
+      const { id, dueDate, description, ...rest } = input;
       const updates: Record<string, any> = { ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) };
+      if (description !== undefined) {
+        updates.description = description != null
+          ? (await processRichTextHtml(description, "cohort-assignment")) ?? null
+          : null;
+      }
       if (dueDate !== undefined) updates.dueDate = dueDate ? new Date(dueDate) : null;
       if (Object.keys(updates).length > 0) {
         await db.update(lmsCohortAssignments).set(updates).where(eq(lmsCohortAssignments.id, id));
@@ -401,6 +418,9 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const description = input.description != null
+        ? (await processRichTextHtml(input.description, "cohort-recording")) ?? null
+        : null;
       const [{ maxPos }] = await db.select({ maxPos: sql<number>`COALESCE(MAX(position),0)` })
         .from(lmsCohortRecordings).where(eq(lmsCohortRecordings.courseId, input.courseId));
       const [result] = await db.insert(lmsCohortRecordings).values({
@@ -408,7 +428,7 @@ export const lmsCohortAdminRouter = router({
         cohortGroupId: input.cohortGroupId ?? null,
         sessionId: input.sessionId ?? null,
         title: input.title,
-        description: input.description ?? null,
+        description,
         videoUrl: input.videoUrl ?? null,
         thumbnailUrl: input.thumbnailUrl ?? null,
         durationSeconds: input.durationSeconds ?? null,
@@ -436,8 +456,13 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, ...rest } = input;
-      const updates = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+      const { id, description, ...rest } = input;
+      const updates = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) as Record<string, unknown>;
+      if (description !== undefined) {
+        updates.description = description != null
+          ? (await processRichTextHtml(description, "cohort-recording")) ?? null
+          : null;
+      }
       if (Object.keys(updates).length > 0) {
         await db.update(lmsCohortRecordings).set(updates).where(eq(lmsCohortRecordings.id, id));
       }
