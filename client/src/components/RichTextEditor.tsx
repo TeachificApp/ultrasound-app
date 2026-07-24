@@ -686,6 +686,34 @@ export default function RichTextEditor({
       onChange(html === "<p></p>" ? "" : html);
     },
     editorProps: {
+      // Strip non-standard HTML attributes that external editors (web pages, Google Docs, Word, etc.)
+      // add to elements. Without this, unknown attributes like containerstyle/wrapperstyle render
+      // as visible raw text in the TipTap editor area.
+      transformPastedHTML: (html: string) => {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+          const nonStandardAttrs = [
+            "containerstyle", "wrapperstyle", "containerStyle", "wrapperStyle",
+          ];
+          doc.body.querySelectorAll("*").forEach((el) => {
+            nonStandardAttrs.forEach((attr) => el.removeAttribute(attr));
+            // Remove any data-mce-* or data-stringify-* attributes from MCE/other editors
+            Array.from(el.attributes).forEach((a) => {
+              if (
+                a.name.startsWith("data-mce") ||
+                a.name.startsWith("data-stringify") ||
+                a.name.startsWith("data-sheets")
+              ) {
+                el.removeAttribute(a.name);
+              }
+            });
+          });
+          return doc.body.innerHTML;
+        } catch {
+          return html;
+        }
+      },
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
         if (!items) return false;
