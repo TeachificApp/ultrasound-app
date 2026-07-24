@@ -11186,8 +11186,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                       {s.meetingUrl && <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><LinkIcon className="w-3 h-3" />Meeting Link</a>}
                       {s.recordingUrl && <a href={s.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><PlayCircle className="w-3 h-3" />Recording</a>}
                     </div>
-                    {/* render as HTML not raw text */}
-                    {s.description && <RichTextDisplay content={s.description} className="text-xs text-gray-400 mt-1 line-clamp-2" />}
+                    {s.description && <RichTextDisplay content={s.description} className="text-xs text-gray-500 mt-1 line-clamp-2" />}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {/* Google Calendar */}
