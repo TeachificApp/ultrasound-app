@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   ChevronLeft, Film, Calendar, Clock, AlertCircle, BookOpen,
 } from "lucide-react";
+import { RichTextDisplay } from "@/components/RichTextEditor";
 import Plyr from "plyr";
 import "plyr/dist/plyr.css";
 
@@ -471,7 +472,7 @@ export default function CohortReplayPlayer() {
                     </p>
                   )}
                   {session.description && (
-                    <p className="text-sm text-gray-600 mt-2">{session.description}</p>
+                    <RichTextDisplay content={session.description} className="text-sm text-gray-600 mt-2" />
                   )}
                 </div>
               </CardContent>

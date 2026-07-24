@@ -1605,7 +1605,7 @@ function CohortCalendarTab({ cohortData, isLoading }: { cohortData: any; isLoadi
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm">{s.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{fmtCohortDate(s.sessionDate)} · {fmtCohortTime(s.sessionDate)} · {fmtCohortDuration(s.durationMinutes)}</p>
-                  {s.description && <p className="text-xs text-gray-400 mt-1 line-clamp-2">{s.description}</p>}
+                  {s.description && <RichTextDisplay content={s.description} className="text-xs text-gray-400 mt-1 line-clamp-2" />}
                 </div>
                 <div className="flex flex-col gap-1.5 flex-shrink-0">
                   <a
