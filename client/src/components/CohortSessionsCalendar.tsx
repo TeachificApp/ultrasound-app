@@ -5,6 +5,7 @@
  * and as a standalone embed at /embed/cohort-sessions/:groupId.
  */
 import { useState, useMemo } from "react";
+import { RichTextDisplay } from "@/components/RichTextEditor";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +79,7 @@ function SessionCard({
             {session.title}
           </p>
           {!compact && session.description && (
-            <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{session.description}</p>
+            <RichTextDisplay content={session.description} className="text-sm text-gray-500 mt-0.5 line-clamp-2" />
           )}
           <div className="flex items-center gap-3 mt-1 flex-wrap">
             <span className="flex items-center gap-1 text-xs text-gray-500">

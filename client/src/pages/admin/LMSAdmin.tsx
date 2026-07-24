@@ -10997,7 +10997,7 @@ function CohortTab({ courseId }: { courseId: number }) {
       action: "TEMPLATE",
       text: s.title,
       dates: `${fmt(start)}/${fmt(end)}`,
-      details: [s.description ?? "", s.meetingUrl ? `Join: ${s.meetingUrl}` : ""].filter(Boolean).join("\n"),
+      details: [(s.description ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(), s.meetingUrl ? `Join: ${s.meetingUrl}` : ""].filter(Boolean).join("\n"),
     });
     return `https://calendar.google.com/calendar/render?${params}`;
   };
@@ -11186,7 +11186,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                       {s.meetingUrl && <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><LinkIcon className="w-3 h-3" />Meeting Link</a>}
                       {s.recordingUrl && <a href={s.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><PlayCircle className="w-3 h-3" />Recording</a>}
                     </div>
-                    {s.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{s.description}</p>}
+                    {s.description && <RichTextDisplay content={s.description} className="text-xs text-gray-400 mt-1 line-clamp-2" />}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {/* Google Calendar */}

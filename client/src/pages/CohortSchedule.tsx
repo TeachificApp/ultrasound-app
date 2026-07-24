@@ -107,7 +107,7 @@ function generateIcs(sessions: any[], courseTitle: string) {
     lines.push(`DTSTART:${toIcsDate(start)}`);
     lines.push(`DTEND:${toIcsDate(end)}`);
     lines.push(`SUMMARY:${s.title}`);
-    if (s.description) lines.push(`DESCRIPTION:${s.description.replace(/\n/g, "\\n")}`);
+    if (s.description) lines.push(`DESCRIPTION:${s.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().replace(/\n/g, "\\n")}`);
     if (s.meetingUrl) lines.push(`URL:${s.meetingUrl}`);
     lines.push("END:VEVENT");
   }
@@ -996,7 +996,7 @@ function SessionCard({ session, isUpcoming: isUpcomingProp, now }: { session: an
               </div>
             </div>
             {session.description && (
-              <p className="text-gray-500 text-sm mt-1 line-clamp-2">{session.description}</p>
+              <RichTextDisplay content={session.description} className="text-gray-500 text-sm mt-1 line-clamp-2" />
             )}
             <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 flex-wrap">
               <span className="flex items-center gap-1">
