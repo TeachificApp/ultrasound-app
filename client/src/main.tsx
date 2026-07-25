@@ -54,9 +54,11 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  // Never redirect to /login from checkout or purchase pages — these support guest checkout.
-  // Stripe collects the buyer's email; the webhook auto-creates the account after payment.
+  // Never redirect to /login from public-facing pages — these are accessible without auth.
+  // Funnel/landing pages, checkout pages, and product landing pages must never force a login redirect.
   const path = window.location.pathname;
+
+  // Public-facing product & checkout pages
   const isCheckoutPage = path.startsWith("/checkout") ||
     path.startsWith("/memberships/") ||
     path.startsWith("/courses/") ||
@@ -64,8 +66,17 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
     path.startsWith("/workshops/") ||
     path.startsWith("/downloads/") ||
     path.startsWith("/product/") ||
-    path.startsWith("/diy-accreditation-plans");
-  if (isCheckoutPage) return;
+    path.startsWith("/diy-accreditation-plans") ||
+    path.startsWith("/webinars/") ||
+    path.startsWith("/communities/");
+
+  // Funnel pages (/:slug/:pageSlug) and standalone landing pages (/p/:slug)
+  // These are always public — blocks handle their own auth state gracefully.
+  const isFunnelOrLandingPage = path.startsWith("/p/") ||
+    // /:slug/:pageSlug pattern — two path segments, neither is a known app route
+    (/^\/[^/]+\/[^/]+$/.test(path) && !path.startsWith("/admin") && !path.startsWith("/api"));
+
+  if (isCheckoutPage || isFunnelOrLandingPage) return;
 
   window.location.href = "/login";
 };

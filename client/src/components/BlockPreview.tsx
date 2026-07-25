@@ -2855,7 +2855,8 @@ function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
 
   async function handleCTA() {
     if (!user) {
-      window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}`;
+      // Never redirect away from a public funnel/landing page — open login in a new tab.
+      window.open(`/login?return=${encodeURIComponent(window.location.href)}`, "_blank");
       return;
     }
     if (!productSlug && !productId) return;

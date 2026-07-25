@@ -46,8 +46,7 @@ async function uniquePageSlug(
 
 export const funnelRouter = router({
   /** List all products (courses, downloads, bundles) for order bump picker */
-  listAllProducts: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+  listAllProducts: publicProcedure.query(async () => {
     const db = await getDb();
     const [courses, downloads, bundles, physical, webinarList, communityList, workshopList] = await Promise.all([
       db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl, courseType: lmsCourses.type }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
