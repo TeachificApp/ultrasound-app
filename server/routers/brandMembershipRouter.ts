@@ -934,6 +934,7 @@ export const brandMembershipRouter = router({
       email: z.string().email().max(320),
       organization: z.string().min(1).max(300),
       teamSize: z.string().min(1).max(100),
+      productInterest: z.string().max(200).optional(),
       message: z.string().max(2000).optional(),
       brand: z.enum(["aaus", "iheartecho"]),
     }))
@@ -945,6 +946,7 @@ export const brandMembershipRouter = router({
         `Email: ${input.email}`,
         `Organization: ${input.organization}`,
         `Team Size: ${input.teamSize}`,
+        ...(input.productInterest ? [`Product Interest: ${input.productInterest}`] : []),
         ...(input.message ? [`Message: ${input.message}`] : []),
       ];
       try {

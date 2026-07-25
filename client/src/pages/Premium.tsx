@@ -177,6 +177,7 @@ export default function Premium() {
   const [teamOrg, setTeamOrg] = useState("");
   const [teamSize, setTeamSize] = useState("");
   const [teamMessage, setTeamMessage] = useState("");
+  const [teamProductInterest, setTeamProductInterest] = useState("");
   const teamFormRef = useRef<HTMLDivElement>(null);
 
   const brand = detectBrand();
@@ -677,6 +678,7 @@ export default function Premium() {
                     email={teamEmail} setEmail={setTeamEmail}
                     org={teamOrg} setOrg={setTeamOrg}
                     size={teamSize} setSize={setTeamSize}
+                    productInterest={teamProductInterest} setProductInterest={setTeamProductInterest}
                     message={teamMessage} setMessage={setTeamMessage}
                     onSuccess={() => setTeamSubmitted(true)}
                   />
@@ -856,6 +858,7 @@ function TeamInquiryForm({
   email, setEmail,
   org, setOrg,
   size, setSize,
+  productInterest, setProductInterest,
   message, setMessage,
   onSuccess,
 }: {
@@ -865,6 +868,7 @@ function TeamInquiryForm({
   email: string; setEmail: (v: string) => void;
   org: string; setOrg: (v: string) => void;
   size: string; setSize: (v: string) => void;
+  productInterest: string; setProductInterest: (v: string) => void;
   message: string; setMessage: (v: string) => void;
   onSuccess: () => void;
 }) {
@@ -888,10 +892,28 @@ function TeamInquiryForm({
       toast.error("Please fill in all required fields.");
       return;
     }
-    submitInquiry.mutate({ name: name.trim(), email: email.trim(), organization: org.trim(), teamSize: size.trim(), message: message.trim() || undefined, brand });
+    submitInquiry.mutate({ name: name.trim(), email: email.trim(), organization: org.trim(), teamSize: size.trim(), productInterest: productInterest.trim() || undefined, message: message.trim() || undefined, brand });
   }
 
   const TEAM_SIZES = ["5–10 users", "11–25 users", "26–50 users", "51–100 users", "100+ users"];
+  const isIHE = brand === "iheartecho";
+  const PRODUCT_OPTIONS = isIHE
+    ? [
+        "EchoAssist™ Monthly Membership ($9.97/mo)",
+        "EchoAssist™ Lifetime Access ($99.97 one-time)",
+        "Both Apps — Dual Monthly ($12.99/mo)",
+        "Both Apps — Dual Lifetime ($147 one-time)",
+        "Course Access",
+        "Not sure yet — need more info",
+      ]
+    : [
+        "UltrasoundAssist™ Monthly Membership ($9.97/mo)",
+        "UltrasoundAssist™ Lifetime Access ($99.97 one-time)",
+        "Both Apps — Dual Monthly ($12.99/mo)",
+        "Both Apps — Dual Lifetime ($147 one-time)",
+        "Course Access",
+        "Not sure yet — need more info",
+      ];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -924,6 +946,17 @@ function TeamInquiryForm({
             {TEAM_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Product Interest (optional)</label>
+        <select
+          value={productInterest}
+          onChange={e => setProductInterest(e.target.value)}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <option value="">Select product…</option>
+          {PRODUCT_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
       </div>
       <div>
         <label className="block text-xs font-semibold text-gray-600 mb-1">Additional Notes (optional)</label>
