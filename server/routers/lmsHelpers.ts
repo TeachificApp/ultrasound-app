@@ -179,7 +179,7 @@ export async function issueCertificateIfEnabled(
 ) {
   if (!db) return;
   // Check course has certificate enabled
-  const [course] = await db.select({ hasCertificate: lmsCourses.hasCertificate, title: lmsCourses.title, certificateTemplateId: lmsCourses.certificateTemplateId }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
+  const [course] = await db.select({ hasCertificate: lmsCourses.hasCertificate, title: lmsCourses.title, certificateTemplateId: lmsCourses.certificateTemplateId, creditHours: lmsCourses.creditHours }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
   if (!course?.hasCertificate) return;
 
   // Check if certificate already issued
@@ -220,6 +220,7 @@ export async function issueCertificateIfEnabled(
       learnerName: user.credentials ? `${learnerName}, ${user.credentials}` : learnerName,
       courseTitle: course.title,
       issuedAt,
+      creditHours: course.creditHours ?? null,
     });
   } else {
     pdfBuffer = await generateCertificatePdf({
@@ -227,6 +228,7 @@ export async function issueCertificateIfEnabled(
       courseTitle: course.title,
       issuedAt,
       credentials: user.credentials,
+      creditHours: course.creditHours ?? null,
       template,
     });
   }

@@ -1725,6 +1725,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
   const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(course.installmentIntervalDays ?? 30));
   const [hasCertificate, setHasCertificate] = useState(course.hasCertificate);
   const [certificateTemplateId, setCertificateTemplateId] = useState<number | null>((course as any).certificateTemplateId ?? null);
+  const [creditHours, setCreditHours] = useState<string>((course as any).creditHours ?? "");
   const [isFeatured, setIsFeatured] = useState(course.isFeatured ?? false);
   const [isDrip, setIsDrip] = useState(course.isDrip ?? false);
   const [hideProgress, setHideProgress] = useState(course.hideProgress ?? false);
@@ -1827,6 +1828,8 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
               pricingType,
               isFree: pricingType === "free",
               hasCertificate,
+              certificateTemplateId,
+              creditHours: creditHours.trim() || null,
               isFeatured,
               isDrip,
               hideProgress,
@@ -2119,9 +2122,21 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
         <Label htmlFor="cert-switch" className="text-sm">Certificate of completion</Label>
       </div>
       {hasCertificate && (
-        <div className="ml-6 mt-1">
-          <Label className="text-xs text-muted-foreground">Certificate Template</Label>
-          <CertTemplateSelector value={certificateTemplateId} onChange={setCertificateTemplateId} />
+        <div className="ml-6 mt-2 space-y-2">
+          <div>
+            <Label className="text-xs text-muted-foreground">Certificate Template</Label>
+            <CertTemplateSelector value={certificateTemplateId} onChange={setCertificateTemplateId} />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">CME/CE Credit Hours (optional)</Label>
+            <Input
+              className="mt-1 h-8 text-sm w-32"
+              placeholder="e.g. 1.5"
+              value={creditHours}
+              onChange={e => setCreditHours(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-0.5">Shown on the issued certificate. Leave blank to omit.</p>
+          </div>
         </div>
       )}
 
@@ -2257,7 +2272,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
         </div>
         <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
           disabled={updateCourseSettings.isPending}
-          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, certificateTemplateId, isFeatured, publishDomain: publishDomain || null })}
+          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, certificateTemplateId, creditHours: creditHours.trim() || null, isFeatured, publishDomain: publishDomain || null })}
         >
           {updateCourseSettings.isPending ? "Saving..." : "Save URL & SEO"}
         </Button>
@@ -2418,6 +2433,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
           isFree: pricingType === "free",
           hasCertificate,
           certificateTemplateId,
+          creditHours: creditHours.trim() || null,
           isFeatured,
           isDrip,
           hideProgress,

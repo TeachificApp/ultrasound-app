@@ -3849,6 +3849,7 @@ export const lmsGroupRouter = router({
       status: z.enum(["draft", "public", "hidden", "private", "archived"]).optional(),
       hasCertificate: z.boolean().optional(),
       certificateTemplateId: z.number().int().positive().nullable().optional(),
+      creditHours: z.string().max(20).nullable().optional(),
       isFeatured: z.boolean().optional(),
       isDrip: z.boolean().optional(),
       accessDurationDays: z.number().int().positive().nullable().optional(),

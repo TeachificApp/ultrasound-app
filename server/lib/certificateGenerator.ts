@@ -38,11 +38,13 @@ export interface CertificateOptions {
   issuedAt: Date;
   /** Optional credential string, e.g. "RVT, RDMS" */
   credentials?: string | null;
+  /** Optional number of CME/CE credit hours, e.g. "1.5" or "2" */
+  creditHours?: string | null;
   /** Optional template — falls back to hardcoded defaults if null */
   template?: CertificateTemplate | null;
   /**
    * When true, render the static design and add AcroForm fields for
-   * learner_name, course_title, and issued_date instead of real data.
+   * learner_name, course_title, issued_date, and credits instead of real data.
    * Defaults to false (real data rendered).
    */
   usePlaceholders?: boolean;
@@ -93,7 +95,8 @@ function getFieldDefs(layout: string, W: number, H: number): FieldDef[] {
     return [
       { name: "learner_name",  label: "Learner Name",  x: 60,  y: H - 172 - 40, width: W - 120, height: 44, fontSize: 28 },
       { name: "course_title",  label: "Course Title",  x: 80,  y: H - 254 - 28, width: W - 160, height: 32, fontSize: 16 },
-      { name: "issued_date",   label: "Issued Date",   x: 60,  y: H - 314 - 18, width: W - 120, height: 22, fontSize: 10 },
+      { name: "issued_date",   label: "Issued Date",   x: 60,  y: H - 314 - 18, width: 300,     height: 22, fontSize: 10 },
+      { name: "credits",       label: "Credits",       x: W - 260, y: H - 314 - 18, width: 200, height: 22, fontSize: 10 },
     ];
   }
   if (layout === "modern") {
@@ -101,13 +104,15 @@ function getFieldDefs(layout: string, W: number, H: number): FieldDef[] {
       { name: "learner_name",  label: "Learner Name",  x: 50,  y: H - 164 - 40, width: W - 90,  height: 44, fontSize: 26 },
       { name: "course_title",  label: "Course Title",  x: 50,  y: H - 244 - 28, width: W - 90,  height: 32, fontSize: 16 },
       { name: "issued_date",   label: "Issued Date",   x: 50,  y: H - 304 - 18, width: 300,     height: 22, fontSize: 10 },
+      { name: "credits",       label: "Credits",       x: W - 310, y: H - 304 - 18, width: 250, height: 22, fontSize: 10 },
     ];
   }
   // classic (default)
   return [
     { name: "learner_name",  label: "Learner Name",  x: 60,  y: H - 192 - 44, width: W - 120, height: 48, fontSize: 30 },
     { name: "course_title",  label: "Course Title",  x: 80,  y: H - 272 - 30, width: W - 160, height: 34, fontSize: 18 },
-    { name: "issued_date",   label: "Issued Date",   x: 60,  y: H - 334 - 20, width: W - 120, height: 24, fontSize: 11 },
+    { name: "issued_date",   label: "Issued Date",   x: 60,  y: H - 334 - 20, width: 300,     height: 24, fontSize: 11 },
+    { name: "credits",       label: "Credits",       x: W - 320, y: H - 334 - 20, width: 260, height: 24, fontSize: 11 },
   ];
 }
 
@@ -212,6 +217,7 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
     const displayName = ph ? "" : (opts.credentials ? `${opts.learnerName}, ${opts.credentials}` : opts.learnerName);
     const courseTitle = ph ? "" : opts.courseTitle;
     const dateLabel = ph ? "" : `Issued: ${opts.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`;
+    const creditsLabel = ph ? "" : (opts.creditHours ? `${opts.creditHours} CME Credit${parseFloat(opts.creditHours) !== 1 ? "s" : ""}` : "");
 
     if (layout === "minimal") {
       doc.moveTo(40, 40).lineTo(W - 40, 40).lineWidth(2).stroke(TEAL);
@@ -236,7 +242,10 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
       if (!ph) doc.font("Helvetica-Bold").fontSize(16).fillColor(TEAL).text(courseTitle, 80, 254, { align: "center", width: W - 160 });
 
       doc.moveTo(W / 2 - 120, 300).lineTo(W / 2 + 120, 300).lineWidth(0.5).stroke(GOLD);
-      if (!ph) doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(dateLabel, 0, 314, { align: "center" });
+      if (!ph) {
+        doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(dateLabel, 60, 314, { width: 300 });
+        if (creditsLabel) doc.font("Helvetica-Bold").fontSize(10).fillColor(TEAL).text(creditsLabel, W - 260, 314, { width: 200, align: "right" });
+      }
 
       doc.font("Helvetica").fontSize(8).fillColor("#94a3b8").text(footerText, 0, H - 32, { align: "center" });
 
@@ -264,7 +273,10 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
       if (!ph) doc.font("Helvetica-Bold").fontSize(16).fillColor(TEAL).text(courseTitle, lx, 244, { width: W - lx - 40 });
 
       doc.moveTo(lx, 290).lineTo(lx + 240, 290).lineWidth(1).stroke(GOLD);
-      if (!ph) doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(dateLabel, lx, 304);
+      if (!ph) {
+        doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(dateLabel, lx, 304, { width: 300 });
+        if (creditsLabel) doc.font("Helvetica-Bold").fontSize(10).fillColor(TEAL).text(creditsLabel, W - 310, 304, { width: 250, align: "right" });
+      }
 
       doc.rect(0, H - 40, W, 40).fill(DARK);
       doc.font("Helvetica").fontSize(8).fillColor("#94a3b8").text(footerText, 0, H - 26, { align: "center" });
@@ -299,7 +311,10 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
       if (!ph) doc.font("Helvetica-Bold").fontSize(18).fillColor(TEAL).text(courseTitle, 80, 272, { align: "center", width: W - 160 });
 
       doc.moveTo(W / 2 - 160, 320).lineTo(W / 2 + 160, 320).lineWidth(1).stroke(GOLD);
-      if (!ph) doc.font("Helvetica").fontSize(11).fillColor("#64748b").text(dateLabel, 0, 334, { align: "center" });
+      if (!ph) {
+        doc.font("Helvetica").fontSize(11).fillColor("#64748b").text(dateLabel, 60, 334, { width: 300 });
+        if (creditsLabel) doc.font("Helvetica-Bold").fontSize(11).fillColor(TEAL).text(creditsLabel, W - 320, 334, { width: 260, align: "right" });
+      }
 
       doc.rect(18, H - 50, W - 36, 32).fill(DARK);
       doc.font("Helvetica").fontSize(9).fillColor("#94a3b8").text(footerText, 0, H - 40, { align: "center" });

@@ -24,6 +24,8 @@ export interface OverlayOptions {
   learnerName: string;
   courseTitle: string;
   issuedAt: Date;
+  /** Optional CME/CE credit hours string, e.g. "1.5" */
+  creditHours?: string | null;
 }
 
 /**
@@ -49,10 +51,15 @@ export async function overlayLearnerData(
 
     // Fill each field if it exists — silently skip missing fields so legacy
     // templates (plain-text placeholders) degrade gracefully.
+    const creditsValue = opts.creditHours
+      ? `${opts.creditHours} CME Credit${parseFloat(opts.creditHours) !== 1 ? "s" : ""}`
+      : "";
+
     const fieldMap: Record<string, string> = {
       learner_name: opts.learnerName,
       course_title: opts.courseTitle,
       issued_date:  `Issued: ${dateStr}`,
+      ...(creditsValue ? { credits: creditsValue } : {}),
     };
 
     let filledCount = 0;
