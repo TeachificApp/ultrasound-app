@@ -19,6 +19,7 @@ import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
+import { overlayLearnerData } from "../lib/certificatePdfOverlay";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
@@ -205,14 +206,21 @@ export async function issueCertificateIfEnabled(
     template = defaultTmpl ?? null;
   }
 
-  // Generate PDF — if the template has a custom uploaded PDF, use it directly;
+  // Generate PDF — if the template has a custom uploaded PDF, fetch it and
+  // overlay the real learner data (replacing {{LEARNER_NAME}} etc.);
   // otherwise generate one programmatically from the template settings.
   let pdfBuffer: Buffer;
   if (template?.pdfTemplateUrl) {
     // Fetch the pre-uploaded custom PDF from S3
     const res = await fetch(template.pdfTemplateUrl);
     if (!res.ok) throw new Error(`Failed to fetch custom PDF template: ${res.status}`);
-    pdfBuffer = Buffer.from(await res.arrayBuffer());
+    const rawBuffer = Buffer.from(await res.arrayBuffer());
+    // Replace placeholder strings with real learner data
+    pdfBuffer = await overlayLearnerData(rawBuffer, {
+      learnerName: user.credentials ? `${learnerName}, ${user.credentials}` : learnerName,
+      courseTitle: course.title,
+      issuedAt,
+    });
   } else {
     pdfBuffer = await generateCertificatePdf({
       learnerName,

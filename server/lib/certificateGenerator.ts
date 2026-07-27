@@ -28,6 +28,12 @@ export interface CertificateOptions {
   credentials?: string | null;
   /** Optional template — falls back to hardcoded defaults if null */
   template?: CertificateTemplate | null;
+  /**
+   * When true, replace learner name / course title / date with placeholder
+   * strings so the downloaded PDF shows where dynamic fields will appear.
+   * Defaults to false (real data rendered).
+   */
+  usePlaceholders?: boolean;
 }
 
 /** Fetch a URL and return a Buffer (used for logo/background images) */
@@ -70,6 +76,10 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
       size: "A4",
       layout: "landscape",
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      // Disable compression when generating placeholder PDFs so the placeholder
+      // strings remain as plain text in the content stream and can be replaced
+      // by a simple byte-level string substitution on issuance.
+      compress: !opts.usePlaceholders,
     });
 
     const chunks: Buffer[] = [];
@@ -93,6 +103,16 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
       doc.rect(0, 0, W, H).fill(LIGHT_BG);
     }
 
+    // Resolve display values — use placeholders when generating a sample template download
+    const ph = opts.usePlaceholders;
+    const displayName = ph
+      ? "{{LEARNER_NAME}}"
+      : (opts.credentials ? `${opts.learnerName}, ${opts.credentials}` : opts.learnerName);
+    const courseTitle = ph ? "{{COURSE_TITLE}}" : opts.courseTitle;
+    const dateLabel = ph
+      ? "Issued: {{ISSUED_DATE}}"
+      : `Issued: ${opts.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`;
+
     if (layout === "minimal") {
       // ── Minimal layout: clean lines, no heavy header band ──────────────────
       doc.moveTo(40, 40).lineTo(W - 40, 40).lineWidth(2).stroke(TEAL);
@@ -112,17 +132,13 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
       doc.moveTo(W / 2 - 120, 130).lineTo(W / 2 + 120, 130).lineWidth(0.5).stroke(GOLD);
 
       doc.font("Helvetica").fontSize(12).fillColor("#475569").text("This certifies that", 0, 148, { align: "center" });
-
-      const displayName = opts.credentials ? `${opts.learnerName}, ${opts.credentials}` : opts.learnerName;
       doc.font("Helvetica-Bold").fontSize(30).fillColor(DARK).text(displayName, 60, 172, { align: "center", width: W - 120 });
 
       doc.font("Helvetica").fontSize(12).fillColor("#475569").text("has successfully completed", 0, 230, { align: "center" });
-      doc.font("Helvetica-Bold").fontSize(16).fillColor(TEAL).text(opts.courseTitle, 80, 254, { align: "center", width: W - 160 });
+      doc.font("Helvetica-Bold").fontSize(16).fillColor(TEAL).text(courseTitle, 80, 254, { align: "center", width: W - 160 });
 
       doc.moveTo(W / 2 - 120, 300).lineTo(W / 2 + 120, 300).lineWidth(0.5).stroke(GOLD);
-
-      const dateStr = opts.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-      doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(`Issued: ${dateStr}`, 0, 314, { align: "center" });
+      doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(dateLabel, 0, 314, { align: "center" });
 
       doc.font("Helvetica").fontSize(8).fillColor("#94a3b8").text(footerText, 0, H - 32, { align: "center" });
 
@@ -146,17 +162,13 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
       doc.moveTo(lx, 128).lineTo(lx + 240, 128).lineWidth(1).stroke(GOLD);
 
       doc.font("Helvetica").fontSize(11).fillColor("#475569").text("This certifies that", lx, 144);
-
-      const displayName = opts.credentials ? `${opts.learnerName}, ${opts.credentials}` : opts.learnerName;
       doc.font("Helvetica-Bold").fontSize(28).fillColor(DARK).text(displayName, lx, 164, { width: W - lx - 40 });
 
       doc.font("Helvetica").fontSize(11).fillColor("#475569").text("has successfully completed", lx, 220);
-      doc.font("Helvetica-Bold").fontSize(16).fillColor(TEAL).text(opts.courseTitle, lx, 244, { width: W - lx - 40 });
+      doc.font("Helvetica-Bold").fontSize(16).fillColor(TEAL).text(courseTitle, lx, 244, { width: W - lx - 40 });
 
       doc.moveTo(lx, 290).lineTo(lx + 240, 290).lineWidth(1).stroke(GOLD);
-
-      const dateStr = opts.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-      doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(`Issued: ${dateStr}`, lx, 304);
+      doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(dateLabel, lx, 304);
 
       doc.rect(0, H - 40, W, 40).fill(DARK);
       doc.font("Helvetica").fontSize(8).fillColor("#94a3b8").text(footerText, 0, H - 26, { align: "center" });
@@ -189,17 +201,13 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
       doc.moveTo(W / 2 - 160, 150).lineTo(W / 2 + 160, 150).lineWidth(1).stroke(GOLD);
 
       doc.font("Helvetica").fontSize(12).fillColor("#475569").text("This certifies that", 0, 168, { align: "center" });
-
-      const displayName = opts.credentials ? `${opts.learnerName}, ${opts.credentials}` : opts.learnerName;
       doc.font("Helvetica-Bold").fontSize(32).fillColor(DARK).text(displayName, 60, 192, { align: "center", width: W - 120 });
 
       doc.font("Helvetica").fontSize(12).fillColor("#475569").text("has successfully completed the course", 0, 248, { align: "center" });
-      doc.font("Helvetica-Bold").fontSize(18).fillColor(TEAL).text(opts.courseTitle, 80, 272, { align: "center", width: W - 160 });
+      doc.font("Helvetica-Bold").fontSize(18).fillColor(TEAL).text(courseTitle, 80, 272, { align: "center", width: W - 160 });
 
       doc.moveTo(W / 2 - 160, 320).lineTo(W / 2 + 160, 320).lineWidth(1).stroke(GOLD);
-
-      const dateStr = opts.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-      doc.font("Helvetica").fontSize(11).fillColor("#64748b").text(`Issued: ${dateStr}`, 0, 334, { align: "center" });
+      doc.font("Helvetica").fontSize(11).fillColor("#64748b").text(dateLabel, 0, 334, { align: "center" });
 
       // Footer
       doc.rect(18, H - 50, W - 36, 32).fill(DARK);

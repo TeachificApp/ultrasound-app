@@ -241,13 +241,15 @@ const lmsCertificateRouter = router({
       if (tmpl.pdfTemplateUrl) {
         return { url: tmpl.pdfTemplateUrl, isCustom: true };
       }
-      // Otherwise generate a sample using placeholder learner info
+      // Otherwise generate a sample with placeholder strings so the admin can
+      // see exactly where {{LEARNER_NAME}}, {{COURSE_TITLE}}, {{ISSUED_DATE}} appear.
       const pdfBuffer = await generateCertificatePdf({
-        learnerName: "Jane Smith, RVT",
-        courseTitle: "Sample Course Title",
+        learnerName: "",
+        courseTitle: "",
         issuedAt: new Date(),
         credentials: null,
         template: tmpl,
+        usePlaceholders: true,
       });
       const base64 = pdfBuffer.toString("base64");
       return { dataUri: `data:application/pdf;base64,${base64}`, isCustom: false };
