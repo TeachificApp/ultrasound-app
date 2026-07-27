@@ -118,11 +118,168 @@ import { lmsEnrollmentAdminRouter } from "./lmsEnrollmentAdminRouter";
 import { lmsCohortAdminRouter } from "./lmsCohortAdminRouter";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
+// ─── Certificate Template Router (admin) ─────────────────────────────────────
+const lmsCertificateRouter = router({
+  listCertificateTemplates: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(lmsCertificateTemplates).orderBy(desc(lmsCertificateTemplates.createdAt));
+    }),
+  createCertificateTemplate: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(200),
+      description: z.string().optional().nullable(),
+      backgroundImageUrl: z.string().optional().nullable(),
+      logoUrl: z.string().optional().nullable(),
+      primaryColor: z.string().default("#189aa1"),
+      accentColor: z.string().default("#c9a84c"),
+      textColor: z.string().default("#0e1e2e"),
+      fontFamily: z.string().default("Helvetica"),
+      footerText: z.string().optional().nullable(),
+      organizationName: z.string().default("All About Ultrasound"),
+      layout: z.enum(["classic", "modern", "minimal"]).default("classic"),
+      isDefault: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (input.isDefault) {
+        await db.update(lmsCertificateTemplates).set({ isDefault: false });
+      }
+      const [result] = await db.insert(lmsCertificateTemplates).values({ ...input, isActive: true });
+      return { id: (result as any).insertId };
+    }),
+  updateCertificateTemplate: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      name: z.string().min(1).max(200).optional(),
+      description: z.string().optional().nullable(),
+      backgroundImageUrl: z.string().optional().nullable(),
+      logoUrl: z.string().optional().nullable(),
+      primaryColor: z.string().optional(),
+      accentColor: z.string().optional(),
+      textColor: z.string().optional(),
+      fontFamily: z.string().optional(),
+      footerText: z.string().optional().nullable(),
+      organizationName: z.string().optional(),
+      layout: z.enum(["classic", "modern", "minimal"]).optional(),
+      isDefault: z.boolean().optional(),
+      isActive: z.boolean().optional(),
+      pdfTemplateUrl: z.string().optional().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, ...fields } = input;
+      if (fields.isDefault) {
+        await db.update(lmsCertificateTemplates).set({ isDefault: false });
+      }
+      await db.update(lmsCertificateTemplates).set(fields as any).where(eq(lmsCertificateTemplates.id, id));
+      return { success: true };
+    }),
+  deleteCertificateTemplate: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsCourses).set({ certificateTemplateId: null }).where(eq(lmsCourses.certificateTemplateId, input.id));
+      await db.delete(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.id, input.id));
+      return { success: true };
+    }),
+  listIssuedCertificates: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive().optional(),
+      userId: z.number().int().positive().optional(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions: any[] = [];
+      if (input.courseId) conditions.push(eq(lmsCertificates.courseId, input.courseId));
+      if (input.userId) conditions.push(eq(lmsCertificates.userId, input.userId));
+      const offset = (input.page - 1) * input.pageSize;
+      const rows = await db
+        .select({
+          id: lmsCertificates.id,
+          userId: lmsCertificates.userId,
+          courseId: lmsCertificates.courseId,
+          certificateUrl: lmsCertificates.certificateUrl,
+          issuedAt: lmsCertificates.issuedAt,
+          templateId: lmsCertificates.templateId,
+          userName: users.name,
+          userEmail: users.email,
+          courseTitle: lmsCourses.title,
+          courseType: lmsCourses.type,
+        })
+        .from(lmsCertificates)
+        .leftJoin(users, eq(lmsCertificates.userId, users.id))
+        .leftJoin(lmsCourses, eq(lmsCertificates.courseId, lmsCourses.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(lmsCertificates.issuedAt))
+        .limit(input.pageSize)
+        .offset(offset);
+      return rows;
+    }),
+  /** Generate a sample certificate PDF for a template and return it as a base64 data URI for download */
+  generateSampleCertificatePdf: protectedProcedure
+    .input(z.object({ templateId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [tmpl] = await db.select().from(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.id, input.templateId)).limit(1);
+      if (!tmpl) throw new TRPCError({ code: "NOT_FOUND" });
+      // If a custom PDF already exists, return it directly
+      if (tmpl.pdfTemplateUrl) {
+        return { url: tmpl.pdfTemplateUrl, isCustom: true };
+      }
+      // Otherwise generate a sample using placeholder learner info
+      const pdfBuffer = await generateCertificatePdf({
+        learnerName: "Jane Smith, RVT",
+        courseTitle: "Sample Course Title",
+        issuedAt: new Date(),
+        credentials: null,
+        template: tmpl,
+      });
+      const base64 = pdfBuffer.toString("base64");
+      return { dataUri: `data:application/pdf;base64,${base64}`, isCustom: false };
+    }),
+  /** Upload a custom PDF template for a certificate template (base64 data URI) */
+  uploadCertificatePdf: protectedProcedure
+    .input(z.object({
+      templateId: z.number().int().positive(),
+      dataUri: z.string().min(1).max(20_000_000), // ~15 MB PDF
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const b64Marker = ";base64,";
+      const b64Idx = input.dataUri.indexOf(b64Marker);
+      const base64Data = b64Idx >= 0 ? input.dataUri.slice(b64Idx + b64Marker.length) : input.dataUri;
+      const buffer = Buffer.from(base64Data, "base64");
+      const suffix = randomBytes(4).toString("hex");
+      const fileKey = `certificate-templates/template-${input.templateId}-${suffix}.pdf`;
+      const { url } = await storagePut(fileKey, buffer, "application/pdf");
+      await db.update(lmsCertificateTemplates).set({ pdfTemplateUrl: url }).where(eq(lmsCertificateTemplates.id, input.templateId));
+      return { url };
+    }),
+});
+
 export const lmsAdminRouter = router({
   ...lmsCourseBuilderRouter._def.procedures,
   ...lmsQuizLandingRouter._def.procedures,
   ...lmsEnrollmentAdminRouter._def.procedures,
   ...lmsCohortAdminRouter._def.procedures,
+  ...lmsCertificateRouter._def.procedures,
 });
 
 // ─── Public Router ────────────────────────────────────────────────────────────

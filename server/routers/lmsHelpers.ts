@@ -205,14 +205,23 @@ export async function issueCertificateIfEnabled(
     template = defaultTmpl ?? null;
   }
 
-  // Generate PDF
-  const pdfBuffer = await generateCertificatePdf({
-    learnerName,
-    courseTitle: course.title,
-    issuedAt,
-    credentials: user.credentials,
-    template,
-  });
+  // Generate PDF — if the template has a custom uploaded PDF, use it directly;
+  // otherwise generate one programmatically from the template settings.
+  let pdfBuffer: Buffer;
+  if (template?.pdfTemplateUrl) {
+    // Fetch the pre-uploaded custom PDF from S3
+    const res = await fetch(template.pdfTemplateUrl);
+    if (!res.ok) throw new Error(`Failed to fetch custom PDF template: ${res.status}`);
+    pdfBuffer = Buffer.from(await res.arrayBuffer());
+  } else {
+    pdfBuffer = await generateCertificatePdf({
+      learnerName,
+      courseTitle: course.title,
+      issuedAt,
+      credentials: user.credentials,
+      template,
+    });
+  }
 
   // Upload PDF to S3
   const suffix = randomBytes(6).toString("hex");

@@ -1,8 +1,12 @@
 /**
  * CertificateTemplatesAdmin.tsx
  * Admin UI for managing certificate templates and viewing issued certificates.
+ *
+ * Changes:
+ * - Signature fields removed (no admin signature required on certificates)
+ * - PDF template download + re-upload supported per template
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Award, Star, Download, Eye } from "lucide-react";
+import { Plus, Edit, Trash2, Award, Star, Download, Eye, Upload, FileText, X } from "lucide-react";
 
 interface CertTemplate {
   id: number;
@@ -27,12 +31,10 @@ interface CertTemplate {
   accentColor: string;
   textColor: string;
   fontFamily: string;
-  signatureName?: string | null;
-  signatureTitle?: string | null;
-  signatureImageUrl?: string | null;
   footerText?: string | null;
   organizationName: string;
   layout: "classic" | "modern" | "minimal";
+  pdfTemplateUrl?: string | null;
   isDefault: boolean;
   isActive: boolean;
   createdAt: Date | string;
@@ -47,12 +49,10 @@ const DEFAULT_TEMPLATE: Omit<CertTemplate, "id" | "createdAt"> = {
   accentColor: "#c9a84c",
   textColor: "#0e1e2e",
   fontFamily: "Helvetica",
-  signatureName: "Lara Williams, RVT, RDMS",
-  signatureTitle: "Founder, All About Ultrasound™",
-  signatureImageUrl: null,
   footerText: "www.allaboutultrasound.com  ·  © All About Ultrasound™",
   organizationName: "All About Ultrasound",
   layout: "classic",
+  pdfTemplateUrl: null,
   isDefault: false,
   isActive: true,
 };
@@ -156,24 +156,6 @@ function TemplateEditor({
       </div>
 
       <div className="border rounded-lg p-3 space-y-3">
-        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Signature</p>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>Signature Name</Label>
-            <Input value={form.signatureName ?? ""} onChange={e => set("signatureName", e.target.value || null)} placeholder="e.g. Lara Williams, RVT, RDMS" />
-          </div>
-          <div>
-            <Label>Signature Title</Label>
-            <Input value={form.signatureTitle ?? ""} onChange={e => set("signatureTitle", e.target.value || null)} placeholder="e.g. Founder, All About Ultrasound™" />
-          </div>
-          <div className="col-span-2">
-            <Label>Signature Image URL (optional)</Label>
-            <Input value={form.signatureImageUrl ?? ""} onChange={e => set("signatureImageUrl", e.target.value || null)} placeholder="https://..." />
-          </div>
-        </div>
-      </div>
-
-      <div className="border rounded-lg p-3 space-y-3">
         <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Footer</p>
         <div>
           <Label>Footer Text</Label>
@@ -198,6 +180,145 @@ function TemplateEditor({
           {isSaving ? "Saving..." : "Save Template"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** PDF upload panel shown on each template card */
+function PdfUploadPanel({ template }: { template: CertTemplate }) {
+  const utils = trpc.useUtils();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const uploadMut = trpc.lmsAdmin.uploadCertificatePdf.useMutation({
+    onSuccess: () => {
+      utils.lmsAdmin.listCertificateTemplates.invalidate();
+      toast.success("PDF template uploaded");
+    },
+    onError: (e) => toast.error(`Upload failed: ${e.message}`),
+  });
+
+  const removeMut = trpc.lmsAdmin.updateCertificateTemplate.useMutation({
+    onSuccess: () => {
+      utils.lmsAdmin.listCertificateTemplates.invalidate();
+      toast.success("PDF template removed — generated PDF will be used");
+    },
+    onError: (e) => toast.error(`Error: ${e.message}`),
+  });
+
+  const sampleMut = trpc.lmsAdmin.generateSampleCertificatePdf.useMutation({
+    onError: (e) => { toast.error(`Download failed: ${e.message}`); setDownloading(false); },
+  });
+
+  const handleDownloadSample = async () => {
+    setDownloading(true);
+    try {
+      const result = await sampleMut.mutateAsync({ templateId: template.id });
+      if (result.url) {
+        // Custom PDF — open directly
+        window.open(result.url, "_blank");
+      } else if (result.dataUri) {
+        // Generated PDF — trigger browser download
+        const a = document.createElement("a");
+        a.href = result.dataUri;
+        a.download = `certificate-template-${template.id}-sample.pdf`;
+        a.click();
+      }
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Only PDF files are accepted");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("PDF must be under 15 MB");
+      return;
+    }
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUri = reader.result as string;
+        await uploadMut.mutateAsync({ templateId: template.id, dataUri });
+        setUploading(false);
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read file");
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setUploading(false);
+    }
+    // Reset input so same file can be re-selected
+    e.target.value = "";
+  };
+
+  return (
+    <div className="border-t pt-3 mt-1 space-y-2">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">PDF Template</p>
+      {template.pdfTemplateUrl ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" className="text-xs h-7" onClick={handleDownloadSample} disabled={downloading}>
+            <Download className="w-3 h-3 mr-1" />{downloading ? "Generating…" : "Download PDF"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-7"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+          >
+            <Upload className="w-3 h-3 mr-1" />{uploading ? "Uploading…" : "Replace PDF"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-xs h-7 text-destructive hover:text-destructive"
+            onClick={() => removeMut.mutate({ id: template.id, pdfTemplateUrl: null })}
+            disabled={removeMut.isPending}
+          >
+            <X className="w-3 h-3 mr-1" />Remove
+          </Button>
+          <span className="text-xs text-muted-foreground">Custom PDF active</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-7"
+            onClick={handleDownloadSample}
+            disabled={downloading}
+          >
+            <Download className="w-3 h-3 mr-1" />{downloading ? "Generating…" : "Download Sample"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-7"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+          >
+            <Upload className="w-3 h-3 mr-1" />{uploading ? "Uploading…" : "Upload PDF Template"}
+          </Button>
+          <span className="text-xs text-muted-foreground">Using generated PDF</span>
+        </div>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={handleFile}
+      />
     </div>
   );
 }
@@ -256,7 +377,7 @@ export default function CertificateTemplatesAdmin() {
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-lg font-semibold">Certificate Templates</h3>
-              <p className="text-sm text-muted-foreground">Design templates used when issuing completion certificates.</p>
+              <p className="text-sm text-muted-foreground">Design templates used when issuing completion certificates. You can upload a custom PDF to replace the generated design.</p>
             </div>
             <Button onClick={() => setShowCreate(true)}>
               <Plus className="w-4 h-4 mr-1" /> New Template
@@ -296,12 +417,16 @@ export default function CertificateTemplatesAdmin() {
                       <div className="w-6 h-6 rounded-full border" style={{ background: t.accentColor }} title="Accent" />
                       <div className="w-6 h-6 rounded-full border" style={{ background: t.textColor }} title="Text" />
                       <span className="text-xs text-muted-foreground ml-1 capitalize">{t.layout}</span>
+                      {t.pdfTemplateUrl && (
+                        <Badge variant="outline" className="text-xs ml-auto">
+                          <FileText className="w-3 h-3 mr-1" />Custom PDF
+                        </Badge>
+                      )}
                     </div>
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      {t.signatureName && <div>Signature: {t.signatureName}</div>}
+                    <div className="text-xs text-muted-foreground">
                       {t.organizationName && <div>Org: {t.organizationName}</div>}
                     </div>
-                    <div className="flex gap-2 pt-1">
+                    <div className="flex gap-2 pt-1 flex-wrap">
                       {!t.isDefault && (
                         <Button size="sm" variant="outline" className="text-xs" onClick={() => setDefaultMut.mutate({ id: t.id, isDefault: true })}>
                           <Star className="w-3 h-3 mr-1" />Set Default
@@ -314,6 +439,8 @@ export default function CertificateTemplatesAdmin() {
                         <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
+                    {/* PDF download / upload panel */}
+                    <PdfUploadPanel template={t} />
                   </CardContent>
                 </Card>
               ))}

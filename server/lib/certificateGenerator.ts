@@ -13,9 +13,6 @@ export interface CertificateTemplate {
   accentColor?: string | null;
   textColor?: string | null;
   fontFamily?: string | null;
-  signatureName?: string | null;
-  signatureTitle?: string | null;
-  signatureImageUrl?: string | null;
   backgroundImageUrl?: string | null;
   logoUrl?: string | null;
   footerText?: string | null;
@@ -55,8 +52,6 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
   const DARK = tmpl.textColor || "#0e1e2e";
   const LIGHT_BG = "#f0fbfc";
   const orgName = tmpl.organizationName || "All About Ultrasound™";
-  const sigName = tmpl.signatureName || "Lara Williams, RVT, RDMS";
-  const sigTitle = tmpl.signatureTitle || `Founder, ${orgName}`;
   const footerText = tmpl.footerText || `www.allaboutultrasound.com  ·  © ${orgName}`;
   const layout = tmpl.layout || "classic";
 
@@ -129,12 +124,6 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
       const dateStr = opts.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
       doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(`Issued: ${dateStr}`, 0, 314, { align: "center" });
 
-      // Signature
-      const sigX = W / 2 - 80;
-      doc.moveTo(sigX, 390).lineTo(sigX + 160, 390).lineWidth(0.5).stroke("#94a3b8");
-      doc.font("Helvetica").fontSize(9).fillColor("#64748b").text(sigName, sigX - 20, 398, { width: 200, align: "center" });
-      doc.font("Helvetica").fontSize(8).fillColor("#94a3b8").text(sigTitle, sigX - 20, 410, { width: 200, align: "center" });
-
       doc.font("Helvetica").fontSize(8).fillColor("#94a3b8").text(footerText, 0, H - 32, { align: "center" });
 
     } else if (layout === "modern") {
@@ -168,11 +157,6 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
 
       const dateStr = opts.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
       doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(`Issued: ${dateStr}`, lx, 304);
-
-      // Signature
-      doc.moveTo(lx, 400).lineTo(lx + 160, 400).lineWidth(0.5).stroke("#94a3b8");
-      doc.font("Helvetica").fontSize(9).fillColor("#64748b").text(sigName, lx, 408);
-      doc.font("Helvetica").fontSize(8).fillColor("#94a3b8").text(sigTitle, lx, 420);
 
       doc.rect(0, H - 40, W, 40).fill(DARK);
       doc.font("Helvetica").fontSize(8).fillColor("#94a3b8").text(footerText, 0, H - 26, { align: "center" });
@@ -216,12 +200,6 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
 
       const dateStr = opts.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
       doc.font("Helvetica").fontSize(11).fillColor("#64748b").text(`Issued: ${dateStr}`, 0, 334, { align: "center" });
-
-      // Signature
-      const sigX = W / 2 - 80;
-      doc.moveTo(sigX, 420).lineTo(sigX + 160, 420).lineWidth(1).stroke("#94a3b8");
-      doc.font("Helvetica").fontSize(10).fillColor("#94a3b8").text(sigName, sigX - 20, 428, { width: 200, align: "center" });
-      doc.font("Helvetica").fontSize(9).fillColor("#94a3b8").text(sigTitle, sigX - 20, 442, { width: 200, align: "center" });
 
       // Footer
       doc.rect(18, H - 50, W - 36, 32).fill(DARK);

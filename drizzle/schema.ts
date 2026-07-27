@@ -3453,6 +3453,9 @@ export const lmsCertificateTemplates = mysqlTable("lms_certificate_templates", {
   organizationName: varchar("organization_name", { length: 200 }).default("All About Ultrasound").notNull(),
   // Layout variant: classic | modern | minimal
   layout: mysqlEnum("layout", ["classic", "modern", "minimal"]).default("classic").notNull(),
+  // Optional custom PDF template — when set, this PDF is used as the certificate instead of the generated one.
+  // Admins can download this PDF, edit it externally, and re-upload it.
+  pdfTemplateUrl: text("pdf_template_url"),
   isDefault: boolean("is_default").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
