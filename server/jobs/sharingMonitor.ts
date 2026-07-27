@@ -15,12 +15,8 @@
 import { getDb } from "../db";
 import { ipAccessLogs, sharingAbuseFlags, users } from "../../drizzle/schema";
 import { eq, and, gte, sql, desc, inArray } from "drizzle-orm";
-import { sendEmail } from "../_core/email";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
-
-const ALERT_EMAIL = "support@allaboutultrasound.com";
-const ALERT_NAME = "Support Team";
 
 // Thresholds
 const MAX_IPS_24H = 3;       // Max distinct IPs in 24 hours before flagging
@@ -170,9 +166,15 @@ async function detectSuspiciousAccounts(): Promise<SuspiciousUser[]> {
   return results;
 }
 
-// ─── Flagging & Alerting ──────────────────────────────────────────────────────
+// ─── Flagging ────────────────────────────────────────────────────────────────
+// NOTE: No automatic emails are sent. All alert and suspension emails require
+// a manual admin trigger from the Sharing Monitor admin panel.
 
-function buildAlertEmail(flaggedUsers: SuspiciousUser[]): string {
+// buildAlertEmail removed — emails are sent manually by admins only.
+// The function below is kept as dead code reference for the admin email template
+// used in sharingMonitorRouter.ts (buildStudentAlertEmail).
+
+function _buildAlertEmailUnused(flaggedUsers: SuspiciousUser[]): string {
   const rows = flaggedUsers.map(u => `
     <tr style="border-bottom: 1px solid #e5e7eb;">
       <td style="padding: 12px 8px; font-size: 14px;">${u.userName || "Unknown"}</td>
@@ -243,13 +245,19 @@ function buildAlertEmail(flaggedUsers: SuspiciousUser[]): string {
   `;
 }
 
+/**
+ * Create abuse flags in the database for suspicious users.
+ * NOTE: No emails are sent automatically — all alert and suspension emails
+ * require a manual admin trigger from the Sharing Monitor admin panel.
+ */
 async function flagAndAlert(suspiciousUsers: SuspiciousUser[]): Promise<void> {
   if (suspiciousUsers.length === 0) return;
 
   const db = await getDb();
   if (!db) return;
 
-  // Create flags in database
+  // Create flags in database only — no automatic emails sent.
+  // Admins review flags in the Sharing Monitor and send emails manually.
   for (const user of suspiciousUsers) {
     await db.insert(sharingAbuseFlags).values({
       userId: user.userId,
@@ -257,26 +265,11 @@ async function flagAndAlert(suspiciousUsers: SuspiciousUser[]): Promise<void> {
       distinctIpCount: user.distinctIps7d,
       ipAddresses: JSON.stringify(user.ipList),
       detectionReason: user.reason,
-      alertSentAt: new Date(),
+      // alertSentAt is intentionally left null — set only when admin manually sends an alert
     });
   }
 
-  // Send consolidated alert email
-  const htmlBody = buildAlertEmail(suspiciousUsers);
-  const subject = `⚠️ Account Sharing Alert: ${suspiciousUsers.length} account${suspiciousUsers.length > 1 ? "s" : ""} flagged`;
-
-  const sent = await sendEmail({
-    to: { name: ALERT_NAME, email: ALERT_EMAIL },
-    subject,
-    htmlBody,
-    previewText: `${suspiciousUsers.length} account(s) flagged for potential sharing abuse`,
-  });
-
-  if (sent) {
-    console.log(`[SharingMonitor] Alert sent to ${ALERT_EMAIL} for ${suspiciousUsers.length} user(s)`);
-  } else {
-    console.warn("[SharingMonitor] Failed to send alert email");
-  }
+  console.log(`[SharingMonitor] Flagged ${suspiciousUsers.length} account(s) for admin review. No automatic emails sent.`);
 }
 
 // ─── Main Cron Runner ─────────────────────────────────────────────────────────
