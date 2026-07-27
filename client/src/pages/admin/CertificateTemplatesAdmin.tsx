@@ -329,6 +329,7 @@ function StandalonePdfPanel() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Generate a sample PDF using the default template (or built-in defaults if none)
   const sampleMut = trpc.lmsAdmin.generateSampleCertificatePdf.useMutation({
@@ -418,7 +419,10 @@ function StandalonePdfPanel() {
         <p className="text-sm font-medium">PDF Certificate Template</p>
         <p className="text-xs text-muted-foreground">Download the sample to edit the design, then re-upload your customised PDF.</p>
       </div>
-      <div className="flex gap-2 shrink-0">
+      <div className="flex gap-2 shrink-0 flex-wrap">
+        <Button size="sm" variant="outline" onClick={() => setPreviewOpen(true)}>
+          <Eye className="w-3.5 h-3.5 mr-1" />Preview
+        </Button>
         <Button size="sm" variant="outline" onClick={handleDownloadSample} disabled={downloading}>
           <Download className="w-3.5 h-3.5 mr-1" />{downloading ? "Generating…" : "Download Sample"}
         </Button>
@@ -426,8 +430,62 @@ function StandalonePdfPanel() {
           <Upload className="w-3.5 h-3.5 mr-1" />{uploading ? "Uploading…" : "Upload PDF"}
         </Button>
       </div>
+      {previewOpen && (
+        <PdfPreviewModal
+          templateId={defaultTemplate?.id}
+          templateName={defaultTemplate?.name ?? "Default Template"}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
       <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={handleFile} />
     </div>
+  );
+}
+
+// ── PDF Preview Modal ──────────────────────────────────────────────────────
+function PdfPreviewModal({ templateId, templateName, onClose }: {
+  templateId?: number;
+  templateName?: string;
+  onClose: () => void;
+}) {
+  const [dataUri, setDataUri] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const sampleMut = trpc.lmsAdmin.generateSampleCertificatePdf.useMutation({
+    onSuccess: (res) => {
+      setDataUri(res.url ?? res.dataUri ?? null);
+      setLoading(false);
+    },
+    onError: (e) => { setError(e.message); setLoading(false); },
+  });
+  // Trigger on mount
+  const triggered = useRef(false);
+  if (!triggered.current) {
+    triggered.current = true;
+    sampleMut.mutate({ templateId: templateId && templateId > 0 ? templateId : undefined });
+  }
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-[#189aa1]" />
+            Preview: {templateName ?? "Certificate Template"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 bg-muted/30 flex items-center justify-center">
+          {loading && <div className="text-muted-foreground text-sm animate-pulse">Generating preview…</div>}
+          {error && <div className="text-destructive text-sm px-6">{error}</div>}
+          {!loading && !error && dataUri && (
+            <iframe src={dataUri} className="w-full h-full border-0" title="Certificate Preview" />
+          )}
+        </div>
+        <div className="px-6 py-3 border-t shrink-0 flex justify-between items-center">
+          <p className="text-xs text-muted-foreground">Placeholders shown: {"{{LEARNER_NAME}}"}, {"{{COURSE_TITLE}}"}, {"{{ISSUED_DATE}}"}</p>
+          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -440,6 +498,7 @@ export default function CertificateTemplatesAdmin() {
   const [showCreate, setShowCreate] = useState(false);
   const [editTemplate, setEditTemplate] = useState<CertTemplate | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<{ id?: number; name?: string } | null>(null);
 
   const createMut = trpc.lmsAdmin.createCertificateTemplate.useMutation({
     onSuccess: () => {
@@ -542,6 +601,9 @@ export default function CertificateTemplatesAdmin() {
                           <Star className="w-3 h-3 mr-1" />Set Default
                         </Button>
                       )}
+                      <Button size="sm" variant="outline" onClick={() => setPreviewTemplate({ id: t.id, name: t.name })}>
+                        <Eye className="w-3 h-3 mr-1" />Preview
+                      </Button>
                       <Button size="sm" variant="outline" onClick={() => setEditTemplate(t)}>
                         <Edit className="w-3 h-3 mr-1" />Edit
                       </Button>
@@ -616,6 +678,15 @@ export default function CertificateTemplatesAdmin() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* ── PDF Preview Modal ─────────────────────────────────────────────── */}
+      {previewTemplate !== null && (
+        <PdfPreviewModal
+          templateId={previewTemplate.id}
+          templateName={previewTemplate.name}
+          onClose={() => setPreviewTemplate(null)}
+        />
+      )}
 
       {/* ── Create Dialog ──────────────────────────────────────────────────── */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
