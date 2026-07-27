@@ -228,27 +228,46 @@ const lmsCertificateRouter = router({
         .offset(offset);
       return rows;
     }),
-  /** Generate a sample certificate PDF for a template and return it as a base64 data URI for download */
+  /** Generate a sample certificate PDF — works with or without an existing template */
   generateSampleCertificatePdf: protectedProcedure
-    .input(z.object({ templateId: z.number().int().positive() }))
+    .input(z.object({ templateId: z.number().int().optional() }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [tmpl] = await db.select().from(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.id, input.templateId)).limit(1);
-      if (!tmpl) throw new TRPCError({ code: "NOT_FOUND" });
-      // If a custom PDF already exists, return it directly
-      if (tmpl.pdfTemplateUrl) {
+      // Resolve template: use provided id, or fall back to default, or any active template
+      let tmpl: typeof lmsCertificateTemplates.$inferSelect | null = null;
+      if (input.templateId && input.templateId > 0) {
+        const [row] = await db.select().from(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.id, input.templateId)).limit(1);
+        tmpl = row ?? null;
+      }
+      if (!tmpl) {
+        const rows = await db.select().from(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.isActive, true)).limit(10);
+        tmpl = rows.find(r => r.isDefault) ?? rows[0] ?? null;
+      }
+      // If a custom PDF already exists on the resolved template, return it directly
+      if (tmpl?.pdfTemplateUrl) {
         return { url: tmpl.pdfTemplateUrl, isCustom: true };
       }
-      // Otherwise generate a sample with placeholder strings so the admin can
+      // Build a fallback template config using brand defaults when no DB template exists
+      const effectiveTemplate = tmpl ?? {
+        id: 0, name: "Default",
+        primaryColor: "#189aa1", accentColor: "#c9a84c", textColor: "#0e1e2e",
+        fontFamily: "Helvetica",
+        footerText: "www.allaboutultrasound.com  \u00b7  \u00a9 All About Ultrasound\u2122",
+        organizationName: "All About Ultrasound",
+        layout: "classic", isDefault: true, isActive: true,
+        pdfTemplateUrl: null, description: null,
+        createdAt: new Date(), updatedAt: new Date(),
+      };
+      // Generate a sample with placeholder strings so the admin can
       // see exactly where {{LEARNER_NAME}}, {{COURSE_TITLE}}, {{ISSUED_DATE}} appear.
       const pdfBuffer = await generateCertificatePdf({
         learnerName: "",
         courseTitle: "",
         issuedAt: new Date(),
         credentials: null,
-        template: tmpl,
+        template: effectiveTemplate as any,
         usePlaceholders: true,
       });
       const base64 = pdfBuffer.toString("base64");
