@@ -323,6 +323,114 @@ function PdfUploadPanel({ template }: { template: CertTemplate }) {
   );
 }
 
+/** Standalone PDF actions panel — always visible, works without any saved templates */
+function StandalonePdfPanel() {
+  const utils = trpc.useUtils();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  // Generate a sample PDF using the default template (or built-in defaults if none)
+  const sampleMut = trpc.lmsAdmin.generateSampleCertificatePdf.useMutation({
+    onError: (e) => { toast.error(`Download failed: ${e.message}`); setDownloading(false); },
+  });
+
+  // Create a new default template with the uploaded PDF
+  const createMut = trpc.lmsAdmin.createCertificateTemplate.useMutation({
+    onSuccess: () => {
+      utils.lmsAdmin.listCertificateTemplates.invalidate();
+      toast.success("Default template created with your PDF");
+    },
+    onError: (e) => toast.error(`Error: ${e.message}`),
+  });
+
+  const uploadMut = trpc.lmsAdmin.uploadCertificatePdf.useMutation({
+    onSuccess: () => {
+      utils.lmsAdmin.listCertificateTemplates.invalidate();
+      toast.success("PDF template uploaded");
+    },
+    onError: (e) => toast.error(`Upload failed: ${e.message}`),
+  });
+
+  const { data: templates = [] } = trpc.lmsAdmin.listCertificateTemplates.useQuery();
+  const defaultTemplate = (templates as CertTemplate[]).find((t) => t.isDefault) ?? (templates as CertTemplate[])[0] ?? null;
+
+  const handleDownloadSample = async () => {
+    setDownloading(true);
+    try {
+      const result = await sampleMut.mutateAsync({ templateId: defaultTemplate?.id ?? 0 });
+      if (result.url) {
+        window.open(result.url, "_blank");
+      } else if (result.dataUri) {
+        const a = document.createElement("a");
+        a.href = result.dataUri;
+        a.download = "certificate-template-sample.pdf";
+        a.click();
+      }
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") { toast.error("Only PDF files are accepted"); return; }
+    if (file.size > 15 * 1024 * 1024) { toast.error("PDF must be under 15 MB"); return; }
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUri = reader.result as string;
+        if (defaultTemplate) {
+          await uploadMut.mutateAsync({ templateId: defaultTemplate.id, dataUri });
+        } else {
+          // No templates yet — create a default one with this PDF
+          const created = await createMut.mutateAsync({
+            name: "Default",
+            description: "Auto-created from uploaded PDF",
+            primaryColor: "#189aa1",
+            accentColor: "#c9a84c",
+            textColor: "#0e1e2e",
+            fontFamily: "Helvetica",
+            footerText: "www.allaboutultrasound.com  ·  © All About Ultrasound™",
+            organizationName: "All About Ultrasound",
+            layout: "classic",
+            isDefault: true,
+            isActive: true,
+          } as any);
+          if ((created as any)?.id) {
+            await uploadMut.mutateAsync({ templateId: (created as any).id, dataUri });
+          }
+        }
+        setUploading(false);
+      };
+      reader.onerror = () => { toast.error("Failed to read file"); setUploading(false); };
+      reader.readAsDataURL(file);
+    } catch { setUploading(false); }
+    e.target.value = "";
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-3 bg-muted/40 border rounded-lg">
+      <FileText className="w-5 h-5 text-muted-foreground shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">PDF Certificate Template</p>
+        <p className="text-xs text-muted-foreground">Download the sample to edit the design, then re-upload your customised PDF.</p>
+      </div>
+      <div className="flex gap-2 shrink-0">
+        <Button size="sm" variant="outline" onClick={handleDownloadSample} disabled={downloading}>
+          <Download className="w-3.5 h-3.5 mr-1" />{downloading ? "Generating…" : "Download Sample"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
+          <Upload className="w-3.5 h-3.5 mr-1" />{uploading ? "Uploading…" : "Upload PDF"}
+        </Button>
+      </div>
+      <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={handleFile} />
+    </div>
+  );
+}
+
 export default function CertificateTemplatesAdmin() {
   const utils = trpc.useUtils();
 
@@ -383,6 +491,8 @@ export default function CertificateTemplatesAdmin() {
               <Plus className="w-4 h-4 mr-1" /> New Template
             </Button>
           </div>
+
+          <StandalonePdfPanel />
 
           {isLoading ? (
             <div className="text-center py-12 text-muted-foreground">Loading templates…</div>
