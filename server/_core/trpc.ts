@@ -17,6 +17,15 @@ const requireUser = t.middleware(async opts => {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
+  // Block suspended accounts from all protected procedures.
+  // Admins are exempt so they can still manage the platform.
+  if (ctx.user.suspendedAt && ctx.user.role !== "admin") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Your account has been suspended. Please contact support@allaboutultrasound.com if you believe this is an error.",
+    });
+  }
+
   return next({
     ctx: {
       ...ctx,

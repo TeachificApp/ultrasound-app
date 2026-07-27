@@ -6,13 +6,139 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { ipAccessLogs, sharingAbuseFlags, users, lmsEnrollments, lmsCourses } from "../../drizzle/schema";
-import { eq, and, gte, desc, sql, inArray } from "drizzle-orm";
+import { ipAccessLogs, sharingAbuseFlags, users, lmsEnrollments, lmsCourses, brandMemberships, membershipSubscriptions, labSubscriptions, teamSubscriptions, employerProfiles, employerSubscriptions } from "../../drizzle/schema";
+import { eq, and, gte, desc, sql, inArray, or } from "drizzle-orm";
 import { runSharingMonitor } from "../jobs/sharingMonitor";
 import { sendEmail } from "../_core/email";
+import { getStripeClient } from "../lib/stripeClient";
 
 const SUPPORT_EMAIL = "support@allaboutultrasound.com";
 const SUPPORT_NAME = "All About Ultrasound Support";
+
+/**
+ * Cancel all active Stripe subscriptions for a user across all subscription tables.
+ * Returns a summary of what was cancelled.
+ */
+async function cancelAllUserStripeSubscriptions(userId: number): Promise<{
+  cancelled: string[];
+  errors: string[];
+}> {
+  const db = await getDb();
+  if (!db) return { cancelled: [], errors: ["DB unavailable"] };
+
+  const stripe = getStripeClient();
+  const cancelled: string[] = [];
+  const errors: string[] = [];
+
+  async function cancelSub(subId: string | null | undefined, source: string): Promise<void> {
+    if (!subId) return;
+    try {
+      const sub = await stripe.subscriptions.retrieve(subId);
+      if (sub.status !== "canceled") {
+        await stripe.subscriptions.cancel(subId);
+        cancelled.push(`${source}:${subId}`);
+        console.log(`[SuspendUser] Cancelled Stripe subscription ${subId} (${source}) for user ${userId}`);
+      }
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      errors.push(`${source}:${subId} — ${msg}`);
+      console.error(`[SuspendUser] Failed to cancel ${subId} (${source}):`, msg);
+    }
+  }
+
+  // 1. brandMemberships — per-brand premium subscriptions
+  const brandSubs = await db
+    .select({ id: brandMemberships.id, subId: brandMemberships.stripeSubscriptionId })
+    .from(brandMemberships)
+    .where(eq(brandMemberships.userId, userId));
+  for (const row of brandSubs) {
+    await cancelSub(row.subId, "brandMembership");
+    if (row.subId) {
+      await db.update(brandMemberships)
+        .set({ status: "cancelled" })
+        .where(eq(brandMemberships.id, row.id));
+    }
+  }
+
+  // 2. membershipSubscriptions — plan-based subscriptions
+  const memberSubs = await db
+    .select({ id: membershipSubscriptions.id, subId: membershipSubscriptions.stripeSubscriptionId })
+    .from(membershipSubscriptions)
+    .where(and(
+      eq(membershipSubscriptions.userId, userId),
+      or(
+        eq(membershipSubscriptions.status, "active"),
+        eq(membershipSubscriptions.status, "trialing"),
+        eq(membershipSubscriptions.status, "past_due")
+      )
+    ));
+  for (const row of memberSubs) {
+    await cancelSub(row.subId, "membershipSubscription");
+    if (row.subId) {
+      await db.update(membershipSubscriptions)
+        .set({ status: "cancelled" })
+        .where(eq(membershipSubscriptions.id, row.id));
+    }
+  }
+
+  // 3. labSubscriptions — lab admin billing (user is the billing admin)
+  const labSubs = await db
+    .select({ id: labSubscriptions.id, subId: labSubscriptions.stripeSubscriptionId })
+    .from(labSubscriptions)
+    .where(eq(labSubscriptions.adminUserId, userId));
+  for (const row of labSubs) {
+    await cancelSub(row.subId, "labSubscription");
+    if (row.subId) {
+      await db.update(labSubscriptions)
+        .set({ status: "canceled", canceledAt: new Date() })
+        .where(eq(labSubscriptions.id, row.id));
+    }
+  }
+
+  // 4. teamSubscriptions — team/institution billing admin
+  const teamSubs = await db
+    .select({ id: teamSubscriptions.id, subId: teamSubscriptions.stripeSubscriptionId })
+    .from(teamSubscriptions)
+    .where(eq(teamSubscriptions.adminUserId, userId));
+  for (const row of teamSubs) {
+    await cancelSub(row.subId, "teamSubscription");
+    if (row.subId) {
+      await db.update(teamSubscriptions)
+        .set({ status: "canceled", canceledAt: new Date() })
+        .where(eq(teamSubscriptions.id, row.id));
+    }
+  }
+
+  // 5. employerSubscriptions — job board / employer billing
+  //    employerSubscriptions links via employerProfiles.userId → employerProfiles.id → employerSubscriptions.employerId
+  const empProfiles = await db
+    .select({ id: employerProfiles.id })
+    .from(employerProfiles)
+    .where(eq(employerProfiles.userId, userId));
+  if (empProfiles.length > 0) {
+    const empProfileIds = empProfiles.map(p => p.id);
+    const empSubs = await db
+      .select({ id: employerSubscriptions.id, subId: employerSubscriptions.stripeSubscriptionId })
+      .from(employerSubscriptions)
+      .where(and(
+        inArray(employerSubscriptions.employerId, empProfileIds),
+        or(
+          eq(employerSubscriptions.status, "active"),
+          eq(employerSubscriptions.status, "trialing" as any)
+        )
+      ));
+    for (const row of empSubs) {
+      await cancelSub(row.subId, "employerSubscription");
+      if (row.subId) {
+        await db.update(employerSubscriptions)
+          .set({ status: "cancelled" })
+          .where(eq(employerSubscriptions.id, row.id));
+      }
+    }
+  }
+
+  return { cancelled, errors };
+}
 
 function assertAdmin(ctx: { user: { role: string } }) {
   if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -581,6 +707,13 @@ export const sharingMonitorRouter = router({
           .where(eq(sharingAbuseFlags.id, input.flagId));
       }
 
+      // Cancel all Stripe subscriptions for the user
+      const stripeResult = await cancelAllUserStripeSubscriptions(input.userId).catch(err => {
+        console.error("[SuspendUser] Stripe cancellation error:", err);
+        return { cancelled: [], errors: [String(err)] };
+      });
+      console.log(`[SuspendUser] Stripe cancellation result for user ${input.userId}:`, stripeResult);
+
       // Send suspension notice email if requested
       let emailSent = false;
       if (input.sendEmail && userRow.email) {
@@ -599,7 +732,37 @@ export const sharingMonitorRouter = router({
         });
       }
 
-      return { success: true, emailSent, suspendedUser: userRow.email };
+      return {
+        success: true,
+        emailSent,
+        suspendedUser: userRow.email,
+        subscriptionsCancelled: stripeResult.cancelled,
+        subscriptionErrors: stripeResult.errors,
+      };
+    }),
+
+  /** Bulk update flag status for multiple flags at once */
+  bulkUpdateFlagStatus: protectedProcedure
+    .input(z.object({
+      flagIds: z.array(z.number()).min(1).max(200),
+      status: z.enum(["confirmed", "dismissed", "warned"]),
+      notes: z.string().max(1000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      await db.update(sharingAbuseFlags)
+        .set({
+          status: input.status,
+          reviewedAt: new Date(),
+          reviewedBy: ctx.user.id,
+          notes: input.notes ?? null,
+        })
+        .where(inArray(sharingAbuseFlags.id, input.flagIds));
+
+      return { success: true, updatedCount: input.flagIds.length };
     }),
 
   /** Lift a suspension from a user account */

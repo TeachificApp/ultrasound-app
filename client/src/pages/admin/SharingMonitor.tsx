@@ -771,6 +771,10 @@ export default function SharingMonitor() {
   const [detailPanel, setDetailPanel] = useState<{ userId: number; flagId: number } | null>(null);
   const [actionDialog, setActionDialog] = useState<{ flagId: number; action: "confirmed" | "dismissed" | "warned" } | null>(null);
   const [notes, setNotes] = useState("");
+  // Bulk selection state
+  const [selectedFlagIds, setSelectedFlagIds] = useState<Set<number>>(new Set());
+  const [bulkDialog, setBulkDialog] = useState<{ action: "confirmed" | "dismissed" | "warned" } | null>(null);
+  const [bulkNotes, setBulkNotes] = useState("");
 
   const stats = trpc.sharingMonitor.getStats.useQuery();
   const flags = trpc.sharingMonitor.getFlags.useQuery({ status: statusFilter, limit: 50, offset: 0 });
@@ -783,11 +787,43 @@ export default function SharingMonitor() {
       toast.success("Flag status has been updated successfully.");
     },
   });
+  const bulkUpdateStatus = trpc.sharingMonitor.bulkUpdateFlagStatus.useMutation({
+    onSuccess: (data) => {
+      flags.refetch();
+      stats.refetch();
+      setSelectedFlagIds(new Set());
+      setBulkDialog(null);
+      setBulkNotes("");
+      toast.success(`${data.updatedCount} flag${data.updatedCount !== 1 ? "s" : ""} updated successfully.`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const triggerScan = trpc.sharingMonitor.triggerScan.useMutation({
     onSuccess: () => {
       toast.info("Account sharing scan has been started. Check back in a few minutes.");
     },
   });
+
+  const allFlagIds = (flags.data?.flags ?? []).map((f: any) => f.id as number);
+  const allSelected = allFlagIds.length > 0 && allFlagIds.every(id => selectedFlagIds.has(id));
+  const someSelected = selectedFlagIds.size > 0;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedFlagIds(new Set());
+    } else {
+      setSelectedFlagIds(new Set(allFlagIds));
+    }
+  }
+
+  function toggleFlag(id: number) {
+    setSelectedFlagIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const statusColors: Record<string, string> = {
     flagged: "bg-amber-100 text-amber-800 border-amber-200",
@@ -899,7 +935,48 @@ export default function SharingMonitor() {
         {/* Flags Table */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Flagged Accounts</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Flagged Accounts</CardTitle>
+              {/* Bulk action toolbar — visible when rows are selected */}
+              {someSelected && (
+                <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5">
+                  <span className="text-xs font-medium text-teal-800">{selectedFlagIds.size} selected</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 text-green-700 border-green-300 hover:bg-green-50"
+                    onClick={() => setBulkDialog({ action: "dismissed" })}
+                    disabled={bulkUpdateStatus.isPending}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" /> Dismiss All
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 text-orange-700 border-orange-300 hover:bg-orange-50"
+                    onClick={() => setBulkDialog({ action: "warned" })}
+                    disabled={bulkUpdateStatus.isPending}
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" /> Warn All
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 text-red-700 border-red-300 hover:bg-red-50"
+                    onClick={() => setBulkDialog({ action: "confirmed" })}
+                    disabled={bulkUpdateStatus.isPending}
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> Confirm All
+                  </Button>
+                  <button
+                    className="text-gray-400 hover:text-gray-600 ml-1"
+                    onClick={() => setSelectedFlagIds(new Set())}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {flags.isLoading ? (
@@ -914,6 +991,15 @@ export default function SharingMonitor() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-gray-500">
+                      <th className="pb-2 pr-2 w-8">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={toggleSelectAll}
+                          className="rounded cursor-pointer"
+                          title="Select all"
+                        />
+                      </th>
                       <th className="pb-2 pr-4">User</th>
                       <th className="pb-2 pr-4">Status</th>
                       <th className="pb-2 pr-4">Distinct IPs</th>
@@ -927,9 +1013,19 @@ export default function SharingMonitor() {
                     {flags.data.flags.map((flag: any) => (
                       <tr
                         key={flag.id}
-                        className="border-b last:border-0 hover:bg-gray-50 cursor-pointer"
+                        className={`border-b last:border-0 hover:bg-gray-50 cursor-pointer ${
+                          selectedFlagIds.has(flag.id) ? "bg-teal-50" : ""
+                        }`}
                         onClick={() => setDetailPanel({ userId: flag.userId, flagId: flag.id })}
                       >
+                        <td className="py-3 pr-2" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedFlagIds.has(flag.id)}
+                            onChange={() => toggleFlag(flag.id)}
+                            className="rounded cursor-pointer"
+                          />
+                        </td>
                         <td className="py-3 pr-4">
                           <div className="font-medium text-gray-900">{flag.userName || "Unknown"}</div>
                           <div className="text-xs text-gray-500">{flag.userEmail || "N/A"}</div>
@@ -1007,6 +1103,54 @@ export default function SharingMonitor() {
           onFlagUpdated={() => { flags.refetch(); stats.refetch(); }}
         />
       )}
+
+      {/* Bulk Action Dialog */}
+      <Dialog open={!!bulkDialog} onOpenChange={(open) => { if (!open) { setBulkDialog(null); setBulkNotes(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {bulkDialog?.action === "confirmed" && `Confirm ${selectedFlagIds.size} Flag${selectedFlagIds.size !== 1 ? "s" : ""} as Abuse`}
+              {bulkDialog?.action === "warned" && `Warn ${selectedFlagIds.size} Account${selectedFlagIds.size !== 1 ? "s" : ""}`}
+              {bulkDialog?.action === "dismissed" && `Dismiss ${selectedFlagIds.size} Flag${selectedFlagIds.size !== 1 ? "s" : ""}`}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              {bulkDialog?.action === "confirmed" && `Mark all ${selectedFlagIds.size} selected flags as confirmed account sharing abuse.`}
+              {bulkDialog?.action === "warned" && `Mark all ${selectedFlagIds.size} selected accounts as warned.`}
+              {bulkDialog?.action === "dismissed" && `Dismiss all ${selectedFlagIds.size} selected flags as false positives (e.g., users traveling, VPN use, post-webinar traffic).`}
+            </p>
+            <Textarea
+              placeholder="Add notes (optional, applied to all selected flags)…"
+              value={bulkNotes}
+              onChange={(e) => setBulkNotes(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setBulkDialog(null); setBulkNotes(""); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (bulkDialog) {
+                  bulkUpdateStatus.mutate({
+                    flagIds: Array.from(selectedFlagIds),
+                    status: bulkDialog.action,
+                    notes: bulkNotes || undefined,
+                  });
+                }
+              }}
+              disabled={bulkUpdateStatus.isPending}
+              className={
+                bulkDialog?.action === "confirmed" ? "bg-red-600 hover:bg-red-700" :
+                bulkDialog?.action === "warned" ? "bg-orange-600 hover:bg-orange-700" :
+                "bg-green-600 hover:bg-green-700"
+              }
+            >
+              {bulkUpdateStatus.isPending ? "Saving…" : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Action Dialog */}
       <Dialog open={!!actionDialog} onOpenChange={() => { setActionDialog(null); setNotes(""); }}>
