@@ -92,6 +92,10 @@ export const users = mysqlTable("users", {
   commentBanned: boolean("commentBanned").default(false).notNull(),
   // Community role — admin/moderator get special badges and moderation powers in Community
   communityRole: mysqlEnum("communityRole", ["member", "moderator", "admin"]).default("member").notNull(),
+  // Account suspension — set by admin for confirmed ToS violations (e.g. account sharing)
+  suspendedAt: timestamp("suspendedAt"),
+  suspensionReason: varchar("suspensionReason", { length: 500 }),
+  suspendedBy: int("suspendedBy"), // admin user id who issued the suspension
 });
 
 export type User = typeof users.$inferSelect;
