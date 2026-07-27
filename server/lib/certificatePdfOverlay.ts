@@ -1,28 +1,21 @@
 /**
  * certificatePdfOverlay.ts
  *
- * Replaces placeholder text in pdfkit-generated PDF certificate templates with
- * real learner data on certificate issuance.
+ * Fills AcroForm text fields in a custom PDF certificate template with real
+ * learner data on certificate issuance.
  *
- * pdfkit stores text using the TJ operator with hex-encoded strings and kerning
- * adjustments, e.g.:
- *   [<48656c6c6f> 50 <20576f726c64> 0] TJ
+ * The downloaded sample PDF contains three named AcroForm text fields:
+ *   "learner_name"  — learner's display name (with credentials if set)
+ *   "course_title"  — course title
+ *   "issued_date"   — formatted issue date (e.g. "July 27, 2026")
  *
- * Long strings are split into multiple hex chunks with kerning numbers between
- * them. This module reassembles the full text from each TJ array, checks if it
- * contains a placeholder, and replaces the entire TJ array with a new one that
- * renders the replacement value as a single un-kerned hex string.
+ * The admin can open the sample in Acrobat/Preview, reposition and resize
+ * these fields, then re-upload the edited PDF. On issuance, this module
+ * fills the fields by name and flattens the form so the output is a
+ * non-editable PDF.
  *
- * Supported placeholders (visible in the downloaded sample PDF):
- *   {{LEARNER_NAME}}   → learner's display name (with credentials if set)
- *   {{COURSE_TITLE}}   → course title
- *   {{ISSUED_DATE}}    → formatted issue date (e.g. "July 27, 2026")
- *
- * Admin workflow:
- * 1. Download the sample PDF — placeholders appear as visible text.
- * 2. Edit the design in any PDF editor without changing the placeholder strings.
- * 3. Re-upload the edited PDF.
- * 4. On issuance, this module swaps the placeholders for real learner data.
+ * Falls back gracefully if the PDF has no AcroForm or the expected fields
+ * are missing (e.g. a legacy plain-text template).
  */
 
 import { PDFDocument } from "pdf-lib";
@@ -33,43 +26,12 @@ export interface OverlayOptions {
   issuedAt: Date;
 }
 
-/** Convert a UTF-8 string to its lowercase hex representation */
-function toHex(str: string): string {
-  return Buffer.from(str, "utf8").toString("hex").toLowerCase();
-}
-
 /**
- * Decode a pdfkit TJ array into the plain text it renders.
- * TJ arrays look like: [<hex1> num <hex2> num ... <hexN> 0]
- * We concatenate all hex chunks and ignore the kerning numbers.
- */
-function decodeTJArray(tjContent: string): string {
-  const hexChunks = [...tjContent.matchAll(/<([0-9a-f]+)>/gi)];
-  const allHex = hexChunks.map((m) => m[1]).join("");
-  try {
-    return Buffer.from(allHex, "hex").toString("utf8");
-  } catch {
-    return "";
-  }
-}
-
-/**
- * Build a replacement TJ array that renders `text` as a single hex string
- * with no kerning. Preserves the surrounding [ ] brackets.
- */
-function buildTJArray(text: string): string {
-  const hex = toHex(text);
-  return `[<${hex}> 0] TJ`;
-}
-
-/**
- * Replace placeholder strings in a pdfkit-generated PDF buffer with real learner data.
+ * Fill AcroForm fields in a custom PDF template with real learner data,
+ * then flatten the form so the result is a static, non-editable PDF.
  *
- * Scans all TJ arrays in the PDF content streams, decodes the text they render,
- * and replaces any that contain a placeholder with a new TJ array containing the
- * real value. After patching, pdf-lib re-serialises the document to fix the xref.
- *
- * Falls back to the original buffer if parsing or patching fails.
+ * Falls back to the original buffer if the PDF cannot be parsed or has
+ * no AcroForm fields.
  */
 export async function overlayLearnerData(
   pdfBuffer: Buffer,
@@ -81,42 +43,44 @@ export async function overlayLearnerData(
     day: "numeric",
   });
 
-  const replacements: [string, string][] = [
-    ["{{LEARNER_NAME}}", opts.learnerName],
-    ["{{COURSE_TITLE}}", opts.courseTitle],
-    ["{{ISSUED_DATE}}", dateStr],
-    // Handle the compound form used by the generator
-    [`Issued: {{ISSUED_DATE}}`, `Issued: ${dateStr}`],
-  ];
-
   try {
-    let pdfString = pdfBuffer.toString("latin1");
+    const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+    const form = pdfDoc.getForm();
 
-    // Match all TJ arrays: [...] TJ  (handles both single-line and multi-chunk forms)
-    // The regex captures everything between [ and ] followed by optional whitespace and TJ
-    pdfString = pdfString.replace(/\[([^\]]+)\]\s*TJ/g, (match, tjContent) => {
-      const decoded = decodeTJArray(tjContent);
-      if (!decoded) return match;
+    // Fill each field if it exists — silently skip missing fields so legacy
+    // templates (plain-text placeholders) degrade gracefully.
+    const fieldMap: Record<string, string> = {
+      learner_name: opts.learnerName,
+      course_title: opts.courseTitle,
+      issued_date:  `Issued: ${dateStr}`,
+    };
 
-      // Check if any placeholder appears in the decoded text
-      for (const [placeholder, value] of replacements) {
-        if (decoded.includes(placeholder)) {
-          // Replace the placeholder in the decoded text and rebuild the TJ array
-          const newText = decoded.split(placeholder).join(value);
-          return buildTJArray(newText);
-        }
+    let filledCount = 0;
+    for (const [fieldName, value] of Object.entries(fieldMap)) {
+      try {
+        const field = form.getTextField(fieldName);
+        field.setText(value);
+        filledCount++;
+      } catch {
+        // Field not found — skip
       }
-      return match;
-    });
+    }
 
-    const patched = Buffer.from(pdfString, "latin1");
+    if (filledCount === 0) {
+      // No AcroForm fields found — return original buffer unchanged.
+      // The caller (lmsHelpers) will serve the raw PDF as-is.
+      console.warn("[certificatePdfOverlay] No AcroForm fields found in template PDF — serving raw template");
+      return pdfBuffer;
+    }
 
-    // Re-serialise with pdf-lib to fix the cross-reference table
-    const pdfDoc = await PDFDocument.load(patched, { ignoreEncryption: true });
-    const fixed = await pdfDoc.save();
-    return Buffer.from(fixed);
+    // Flatten the form so the filled values become static text and the
+    // PDF is no longer editable.
+    form.flatten();
+
+    const saved = await pdfDoc.save();
+    return Buffer.from(saved);
   } catch (err) {
-    console.warn("[certificatePdfOverlay] Failed to patch PDF, returning original:", err);
+    console.warn("[certificatePdfOverlay] Failed to fill PDF form fields, returning original:", err);
     return pdfBuffer;
   }
 }

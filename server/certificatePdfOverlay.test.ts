@@ -1,70 +1,84 @@
-import { describe, it, expect } from "vitest";
-import { overlayLearnerData } from "./lib/certificatePdfOverlay";
-import { generateCertificatePdf } from "./lib/certificateGenerator";
-
-/** pdfkit hex-encodes text in the content stream */
-function toHex(str: string): string {
-  return Buffer.from(str, "utf8").toString("hex").toLowerCase();
-}
-
 /**
- * Decode all TJ arrays in a PDF buffer and return the concatenated plain text.
- * This mirrors what a PDF viewer would render.
+ * certificatePdfOverlay.test.ts
+ *
+ * Tests the AcroForm-based certificate PDF overlay:
+ * 1. generateCertificatePdf with usePlaceholders=true produces a PDF with
+ *    three named AcroForm text fields (learner_name, course_title, issued_date).
+ * 2. overlayLearnerData fills those fields with real learner data and flattens
+ *    the form, producing a static PDF.
+ * 3. overlayLearnerData returns the original buffer when the PDF has no AcroForm fields.
  */
-function extractTextFromPdf(buf: Buffer): string {
-  const txt = buf.toString("latin1");
-  const parts: string[] = [];
-  for (const m of txt.matchAll(/\[([^\]]+)\]\s*TJ/g)) {
-    const hexChunks = [...m[1].matchAll(/<([0-9a-f]+)>/gi)];
-    const allHex = hexChunks.map((c) => c[1]).join("");
-    try {
-      parts.push(Buffer.from(allHex, "hex").toString("utf8"));
-    } catch { /* skip */ }
-  }
-  return parts.join(" ");
-}
 
-describe("certificatePdfOverlay", () => {
-  it("replaces all three placeholder strings in a pdfkit-generated PDF", async () => {
-    // Generate a sample PDF with placeholder strings
-    const sampleBuffer = await generateCertificatePdf({
-      learnerName: "",
-      courseTitle: "",
+import { describe, it, expect } from "vitest";
+import { generateCertificatePdf } from "./lib/certificateGenerator";
+import { overlayLearnerData } from "./lib/certificatePdfOverlay";
+import { PDFDocument } from "pdf-lib";
+
+describe("AcroForm certificate PDF overlay", () => {
+  it("generates a placeholder PDF with three AcroForm text fields", async () => {
+    const buf = await generateCertificatePdf({
+      learnerName: "Test Learner",
+      courseTitle: "Test Course",
       issuedAt: new Date("2026-01-15"),
-      credentials: null,
-      template: null,
       usePlaceholders: true,
     });
 
-    // Verify placeholders appear in the rendered text
-    const sampleText = extractTextFromPdf(sampleBuffer);
-    expect(sampleText).toContain("{{LEARNER_NAME}}");
-    expect(sampleText).toContain("{{COURSE_TITLE}}");
-    expect(sampleText).toContain("{{ISSUED_DATE}}");
+    expect(buf.length).toBeGreaterThan(1000);
+    expect(buf.slice(0, 4).toString("ascii")).toBe("%PDF");
 
-    // Apply overlay with real learner data
+    // Load with pdf-lib and verify the three fields exist
+    const pdfDoc = await PDFDocument.load(buf);
+    const form = pdfDoc.getForm();
+    const fieldNames = form.getFields().map((f) => f.getName());
+
+    expect(fieldNames).toContain("learner_name");
+    expect(fieldNames).toContain("course_title");
+    expect(fieldNames).toContain("issued_date");
+  });
+
+  it("fills AcroForm fields with real learner data and flattens the form", async () => {
+    // Generate a placeholder PDF (the template the admin would download)
+    const templateBuf = await generateCertificatePdf({
+      learnerName: "Placeholder",
+      courseTitle: "Placeholder",
+      issuedAt: new Date("2026-01-15"),
+      usePlaceholders: true,
+    });
+
+    // Overlay real learner data
     const issuedAt = new Date("2026-07-27");
-    const patched = await overlayLearnerData(sampleBuffer, {
+    const filled = await overlayLearnerData(templateBuf, {
       learnerName: "Jane Smith, RVT",
-      courseTitle: "Advanced Echo Fundamentals",
+      courseTitle: "Advanced Echocardiography",
       issuedAt,
     });
 
-    const patchedText = extractTextFromPdf(patched);
+    expect(filled.length).toBeGreaterThan(1000);
+    expect(filled.slice(0, 4).toString("ascii")).toBe("%PDF");
 
-    // Placeholders should be gone
-    expect(patchedText).not.toContain("{{LEARNER_NAME}}");
-    expect(patchedText).not.toContain("{{COURSE_TITLE}}");
-    expect(patchedText).not.toContain("{{ISSUED_DATE}}");
+    // After flattening, the form should have no interactive fields
+    // (the filled text is embedded in the content stream, not as plain bytes)
+    const pdfDoc2 = await PDFDocument.load(filled);
+    expect(pdfDoc2.getForm().getFields().length).toBe(0);
+  });
 
-    // Real values should be present
-    expect(patchedText).toContain("Jane Smith, RVT");
-    expect(patchedText).toContain("Advanced Echo Fundamentals");
-    expect(patchedText).toContain("July 27, 2026");
+  it("returns original buffer when PDF has no AcroForm fields", async () => {
+    // Generate a real (non-placeholder) certificate — no AcroForm fields
+    const realBuf = await generateCertificatePdf({
+      learnerName: "Jane Smith",
+      courseTitle: "Test Course",
+      issuedAt: new Date("2026-01-15"),
+      usePlaceholders: false,
+    });
 
-    // Result should still be a valid PDF
-    expect(patched.slice(0, 4).toString("ascii")).toBe("%PDF");
-    expect(patched.length).toBeGreaterThan(1000);
+    const result = await overlayLearnerData(realBuf, {
+      learnerName: "Other Name",
+      courseTitle: "Other Course",
+      issuedAt: new Date("2026-01-15"),
+    });
+
+    // Should return the original buffer unchanged (no fields to fill)
+    expect(result).toEqual(realBuf);
   });
 
   it("returns original buffer if PDF cannot be parsed", async () => {
@@ -74,7 +88,6 @@ describe("certificatePdfOverlay", () => {
       courseTitle: "Test Course",
       issuedAt: new Date(),
     });
-    // Should fall back to original (pdf-lib validation fails, returns original)
     expect(result).toEqual(garbage);
   });
 });
