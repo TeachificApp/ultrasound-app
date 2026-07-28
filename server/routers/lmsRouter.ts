@@ -428,7 +428,11 @@ export const lmsAIRouter = router({
   /** AI: Generate flashcards from lesson content */
   generateFlashcardsFromLesson: protectedProcedure
     .input(z.object({
-      lessonId: z.number().int().positive(),
+      lessonId: z.number().int().positive().optional(),
+      courseId: z.number().int().positive().optional(),
+      lessonIds: z.array(z.number().int().positive()).optional(),
+      /** Free-text topic — used when source is 'topic' */
+      topic: z.string().max(500).optional(),
       count: z.number().int().min(1).max(30).default(10),
       cardStyle: z.enum(["understanding", "thinking", "compliance", "thought_provoking", "reflection", "custom"]).default("understanding"),
       customPrompt: z.string().max(500).optional(),
@@ -437,31 +441,56 @@ export const lmsAIRouter = router({
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [lesson] = await db.select({
-        id: lmsLessons.id,
-        title: lmsLessons.title,
-        content: lmsLessons.content,
-        contentBlocks: lmsLessons.contentBlocks,
-      }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
-      if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
-      let lessonText = lesson.title ?? "";
-      if (lesson.content) lessonText += "\n" + lesson.content;
-      if (lesson.contentBlocks) {
-        try {
-          const blocks = typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks as string) : lesson.contentBlocks;
-          if (Array.isArray(blocks)) {
-            for (const block of blocks) {
-              const d = block.data ?? {};
-              if (d.text) lessonText += "\n" + d.text;
-              if (d.content) lessonText += "\n" + d.content;
-              if (d.title) lessonText += "\n" + d.title;
-              if (d.body) lessonText += "\n" + d.body;
-              if (d.caption) lessonText += "\n" + d.caption;
-            }
+      let lessonText = "";
+      if (input.topic) {
+        // Topic-based generation — no lesson content needed
+        lessonText = `Topic: ${input.topic}`;
+      } else {
+        // Determine which lessons to pull content from
+        let targetLessonIds: number[] = [];
+        if (input.lessonIds && input.lessonIds.length > 0) {
+          targetLessonIds = input.lessonIds;
+        } else if (input.courseId) {
+          const courseLessons = await db.select({ id: lmsLessons.id })
+            .from(lmsLessons)
+            .innerJoin(lmsSections, eq(lmsLessons.sectionId, lmsSections.id))
+            .where(eq(lmsSections.courseId, input.courseId));
+          targetLessonIds = courseLessons.map(l => l.id);
+        } else if (input.lessonId) {
+          targetLessonIds = [input.lessonId];
+        } else {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Provide lessonId, courseId, lessonIds, or topic." });
+        }
+        if (targetLessonIds.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No lessons specified." });
+        const targetLessons = await db.select({
+          id: lmsLessons.id,
+          title: lmsLessons.title,
+          content: lmsLessons.content,
+          contentBlocks: lmsLessons.contentBlocks,
+        }).from(lmsLessons).where(inArray(lmsLessons.id, targetLessonIds));
+        const extractText = (lesson: typeof targetLessons[0]) => {
+          let text = lesson.title ?? "";
+          if (lesson.content) text += "\n" + lesson.content;
+          if (lesson.contentBlocks) {
+            try {
+              const blocks = typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks as string) : lesson.contentBlocks;
+              if (Array.isArray(blocks)) {
+                for (const block of blocks) {
+                  const d = block.data ?? {};
+                  if (d.text) text += "\n" + d.text;
+                  if (d.content) text += "\n" + d.content;
+                  if (d.title) text += "\n" + d.title;
+                  if (d.body) text += "\n" + d.body;
+                  if (d.caption) text += "\n" + d.caption;
+                }
+              }
+            } catch { /* ignore */ }
           }
-        } catch { /* ignore parse errors */ }
+          return text;
+        };
+        lessonText = targetLessons.map(l => `=== ${l.title} ===\n${extractText(l)}`).join("\n\n");
+        if (lessonText.trim().length < 20) throw new TRPCError({ code: "BAD_REQUEST", message: "Lessons have insufficient text content to generate flashcards." });
       }
-      if (lessonText.trim().length < 20) throw new TRPCError({ code: "BAD_REQUEST", message: "Lesson has insufficient text content to generate flashcards." });
       const flashcardStylePrompts: Record<string, string> = {
         understanding: "Create straightforward recall flashcards: front = term or definition question, back = clear concise answer. Focus on key concepts, anatomy, measurements, and definitions.",
         thinking: "Create application-based flashcards that require the learner to reason or apply knowledge: front = scenario or 'why/how' question, back = reasoned explanation.",

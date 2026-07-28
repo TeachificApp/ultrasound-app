@@ -5576,6 +5576,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           data={d as any}
           onChange={(newData) => onChange(newData as any)}
           lessonId={lessonId}
+          courseId={courseId}
           handleFileUpload={async (file, targetField, context) => {
             if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return null; }
             setUploading(targetField);

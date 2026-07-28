@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
@@ -35,6 +36,7 @@ interface Props {
   onChange: (data: LessonFlashcardData) => void;
   handleFileUpload?: (file: File, targetField: string, context: string) => Promise<string | null>;
   lessonId?: number;
+  courseId?: number;
 }
 
 const EMPTY_CARD: FlashcardItem = { front: "", back: "", hint: "" };
@@ -44,7 +46,7 @@ const DEFAULT_STILL_LEARNING_COLOR = "#f0fdfa";
 const DEFAULT_GOT_IT_TEXT = "#ffffff";
 const DEFAULT_STILL_LEARNING_TEXT = "#189593";
 
-export default function LessonFlashcardBlockEditor({ data, onChange, handleFileUpload, lessonId }: Props) {
+export default function LessonFlashcardBlockEditor({ data, onChange, handleFileUpload, lessonId, courseId }: Props) {
   const [activeTab, setActiveTab] = useState<"ai" | "manual" | "style">("manual");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingCard, setEditingCard] = useState<FlashcardItem | null>(null);
@@ -52,16 +54,54 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
   const [aiStyle, setAiStyle] = useState<"understanding" | "thinking" | "compliance" | "thought_provoking" | "reflection" | "custom">("understanding");
   const [aiCustomPrompt, setAiCustomPrompt] = useState("");
   const [aiPreview, setAiPreview] = useState<FlashcardItem[] | null>(null);
+  // AI source selection
+  const [aiSource, setAiSource] = useState<"lesson" | "course" | "pick" | "topic">("lesson");
+  const [selectedLessonIds, setSelectedLessonIds] = useState<number[]>([]);
+  const [aiTopic, setAiTopic] = useState("");
   const frontImgRef = useRef<HTMLInputElement | null>(null);
   const backImgRef = useRef<HTMLInputElement | null>(null);
 
-  const generateMutation = trpc.lmsGroup.generateFlashcardsFromLesson.useMutation({
+  // Fetch course lessons for "course" / "pick" modes
+  const { data: curriculumData } = trpc.lmsAdmin.getCurriculumById.useQuery(
+    { courseId: courseId! },
+    { enabled: !!courseId && (aiSource === "pick" || aiSource === "course") }
+  );
+  const courseLessons: { id: number; title: string }[] = curriculumData?.sections?.flatMap((s: any) => s.lessons ?? []) ?? [];
+
+  const generateMutation = trpc.lmsAdmin.generateFlashcardsFromLesson.useMutation({
     onSuccess: (res) => {
       setAiPreview(res.cards);
       toast.success(`Generated ${res.cards.length} flashcards — review and apply below.`);
     },
     onError: (err) => toast.error(err.message),
   });
+
+  const canGenerate =
+    aiSource === "lesson" ? !!lessonId
+    : aiSource === "course" ? !!courseId
+    : aiSource === "pick" ? selectedLessonIds.length > 0
+    : aiTopic.trim().length > 0;
+
+  const handleGenerate = () => {
+    const payload: Parameters<typeof generateMutation.mutate>[0] = {
+      count: aiCount,
+      cardStyle: aiStyle,
+      customPrompt: aiStyle === "custom" ? aiCustomPrompt : undefined,
+    };
+    if (aiSource === "lesson" && lessonId) {
+      payload.lessonId = lessonId;
+    } else if (aiSource === "course" && courseId) {
+      payload.courseId = courseId;
+    } else if (aiSource === "pick") {
+      payload.lessonIds = selectedLessonIds;
+    } else if (aiSource === "topic" && aiTopic.trim()) {
+      payload.topic = aiTopic.trim();
+    } else {
+      toast.error("Please select a source or enter a topic for AI generation.");
+      return;
+    }
+    generateMutation.mutate(payload);
+  };
 
   const set = (key: keyof LessonFlashcardData, value: any) => onChange({ ...data, [key]: value });
   const setMulti = (updates: Partial<LessonFlashcardData>) => onChange({ ...data, ...updates });
@@ -153,9 +193,80 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
 
         {/* ── AI Generate ── */}
         <TabsContent value="ai" className="mt-3 space-y-3">
-          {!lessonId && (
-            <p className="text-xs text-amber-600 bg-amber-50 rounded p-2">Save the lesson first to enable AI generation.</p>
+          {/* Source selector */}
+          <div className="space-y-2">
+            <Label className="text-xs text-gray-600 font-medium">Generate from:</Label>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { value: "lesson", label: "Current Lesson", disabled: !lessonId },
+                { value: "course", label: "Entire Course", disabled: !courseId },
+                { value: "pick", label: "Pick Lessons", disabled: !courseId },
+                { value: "topic", label: "Topic / Custom", disabled: false },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={opt.disabled}
+                  onClick={() => setAiSource(opt.value as typeof aiSource)}
+                  className={`text-xs px-2 py-1.5 rounded border transition-all ${
+                    aiSource === opt.value
+                      ? "bg-teal-600 text-white border-teal-600"
+                      : opt.disabled
+                      ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:text-teal-700"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {aiSource === "lesson" && !lessonId && (
+              <p className="text-xs text-amber-600 bg-amber-50 rounded p-2">Save the lesson first to enable AI generation from this lesson.</p>
+            )}
+          </div>
+
+          {/* Topic input */}
+          {aiSource === "topic" && (
+            <div>
+              <Label className="text-xs text-gray-600">Topic or custom instructions</Label>
+              <Textarea value={aiTopic} onChange={(e) => setAiTopic(e.target.value)}
+                placeholder="e.g. Doppler ultrasound physics, normal vs abnormal cardiac anatomy, FAST exam technique…"
+                className="text-xs mt-1 min-h-[60px]" maxLength={800} />
+              <p className="text-xs text-gray-400 mt-0.5 text-right">{aiTopic.length}/800</p>
+            </div>
           )}
+
+          {/* Lesson picker for "pick" mode */}
+          {aiSource === "pick" && courseId && (
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-600">Select lessons to generate from:</Label>
+              <div className="max-h-36 overflow-y-auto border border-gray-200 rounded p-2 space-y-1 bg-white">
+                {courseLessons.length === 0 ? (
+                  <p className="text-xs text-gray-400">Loading lessons…</p>
+                ) : (
+                  courseLessons.map((l: any) => (
+                    <div key={l.id} className="flex items-center gap-2">
+                      <Checkbox id={`fc-lesson-${l.id}`} checked={selectedLessonIds.includes(l.id)}
+                        onCheckedChange={(checked) => setSelectedLessonIds(prev =>
+                          checked ? [...prev, l.id] : prev.filter(id => id !== l.id)
+                        )} />
+                      <label htmlFor={`fc-lesson-${l.id}`} className="text-xs text-gray-700 cursor-pointer flex-1 truncate">{l.title}</label>
+                    </div>
+                  ))
+                )}
+              </div>
+              {courseLessons.length > 0 && (
+                <div className="flex gap-2">
+                  <button type="button" className="text-xs text-teal-600 hover:text-teal-700"
+                    onClick={() => setSelectedLessonIds(courseLessons.map((l: any) => l.id))}>Select all</button>
+                  <span className="text-gray-300">|</span>
+                  <button type="button" className="text-xs text-gray-500 hover:text-gray-700"
+                    onClick={() => setSelectedLessonIds([])}>Clear</button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <Label className="text-xs text-gray-600 whitespace-nowrap shrink-0">Cards to generate:</Label>
@@ -200,12 +311,13 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
             <Button
               size="sm"
               className="h-8 bg-teal-600 hover:bg-teal-700 text-white text-xs w-full"
-              disabled={!lessonId || generateMutation.isPending}
-              onClick={() => generateMutation.mutate({ lessonId: lessonId!, count: aiCount, cardStyle: aiStyle, customPrompt: aiStyle === "custom" ? aiCustomPrompt : undefined })}
+              disabled={!canGenerate || generateMutation.isPending}
+              onClick={handleGenerate}
             >
-              {generateMutation.isPending ? "Generating…" : "Generate from Lesson"}
+              {generateMutation.isPending ? "Generating…" : "Generate Flashcards"}
             </Button>
           </div>
+
           {aiPreview && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-700">Preview ({aiPreview.length} cards):</p>
@@ -324,7 +436,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
                   </div>
                 </div>
               )}
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2">
                 <Button size="sm" className="h-8 bg-teal-600 hover:bg-teal-700 text-white text-xs" onClick={saveCard}>
                   {editingIndex === null ? "Add Card" : "Save Changes"}
                 </Button>
@@ -337,8 +449,8 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
             <Button
               size="sm"
               variant="outline"
-              className="h-8 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
-              onClick={() => { setEditingIndex(null); setEditingCard({ ...EMPTY_CARD }); }}
+              className="h-8 text-xs w-full border-dashed border-teal-300 text-teal-600 hover:bg-teal-50"
+              onClick={() => setEditingCard({ ...EMPTY_CARD })}
             >
               + Add Card
             </Button>
@@ -346,118 +458,49 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
         </TabsContent>
 
         {/* ── Button Style ── */}
-        <TabsContent value="style" className="mt-3 space-y-4">
-          <p className="text-xs text-gray-500">Customize the "Got It" and "Still Learning" button colors shown to students.</p>
-
-          {/* Preview */}
-          <div className="flex gap-3">
-            <button
-              className="flex-1 py-2.5 text-sm rounded-xl font-semibold border-2 shadow-sm transition-all"
-              style={{ background: stillLearningColor, color: stillLearningText, borderColor: stillLearningText + "55" }}
-            >↺ Still Learning</button>
-            <button
-              className="flex-1 py-2.5 text-sm rounded-xl font-semibold shadow-md transition-all"
-              style={{ background: gotItColor, color: gotItText }}
-            >✓ Got It!</button>
-          </div>
-
+        <TabsContent value="style" className="mt-3 space-y-3">
+          <p className="text-xs text-gray-500">Customize the "Got It" and "Still Learning" button appearance.</p>
           <div className="grid grid-cols-2 gap-3">
-            {/* Got It button */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-700">Got It! Button</p>
-              <div>
-                <Label className="text-xs text-gray-600">Background</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={gotItColor}
-                    onChange={(e) => set("gotItColor", e.target.value)}
-                    className="h-8 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
-                  />
-                  <Input
-                    value={gotItColor}
-                    onChange={(e) => set("gotItColor", e.target.value)}
-                    className="h-8 text-xs font-mono"
-                    placeholder="#1ab7b4"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600">Text Color</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={gotItText}
-                    onChange={(e) => set("gotItTextColor", e.target.value)}
-                    className="h-8 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
-                  />
-                  <Input
-                    value={gotItText}
-                    onChange={(e) => set("gotItTextColor", e.target.value)}
-                    className="h-8 text-xs font-mono"
-                    placeholder="#ffffff"
-                  />
-                </div>
+            <div>
+              <Label className="text-xs text-gray-600">Got It — Background</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <input type="color" value={gotItColor} onChange={(e) => set("gotItColor", e.target.value)} className="h-8 w-10 rounded border border-gray-200 cursor-pointer" />
+                <Input value={gotItColor} onChange={(e) => set("gotItColor", e.target.value)} className="h-8 text-xs flex-1" />
               </div>
             </div>
-
-            {/* Still Learning button */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-700">Still Learning Button</p>
-              <div>
-                <Label className="text-xs text-gray-600">Background</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={stillLearningColor}
-                    onChange={(e) => set("stillLearningColor", e.target.value)}
-                    className="h-8 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
-                  />
-                  <Input
-                    value={stillLearningColor}
-                    onChange={(e) => set("stillLearningColor", e.target.value)}
-                    className="h-8 text-xs font-mono"
-                    placeholder="#f0fdfa"
-                  />
-                </div>
+            <div>
+              <Label className="text-xs text-gray-600">Got It — Text</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <input type="color" value={gotItText} onChange={(e) => set("gotItTextColor", e.target.value)} className="h-8 w-10 rounded border border-gray-200 cursor-pointer" />
+                <Input value={gotItText} onChange={(e) => set("gotItTextColor", e.target.value)} className="h-8 text-xs flex-1" />
               </div>
-              <div>
-                <Label className="text-xs text-gray-600">Text Color</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={stillLearningText}
-                    onChange={(e) => set("stillLearningTextColor", e.target.value)}
-                    className="h-8 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
-                  />
-                  <Input
-                    value={stillLearningText}
-                    onChange={(e) => set("stillLearningTextColor", e.target.value)}
-                    className="h-8 text-xs font-mono"
-                    placeholder="#189593"
-                  />
-                </div>
+            </div>
+            <div>
+              <Label className="text-xs text-gray-600">Still Learning — Background</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <input type="color" value={stillLearningColor} onChange={(e) => set("stillLearningColor", e.target.value)} className="h-8 w-10 rounded border border-gray-200 cursor-pointer" />
+                <Input value={stillLearningColor} onChange={(e) => set("stillLearningColor", e.target.value)} className="h-8 text-xs flex-1" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs text-gray-600">Still Learning — Text</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <input type="color" value={stillLearningText} onChange={(e) => set("stillLearningTextColor", e.target.value)} className="h-8 w-10 rounded border border-gray-200 cursor-pointer" />
+                <Input value={stillLearningText} onChange={(e) => set("stillLearningTextColor", e.target.value)} className="h-8 text-xs flex-1" />
               </div>
             </div>
           </div>
-
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            onClick={() => setMulti({
-              gotItColor: DEFAULT_GOT_IT_COLOR,
-              gotItTextColor: DEFAULT_GOT_IT_TEXT,
-              stillLearningColor: DEFAULT_STILL_LEARNING_COLOR,
-              stillLearningTextColor: DEFAULT_STILL_LEARNING_TEXT,
-            })}
-          >Reset to Default Teal</Button>
+          {/* Preview */}
+          <div className="flex gap-2 mt-2">
+            <button type="button" style={{ backgroundColor: gotItColor, color: gotItText }} className="flex-1 py-2 rounded text-sm font-semibold transition-all">
+              Got It ✓
+            </button>
+            <button type="button" style={{ backgroundColor: stillLearningColor, color: stillLearningText, borderColor: stillLearningText + "33" }} className="flex-1 py-2 rounded text-sm font-semibold border transition-all">
+              Still Learning ↩
+            </button>
+          </div>
         </TabsContent>
       </Tabs>
-
-      <Badge variant="secondary" className="text-xs">
-        {(data.cards ?? []).length} card{(data.cards ?? []).length !== 1 ? "s" : ""}
-      </Badge>
     </div>
   );
 }
