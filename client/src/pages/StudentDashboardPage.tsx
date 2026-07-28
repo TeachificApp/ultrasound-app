@@ -2256,6 +2256,22 @@ export default function StudentDashboardPage() {
     return () => { el.removeEventListener("scroll", updateTabScrollState); ro.disconnect(); };
   }, [updateTabScrollState]);
 
+  // Show welcome toast after successful course purchase redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("enrolled") === "1") {
+      toast.success("You're enrolled! Your course is ready.", {
+        description: "Find it below in My Content.",
+        duration: 6000,
+      });
+      params.delete("enrolled");
+      params.delete("session_id");
+      const newSearch = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (newSearch ? `?${newSearch}` : ""));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Keep URL in sync when tab changes.
   // Use window.history.replaceState directly so the URL updates reliably
   // across all subdomains — wouter's navigate() can miss re-renders when

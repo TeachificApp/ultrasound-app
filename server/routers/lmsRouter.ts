@@ -1911,7 +1911,16 @@ export const lmsLearnerRouter = router({
         trigger_order_type: "course",
         ...orderBumpCheckout?.metadata,
       };
-      const successUrl = `${input.origin}/courses/${course.slug}/success?session_id={CHECKOUT_SESSION_ID}`;
+      // ── Post-purchase redirect ────────────────────────────────────────────────
+      // Priority: postPurchaseRedirectUrl (admin-set) → customThankYou page → My Dashboard
+      const _postPurchasePath = course.postPurchaseRedirectUrl
+        ? course.postPurchaseRedirectUrl
+        : course.customThankYouEnabled
+          ? `/courses/${course.slug}/thank-you`
+          : `/my-dashboard?tab=content&enrolled=1`;
+      const successUrl = _postPurchasePath.startsWith('http')
+        ? `${_postPurchasePath}${_postPurchasePath.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
+        : `${input.origin}${_postPurchasePath}${_postPurchasePath.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${input.origin}/courses/${course.slug}`;
 
       let session: any;
@@ -2241,7 +2250,15 @@ export const lmsLearnerRouter = router({
         ...orderBumpCheckout?.metadata,
       };
 
-      const successUrl = `${input.origin}/courses/${course.slug}/success?session_id={CHECKOUT_SESSION_ID}`;
+      // ── Post-purchase redirect (guest checkout) ────────────────────────────────
+      const _guestPostPurchasePath = course.postPurchaseRedirectUrl
+        ? course.postPurchaseRedirectUrl
+        : course.customThankYouEnabled
+          ? `/courses/${course.slug}/thank-you`
+          : `/my-dashboard?tab=content&enrolled=1`;
+      const successUrl = _guestPostPurchasePath.startsWith('http')
+        ? `${_guestPostPurchasePath}${_guestPostPurchasePath.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
+        : `${input.origin}${_guestPostPurchasePath}${_guestPostPurchasePath.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${input.origin}/courses/${course.slug}`;
 
       let discounts: Array<{ promotion_code: string }> | undefined;
