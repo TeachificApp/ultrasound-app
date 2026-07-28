@@ -71,7 +71,7 @@ export type BlockType =
   | "price_stack" | "urgency_offer" | "checkout_form"
   | "footer" | "logo_strip" | "three_column"
   | "related_products" | "embedded_checkout" | "inline_checkout"
-  | "lesson_quiz" | "lesson_flashcard"
+  | "lesson_quiz" | "lesson_flashcard" | "lesson_certificate"
   | "file_download" | "scorm_embed" | "url_embed"
   | "column_layout" | "carousel" | "ticker" | "countdown_v2"
   | "live_session"
@@ -1094,6 +1094,28 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             </div>
           ))}
           {questions.length > 2 && <p className="text-xs text-gray-400 mt-1">+{questions.length - 2} more questions</p>}
+        </div>
+      );
+    }
+    case "lesson_certificate": {
+      return (
+        <div className="px-6 py-5 bg-white border border-teal-200 rounded-xl">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+              <Award className="w-4 h-4 text-teal-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">{d.heading || "Your Certificate of Completion"}</p>
+              <p className="text-xs text-gray-500">{d.subtext || "Download and share your achievement."}</p>
+            </div>
+          </div>
+          <div className="w-full bg-gradient-to-br from-teal-50 to-teal-100 border border-teal-200 rounded-lg h-32 flex items-center justify-center">
+            <div className="text-center">
+              <Award className="w-8 h-8 text-teal-400 mx-auto mb-1" />
+              <p className="text-xs text-teal-600 font-medium">Certificate Preview</p>
+              <p className="text-xs text-teal-400">Shown to learners who have earned it</p>
+            </div>
+          </div>
         </div>
       );
     }

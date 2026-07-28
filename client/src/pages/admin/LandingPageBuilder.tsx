@@ -445,6 +445,7 @@ export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion
 BLOCK_CATALOG.push(
   { type: "lesson_quiz", label: "Lesson Quiz", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, category: "Content", defaultData: { title: "Knowledge Check", questions: [], showExplanations: true, passingScore: 70, shuffleQuestions: false } },
   { type: "lesson_flashcard", label: "Flashcard Deck", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, category: "Content", defaultData: { title: "Review Flashcards", cards: [], shuffleCards: true, showHints: true } },
+  { type: "lesson_certificate", label: "Certificate Preview", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>, category: "Content", defaultData: { heading: "Your Certificate of Completion", subtext: "Download and share your achievement.", lockedMessage: "Complete all required lessons to unlock your certificate.", bgColor: "#f0fafa", requireQuizPass: false, gateQuizLessonId: null, quizNotPassedMessage: "You must pass the required quiz before accessing your certificate." } },
   { type: "quiz_embed", label: "Quiz Embed", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, category: "Content", defaultData: { quizId: null, showHeader: true } },
   { type: "scorm_embed", label: "SCORM / HTML Package", icon: <Package size={14} />, category: "Content",
     defaultData: { mediaAssetId: null, mediaAssetSlug: "", mediaAssetTitle: "", title: "", caption: "", height: 600, bgColor: "#ffffff" } },
@@ -5590,6 +5591,75 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           }}
         />
       );
+    case "lesson_certificate": {
+      const { data: certCurriculumData } = trpc.lmsAdmin.getCurriculumById.useQuery(
+        { courseId: courseId ?? 0 },
+        { enabled: !!courseId }
+      );
+      const certLessons: Array<{ id: number; title: string }> = useMemo(() => {
+        if (!certCurriculumData) return [];
+        return certCurriculumData.sections?.flatMap((s: any) => s.lessons ?? []) ?? [];
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [certCurriculumData]);
+      return (
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Heading</label>
+            <DebouncedInput value={d.heading ?? "Your Certificate of Completion"} onChange={v => set("heading", v)} className="h-8 text-xs" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Sub-text</label>
+            <DebouncedInput value={d.subtext ?? "Download and share your achievement."} onChange={v => set("subtext", v)} className="h-8 text-xs" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Locked message (certificate not yet issued)</label>
+            <DebouncedInput value={d.lockedMessage ?? "Complete all required lessons to unlock your certificate."} onChange={v => set("lockedMessage", v)} className="h-8 text-xs" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Background color</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={d.bgColor ?? "#f0fafa"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0.5" />
+              <DebouncedInput value={d.bgColor ?? "#f0fafa"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" />
+            </div>
+          </div>
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-gray-700">Require quiz pass to view certificate</label>
+              <input
+                type="checkbox"
+                checked={d.requireQuizPass ?? false}
+                onChange={e => set("requireQuizPass", e.target.checked)}
+                className="w-4 h-4 rounded accent-teal-600"
+              />
+            </div>
+            {d.requireQuizPass && (
+              <div className="space-y-3 pl-2 border-l-2 border-teal-200">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Quiz lesson to pass</label>
+                  <Select
+                    value={d.gateQuizLessonId != null ? String(d.gateQuizLessonId) : ""}
+                    onValueChange={v => set("gateQuizLessonId", v ? Number(v) : null)}
+                  >
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select a lesson…" /></SelectTrigger>
+                    <SelectContent>
+                      {certLessons.map((l: any) => (
+                        <SelectItem key={l.id} value={String(l.id)}>{l.title}</SelectItem>
+                      ))}
+                      {certLessons.length === 0 && <SelectItem value="_none" disabled>No lessons found</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-gray-400 mt-1">Learner must pass the quiz on this lesson before the certificate is shown.</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Quiz not passed message</label>
+                  <DebouncedInput value={d.quizNotPassedMessage ?? "You must pass the required quiz before accessing your certificate."} onChange={v => set("quizNotPassedMessage", v)} className="h-8 text-xs" />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
     case "remaining_seats": {
       const rsItems = rsSourceType === "workshop_instance" ? rsWorkshopInstances : rsCohortGroups;
       const rsIsLoading = rsSourceType === "workshop_instance" ? rsWorkshopsLoading : rsCohortsLoading;

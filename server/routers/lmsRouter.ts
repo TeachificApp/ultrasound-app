@@ -2547,6 +2547,42 @@ export const lmsLearnerRouter = router({
       return cert ?? null;
     }),
 
+  // ── Quiz Gate ──────────────────────────────────────────────────────────
+  /**
+   * Returns whether the current user has passed the quiz for a specific lesson.
+   * Used by the Certificate Preview block to gate access behind a quiz pass.
+   */
+  getLessonQuizPassStatus: protectedProcedure
+    .input(z.object({ lessonId: z.number().int(), courseSlug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) return { passed: false, score: null, attempts: 0 };
+      const [enrollment] = await db.select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id)))
+        .limit(1);
+      if (!enrollment) return { passed: false, score: null, attempts: 0 };
+      const [progress] = await db.select({
+        quizPassed: lmsLessonProgress.quizPassed,
+        quizScore: lmsLessonProgress.quizScore,
+        attempts: lmsLessonProgress.attempts,
+      })
+        .from(lmsLessonProgress)
+        .where(and(
+          eq(lmsLessonProgress.enrollmentId, enrollment.id),
+          eq(lmsLessonProgress.lessonId, input.lessonId),
+        ))
+        .limit(1);
+      if (!progress) return { passed: false, score: null, attempts: 0 };
+      return {
+        passed: progress.quizPassed ?? false,
+        score: progress.quizScore ?? null,
+        attempts: progress.attempts ?? 0,
+      };
+    }),
+
   // ── Lesson Notes ──────────────────────────────────────────────────────────
 
   /** Get all notes for a course (grouped by lesson) */

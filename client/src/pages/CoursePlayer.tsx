@@ -27,6 +27,7 @@ import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 
 import LessonCommentSection from "@/components/LessonCommentSection";
+import CertificatePreviewBlock from "@/components/CertificatePreviewBlock";
 
 // Lazy-load the heavy editor so it doesn't bloat the initial bundle
 const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));
@@ -2375,6 +2376,8 @@ export default function CoursePlayer() {
                           <InlineLessonQuiz key={block.id} data={block.data as any} />
                         ) : block.type === "lesson_flashcard" ? (
                           <InlineLessonFlashcardDeck key={block.id} data={block.data as any} />
+                        ) : block.type === "lesson_certificate" ? (
+                          <CertificatePreviewBlock key={block.id} data={block.data as any} courseSlug={slug!} isAdmin={false} />
                         ) : block.type === "live_session" ? (
                           <InlineLiveSession key={block.id} data={block.data as any} />
                         ) : block.type === "sdms_cme_module" ? (
