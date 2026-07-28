@@ -34,7 +34,7 @@ const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
 // ─── Quiz Runner ──────────────────────────────────────────────────────────────
-function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit Quiz" }: { lesson: any; courseSlug: string; onComplete: () => void; submitQuizLabel?: string }) {
+function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit Quiz", isAdminPreview = false }: { lesson: any; courseSlug: string; onComplete: () => void; submitQuizLabel?: string; isAdminPreview?: boolean }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -54,7 +54,7 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
   const quiz = lesson.quiz;
   if (!quiz) return <div className="text-gray-500 text-sm">No quiz data available.</div>;
   const questions = quiz.questions ?? [];
-  const handleSubmit = () => submitQuiz.mutate({ lessonId: lesson.id, courseSlug, answers });
+  const handleSubmit = () => submitQuiz.mutate({ lessonId: lesson.id, courseSlug, answers, isAdminPreview });
   const handleRetake = () => { setAnswers({}); setSubmitted(false); setResult(null); };
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -1397,11 +1397,9 @@ export default function CoursePlayer() {
     if (!selectedLessonId) return;
     // Optimistically mark as complete immediately so checkmarks appear in both sidebars
     setOptimisticCompleted(prev => new Set([...prev, selectedLessonId]));
-    // In admin preview mode the enrollment is synthetic (id: -1) — skip the server call
-    // to avoid a FORBIDDEN error. Progress is not persisted in preview mode.
-    if (!data?.isAdminPreview) {
-      await markComplete.mutateAsync({ lessonId: selectedLessonId, courseSlug: slug! });
-    }
+    // In admin preview mode, pass the flag so the server auto-creates a real enrollment
+    // and tracks progress + issues a certificate just like a real learner.
+    await markComplete.mutateAsync({ lessonId: selectedLessonId, courseSlug: slug!, isAdminPreview: data?.isAdminPreview ?? false });
     // Fire the effect BEFORE navigating — the LessonEffectPlayer must still be mounted
     // when the custom event fires. Navigating immediately (setSelectedLessonId) causes React
     // to re-key the players for the next lesson, unmounting the current one before the
@@ -2360,6 +2358,7 @@ export default function CoursePlayer() {
                       lesson={lessonData}
                       courseSlug={slug!}
                       submitQuizLabel={lbl.submitQuiz}
+                      isAdminPreview={data?.isAdminPreview ?? false}
                       onComplete={() => {
                         fireLessonCompleteEffect();
                         utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });

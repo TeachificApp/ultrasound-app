@@ -3237,7 +3237,7 @@ export const lmsEnrollments = mysqlTable("lms_enrollments", {
   affiliateCode: varchar("affiliate_code", { length: 64 }),
   orderId: int("order_id"),
   // Enrollment type: 'full' = paid/full access, 'free_preview' = free preview only (limited to preview lessons)
-  enrollmentType: mysqlEnum("enrollment_type", ["full", "free_preview"]).default("full").notNull(),
+  enrollmentType: mysqlEnum("enrollment_type", ["full", "free_preview", "admin_preview"]).default("full").notNull(),
   /** When set, enrollment is inactive after this time (Thinkific expiry, membership period end) */
   accessExpiresAt: timestamp("access_expires_at"),
   source: varchar("source", { length: 32 }).default("manual").notNull(),

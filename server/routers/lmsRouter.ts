@@ -260,13 +260,14 @@ const lmsCertificateRouter = router({
         pdfTemplateUrl: null, description: null,
         createdAt: new Date(), updatedAt: new Date(),
       };
-      // Generate a sample with placeholder strings so the admin can
-      // see exactly where {{LEARNER_NAME}}, {{COURSE_TITLE}}, {{ISSUED_DATE}} appear.
+      // Generate a sample with placeholder AcroForm fields so the admin can
+      // see and reposition Learner Name, Course Title, Issued Date, and Credits.
       const pdfBuffer = await generateCertificatePdf({
         learnerName: "",
         courseTitle: "",
         issuedAt: new Date(),
         credentials: null,
+        creditHours: "1.0", // sample value so the Credits field appears in the template
         template: effectiveTemplate as any,
         usePlaceholders: true,
       });
@@ -1338,14 +1339,27 @@ export const lmsLearnerRouter = router({
 
   /** Mark a lesson complete */
   markLessonComplete: protectedProcedure
-    .input(z.object({ lessonId: z.number(), courseSlug: z.string() }))
+    .input(z.object({ lessonId: z.number(), courseSlug: z.string(), isAdminPreview: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      const [enrollment] = await db.select().from(lmsEnrollments)
+      let [enrollment] = await db.select().from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+      // Admin preview mode: auto-create a real enrollment so progress and certificate issuance work
+      if (!enrollment && input.isAdminPreview && ctx.user.role === "admin") {
+        await db.insert(lmsEnrollments).values({
+          userId: ctx.user.id,
+          courseId: course.id,
+          enrollmentType: "admin_preview",
+          enrolledAt: new Date(),
+          progressPct: 0,
+        });
+        const [newEnrollment] = await db.select().from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+        enrollment = newEnrollment;
+      }
       if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
 
       const [existing] = await db.select().from(lmsLessonProgress)
@@ -1382,14 +1396,28 @@ export const lmsLearnerRouter = router({
       lessonId: z.number(),
       courseSlug: z.string(),
       answers: z.record(z.string(), z.union([z.string(), z.array(z.string())])), // questionId -> answer or array of answers
+      isAdminPreview: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      const [enrollment] = await db.select().from(lmsEnrollments)
+      let [enrollment] = await db.select().from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+      // Admin preview mode: auto-create a real enrollment so quiz progress and certificate issuance work
+      if (!enrollment && input.isAdminPreview && ctx.user.role === "admin") {
+        await db.insert(lmsEnrollments).values({
+          userId: ctx.user.id,
+          courseId: course.id,
+          enrollmentType: "admin_preview",
+          enrolledAt: new Date(),
+          progressPct: 0,
+        });
+        const [newEnrollment] = await db.select().from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+        enrollment = newEnrollment;
+      }
       if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
 
       const [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, input.lessonId)).limit(1);
