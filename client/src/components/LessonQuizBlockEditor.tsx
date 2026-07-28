@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import {
   Pencil, Trash2, Plus, Database, Search, Video, Image as ImageIcon,
   FolderOpen, Tag, Crosshair, Shuffle, CheckSquare, ToggleLeft, AlignLeft,
-  ChevronDown, ChevronUp, GripVertical, X,
+  ChevronDown, ChevronUp, GripVertical, X, Loader2,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -281,6 +281,9 @@ function SaveToBankDialog({
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [newTagName, setNewTagName] = useState("");
+  const [newFolderName, setNewFolderName] = useState("");
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const utils = trpc.useUtils();
 
   const { data: tagsData } = trpc.questionBank.listTags.useQuery();
   const { data: foldersData } = trpc.questionBank.listFolders.useQuery();
@@ -292,6 +295,17 @@ function SaveToBankDialog({
       setSelectedTagIds(prev => [...prev, tag.id]);
       setNewTagName("");
     },
+  });
+
+  const createFolderMutation = trpc.questionBank.createFolder.useMutation({
+    onSuccess: (folder: any) => {
+      utils.questionBank.listFolders.invalidate();
+      setSelectedFolderId(folder.id);
+      setNewFolderName("");
+      setShowNewFolder(false);
+      toast.success("Folder created.");
+    },
+    onError: (err: any) => toast.error(err.message),
   });
 
   const saveMutation = trpc.questionBank.createQuestion.useMutation({
@@ -306,7 +320,7 @@ function SaveToBankDialog({
     const qType = question.type ?? "mcq";
     const payload: any = {
       question: question.question,
-      questionType: qType,
+      type: qType,
       explanation: question.explanation ?? "",
       questionImageUrl: question.imageUrl,
       questionVideoUrl: question.videoUrl,
@@ -317,26 +331,26 @@ function SaveToBankDialog({
     };
 
     if (qType === "truefalse") {
-      payload.options = JSON.stringify([{ text: "True" }, { text: "False" }]);
+      payload.options = [{ text: "True" }, { text: "False" }];
       payload.correctAnswer = question.correctAnswer === 0 ? "True" : "False";
     } else if (qType === "multiselect") {
-      payload.options = JSON.stringify(question.options.map((o, i) => ({
+      payload.options = question.options.map((o: string, i: number) => ({
         text: o,
         imageUrl: question.answerImages?.[i],
-      })));
-      payload.correctAnswer = JSON.stringify(question.correctAnswers ?? []);
+      }));
+      payload.correctAnswers = question.correctAnswers ?? [];
     } else if (qType === "hotspot") {
-      payload.options = JSON.stringify([]);
-      payload.correctAnswer = JSON.stringify(question.hotspotMarkers ?? []);
+      payload.options = [];
+      payload.hotspotMarkers = JSON.stringify(question.hotspotMarkers ?? []);
       payload.questionImageUrl = question.hotspotImageUrl ?? question.imageUrl;
     } else if (qType === "matching") {
-      payload.options = JSON.stringify(question.matchingPairs ?? []);
-      payload.correctAnswer = JSON.stringify(question.matchingPairs ?? []);
+      payload.options = [];
+      payload.matchingPairs = JSON.stringify(question.matchingPairs ?? []);
     } else {
-      payload.options = JSON.stringify(question.options.map((o, i) => ({
+      payload.options = question.options.map((o: string, i: number) => ({
         text: o,
         imageUrl: question.answerImages?.[i],
-      })));
+      }));
       payload.correctAnswer = question.options[question.correctAnswer] ?? "";
     }
 
@@ -357,18 +371,45 @@ function SaveToBankDialog({
             <Label className="text-xs text-gray-600 flex items-center gap-1 mb-1">
               <FolderOpen size={11} /> Folder (optional)
             </Label>
-            <Select value={selectedFolderId?.toString() ?? "none"}
-              onValueChange={(v) => setSelectedFolderId(v === "none" ? null : Number(v))}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="No folder" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none" className="text-xs">No folder</SelectItem>
-                {folders.map((f: any) => (
-                  <SelectItem key={f.id} value={f.id.toString()} className="text-xs">
-                    {f.name} ({f.questionCount ?? 0})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-1">
+              <Select value={selectedFolderId?.toString() ?? "none"}
+                onValueChange={(v) => setSelectedFolderId(v === "none" ? null : Number(v))}>
+                <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="No folder" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" className="text-xs">No folder</SelectItem>
+                  {folders.map((f: any) => (
+                    <SelectItem key={f.id} value={f.id.toString()} className="text-xs">
+                      {f.name} ({f.questionCount ?? 0})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" size="sm" variant="outline" className="h-8 text-xs px-2 shrink-0"
+                title="Create new folder"
+                onClick={() => setShowNewFolder(v => !v)}>
+                <FolderOpen size={12} /><Plus size={10} className="-ml-0.5" />
+              </Button>
+            </div>
+            {showNewFolder && (
+              <div className="flex gap-1 mt-1">
+                <Input
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="New folder name…"
+                  className="h-7 text-xs flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newFolderName.trim()) {
+                      createFolderMutation.mutate({ name: newFolderName.trim() });
+                    }
+                  }}
+                />
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
+                  disabled={!newFolderName.trim() || createFolderMutation.isPending}
+                  onClick={() => newFolderName.trim() && createFolderMutation.mutate({ name: newFolderName.trim() })}>
+                  {createFolderMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : "Create"}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Tags */}
