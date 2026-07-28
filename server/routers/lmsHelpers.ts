@@ -165,7 +165,7 @@ export async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enro
 
   // Issue certificate if newly completed and course has hasCertificate enabled
   if (pct >= 100 && !wasCompleted) {
-    void issueCertificateIfEnabled(db, enrollmentId, enrollRow.userId, courseId).catch(e =>
+    void issueCertificateIfEnabled(db, enrollmentId, enrollRow.userId, courseId, enrollRow.enrollmentType).catch(e =>
       console.error("[certificate] Failed to issue certificate:", e)
     );
   }
@@ -175,7 +175,8 @@ export async function issueCertificateIfEnabled(
   db: Awaited<ReturnType<typeof getDb>>,
   enrollmentId: number,
   userId: number,
-  courseId: number
+  courseId: number,
+  enrollmentType?: string
 ) {
   if (!db) return;
   // Check course has certificate enabled
@@ -248,16 +249,18 @@ export async function issueCertificateIfEnabled(
     issuedAt,
   });
 
-  // Send email
-  await sendCertificateEmail({
-    to: { name: learnerName, email: user.email },
-    courseTitle: course.title,
-    certificateUrl,
-    pdfBuffer,
-    issuedAt,
-  });
+  // Send email — skip for admin_preview enrollments (test runs should not send real emails)
+  if (enrollmentType !== "admin_preview") {
+    await sendCertificateEmail({
+      to: { name: learnerName, email: user.email },
+      courseTitle: course.title,
+      certificateUrl,
+      pdfBuffer,
+      issuedAt,
+    });
+  }
 
-  console.log(`[certificate] Issued certificate for user ${userId}, course ${courseId}`);
+  console.log(`[certificate] Issued certificate for user ${userId}, course ${courseId}${enrollmentType === "admin_preview" ? " (admin preview — email suppressed)" : ""}`);
 }
 
 // ─── Public Router ────────────────────────────────────────────────────────────

@@ -1016,7 +1016,33 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [addLessonSection, setAddLessonSection] = useState<number | null>(null);
   const [addLessonAtCourseLevel, setAddLessonAtCourseLevel] = useState(false);
+  // Restore editLesson from URL on mount (so page refresh re-opens the lesson editor)
+  const urlEditLessonId = (() => { try { const v = new URLSearchParams(window.location.search).get("editLesson"); return v ? Number(v) : null; } catch { return null; } })();
   const [editLesson, setEditLesson] = useState<any>(null);
+  // Once course data loads, restore editLesson from URL param if present
+  const restoredLessonRef = useRef(false);
+  useEffect(() => {
+    if (!restoredLessonRef.current && urlEditLessonId && course) {
+      restoredLessonRef.current = true;
+      const allLessons = [
+        ...(course.topLevelLessons ?? []),
+        ...(course.sections ?? []).flatMap((s: any) => s.lessons ?? []),
+      ];
+      const found = allLessons.find((l: any) => l.id === urlEditLessonId);
+      if (found) setEditLesson(found);
+    }
+  }, [course, urlEditLessonId]);
+  // Sync editLesson.id to URL so page refresh restores the lesson editor
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (editLesson) {
+      params.set("editLesson", String(editLesson.id));
+    } else {
+      params.delete("editLesson");
+    }
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, "", newUrl);
+  }, [editLesson]);
   // No pendingLessonId needed — AddLessonDialog now passes the full lesson object directly
   const [quizLesson, setQuizLesson] = useState<any>(null);
   const [importMediaSection, setImportMediaSection] = useState<number | null>(null);
@@ -7432,6 +7458,19 @@ export default function LMSAdmin() {
     setEditingCourseId(newCourseId);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // Sync editingCourseId to URL so page refresh restores the course editor
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (editingCourseId) {
+      params.set("editCourse", String(editingCourseId));
+    } else {
+      params.delete("editCourse");
+      params.delete("editLesson");
+    }
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, "", newUrl);
+  }, [editingCourseId]);
 
   // Flatten all tabs to find active group color
   const allItems = LMS_NAV_GROUPS.flatMap(g => g.items.map(i => ({ ...i, groupColor: g.color })));
