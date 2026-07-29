@@ -280,7 +280,7 @@ export const cmeEntries = mysqlTable("cmeEntries", {
     "other"
   ]).default("echo_specific").notNull(),
   activityDate: varchar("activityDate", { length: 20 }).notNull(), // YYYY-MM-DD
-  creditHours: int("creditHours").notNull().default(0),
+  creditHours: decimal("creditHours", { precision: 5, scale: 2 }).notNull().default("0.00"),
   certificationNumber: varchar("certificationNumber", { length: 100 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
