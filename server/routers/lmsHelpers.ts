@@ -110,10 +110,12 @@ export async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enro
   const courseSections = await db.select({ id: lmsSections.id }).from(lmsSections).where(eq(lmsSections.courseId, courseId));
   const sectionIds = courseSections.map(s => s.id);
 
-  // Count lessons that count toward progress — exclude free-preview lessons hidden after purchase
-  // (previewMode = 'preview_hide_after_purchase' are not visible to enrolled students so must not count)
+  // Count lessons that count toward progress:
+  // 1. Exclude free-preview lessons hidden after purchase (not visible to enrolled students)
+  // 2. Exclude draft lessons (lessonStatus = 'draft' — hidden from learners)
+  // 3. Exclude lessons explicitly marked as not counting toward completion
   let totalCount = 0;
-  const excludeHiddenPreview = sql`${lmsLessons.previewMode} != 'preview_hide_after_purchase' OR ${lmsLessons.previewMode} IS NULL`;
+  const excludeHiddenPreview = sql`(${lmsLessons.previewMode} != 'preview_hide_after_purchase' OR ${lmsLessons.previewMode} IS NULL) AND ${lmsLessons.lessonStatus} = 'published' AND ${lmsLessons.countTowardCompletion} = 1`;
   if (sectionIds.length > 0) {
     const [totalRows] = await db.select({ count: sql<number>`count(*)` }).from(lmsLessons).where(
       and(

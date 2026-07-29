@@ -194,8 +194,12 @@ export default function CourseOverview() {
   const firstIncomplete = allLessons.find((l: any) => !completedIds.has(l.id));
   const continueLesson = firstIncomplete ?? allLessons[0];
 
-  const totalLessons = allLessons.length;
-  const completedCount = allLessons.filter((l: any) => completedIds.has(l.id)).length;
+  // Only count published lessons that are marked to count toward completion
+  const countableLessons = allLessons.filter((l: any) =>
+    l.lessonStatus === 'published' && l.countTowardCompletion !== false && l.countTowardCompletion !== 0
+  );
+  const totalLessons = countableLessons.length;
+  const completedCount = countableLessons.filter((l: any) => completedIds.has(l.id)).length;
   const progressPct = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
   // Progress bar only shown when at least one lesson requires manual completion (progress is trackable)
   const hasAnyManualComplete = allLessons.some((l: any) => l.requireManualComplete === 1 || l.requireManualComplete === true);

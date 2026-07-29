@@ -4384,6 +4384,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [showInstructor, setShowInstructor] = useState<"inherit" | "show" | "hide">(lesson.showInstructor ?? "inherit");
   const [isPrerequisite, setIsPrerequisite] = useState<boolean>(!!lesson.isPrerequisite);
   const [commentsEnabled, setCommentsEnabled] = useState<boolean>(!!(lesson as any).commentsEnabled);
+  const [countTowardCompletion, setCountTowardCompletion] = useState<boolean>((lesson as any).countTowardCompletion !== false && (lesson as any).countTowardCompletion !== 0);
   const [meetingLink, setMeetingLink] = useState<string>((lesson as any).meetingLink ?? "");
   const [liveStartAt, setLiveStartAt] = useState<string>((lesson as any).liveStartAt ? new Date((lesson as any).liveStartAt).toISOString().slice(0, 16) : "");
   const [liveEndAt, setLiveEndAt] = useState<string>((lesson as any).liveEndAt ? new Date((lesson as any).liveEndAt).toISOString().slice(0, 16) : "");
@@ -4409,6 +4410,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setShowInstructor(lessonShallow.showInstructor ?? "inherit");
     setIsPrerequisite(!!lessonShallow.isPrerequisite);
     setCommentsEnabled(!!(lessonShallow as any).commentsEnabled);
+    setCountTowardCompletion((lessonShallow as any).countTowardCompletion !== false && (lessonShallow as any).countTowardCompletion !== 0);
     setMeetingLink((lessonShallow as any).meetingLink ?? "");
     setLiveStartAt((lessonShallow as any).liveStartAt ? new Date((lessonShallow as any).liveStartAt).toISOString().slice(0, 16) : "");
     setLiveEndAt((lessonShallow as any).liveEndAt ? new Date((lessonShallow as any).liveEndAt).toISOString().slice(0, 16) : "");
@@ -4477,6 +4479,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       showInstructor,
       isPrerequisite,
       commentsEnabled,
+      countTowardCompletion,
       meetingLink: meetingLink.trim() || null,
       liveStartAt: liveStartAt ? new Date(liveStartAt).getTime() : null,
       liveEndAt: liveEndAt ? new Date(liveEndAt).getTime() : null,
@@ -4698,8 +4701,22 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
 
           {/* Comments toggle */}
           <div className="flex items-center gap-2">
-            <Switch checked={commentsEnabled} onCheckedChange={setCommentsEnabled} id="edit-comments-enabled" />
+            <Switch checked={commentsEnabled} onCheckedChange={v => { setCommentsEnabled(v); setIsDirty(true); }} id="edit-comments-enabled" />
             <Label htmlFor="edit-comments-enabled" className="text-sm">Enable student discussion / comments on this lesson</Label>
+          </div>
+
+          {/* Count toward completion toggle */}
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Count toward completion</p>
+              <p className="text-xs text-gray-400 mt-0.5">When off, this lesson is excluded from the progress percentage and certificate eligibility check. Useful for optional or bonus lessons.</p>
+            </div>
+            <Switch
+              checked={countTowardCompletion}
+              onCheckedChange={v => { setCountTowardCompletion(v); setIsDirty(true); }}
+              id="edit-count-toward-completion"
+              className="ml-4 shrink-0"
+            />
           </div>
           {/* Live meeting link */}
           <div className="border border-teal-100 rounded-lg p-4 space-y-2 bg-teal-50/40">

@@ -986,6 +986,7 @@ export const lmsCourseBuilderRouter = router({
       prerequisiteLessonId: z.number().int().nullable().optional(),
       isPrerequisite: z.boolean().optional(),
       commentsEnabled: z.boolean().optional(),
+      countTowardCompletion: z.boolean().optional(),
       meetingLink: z.string().max(1024).nullable().optional(),
       liveStartAt: z.number().int().nullable().optional(),
       liveEndAt: z.number().int().nullable().optional(),
@@ -996,7 +997,7 @@ export const lmsCourseBuilderRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, requireVideoCompletion, requireManualComplete, isPrerequisite, commentsEnabled, ...rest } = input;
+      const { id, requireVideoCompletion, requireManualComplete, isPrerequisite, commentsEnabled, countTowardCompletion, ...rest } = input;
       const updates: Record<string, unknown> = Object.fromEntries(
         Object.entries(rest).filter(([, v]) => v !== undefined)
       );
@@ -1005,6 +1006,7 @@ export const lmsCourseBuilderRouter = router({
       if (requireManualComplete !== undefined) updates.requireManualComplete = requireManualComplete === null ? null : (requireManualComplete ? 1 : 0);
       if (isPrerequisite !== undefined) updates.isPrerequisite = isPrerequisite;
       if (commentsEnabled !== undefined) updates.commentsEnabled = commentsEnabled ? 1 : 0;
+      if (countTowardCompletion !== undefined) updates.countTowardCompletion = countTowardCompletion ? 1 : 0;
       // Convert null dripDays to 0 (no drip)
       if (updates.dripDays === null) updates.dripDays = 0;
       // Keep isPreview in sync with previewMode for backward compat

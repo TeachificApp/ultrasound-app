@@ -1409,6 +1409,7 @@ export const lmsLearnerRouter = router({
           effectConfettiMode: lmsLessons.effectConfettiMode,
           effectBannerDuration: lmsLessons.effectBannerDuration,
           lessonStatus: lmsLessons.lessonStatus,
+          countTowardCompletion: lmsLessons.countTowardCompletion,
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
         }).from(lmsLessons).where(
@@ -2731,7 +2732,26 @@ export const lmsLearnerRouter = router({
       // Fetch sections + lessons
       const [sections, allLessons] = await Promise.all([
         db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
-        db.select().from(lmsLessons).where(
+        db.select({
+          id: lmsLessons.id,
+          courseId: lmsLessons.courseId,
+          sectionId: lmsLessons.sectionId,
+          title: lmsLessons.title,
+          slug: lmsLessons.slug,
+          position: lmsLessons.position,
+          lessonType: lmsLessons.lessonType,
+          lessonStatus: lmsLessons.lessonStatus,
+          countTowardCompletion: lmsLessons.countTowardCompletion,
+          requireManualComplete: lmsLessons.requireManualComplete,
+          previewMode: lmsLessons.previewMode,
+          dripDays: lmsLessons.dripDays,
+          dripDate: lmsLessons.dripDate,
+          prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
+          thumbnailUrl: lmsLessons.thumbnailUrl,
+          estimatedMinutes: lmsLessons.estimatedMinutes,
+          createdAt: lmsLessons.createdAt,
+          updatedAt: lmsLessons.updatedAt,
+        }).from(lmsLessons).where(
           // Admins in preview mode see all lessons; enrolled learners only see published lessons
           isAdminPreview
             ? eq(lmsLessons.courseId, course.id)

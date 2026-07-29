@@ -3140,6 +3140,8 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   commentsEnabled: boolean("comments_enabled").default(false).notNull(),
   // Per-lesson publish status: 'published' = visible to enrolled learners (default), 'draft' = hidden from learners even if course is published
   lessonStatus: mysqlEnum("lesson_status", ["published", "draft"]).default("published").notNull(),
+  // Whether this lesson counts toward course completion progress. Default true. Set to false for optional/bonus lessons.
+  countTowardCompletion: boolean("count_toward_completion").default(true).notNull(),
   // Show/hide native video controls (play, pause, seek, volume) for video/embed/video_text lessons. Default true.
   showVideoControls: boolean("show_video_controls").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
