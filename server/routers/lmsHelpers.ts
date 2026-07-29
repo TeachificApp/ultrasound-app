@@ -190,7 +190,7 @@ export async function issueCertificateIfEnabled(
 ) {
   if (!db) return;
   // Check course has certificate enabled
-  const [course] = await db.select({ hasCertificate: lmsCourses.hasCertificate, title: lmsCourses.title, certificateTemplateId: lmsCourses.certificateTemplateId, creditHours: lmsCourses.creditHours }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
+  const [course] = await db.select({ hasCertificate: lmsCourses.hasCertificate, title: lmsCourses.title, certificateTemplateId: lmsCourses.certificateTemplateId, creditHours: lmsCourses.creditHours, certificateTitleOverride: lmsCourses.certificateTitleOverride }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
   if (!course?.hasCertificate) return;
 
   // Check if certificate already issued
@@ -227,16 +227,18 @@ export async function issueCertificateIfEnabled(
     if (!res.ok) throw new Error(`Failed to fetch custom PDF template: ${res.status}`);
     const rawBuffer = Buffer.from(await res.arrayBuffer());
     // Replace placeholder strings with real learner data
+    const certTitle = (course.certificateTitleOverride && course.certificateTitleOverride.trim()) ? course.certificateTitleOverride.trim() : course.title;
     pdfBuffer = await overlayLearnerData(rawBuffer, {
       learnerName: learnerName,
-      courseTitle: course.title,
+      courseTitle: certTitle,
       issuedAt,
       creditHours: course.creditHours ?? null,
     });
   } else {
+    const certTitle = (course.certificateTitleOverride && course.certificateTitleOverride.trim()) ? course.certificateTitleOverride.trim() : course.title;
     pdfBuffer = await generateCertificatePdf({
       learnerName,
-      courseTitle: course.title,
+      courseTitle: certTitle,
       issuedAt,
       credentials: user.credentials,
       creditHours: course.creditHours ?? null,
@@ -261,9 +263,10 @@ export async function issueCertificateIfEnabled(
 
   // Send email — skip for admin_preview enrollments (test runs should not send real emails)
   if (enrollmentType !== "admin_preview") {
+    const certTitleForEmail = (course.certificateTitleOverride && course.certificateTitleOverride.trim()) ? course.certificateTitleOverride.trim() : course.title;
     await sendCertificateEmail({
       to: { name: learnerName, email: user.email },
-      courseTitle: course.title,
+      courseTitle: certTitleForEmail,
       certificateUrl,
       pdfBuffer,
       issuedAt,

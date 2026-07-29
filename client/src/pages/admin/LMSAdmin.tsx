@@ -1785,6 +1785,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
   const [hasCertificate, setHasCertificate] = useState(course.hasCertificate);
   const [certificateTemplateId, setCertificateTemplateId] = useState<number | null>((course as any).certificateTemplateId ?? null);
   const [creditHours, setCreditHours] = useState<string>((course as any).creditHours ?? "");
+  const [certificateTitleOverride, setCertificateTitleOverride] = useState<string>((course as any).certificateTitleOverride ?? "");
   const [isFeatured, setIsFeatured] = useState(course.isFeatured ?? false);
   const [isDrip, setIsDrip] = useState(course.isDrip ?? false);
   const [hideProgress, setHideProgress] = useState(course.hideProgress ?? false);
@@ -1889,6 +1890,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
               hasCertificate,
               certificateTemplateId,
               creditHours: creditHours.trim() || null,
+              certificateTitleOverride: certificateTitleOverride.trim() || null,
               isFeatured,
               isDrip,
               hideProgress,
@@ -2187,6 +2189,16 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
             <CertTemplateSelector value={certificateTemplateId} onChange={setCertificateTemplateId} />
           </div>
           <div>
+            <Label className="text-xs text-muted-foreground">Certificate Course Title</Label>
+            <Input
+              className="mt-1 h-8 text-sm"
+              placeholder={`Defaults to: ${course.title}`}
+              value={certificateTitleOverride}
+              onChange={e => setCertificateTitleOverride(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-0.5">The course title printed on the certificate. Leave blank to use the main course title.</p>
+          </div>
+          <div>
             <Label className="text-xs text-muted-foreground">CME/CE Credit Hours (optional)</Label>
             <Input
               className="mt-1 h-8 text-sm w-32"
@@ -2331,7 +2343,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
         </div>
         <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
           disabled={updateCourseSettings.isPending}
-          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, certificateTemplateId, creditHours: creditHours.trim() || null, isFeatured, publishDomain: publishDomain || null })}
+          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, certificateTemplateId, creditHours: creditHours.trim() || null, certificateTitleOverride: certificateTitleOverride.trim() || null, isFeatured, publishDomain: publishDomain || null })}
         >
           {updateCourseSettings.isPending ? "Saving..." : "Save URL & SEO"}
         </Button>
@@ -2493,6 +2505,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
           hasCertificate,
           certificateTemplateId,
           creditHours: creditHours.trim() || null,
+          certificateTitleOverride: certificateTitleOverride.trim() || null,
           isFeatured,
           isDrip,
           hideProgress,

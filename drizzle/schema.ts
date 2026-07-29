@@ -2969,6 +2969,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   certificateTemplateId: int("certificate_template_id"), // FK to lms_certificate_templates.id (null = default template)
   // Number of CME/CE credit hours awarded on completion (null = no credits shown on certificate)
   creditHours: varchar("credit_hours", { length: 16 }),
+  // Optional override for the course title shown on the certificate (falls back to main title if empty)
+  certificateTitleOverride: varchar("certificate_title_override", { length: 512 }),
   // Featured: admin-selectable to show on LMS home page
   isFeatured: boolean("is_featured").default(false).notNull(),
   // Drip: unlock all immediately (false) or by schedule (true)

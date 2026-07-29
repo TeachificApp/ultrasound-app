@@ -200,6 +200,7 @@ export const lmsCourseBuilderRouter = router({
       hasCertificate: z.boolean().optional(),
       certificateTemplateId: z.number().int().positive().nullable().optional(),
       creditHours: z.string().max(20).nullable().optional(),
+      certificateTitleOverride: z.string().max(512).nullable().optional(),
       isFeatured: z.boolean().optional(),
       isDrip: z.boolean().optional(),
       showInstructor: z.boolean().optional(),

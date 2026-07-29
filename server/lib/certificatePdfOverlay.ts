@@ -18,7 +18,7 @@
  * are missing (e.g. a legacy plain-text template).
  */
 
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, TextAlignment } from "pdf-lib";
 
 export interface OverlayOptions {
   learnerName: string;
@@ -66,7 +66,19 @@ export async function overlayLearnerData(
     for (const [fieldName, value] of Object.entries(fieldMap)) {
       try {
         const field = form.getTextField(fieldName);
+        // Preserve the field's existing alignment before setting text.
+        // pdf-lib resets alignment to Left when setText is called, so we
+        // read it first and re-apply it afterwards.
+        let existingAlignment: TextAlignment | undefined;
+        try {
+          existingAlignment = field.getAlignment();
+        } catch {
+          // getAlignment may throw on older field definitions — ignore
+        }
         field.setText(value);
+        if (existingAlignment !== undefined) {
+          field.setAlignment(existingAlignment);
+        }
         // Auto-scale the learner name font size so long names always fit.
         // We use a simple heuristic: base size 36pt, shrink by ~0.6pt per
         // character over 20 chars, with a floor of 18pt.
