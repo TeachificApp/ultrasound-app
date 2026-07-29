@@ -837,7 +837,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
 
 // ─── Lesson Row ──────────────────────────────────────────────────────────────
 
-function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp, onMoveDown, onToggleStatus }: {
+function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp, onMoveDown, onToggleStatus, onToggleCountTowardCompletion }: {
   lesson: any;
   onEdit: (lesson: any) => void;
   onQuiz: (lesson: any) => void;
@@ -846,6 +846,7 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp,
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onToggleStatus?: (id: number, newStatus: "published" | "draft") => void;
+  onToggleCountTowardCompletion?: (id: number, newValue: boolean) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
   const style: React.CSSProperties = {
@@ -885,6 +886,22 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp,
       {lesson.isPreview && <Badge variant="outline" className="text-xs text-teal-600 border-teal-300">Preview</Badge>}
       {lesson.requireVideoCompletion === 1 && <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Video req.</Badge>}
       {lesson.requireManualComplete === 1 && <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Manual</Badge>}
+      {onToggleCountTowardCompletion && (
+        <button
+          title={lesson.countTowardCompletion !== false && lesson.countTowardCompletion !== 0 ? "Counts toward completion — click to exclude" : "Excluded from completion — click to include"}
+          onClick={() => {
+            const current = lesson.countTowardCompletion !== false && lesson.countTowardCompletion !== 0;
+            onToggleCountTowardCompletion(lesson.id, !current);
+          }}
+          className={`text-xs font-semibold px-2 py-0.5 rounded border transition-colors ${
+            lesson.countTowardCompletion !== false && lesson.countTowardCompletion !== 0
+              ? "text-teal-600 border-teal-300 bg-teal-50 hover:bg-teal-100"
+              : "text-gray-400 border-gray-200 bg-white hover:bg-teal-50 hover:text-teal-600 hover:border-teal-300"
+          }`}
+        >
+          {lesson.countTowardCompletion !== false && lesson.countTowardCompletion !== 0 ? "Counts" : "Excluded"}
+        </button>
+      )}
       {lesson.type === "quiz" && (
         <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onQuiz(lesson)}>
           <HelpCircle className="w-3 h-3 mr-1" /> Quiz
@@ -1065,6 +1082,20 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
     onSuccess: () => refetch(),
     onError: e => toast.error(`Error: ${e.message}`),
   });
+  const updateCountTowardCompletion = trpc.lmsAdmin.updateLesson.useMutation({
+    onError: e => { toast.error(`Error: ${e.message}`); refetch(); },
+  });
+  // Optimistic toggle for countTowardCompletion — updates local state immediately, then persists
+  const handleToggleCountTowardCompletion = (lessonId: number, newValue: boolean) => {
+    // Optimistically update localTopLessons
+    setLocalTopLessons(prev => prev.map((l: any) => l.id === lessonId ? { ...l, countTowardCompletion: newValue } : l));
+    // Optimistically update lessons inside sections
+    setLocalSections(prev => prev.map((s: any) => ({
+      ...s,
+      lessons: (s.lessons ?? []).map((l: any) => l.id === lessonId ? { ...l, countTowardCompletion: newValue } : l),
+    })));
+    updateCountTowardCompletion.mutate({ id: lessonId, countTowardCompletion: newValue });
+  };
 
   const handleSaveCourseSettings = (data: any) => {
     const allLessonsFlat = [
@@ -1327,14 +1358,15 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
                     <div className="divide-y divide-gray-100">
                       {localTopLessons.map((lesson: any, li: number) => (
                         <SortableLessonRow
-                          key={lesson.id} lesson={lesson}
-                          onEdit={setEditLesson} onQuiz={setQuizLesson}
-                          onCopy={() => setCopyLessonTarget(lesson)}
-                          onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }}
-                          onToggleStatus={(id, newStatus) => updateLessonStatus.mutate({ id, lessonStatus: newStatus })}
-                          onMoveUp={li > 0 ? () => setLocalTopLessons(prev => { const r = arrayMove(prev, li, li - 1); reorderLessons.mutate({ lessons: r.map((l: any, i: number) => ({ id: l.id, position: i })) }); return r; }) : undefined}
-                          onMoveDown={li < localTopLessons.length - 1 ? () => setLocalTopLessons(prev => { const r = arrayMove(prev, li, li + 1); reorderLessons.mutate({ lessons: r.map((l: any, i: number) => ({ id: l.id, position: i })) }); return r; }) : undefined}
-                        />
+                              key={lesson.id} lesson={lesson}
+                              onEdit={setEditLesson} onQuiz={setQuizLesson}
+                              onCopy={() => setCopyLessonTarget(lesson)}
+                              onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }}
+                              onToggleStatus={(id, newStatus) => updateLessonStatus.mutate({ id, lessonStatus: newStatus })}
+                              onToggleCountTowardCompletion={handleToggleCountTowardCompletion}
+                              onMoveUp={li > 0 ? () => setLocalTopLessons(prev => { const r = arrayMove(prev, li, li - 1); reorderLessons.mutate({ lessons: r.map((l: any, i: number) => ({ id: l.id, position: i })) }); return r; }) : undefined}
+                              onMoveDown={li < localTopLessons.length - 1 ? () => setLocalTopLessons(prev => { const r = arrayMove(prev, li, li + 1); reorderLessons.mutate({ lessons: r.map((l: any, i: number) => ({ id: l.id, position: i })) }); return r; }) : undefined}
+                            />
                       ))}
                     </div>
                   </SortableContext>
@@ -1370,6 +1402,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
                               onCopy={() => setCopyLessonTarget(lesson)}
                               onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }}
                               onToggleStatus={(id, newStatus) => updateLessonStatus.mutate({ id, lessonStatus: newStatus })}
+                              onToggleCountTowardCompletion={handleToggleCountTowardCompletion}
                               onMoveUp={li > 0 ? () => setLocalSections(prev => { const secs = [...prev]; const lessons = arrayMove(secs[si].lessons, li, li - 1); secs[si] = { ...secs[si], lessons }; reorderLessons.mutate({ lessons: lessons.map((l: any, i: number) => ({ id: l.id, position: i })) }); return secs; }) : undefined}
                               onMoveDown={li < section.lessons.length - 1 ? () => setLocalSections(prev => { const secs = [...prev]; const lessons = arrayMove(secs[si].lessons, li, li + 1); secs[si] = { ...secs[si], lessons }; reorderLessons.mutate({ lessons: lessons.map((l: any, i: number) => ({ id: l.id, position: i })) }); return secs; }) : undefined}
                             />
