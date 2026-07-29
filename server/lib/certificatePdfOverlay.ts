@@ -58,7 +58,7 @@ export async function overlayLearnerData(
     const fieldMap: Record<string, string> = {
       learner_name: opts.learnerName,
       course_title: opts.courseTitle,
-      issued_date:  `Issued: ${dateStr}`,
+      issued_date:  dateStr,
       ...(creditsValue ? { credits: creditsValue } : {}),
     };
 
