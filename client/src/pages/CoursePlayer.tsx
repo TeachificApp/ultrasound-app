@@ -2391,7 +2391,7 @@ export default function CoursePlayer() {
                         ) : block.type === "lesson_flashcard" ? (
                           <InlineLessonFlashcardDeck key={block.id} data={block.data as any} />
                         ) : block.type === "lesson_certificate" ? (
-                          <CertificatePreviewBlock key={block.id} data={block.data as any} courseSlug={slug!} isAdmin={adminBypass} />
+                          <CertificatePreviewBlock key={block.id} data={block.data as any} courseSlug={slug!} isAdmin={adminBypass} hasRealEnrollment={!!(data?.enrollment && data.enrollment.id !== -1)} />
                         ) : block.type === "live_session" ? (
                           <InlineLiveSession key={block.id} data={block.data as any} />
                         ) : block.type === "sdms_cme_module" ? (

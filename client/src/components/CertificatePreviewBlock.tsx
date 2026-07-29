@@ -135,7 +135,7 @@ function SocialShareRow({ certUrl, heading }: { certUrl: string; heading: string
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export default function CertificatePreviewBlock({ data, courseSlug, isAdmin }: Props) {
+export default function CertificatePreviewBlock({ data, courseSlug, isAdmin, hasRealEnrollment }: Props & { hasRealEnrollment?: boolean }) {
   const [showEmbed, setShowEmbed] = useState(true);
 
   const heading = data.heading ?? "Your Certificate of Completion";
@@ -145,7 +145,9 @@ export default function CertificatePreviewBlock({ data, courseSlug, isAdmin }: P
   const bgColor = data.bgColor ?? "#f0fafa";
 
   // ── Admin placeholder ──────────────────────────────────────────────────────
-  if (isAdmin) {
+  // Show admin placeholder only when admin has no real enrollment (pure preview mode).
+  // If admin is also an enrolled learner, show their actual certificate.
+  if (isAdmin && !hasRealEnrollment) {
     return (
       <div
         className="rounded-2xl border border-teal-200 p-6 flex flex-col items-center gap-4 text-center"
