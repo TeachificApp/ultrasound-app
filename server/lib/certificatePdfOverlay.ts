@@ -67,6 +67,18 @@ export async function overlayLearnerData(
       try {
         const field = form.getTextField(fieldName);
         field.setText(value);
+        // Auto-scale the learner name font size so long names always fit.
+        // We use a simple heuristic: base size 36pt, shrink by ~0.6pt per
+        // character over 20 chars, with a floor of 18pt.
+        if (fieldName === "learner_name") {
+          const baseSize = 36;
+          const floor = 18;
+          const charCount = value.length;
+          const size = charCount > 20
+            ? Math.max(floor, baseSize - Math.floor((charCount - 20) * 0.65))
+            : baseSize;
+          field.setFontSize(size);
+        }
         filledCount++;
       } catch {
         // Field not found — skip
