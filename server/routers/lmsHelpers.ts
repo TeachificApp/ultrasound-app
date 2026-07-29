@@ -186,7 +186,8 @@ export async function issueCertificateIfEnabled(
   enrollmentId: number,
   userId: number,
   courseId: number,
-  enrollmentType?: string
+  enrollmentType?: string,
+  forceReissue?: boolean
 ) {
   if (!db) return;
   // Check course has certificate enabled
@@ -196,7 +197,11 @@ export async function issueCertificateIfEnabled(
   // Check if certificate already issued
   const [existing] = await db.select({ id: lmsCertificates.id }).from(lmsCertificates)
     .where(and(eq(lmsCertificates.userId, userId), eq(lmsCertificates.courseId, courseId))).limit(1);
-  if (existing) return;
+  if (existing) {
+    if (!forceReissue) return;
+    // Force re-issue: delete the existing certificate so it regenerates with latest data
+    await db.delete(lmsCertificates).where(and(eq(lmsCertificates.userId, userId), eq(lmsCertificates.courseId, courseId)));
+  }
 
   // Get user info
   const [user] = await db.select({ name: users.name, email: users.email, displayName: users.displayName, credentials: users.credentials }).from(users).where(eq(users.id, userId)).limit(1);

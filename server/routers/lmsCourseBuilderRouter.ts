@@ -252,6 +252,22 @@ export const lmsCourseBuilderRouter = router({
       if (Object.keys(filtered).length > 0) {
         await db.update(lmsCourses).set(filtered).where(eq(lmsCourses.id, id));
       }
+
+      // Auto-reissue certificates when cert-related fields change
+      const certFieldsChanged = ['certificateTitleOverride', 'creditHours', 'certificateTemplateId'].some(f => filtered[f] !== undefined);
+      if (certFieldsChanged) {
+        // Find all enrollments for this course that have issued certificates
+        const enrollmentsWithCerts = await db
+          .select({ id: lmsEnrollments.id, userId: lmsEnrollments.userId, enrollmentType: lmsEnrollments.enrollmentType })
+          .from(lmsEnrollments)
+          .innerJoin(lmsCertificates, and(eq(lmsCertificates.userId, lmsEnrollments.userId), eq(lmsCertificates.courseId, id)))
+          .where(eq(lmsEnrollments.courseId, id));
+        // Re-issue each certificate with forceReissue=true (fire-and-forget, don't block the response)
+        void Promise.allSettled(enrollmentsWithCerts.map(e =>
+          issueCertificateIfEnabled(db, e.id, e.userId, id, e.enrollmentType, true)
+        ));
+      }
+
       return { success: true };
     }),
   deleteCourse: protectedProcedure
