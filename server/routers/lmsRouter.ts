@@ -1413,7 +1413,13 @@ export const lmsLearnerRouter = router({
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       // Check enrollment first — must happen before isAdminPreview check (expiry-aware)
       const { getActiveEnrollment } = await import("../lib/enrollmentAccess");
-      const enrollment = await getActiveEnrollment(db as any, ctx.user.id, course.id);
+      const enrollmentAccess = await getActiveEnrollment(db as any, ctx.user.id, course.id);
+      // Fetch the full enrollment row (with progressPct, completedAt, certificateIssuedAt) if access is confirmed
+      let enrollment: typeof lmsEnrollments.$inferSelect | null = null;
+      if (enrollmentAccess) {
+        const [fullRow] = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollmentAccess.id)).limit(1);
+        enrollment = fullRow ?? null;
+      }
 
       // Admin preview mode: only active when admin is NOT enrolled AND explicitly requested preview.
       // If the admin IS enrolled, treat them as a regular enrolled user so progress is tracked.

@@ -1020,6 +1020,21 @@ export const lmsCourseBuilderRouter = router({
         updates.previewMode = updates.isPreview ? "preview" : "none";
       }
       if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates as any).where(eq(lmsLessons.id, id));
+
+      // When countTowardCompletion changes, recalculate progress for all enrollments in this course
+      // so existing completions are immediately reflected in the correct percentage.
+      if (countTowardCompletion !== undefined) {
+        const [lessonRow] = await db.select({ courseId: lmsLessons.courseId }).from(lmsLessons).where(eq(lmsLessons.id, id)).limit(1);
+        if (lessonRow) {
+          const enrollments = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+            .where(eq(lmsEnrollments.courseId, lessonRow.courseId));
+          // Fire-and-forget — don't block the response
+          void Promise.all(enrollments.map(e => recalcProgress(db, e.id))).catch(err =>
+            console.error('[updateLesson] recalcProgress after countTowardCompletion change failed:', err)
+          );
+        }
+      }
+
       return { success: true };
     }),
 
