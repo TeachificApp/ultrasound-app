@@ -9008,6 +9008,19 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
     onSuccess: () => { toast.success("Student unenrolled successfully"); setUnenrollTarget(null); refetch(); },
     onError: e => toast.error(e.message),
   });
+  const [certTarget, setCertTarget] = useState<{ enrollmentId: number; name: string; hasCert: boolean } | null>(null);
+  const manualIssueCertificate = trpc.lmsEnrollmentAdmin.manualIssueCertificate.useMutation({
+    onSuccess: (result) => {
+      if (result.alreadyExisted) {
+        toast.info("Certificate already existed — no change made.");
+      } else {
+        toast.success("Certificate issued successfully!");
+      }
+      setCertTarget(null);
+      refetch();
+    },
+    onError: e => toast.error(`Certificate error: ${e.message}`),
+  });
   // Cohort groups (for group picker in enroll dialog)
   const { data: cohortGroupsForEnroll = [] } = trpc.lmsAdmin.listCohortGroups.useQuery(
     { courseId },
@@ -9147,6 +9160,14 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
                       )}
                       <Button
                         size="sm" variant="ghost"
+                        className="h-7 w-7 p-0 text-amber-500 hover:bg-amber-50 hover:text-amber-700"
+                        title="Issue / re-issue certificate"
+                        onClick={() => setCertTarget({ enrollmentId: e.id, name: e.user?.displayName || e.user?.name || e.user?.email || "this student", hasCert: !!e.certificateIssuedAt })}
+                      >
+                        <Award className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="sm" variant="ghost"
                         className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
                         title="Unenroll student"
                         onClick={() => setUnenrollTarget({ id: e.id, name: e.user?.displayName || e.user?.name || e.user?.email || "this student" })}
@@ -9184,6 +9205,54 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
         onClose={() => setEnrollDialogOpen(false)}
         onEnrolled={() => { setEnrollDialogOpen(false); refetch(); }}
       />
+
+      {/* Manual Certificate Issue Dialog */}
+      <Dialog open={!!certTarget} onOpenChange={(v) => { if (!v) setCertTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <Award className="w-5 h-5" /> Issue Certificate
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-gray-600">
+              Issue a certificate to <strong>{certTarget?.name}</strong>?
+            </p>
+            {certTarget?.hasCert && (
+              <p className="text-xs text-amber-600 mt-2 bg-amber-50 border border-amber-200 rounded p-2">
+                This student already has a certificate. Choosing <strong>Re-issue</strong> will delete the existing certificate and generate a new one (useful after a template update).
+              </p>
+            )}
+            {!certTarget?.hasCert && (
+              <p className="text-xs text-gray-400 mt-2">
+                A new certificate PDF will be generated and emailed to the student.
+              </p>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setCertTarget(null)}>Cancel</Button>
+            {certTarget?.hasCert && (
+              <Button
+                variant="outline"
+                className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                onClick={() => certTarget && manualIssueCertificate.mutate({ enrollmentId: certTarget.enrollmentId, forceReissue: true })}
+                disabled={manualIssueCertificate.isPending}
+              >
+                {manualIssueCertificate.isPending ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Re-issuing...</> : "Re-issue Certificate"}
+              </Button>
+            )}
+            {!certTarget?.hasCert && (
+              <Button
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={() => certTarget && manualIssueCertificate.mutate({ enrollmentId: certTarget.enrollmentId, forceReissue: false })}
+                disabled={manualIssueCertificate.isPending}
+              >
+                {manualIssueCertificate.isPending ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Issuing...</> : "Issue Certificate"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Unenroll Confirmation Dialog */}
       <Dialog open={!!unenrollTarget} onOpenChange={(v) => { if (!v) setUnenrollTarget(null); }}>

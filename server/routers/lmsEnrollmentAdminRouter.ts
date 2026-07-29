@@ -1466,6 +1466,11 @@ CRITICAL REQUIREMENTS:
           .innerJoin(lmsCohortGroups, eq(lmsCohortGroupEnrollments.cohortGroupId, lmsCohortGroups.id))
           .where(eq(lmsCohortGroupEnrollments.enrollmentId, e.id))
           .limit(1);
+        // Certificate status
+        const [cert] = await db.select({ issuedAt: lmsCertificates.issuedAt })
+          .from(lmsCertificates)
+          .where(and(eq(lmsCertificates.userId, e.userId), eq(lmsCertificates.courseId, e.courseId)))
+          .limit(1);
         return {
           ...e,
           user: u ?? null,
@@ -1473,6 +1478,7 @@ CRITICAL REQUIREMENTS:
           lastActivityAt: lastActivity?.completedAt ?? null,
           cohortGroupName: cohortGroupEnrollment?.groupName ?? null,
           cohortGroupId: cohortGroupEnrollment?.groupId ?? null,
+          certificateIssuedAt: cert?.issuedAt ?? null,
         };
       }));
       // Filter by search after enrichment
@@ -3399,5 +3405,54 @@ CRITICAL REQUIREMENTS:
         );
       }
       return { success: true };
+    }),
+
+  /** Manually issue (or re-issue) a certificate for a specific enrollment */
+  manualIssueCertificate: protectedProcedure
+    .input(z.object({
+      enrollmentId: z.number().int().positive(),
+      forceReissue: z.boolean().optional().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Load enrollment
+      const [enrollment] = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.id, input.enrollmentId)).limit(1);
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+
+      // Load course
+      const [course] = await db.select({ id: lmsCourses.id, hasCertificate: lmsCourses.hasCertificate, title: lmsCourses.title, certificateTemplateId: lmsCourses.certificateTemplateId, creditHours: lmsCourses.creditHours })
+        .from(lmsCourses).where(eq(lmsCourses.id, enrollment.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+      if (!course.hasCertificate) throw new TRPCError({ code: "BAD_REQUEST", message: "This course does not have certificates enabled" });
+
+      // If forceReissue, delete any existing certificate first
+      if (input.forceReissue) {
+        await db.delete(lmsCertificates).where(
+          and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId))
+        );
+      }
+
+      // Check if certificate already exists (after potential deletion)
+      const [existing] = await db.select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
+        .from(lmsCertificates)
+        .where(and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId)))
+        .limit(1);
+      if (existing) {
+        return { success: true, alreadyExisted: true, certificateUrl: existing.certificateUrl };
+      }
+
+      // Issue certificate (reuse the shared helper — skips email for admin_preview)
+      await issueCertificateIfEnabled(db, enrollment.id, enrollment.userId, enrollment.courseId, enrollment.enrollmentType);
+
+      // Fetch the newly created certificate URL
+      const [newCert] = await db.select({ certificateUrl: lmsCertificates.certificateUrl })
+        .from(lmsCertificates)
+        .where(and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId)))
+        .limit(1);
+
+      return { success: true, alreadyExisted: false, certificateUrl: newCert?.certificateUrl ?? null };
     }),
 });

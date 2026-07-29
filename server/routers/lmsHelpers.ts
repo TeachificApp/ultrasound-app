@@ -133,6 +133,14 @@ export async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enro
   const total = totalCount;
   if (total === 0) return;
 
+  // Guard: if this enrollment has NO lesson_progress records at all, it was likely synced
+  // from Thinkific with a direct progress_pct value. Do not override it — only recalc
+  // when the learner has actually interacted with lessons in this platform.
+  const [{ anyProgress }] = await db.select({ anyProgress: sql<number>`count(*)` })
+    .from(lmsLessonProgress)
+    .where(eq(lmsLessonProgress.enrollmentId, enrollmentId));
+  if (Number(anyProgress) === 0) return;
+
   // Count completed lessons — also exclude hidden preview lessons from the completed count
   // so that any stale progress records for those lessons don't inflate the percentage
   const countableIds = await db

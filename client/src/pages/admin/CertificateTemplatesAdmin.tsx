@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Award, Star, Download, Eye, Upload, FileText, X } from "lucide-react";
+import { Plus, Edit, Trash2, Award, Star, Download, Eye, Upload, FileText, X, Loader2 } from "lucide-react";
 
 interface CertTemplate {
   id: number;
@@ -68,6 +68,27 @@ function TemplateEditor({
   onCancel: () => void;
   isSaving: boolean;
 }) {
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewDataUri, setPreviewDataUri] = useState<string | null>(null);
+  const previewMut = trpc.lmsAdmin.generateSampleCertificatePdfInline.useMutation({
+    onSuccess: (res) => { setPreviewDataUri(res.dataUri); setPreviewLoading(false); },
+    onError: (e) => { toast.error(`Preview failed: ${e.message}`); setPreviewLoading(false); },
+  });
+  const handlePreview = () => {
+    setPreviewLoading(true);
+    setPreviewDataUri(null);
+    previewMut.mutate({
+      primaryColor: form.primaryColor,
+      accentColor: form.accentColor,
+      textColor: form.textColor,
+      fontFamily: form.fontFamily,
+      footerText: form.footerText,
+      organizationName: form.organizationName,
+      layout: form.layout,
+      logoUrl: form.logoUrl,
+      backgroundImageUrl: form.backgroundImageUrl,
+    });
+  };
   const [form, setForm] = useState<Omit<CertTemplate, "id" | "createdAt">>({
     ...DEFAULT_TEMPLATE,
     ...initial,
@@ -174,12 +195,34 @@ function TemplateEditor({
         </div>
       </div>
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancel</Button>
-        <Button onClick={() => onSave(form)} disabled={isSaving || !form.name.trim()}>
-          {isSaving ? "Saving..." : "Save Template"}
+      <div className="flex justify-between items-center pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handlePreview}
+          disabled={previewLoading}
+          className="text-[#189aa1] border-[#189aa1] hover:bg-teal-50"
+        >
+          {previewLoading ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Generating…</> : <><Eye className="w-4 h-4 mr-1" />Preview with Sample Data</>}
         </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancel</Button>
+          <Button onClick={() => onSave(form)} disabled={isSaving || !form.name.trim()}>
+            {isSaving ? "Saving..." : "Save Template"}
+          </Button>
+        </div>
       </div>
+
+      {/* Inline PDF preview */}
+      {previewDataUri && (
+        <div className="border rounded-lg overflow-hidden" style={{ height: "60vh" }}>
+          <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b">
+            <p className="text-xs text-muted-foreground">Sample preview — placeholders shown for learner name, course title, and date</p>
+            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setPreviewDataUri(null)}>Close Preview</Button>
+          </div>
+          <iframe src={previewDataUri} className="w-full h-full border-0" title="Certificate Preview" />
+        </div>
+      )}
     </div>
   );
 }

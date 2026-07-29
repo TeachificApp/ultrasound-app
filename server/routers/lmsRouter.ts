@@ -274,6 +274,49 @@ const lmsCertificateRouter = router({
       const base64 = pdfBuffer.toString("base64");
       return { dataUri: `data:application/pdf;base64,${base64}`, isCustom: false };
     }),
+  /** Generate a sample certificate PDF from inline template settings (no DB save required) */
+  generateSampleCertificatePdfInline: protectedProcedure
+    .input(z.object({
+      primaryColor: z.string().optional(),
+      accentColor: z.string().optional(),
+      textColor: z.string().optional(),
+      fontFamily: z.string().optional(),
+      footerText: z.string().nullable().optional(),
+      organizationName: z.string().optional(),
+      layout: z.enum(["classic", "modern", "minimal"]).optional(),
+      logoUrl: z.string().nullable().optional(),
+      backgroundImageUrl: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const effectiveTemplate = {
+        id: 0, name: "Preview",
+        primaryColor: input.primaryColor ?? "#189aa1",
+        accentColor: input.accentColor ?? "#c9a84c",
+        textColor: input.textColor ?? "#0e1e2e",
+        fontFamily: input.fontFamily ?? "Helvetica",
+        footerText: input.footerText ?? "www.allaboutultrasound.com  \u00b7  \u00a9 All About Ultrasound\u2122",
+        organizationName: input.organizationName ?? "All About Ultrasound",
+        layout: input.layout ?? "classic",
+        logoUrl: input.logoUrl ?? null,
+        backgroundImageUrl: input.backgroundImageUrl ?? null,
+        isDefault: false, isActive: true,
+        pdfTemplateUrl: null, description: null,
+        createdAt: new Date(), updatedAt: new Date(),
+      };
+      const pdfBuffer = await generateCertificatePdf({
+        learnerName: "",
+        courseTitle: "",
+        issuedAt: new Date(),
+        credentials: null,
+        creditHours: "1.0",
+        template: effectiveTemplate as any,
+        usePlaceholders: true,
+      });
+      const base64 = pdfBuffer.toString("base64");
+      return { dataUri: `data:application/pdf;base64,${base64}` };
+    }),
+
   /** Upload a custom PDF template for a certificate template (base64 data URI) */
   uploadCertificatePdf: protectedProcedure
     .input(z.object({
@@ -2724,10 +2767,12 @@ export const lmsLearnerRouter = router({
       const { getActiveEnrollment: getActiveEnrollment2 } = await import("../lib/enrollmentAccess");
       const enrollment = await getActiveEnrollment2(db as any, ctx.user.id, course.id);
 
-      // Admin preview mode: only active when admin is NOT enrolled AND explicitly requested preview.
+      // Admin preview mode: active when admin is not enrolled OR when explicitly requested.
       // If the admin IS enrolled, treat them as a regular enrolled user so progress is tracked.
-      const isAdminPreview = input.preview && ctx.user.role === "admin" && !enrollment;
-      if (!enrollment && !isAdminPreview) throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
+      const isAdminByRole = ctx.user.role === "admin";
+      const isAdminPreview = (input.preview || isAdminByRole) && isAdminByRole && !enrollment;
+      // Admins always get access (either via enrollment or admin bypass)
+      if (!enrollment && !isAdminByRole) throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
 
       // Fetch sections + lessons
       const [sections, allLessons] = await Promise.all([

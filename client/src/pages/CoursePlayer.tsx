@@ -1873,9 +1873,16 @@ export default function CoursePlayer() {
             <button
               className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors"
               style={{ color: primaryColor }}
+              onClick={() => { setMobileSidebarOpen(false); navigate("/dashboard"); }}
+            >
+              <ChevronLeft className="w-3 h-3" /> My Dashboard
+            </button>
+            <button
+              className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors opacity-70 hover:opacity-100"
+              style={{ color: primaryColor }}
               onClick={() => { setMobileSidebarOpen(false); navigate("/education-library"); }}
             >
-              <ChevronLeft className="w-3 h-3" /> Back to Library
+              <ChevronLeft className="w-3 h-3" /> Education Library
             </button>
             <button
               className="text-[10px] font-medium flex items-center gap-1 transition-colors opacity-80 hover:opacity-100"
@@ -1914,9 +1921,16 @@ export default function CoursePlayer() {
             <button
               className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors"
               style={{ color: primaryColor }}
+              onClick={() => navigate("/dashboard")}
+            >
+              <ChevronLeft className="w-3 h-3" /> My Dashboard
+            </button>
+            <button
+              className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors opacity-70 hover:opacity-100"
+              style={{ color: primaryColor }}
               onClick={() => navigate("/education-library")}
             >
-              <ChevronLeft className="w-3 h-3" /> Back to Library
+              <ChevronLeft className="w-3 h-3" /> Education Library
             </button>
             {sidebarTab === "lessons" && (
               <>
