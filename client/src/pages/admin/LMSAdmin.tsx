@@ -4418,13 +4418,29 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setShowVideoControls((lessonShallow as any).showVideoControls ?? true);
   }, [lessonShallow.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then)
+  // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then,
+  // and settings fields like countTowardCompletion may not be present on the shallow lessonShallow object)
   useEffect(() => {
     if (fullLesson) {
       setLessonType(fullLesson.type ?? "text");
       setContent(fullLesson.content ?? "");
       setVideoContent(fullLesson.videoContent ?? "");
       setEmbedUrl(fullLesson.embedUrl ?? "");
+      // Sync settings that may not be on the shallow object
+      setCommentsEnabled(!!(fullLesson as any).commentsEnabled);
+      setCountTowardCompletion((fullLesson as any).countTowardCompletion !== false && (fullLesson as any).countTowardCompletion !== 0);
+      setShowVideoControls((fullLesson as any).showVideoControls ?? true);
+      setLessonStatus((fullLesson as any).lessonStatus ?? "published");
+      setRequireVideoCompletion(fullLesson.requireVideoCompletion === 1);
+      setRequireManualComplete(
+        fullLesson.requireManualComplete === null || fullLesson.requireManualComplete === undefined ? null : fullLesson.requireManualComplete === 1
+      );
+      setIsPrerequisite(!!(fullLesson as any).isPrerequisite);
+      setPreviewMode((fullLesson as any).previewMode ?? (fullLesson.isPreview ? "preview" : "none"));
+      setDurationMinutes(String(fullLesson.durationMinutes ?? ""));
+      setDripDays(String(fullLesson.dripDays ?? ""));
+      setShowInstructor(fullLesson.showInstructor ?? "inherit");
+      setMeetingLink((fullLesson as any).meetingLink ?? "");
     }
   }, [fullLesson]);
 
