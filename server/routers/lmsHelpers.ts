@@ -228,7 +228,7 @@ export async function issueCertificateIfEnabled(
     const rawBuffer = Buffer.from(await res.arrayBuffer());
     // Replace placeholder strings with real learner data
     pdfBuffer = await overlayLearnerData(rawBuffer, {
-      learnerName: user.credentials ? `${learnerName}, ${user.credentials}` : learnerName,
+      learnerName: learnerName,
       courseTitle: course.title,
       issuedAt,
       creditHours: course.creditHours ?? null,
