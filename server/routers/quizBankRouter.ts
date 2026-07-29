@@ -18,12 +18,12 @@ import {
   quizBanks,
   quizBankQuestions,
   quizBankTags,
+  quizBankFolders,
   quizQuestionTags,
   quizAnswerChoices,
   quizImportJobs,
 } from "../../drizzle/schema";
 import { and, eq, inArray, like, sql, desc, asc } from "drizzle-orm";
-import { storagePut } from "../storage";
 
 // ─── Question type enum ───────────────────────────────────────────────────────
 const QUESTION_TYPES = ["mc","tf","ms","hotspot","puzzle","matching","sequence","numeric","short_answer","info_slide"] as const;
@@ -76,24 +76,61 @@ function toDecimalString(value: number | undefined): string | undefined {
 }
 
 export const quizBankRouter = router({
-  // ─── Banks ────────────────────────────────────────────────────────────────
+  // ─── Folders ──────────────────────────────────────────────────────────────────────────────────────
+  listFolders: protectedProcedure
+    .query(async () => {
+      return (await db()).select().from(quizBankFolders)
+        .orderBy(asc(quizBankFolders.sortOrder), asc(quizBankFolders.name));
+    }),
+
+  createFolder: protectedProcedure
+    .input(z.object({ name: z.string().min(1), description: z.string().optional(), parentId: z.number().nullable().optional(), color: z.string().optional() }))
+    .mutation(async ({ input }) => {
+      const [result] = await (await db()).insert(quizBankFolders).values({
+        name: input.name,
+        description: input.description,
+        parentId: input.parentId ?? null,
+        color: input.color ?? "#6366f1",
+      });
+      return { id: (result as any).insertId };
+    }),
+
+  updateFolder: protectedProcedure
+    .input(z.object({ id: z.number(), name: z.string().min(1), description: z.string().nullable().optional(), parentId: z.number().nullable().optional(), color: z.string().optional() }))
+    .mutation(async ({ input }) => {
+      await (await db()).update(quizBankFolders).set({
+        name: input.name,
+        description: input.description ?? null,
+        parentId: input.parentId ?? null,
+        color: input.color,
+      }).where(eq(quizBankFolders.id, input.id));
+    }),
+
+  deleteFolder: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      // Move questions in this folder to no folder
+      await (await db()).update(quizBankQuestions).set({ folderId: null }).where(eq(quizBankQuestions.folderId, input.id));
+      // Move child folders to root
+      await (await db()).update(quizBankFolders).set({ parentId: null }).where(eq(quizBankFolders.parentId, input.id));
+      await (await db()).delete(quizBankFolders).where(eq(quizBankFolders.id, input.id));
+    }),
+
+  // ─── Banks ──────────────────────────────────────────────────────────────────────────────────────
   listBanks: protectedProcedure
-    .input(z.object({ orgId: z.number() }))
-    .query(async ({ input, ctx }) => {
+    .query(async () => {
       return (await db()).select().from(quizBanks)
-        .where(eq(quizBanks.orgId, input.orgId))
         .orderBy(asc(quizBanks.name));
     }),
 
   createBank: protectedProcedure
-    .input(z.object({ orgId: z.number(), name: z.string().min(1), description: z.string().optional() }))
+    .input(z.object({ name: z.string().min(1), description: z.string().optional() }))
     .mutation(async ({ input }) => {
       const [result] = await (await db()).insert(quizBanks).values({
-        orgId: input.orgId,
         name: input.name,
         description: input.description,
       });
-      return { id: result.insertId };
+      return { id: (result as any).insertId };
     }),
 
   updateBank: protectedProcedure
@@ -105,7 +142,6 @@ export const quizBankRouter = router({
   deleteBank: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
-      // Delete all questions in this bank first
       const questions = await (await db()).select({ id: quizBankQuestions.id })
         .from(quizBankQuestions).where(eq(quizBankQuestions.bankId, input.id));
       if (questions.length > 0) {
@@ -119,22 +155,19 @@ export const quizBankRouter = router({
 
   // ─── Tags ─────────────────────────────────────────────────────────────────
   listTags: protectedProcedure
-    .input(z.object({ orgId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async () => {
       return (await db()).select().from(quizBankTags)
-        .where(eq(quizBankTags.orgId, input.orgId))
         .orderBy(asc(quizBankTags.name));
     }),
 
   createTag: protectedProcedure
-    .input(z.object({ orgId: z.number(), name: z.string().min(1), color: z.string().optional() }))
+    .input(z.object({ name: z.string().min(1), color: z.string().optional() }))
     .mutation(async ({ input }) => {
       const [result] = await (await db()).insert(quizBankTags).values({
-        orgId: input.orgId,
         name: input.name,
         color: input.color ?? "#24abbc",
       });
-      return { id: result.insertId };
+      return { id: (result as any).insertId };
     }),
 
   updateTag: protectedProcedure
@@ -153,8 +186,8 @@ export const quizBankRouter = router({
   // ─── Questions ────────────────────────────────────────────────────────────
   listQuestions: protectedProcedure
     .input(z.object({
-      orgId: z.number(),
       bankId: z.number().optional(),
+      folderId: z.number().nullable().optional(),
       tagIds: z.array(z.number()).optional(),
       questionType: z.string().optional(),
       search: z.string().optional(),
@@ -164,20 +197,23 @@ export const quizBankRouter = router({
       offset: z.number().default(0),
     }))
     .query(async ({ input }) => {
-      const conditions = [eq(quizBankQuestions.orgId, input.orgId)];
+      const conditions: any[] = [];
       if (input.bankId) conditions.push(eq(quizBankQuestions.bankId, input.bankId));
+      if (input.folderId !== undefined) {
+        if (input.folderId === null) conditions.push(sql`${quizBankQuestions.folderId} IS NULL`);
+        else conditions.push(eq(quizBankQuestions.folderId, input.folderId));
+      }
       if (!input.includeArchived) conditions.push(eq(quizBankQuestions.isArchived, false));
       if (input.questionType) conditions.push(eq(quizBankQuestions.questionType, input.questionType as QuestionType));
       if (input.difficulty) conditions.push(eq(quizBankQuestions.difficulty, input.difficulty as "easy"|"medium"|"hard"));
       if (input.search) conditions.push(like(quizBankQuestions.questionText, `%${input.search}%`));
 
       const questions = await (await db()).select().from(quizBankQuestions)
-        .where(and(...conditions))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(quizBankQuestions.createdAt))
         .limit(input.limit)
         .offset(input.offset);
 
-      // Get choices and tags for each question
       if (questions.length === 0) return { questions: [], total: 0 };
 
       const qIds = questions.map(q => q.id);
@@ -187,8 +223,9 @@ export const quizBankRouter = router({
       const tags = await (await db()).select().from(quizQuestionTags)
         .where(inArray(quizQuestionTags.questionId, qIds));
 
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
       const [{ count }] = await (await db()).select({ count: sql<number>`count(*)` })
-        .from(quizBankQuestions).where(and(...conditions));
+        .from(quizBankQuestions).where(whereClause);
 
       return {
         questions: questions.map(q => ({
@@ -213,9 +250,101 @@ export const quizBankRouter = router({
       return { ...question, choices, tagIds: tags.map(t => t.tagId) };
     }),
 
+  bulkImport: protectedProcedure
+    .input(z.object({
+      folderId: z.number().nullable().optional(),
+      bankId: z.number().optional(),
+      questions: z.array(z.object({
+        questionType: z.string(),
+        stem: z.string(),
+        dataJson: z.string().optional(),
+        points: z.number().default(1),
+        difficulty: z.enum(["easy","medium","hard"]).default("medium"),
+        explanation: z.string().optional(),
+        tags: z.string().optional(),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      // Find or create default bank
+      let bankId = input.bankId;
+      if (!bankId) {
+        const banks = await (await db()).select().from(quizBanks).where(eq(quizBanks.isDefault, true)).limit(1);
+        if (banks.length > 0) {
+          bankId = banks[0].id;
+        } else {
+          const allBanks = await (await db()).select().from(quizBanks).limit(1);
+          if (allBanks.length > 0) {
+            bankId = allBanks[0].id;
+          } else {
+            const [r] = await (await db()).insert(quizBanks).values({ name: "Default Bank", isDefault: true, questionCount: 0 });
+            bankId = (r as any).insertId;
+          }
+        }
+      }
+      let imported = 0;
+      let skipped = 0;
+      for (const q of input.questions) {
+        try {
+          let choices: any[] = [];
+          if (q.dataJson) {
+            try { choices = JSON.parse(q.dataJson)?.choices ?? []; } catch {}
+          }
+          const [qResult] = await (await db()).insert(quizBankQuestions).values({
+            bankId: bankId!,
+            folderId: input.folderId ?? null,
+            questionType: (q.questionType === "mcq" ? "mc" : q.questionType === "multiple_select" ? "ms" : q.questionType) as any,
+            questionText: q.stem,
+            points: q.points ?? 1,
+            difficulty: q.difficulty ?? "medium",
+            explanationText: q.explanation,
+            importSource: "csv",
+          });
+          const qId = (qResult as any).insertId;
+          if (choices.length > 0) {
+            await (await db()).insert(quizAnswerChoices).values(
+              choices.map((c: any, i: number) => ({
+                questionId: qId,
+                choiceText: c.text ?? c.choiceText ?? "",
+                isCorrect: c.isCorrect ?? c.correct ?? false,
+                sortOrder: i,
+              }))
+            );
+          }
+          // Handle tags
+          if (q.tags) {
+            const tagNames = q.tags.split(",").map((t: string) => t.trim()).filter(Boolean);
+            for (const tagName of tagNames) {
+              let tag = (await (await db()).select().from(quizBankTags).where(eq(quizBankTags.name, tagName)).limit(1))[0];
+              if (!tag) {
+                const [tr] = await (await db()).insert(quizBankTags).values({ name: tagName });
+                const tagId = (tr as any).insertId;
+                await (await db()).insert(quizQuestionTags).values({ questionId: qId, tagId });
+              } else {
+                await (await db()).insert(quizQuestionTags).values({ questionId: qId, tagId: tag.id });
+              }
+            }
+          }
+          imported++;
+        } catch {
+          skipped++;
+        }
+      }
+      if (bankId) {
+        await (await db()).update(quizBanks).set({ questionCount: sql`question_count + ${imported}` }).where(eq(quizBanks.id, bankId!));
+      }
+      return { imported, skipped };
+    }),
+
+  moveToFolder: protectedProcedure
+    .input(z.object({ ids: z.array(z.number()), folderId: z.number().nullable() }))
+    .mutation(async ({ input }) => {
+      if (input.ids.length === 0) return;
+      await (await db()).update(quizBankQuestions).set({ folderId: input.folderId }).where(inArray(quizBankQuestions.id, input.ids));
+    }),
+
   upsertQuestion: protectedProcedure
     .input(questionUpsertSchema)
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const { id, tagIds, choices, ...questionData } = input;
       const normalizedQuestionData = {
         ...questionData,
@@ -234,15 +363,8 @@ export const quizBankRouter = router({
       } else {
         const [result] = await (await db()).insert(quizBankQuestions).values({
           ...normalizedQuestionData,
-          orgId: questionData.bankId, // will be overridden below
         });
-        // Fix orgId from bank
-        const [bank] = await (await db()).select({ orgId: quizBanks.orgId }).from(quizBanks).where(eq(quizBanks.id, questionData.bankId));
-        if (bank) {
-          await (await db()).update(quizBankQuestions).set({ orgId: bank.orgId }).where(eq(quizBankQuestions.id, result.insertId));
-        }
-        questionId = result.insertId;
-        // Update question count
+        questionId = (result as any).insertId;
         await (await db()).update(quizBanks).set({ questionCount: sql`question_count + 1` }).where(eq(quizBanks.id, questionData.bankId));
       }
 
@@ -294,10 +416,19 @@ export const quizBankRouter = router({
       await (await db()).update(quizBankQuestions).set({ isArchived: input.archived }).where(eq(quizBankQuestions.id, input.id));
     }),
 
+  // ─── Bulk operations ──────────────────────────────────────────────────────
+  bulkDelete: protectedProcedure
+    .input(z.object({ ids: z.array(z.number()) }))
+    .mutation(async ({ input }) => {
+      if (input.ids.length === 0) return;
+      await (await db()).delete(quizQuestionTags).where(inArray(quizQuestionTags.questionId, input.ids));
+      await (await db()).delete(quizAnswerChoices).where(inArray(quizAnswerChoices.questionId, input.ids));
+      await (await db()).delete(quizBankQuestions).where(inArray(quizBankQuestions.id, input.ids));
+    }),
+
   // ─── Import ───────────────────────────────────────────────────────────────
   createImportJob: protectedProcedure
     .input(z.object({
-      orgId: z.number(),
       bankId: z.number().optional(),
       source: z.enum(["scorm","csv","xls"]),
       filename: z.string(),
@@ -305,7 +436,6 @@ export const quizBankRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const [result] = await (await db()).insert(quizImportJobs).values({
-        orgId: input.orgId,
         bankId: input.bankId,
         importedById: ctx.user.id,
         source: input.source,
@@ -313,7 +443,7 @@ export const quizBankRouter = router({
         fileUrl: input.fileUrl,
         status: "pending",
       });
-      return { id: result.insertId };
+      return { id: (result as any).insertId };
     }),
 
   getImportJob: protectedProcedure
@@ -325,10 +455,8 @@ export const quizBankRouter = router({
     }),
 
   listImportJobs: protectedProcedure
-    .input(z.object({ orgId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async () => {
       return (await db()).select().from(quizImportJobs)
-        .where(eq(quizImportJobs.orgId, input.orgId))
         .orderBy(desc(quizImportJobs.createdAt))
         .limit(20);
     }),
@@ -340,19 +468,16 @@ export const quizBankRouter = router({
       source: z.enum(["scorm","csv","xls"]),
     }))
     .mutation(async ({ input }) => {
-      // Mark as parsing
       await (await db()).update(quizImportJobs).set({ status: "parsing" }).where(eq(quizImportJobs.id, input.jobId));
 
       try {
         let parsedQuestions: any[] = [];
 
         if (input.source === "csv") {
-          // Parse CSV
           const response = await fetch(input.fileUrl);
           const text = await response.text();
           parsedQuestions = parseCSVQuestions(text);
         } else if (input.source === "scorm") {
-          // Parse SCORM QTI XML
           const response = await fetch(input.fileUrl);
           const text = await response.text();
           parsedQuestions = parseSCORMQuestions(text);
@@ -377,8 +502,7 @@ export const quizBankRouter = router({
     .input(z.object({
       jobId: z.number(),
       bankId: z.number(),
-      orgId: z.number(),
-      selectedIndices: z.array(z.number()).optional(), // null = import all
+      selectedIndices: z.array(z.number()).optional(),
     }))
     .mutation(async ({ input }) => {
       const [job] = await (await db()).select().from(quizImportJobs).where(eq(quizImportJobs.id, input.jobId));
@@ -398,7 +522,6 @@ export const quizBankRouter = router({
       for (const q of toImport) {
         try {
           const [qResult] = await (await db()).insert(quizBankQuestions).values({
-            orgId: input.orgId,
             bankId: input.bankId,
             questionType: q.questionType ?? "mc",
             questionText: q.questionText ?? "Imported question",
@@ -415,7 +538,7 @@ export const quizBankRouter = router({
           if (q.choices && q.choices.length > 0) {
             await (await db()).insert(quizAnswerChoices).values(
               q.choices.map((c: any, i: number) => ({
-                questionId: qResult.insertId,
+                questionId: (qResult as any).insertId,
                 choiceText: c.text ?? c.choiceText,
                 isCorrect: c.isCorrect ?? false,
                 sortOrder: i,
@@ -431,7 +554,6 @@ export const quizBankRouter = router({
         }
       }
 
-      // Update bank question count
       await (await db()).update(quizBanks).set({ questionCount: sql`question_count + ${importedCount}` }).where(eq(quizBanks.id, input.bankId));
 
       await (await db()).update(quizImportJobs).set({
@@ -465,7 +587,6 @@ function parseCSVQuestions(csvText: string): any[] {
     const questionType = detectQuestionType(row);
     const choices: any[] = [];
 
-    // Parse A/B/C/D choices
     ["a","b","c","d","e","f"].forEach(letter => {
       const text = row[letter] || row[`choice_${letter}`] || row[`option_${letter}`];
       if (text) {
@@ -522,14 +643,12 @@ function detectQuestionType(row: Record<string, string>): string {
 function parseSCORMQuestions(xmlText: string): any[] {
   const questions: any[] = [];
 
-  // Simple regex-based QTI parser (handles SCORM 1.2 and 2004 QTI)
   const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/gi;
   let itemMatch;
 
   while ((itemMatch = itemRegex.exec(xmlText)) !== null) {
     const itemXml = itemMatch[1];
 
-    // Extract question text
     const matTextMatch = itemXml.match(/<mattext[^>]*>([\s\S]*?)<\/mattext>/i)
       || itemXml.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
     if (!matTextMatch) continue;
@@ -537,12 +656,10 @@ function parseSCORMQuestions(xmlText: string): any[] {
     const questionText = stripHtml(matTextMatch[1]).trim();
     if (!questionText) continue;
 
-    // Extract response type
     const rtMatch = itemXml.match(/rcardinality="([^"]+)"/i);
     const cardinality = rtMatch ? rtMatch[1].toLowerCase() : "single";
     const questionType = cardinality === "multiple" ? "ms" : "mc";
 
-    // Extract choices
     const choices: any[] = [];
     const responseChoiceRegex = /<response_label[^>]*ident="([^"]+)"[^>]*>([\s\S]*?)<\/response_label>/gi;
     let choiceMatch;
@@ -554,7 +671,6 @@ function parseSCORMQuestions(xmlText: string): any[] {
       }
     }
 
-    // Mark correct answers
     const correctRegex = /<varequal[^>]*>(.*?)<\/varequal>/gi;
     let correctMatch;
     while ((correctMatch = correctRegex.exec(itemXml)) !== null) {
@@ -563,7 +679,6 @@ function parseSCORMQuestions(xmlText: string): any[] {
       if (choice) choice.isCorrect = true;
     }
 
-    // Extract feedback
     const feedbackMatch = itemXml.match(/<mattext[^>]*>([\s\S]*?)<\/mattext>/gi);
     const explanationText = feedbackMatch && feedbackMatch.length > 1
       ? stripHtml(feedbackMatch[feedbackMatch.length - 1]).trim()

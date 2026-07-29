@@ -7599,9 +7599,23 @@ export type DeferredCheckoutSession = typeof deferredCheckoutSessions.$inferSele
 export type InsertDeferredCheckoutSession = typeof deferredCheckoutSessions.$inferInsert;
 
 // ─── Quiz Builder Tables (from Teachific) ───────────────────────────────────
+
+// ─── Quiz Bank Folders ───────────────────────────────────────────────────────
+export const quizBankFolders = mysqlTable("quiz_bank_folders", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  parentId: int("parent_id"),
+  color: varchar("color", { length: 20 }).default("#6366f1"),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type QuizBankFolder = typeof quizBankFolders.$inferSelect;
+
 export const quizBankTags = mysqlTable("quiz_bank_tags", {
   id: int("id").autoincrement().primaryKey(),
-  orgId: int("org_id").notNull(),
+  orgId: int("org_id"),
   name: varchar("name", { length: 100 }).notNull(),
   color: varchar("color", { length: 20 }).default("#24abbc"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -7611,7 +7625,7 @@ export type QuizBankTag = typeof quizBankTags.$inferSelect;
 // ─── Question Banks ───────────────────────────────────────────────────────────
 export const quizBanks = mysqlTable("quiz_banks", {
   id: int("id").autoincrement().primaryKey(),
-  orgId: int("org_id").notNull(),
+  orgId: int("org_id"),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   isDefault: boolean("is_default").default(false),
@@ -7624,8 +7638,10 @@ export type QuizBank = typeof quizBanks.$inferSelect;
 // ─── Question Bank Questions ──────────────────────────────────────────────────
 export const quizBankQuestions = mysqlTable("quiz_bank_questions", {
   id: int("id").autoincrement().primaryKey(),
-  orgId: int("org_id").notNull(),
+  orgId: int("org_id"),
   bankId: int("bank_id").notNull(),
+  folderId: int("folder_id"),
+  usageCount: int("usage_count").default(0),
   questionType: mysqlEnum("question_type", [
     "mc","tf","ms","hotspot","puzzle","matching","sequence","numeric","short_answer","info_slide"
   ]).notNull().default("mc"),
@@ -7683,7 +7699,7 @@ export type InsertQuizAnswerChoice = typeof quizAnswerChoices.$inferInsert;
 // ─── Quizzes ──────────────────────────────────────────────────────────────────
 export const quizzes = mysqlTable("quizzes", {
   id: int("id").autoincrement().primaryKey(),
-  orgId: int("org_id").notNull(),
+  orgId: int("org_id"),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   coverImageUrl: varchar("cover_image_url", { length: 1024 }),
@@ -7888,3 +7904,64 @@ export const questionBankItems = mysqlTable("question_bank_items", {
 });
 export type QuestionBankItem = typeof questionBankItems.$inferSelect;
 export type InsertQuestionBankItem = typeof questionBankItems.$inferInsert;
+
+// ─── Content Packages (SCORM / HTML5 native hosting) ─────────────────────────
+export const contentPackages = mysqlTable("content_packages", {
+  id: int("id").autoincrement().primaryKey(),
+  orgId: int("orgId").notNull().default(1),
+  uploadedBy: int("uploadedBy").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  originalZipKey: varchar("originalZipKey", { length: 512 }),
+  originalZipUrl: varchar("originalZipUrl", { length: 1024 }),
+  originalZipSize: int("originalZipSize"),
+  contentType: mysqlEnum("contentType", ["scorm", "html", "articulate", "ispring", "unknown"]).default("unknown").notNull(),
+  scormVersion: mysqlEnum("scormVersion", ["1.2", "2004", "none"]).default("none").notNull(),
+  scormEntryPoint: varchar("scormEntryPoint", { length: 512 }),
+  scormManifest: longtext("scormManifest"),
+  extractedFolderKey: varchar("extractedFolderKey", { length: 512 }),
+  displayMode: mysqlEnum("displayMode", ["native", "lms_shell", "iframe"]).default("native").notNull(),
+  lmsShellConfig: longtext("lmsShellConfig"),
+  status: mysqlEnum("status", ["pending", "processing", "ready", "error"]).default("pending").notNull(),
+  processingError: text("processingError"),
+  currentVersionId: int("currentVersionId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ContentPackage = typeof contentPackages.$inferSelect;
+export type InsertContentPackage = typeof contentPackages.$inferInsert;
+
+// ─── Content Versions ─────────────────────────────────────────────────────────
+export const contentVersions = mysqlTable("content_versions", {
+  id: int("id").autoincrement().primaryKey(),
+  packageId: int("packageId").notNull(),
+  versionNumber: int("versionNumber").notNull().default(1),
+  versionLabel: varchar("versionLabel", { length: 64 }),
+  changelog: text("changelog"),
+  zipKey: varchar("zipKey", { length: 512 }),
+  zipUrl: varchar("zipUrl", { length: 1024 }),
+  zipSize: int("zipSize"),
+  extractedFolderKey: varchar("extractedFolderKey", { length: 512 }),
+  entryPoint: varchar("entryPoint", { length: 512 }),
+  fileCount: int("fileCount").default(0),
+  uploadedBy: int("uploadedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ContentVersion = typeof contentVersions.$inferSelect;
+export type InsertContentVersion = typeof contentVersions.$inferInsert;
+
+// ─── File Assets ──────────────────────────────────────────────────────────────
+export const fileAssets = mysqlTable("file_assets", {
+  id: int("id").autoincrement().primaryKey(),
+  packageId: int("packageId").notNull(),
+  versionId: int("versionId"),
+  relativePath: varchar("relativePath", { length: 512 }).notNull(),
+  s3Key: varchar("s3Key", { length: 512 }).notNull(),
+  s3Url: varchar("s3Url", { length: 1024 }).notNull(),
+  fileSize: int("fileSize"),
+  mimeType: varchar("mimeType", { length: 128 }),
+  isEntryPoint: boolean("isEntryPoint").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type FileAsset = typeof fileAssets.$inferSelect;
+export type InsertFileAsset = typeof fileAssets.$inferInsert;

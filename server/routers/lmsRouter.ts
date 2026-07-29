@@ -796,11 +796,12 @@ export const lmsPublicRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      // draft, archived, and private are not publicly accessible; hidden is accessible by direct URL
-      // Admins can always see any course regardless of status or preview flag
+      // draft is viewable via direct URL but CTAs are disabled ("Not Available For Purchase")
+      // archived and private are not publicly accessible; hidden is accessible by direct URL
+      // Admins can always see any course regardless of status
       const isAdmin = ctx.user?.role === "admin";
       if (!isAdmin) {
-        if (course.status === "draft" || course.status === "archived" || course.status === "private") throw new TRPCError({ code: "NOT_FOUND" });
+        if (course.status === "archived" || course.status === "private") throw new TRPCError({ code: "NOT_FOUND" });
       }
 
       // Sections + preview lessons

@@ -1941,6 +1941,7 @@ export default function CourseLanding() {
   }
 
   const lp = course.landingPage;
+  const isDraft = (course as any).status === "draft";
   const price = formatPrice(course);
   const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
   const isEnrollmentClosed = !enrollment && course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date();
@@ -1960,8 +1961,8 @@ export default function CourseLanding() {
     course?.pricingType === "subscription" ||
     (course?.pricingOptions as { pricingType?: string }[] | undefined)?.some((o) => o.pricingType === "subscription");
   const enrolledCtaLabel = isSubscriptionCourse ? SUBSCRIPTION_RESUME_LABEL : "Continue Learning";
-  const ctaText = enrollment ? enrolledCtaLabel : showWaitlistCta ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
-  const checkoutBusy = enrolling || enrollFree.isPending || createCheckout.isPending || isGuarded;
+  const ctaText = isDraft ? "Not Available For Purchase" : enrollment ? enrolledCtaLabel : showWaitlistCta ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
+  const checkoutBusy = isDraft || enrolling || enrollFree.isPending || createCheckout.isPending || isGuarded;
   const handleEnrollGuarded = () => runGuarded(() => { void handleEnroll(); });
   const handleEnrollWithOptionGuarded = (pricingOptionId: number | undefined) =>
     runGuarded(() => { void handleEnrollWithOption(pricingOptionId); });
@@ -2370,7 +2371,11 @@ export default function CourseLanding() {
               <p className="text-xs text-gray-500">{course.trialDays ?? 7}-day free trial, then billed {course.subscriptionInterval ?? "monthly"}</p>
             )}
 
-            {isWaitlistMode ? (
+            {isDraft ? (
+              <Button className="w-full font-semibold" size="lg" disabled variant="outline">
+                Not Available For Purchase
+              </Button>
+            ) : isWaitlistMode ? (
               <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleWaitlistCta}>
                 <Bell className="w-4 h-4 mr-2" />{waitlistCtaLabel}
               </Button>

@@ -139,7 +139,7 @@ router.post("/import/preview", upload.single("file"), async (req: Request, res: 
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
-    const orgId = (authUser as any).orgId?.toString() ?? "unknown";
+    const orgId = "platform";
     const originalName = req.file.originalname.toLowerCase();
     let xlsxBuffer = req.file.buffer;
     let mediaUrlMap = new Map<string, string>();
@@ -236,7 +236,7 @@ router.post("/bank-import/preview", upload.single("file"), async (req: Request, 
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const originalName = req.file.originalname.toLowerCase();
     const source = req.body.source as string ?? "auto";
-    const orgId = (user as any)?.orgId?.toString() ?? "unknown";
+    const orgId = "platform";
     const hostedPackage = await hostUploadedPackage(req.file, orgId);
     const withHostedPackage = (payload: Record<string, unknown>) => res.json({
       ...payload,
@@ -934,12 +934,8 @@ router.get("/bank-export", async (req: Request, res: Response) => {
   try {
     const user = await authenticateRequest(req);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const orgId = Number(req.query.orgId);
-    if (!Number.isFinite(orgId)) return res.status(400).json({ error: "orgId is required" });
+    const orgId = 1; // single-tenant platform
     const role = String((user as any).role ?? "");
-    if (!["site_owner", "site_admin", "org_super_admin", "org_admin"].includes(role)) {
-      return res.status(403).json({ error: "Organization admin access required" });
-    }
 
     const format = String(req.query.format ?? "xlsx").toLowerCase();
     const ids = String(req.query.ids ?? "")
@@ -954,8 +950,8 @@ router.get("/bank-export", async (req: Request, res: Response) => {
         : Number(folderIdParam);
 
     const sourceQuestions = ids.length > 0
-      ? await getQuestionsByIds(orgId, ids)
-      : await getQuestionsByOrg(orgId, {
+      ? await getQuestionsByIds(1, ids)
+      : await getQuestionsByOrg(1, {
           folderId: folderId as number | null | undefined,
           limit: 10000,
           offset: 0,
@@ -1002,7 +998,7 @@ router.post("/bank-import/extract-from-package", async (req: Request, res: Respo
     // Run the same extraction pipeline as bank-import/preview
     const { xlsxBuffer, xmlBuffers, mediaMap, quizDocumentBuffer } = await extractBankZip(zipBuffer);
     let mediaUrlMap = new Map<string, string>();
-    if (mediaMap.size > 0) mediaUrlMap = await uploadMediaToS3(mediaMap, orgId.toString());
+    if (mediaMap.size > 0) mediaUrlMap = await uploadMediaToS3(mediaMap, "platform");
     // Try iSpring document.json
     if (quizDocumentBuffer) {
       try {
@@ -1056,72 +1052,61 @@ router.post("/bank-import/confirm-native", async (req: Request, res: Response) =
   try {
     const user = await authenticateRequest(req);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const { hostedPackageKey, hostedPackageUrl, title, description, orgId: orgIdStr } = req.body as {
+    const { hostedPackageKey, hostedPackageUrl, title, description } = req.body as {
       hostedPackageKey: string;
       hostedPackageUrl: string;
       title: string;
       description?: string;
-      orgId: string;
     };
-    if (!hostedPackageKey || !hostedPackageUrl || !title || !orgIdStr) {
-      return res.status(400).json({ error: "hostedPackageKey, hostedPackageUrl, title, and orgId are required" });
+    if (!hostedPackageKey || !hostedPackageUrl || !title) {
+      return res.status(400).json({ error: "hostedPackageKey, hostedPackageUrl, and title are required" });
     }
-    const orgId = parseInt(orgIdStr, 10);
-    if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid orgId" });
-    const userId = (user as any).id;
-    // Import createPackage and processZip lazily to avoid circular deps
-    const { createPackage } = await import("./db");
+    // Create a content_packages record and trigger async ZIP processing
+    const { createPackage, updatePackage, getDb } = await import("./db");
     const { processZip } = await import("./scormUploadRoutes");
-    // Download the already-hosted ZIP from S3 so processZip can read it from disk
-    const { storageGet } = await import("./storage");
-    const { url: downloadUrl } = await storageGet(hostedPackageKey);
-    const fetchRes = await fetch(downloadUrl);
-    if (!fetchRes.ok) throw new Error(`Failed to fetch hosted package: ${fetchRes.status}`);
-    const arrayBuf = await fetchRes.arrayBuffer();
-    const zipBuffer = Buffer.from(arrayBuf);
-    const zipSize = zipBuffer.length;
-    // Write to a temp file (processZip needs a file path, not a buffer)
-    const suffix = Date.now().toString(36);
-    const tmpPath = join(tmpdir(), `native-import-${suffix}.zip`);
-    writeFileSync(tmpPath, zipBuffer);
-    // Create the content_packages record
-    const pkg = await createPackage({
+    const { contentPackages } = await import("../drizzle/schema");
+    const { desc, eq } = await import("drizzle-orm");
+    const suffix = hostedPackageKey.split("/").pop()?.split(".")[0] ?? "pkg";
+    const orgId = 1; // single-tenant platform
+    await createPackage({
       orgId,
-      uploadedBy: userId,
-      title: title.trim(),
-      description: description?.trim() ?? null,
+      uploadedBy: user.id,
+      title,
+      description: description ?? null,
       originalZipKey: hostedPackageKey,
       originalZipUrl: hostedPackageUrl,
-      originalZipSize: zipSize,
+      originalZipSize: null,
       contentType: "unknown",
       scormVersion: "none",
       displayMode: "native",
       status: "processing",
     });
-    // Fetch the newly created package ID
-    const { getDb } = await import("./db");
-    const { contentPackages } = await import("../drizzle/schema");
-    const { desc, eq } = await import("drizzle-orm");
     const db = await getDb();
-    if (!db) {
-      if (existsSync(tmpPath)) unlinkSync(tmpPath);
-      return res.status(500).json({ error: "DB unavailable" });
-    }
+    if (!db) return res.status(500).json({ error: "DB unavailable" });
     const pkgs = await db.select().from(contentPackages)
       .where(eq(contentPackages.orgId, orgId))
       .orderBy(desc(contentPackages.createdAt))
       .limit(1);
-    const newPkg = pkgs[0];
-    if (!newPkg) {
-      if (existsSync(tmpPath)) unlinkSync(tmpPath);
-      return res.status(500).json({ error: "Package creation failed" });
-    }
-    // Kick off async ZIP processing (extraction + S3 upload + manifest parse)
-    processZip(tmpPath, zipSize, newPkg.id, orgId, suffix).catch((err: unknown) => {
-      console.error(`[NativeImport] Package ${newPkg.id} processing failed:`, err);
+    const pkg = pkgs[0];
+    if (!pkg) return res.status(500).json({ error: "Package creation failed" });
+    // Download ZIP from S3 to a temp file for processing
+    const { storageGet } = await import("./storage");
+    const { url: presignedUrl } = await storageGet(hostedPackageKey);
+    const os = await import("os");
+    const pathMod = await import("path");
+    const fsMod = await import("fs");
+    const tmpPath = pathMod.join(os.tmpdir(), `scorm-${pkg.id}-${Date.now()}.zip`);
+    const dlResponse = await fetch(presignedUrl);
+    if (!dlResponse.ok) return res.status(500).json({ error: "Failed to download package from S3" });
+    const buffer = Buffer.from(await dlResponse.arrayBuffer());
+    fsMod.writeFileSync(tmpPath, buffer);
+    processZip(tmpPath, buffer.length, pkg.id, orgId, suffix).catch((err: unknown) => {
+      console.error(`[NativeImport] Package ${pkg.id} processing failed:`, err);
+      updatePackage(pkg.id, { status: "error", processingError: String(err) }).catch(console.error);
     });
     return res.json({
-      packageId: newPkg.id,
+      packageId: pkg.id,
+      packageUrl: hostedPackageUrl,
       message: "Package created and processing started.",
     });
   } catch (err: unknown) {

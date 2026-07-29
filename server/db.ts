@@ -3151,3 +3151,86 @@ export async function searchUsersByQuery(query: string, limit = 10): Promise<Arr
     .limit(limit);
 }
 
+
+// ─── Content Packages DB Helpers ──────────────────────────────────────────────
+export async function createPackage(data: {
+  orgId: number;
+  uploadedBy: number;
+  title: string;
+  description?: string | null;
+  originalZipKey?: string | null;
+  originalZipUrl?: string | null;
+  originalZipSize?: number | null;
+  contentType?: string;
+  scormVersion?: string;
+  scormEntryPoint?: string | null;
+  scormManifest?: string | null;
+  extractedFolderKey?: string | null;
+  displayMode?: string;
+  lmsShellConfig?: string | null;
+  status?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { contentPackages } = await import("../drizzle/schema");
+  await db.insert(contentPackages).values(data as any);
+}
+
+export async function updatePackage(id: number, data: Record<string, unknown>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { contentPackages } = await import("../drizzle/schema");
+  await db.update(contentPackages).set(data as any).where(eq(contentPackages.id, id));
+}
+
+export async function getPackageById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const { contentPackages } = await import("../drizzle/schema");
+  const [pkg] = await db.select().from(contentPackages).where(eq(contentPackages.id, id));
+  return pkg ?? null;
+}
+
+export async function createVersion(data: {
+  packageId: number;
+  versionNumber?: number;
+  versionLabel?: string | null;
+  changelog?: string | null;
+  zipKey?: string | null;
+  zipUrl?: string | null;
+  zipSize?: number | null;
+  extractedFolderKey?: string | null;
+  entryPoint?: string | null;
+  fileCount?: number;
+  uploadedBy?: number | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { contentVersions } = await import("../drizzle/schema");
+  await db.insert(contentVersions).values(data as any);
+}
+
+export async function getVersionsByPackage(packageId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { contentVersions } = await import("../drizzle/schema");
+  return db.select().from(contentVersions)
+    .where(eq(contentVersions.packageId, packageId))
+    .orderBy(desc(contentVersions.createdAt));
+}
+
+export async function createFileAsset(data: {
+  packageId: number;
+  versionId?: number | null;
+  relativePath: string;
+  s3Key: string;
+  s3Url: string;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  isEntryPoint?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { fileAssets } = await import("../drizzle/schema");
+  await db.insert(fileAssets).values(data as any);
+}

@@ -326,7 +326,7 @@ function QuestionEditor({
 }
 
 // ─── Import Dialog ────────────────────────────────────────────────────────────
-function ImportDialog({ bankId, orgId, onClose }: { bankId: number; orgId: number; onClose: () => void }) {
+function ImportDialog({ bankId, onClose }: { bankId: number; onClose: () => void }) {
   const [step, setStep] = useState<"select" | "preview" | "importing">("select");
   const [source, setSource] = useState<"csv" | "scorm">("csv");
   const [fileUrl, setFileUrl] = useState("");
@@ -343,7 +343,7 @@ function ImportDialog({ bankId, orgId, onClose }: { bankId: number; orgId: numbe
 
   const handleParse = async () => {
     if (!fileUrl) return;
-    const job = await createJob.mutateAsync({ orgId, bankId, source, filename, fileUrl });
+    const job = await createJob.mutateAsync({ bankId, source, filename, fileUrl });
     setJobId(job.id);
     const result = await parseJob.mutateAsync({ jobId: job.id, fileUrl, source });
     setPreview(result.questions);
@@ -465,7 +465,6 @@ function ImportDialog({ bankId, orgId, onClose }: { bankId: number; orgId: numbe
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function QuestionBankPage() {
   const { user } = useAuth();
-  const orgId = (user as any)?.orgId ?? 0;
 
   const [selectedBankId, setSelectedBankId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -483,11 +482,11 @@ export default function QuestionBankPage() {
   const utils = trpc.useUtils();
 
   // ─── Data ──────────────────────────────────────────────────────────────────
-  const { data: banks = [], isLoading: banksLoading } = trpc.quizBank.listBanks.useQuery({ orgId }, { enabled: !!orgId });
-  const { data: tags = [] } = trpc.quizBank.listTags.useQuery({ orgId }, { enabled: !!orgId });
+  const { data: banks = [], isLoading: banksLoading } = trpc.quizBank.listBanks.useQuery();
+  const { data: tags = [] } = trpc.quizBank.listTags.useQuery();
   const { data: questionsData, isLoading: questionsLoading } = trpc.quizBank.listQuestions.useQuery(
-    { orgId, bankId: selectedBankId!, search: search || undefined, questionType: filterType !== "all" ? filterType : undefined, difficulty: filterDifficulty !== "all" ? filterDifficulty as Difficulty : undefined, tagIds: filterTagId ? [filterTagId] : undefined },
-    { enabled: !!selectedBankId && !!orgId }
+    { bankId: selectedBankId!, search: search || undefined, questionType: filterType !== "all" ? filterType : undefined, difficulty: filterDifficulty !== "all" ? filterDifficulty as Difficulty : undefined, tagIds: filterTagId ? [filterTagId] : undefined },
+    { enabled: !!selectedBankId }
   );
   const questions = questionsData?.questions ?? [];
 
@@ -727,7 +726,7 @@ export default function QuestionBankPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewBank(false)}>Cancel</Button>
-            <Button onClick={() => createBank.mutate({ orgId, name: newBankName, description: newBankDesc })} disabled={!newBankName.trim() || createBank.isPending}>
+            <Button onClick={() => createBank.mutate({ name: newBankName, description: newBankDesc })} disabled={!newBankName.trim() || createBank.isPending}>
               Create Bank
             </Button>
           </DialogFooter>
@@ -754,7 +753,7 @@ export default function QuestionBankPage() {
       {/* Import */}
       {showImport && selectedBankId && (
         <Dialog open={showImport} onOpenChange={setShowImport}>
-          <ImportDialog bankId={selectedBankId} orgId={orgId} onClose={() => setShowImport(false)} />
+          <ImportDialog bankId={selectedBankId} onClose={() => setShowImport(false)} />
         </Dialog>
       )}
 
@@ -764,8 +763,8 @@ export default function QuestionBankPage() {
           <DialogHeader><DialogTitle>Manage Tags</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="flex gap-2">
-              <Input value={newTagName} onChange={e => setNewTagName(e.target.value)} placeholder="New tag name..." onKeyDown={e => e.key === "Enter" && newTagName.trim() && createTag.mutate({ orgId, name: newTagName })} />
-              <Button onClick={() => createTag.mutate({ orgId, name: newTagName })} disabled={!newTagName.trim()}>Add</Button>
+              <Input value={newTagName} onChange={e => setNewTagName(e.target.value)} placeholder="New tag name..." onKeyDown={e => e.key === "Enter" && newTagName.trim() && createTag.mutate({ name: newTagName })} />
+              <Button onClick={() => createTag.mutate({ name: newTagName })} disabled={!newTagName.trim()}>Add</Button>
             </div>
             <div className="flex flex-wrap gap-2">
               {tags.map(tag => (

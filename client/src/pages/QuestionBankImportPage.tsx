@@ -6,7 +6,6 @@
 import { useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useOrgScope } from "@/hooks/useOrgScope";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -93,7 +92,6 @@ function StepIndicator({ step, current }: { step: number; current: number }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function QuestionBankImportPage() {
   const [, setLocation] = useLocation();
-  const { orgId, ready } = useOrgScope();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Wizard state
@@ -117,17 +115,13 @@ export default function QuestionBankImportPage() {
   const [nativePackageId, setNativePackageId] = useState<number | null>(null);
 
   // Fetch folders for destination selector
-  const { data: folders } = trpc.questionBank.listFolders.useQuery(
-    { orgId: orgId! },
-    { enabled: !!orgId && ready }
-  );
+  const { data: folders } = trpc.quizBank.listFolders.useQuery();
 
   // Bulk import mutation
-  const bulkImport = trpc.questionBank.bulkImport.useMutation();
+  const bulkImport = trpc.quizBank.bulkImport.useMutation();
 
   // ─── File upload & parse ────────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
-    if (!orgId) return;
     const allowed = [".csv", ".xml", ".zip", ".quiz", ".xlsx", ".xls"];
     const ext = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
     if (!allowed.includes(ext)) {
@@ -162,7 +156,7 @@ export default function QuestionBankImportPage() {
     } finally {
       setUploading(false);
     }
-  }, [orgId]);
+  }, []);
 
   const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -196,7 +190,7 @@ export default function QuestionBankImportPage() {
 
   // ─── Confirm import ─────────────────────────────────────────────────────────
   const handleConfirmImport = async () => {
-    if (!preview || !orgId) return;
+    if (!preview) return;
     setImporting(true);
     try {
       // Step A: native hosting (if requested)
@@ -213,7 +207,6 @@ export default function QuestionBankImportPage() {
             hostedPackageUrl: preview.hostedPackageUrl,
             title: nativeTitle.trim() || (preview.hostedPackageName ?? "Imported Package"),
             description: nativeDescription.trim() || undefined,
-            orgId: String(orgId),
           }),
         });
         const data = await res.json();
@@ -227,7 +220,7 @@ export default function QuestionBankImportPage() {
         if (selectedIndices.size === 0) throw new Error("No questions selected.");
         const questionsToImport = preview.questions.filter((_, i) => selectedIndices.has(i));
         const folderId = targetFolderId === "none" ? null : parseInt(targetFolderId, 10);
-        const result = await bulkImport.mutateAsync({ orgId, folderId, questions: questionsToImport });
+        const result = await bulkImport.mutateAsync({ folderId, questions: questionsToImport });
         setImportResult({ imported: result.imported, skipped: result.skipped });
         toast.success(`Successfully imported ${result.imported} question${result.imported !== 1 ? "s" : ""} into the Question Bank.`);
       } else {
@@ -244,15 +237,6 @@ export default function QuestionBankImportPage() {
   };
 
   // ─── Render ─────────────────────────────────────────────────────────────────
-  if (!ready) {
-    return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
