@@ -62,6 +62,12 @@ export async function overlayLearnerData(
       ...(creditsValue ? { credits: creditsValue } : {}),
     };
 
+    // Fields that must always be left-aligned regardless of template definition.
+    // The credits and issued_date fields in the ACCME template are stored as
+    // center-aligned but the design requires them to share a left-aligned
+    // starting position matching the "Type of Credit Awarded" label value.
+    const forceLeftAlign = new Set(['credits', 'issued_date']);
+
     let filledCount = 0;
     for (const [fieldName, value] of Object.entries(fieldMap)) {
       try {
@@ -69,11 +75,16 @@ export async function overlayLearnerData(
         // Preserve the field's existing alignment before setting text.
         // pdf-lib resets alignment to Left when setText is called, so we
         // read it first and re-apply it afterwards.
+        // Exception: fields in forceLeftAlign are always set to Left.
         let existingAlignment: TextAlignment | undefined;
-        try {
-          existingAlignment = field.getAlignment();
-        } catch {
-          // getAlignment may throw on older field definitions — ignore
+        if (forceLeftAlign.has(fieldName)) {
+          existingAlignment = TextAlignment.Left;
+        } else {
+          try {
+            existingAlignment = field.getAlignment();
+          } catch {
+            // getAlignment may throw on older field definitions — ignore
+          }
         }
         field.setText(value);
         if (existingAlignment !== undefined) {
