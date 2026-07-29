@@ -20,6 +20,7 @@ import { registerUploadMediaRepoRoute } from "../routes/uploadMediaRepo";
 import { registerUploadCourseImageRoute } from "../routes/uploadCourseImage";
 import { registerProcessRichTextHtmlRoute } from "../routes/processRichTextHtml";
 import { registerUploadQuizBankFileRoute } from "../routes/uploadQuizBankFile";
+import quizImportRouter from "../quizImportRoutes";
 import { registerUploadDigitalFileRoute } from "../routes/uploadDigitalFile";
 import { registerUploadCohortMediaRoute } from "../routes/uploadCohortMedia";
 import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResource";
@@ -243,6 +244,8 @@ async function startServer() {
   registerProcessRichTextHtmlRoute(app);
   // Quiz bank direct file upload (SCORM .quiz, CSV, XLSX — bypasses media library)
   registerUploadQuizBankFileRoute(app);
+  // Quiz bank import REST routes (preview, confirm-native, csv-template, xlsx template)
+  app.use("/api/quiz", quizImportRouter);
   // Digital download file upload (multipart, bypasses JSON body limit)
   registerUploadDigitalFileRoute(app);
   // Cohort group discussion media upload (images + videos, admin only)

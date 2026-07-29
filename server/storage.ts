@@ -249,6 +249,20 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
   };
 }
 
+/**
+ * storagePutStream — upload a file from a local path to storage.
+ * Used by scormUploadRoutes for large ZIP file uploads.
+ */
+export async function storagePutStream(
+  relKey: string,
+  filePath: string,
+  contentType = "application/octet-stream"
+): Promise<{ key: string; url: string }> {
+  const { readFileSync } = await import("fs");
+  const data = readFileSync(filePath);
+  return storagePut(relKey, data, contentType);
+}
+
 export async function storageDelete(relKey: string): Promise<void> {
   const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);

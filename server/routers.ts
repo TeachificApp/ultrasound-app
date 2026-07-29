@@ -64,6 +64,7 @@ import { printfulAdminRouter, printfulPublicRouter } from "./routers/printfulRou
 import { shopifyAdminRouter } from "./routers/shopifyRouter";
 import { printifyAdminRouter } from "./routers/printifyRouter";
 import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuizAdminRouter } from "./routers/standaloneQuizRouter";
+import { quizBankRouter } from "./routers/quizBankRouter";
 import { teamRouter } from "./routers/teamRouter";
 import { adminNotificationsRouter } from "./routers/adminNotificationsRouter";
 import { sonoTravelersRouter } from "./routers/sonoTravelersRouter";
@@ -2709,6 +2710,8 @@ export const appRouter = router({
   standaloneQuiz: standaloneQuizPublicRouter,
   standaloneQuizLearner: standaloneQuizLearnerRouter,
   standaloneQuizAdmin: standaloneQuizAdminRouter,
+  // ─── Quiz Bank ───────────────────────────────────────────────────────────────
+  quizBank: quizBankRouter,
   team: teamRouter,
   adminNotifications: adminNotificationsRouter,
   sonoTravelers: sonoTravelersRouter,
