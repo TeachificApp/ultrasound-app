@@ -957,12 +957,25 @@ export function buildFunnelPurchaseConfirmationEmail(opts: {
   orderBumps?: Array<{ title: string; price: number }>;
   loginUrl: string;
   brandMode?: BrandMode;
+  purchaseDate?: Date | string | null;
+  cardLast4?: string | null;
+  cardBrand?: string | null;
 }): { subject: string; htmlBody: string; previewText: string } {
   const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
   const subject = `Your purchase is confirmed — ${opts.productName}`;
   const previewText = `Thank you for your purchase! Your access to ${opts.productName} is now active.`;
   const totalCents = opts.amountPaid;
   const totalDisplay = `$${(totalCents / 100).toFixed(2)}`;
+
+  // Format purchase date
+  const purchaseDateDisplay = opts.purchaseDate
+    ? new Date(opts.purchaseDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+  // Format card display
+  const cardDisplay = opts.cardLast4
+    ? `${opts.cardBrand ? opts.cardBrand.charAt(0).toUpperCase() + opts.cardBrand.slice(1) + " " : ""}\u2022\u2022\u2022\u2022 ${opts.cardLast4}`
+    : null;
 
   const bumpRows = (opts.orderBumps ?? []).length > 0
     ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0 0;">
@@ -973,6 +986,17 @@ export function buildFunnelPurchaseConfirmationEmail(opts: {
           </tr>`).join("")}
       </table>`
     : "";
+
+  const paymentDetailsRows = `
+    <tr>
+      <td style="font-size:13px;color:#475569;padding:4px 0;">Date</td>
+      <td style="font-size:13px;color:#475569;text-align:right;padding:4px 0;">${purchaseDateDisplay}</td>
+    </tr>
+    ${cardDisplay ? `<tr>
+      <td style="font-size:13px;color:#475569;padding:4px 0;">Payment</td>
+      <td style="font-size:13px;color:#475569;text-align:right;padding:4px 0;">${cardDisplay}</td>
+    </tr>` : ""}
+  `;
 
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
@@ -996,6 +1020,7 @@ export function buildFunnelPurchaseConfirmationEmail(opts: {
           <td style="font-size:14px;color:#0e1e2e;font-weight:700;padding:4px 0;">Total Paid</td>
           <td style="font-size:14px;color:${brandColor};font-weight:700;text-align:right;padding:4px 0;">${totalDisplay}</td>
         </tr>
+        ${paymentDetailsRows}
       </table>
     </div>
     <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">

@@ -1372,6 +1372,21 @@ function PurchasesTab() {
                       <span className="text-gray-400">Status</span>
                       <span className="font-medium text-green-600 capitalize">{receiptPurchase.status ?? "paid"}</span>
                     </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Date</span>
+                      <span className="font-medium text-gray-600">{formatDate(receiptPurchase.date)}</span>
+                    </div>
+                    {("cardLast4" in receiptPurchase) && receiptPurchase.cardLast4 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Payment</span>
+                        <span className="font-medium text-gray-600">
+                          {receiptPurchase.cardBrand
+                            ? receiptPurchase.cardBrand.charAt(0).toUpperCase() + receiptPurchase.cardBrand.slice(1) + " "
+                            : ""}
+                          &bull;&bull;&bull;&bull; {receiptPurchase.cardLast4}
+                        </span>
+                      </div>
+                    )}
                     {invoiceNumber && (
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-400">Invoice #</span>

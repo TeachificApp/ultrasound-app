@@ -1525,6 +1525,9 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
             orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
             loginUrl: autoLoginUrlExisting,
             brandMode: brandMode as any,
+            purchaseDate: new Date(),
+            cardLast4,
+            cardBrand,
           });
           await sendEmail({ to: { name: customerName || firstName, email: customerEmail! }, subject, htmlBody, previewText });
           console.log(`[Stripe] Purchase confirmation email sent to existing user ${customerEmail} for "${productName}"`);
@@ -1539,6 +1542,17 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   // ── END AUTO-ACCOUNT CREATION ────────────────────────────────────────────
 
   const checkoutSessionId = paymentIntent.checkout_session_id as string | undefined;
+
+  // Fetch card last4 from Stripe (best-effort, won't block fulfillment on failure)
+  let cardLast4: string | null = null;
+  let cardBrand: string | null = null;
+  try {
+    const piExpanded = await getStripeClient().paymentIntents.retrieve(piId, { expand: ["payment_method"] }) as any;
+    const pm = piExpanded.payment_method;
+    const card = pm?.card ?? pm?.card_present ?? null;
+    cardLast4 = card?.last4 ?? null;
+    cardBrand = card?.brand ?? null;
+  } catch { /* non-critical */ }
 
   // Idempotency check
   if (checkoutSessionId) {
@@ -1594,6 +1608,8 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       shippingState,
       shippingPostalCode,
       shippingCountry,
+      cardLast4,
+      cardBrand,
       status: "paid",
     });
     console.log(`[Stripe] Funnel purchase recorded: user ${resolvedUserId}, product "${productName}", PI: ${piId}`);
@@ -1833,6 +1849,9 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
         loginUrl: autoLoginUrl,
         brandMode: brandMode as any,
+        purchaseDate: new Date(),
+        cardLast4,
+        cardBrand,
       });
       await sendEmail({ to: { name: customerName || firstName, email: customerEmail }, subject, htmlBody, previewText });
       console.log(`[Stripe] Purchase confirmation email sent to ${customerEmail} for "${productName}" (auto-login: ${resolvedUserId ? 'yes' : 'no'})`);

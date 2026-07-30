@@ -4596,6 +4596,9 @@ export const funnelPurchases = mysqlTable("funnel_purchases", {
   shippingState: varchar("shipping_state", { length: 100 }),
   shippingPostalCode: varchar("shipping_postal_code", { length: 20 }),
   shippingCountry: varchar("shipping_country", { length: 10 }),
+  // Payment method details (fetched from Stripe at purchase time)
+  cardLast4: varchar("card_last4", { length: 4 }),
+  cardBrand: varchar("card_brand", { length: 32 }),
   // Status
   status: mysqlEnum("status", ["pending", "paid", "failed", "refunded"]).default("pending").notNull(),
   purchasedAt: timestamp("purchased_at").defaultNow().notNull(),

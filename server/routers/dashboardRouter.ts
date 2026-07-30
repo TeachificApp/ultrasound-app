@@ -956,6 +956,8 @@ export const dashboardRouter = router({
         sourceType: funnelPurchases.sourceType,
         stripePaymentIntentId: funnelPurchases.stripePaymentIntentId,
         stripeCheckoutSessionId: funnelPurchases.stripeCheckoutSessionId,
+        cardLast4: funnelPurchases.cardLast4,
+        cardBrand: funnelPurchases.cardBrand,
       })
       .from(funnelPurchases)
       .where(eq(funnelPurchases.userId, userId))
@@ -1218,6 +1220,8 @@ export const dashboardRouter = router({
         transactionId: p.stripePaymentIntentId ?? p.stripeCheckoutSessionId ?? null as string | null,
         brand: null as string | null,
         fulfillmentStatus: null as string | null,
+        cardLast4: p.cardLast4 ?? null as string | null,
+        cardBrand: p.cardBrand ?? null as string | null,
       })),
       ...oneTimeOrders.map(o => ({
         id: `order-${o.id}`,
@@ -1375,4 +1379,23 @@ export const dashboardRouter = router({
 
     return allPurchases;
   }),
+
+  // Fetch card last4 for a specific payment intent (called lazily when receipt modal opens)
+  getPaymentMethodDetails: protectedProcedure
+    .input(z.object({ paymentIntentId: z.string() }))
+    .query(async ({ input }) => {
+      try {
+        const pi = await getStripeClient().paymentIntents.retrieve(input.paymentIntentId, {
+          expand: ["payment_method"],
+        }) as any;
+        const pm = pi.payment_method;
+        const card = pm?.card ?? pm?.card_present ?? null;
+        return {
+          cardLast4: card?.last4 ?? null as string | null,
+          cardBrand: card?.brand ?? null as string | null,
+        };
+      } catch {
+        return { cardLast4: null, cardBrand: null };
+      }
+    }),
 });
