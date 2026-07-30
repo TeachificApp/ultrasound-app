@@ -3444,8 +3444,9 @@ CRITICAL REQUIREMENTS:
         return { success: true, alreadyExisted: true, certificateUrl: existing.certificateUrl };
       }
 
-      // Issue certificate (reuse the shared helper — skips email for admin_preview)
-      await issueCertificateIfEnabled(db, enrollment.id, enrollment.userId, enrollment.courseId, enrollment.enrollmentType);
+      // Issue certificate (reuse the shared helper — skips email for admin_preview).
+      // adminBypass=true: admin explicitly requested this, so bypass the CERT_CUTOFF_DATE guard.
+      await issueCertificateIfEnabled(db, enrollment.id, enrollment.userId, enrollment.courseId, enrollment.enrollmentType, { forceReissue: false, adminBypass: true });
 
       // Fetch the newly created certificate URL
       const [newCert] = await db.select({ certificateUrl: lmsCertificates.certificateUrl })

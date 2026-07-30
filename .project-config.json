@@ -8,17 +8,18 @@
   "dev_command": "pnpm run dev",
   "env_vars": {
     "DATABASE_URL": "mysql://2mhhtxpXA9Esras.9b3674e1e24c:mvsCM0Xk4QDYxH86nu44@gateway04.us-east-1.prod.aws.tidbcloud.com:4000/UrcfdRVE8J6mpMNR48QuFe?ssl={\"rejectUnauthorized\":true}",
-    "DRIZZLE_DATABASE_URL": "mysql://2mhhtxpXA9Esras.9b3674e1e24c:mvsCM0Xk4QDYxH86nu44@gateway04.us-east-1.prod.aws.tidbcloud.com:4000/UrcfdRVE8J6mpMNR48QuFe?ssl={\"rejectUnauthorized\":true}"
+    "DRIZZLE_DATABASE_URL": "mysql://2mhhtxpXA9Esras.9b3674e1e24c:mvsCM0Xk4QDYxH86nu44@gateway04.us-east-1.prod.aws.tidbcloud.com:4000/UrcfdRVE8J6mpMNR48QuFe?ssl={\"rejectUnauthorized\":true}",
+    "MANUS_WEBDEV_PROJECT_ID": "UrcfdRVE8J6mpMNR48QuFe"
   },
   "experiments": [
     "no_db_push"
   ],
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663401463434/UrcfdRVE8J6mpMNR48QuFe",
-    "access_key_id": "ASIAZV3A2ECZAWH72W7G",
-    "secret_access_key": "uui3lstvDhjMZjVx5IBSb0t71+/VbiYlAxDA4fCK",
-    "session_token": "IQoJb3JpZ2luX2VjEJL//////////wEaCXVzLWVhc3QtMSJGMEQCIB6hBQ2KqDTYgCLVEbNn2FDpH6UutKnUfkwKxGTlV3WIAiA88SWNFTbFt8RejDjF9TY9yCC/D8maE2T2wb8d8PFEkyr1AwhaEAQaDDY2NTM4NjA5ODg2NiIMqV1OcN7xKO0h1fLlKtIDeBpjiLM3g9l5WSxK4Kl7wgfTQJrgY9A377pcV0jvOr2GlKVW/ZGDJmzBuikbKmJMYaIZ5Ae5zpivtCHc86FnluEquzdma1VQefG92pkx2DwphIOL/bjT4L0JPfFs9MzIc/xO38ZuYq4pcwidxG7+Wyzn+7pABTlny1j7SJRV1ZZD04xP9jjzBgC7CR2Efhr2x/9wfytf1F0WQ7tuz9NDp6az2CnZ/Ru2zVPutKgVrmTf+LQeOgvsAF3wv1hfIt98bVGr/1tUs0P8hHiKLFCMFfq0t0tVz5iNLMbzKt/YhAX+e0RUoyKXgp4E73RzJb0WLPNqKzGuI+RWqtpgxHeObj+7Xb8nIgfpa6i5SsjsoMhhUqnBG4YGkCkc/N5TEkoArYCaQffBdCwwOYG8rv6jRjuhsDHTv5yO12JvhOiohBGwhs5uO0aJxIIST39YdnKjN+8OKupfoKbeaXlbpbZ/M4ivwQKUGphWEp9a26ZOC0QtZLLS8QsXZ6YmOwl4Kr3ah94U06khcmvQS2ewaL5dKDPdTE8Mu6s4qFPGT6LWqMGG2y5gunTbKvaeCewsV21RmOA7ti/zm8KVVkZVGynzoBhSpKRliSYI++vUx7ZgHbuRLzCgh6DTBjqeASKk37CCNheqf1FMNg2O+Cn2YeVJ1F2JZfdZIxRIyUCBno+xYkrZ6EIi0e4BeHDg1TTD/Jw7pPDYVh3uUCJZ+4dMy+uQ6+tG+eb9lv1sd0p3ikRmrY3A8Sj5ZUk+TK+Uh/DZ9dfqniXyBAfT8iv3TDEPujhhzV1LbGOXYhah+aeaqK1SlLViI9o0apZ3/LxEbNbUOIiaLVLyJEvCiNeL",
-    "expiration": "2026-07-28T13:19:28.000Z",
+    "access_key_id": "ASIAZV3A2ECZJ5MBO2SI",
+    "secret_access_key": "M6lQDz6yhEpevM9+XrX6sUeX1eJuoSwNYQH1Jx91",
+    "session_token": "IQoJb3JpZ2luX2VjENH//////////wEaCXVzLWVhc3QtMSJIMEYCIQCmdtC+DmpGqlWwUuWBqUpUNWchpc+lGV8qpKRS/pGaqwIhANE+/Lj7kzrs6fRAorCIqVxnCbtMcVuqYgFCcSnzIl0iKv4DCJr//////////wEQBBoMNjY1Mzg2MDk4ODY2IgwRWBYpZAn4YZIB8VIq0gMvOlaMFrEJoNM4jwT93ey2CMCe9OfwYtax8kIYw9jG/+XUj8aB5n4xbFqdfg+55sfz71i1nhHcasb+C0Hbbl/LHJ8lGF8z2sMKjgBuLCefaAU6GYR/uCJRop74XoZi+xzFOWxrtIKGxqdSh5x040Sge81lCgG03YnQU7lJ+84ufLslCuF7l2NeTC4kKqxaX78VAqnI6yYLbb1+9XFq0sOMIAnVrhVbZBYDO3HCpkHJYFqR1nP/Hc9vhLJj74Aa2HDQUHz6bgXCqwjyinIrcjRj01ao2cvT28wqr8J4bzSSMu9rkDIyZycwgdgsJ1cvaGWR05sNNNVFraIiaZxF7NrqkXSbo7D9ck2SZg46eKb0gQGKjZvawC/BHX3ws1s+nvGwGDIL/jJiuXKQB/2ibfwwGktcAHUXgDF5L/yrIqHTmuhiEjnATpUKU1CDsCWRTDzCKa5Bpz4+G6neckPSLaQyk40nQDXCjmZoe4v0nAXF/Lx0hLUouUx1xSYmrhQOFnRebunTLIXIHZ5eSFC0TbAxChMbYz4VeqRMcgottEPqb4UC4o2Q5k24g6ihxi1oquZr+Dq3/eXEpHvEv4aoTe8AWSMmHK2WsiTVmwZdt59PgdW8MKb5rdMGOpwBs9xjSokUkDghANNEyka4MJlP/GZ7S4X5XSUFH2EJK3NEBdKUUfHJofqssa4Q0UvPnlZN/AHICPnODt1fwK6yQU4myboBMw9P4Q/sEag2SvcXZUPVV0I1OOGYCFSoRYCE1JnD3LaVm33ao39NZO+VZxSTXetTvmyF4Co5lIKy6F3ky/DiVhpKKJ1Xce35VHAd78pb96TkRW3wiHw3",
+    "expiration": "2026-07-31T04:32:38.000Z",
     "backend": "GIT_BACKEND_S3"
   },
   "name": "ultrasound-assist",
@@ -46,7 +47,7 @@
     "PLATFORM_ADMIN_EMAIL": "admin@allaboutultrasound.com",
     "PRINTFUL_API_KEY": "SeGTyxzdFbAwZLRKguJeZPjQ6GJydI6YqK7n4dhE",
     "RAILWAY_MYSQL_URL": "mysql://root:KruQyAdWBhuuYwueWWPYcirRtkUYbYNE@viaduct.proxy.rlwy.net:37790/railway",
-    "SENDGRID_API_KEY": "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",
+    "SENDGRID_API_KEY": "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",
     "SENDGRID_FROM_EMAIL": "admin@allaboutultrasound.com",
     "SENDGRID_FROM_NAME": "AllAboutUltrasound",
     "STRIPE_LIVE_PUBLISHABLE_KEY": "pk_live_4YnN7raY56bZeVZnM7b9t1tM",
