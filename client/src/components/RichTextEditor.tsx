@@ -22,6 +22,9 @@
  */
 
 import { useEditor, EditorContent, Node, mergeAttributes } from "@tiptap/react";
+import { Mathematics } from "@tiptap/extension-mathematics";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import StarterKit from "@tiptap/starter-kit";
 import { ImageResize } from "tiptap-extension-resize-image";
 import Link from "@tiptap/extension-link";
@@ -678,6 +681,7 @@ export default function RichTextEditor({
       TableRow,
       CustomTableHeader,
       CustomTableCell,
+      Mathematics,
     ],
     content: value,
     editable: !disabled,
@@ -1376,6 +1380,20 @@ export default function RichTextEditor({
 
           <Sep />
 
+          {/* Math / Formula */}
+          <ToolbarBtn
+            title="Insert math formula (LaTeX). Wrap inline: $formula$  Block: $$formula$$"
+            active={editor.isActive("math")}
+            onClick={() => {
+              // Insert a block math placeholder the user can edit
+              editor.chain().focus().insertContent("$$\\frac{a}{b}$$").run();
+            }}
+          >
+            <span className="font-serif font-bold text-xs leading-none select-none" style={{ fontFamily: 'Georgia, serif', letterSpacing: '-0.5px' }}>∑</span>
+          </ToolbarBtn>
+
+          <Sep />
+
           {/* Emoji Picker */}
           <div className="relative">
             <ToolbarBtn title="Insert emoji" onClick={() => setEmojiPickerOpen(p => !p)}>
@@ -1472,6 +1490,11 @@ export default function RichTextEditor({
         .rte-content .tiptap table.table-borderless tr:nth-child(even) td { background-color: transparent; }
         .rte-content .tableWrapper { overflow-x: auto; }
         .rte-content .resize-cursor { cursor: col-resize; }
+        /* KaTeX math rendering inside TipTap editor */
+        .rte-content .tiptap .math-node { display: inline-block; cursor: pointer; border-radius: 3px; padding: 0 2px; transition: background 0.1s; }
+        .rte-content .tiptap .math-node:hover { background: rgba(20,144,150,0.08); }
+        .rte-content .tiptap .math-node.ProseMirror-selectednode { background: rgba(20,144,150,0.18); outline: 2px solid #149096; }
+        .rte-content .tiptap .math-node.math-block { display: block; text-align: center; margin: 0.75em 0; padding: 0.5em 0; }
       `}</style>
 
       {/* ── Dialogs ── */}
@@ -1832,6 +1855,7 @@ export default function RichTextEditor({
 /**
  * RichTextDisplay — renders saved HTML from RichTextEditor in read-only mode.
  * Use wherever rich text content is displayed (case detail, admin preview, etc.)
+ * Automatically renders KaTeX math nodes produced by the Mathematics extension.
  */
 export function RichTextDisplay({
   html,
@@ -1843,9 +1867,28 @@ export function RichTextDisplay({
   className?: string;
 }) {
   const resolvedHtml = html ?? content ?? "";
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  // After mount / update, re-render any KaTeX math nodes that TipTap serialised
+  // as <span class="math-node">…</span> or <div class="math-node math-block">…</div>
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.querySelectorAll<HTMLElement>(".math-node").forEach((node) => {
+      const latex = node.textContent ?? "";
+      const isBlock = node.classList.contains("math-block");
+      try {
+        katex.render(latex, node, { displayMode: isBlock, throwOnError: false, output: "html" });
+      } catch {
+        // leave as-is if KaTeX can't parse it
+      }
+    });
+  }, [resolvedHtml]);
+
   if (!resolvedHtml) return null;
   return (
     <div
+      ref={ref}
       className={cn(
         "prose prose-sm max-w-none text-gray-700",
         "[&_h1]:text-lg [&_h1]:font-extrabold [&_h1]:text-[#0e1e2e] [&_h1]:mt-4 [&_h1]:mb-2",
