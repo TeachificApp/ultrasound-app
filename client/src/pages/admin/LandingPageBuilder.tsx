@@ -322,7 +322,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     defaultData: { headline: "Upcoming Live Sessions", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true, showLocation: true, displayMode: "list", groupSelectionMode: "all", selectedGroupIds: [], enrollNowText: "Enroll Now", showEnrollNow: true, showPastSessions: false } },
   { type: "cohort_instance_cards_auto", label: "Cohort Groups / Instances (Auto)", icon: <Layers size={14} />, category: "Content",
     defaultData: { headline: "Upcoming Cohorts", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true, showLocation: true, groupSelectionMode: "all", selectedGroupIds: [], enrollNowText: "Enroll Now", showEnrollNow: true, showCompletedGroups: false } },
-  { type: "remaining_seats", label: "Remaining Seats (Live)", icon: <Users size={14} />, category: "Content",
+  { type: "remaining_seats", label: "Remaining Seats (Live)", icon: <Users size={14} />, category: "Smart",
     defaultData: {
       sourceType: "workshop_instance" as "workshop_instance" | "cohort_group",
       sourceId: null as number | null,
