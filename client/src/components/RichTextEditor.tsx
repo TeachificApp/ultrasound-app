@@ -1949,9 +1949,12 @@ export function RichTextDisplay({
   React.useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Step 1: set the raw HTML (resets any previously rendered KaTeX)
+    el.innerHTML = resolvedHtml;
+    // Step 2: immediately render KaTeX on all math nodes
     el.querySelectorAll<HTMLElement>('[data-type="block-math"], [data-type="inline-math"]').forEach((node) => {
       const latex = node.getAttribute("data-latex") ?? node.textContent ?? "";
-      if (!latex) return;
+      if (!latex.trim()) return;
       const isBlock = node.getAttribute("data-type") === "block-math";
       try {
         katex.render(latex, node, { displayMode: isBlock, throwOnError: false, output: "html" });
@@ -1995,7 +1998,6 @@ export function RichTextDisplay({
         "[&_[data-type='inline-math']]:inline",
         className,
       )}
-      dangerouslySetInnerHTML={{ __html: resolvedHtml }}
     />
   );
 }
