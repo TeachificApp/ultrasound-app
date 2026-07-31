@@ -640,3 +640,20 @@ textarea,
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ── KaTeX Math Node Rendering ─────────────────────────────────────────────── */
+/* Block (display) math: centered, scrollable for wide equations */
+[data-type="block-math"] {
+  display: block;
+  text-align: center;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+/* Inline math: stays inline with surrounding text */
+[data-type="inline-math"] {
+  display: inline;
+}
+/* KaTeX rendered output alignment */
+[data-type="block-math"] .katex-display {
+  margin: 0;
+}

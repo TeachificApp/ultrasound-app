@@ -17,7 +17,7 @@ import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
-import { RichTextDisplay } from "@/components/RichTextEditor";
+import { MathContent } from "@/components/MathContent";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
@@ -230,7 +230,13 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}>
           <CC style={{ textAlign: d.align ?? "left" }}>
-            <RichTextDisplay html={d.html ?? ""} className="prose" />
+            <MathContent
+              html={d.html ?? ""}
+              className="prose"
+              style={{
+                // Ensure block-math nodes are centered and scrollable
+              }}
+            />
           </CC>
         </div>
       );
