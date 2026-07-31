@@ -31,6 +31,7 @@ import type { Block } from "@/components/BlockPreview";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { SUBSCRIPTION_RESUME_LABEL } from "@/lib/accessCta";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
+import { MathContent } from "@/components/MathContent";
 import { PublicLandingBlock } from "@/components/PublicLandingBlock";
 import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
@@ -374,7 +375,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, onEnrollWithOption, onCheckoutPage, onSoldOutOverride)}>
-          <CC><div className="prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} /></CC>
+          <CC><MathContent html={d.html ?? ""} className="prose" /></CC>
         </div>
       );
     case "image": {

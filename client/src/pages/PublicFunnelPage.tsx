@@ -28,6 +28,7 @@ import LeadCaptureModal from "@/components/LeadCaptureModal";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { LEARN_APP_URL } from "@/hooks/useSubdomain";
 import { getLoginUrl } from "@/const";
+import { MathContent } from "@/components/MathContent";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
 
@@ -188,7 +189,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
     case "text":
       return (
         <div className="py-10" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}>
-          <div className="max-w-5xl mx-auto px-4 sm:px-6"><div className="prose prose-lg" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} /></div>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6"><MathContent html={d.html ?? ""} className="prose prose-lg" /></div>
         </div>
       );
     case "image": {

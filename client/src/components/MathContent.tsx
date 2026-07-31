@@ -9,7 +9,7 @@
  * avoid circular import issues (BlockPreview → CourseLanding → BlockPreview).
  * It only imports katex directly.
  */
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useLayoutEffect } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,9 @@ interface MathContentProps {
 export function MathContent({ html, className, style }: MathContentProps) {
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // useLayoutEffect fires synchronously after DOM mutations, before paint.
+  // This ensures KaTeX renders before the user sees the empty math nodes.
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.querySelectorAll<HTMLElement>('[data-type="block-math"], [data-type="inline-math"]').forEach((node) => {

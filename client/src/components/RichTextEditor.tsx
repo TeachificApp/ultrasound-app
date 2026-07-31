@@ -1944,7 +1944,9 @@ export function RichTextDisplay({
   //   <div data-type="block-math" data-latex="..."></div>
   // and inline math as:
   //   <span data-type="inline-math" data-latex="..."></span>
-  React.useEffect(() => {
+  // useLayoutEffect fires synchronously after DOM mutations, before paint.
+  // This ensures KaTeX renders before the user sees the empty math nodes.
+  React.useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.querySelectorAll<HTMLElement>('[data-type="block-math"], [data-type="inline-math"]').forEach((node) => {

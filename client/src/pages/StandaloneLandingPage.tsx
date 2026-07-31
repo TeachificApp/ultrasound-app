@@ -105,6 +105,7 @@ import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { ImageLinkWrapper } from "@/components/BlockPreview";
+import { MathContent } from "@/components/MathContent";
 
 function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block: Block; funnelId: number; pageId: number; funnelSlug: string }) {
   const { data: freeEnrollCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
@@ -366,7 +367,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
     case "text":
       return (
         <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor || "#ffffff", color: d.textColor || "#1a1a1a", textAlign: d.align || "left" }}>
-          <div className="max-w-3xl mx-auto prose prose-lg" dangerouslySetInnerHTML={{ __html: d.html || "" }} />
+          <MathContent html={d.html || ""} className="max-w-3xl mx-auto prose prose-lg" />
         </div>
       );
     case "image": {

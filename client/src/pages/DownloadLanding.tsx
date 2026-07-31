@@ -29,6 +29,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSeoHead } from "@/hooks/useSeoHead";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { CountdownV2Block, ImageLinkWrapper, CC } from "@/components/BlockPreview";
+import { MathContent } from "@/components/MathContent";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
@@ -157,7 +158,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
     case "text":
       return (
         <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a" }}>
-          <CC style={{ textAlign: d.align ?? "left" }}><div className="prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} /></CC>
+          <CC style={{ textAlign: d.align ?? "left" }}><MathContent html={d.html ?? ""} className="prose" /></CC>
         </div>
       );
     case "image": {

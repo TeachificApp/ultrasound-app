@@ -24,6 +24,7 @@ import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { PURCHASE_ACCESS_LABEL, productAccessHref } from "@/lib/accessCta";
 import { useState, useEffect, useRef } from "react";
 import { ImageLinkWrapper, BlockPreview, type Block } from "@/components/BlockPreview";
+import { MathContent } from "@/components/MathContent";
 
 // ─── Shopify Embed ─────────────────────────────────────────────────────────────
 function ShopifyEmbed({ embedCode }: { embedCode: string }) {
@@ -174,7 +175,7 @@ function RenderBlock({ block, onBuy, buying, price, slug, hasPurchased }: {
     case "text":
       return (
         <div className="py-8" style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#1a1a1a" }}>
-          <CC style={{ textAlign: (d.align ?? "left") as any }}><div className="prose prose-gray" dangerouslySetInnerHTML={{ __html: d.html ?? d.content ?? "" }} /></CC>
+          <CC style={{ textAlign: (d.align ?? "left") as any }}><MathContent html={d.html ?? d.content ?? ""} className="prose prose-gray" /></CC>
         </div>
       );
     case "image": {

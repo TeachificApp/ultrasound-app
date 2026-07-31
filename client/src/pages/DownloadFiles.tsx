@@ -14,6 +14,7 @@ import { Download, Eye, FileDown, ArrowLeft, CheckCircle, Lock } from "lucide-re
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useEffect, useState } from "react";
+import { MathContent } from "@/components/MathContent";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 
 // ─── Member Page Block Renderer ──────────────────────────────────────────────
@@ -27,10 +28,7 @@ function MemberPageBlock({ block }: { block: any }) {
   switch (block.type) {
     case "text":
       return (
-        <div
-          className="prose prose-base max-w-none text-gray-800 leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: d.html ?? d.content ?? "" }}
-        />
+        <MathContent html={d.html ?? d.content ?? ""} className="prose prose-base max-w-none text-gray-800 leading-relaxed" />
       );
     case "image":
       return d.url ? (
