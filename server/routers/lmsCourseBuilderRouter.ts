@@ -228,6 +228,12 @@ export const lmsCourseBuilderRouter = router({
       playerTheme: z.enum(["light", "dark"]).optional(),
       // Multi-cohort mode: when true, sessions/assignments/recordings are scoped per cohort group
       multiCohortMode: z.boolean().optional(),
+      // Purchase terms override (leave null to use platform default)
+      purchaseTermsText: z.string().max(1000).nullable().optional(),
+      purchaseTermsLinkText1: z.string().max(255).nullable().optional(),
+      purchaseTermsLinkUrl1: z.string().max(2048).nullable().optional(),
+      purchaseTermsLinkText2: z.string().max(255).nullable().optional(),
+      purchaseTermsLinkUrl2: z.string().max(2048).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

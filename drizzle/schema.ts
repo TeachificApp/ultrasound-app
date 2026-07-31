@@ -3057,6 +3057,12 @@ export const lmsCourses = mysqlTable("lms_courses", {
   waitlistSuccessMessage: longtext("waitlist_success_message"),
   // Block editor content for the Course Player right sidebar (shown below the instructor section)
   playerSidebarBlocks: longtext("player_sidebar_blocks"),
+  // Per-course purchase terms agreement checkbox text (null = use site-level default from site_settings)
+  purchaseTermsText: text("purchase_terms_text"),
+  purchaseTermsLinkText1: varchar("purchase_terms_link_text_1", { length: 255 }),
+  purchaseTermsLinkUrl1: varchar("purchase_terms_link_url_1", { length: 2048 }),
+  purchaseTermsLinkText2: varchar("purchase_terms_link_text_2", { length: 255 }),
+  purchaseTermsLinkUrl2: varchar("purchase_terms_link_url_2", { length: 2048 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3593,6 +3599,12 @@ export const digitalProducts = mysqlTable("digital_products", {
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
   // Per-download publish domain override (null = use global downloadPublishDomain)
   publishDomain: varchar("publish_domain", { length: 255 }),
+  // Per-product checkout terms override (null = use platform_settings global default)
+  purchaseTermsText: text("purchase_terms_text"),
+  purchaseTermsLinkText1: varchar("purchase_terms_link_text_1", { length: 255 }),
+  purchaseTermsLinkUrl1: varchar("purchase_terms_link_url_1", { length: 2048 }),
+  purchaseTermsLinkText2: varchar("purchase_terms_link_text_2", { length: 255 }),
+  purchaseTermsLinkUrl2: varchar("purchase_terms_link_url_2", { length: 2048 }),
   // Stripe product/price IDs — auto-synced on save
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
@@ -4374,6 +4386,16 @@ export const platformSettings = mysqlTable("platform_settings", {
   // ── Legal / Checkout URLs ──
   termsUrl: varchar("terms_url", { length: 500 }),
   privacyUrl: varchar("privacy_url", { length: 500 }),
+  // ── Checkout Terms Checkbox Text ──
+  // The label shown next to the agreement checkbox on all Stripe checkout pages.
+  // checkoutTermsText: the sentence before the links (e.g. "I have reviewed and agree to the")
+  // checkoutTermsLinkText1/Url1: first linked term (e.g. "Terms of Service")
+  // checkoutTermsLinkText2/Url2: second linked term (e.g. "Privacy Policy")
+  checkoutTermsText: text("checkout_terms_text"),
+  checkoutTermsLinkText1: varchar("checkout_terms_link_text_1", { length: 255 }),
+  checkoutTermsLinkUrl1: varchar("checkout_terms_link_url_1", { length: 2048 }),
+  checkoutTermsLinkText2: varchar("checkout_terms_link_text_2", { length: 255 }),
+  checkoutTermsLinkUrl2: varchar("checkout_terms_link_url_2", { length: 2048 }),
   /** JSON snapshot for SCORM health email dedup: { unhealthyAssetIds, lastAlertAt } */
   scormHealthSnapshot: text("scorm_health_snapshot"),
   /** Optional override for SCORM health alert emails (else owner / SCORM_HEALTH_ALERT_EMAIL env) */
@@ -5044,6 +5066,12 @@ export const webinars = mysqlTable("webinars", {
   hidePricingOptions: boolean("hide_pricing_options").default(false).notNull(),
   // After Purchase Workflow — JSON array of workflow action objects
   afterPurchaseWorkflow: longtext("after_purchase_workflow"),
+  // Per-webinar checkout terms override (null = use platform_settings global default)
+  purchaseTermsText: text("purchase_terms_text"),
+  purchaseTermsLinkText1: varchar("purchase_terms_link_text_1", { length: 255 }),
+  purchaseTermsLinkUrl1: varchar("purchase_terms_link_url_1", { length: 2048 }),
+  purchaseTermsLinkText2: varchar("purchase_terms_link_text_2", { length: 255 }),
+  purchaseTermsLinkUrl2: varchar("purchase_terms_link_url_2", { length: 2048 }),
   // Stripe product/price IDs — auto-synced on save
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
@@ -7071,6 +7099,12 @@ export const workshops = mysqlTable("workshops", {
   waitlistContentBlocks: longtext("waitlist_content_blocks"),
   waitlistSuccessMessage: longtext("waitlist_success_message"),
 
+  // Per-workshop checkout terms override (null = use platform_settings global default)
+  purchaseTermsText: text("purchase_terms_text"),
+  purchaseTermsLinkText1: varchar("purchase_terms_link_text_1", { length: 255 }),
+  purchaseTermsLinkUrl1: varchar("purchase_terms_link_url_1", { length: 2048 }),
+  purchaseTermsLinkText2: varchar("purchase_terms_link_text_2", { length: 255 }),
+  purchaseTermsLinkUrl2: varchar("purchase_terms_link_url_2", { length: 2048 }),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

@@ -256,6 +256,11 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
+  const [purchaseTermsText, setPurchaseTermsText] = useState("");
+  const [purchaseTermsLinkText1, setPurchaseTermsLinkText1] = useState("");
+  const [purchaseTermsLinkUrl1, setPurchaseTermsLinkUrl1] = useState("");
+  const [purchaseTermsLinkText2, setPurchaseTermsLinkText2] = useState("");
+  const [purchaseTermsLinkUrl2, setPurchaseTermsLinkUrl2] = useState("");
 
   // Instance dialog state
   const [instanceDialogOpen, setInstanceDialogOpen] = useState(false);
@@ -315,6 +320,11 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setThumbnailUrl(w.thumbnailUrl ?? "");
     setMetaTitle((w as any).metaTitle ?? "");
     setMetaDescription((w as any).metaDescription ?? "");
+    setPurchaseTermsText((w as any).purchaseTermsText ?? "");
+    setPurchaseTermsLinkText1((w as any).purchaseTermsLinkText1 ?? "");
+    setPurchaseTermsLinkUrl1((w as any).purchaseTermsLinkUrl1 ?? "");
+    setPurchaseTermsLinkText2((w as any).purchaseTermsLinkText2 ?? "");
+    setPurchaseTermsLinkUrl2((w as any).purchaseTermsLinkUrl2 ?? "");
   }, [data]);
 
   const updateMutation = trpc.workshopAdmin.update.useMutation({
@@ -616,6 +626,45 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
                 <Label className="text-xs">Meta Description <span className="text-gray-400 font-normal">(SEO)</span></Label>
                 <Textarea value={metaDescription} onChange={e => setMetaDescription(e.target.value)} rows={2} className="mt-1 text-sm" placeholder="Brief description for search engines (150-160 chars)" />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Purchase Terms Override */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">📋 Purchase Terms Override</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">Override the checkout terms checkbox text for this workshop only. Leave all fields blank to use the platform-level default.</p>
+              <div>
+                <Label className="text-xs">Agreement sentence</Label>
+                <Textarea value={purchaseTermsText} onChange={e => setPurchaseTermsText(e.target.value)} rows={2} className="mt-1 text-sm resize-none" placeholder="e.g. I have reviewed and agree to the" maxLength={1000} />
+                <p className="text-xs text-gray-400 mt-0.5">Text before the two links.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Link 1 label</Label>
+                  <Input value={purchaseTermsLinkText1} onChange={e => setPurchaseTermsLinkText1(e.target.value)} placeholder="e.g. Terms of Service" className="mt-1 text-sm" maxLength={255} />
+                </div>
+                <div>
+                  <Label className="text-xs">Link 1 URL</Label>
+                  <Input value={purchaseTermsLinkUrl1} onChange={e => setPurchaseTermsLinkUrl1(e.target.value)} placeholder="https://example.com/terms" className="mt-1 text-sm font-mono" maxLength={2048} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Link 2 label</Label>
+                  <Input value={purchaseTermsLinkText2} onChange={e => setPurchaseTermsLinkText2(e.target.value)} placeholder="e.g. Privacy Policy" className="mt-1 text-sm" maxLength={255} />
+                </div>
+                <div>
+                  <Label className="text-xs">Link 2 URL</Label>
+                  <Input value={purchaseTermsLinkUrl2} onChange={e => setPurchaseTermsLinkUrl2(e.target.value)} placeholder="https://example.com/privacy" className="mt-1 text-sm font-mono" maxLength={2048} />
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
+                disabled={updateMutation.isPending}
+                onClick={() => updateMutation.mutate({ id: workshopId, purchaseTermsText: purchaseTermsText.trim() || null, purchaseTermsLinkText1: purchaseTermsLinkText1.trim() || null, purchaseTermsLinkUrl1: purchaseTermsLinkUrl1.trim() || null, purchaseTermsLinkText2: purchaseTermsLinkText2.trim() || null, purchaseTermsLinkUrl2: purchaseTermsLinkUrl2.trim() || null })}
+              >
+                {updateMutation.isPending ? "Saving..." : "Save Purchase Terms"}
+              </Button>
             </CardContent>
           </Card>
 

@@ -540,6 +540,11 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [publishDomain, setPublishDomain] = useState("");
+  const [purchaseTermsText, setPurchaseTermsText] = useState("");
+  const [purchaseTermsLinkText1, setPurchaseTermsLinkText1] = useState("");
+  const [purchaseTermsLinkUrl1, setPurchaseTermsLinkUrl1] = useState("");
+  const [purchaseTermsLinkText2, setPurchaseTermsLinkText2] = useState("");
+  const [purchaseTermsLinkUrl2, setPurchaseTermsLinkUrl2] = useState("");
   const updateSettingsMut = trpc.downloadsAdmin.updateDownloadSettings.useMutation({
     onSuccess: () => toast.success("URL & SEO settings saved"),
     onError: (e) => toast.error(e.message),
@@ -574,6 +579,11 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
     setMetaTitle((product as any).metaTitle ?? "");
     setMetaDescription((product as any).metaDescription ?? "");
     setPublishDomain((product as any).publishDomain ?? "");
+    setPurchaseTermsText((product as any).purchaseTermsText ?? "");
+    setPurchaseTermsLinkText1((product as any).purchaseTermsLinkText1 ?? "");
+    setPurchaseTermsLinkUrl1((product as any).purchaseTermsLinkUrl1 ?? "");
+    setPurchaseTermsLinkText2((product as any).purchaseTermsLinkText2 ?? "");
+    setPurchaseTermsLinkUrl2((product as any).purchaseTermsLinkUrl2 ?? "");
   }
 
   const handleSave = () => {
@@ -794,9 +804,48 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               </div>
               <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
                 disabled={updateSettingsMut.isPending}
-                onClick={() => updateSettingsMut.mutate({ productId, slug: slug.trim() || product.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, publishDomain: publishDomain || null })}
+                onClick={() => updateSettingsMut.mutate({ productId, slug: slug.trim() || product.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, publishDomain: publishDomain || null, purchaseTermsText: purchaseTermsText.trim() || null, purchaseTermsLinkText1: purchaseTermsLinkText1.trim() || null, purchaseTermsLinkUrl1: purchaseTermsLinkUrl1.trim() || null, purchaseTermsLinkText2: purchaseTermsLinkText2.trim() || null, purchaseTermsLinkUrl2: purchaseTermsLinkUrl2.trim() || null })}
               >
                 {updateSettingsMut.isPending ? "Saving..." : "Save URL & SEO"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Purchase Terms Override */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm flex items-center gap-2"><span className="text-base">📋</span> Purchase Terms Override</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground">Override the checkout terms checkbox text for this download only. Leave all fields blank to use the platform-level default.</p>
+              <div>
+                <Label className="text-sm">Agreement sentence</Label>
+                <Textarea value={purchaseTermsText} onChange={e => setPurchaseTermsText(e.target.value)} placeholder="e.g. I have reviewed and agree to the" className="mt-1 resize-none h-16" maxLength={1000} />
+                <p className="text-xs text-muted-foreground mt-0.5">Text before the two links.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm">Link 1 label</Label>
+                  <Input value={purchaseTermsLinkText1} onChange={e => setPurchaseTermsLinkText1(e.target.value)} placeholder="e.g. Terms of Service" className="mt-1" maxLength={255} />
+                </div>
+                <div>
+                  <Label className="text-sm">Link 1 URL</Label>
+                  <Input value={purchaseTermsLinkUrl1} onChange={e => setPurchaseTermsLinkUrl1(e.target.value)} placeholder="https://example.com/terms" className="mt-1 font-mono text-xs" maxLength={2048} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm">Link 2 label</Label>
+                  <Input value={purchaseTermsLinkText2} onChange={e => setPurchaseTermsLinkText2(e.target.value)} placeholder="e.g. Privacy Policy" className="mt-1" maxLength={255} />
+                </div>
+                <div>
+                  <Label className="text-sm">Link 2 URL</Label>
+                  <Input value={purchaseTermsLinkUrl2} onChange={e => setPurchaseTermsLinkUrl2(e.target.value)} placeholder="https://example.com/privacy" className="mt-1 font-mono text-xs" maxLength={2048} />
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
+                disabled={updateSettingsMut.isPending}
+                onClick={() => updateSettingsMut.mutate({ productId, slug: slug.trim() || product.slug, purchaseTermsText: purchaseTermsText.trim() || null, purchaseTermsLinkText1: purchaseTermsLinkText1.trim() || null, purchaseTermsLinkUrl1: purchaseTermsLinkUrl1.trim() || null, purchaseTermsLinkText2: purchaseTermsLinkText2.trim() || null, purchaseTermsLinkUrl2: purchaseTermsLinkUrl2.trim() || null })}
+              >
+                {updateSettingsMut.isPending ? "Saving..." : "Save Purchase Terms"}
               </Button>
             </CardContent>
           </Card>

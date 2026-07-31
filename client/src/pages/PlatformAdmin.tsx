@@ -100,6 +100,7 @@ import {
   Bell,
   Radio,
   BookOpen,
+  FileText,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1349,6 +1350,154 @@ function TrackingPixelsPanel() {
   );
 }
 
+function CheckoutTermsPanel() {
+  const { data: terms, refetch } = trpc.siteSettings.getCheckoutTerms.useQuery();
+  const updateTerms = trpc.siteSettings.updateCheckoutTerms.useMutation({
+    onSuccess: () => {
+      toast.success("Checkout terms saved.");
+      refetch();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const [draft, setDraft] = useState({
+    termsText: "",
+    termsLink1Text: "",
+    termsLink1Url: "",
+    termsLink2Text: "",
+    termsLink2Url: "",
+  });
+  const [initialised, setInitialised] = useState(false);
+
+  useEffect(() => {
+    if (terms && !initialised) {
+      setDraft({
+        termsText: terms.termsText ?? "",
+        termsLink1Text: terms.termsLink1Text ?? "",
+        termsLink1Url: terms.termsLink1Url ?? "",
+        termsLink2Text: terms.termsLink2Text ?? "",
+        termsLink2Url: terms.termsLink2Url ?? "",
+      });
+      setInitialised(true);
+    }
+  }, [terms, initialised]);
+
+  const isDirty =
+    initialised &&
+    terms &&
+    (
+      draft.termsText !== (terms.termsText ?? "") ||
+      draft.termsLink1Text !== (terms.termsLink1Text ?? "") ||
+      draft.termsLink1Url !== (terms.termsLink1Url ?? "") ||
+      draft.termsLink2Text !== (terms.termsLink2Text ?? "") ||
+      draft.termsLink2Url !== (terms.termsLink2Url ?? "")
+    );
+
+  return (
+    <Card className="mb-6 border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-[#189aa1]" />
+          Checkout Terms Agreement Text
+        </CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Customise the checkbox text shown to customers during Stripe checkout. The sentence is followed by two linked labels (e.g. "Terms of Service" and "Privacy Policy"). Leave a field blank to use the built-in default.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-4">
+        {/* Terms sentence */}
+        <div>
+          <Label className="text-xs font-medium text-gray-700 mb-1 block">Agreement sentence</Label>
+          <Textarea
+            rows={2}
+            placeholder="e.g. I have reviewed and agree to the"
+            value={draft.termsText}
+            onChange={e => setDraft(prev => ({ ...prev, termsText: e.target.value }))}
+            className="text-sm resize-none"
+          />
+          <p className="text-xs text-gray-400 mt-1">This text appears before the two links.</p>
+        </div>
+        {/* Link 1 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs font-medium text-gray-700 mb-1 block">Link 1 label</Label>
+            <Input
+              placeholder="e.g. Terms of Service"
+              value={draft.termsLink1Text}
+              onChange={e => setDraft(prev => ({ ...prev, termsLink1Text: e.target.value }))}
+              className="text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-medium text-gray-700 mb-1 block">Link 1 URL</Label>
+            <Input
+              placeholder="https://example.com/terms"
+              value={draft.termsLink1Url}
+              onChange={e => setDraft(prev => ({ ...prev, termsLink1Url: e.target.value }))}
+              className="text-sm font-mono"
+            />
+          </div>
+        </div>
+        {/* Link 2 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs font-medium text-gray-700 mb-1 block">Link 2 label</Label>
+            <Input
+              placeholder="e.g. Privacy Policy"
+              value={draft.termsLink2Text}
+              onChange={e => setDraft(prev => ({ ...prev, termsLink2Text: e.target.value }))}
+              className="text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-medium text-gray-700 mb-1 block">Link 2 URL</Label>
+            <Input
+              placeholder="https://example.com/privacy"
+              value={draft.termsLink2Url}
+              onChange={e => setDraft(prev => ({ ...prev, termsLink2Url: e.target.value }))}
+              className="text-sm font-mono"
+            />
+          </div>
+        </div>
+        {/* Preview */}
+        <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+          <p className="text-xs text-gray-500 mb-1 font-medium">Preview</p>
+          <p className="text-sm text-gray-700">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded border border-gray-400 inline-block flex-shrink-0" />
+              {draft.termsText || "I have reviewed and agree to the"}{" "}
+              <a className="text-[#189aa1] underline" href={draft.termsLink1Url || "#"} target="_blank" rel="noreferrer">
+                {draft.termsLink1Text || "Terms of Service"}
+              </a>{" "}
+              and{" "}
+              <a className="text-[#189aa1] underline" href={draft.termsLink2Url || "#"} target="_blank" rel="noreferrer">
+                {draft.termsLink2Text || "Privacy Policy"}
+              </a>
+            </span>
+          </p>
+        </div>
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            disabled={!isDirty || updateTerms.isPending}
+            onClick={() => updateTerms.mutate({
+              termsText: draft.termsText || null,
+              termsLink1Text: draft.termsLink1Text || null,
+              termsLink1Url: draft.termsLink1Url || null,
+              termsLink2Text: draft.termsLink2Text || null,
+              termsLink2Url: draft.termsLink2Url || null,
+            })}
+            style={{ background: "#189aa1" }}
+            className="text-white"
+          >
+            {updateTerms.isPending ? "Saving…" : "Save Terms"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PlatformAdmin() {
   const { user, isAuthenticated, loading } = useAuth();
   const isIHE = isIHeartEchoDomain();
@@ -1866,6 +2015,9 @@ export default function PlatformAdmin() {
 
         {/* Tracking Pixels */}
         <TrackingPixelsPanel />
+
+        {/* Checkout Terms */}
+        <CheckoutTermsPanel />
 
         {/* Sync CME Courses */}
         <Card className="mb-6 border-0 shadow-sm">

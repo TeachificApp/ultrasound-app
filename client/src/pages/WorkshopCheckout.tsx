@@ -50,6 +50,11 @@ export default function WorkshopCheckout() {
     currency: string;
     termsUrl: string;
     privacyUrl: string;
+    checkoutTermsText: string;
+    checkoutTermsLink1Text: string;
+    checkoutTermsLink1Url: string;
+    checkoutTermsLink2Text: string;
+    checkoutTermsLink2Url: string;
     free: boolean;
   } | null>(null);
 
@@ -208,26 +213,18 @@ export default function WorkshopCheckout() {
                   style={termsAccepted ? { backgroundColor: primary, borderColor: primary } : {}}
                 />
                 <Label htmlFor="terms" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
-                  I have reviewed and agree to the{" "}
-                  <a
-                    href={sessionMeta.termsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium hover:underline"
-                    style={{ color: primary }}
-                  >
-                    Terms of Service
-                  </a>{" "}
-                  and{" "}
-                  <a
-                    href={sessionMeta.privacyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium hover:underline"
-                    style={{ color: primary }}
-                  >
-                    Privacy Policy
-                  </a>
+                  {sessionMeta.checkoutTermsText}{" "}
+                  {sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url && (
+                    <a href={sessionMeta.checkoutTermsLink1Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }}>
+                      {sessionMeta.checkoutTermsLink1Text}
+                    </a>
+                  )}
+                  {sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url && (
+                    <>{" "}and{" "}
+                    <a href={sessionMeta.checkoutTermsLink2Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }}>
+                      {sessionMeta.checkoutTermsLink2Text}
+                    </a></>
+                  )}
                   .
                 </Label>
               </div>

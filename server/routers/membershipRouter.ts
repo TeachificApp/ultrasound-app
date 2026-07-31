@@ -1,4 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
+import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "../_core/trpc";
 import { getDb } from "../db";
@@ -914,7 +915,8 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
       return { clientSecret: null, free: true, courseTitle: plan.title, courseSubtitle: null, courseDescription: plan.description ?? null, courseThumbnail: plan.coverImage ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: plan.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: plan.currency ?? "usd", minSeats: null, discountPercent: null };
     }
     const { platformSettings } = await import("../../drizzle/schema");
-    const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
+    const [settings] = await db.select().from(platformSettings).limit(1);
+    const memTerms = resolveCheckoutTerms(plan, settings);
     const stripe = getStripeClient();
     const validatePriceId2 = async (priceId: string | null | undefined): Promise<string | null> => { if (!priceId) return null; try { await stripe.prices.retrieve(priceId); return priceId; } catch (e: any) { if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) return null; throw e; } };
     const isRecurring = plan.billingInterval !== "one_time" && plan.billingInterval !== "lifetime";
@@ -994,8 +996,7 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
       gradientTo: "#4ad9e0",
       gradientDirection: "135deg",
       playerTheme: "light",
-      termsUrl: settings?.termsUrl ?? "",
-      privacyUrl: settings?.privacyUrl ?? "",
+      ...memTerms,
       productName: plan.title,
       displayPrice: Number(plan.price),
       pricingType: isRecurring ? "subscription" : "one_time",

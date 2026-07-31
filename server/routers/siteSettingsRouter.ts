@@ -1,52 +1,49 @@
 import { z } from "zod";
-import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
-import { siteSettings } from "../../drizzle/schema";
+import { siteSettings, platformSettings } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
-const ALLOWED_KEYS = [
-  "meta_pixel_id_aaus",
-  "meta_pixel_id_ihe",
-  "meta_pixel_id_learn",
-] as const;
+// ── Key-value helpers for site_settings table (used for pixel IDs) ───────────
 
-type SettingKey = (typeof ALLOWED_KEYS)[number];
-
-async function getSetting(key: SettingKey): Promise<string | null> {
+async function getSetting(key: string): Promise<string | null> {
   const db = await getDb();
   if (!db) return null;
   const [row] = await db
-    .select({ settingValue: siteSettings.settingValue })
+    .select({ value: siteSettings.settingValue })
     .from(siteSettings)
     .where(eq(siteSettings.settingKey, key))
     .limit(1);
-  return row?.settingValue ?? null;
+  return row?.value ?? null;
 }
 
-async function upsertSetting(key: SettingKey, value: string | null, userId: number) {
+async function upsertSetting(key: string, value: string | null, userId: number): Promise<void> {
   const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  await db
-    .insert(siteSettings)
-    .values({ settingKey: key, settingValue: value, updatedAt: Date.now(), updatedBy: userId })
-    .onDuplicateKeyUpdate({
-      set: { settingValue: value, updatedAt: Date.now(), updatedBy: userId },
-    });
+  if (!db) return;
+  const now = Date.now();
+  if (value === null || value === "") {
+    await db.delete(siteSettings).where(eq(siteSettings.settingKey, key));
+  } else {
+    await db
+      .insert(siteSettings)
+      .values({ settingKey: key, settingValue: value, updatedAt: now, updatedBy: userId })
+      .onDuplicateKeyUpdate({ set: { settingValue: value, updatedAt: now, updatedBy: userId } });
+  }
 }
 
 export const siteSettingsRouter = router({
-  /** Public: fetch all pixel IDs so the frontend can inject the right one */
+  /** Public: get pixel IDs for tracking */
   getPixelIds: publicProcedure.query(async () => {
     const [aaus, ihe, learn] = await Promise.all([
-      getSetting("meta_pixel_id_aaus"),
-      getSetting("meta_pixel_id_ihe"),
-      getSetting("meta_pixel_id_learn"),
+      getSetting("meta_pixel_aaus"),
+      getSetting("meta_pixel_ihe"),
+      getSetting("meta_pixel_learn"),
     ]);
     return { aaus, ihe, learn };
   }),
 
-  /** Admin: update a single pixel ID (pass null to clear) */
+  /** Admin: update a pixel ID for a brand */
   updatePixelId: protectedProcedure
     .input(
       z.object({
@@ -58,8 +55,83 @@ export const siteSettingsRouter = router({
       if (ctx.user.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
-      const key = `meta_pixel_id_${input.brand}` as SettingKey;
-      await upsertSetting(key, input.pixelId || null, ctx.user.id);
+      await upsertSetting(`meta_pixel_${input.brand}`, input.pixelId, ctx.user.id);
+      return { success: true };
+    }),
+
+  /** Public: get site-level checkout terms defaults (used as fallback in all checkout flows) */
+  getCheckoutTerms: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) {
+      return {
+        termsText: "I have reviewed and agree to the",
+        termsLink1Text: "Terms of Service",
+        termsLink1Url: "",
+        termsLink2Text: "Privacy Policy",
+        termsLink2Url: "",
+      };
+    }
+    const [row] = await db
+      .select({
+        checkoutTermsText: platformSettings.checkoutTermsText,
+        checkoutTermsLinkText1: platformSettings.checkoutTermsLinkText1,
+        checkoutTermsLinkUrl1: platformSettings.checkoutTermsLinkUrl1,
+        checkoutTermsLinkText2: platformSettings.checkoutTermsLinkText2,
+        checkoutTermsLinkUrl2: platformSettings.checkoutTermsLinkUrl2,
+        termsUrl: platformSettings.termsUrl,
+        privacyUrl: platformSettings.privacyUrl,
+      })
+      .from(platformSettings)
+      .where(eq(platformSettings.id, 1))
+      .limit(1);
+
+    return {
+      termsText: row?.checkoutTermsText ?? "I have reviewed and agree to the",
+      termsLink1Text: row?.checkoutTermsLinkText1 ?? "Terms of Service",
+      termsLink1Url: row?.checkoutTermsLinkUrl1 ?? row?.termsUrl ?? "",
+      termsLink2Text: row?.checkoutTermsLinkText2 ?? "Privacy Policy",
+      termsLink2Url: row?.checkoutTermsLinkUrl2 ?? row?.privacyUrl ?? "",
+    };
+  }),
+
+  /** Admin: update site-level checkout terms defaults */
+  updateCheckoutTerms: protectedProcedure
+    .input(
+      z.object({
+        termsText: z.string().max(1000).nullable(),
+        termsLink1Text: z.string().max(255).nullable(),
+        termsLink1Url: z.string().max(2048).nullable(),
+        termsLink2Text: z.string().max(255).nullable(),
+        termsLink2Url: z.string().max(2048).nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      await db
+        .insert(platformSettings)
+        .values({
+          id: 1,
+          checkoutTermsText: input.termsText ?? undefined,
+          checkoutTermsLinkText1: input.termsLink1Text ?? undefined,
+          checkoutTermsLinkUrl1: input.termsLink1Url ?? undefined,
+          checkoutTermsLinkText2: input.termsLink2Text ?? undefined,
+          checkoutTermsLinkUrl2: input.termsLink2Url ?? undefined,
+        })
+        .onDuplicateKeyUpdate({
+          set: {
+            checkoutTermsText: input.termsText ?? undefined,
+            checkoutTermsLinkText1: input.termsLink1Text ?? undefined,
+            checkoutTermsLinkUrl1: input.termsLink1Url ?? undefined,
+            checkoutTermsLinkText2: input.termsLink2Text ?? undefined,
+            checkoutTermsLinkUrl2: input.termsLink2Url ?? undefined,
+          },
+        });
+
       return { success: true };
     }),
 });

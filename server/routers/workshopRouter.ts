@@ -1,4 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
+import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, like, lte, or, sql, isNull } from "drizzle-orm";
@@ -547,10 +548,8 @@ export const workshopLearnerRouter = router({
           : Math.round(Number(workshop.price));
 
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db
-        .select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl })
-        .from(platformSettings)
-        .limit(1);
+      const [settings] = await db.select().from(platformSettings).limit(1);
+      const workshopTerms = resolveCheckoutTerms(workshop, settings);
 
       if (priceInCents === 0 || workshop.isFree) {
         // Free enrollment — only if user is logged in
@@ -577,8 +576,7 @@ export const workshopLearnerRouter = router({
           productName: `${workshop.title} — ${instance.title}`,
           displayPrice: 0,
           currency: workshop.currency,
-          termsUrl: settings?.termsUrl ?? "",
-          privacyUrl: settings?.privacyUrl ?? "",
+          ...workshopTerms,
         };
       }
 
@@ -640,8 +638,7 @@ export const workshopLearnerRouter = router({
         productName: `${workshop.title} — ${instanceTitle}`,
         displayPrice: Math.round(priceInCents / 100),
         currency: workshop.currency,
-        termsUrl: settings?.termsUrl ?? "",
-        privacyUrl: settings?.privacyUrl ?? "",
+        ...workshopTerms,
       };
     }),
 
@@ -863,6 +860,11 @@ export const workshopAdminRouter = router({
         publishDomain: z.string().nullish(),
         afterPurchaseWorkflow: z.string().nullish(),
         checkoutPageConfig: z.string().nullish(),
+        purchaseTermsText: z.string().max(2000).nullish(),
+        purchaseTermsLinkText1: z.string().max(255).nullish(),
+        purchaseTermsLinkUrl1: z.string().max(2048).nullish(),
+        purchaseTermsLinkText2: z.string().max(255).nullish(),
+        purchaseTermsLinkUrl2: z.string().max(2048).nullish(),
       })
     )
     .mutation(async ({ input }) => {

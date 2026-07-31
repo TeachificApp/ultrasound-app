@@ -1,4 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
+import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 /**
  * webinarRouter.ts — Live & prerecorded webinars with discussions
  */
@@ -209,6 +210,11 @@ export const webinarAdminRouter = router({
       slug: z.string().optional(),
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),
+      purchaseTermsText: z.string().max(2000).nullable().optional(),
+      purchaseTermsLinkText1: z.string().max(255).nullable().optional(),
+      purchaseTermsLinkUrl1: z.string().max(2048).nullable().optional(),
+      purchaseTermsLinkText2: z.string().max(255).nullable().optional(),
+      purchaseTermsLinkUrl2: z.string().max(2048).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -405,7 +411,8 @@ export const webinarSessionRouter = router({
         return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: subtitle, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: null, brand: webinar.brand ?? "all_about_ultrasound" };
       }
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
+      const [settings] = await db.select().from(platformSettings).limit(1);
+      const webTerms = resolveCheckoutTerms(webinar, settings);
       const stripe = getStripeClient();
       // ── 100% promo intercept for webinars ────────────────────────────────
       if (input.promoCode) {
@@ -464,8 +471,7 @@ export const webinarSessionRouter = router({
         gradientTo: "#4ad9e0",
         gradientDirection: "135deg",
         playerTheme: "light",
-        termsUrl: settings?.termsUrl ?? "",
-        privacyUrl: settings?.privacyUrl ?? "",
+        ...webTerms,
         productName: webinar.title,
         displayPrice: priceCents,
         pricingType: "one_time",

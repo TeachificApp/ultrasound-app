@@ -1828,6 +1828,12 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
   const [gradientEnd, setGradientEnd] = useState(course.gradientTo ?? "");
   const [gradientDirection, setGradientDirection] = useState(course.gradientDirection ?? "to right");
   const [useGradient, setUseGradient] = useState(!!(course.gradientFrom && course.gradientTo));
+  // Purchase terms override
+  const [purchaseTermsText, setPurchaseTermsText] = useState<string>((course as any).purchaseTermsText ?? "");
+  const [purchaseTermsLinkText1, setPurchaseTermsLinkText1] = useState<string>((course as any).purchaseTermsLinkText1 ?? "");
+  const [purchaseTermsLinkUrl1, setPurchaseTermsLinkUrl1] = useState<string>((course as any).purchaseTermsLinkUrl1 ?? "");
+  const [purchaseTermsLinkText2, setPurchaseTermsLinkText2] = useState<string>((course as any).purchaseTermsLinkText2 ?? "");
+  const [purchaseTermsLinkUrl2, setPurchaseTermsLinkUrl2] = useState<string>((course as any).purchaseTermsLinkUrl2 ?? "");
   const updateCourseSettings = trpc.lmsGroup.updateCourseSettings.useMutation({
     onSuccess: () => toast.success("URL & SEO settings saved"),
     onError: (e) => toast.error(e.message),
@@ -2343,10 +2349,43 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
         </div>
         <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
           disabled={updateCourseSettings.isPending}
-          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, certificateTemplateId, creditHours: creditHours.trim() || null, certificateTitleOverride: certificateTitleOverride.trim() || null, isFeatured, publishDomain: publishDomain || null })}
+          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, certificateTemplateId, creditHours: creditHours.trim() || null, certificateTitleOverride: certificateTitleOverride.trim() || null, isFeatured, publishDomain: publishDomain || null, purchaseTermsText: purchaseTermsText.trim() || null, purchaseTermsLinkText1: purchaseTermsLinkText1.trim() || null, purchaseTermsLinkUrl1: purchaseTermsLinkUrl1.trim() || null, purchaseTermsLinkText2: purchaseTermsLinkText2.trim() || null, purchaseTermsLinkUrl2: purchaseTermsLinkUrl2.trim() || null })}
         >
           {updateCourseSettings.isPending ? "Saving..." : "Save URL & SEO"}
         </Button>
+      </div>
+
+      {/* Purchase Terms Override */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <span className="text-base">📋</span> Purchase Terms Override
+        </h3>
+        <p className="text-xs text-gray-500">Override the checkout terms checkbox text for this course only. Leave all fields blank to use the platform-level default.</p>
+        <div>
+          <Label className="text-sm">Agreement sentence</Label>
+          <textarea value={purchaseTermsText} onChange={e => setPurchaseTermsText(e.target.value)} placeholder="e.g. I have reviewed and agree to the" className="mt-1 w-full text-sm border border-gray-200 rounded-md p-2 resize-none h-16 focus:outline-none focus:ring-2 focus:ring-teal-500" maxLength={1000} />
+          <p className="text-xs text-gray-400 mt-0.5">Text before the two links.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-sm">Link 1 label</Label>
+            <Input value={purchaseTermsLinkText1} onChange={e => setPurchaseTermsLinkText1(e.target.value)} placeholder="e.g. Terms of Service" className="mt-1" maxLength={255} />
+          </div>
+          <div>
+            <Label className="text-sm">Link 1 URL</Label>
+            <Input value={purchaseTermsLinkUrl1} onChange={e => setPurchaseTermsLinkUrl1(e.target.value)} placeholder="https://example.com/terms" className="mt-1 font-mono text-xs" maxLength={2048} />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-sm">Link 2 label</Label>
+            <Input value={purchaseTermsLinkText2} onChange={e => setPurchaseTermsLinkText2(e.target.value)} placeholder="e.g. Privacy Policy" className="mt-1" maxLength={255} />
+          </div>
+          <div>
+            <Label className="text-sm">Link 2 URL</Label>
+            <Input value={purchaseTermsLinkUrl2} onChange={e => setPurchaseTermsLinkUrl2(e.target.value)} placeholder="https://example.com/privacy" className="mt-1 font-mono text-xs" maxLength={2048} />
+          </div>
+        </div>
       </div>
 
       {/* Enrollment Email Toggle */}

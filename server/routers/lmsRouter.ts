@@ -34,6 +34,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
+import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
@@ -3481,10 +3482,8 @@ export const lmsLearnerRouter = router({
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
       if (course.status === "draft" || course.status === "archived") throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Fetch org-level legal URLs from platform_settings
-      const [orgSettings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
-      const termsUrl = orgSettings?.termsUrl ?? "https://www.allaboutultrasound.com/terms";
-      const privacyUrl = orgSettings?.privacyUrl ?? "https://www.allaboutultrasound.com/privacy-policy.html";
+      // Fetch org-level legal URLs and checkout terms from platform_settings
+      const [orgSettings] = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
 
       const stripe = getStripeClient();
 
@@ -3569,6 +3568,7 @@ export const lmsLearnerRouter = router({
           metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: String(requestedSeats), ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
           payment_intent_data: { description: `${course.title} — Team License — ${requestedSeats} seats` },
         });
+        const terms0 = resolveCheckoutTerms(course, orgSettings);
         return {
           clientSecret: session.client_secret!,
           courseTitle: course.title,
@@ -3581,8 +3581,7 @@ export const lmsLearnerRouter = router({
           gradientTo: course.gradientTo ?? "#0d9488",
           gradientDirection: course.gradientDirection ?? "135deg",
           playerTheme: course.playerTheme ?? "light",
-          termsUrl,
-          privacyUrl,
+          ...terms0,
           productName,
           displayPrice,
           pricingType,
@@ -3650,6 +3649,7 @@ export const lmsLearnerRouter = router({
             ? { payment_intent_data: { description: `${course.title} — One-Time Purchase` } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
         });
+        const terms1 = resolveCheckoutTerms(course, orgSettings);
         return {
           clientSecret: session.client_secret!,
           courseTitle: course.title,
@@ -3662,8 +3662,7 @@ export const lmsLearnerRouter = router({
           gradientTo: course.gradientTo ?? "#0d9488",
           gradientDirection: course.gradientDirection ?? "135deg",
           playerTheme: course.playerTheme ?? "light",
-          termsUrl,
-          privacyUrl,
+          ...terms1,
           productName,
           displayPrice,
           pricingType,
@@ -3731,6 +3730,7 @@ export const lmsLearnerRouter = router({
             ? { payment_intent_data: { description: `${course.title} — One-Time Purchase` } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
       });
+      const terms2 = resolveCheckoutTerms(course, orgSettings);
       return {
         clientSecret: session.client_secret!,
         courseTitle: course.title,
@@ -3743,8 +3743,7 @@ export const lmsLearnerRouter = router({
         gradientTo: course.gradientTo ?? "#0d9488",
         gradientDirection: course.gradientDirection ?? "135deg",
         playerTheme: course.playerTheme ?? "light",
-        termsUrl,
-        privacyUrl,
+        ...terms2,
         productName: course.title,
         displayPrice,
         pricingType,
@@ -4251,6 +4250,12 @@ export const lmsGroupRouter = router({
       isDrip: z.boolean().optional(),
       accessDurationDays: z.number().int().positive().nullable().optional(),
       publishDomain: z.string().max(255).nullable().optional(),
+      purchaseTermsText: z.string().max(2000).nullable().optional(),
+      purchaseTermsLinkText1: z.string().max(255).nullable().optional(),
+      purchaseTermsLinkUrl1: z.string().max(2048).nullable().optional(),
+      purchaseTermsLinkText2: z.string().max(255).nullable().optional(),
+      purchaseTermsLinkUrl2: z.string().max(2048).nullable().optional(),
+      certificateTitleOverride: z.string().max(512).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

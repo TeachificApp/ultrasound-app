@@ -398,6 +398,11 @@ export default function Checkout() {
     playerTheme: string;
     termsUrl: string;
     privacyUrl: string;
+    checkoutTermsText: string;
+    checkoutTermsLink1Text: string;
+    checkoutTermsLink1Url: string;
+    checkoutTermsLink2Text: string;
+    checkoutTermsLink2Url: string;
     productName: string;
     displayPrice: number;
     pricingType: string;
@@ -784,26 +789,30 @@ export default function Checkout() {
                   htmlFor="terms"
                   className={`text-sm leading-relaxed cursor-pointer ${isDark ? "text-gray-300" : "text-gray-700"}`}
                 >
-                  I have reviewed and agree to the{" "}
-                  <a
-                    href={sessionMeta.termsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium hover:underline"
-                    style={linkStyle}
-                  >
-                    Terms of Service
-                  </a>{" "}
-                  and{" "}
-                  <a
-                    href={sessionMeta.privacyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium hover:underline"
-                    style={linkStyle}
-                  >
-                    Privacy Policy
-                  </a>
+                  {sessionMeta.checkoutTermsText}{" "}
+                  {sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url && (
+                    <a
+                      href={sessionMeta.checkoutTermsLink1Url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium hover:underline"
+                      style={linkStyle}
+                    >
+                      {sessionMeta.checkoutTermsLink1Text}
+                    </a>
+                  )}
+                  {sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url && (
+                    <>{" "}and{" "}
+                    <a
+                      href={sessionMeta.checkoutTermsLink2Url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium hover:underline"
+                      style={linkStyle}
+                    >
+                      {sessionMeta.checkoutTermsLink2Text}
+                    </a></>
+                  )}
                   .
                 </Label>
               </div>

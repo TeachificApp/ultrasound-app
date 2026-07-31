@@ -230,6 +230,11 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [coverImage, setCoverImage] = useState("");
+  const [purchaseTermsText, setPurchaseTermsText] = useState("");
+  const [purchaseTermsLinkText1, setPurchaseTermsLinkText1] = useState("");
+  const [purchaseTermsLinkUrl1, setPurchaseTermsLinkUrl1] = useState("");
+  const [purchaseTermsLinkText2, setPurchaseTermsLinkText2] = useState("");
+  const [purchaseTermsLinkUrl2, setPurchaseTermsLinkUrl2] = useState("");
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
   // AI viewers
@@ -269,6 +274,11 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
     setAiViewersMin(webinar.aiViewersMin ?? 50);
     setAiViewersMax(webinar.aiViewersMax ?? 300);
     setAiViewersPeakAt(webinar.aiViewersPeakAt ?? 30);
+    setPurchaseTermsText((webinar as any).purchaseTermsText ?? "");
+    setPurchaseTermsLinkText1((webinar as any).purchaseTermsLinkText1 ?? "");
+    setPurchaseTermsLinkUrl1((webinar as any).purchaseTermsLinkUrl1 ?? "");
+    setPurchaseTermsLinkText2((webinar as any).purchaseTermsLinkText2 ?? "");
+    setPurchaseTermsLinkUrl2((webinar as any).purchaseTermsLinkUrl2 ?? "");
   }, [webinar]);
 
   const updateMutation = trpc.webinarAdmin.update.useMutation({
@@ -549,6 +559,45 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
                 <Label className="text-xs font-medium text-gray-600">Meta Description <span className="text-gray-400 font-normal">(SEO)</span></Label>
                 <Textarea value={metaDescription} onChange={e => setMetaDescription(e.target.value)} rows={2} className="mt-1 text-sm resize-none" placeholder="Brief description for search engines" />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Purchase Terms Override */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">📋 Purchase Terms Override</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">Override the checkout terms checkbox text for this webinar only. Leave all fields blank to use the platform-level default.</p>
+              <div>
+                <Label className="text-xs font-medium text-gray-600">Agreement sentence</Label>
+                <Textarea value={purchaseTermsText} onChange={e => setPurchaseTermsText(e.target.value)} rows={2} className="mt-1 text-sm resize-none" placeholder="e.g. I have reviewed and agree to the" maxLength={1000} />
+                <p className="text-xs text-gray-400 mt-0.5">Text before the two links.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Link 1 label</Label>
+                  <Input value={purchaseTermsLinkText1} onChange={e => setPurchaseTermsLinkText1(e.target.value)} placeholder="e.g. Terms of Service" className="mt-1 text-sm" maxLength={255} />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Link 1 URL</Label>
+                  <Input value={purchaseTermsLinkUrl1} onChange={e => setPurchaseTermsLinkUrl1(e.target.value)} placeholder="https://example.com/terms" className="mt-1 text-sm font-mono" maxLength={2048} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Link 2 label</Label>
+                  <Input value={purchaseTermsLinkText2} onChange={e => setPurchaseTermsLinkText2(e.target.value)} placeholder="e.g. Privacy Policy" className="mt-1 text-sm" maxLength={255} />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Link 2 URL</Label>
+                  <Input value={purchaseTermsLinkUrl2} onChange={e => setPurchaseTermsLinkUrl2(e.target.value)} placeholder="https://example.com/privacy" className="mt-1 text-sm font-mono" maxLength={2048} />
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
+                disabled={updateMutation.isPending}
+                onClick={() => updateMutation.mutate({ id: webinarId, purchaseTermsText: purchaseTermsText.trim() || undefined, purchaseTermsLinkText1: purchaseTermsLinkText1.trim() || undefined, purchaseTermsLinkUrl1: purchaseTermsLinkUrl1.trim() || undefined, purchaseTermsLinkText2: purchaseTermsLinkText2.trim() || undefined, purchaseTermsLinkUrl2: purchaseTermsLinkUrl2.trim() || undefined })}
+              >
+                {updateMutation.isPending ? "Saving..." : "Save Purchase Terms"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,4 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
+import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, sql, asc, or, like, gte, lte, count } from "drizzle-orm";
@@ -610,7 +611,8 @@ export const downloadsLearnerRouter = router({
         if (existing) throw new TRPCError({ code: "CONFLICT", message: "You already own this product." });
       }
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
+      const [settings] = await db.select().from(platformSettings).limit(1);
+      const dlTerms = resolveCheckoutTerms(product, settings);
       const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
@@ -647,8 +649,7 @@ export const downloadsLearnerRouter = router({
         gradientTo: "#4ad9e0",
         gradientDirection: "135deg",
         playerTheme: "light",
-        termsUrl: settings?.termsUrl ?? "",
-        privacyUrl: settings?.privacyUrl ?? "",
+        ...dlTerms,
         productName: product.title,
         displayPrice: Math.round(Number(product.price)),
         pricingType: "one_time",
@@ -1537,6 +1538,11 @@ export const downloadsAdminRouter = router({
       metaDescription: z.string().max(500).optional(),
       status: z.enum(["draft", "published", "hidden", "private", "archived"]).optional(),
       publishDomain: z.string().max(255).nullable().optional(),
+      purchaseTermsText: z.string().max(2000).nullable().optional(),
+      purchaseTermsLinkText1: z.string().max(255).nullable().optional(),
+      purchaseTermsLinkUrl1: z.string().max(2048).nullable().optional(),
+      purchaseTermsLinkText2: z.string().max(255).nullable().optional(),
+      purchaseTermsLinkUrl2: z.string().max(2048).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -2089,7 +2095,8 @@ Make ALL content specific and compelling based on the product title and descript
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You already own this product." });
       // Fetch platform settings for terms/privacy URLs
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select({ termsUrl: platformSettings.termsUrl, privacyUrl: platformSettings.privacyUrl }).from(platformSettings).limit(1);
+      const [settings] = await db.select().from(platformSettings).limit(1);
+      const dl2Terms = resolveCheckoutTerms(product, settings);
       const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
@@ -2126,8 +2133,7 @@ Make ALL content specific and compelling based on the product title and descript
         gradientTo: "#4ad9e0",
         gradientDirection: "135deg",
         playerTheme: "light",
-        termsUrl: settings?.termsUrl ?? "",
-        privacyUrl: settings?.privacyUrl ?? "",
+        ...dl2Terms,
         productName: product.title,
         displayPrice: Math.round(Number(product.price)),
         pricingType: "one_time",
