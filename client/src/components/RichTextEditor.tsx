@@ -158,6 +158,8 @@ import {
   EyeOff,
   Eye,
   Pipette,
+  Loader2,
+  ClipboardPaste,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
@@ -646,6 +648,7 @@ export default function RichTextEditor({
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
+  const [smartPasting, setSmartPasting] = useState(false);
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
@@ -1422,6 +1425,41 @@ export default function RichTextEditor({
             }}
           >
             <span className="font-serif font-bold text-xs leading-none select-none" style={{ fontFamily: 'Georgia, serif', letterSpacing: '-0.5px' }}>∑</span>
+          </ToolbarBtn>
+
+          {/* Smart Paste (LLM math reconstruction) */}
+          <ToolbarBtn
+            title="Smart Paste — paste ChatGPT content with equations and auto-reconstruct math formatting"
+            active={false}
+            onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText();
+                if (!text.trim()) { toast.info("Clipboard is empty"); return; }
+                setSmartPasting(true);
+                toast.info("Reconstructing equations…");
+                const res = await fetch("/api/reconstruct-math", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ text }),
+                });
+                if (!res.ok) {
+                  const err = await res.json().catch(() => ({}));
+                  throw new Error(err.error || `Server error ${res.status}`);
+                }
+                const { html } = await res.json();
+                editorRef.current?.chain().focus().insertContent(html).run();
+                toast.success("Equations reconstructed and inserted");
+              } catch (err: any) {
+                toast.error(`Smart Paste failed: ${err.message}`);
+              } finally {
+                setSmartPasting(false);
+              }
+            }}
+          >
+            {smartPasting
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <ClipboardPaste className="w-3.5 h-3.5" />}
           </ToolbarBtn>
 
           <Sep />

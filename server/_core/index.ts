@@ -19,6 +19,7 @@ import { registerMediaServeRoutes } from "../routes/mediaServe";
 import { registerUploadMediaRepoRoute } from "../routes/uploadMediaRepo";
 import { registerUploadCourseImageRoute } from "../routes/uploadCourseImage";
 import { registerProcessRichTextHtmlRoute } from "../routes/processRichTextHtml";
+import { registerReconstructMathRoute } from "../routes/reconstructMath";
 import { registerUploadQuizBankFileRoute } from "../routes/uploadQuizBankFile";
 import quizImportRouter from "../quizImportRoutes";
 import { registerUploadDigitalFileRoute } from "../routes/uploadDigitalFile";
@@ -242,6 +243,7 @@ async function startServer() {
   // Course/landing-page image upload (multipart, bypasses JSON body limit)
   registerUploadCourseImageRoute(app);
   registerProcessRichTextHtmlRoute(app);
+  registerReconstructMathRoute(app);
   // Quiz bank direct file upload (SCORM .quiz, CSV, XLSX — bypasses media library)
   registerUploadQuizBankFileRoute(app);
   // Quiz bank import REST routes (preview, confirm-native, csv-template, xlsx template)
