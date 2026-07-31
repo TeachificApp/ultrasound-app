@@ -698,12 +698,43 @@ export default function RichTextEditor({
         try {
           const parser = new DOMParser();
           const doc = parser.parseFromString(html, "text/html");
+
+          // ── Convert ChatGPT / Wikipedia MathML to TipTap math nodes ──────────
+          // ChatGPT wraps each equation in <span class="math"> or similar, with
+          // a <math> element that contains <annotation encoding="application/x-tex">
+          // holding the raw LaTeX.  We replace the whole math container with a
+          // TipTap-compatible node that the Mathematics extension can parse.
+          doc.body.querySelectorAll<HTMLElement>("math").forEach((mathEl) => {
+            const annotation = mathEl.querySelector('annotation[encoding="application/x-tex"]');
+            const latex = annotation?.textContent?.trim() ?? "";
+            if (!latex) return;
+
+            // Determine display mode: MathML uses display="block" for block equations
+            const isBlock = mathEl.getAttribute("display") === "block" ||
+              mathEl.closest(".math-display, .katex-display, [data-display='block']") !== null;
+
+            // Build the replacement element that the Mathematics extension parses
+            const replacement = isBlock
+              ? Object.assign(doc.createElement("div"), {
+                  dataset: { type: "block-math", latex },
+                })
+              : Object.assign(doc.createElement("span"), {
+                  dataset: { type: "inline-math", latex },
+                });
+            replacement.setAttribute("data-type", isBlock ? "block-math" : "inline-math");
+            replacement.setAttribute("data-latex", latex);
+
+            // Replace the outermost math container (could be wrapped in a <span class="math">)
+            const container = mathEl.closest(".math, .math-inline, .math-display") ?? mathEl;
+            container.replaceWith(replacement);
+          });
+
+          // ── Strip non-standard attributes from other editors ──────────────────
           const nonStandardAttrs = [
             "containerstyle", "wrapperstyle", "containerStyle", "wrapperStyle",
           ];
           doc.body.querySelectorAll("*").forEach((el) => {
             nonStandardAttrs.forEach((attr) => el.removeAttribute(attr));
-            // Remove any data-mce-* or data-stringify-* attributes from MCE/other editors
             Array.from(el.attributes).forEach((a) => {
               if (
                 a.name.startsWith("data-mce") ||
@@ -714,6 +745,7 @@ export default function RichTextEditor({
               }
             });
           });
+
           return doc.body.innerHTML;
         } catch {
           return html;
@@ -1869,18 +1901,23 @@ export function RichTextDisplay({
   const resolvedHtml = html ?? content ?? "";
   const ref = React.useRef<HTMLDivElement>(null);
 
-  // After mount / update, re-render any KaTeX math nodes that TipTap serialised
-  // as <span class="math-node">…</span> or <div class="math-node math-block">…</div>
+  // After mount / update, re-render any KaTeX math nodes that TipTap serialised.
+  // The Mathematics extension serialises block math as:
+  //   <div data-type="block-math" data-latex="..."></div>
+  // and inline math as:
+  //   <span data-type="inline-math" data-latex="..."></span>
   React.useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.querySelectorAll<HTMLElement>(".math-node").forEach((node) => {
-      const latex = node.textContent ?? "";
-      const isBlock = node.classList.contains("math-block");
+    el.querySelectorAll<HTMLElement>('[data-type="block-math"], [data-type="inline-math"]').forEach((node) => {
+      const latex = node.getAttribute("data-latex") ?? node.textContent ?? "";
+      if (!latex) return;
+      const isBlock = node.getAttribute("data-type") === "block-math";
       try {
         katex.render(latex, node, { displayMode: isBlock, throwOnError: false, output: "html" });
       } catch {
-        // leave as-is if KaTeX can't parse it
+        // leave raw LaTeX if KaTeX can't parse it
+        node.textContent = latex;
       }
     });
   }, [resolvedHtml]);
@@ -1913,6 +1950,9 @@ export function RichTextDisplay({
         "[&_th]:border [&_th]:border-gray-300 [&_th]:bg-teal-50 [&_th]:px-3 [&_th]:py-2 [&_th]:font-semibold [&_th]:text-left [&_th]:text-teal-800",
         "[&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top",
         "[&_tr:nth-child(even)_td]:bg-gray-50",
+        // Math node display styles for KaTeX-rendered content
+        "[&_[data-type='block-math']]:block [&_[data-type='block-math']]:text-center [&_[data-type='block-math']]:my-3 [&_[data-type='block-math']]:overflow-x-auto",
+        "[&_[data-type='inline-math']]:inline",
         className,
       )}
       dangerouslySetInnerHTML={{ __html: resolvedHtml }}
