@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { MathContent } from "@/components/MathContent";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 
 import LessonCommentSection from "@/components/LessonCommentSection";
@@ -975,7 +976,7 @@ function PlayerSidebarBlock({ block, primaryColor }: { block: any; primaryColor:
   const d = block.data ?? {};
   switch (block.type) {
     case "text":
-      return <div className="text-[11px] text-gray-700 leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: d.html ?? d.content ?? "" }} />;
+      return <MathContent html={d.html ?? d.content ?? ""} className="text-[11px] text-gray-700 leading-relaxed prose prose-sm max-w-none" />;
     case "image":
       return d.url ? (
         <div className="rounded-lg overflow-hidden">
@@ -2308,14 +2309,14 @@ export default function CoursePlayer() {
                   {/* ── Text below video (video_text) — only show if no content blocks override ── */}
                   {lessonData.type === "video_text" && lessonData.videoContent && contentBlocks.length === 0 && (
                     <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5">
-                      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.videoContent }} />
+                      <MathContent html={lessonData.videoContent} className="prose prose-sm max-w-none" />
                     </div>
                   )}
 
                   {/* ── Text lesson — only show if no content blocks override ── */}
                   {lessonData.type === "text" && lessonData.content && contentBlocks.length === 0 && (
                     <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5">
-                      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.content }} />
+                      <MathContent html={lessonData.content} className="prose prose-sm max-w-none" />
                     </div>
                   )}
 
