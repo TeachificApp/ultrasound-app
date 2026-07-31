@@ -642,12 +642,12 @@ textarea,
 }
 
 /* ── KaTeX Math Node Rendering ─────────────────────────────────────────────── */
-/* Block (display) math: centered, scrollable for wide equations */
+/* Block (display) math: centered, full-width, no scrollbars */
 [data-type="block-math"] {
   display: block;
   text-align: center;
   margin: 1rem 0;
-  overflow-x: auto;
+  overflow: visible;
 }
 /* Inline math: stays inline with surrounding text */
 [data-type="inline-math"] {

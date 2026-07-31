@@ -233,9 +233,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             <MathContent
               html={d.html ?? ""}
               className="prose"
-              style={{
-                // Ensure block-math nodes are centered and scrollable
-              }}
+              style={{}}
             />
           </CC>
         </div>

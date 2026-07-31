@@ -1994,7 +1994,7 @@ export function RichTextDisplay({
         "[&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top",
         "[&_tr:nth-child(even)_td]:bg-gray-50",
         // Math node display styles for KaTeX-rendered content
-        "[&_[data-type='block-math']]:block [&_[data-type='block-math']]:text-center [&_[data-type='block-math']]:my-3 [&_[data-type='block-math']]:overflow-x-auto",
+        "[&_[data-type='block-math']]:block [&_[data-type='block-math']]:text-center [&_[data-type='block-math']]:my-3 [&_[data-type='block-math']]:overflow-visible",
         "[&_[data-type='inline-math']]:inline",
         className,
       )}
