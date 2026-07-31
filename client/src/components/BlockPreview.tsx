@@ -17,6 +17,7 @@ import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
+import { RichTextDisplay } from "@/components/RichTextEditor";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
@@ -228,7 +229,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}>
-          <CC style={{ textAlign: d.align ?? "left" }}><div className="prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} /></CC>
+          <CC style={{ textAlign: d.align ?? "left" }}>
+            <RichTextDisplay html={d.html ?? ""} className="prose" />
+          </CC>
         </div>
       );
     case "image": {

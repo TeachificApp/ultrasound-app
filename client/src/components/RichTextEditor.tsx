@@ -1429,7 +1429,7 @@ export default function RichTextEditor({
 
           {/* Smart Paste (LLM math reconstruction) */}
           <ToolbarBtn
-            title="Smart Paste — paste ChatGPT content with equations and auto-reconstruct math formatting"
+            title="Smart Paste — paste content with equations and auto-reconstruct math formatting"
             active={false}
             onClick={async () => {
               try {
