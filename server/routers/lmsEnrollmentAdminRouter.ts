@@ -1436,7 +1436,7 @@ CRITICAL REQUIREMENTS:
           countdown_v2: ["headline", "subtext"],
           image_text: ["headline", "bodyHtml"],
           instructor: ["bio"],
-          testimonial: ["quote"],
+          testimonial: ["quote", "author"],
           reviews: ["headline"],
           logos: ["headline"],
           ticker: [], // handled via items[]
@@ -1521,6 +1521,27 @@ CRITICAL REQUIREMENTS:
               if (item.text && typeof item.text === "string" && item.text.trim().length > 2) {
                 item.text = await rewriteField(`${type}.item.text`, item.text);
               }
+            }
+          }
+
+          // Special: reviews — items[].text (the review body)
+          if (type === "reviews" && Array.isArray(d.reviews)) {
+            for (const review of d.reviews) {
+              if (review.text && typeof review.text === "string" && review.text.trim().length > 3) {
+                review.text = await rewriteField(`reviews.item.text`, review.text);
+              }
+            }
+          }
+
+          // Special: column_layout — leftBlocks and rightBlocks are nested block arrays
+          if (type === "column_layout") {
+            if (Array.isArray(d.leftBlocks) && d.leftBlocks.length > 0) {
+              const rewritten = await rewriteBlocks(JSON.stringify(d.leftBlocks));
+              if (rewritten) d.leftBlocks = JSON.parse(rewritten);
+            }
+            if (Array.isArray(d.rightBlocks) && d.rightBlocks.length > 0) {
+              const rewritten = await rewriteBlocks(JSON.stringify(d.rightBlocks));
+              if (rewritten) d.rightBlocks = JSON.parse(rewritten);
             }
           }
 
