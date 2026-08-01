@@ -426,6 +426,28 @@ export async function enrollInFreeMembership(
 export async function getAllThinkificUsers(): Promise<ThinkificUser[]> {
   return fetchAllPages<ThinkificUser>("/users");
 }
+
+/**
+ * Stream all Thinkific users page-by-page, calling `callback` for each user.
+ * Never holds more than one page (250 users) in memory at a time.
+ * Use this instead of getAllThinkificUsers() for background sync jobs.
+ */
+export async function streamThinkificUsers(
+  callback: (user: ThinkificUser) => Promise<void>,
+  limit = 250,
+): Promise<void> {
+  let page = 1;
+  while (true) {
+    const data = await thinkificFetch<PaginatedResponse<ThinkificUser>>(
+      `/users?page=${page}&limit=${limit}`
+    );
+    for (const user of data.items) {
+      await callback(user);
+    }
+    if (!data.meta.pagination.next_page) break;
+    page++;
+  }
+}
 // ─── Course Structure (for import) ───────────────────────────────────────────
 export interface ThinkificCourse {
   id: number;

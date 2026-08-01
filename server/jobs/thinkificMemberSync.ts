@@ -15,7 +15,7 @@
  *   the free membership + community access if they don't already have it.
  * - The job is idempotent: safe to run multiple times.
  */
-import { getAllThinkificUsers } from "../thinkific";
+import { streamThinkificUsers } from "../thinkific";
 import { getDb } from "../db";
 import { users, membershipPlans, membershipSubscriptions, communityMembers, communities } from "../../drizzle/schema";
 import { eq, sql, and } from "drizzle-orm";
@@ -149,84 +149,88 @@ export async function runThinkificMemberSync(): Promise<{
 
   console.log("[ThinkificSync] Starting Thinkific member sync…");
 
-  let thinkificUsers: Awaited<ReturnType<typeof getAllThinkificUsers>> = [];
+  let created = 0;
+  let skipped = 0;
+  let errors = 0;
+  let total = 0;
+
+  const { ensureUserRole } = await import("../db");
+
   try {
-    thinkificUsers = await getAllThinkificUsers();
+    await streamThinkificUsers(async (tUser) => {
+      total++;
+      if (!tUser.email) { errors++; return; }
+      const normalised = tUser.email.trim().toLowerCase();
+
+      try {
+        const existing = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(sql`LOWER(${users.email}) = ${normalised}`)
+          .limit(1);
+
+        if (existing[0]) {
+          // User already exists — ensure they have free access (idempotent)
+          await grantFreeAccessToUser(existing[0].id);
+          skipped++;
+          return;
+        }
+
+        const { randomUUID } = await import("crypto");
+        const syntheticOpenId = `pending_${randomUUID()}`;
+        const firstName = tUser.first_name?.trim() ?? "";
+        const lastName = tUser.last_name?.trim() ?? "";
+        const fullName = [firstName, lastName].filter(Boolean).join(" ") || normalised;
+
+        try {
+          await db.insert(users).values({
+            openId: syntheticOpenId,
+            email: normalised,
+            name: fullName,
+            isPending: true,
+            pendingCreatedAt: new Date(),
+            lastSignedIn: new Date(),
+          });
+        } catch (insertErr: unknown) {
+          const msg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+          if (msg.includes("Duplicate entry") || msg.includes("UNIQUE") || msg.includes("ER_DUP")) {
+            skipped++;
+            return;
+          }
+          throw insertErr;
+        }
+
+        const newUser = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.openId, syntheticOpenId))
+          .limit(1);
+
+        if (newUser[0]) {
+          await ensureUserRole(newUser[0].id);
+          await grantFreeAccessToUser(newUser[0].id);
+        }
+
+        created++;
+      } catch (err) {
+        console.error(`[ThinkificSync] Error processing ${normalised}:`, err);
+        errors++;
+      }
+    });
   } catch (err) {
     console.error("[ThinkificSync] Failed to fetch users from Thinkific API:", err);
     return { total: 0, created: 0, skipped: 0, errors: 1 };
   }
 
-  let created = 0;
-  let skipped = 0;
-  let errors = 0;
-
-  const { ensureUserRole } = await import("../db");
-
-  for (const tUser of thinkificUsers) {
-    if (!tUser.email) { errors++; continue; }
-    const normalised = tUser.email.trim().toLowerCase();
-
-    try {
-      const existing = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(sql`LOWER(${users.email}) = ${normalised}`)
-        .limit(1);
-
-      if (existing[0]) {
-        // User already exists — ensure they have free access (idempotent)
-        await grantFreeAccessToUser(existing[0].id);
-        skipped++;
-        continue;
-      }
-
-      const { randomUUID } = await import("crypto");
-      const syntheticOpenId = `pending_${randomUUID()}`;
-      const firstName = tUser.first_name?.trim() ?? "";
-      const lastName = tUser.last_name?.trim() ?? "";
-      const fullName = [firstName, lastName].filter(Boolean).join(" ") || normalised;
-
-      try {
-        await db.insert(users).values({
-          openId: syntheticOpenId,
-          email: normalised,
-          name: fullName,
-          isPending: true,
-          pendingCreatedAt: new Date(),
-          lastSignedIn: new Date(),
-        });
-      } catch (insertErr: unknown) {
-        const msg = insertErr instanceof Error ? insertErr.message : String(insertErr);
-        if (msg.includes("Duplicate entry") || msg.includes("UNIQUE") || msg.includes("ER_DUP")) {
-          skipped++;
-          continue;
-        }
-        throw insertErr;
-      }
-
-      const newUser = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.openId, syntheticOpenId))
-        .limit(1);
-
-      if (newUser[0]) {
-        await ensureUserRole(newUser[0].id);
-        await grantFreeAccessToUser(newUser[0].id);
-      }
-
-      created++;
-    } catch (err) {
-      console.error(`[ThinkificSync] Error processing ${normalised}:`, err);
-      errors++;
-    }
+  // Suggest GC after large sync to reclaim memory promptly
+  if (typeof global.gc === "function") {
+    try { global.gc(); } catch (_) { /* ignore */ }
   }
 
   console.log(
-    `[ThinkificSync] Sync complete: ${created} created, ${skipped} skipped, ${errors} errors (${thinkificUsers.length} total Thinkific users)`,
+    `[ThinkificSync] Sync complete: ${created} created, ${skipped} skipped, ${errors} errors (${total} total Thinkific users)`,
   );
-  return { total: thinkificUsers.length, created, skipped, errors };
+  return { total, created, skipped, errors };
 }
 
 /**

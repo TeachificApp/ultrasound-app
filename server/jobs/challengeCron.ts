@@ -474,13 +474,13 @@ function buildEmailHtml({
 // ── Scheduler ─────────────────────────────────────────────────────────────────
 
 /**
- * Starts the challenge cron job — runs every 5 minutes.
+ * Starts the challenge cron job — runs every 15 minutes.
  * Called once at server startup.
  */
 export function startChallengeCron() {
-  console.log("[ChallengeCron] Started — runs every 5 minutes. Publishes at 6 AM ET daily.");
+  console.log("[ChallengeCron] Started — runs every 15 minutes. Publishes at 6 AM ET daily.");
   // Run immediately on startup to catch any missed publishes
   runChallengeCron();
-  // Then run every 5 minutes
-  setInterval(runChallengeCron, 5 * 60 * 1000);
+  // Then run every 15 minutes
+  setInterval(runChallengeCron, 15 * 60 * 1000);
 }
