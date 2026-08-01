@@ -113,6 +113,7 @@ import { notifyOwner } from "../_core/notification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
+import { cmeActivityFormRouter } from "./cmeActivityFormRouter";
 import { lmsCourseBuilderRouter } from "./lmsCourseBuilderRouter";
 import { lmsQuizLandingRouter } from "./lmsQuizLandingRouter";
 import { lmsEnrollmentAdminRouter } from "./lmsEnrollmentAdminRouter";
@@ -624,6 +625,7 @@ export const lmsAdminRouter = router({
   ...lmsCohortAdminRouter._def.procedures,
   ...lmsCertificateRouter._def.procedures,
   ...lmsAIRouter._def.procedures,
+  ...cmeActivityFormRouter._def.procedures,
 });
 
 // ─── Public Router ────────────────────────────────────────────────────────────

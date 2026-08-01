@@ -64,6 +64,7 @@ import { useLearnLink } from "@/hooks/useLearnLink";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { SdmsCmeConfigPanel, resolveLmsActivityType } from "@/components/admin/SdmsCmeConfigPanel";
+import { CmeActivityFormPanel } from "@/components/admin/CmeActivityFormPanel";
 import { WebinarsAdmin } from "./WebinarsAdmin";
 import { WorkshopsAdmin } from "./WorkshopsAdmin";
 import BundlesAdmin from "./BundlesAdmin";
@@ -2222,6 +2223,16 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
         activityId={course.id}
         defaultTitle={title}
       />
+
+      {hasCertificate && (
+        <div className="mt-2 border rounded-lg p-4 bg-white">
+          <CmeActivityFormPanel
+            courseId={course.id}
+            courseTitle={course.title ?? title}
+            creditHours={creditHours || null}
+          />
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <Switch checked={isFeatured} onCheckedChange={setIsFeatured} id="featured-switch" />

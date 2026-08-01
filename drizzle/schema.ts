@@ -8002,3 +8002,53 @@ export const fileAssets = mysqlTable("file_assets", {
 });
 export type FileAsset = typeof fileAssets.$inferSelect;
 export type InsertFileAsset = typeof fileAssets.$inferInsert;
+
+// ─── CME Activity Planning Form ───────────────────────────────────────────────
+export const cmeActivityForms = mysqlTable("cme_activity_forms", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("courseId").notNull().unique(), // one form per CME course
+  // Section 1: Activity Overview
+  activityTitle: varchar("activityTitle", { length: 512 }),
+  activityType: varchar("activityType", { length: 64 }),
+  proposedDate: varchar("proposedDate", { length: 128 }),
+  activityLengthHours: varchar("activityLengthHours", { length: 32 }),
+  cmeCreditsRequested: varchar("cmeCreditsRequested", { length: 32 }),
+  offerMocCredit: varchar("offerMocCredit", { length: 32 }),
+  offeredMoreThanOnce: varchar("offeredMoreThanOnce", { length: 32 }),
+  activityStructure: varchar("activityStructure", { length: 64 }),
+  targetAudience: varchar("targetAudience", { length: 64 }),
+  estimatedLearners: varchar("estimatedLearners", { length: 64 }),
+  // Section 2: Professional Practice Gap
+  practiceGapDescription: text("practiceGapDescription"),
+  practiceGapReasons: text("practiceGapReasons"),
+  // Section 3: Educational Needs
+  improvementTypes: text("improvementTypes"), // JSON array: ["knowledge","competence","performance"]
+  improvementKnowledgeText: text("improvementKnowledgeText"),
+  improvementCompetenceText: text("improvementCompetenceText"),
+  improvementPerformanceText: text("improvementPerformanceText"),
+  learnerOutcomes: text("learnerOutcomes"),
+  // Section 4: Learning Objectives
+  learningObjectives: text("learningObjectives"),
+  // Section 5: Educational Format
+  deliveryDescription: text("deliveryDescription"),
+  activityIncludes: text("activityIncludes"), // JSON array of checkboxes
+  assessmentMethods: text("assessmentMethods"), // JSON array of checkboxes
+  // Section 6: Faculty
+  facultyJson: text("facultyJson"), // JSON array of {name, credentials, role}
+  // Section 7: Content Readiness
+  contentStatus: varchar("contentStatus", { length: 64 }),
+  contentAvailableDate: varchar("contentAvailableDate", { length: 128 }),
+  // Section 8: Marketing
+  marketingChannels: text("marketingChannels"), // JSON array
+  marketingMentionsCme: varchar("marketingMentionsCme", { length: 32 }),
+  // Section 9: Financial
+  registrationFee: varchar("registrationFee", { length: 32 }),
+  // Section 10: Attestation
+  attestationName: varchar("attestationName", { length: 256 }),
+  attestationDate: varchar("attestationDate", { length: 64 }),
+  // Meta
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type CmeActivityForm = typeof cmeActivityForms.$inferSelect;
+export type InsertCmeActivityForm = typeof cmeActivityForms.$inferInsert;
