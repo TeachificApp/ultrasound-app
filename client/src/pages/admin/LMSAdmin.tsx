@@ -271,6 +271,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
   const [copySourceTitle, setCopySourceTitle] = useState("");
   const [copyNewName, setCopyNewName] = useState("");
   const [copyAiReformat, setCopyAiReformat] = useState(true);
+  const [copyCmeCredits, setCopyCmeCredits] = useState("");
   const [copyStep, setCopyStep] = useState<"idle" | "copying" | "reformatting" | "done">("idle");
 
   const duplicateCourse = trpc.lmsAdmin.duplicateCourse.useMutation({
@@ -288,6 +289,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
     setCopySourceTitle(title);
     setCopyNewName(`${title} [Copy]`);
     setCopyAiReformat(true);
+    setCopyCmeCredits("");
     setCopyStep("idle");
     setCopyDialogOpen(true);
   };
@@ -300,7 +302,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
       if (copyAiReformat) {
         setCopyStep("reformatting");
         // AI reformat: rewrites all landing page text fields for the new course name
-        await reformatLandingPage.mutateAsync({ courseId: result.id, newCourseName: copyNewName.trim() });
+        await reformatLandingPage.mutateAsync({ courseId: result.id, newCourseName: copyNewName.trim(), newCmeCredits: copyCmeCredits.trim() || undefined });
       } else {
         // No AI reformat: just update the course title directly
         setCopyStep("reformatting");
@@ -471,6 +473,18 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
                     </p>
                   </div>
                 </div>
+                {copyAiReformat && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="copy-cme-credits">CME Credits <span className="text-gray-400 font-normal">(optional)</span></Label>
+                    <Input
+                      id="copy-cme-credits"
+                      value={copyCmeCredits}
+                      onChange={e => setCopyCmeCredits(e.target.value)}
+                      placeholder="e.g. 2 or 2.5 — leave blank to keep existing"
+                    />
+                    <p className="text-xs text-gray-500">If provided, all CME credit numbers (including accreditation statements) will be updated to this value.</p>
+                  </div>
+                )}
               </>
             )}
             {(copyStep === "copying" || copyStep === "reformatting") && (
@@ -3008,6 +3022,7 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
   // ── Reformat Landing Page with AI ──
   const [reformatOpen, setReformatOpen] = useState(false);
   const [reformatName, setReformatName] = useState("");
+  const [reformatCmeCredits, setReformatCmeCredits] = useState("");
   const [reformatStep, setReformatStep] = useState<"idle" | "running" | "done">("idle");
   const reformatMutation = trpc.lmsAdmin.reformatLandingPage.useMutation({
     onError: e => { toast.error(`Reformat error: ${e.message}`); setReformatStep("idle"); },
@@ -3016,7 +3031,11 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
     if (!reformatName.trim()) return;
     setReformatStep("running");
     try {
-      await reformatMutation.mutateAsync({ courseId, newCourseName: reformatName.trim() });
+      await reformatMutation.mutateAsync({
+        courseId,
+        newCourseName: reformatName.trim(),
+        newCmeCredits: reformatCmeCredits.trim() || undefined,
+      });
       setReformatStep("done");
       toast.success("Landing page reformatted!");
       setTimeout(() => setReformatOpen(false), 1400);
@@ -3120,7 +3139,7 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
         <Button
           variant="outline"
           className="border-purple-300 text-purple-700 hover:bg-purple-50 gap-2 w-full"
-          onClick={() => { setReformatName(course?.title ?? ""); setReformatStep("idle"); setReformatOpen(true); }}
+          onClick={() => { setReformatName(course?.title ?? ""); setReformatCmeCredits(""); setReformatStep("idle"); setReformatOpen(true); }}
         >
           <Sparkles className="w-4 h-4" /> Reformat Landing Page with AI
         </Button>
@@ -3139,17 +3158,28 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
           </DialogHeader>
           <div className="space-y-4 py-2">
             {reformatStep === "idle" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="lp-reformat-name">Course Name</Label>
-                <Input
-                  id="lp-reformat-name"
-                  value={reformatName}
-                  onChange={e => setReformatName(e.target.value)}
-                  placeholder="Enter the course name to reformat around..."
-                  autoFocus
-                  onKeyDown={e => { if (e.key === "Enter" && reformatName.trim()) handleReformat(); }}
-                />
-                <p className="text-xs text-gray-500">AI will update every text field to reflect this name. The course title will also be updated.</p>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="lp-reformat-name">Course Name</Label>
+                  <Input
+                    id="lp-reformat-name"
+                    value={reformatName}
+                    onChange={e => setReformatName(e.target.value)}
+                    placeholder="Enter the course name to reformat around..."
+                    autoFocus
+                    onKeyDown={e => { if (e.key === "Enter" && reformatName.trim()) handleReformat(); }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="lp-reformat-cme">CME Credits <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Input
+                    id="lp-reformat-cme"
+                    value={reformatCmeCredits}
+                    onChange={e => setReformatCmeCredits(e.target.value)}
+                    placeholder="e.g. 2 or 2.5"
+                  />
+                  <p className="text-xs text-gray-500">If provided, all CME credit numbers in the landing page (including accreditation statements) will be updated to this value.</p>
+                </div>
               </div>
             )}
             {reformatStep === "running" && (

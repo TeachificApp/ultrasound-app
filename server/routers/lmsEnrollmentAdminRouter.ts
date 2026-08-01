@@ -1370,6 +1370,7 @@ CRITICAL REQUIREMENTS:
     .input(z.object({
       courseId: z.number(),
       newCourseName: z.string().min(1),
+      newCmeCredits: z.string().optional(), // e.g. "2" or "2.5" or "3"
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -1383,19 +1384,53 @@ CRITICAL REQUIREMENTS:
 
       const oldName = course.title;
       const newName = input.newCourseName;
+      const newCredits = input.newCmeCredits?.trim() || null;
+
+      // Replace CME credit numbers throughout a text string using regex.
+      // Matches patterns like: "2 CME", "2.5 CME", "2 AMA PRA", "maximum of 2 AMA",
+      // "designates this enduring education for a maximum of 2", "2CME", etc.
+      function replaceCmeCredits(text: string, credits: string): string {
+        if (!text || !credits) return text;
+        // Match a number (integer or decimal) immediately followed by CME-related keywords
+        return text
+          // "2 CME", "2.5 CME", "2CME"
+          .replace(/(\d+(?:\.\d+)?)\s*(CME)/gi, `${credits} $2`)
+          // "maximum of 2 AMA", "maximum of 2.5 AMA"
+          .replace(/(maximum of )\s*(\d+(?:\.\d+)?)(\s+AMA)/gi, `$1${credits}$3`)
+          // "designates this enduring education for a maximum of 2"
+          .replace(/(for a maximum of )\s*(\d+(?:\.\d+)?)/gi, `$1${credits}`)
+          // "2 AMA PRA Category 1 Credit"
+          .replace(/(\d+(?:\.\d+)?)\s*(AMA PRA)/gi, `${credits} $2`)
+          // "2 credit", "2 credits", "2 credit hour", "2 credit hours"
+          .replace(/(\d+(?:\.\d+)?)\s*(credit(?:s| hours?))/gi, `${credits} $2`);
+      }
 
       // Rewrite a single text field preserving structure/format
       async function rewriteField(fieldName: string, oldValue: string | null | undefined, isHtml = false): Promise<string | null> {
         if (!oldValue || oldValue.trim().length < 4) return oldValue ?? null;
-        // Skip extremely long boilerplate fields (>6000 chars) to avoid LLM truncation
+
+        // For long fields (>6000 chars, e.g. accreditation boilerplate): skip LLM but still apply
+        // CME credit number replacement and course name substitution via regex.
         if (oldValue.trim().length > 6000) {
-          console.log(`[reformatLandingPage] Skipping ${fieldName} — too long (${oldValue.length} chars)`);
-          return oldValue;
+          console.log(`[reformatLandingPage] Long field ${fieldName} (${oldValue.length} chars) — applying regex-only replacement`);
+          let updated = oldValue;
+          // Replace old course name with new course name (case-sensitive first, then case-insensitive)
+          updated = updated.split(oldName).join(newName);
+          // Replace CME credits if provided
+          if (newCredits) updated = replaceCmeCredits(updated, newCredits);
+          return updated;
         }
-        const systemPrompt = `You are a medical education copywriter for an ultrasound training platform. You are reformatting existing course landing page content for a new course. Preserve the EXACT same structure, tone, format, length, and style as the original. Only change references to the old course name and update the clinical/educational content to be relevant to the new course. Do NOT add new sections, change the format, or alter the writing style. ${isHtml ? "The content is HTML — preserve all HTML tags exactly, only change the text content inside tags." : "Return plain text only."} Use United States English spelling.`;
-        const userPrompt = `Old course name: "${oldName}"\nNew course name: "${newName}"\nField: ${fieldName}\n\nOriginal content:\n${oldValue}\n\nRewrite this content so it applies to "${newName}" instead of "${oldName}". Preserve the exact same structure, format, length, and style.`;
+
+        const cmeContext = newCredits
+          ? ` If the content mentions a number of CME credits, AMA PRA credits, or credit hours, update that number to ${newCredits}.`
+          : "";
+        const systemPrompt = `You are a medical education copywriter for an ultrasound training platform. You are reformatting existing course landing page content for a new course. Preserve the EXACT same structure, tone, format, length, and style as the original. Only change references to the old course name and update the clinical/educational content to be relevant to the new course.${cmeContext} Do NOT add new sections, change the format, or alter the writing style. ${isHtml ? "The content is HTML — preserve all HTML tags exactly, only change the text content inside tags." : "Return plain text only."} Use United States English spelling.`;
+        const userPrompt = `Old course name: "${oldName}"\nNew course name: "${newName}"${newCredits ? `\nNew CME credits: ${newCredits}` : ""}\nField: ${fieldName}\n\nOriginal content:\n${oldValue}\n\nRewrite this content so it applies to "${newName}" instead of "${oldName}". Preserve the exact same structure, format, length, and style.`;
         const resp = await invokeLLM({ messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }] });
-        return resp?.choices?.[0]?.message?.content?.trim() ?? oldValue;
+        let result = resp?.choices?.[0]?.message?.content?.trim() ?? oldValue;
+        // Always apply regex CME replacement as a safety net even after LLM rewrite
+        if (newCredits) result = replaceCmeCredits(result, newCredits);
+        return result;
       }
 
       // Helper to rewrite a list of plain-text items (string[])
