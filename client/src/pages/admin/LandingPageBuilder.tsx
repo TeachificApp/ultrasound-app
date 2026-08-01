@@ -3520,7 +3520,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
       const handleAiGenerate = () => {
         if (!aiPrompt.trim()) { toast.error("Please enter a prompt."); return; }
         setIsAiGenerating(true);
-        // Map content type labels to valid format enum values
+        // Map content type labels to valid format enum values (v2 - fixed)
         const formatMap: Record<string, "text" | "outline" | "summary" | "quiz_questions"> = {
           lesson: "text",
           explanation: "text",
