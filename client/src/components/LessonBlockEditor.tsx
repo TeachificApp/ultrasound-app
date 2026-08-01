@@ -56,6 +56,8 @@ interface LessonBlockEditorProps {
   embedded?: boolean;
   /** Optional lesson title shown in the header instead of the generic hint text */
   lessonTitle?: string;
+  /** Optional course title passed to AI content generator in BlockSettings */
+  courseTitle?: string;
   /**
    * When provided, the editor operates in "controlled" mode:
    * Save calls onBlocksChange(blocks) instead of the lesson API.
@@ -81,6 +83,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   onNavigateLesson,
   embedded: embeddedProp = false,
   lessonTitle,
+  courseTitle,
   onBlocksChange,
   editorLabel,
 }: LessonBlockEditorProps, ref: React.Ref<LessonBlockEditorHandle>) {
@@ -913,6 +916,8 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
                     onChange={data => updateBlock(selectedBlock.id, data)}
                     lessonId={lessonId}
                     courseId={courseId}
+                    lessonTitle={lessonTitle}
+                    courseTitle={courseTitle}
                   />
                 </div>
               </div>

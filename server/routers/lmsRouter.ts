@@ -581,6 +581,40 @@ export const lmsAIRouter = router({
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       return { cards: (parsed.cards ?? []).slice(0, input.count) };
     }),
+
+  // ── AI Lesson Content Generator ──────────────────────────────────────────
+  generateLessonContent: protectedProcedure
+    .input(z.object({
+      lessonTitle: z.string().min(1),
+      courseTitle: z.string().optional(),
+      format: z.enum(["text", "outline", "summary", "quiz_questions"]).default("text"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const formatInstructions: Record<string, string> = {
+        text: "Write comprehensive, well-structured lesson content in HTML format. Use <h2>, <h3>, <p>, and <ul>/<li> tags where appropriate. Do not include <html>, <head>, or <body> tags.",
+        outline: "Create a detailed lesson outline in HTML format with main sections as <h2> headings, sub-points as <h3> headings, and key learning objectives as a <ul> list at the top.",
+        summary: "Write a concise summary of the key concepts for this lesson in HTML format. Use <p> for intro and <ul><li> bullet points for the main takeaways.",
+        quiz_questions: "Generate 5 quiz questions with answers for this lesson in HTML format. Format as <ol> with each <li> containing the question in <strong> and the answer in a <p> below it.",
+      };
+      const instruction = formatInstructions[input.format];
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert medical ultrasound educator creating content for All About Ultrasound™ and iHeartEcho™ online learning platforms. Generate high-quality, clinically accurate lesson content for ultrasound and echocardiography education. ${instruction} Return only the HTML fragment — no markdown code fences, no surrounding tags.`,
+          },
+          {
+            role: "user",
+            content: `Generate lesson content for the lesson titled: "${input.lessonTitle}"${input.courseTitle ? ` (part of the course "${input.courseTitle}")` : ""}.`,
+          },
+        ],
+      });
+      const content = (response.choices?.[0]?.message?.content ?? "") as string;
+      // Strip any accidental markdown code fences
+      const cleaned = content.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      return { content: cleaned };
+    }),
 });
 
 export const lmsAdminRouter = router({

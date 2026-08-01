@@ -55,7 +55,7 @@ import {
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
   ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, BookmarkPlus, Music, UserPlus, Search,
   SlidersHorizontal, Radio, Clock, Loader2, ArrowLeftRight, PlayCircle,
-  Table2, LayoutList, FileText, Download,
+  Table2, LayoutList, FileText, Download, Sparkles, Wand2, RefreshCw,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
 import CarouselBlock from "@/components/CarouselBlock";
@@ -2967,7 +2967,7 @@ function FormEmbedFormPicker({ d, set }: { d: Record<string, any>; set: (field: 
   );
 }
 
-export function BlockSettings({ block, onChange, lessonId, courseId }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number; courseId?: number }) {
+export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle, courseTitle }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number; courseId?: number; lessonTitle?: string; courseTitle?: string }) {
   const d = block.data ?? {};
   // Use refs to avoid stale closures with debounced inputs
   const dataRef = useRef(block.data ?? {});
@@ -3498,8 +3498,76 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
         </div>
       );
     }
-    case "text":
-      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Content</label><RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={150} maxHeight={400} placeholder="Start typing your content..." /></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Text Color" field="textColor" /></div>);
+    case "text": {
+      const [aiFormat, setAiFormat] = React.useState<"text" | "outline" | "summary" | "quiz_questions">("text");
+      const [aiPanelOpen, setAiPanelOpen] = React.useState(false);
+      const generateContent = trpc.lmsAdmin.generateLessonContent.useMutation({
+        onSuccess: (data) => {
+          set("html", data.content);
+          setAiPanelOpen(false);
+          toast.success("AI content generated — review and edit as needed.");
+        },
+        onError: (err) => toast.error(`AI generation failed: ${err.message}`),
+      });
+      return (
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-gray-500">Content</label>
+              <button
+                onClick={() => setAiPanelOpen(v => !v)}
+                className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-800 font-medium px-2 py-0.5 rounded bg-teal-50 hover:bg-teal-100 transition-colors"
+                title="Generate content with AI"
+              >
+                <Sparkles size={11} />
+                AI Generate
+              </button>
+            </div>
+            {aiPanelOpen && (
+              <div className="mb-2 p-3 rounded-lg border border-teal-200 bg-teal-50 space-y-2">
+                <p className="text-xs font-semibold text-teal-700 flex items-center gap-1"><Wand2 size={11} /> AI Content Generator</p>
+                <p className="text-xs text-teal-600">
+                  Generating for: <strong>{lessonTitle ?? "this lesson"}</strong>
+                  {courseTitle ? <> in <strong>{courseTitle}</strong></> : null}
+                </p>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Format</label>
+                  <select
+                    value={aiFormat}
+                    onChange={e => setAiFormat(e.target.value as typeof aiFormat)}
+                    className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+                  >
+                    <option value="text">Full lesson content</option>
+                    <option value="outline">Lesson outline</option>
+                    <option value="summary">Key points summary</option>
+                    <option value="quiz_questions">Quiz questions &amp; answers</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => generateContent.mutate({ lessonTitle: lessonTitle ?? block.id, courseTitle, format: aiFormat })}
+                    disabled={generateContent.isPending}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white rounded px-3 py-1.5 transition-colors disabled:opacity-60"
+                  >
+                    {generateContent.isPending ? <><RefreshCw size={11} className="animate-spin" /> Generating…</> : <><Sparkles size={11} /> Generate</>}
+                  </button>
+                  <button onClick={() => setAiPanelOpen(false)} className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5 rounded border border-gray-200 bg-white">
+                    Cancel
+                  </button>
+                </div>
+                {d.html && (
+                  <p className="text-xs text-amber-600">⚠ This will replace the current content.</p>
+                )}
+              </div>
+            )}
+            <RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={150} maxHeight={400} placeholder="Start typing your content, or use AI Generate above…" />
+          </div>
+          <BSAlignField data={d} onSet={set} label="Text Alignment" field="align" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+        </div>
+      );
+    }
       case "image":
         return (
           <div className="space-y-3">
