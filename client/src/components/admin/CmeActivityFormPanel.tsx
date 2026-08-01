@@ -513,15 +513,18 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
         },
       });
       const result = await downloadMutation.mutateAsync({ courseId });
-      // Use anchor click for reliable download (avoids popup blockers)
+      // Fetch as blob to force download regardless of Content-Disposition header
+      const resp = await fetch(result.url);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = result.url;
+      a.href = blobUrl;
       const safeTitle = (courseTitle ?? "cme-form").replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
       a.download = `cme-activity-form-${safeTitle}.docx`;
-      a.target = "_blank";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
       toast.success("DOCX ready — downloading now.");
     } catch (e: any) {
       toast.error("Download failed: " + (e?.message ?? "Unknown error"));
@@ -547,14 +550,18 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
         },
       });
       const result = await downloadPdfMutation.mutateAsync({ courseId });
+      // Fetch as blob to force download regardless of Content-Disposition header
+      const resp = await fetch(result.url);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = result.url;
+      a.href = blobUrl;
       const safeTitle = (courseTitle ?? "cme-form").replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
       a.download = `cme-activity-form-${safeTitle}.pdf`;
-      a.target = "_blank";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
       toast.success("PDF ready — downloading now.");
     } catch (e: any) {
       toast.error("PDF download failed: " + (e?.message ?? "Unknown error"));
