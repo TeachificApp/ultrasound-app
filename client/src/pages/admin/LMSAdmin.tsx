@@ -2025,15 +2025,6 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-700 select-all cursor-text" title="Copy this ID to use in funnels, manual grants, and support tickets">{course.id}</span>
         <span className="text-xs text-gray-400">— use this ID for manual grants &amp; support</span>
         <div className="flex-1" />
-        {/* Reformat Landing Page with AI */}
-        <Button
-          variant="outline"
-          className="border-teal-300 text-teal-700 hover:bg-teal-50 h-9 text-sm"
-          onClick={() => { setReformatNewName(title || course.title || ""); setReformatStep("idle"); setReformatDialogOpen(true); }}
-          title="Use AI to rewrite all landing page text fields for a new course name"
-        >
-          <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Reformat Landing Page
-        </Button>
         {/* Top Save Button */}
         <Button
           className="bg-teal-600 hover:bg-teal-700 text-white"
@@ -3013,6 +3004,27 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
   const navigate = setLocation;
   const openLearnLink = useOpenLearnLink();
   const { data: course } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
+
+  // ── Reformat Landing Page with AI ──
+  const [reformatOpen, setReformatOpen] = useState(false);
+  const [reformatName, setReformatName] = useState("");
+  const [reformatStep, setReformatStep] = useState<"idle" | "running" | "done">("idle");
+  const reformatMutation = trpc.lmsAdmin.reformatLandingPage.useMutation({
+    onError: e => { toast.error(`Reformat error: ${e.message}`); setReformatStep("idle"); },
+  });
+  const handleReformat = async () => {
+    if (!reformatName.trim()) return;
+    setReformatStep("running");
+    try {
+      await reformatMutation.mutateAsync({ courseId, newCourseName: reformatName.trim() });
+      setReformatStep("done");
+      toast.success("Landing page reformatted!");
+      setTimeout(() => setReformatOpen(false), 1400);
+    } catch {
+      setReformatStep("idle");
+    }
+  };
+
   const aiGenerateLandingPage = trpc.lmsAdmin.aiGenerateLandingPage.useMutation({
     onSuccess: () => {
       toast.success("Landing page generated! Opening builder...");
@@ -3091,6 +3103,88 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
           <p className="text-xs text-teal-500 text-center mt-2">This may take 15–30 seconds while the AI builds your page...</p>
         )}
       </div>
+
+      {/* AI Reformat Landing Page */}
+      <div className="bg-white border border-purple-200 rounded-xl p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Reformat Landing Page with AI</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Rewrites all landing page text — descriptions, learning objectives, FAQ, hero, blocks, and SEO fields — to match a new course name while preserving structure and style.
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          className="border-purple-300 text-purple-700 hover:bg-purple-50 gap-2 w-full"
+          onClick={() => { setReformatName(course?.title ?? ""); setReformatStep("idle"); setReformatOpen(true); }}
+        >
+          <Sparkles className="w-4 h-4" /> Reformat Landing Page with AI
+        </Button>
+      </div>
+
+      {/* Reformat Dialog */}
+      <Dialog open={reformatOpen} onOpenChange={open => { if (!open && reformatStep === "idle") setReformatOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-600" /> Reformat Landing Page with AI
+            </DialogTitle>
+            <DialogDescription>
+              AI will rewrite all landing page text fields — hero, descriptions, learning objectives, FAQ, blocks, and SEO — to match the course name below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {reformatStep === "idle" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="lp-reformat-name">Course Name</Label>
+                <Input
+                  id="lp-reformat-name"
+                  value={reformatName}
+                  onChange={e => setReformatName(e.target.value)}
+                  placeholder="Enter the course name to reformat around..."
+                  autoFocus
+                  onKeyDown={e => { if (e.key === "Enter" && reformatName.trim()) handleReformat(); }}
+                />
+                <p className="text-xs text-gray-500">AI will update every text field to reflect this name. The course title will also be updated.</p>
+              </div>
+            )}
+            {reformatStep === "running" && (
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-purple-50 border border-purple-200">
+                <Loader2 className="w-5 h-5 text-purple-600 animate-spin" />
+                <div>
+                  <p className="text-sm font-medium text-purple-800">AI is reformatting your landing page...</p>
+                  <p className="text-xs text-purple-600 mt-0.5">This may take 15–30 seconds.</p>
+                </div>
+              </div>
+            )}
+            {reformatStep === "done" && (
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                <div>
+                  <p className="text-sm font-medium text-green-800">Landing page reformatted!</p>
+                  <p className="text-xs text-green-600 mt-0.5">All text fields updated for "{reformatName}".</p>
+                </div>
+              </div>
+            )}
+          </div>
+          {reformatStep === "idle" && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReformatOpen(false)}>Cancel</Button>
+              <Button
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={handleReformat}
+                disabled={!reformatName.trim()}
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Reformat with AI
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
