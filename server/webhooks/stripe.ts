@@ -262,6 +262,22 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
       }
     }
     console.log(`[Stripe] LMS checkout fulfilled: user ${userId}, course ${courseId}, ${result.notes.join(", ")}`);
+    // ── Revenue Share: fire transfers to partners (non-blocking) ──
+    try {
+      const { executeRevenueShareTransfers } = await import("../lib/revenueShareEngine");
+      const [courseRow3] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
+      await executeRevenueShareTransfers({
+        courseId,
+        grossAmountCents: (session.amount_total as number) ?? 0,
+        currency: (session.currency as string) ?? "usd",
+        paymentIntentId: (session.payment_intent as string) ?? null,
+        checkoutSessionId: session.id as string,
+        customerEmail: (session.customer_email as string) ?? (session.customer_details as any)?.email ?? null,
+        courseTitle: courseRow3?.title ?? null,
+      });
+    } catch (rsErr) {
+      console.error("[RevenueShare] Non-blocking transfer error:", rsErr);
+    }
   } catch (err) {
     console.error(`[Stripe] LMS checkout fulfillment error for session ${session.id}:`, err);
     throw err;

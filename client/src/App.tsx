@@ -113,6 +113,8 @@ const MarketingSiteAdmin = lazy(() => import("./pages/admin/MarketingSiteAdmin")
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
 const InstructorPortal = lazy(() => import("./pages/InstructorPortal"));
+const RevenueShareAdmin = lazy(() => import("./pages/admin/RevenueShareAdmin"));
+const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
 const TeachDashboard = lazy(() => import("./pages/teach/TeachDashboard"));
 const TeachPresentationEditor = lazy(() => import("./pages/teach/TeachPresentationEditor"));
 const TeachMasterDesigner = lazy(() => import("./pages/teach/TeachMasterDesigner"));
@@ -507,6 +509,8 @@ function Router() {
         <Route path="/downloads/:slug" component={DownloadLanding} />
         <Route path="/downloads" component={DownloadsBrowse} />
         <Route path="/bundles/:slug" component={BundleLanding} />
+        <Route path="/admin/revenue-share">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><RevenueShareAdmin /></Suspense></RoleGuard>}</Route>
+        <Route path="/partner-portal">{() => <Suspense fallback={pageFallback}><PartnerPortal /></Suspense>}</Route>
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePagesAdmin /></Suspense></RoleGuard>}</Route>

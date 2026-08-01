@@ -103,6 +103,8 @@ import {
   FileText,
   SendHorizonal,
   XCircle,
+  DollarSign,
+  SplitSquareHorizontal,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1627,6 +1629,7 @@ export default function PlatformAdmin() {
     { id: "duplicate-payments", href: getAdminUrl("/admin/duplicate-payments"), icon: AlertTriangle, label: "Duplicate Payments", description: "Review flagged duplicate charges and duplicate brand memberships before Stripe renewals", color: "#d97706" },
     { id: "career-network", href: getAdminUrl("/admin/career-network"), icon: Briefcase, label: "Career Network", description: "Manage job postings, RSS feed sources, candidate profiles, and employer subscriptions", color: "#0369a1" },
     { id: "notifications", href: getAdminUrl("/admin/notifications"), icon: Bell, label: "Admin Notifications", description: "In-app log of all admin events: orders, enrollments, memberships, and system alerts", color: "#0d9488" },
+    { id: "revenue-share", href: getAdminUrl("/admin/revenue-share"), icon: SplitSquareHorizontal, label: "Revenue Share", description: "Manage revenue share partners, assign percentages per product, and process automatic Stripe payouts", color: "#059669" },
   ];
 
   // Per-Brand tool cards — hrefs include `-aaus` / `-ihe` from brand selector above

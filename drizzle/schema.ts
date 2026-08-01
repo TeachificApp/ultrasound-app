@@ -8054,3 +8054,54 @@ export const cmeActivityForms = mysqlTable("cme_activity_forms", {
 });
 export type CmeActivityForm = typeof cmeActivityForms.$inferSelect;
 export type InsertCmeActivityForm = typeof cmeActivityForms.$inferInsert;
+
+// ─── Revenue Sharing (Stripe Connect) ────────────────────────────────────────
+export const revenueSharePartners = mysqlTable("revenue_share_partners", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id"),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  stripeAccountId: varchar("stripe_account_id", { length: 255 }),
+  onboardingStatus: mysqlEnum("onboarding_status", ["pending", "onboarding", "active", "restricted", "disabled"]).notNull().default("pending"),
+  payoutSchedule: mysqlEnum("payout_schedule", ["immediate", "daily", "weekly", "monthly", "manual"]).notNull().default("immediate"),
+  notes: text("notes"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull().default(0),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull().default(0),
+});
+export type RevenueSharePartner = typeof revenueSharePartners.$inferSelect;
+export type InsertRevenueSharePartner = typeof revenueSharePartners.$inferInsert;
+export const revenueShareAssignments = mysqlTable("revenue_share_assignments", {
+  id: int("id").autoincrement().primaryKey(),
+  partnerId: int("partner_id").notNull(),
+  courseId: int("course_id"),
+  productType: varchar("product_type", { length: 100 }).notNull().default("lms_course"),
+  percentage: decimal("percentage", { precision: 5, scale: 2 }).notNull(),
+  label: varchar("label", { length: 255 }),
+  active: boolean("active").notNull().default(true),
+  createdAt: bigint("created_at", { mode: "number" }).notNull().default(0),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull().default(0),
+});
+export type RevenueShareAssignment = typeof revenueShareAssignments.$inferSelect;
+export type InsertRevenueShareAssignment = typeof revenueShareAssignments.$inferInsert;
+export const revenueShareLedger = mysqlTable("revenue_share_ledger", {
+  id: int("id").autoincrement().primaryKey(),
+  partnerId: int("partner_id").notNull(),
+  assignmentId: int("assignment_id"),
+  courseId: int("course_id"),
+  courseTitle: varchar("course_title", { length: 500 }),
+  paymentIntentId: varchar("payment_intent_id", { length: 255 }),
+  checkoutSessionId: varchar("checkout_session_id", { length: 255 }),
+  customerEmail: varchar("customer_email", { length: 255 }),
+  grossAmount: int("gross_amount").notNull().default(0),
+  sharePercentage: decimal("share_percentage", { precision: 5, scale: 2 }).notNull().default("0"),
+  shareAmount: int("share_amount").notNull().default(0),
+  currency: varchar("currency", { length: 10 }).notNull().default("usd"),
+  stripeTransferId: varchar("stripe_transfer_id", { length: 255 }),
+  status: mysqlEnum("status", ["pending", "processing", "paid", "failed", "cancelled"]).notNull().default("pending"),
+  errorMessage: text("error_message"),
+  paidAt: bigint("paid_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull().default(0),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull().default(0),
+});
+export type RevenueShareLedgerEntry = typeof revenueShareLedger.$inferSelect;
+export type InsertRevenueShareLedgerEntry = typeof revenueShareLedger.$inferInsert;
