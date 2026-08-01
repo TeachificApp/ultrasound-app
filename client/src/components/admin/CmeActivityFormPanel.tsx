@@ -421,8 +421,16 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
         },
       });
       const result = await downloadMutation.mutateAsync({ courseId });
-      window.open(result.url, "_blank");
-      toast.success("DOCX generated — opening download link.");
+      // Use anchor click for reliable download (avoids popup blockers)
+      const a = document.createElement("a");
+      a.href = result.url;
+      const safeTitle = (courseTitle ?? "cme-form").replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
+      a.download = `cme-activity-form-${safeTitle}.docx`;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success("DOCX ready — downloading now.");
     } catch (e: any) {
       toast.error("Download failed: " + (e?.message ?? "Unknown error"));
     } finally {

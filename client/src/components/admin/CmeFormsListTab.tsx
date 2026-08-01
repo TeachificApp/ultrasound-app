@@ -80,8 +80,16 @@ export function CmeFormsListTab() {
     setDownloading(courseId);
     try {
       const result = await downloadMutation.mutateAsync({ courseId });
-      window.open(result.url, "_blank");
-      toast.success(`DOCX downloaded for "${courseTitle}"`);
+      // Use anchor click for reliable download (avoids popup blockers)
+      const a = document.createElement("a");
+      a.href = result.url;
+      const safeTitle = courseTitle.replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
+      a.download = `cme-activity-form-${safeTitle}.docx`;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success(`DOCX ready — downloading "${courseTitle}"`);
     } catch (e: any) {
       toast.error("Download failed: " + (e?.message ?? "Unknown error"));
     } finally {
@@ -236,21 +244,19 @@ export function CmeFormsListTab() {
                         <Edit2 className="w-3 h-3 mr-1" />
                         {row.formStatus === "pending" ? "Start" : "Edit"}
                       </Button>
-                      {row.formStatus !== "pending" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs text-gray-500 hover:bg-gray-100"
-                          disabled={downloading === row.id}
-                          onClick={() => handleDownload(row.id, row.title)}
-                          title="Download DOCX"
-                        >
-                          {downloading === row.id
-                            ? <Loader2 className="w-3 h-3 animate-spin" />
-                            : <Download className="w-3 h-3" />
-                          }
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-gray-500 hover:bg-gray-100"
+                        disabled={downloading === row.id}
+                        onClick={() => handleDownload(row.id, row.title)}
+                        title="Download DOCX"
+                      >
+                        {downloading === row.id
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <Download className="w-3 h-3" />
+                        }
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
