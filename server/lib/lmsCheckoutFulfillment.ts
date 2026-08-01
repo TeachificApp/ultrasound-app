@@ -605,22 +605,22 @@ export async function reconcileLmsCheckoutFromStripeSession(
           ? `https://app.allaboutultrasound.com/auth/reset-password?token=${newUserResetToken}`
           : null;
         if (course.type === "quiz") {
-          await sendQuizAccessEmail({
+          const quizEmailOk = await sendQuizAccessEmail({
             to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
             quizTitle: course.title,
             accessToken,
             setPasswordUrl,
           });
-          notes.push("Quiz access email sent");
+          notes.push(quizEmailOk ? "Quiz access email sent" : "Quiz access email FAILED (check SendGrid key)");
         } else {
-          await sendEnrollmentEmail({
+          const enrollEmailOk = await sendEnrollmentEmail({
             to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
             courseTitle: course.title,
             courseSlug: course.slug,
             accessToken,
             setPasswordUrl,
           });
-          notes.push("Enrollment email sent");
+          notes.push(enrollEmailOk ? "Enrollment email sent" : "Enrollment email FAILED (check SendGrid key)");
         }
       } else {
         notes.push(`Enrollment email skipped (course=${courseEmailEnabled}, platform=${platformEmailEnabled})`);
