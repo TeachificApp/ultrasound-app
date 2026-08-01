@@ -101,6 +101,9 @@ import {
   Radio,
   BookOpen,
   FileText,
+  SendHorizonal,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1019,6 +1022,106 @@ function EnrollmentEmailSettingsPanel() {
             </div>
           </>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Send Test Email Panel ───────────────────────────────────────────────────
+function SendTestEmailPanel() {
+  const { data: me } = trpc.auth.me.useQuery();
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [brandMode, setBrandMode] = useState<"aaus" | "iheartecho">("aaus");
+  const [lastResult, setLastResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // Pre-fill with the logged-in admin's email
+  useEffect(() => {
+    if (me?.email && !recipientEmail) setRecipientEmail(me.email);
+  }, [me?.email]);
+
+  const sendTest = trpc.lmsGroup.sendTestEmail.useMutation({
+    onSuccess: (data) => {
+      setLastResult({ ok: true, msg: `Test email sent to ${data.sentTo}. Check your inbox (and spam folder).` });
+      toast.success(`Test email sent to ${data.sentTo}`);
+    },
+    onError: (e: { message: string }) => {
+      setLastResult({ ok: false, msg: e.message });
+      toast.error(e.message);
+    },
+  });
+
+  const handleSend = () => {
+    if (!recipientEmail.trim()) { toast.error("Enter a recipient email address."); return; }
+    setLastResult(null);
+    sendTest.mutate({ recipientEmail: recipientEmail.trim(), brandMode });
+  };
+
+  return (
+    <Card className="mb-6 border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+          <SendHorizonal className="w-4 h-4 text-teal-600" />
+          Send Test Email
+        </CardTitle>
+        <p className="text-xs text-gray-500 mt-1">
+          Send a test email to verify that your SendGrid API key and sender configuration are working correctly.
+          The test email is logged in the email send log just like a real email.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium text-gray-700">Recipient Email</Label>
+            <Input
+              type="email"
+              value={recipientEmail}
+              onChange={e => setRecipientEmail(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSend()}
+              placeholder="you@example.com"
+              className="text-sm"
+            />
+            <p className="text-xs text-gray-400">Pre-filled with your admin email. Change to test any address.</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium text-gray-700">Brand</Label>
+            <Select value={brandMode} onValueChange={(v) => setBrandMode(v as "aaus" | "iheartecho")}>
+              <SelectTrigger className="text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="aaus">All About Ultrasound</SelectItem>
+                <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-400">Tests the selected brand's sender address and email template.</p>
+          </div>
+        </div>
+
+        {lastResult && (
+          <div className={`flex items-start gap-2 p-3 rounded-lg text-sm ${
+            lastResult.ok ? "bg-green-50 border border-green-200 text-green-800" : "bg-red-50 border border-red-200 text-red-800"
+          }`}>
+            {lastResult.ok
+              ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-green-600" />
+              : <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-600" />}
+            <span>{lastResult.msg}</span>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button
+            onClick={handleSend}
+            disabled={sendTest.isPending || !recipientEmail.trim()}
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+            size="sm"
+          >
+            {sendTest.isPending ? (
+              <><span className="animate-spin mr-1.5">⟳</span> Sending…</>
+            ) : (
+              <><SendHorizonal className="w-3.5 h-3.5 mr-1.5" /> Send Test Email</>
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -2513,6 +2616,9 @@ export default function PlatformAdmin() {
 
         {/* Enrollment Email Settings */}
         <EnrollmentEmailSettingsPanel />
+
+        {/* Send Test Email */}
+        <SendTestEmailPanel />
 
         {/* Publish Domain Settings */}
         <PublishDomainPanel />

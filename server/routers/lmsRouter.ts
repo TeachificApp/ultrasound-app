@@ -4221,6 +4221,45 @@ export const lmsGroupRouter = router({
       return { success: true };
     }),
 
+  /** Send a test email to verify SendGrid delivery (admin only) */
+  sendTestEmail: protectedProcedure
+    .input(z.object({
+      recipientEmail: z.string().email(),
+      brandMode: z.enum(["aaus", "iheartecho"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { emailWrapper } = await import("../_core/email");
+      const brandMode = input.brandMode ?? "aaus";
+      const now = new Date().toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "full", timeStyle: "long" });
+      const htmlBody = emailWrapper(`
+        <h2 style="margin:0 0 12px;font-size:20px;color:#0e1e2e;font-family:Georgia,serif;">
+          ✅ SendGrid Test Email
+        </h2>
+        <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+          This is a test email sent from the <strong>Platform Admin → Email Settings</strong> panel to verify that your SendGrid integration is working correctly.
+        </p>
+        <div style="background:#f0fbfc;border-left:3px solid #189aa1;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
+          <p style="margin:0 0 6px;font-size:13px;color:#0e4a50;font-weight:600;">Test Details</p>
+          <p style="margin:0;font-size:13px;color:#475569;">Sent at: <strong>${now}</strong></p>
+          <p style="margin:4px 0 0;font-size:13px;color:#475569;">Recipient: <strong>${input.recipientEmail}</strong></p>
+          <p style="margin:4px 0 0;font-size:13px;color:#475569;">Brand: <strong>${brandMode.toUpperCase()}</strong></p>
+          <p style="margin:4px 0 0;font-size:13px;color:#475569;">Sent by: <strong>${ctx.user.name ?? ctx.user.email}</strong></p>
+        </div>
+        <p style="margin:0;font-size:13px;color:#94a3b8;">
+          If you received this email, your SendGrid API key and sender configuration are working correctly. No action is needed.
+        </p>
+      `, brandMode);
+      const ok = await sendEmail({
+        to: { name: ctx.user.name ?? "Admin", email: input.recipientEmail },
+        subject: `[Test] SendGrid delivery check — ${now}`,
+        htmlBody,
+        brandMode,
+      });
+      if (!ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "SendGrid rejected the test email. Check the server logs for details (look for [email] SendGrid API error)." });
+      return { success: true, sentTo: input.recipientEmail };
+    }),
+
   /** Update course sendEnrollmentEmail toggle */
   updateCourseEnrollmentEmail: protectedProcedure
     .input(z.object({
