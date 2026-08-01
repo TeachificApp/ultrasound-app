@@ -609,6 +609,9 @@ async function startServer() {
           'ALTER TABLE webhookEvents ADD COLUMN IF NOT EXISTS stripeEventId VARCHAR(128) AFTER source'
         ));
         console.log('[Startup] deferred_checkout_sessions and webhookEvents.stripeEventId ensured');
+        // Schema version check — confirms cmeActivityForms uses snake_case column names
+        const { cmeActivityForms: _caf } = await import('../../drizzle/schema');
+        console.log('[Startup] cmeActivityForms.attestationTitle column:', (_caf as any).attestationTitle?.name, '| signatureDataUrl column:', (_caf as any).signatureDataUrl?.name);
       } catch (err: any) {
         console.error('[Startup] deferred_checkout_sessions migration error:', err?.message ?? err);
       }
