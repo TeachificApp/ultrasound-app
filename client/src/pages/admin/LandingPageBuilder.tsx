@@ -105,6 +105,8 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   // ── Content
   { type: "text", label: "Text / Rich Text", icon: <Type size={14} />, category: "Content",
     defaultData: { html: "<p>Add your content here. Click to edit.</p>", align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } },
+  { type: "ai_content", label: "AI Generate Content", icon: <Sparkles size={14} />, category: "Content",
+    defaultData: { html: "", prompt: "", contentType: "lesson", align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } },
   { type: "image", label: "Image", icon: <Image size={14} />, category: "Content",
     defaultData: { url: "", alt: "", caption: "", align: "center", maxWidth: "50%", linkUrl: "", openInNewTab: true, showShadow: true, noBorder: false } },
   { type: "video", label: "Video Embed", icon: <Video size={14} />, category: "Content",
@@ -3495,6 +3497,81 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
               ))}
             </div>
           </div>}
+        </div>
+      );
+    }
+    case "ai_content": {
+      const [aiPrompt, setAiPrompt] = React.useState<string>(d.prompt ?? "");
+      const [aiContentType, setAiContentType] = React.useState<string>(d.contentType ?? "lesson");
+      const [aiMode, setAiMode] = React.useState<"prompt" | "edit">(d.html ? "edit" : "prompt");
+      const [isAiGenerating, setIsAiGenerating] = React.useState(false);
+      const generateAiContent = trpc.lmsAdmin.generateLessonContent.useMutation({
+        onSuccess: (result) => {
+          setMany({ html: result.content, prompt: aiPrompt, contentType: aiContentType });
+          setAiMode("edit");
+          setIsAiGenerating(false);
+          toast.success("Content generated \u2014 review and edit as needed.");
+        },
+        onError: (e) => {
+          toast.error(`AI generation failed: ${e.message}`);
+          setIsAiGenerating(false);
+        },
+      });
+      const handleAiGenerate = () => {
+        if (!aiPrompt.trim()) { toast.error("Please enter a prompt."); return; }
+        setIsAiGenerating(true);
+        generateAiContent.mutate({ lessonTitle: aiPrompt.trim(), courseTitle, format: aiContentType as any });
+      };
+      return (
+        <div className="space-y-4">
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+            <button onClick={() => setAiMode("prompt")} className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors ${aiMode === "prompt" ? "bg-white shadow text-teal-700" : "text-gray-500 hover:text-gray-700"}`}>
+              <Sparkles size={11} className="inline mr-1" />AI Prompt
+            </button>
+            <button onClick={() => setAiMode("edit")} className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors ${aiMode === "edit" ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
+              Edit Content
+            </button>
+          </div>
+          {aiMode === "prompt" && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Content Type</label>
+                <select value={aiContentType} onChange={e => setAiContentType(e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded-md px-2 focus:outline-none focus:ring-2 focus:ring-teal-400">
+                  <option value="lesson">Full Lesson</option>
+                  <option value="explanation">Explanation</option>
+                  <option value="summary">Summary</option>
+                  <option value="outline">Outline</option>
+                  <option value="exercise">Exercise / Activity</option>
+                  <option value="section">Module Overview</option>
+                  <option value="quiz_questions">Quiz Questions &amp; Answers</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Prompt *</label>
+                <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} placeholder="Describe what content to generate, e.g. 'Explain the fundamentals of cardiac anatomy for beginner sonographers'" className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-xs resize-none h-24 focus:outline-none focus:ring-2 focus:ring-teal-400" />
+              </div>
+              {d.html && <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-xs text-amber-700">\u26a0 Generating new content will replace the existing content in this block.</div>}
+              <button onClick={handleAiGenerate} disabled={isAiGenerating || !aiPrompt.trim()} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gradient-to-r from-[#189aa1] to-[#17a2b8] hover:from-[#147f86] hover:to-[#138496] text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                {isAiGenerating ? <><Loader2 size={13} className="animate-spin" /> Generating...</> : <><Sparkles size={13} /> Generate Content</>}
+              </button>
+              {d.html && <button onClick={() => setAiMode("edit")} className="w-full text-xs text-gray-500 hover:text-gray-700 underline">View / edit existing content instead</button>}
+            </div>
+          )}
+          {aiMode === "edit" && (
+            <div className="space-y-3">
+              {!d.html && <div className="bg-teal-50 border border-teal-100 rounded-md px-3 py-2 text-xs text-teal-600 flex items-center gap-1.5"><Sparkles size={12} /> Use the AI Prompt tab to generate content first, or start typing below.</div>}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Content</label>
+                <RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={200} maxHeight={500} placeholder="Start typing or use AI Prompt to generate content..." />
+              </div>
+              <button onClick={() => setAiMode("prompt")} className="w-full flex items-center justify-center gap-1.5 text-xs text-teal-600 hover:text-teal-800 font-medium py-1.5 rounded border border-teal-200 bg-teal-50 hover:bg-teal-100 transition-colors">
+                <Sparkles size={11} /> Regenerate with AI
+              </button>
+            </div>
+          )}
+          <BSAlignField data={d} onSet={set} label="Text Alignment" field="align" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
         </div>
       );
     }
