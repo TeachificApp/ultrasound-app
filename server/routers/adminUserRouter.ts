@@ -3075,7 +3075,7 @@ export const adminUserRouter = router({
             c.slug AS courseSlug,
             c.type AS courseType,
             u.email AS userEmail,
-            COALESCE(u.display_name, u.name, u.email) AS userName
+            COALESCE(u.name, u.email) AS userName
           FROM lms_enrollments e
           JOIN lms_courses c ON c.id = e.course_id
           JOIN users u ON u.id = e.user_id
