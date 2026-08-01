@@ -383,4 +383,131 @@ export const cmeActivityFormRouter = router({
 
       return { url };
     }),
+
+  // ── Send form PDF to CardioServ via email ─────────────────────────────────
+  sendCmeFormToCardioServ: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      /** Editable email subject */
+      subject: z.string().min(1).max(512),
+      /** Editable email body (plain text, will be wrapped in HTML) */
+      body: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [form] = await db
+        .select()
+        .from(cmeActivityForms)
+        .where(eq(cmeActivityForms.courseId, input.courseId))
+        .limit(1);
+
+      const [course] = await db
+        .select({ id: lmsCourses.id, title: lmsCourses.title, creditHours: lmsCourses.creditHours, slug: lmsCourses.slug })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, input.courseId))
+        .limit(1);
+
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+
+      const formData = form ?? {
+        courseId: input.courseId,
+        activityTitle: course.title,
+        activityType: "enduring",
+        proposedDate: "",
+        activityLengthHours: course.creditHours ?? "",
+        cmeCreditsRequested: course.creditHours ?? "",
+        offerMocCredit: "no",
+        offeredMoreThanOnce: "not_yet_determined",
+        activityStructure: "ongoing",
+        targetAudience: "sonographers",
+        estimatedLearners: "",
+        practiceGapDescription: "",
+        practiceGapReasons: "",
+        improvementTypes: JSON.stringify(["knowledge", "competence", "performance"]),
+        improvementKnowledgeText: "",
+        improvementCompetenceText: "",
+        improvementPerformanceText: "",
+        learnerOutcomes: "",
+        learningObjectives: "",
+        deliveryDescription: "Recorded video presentation with written content and quiz module.",
+        activityIncludes: JSON.stringify(["knowledge_check"]),
+        assessmentMethods: JSON.stringify(["post_test", "learner_evaluation"]),
+        facultyJson: JSON.stringify([{ name: "Lara Williams", credentials: "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE", role: "Planner, Presenter" }]),
+        contentStatus: "fully_developed",
+        contentAvailableDate: "Available now",
+        marketingChannels: JSON.stringify(["email", "website", "social_media"]),
+        marketingMentionsCme: "yes",
+        registrationFee: "yes",
+        attestationName: "Lara Williams",
+        attestationDate: "",
+        attestationTitle: "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE",
+        signatureDataUrl: null,
+        createdAt: null,
+        updatedAt: null,
+      };
+
+      // Generate PDF
+      const pdfBuffer = await generateCmeActivityPdf(formData as any);
+
+      // Build HTML email body from the plain-text body
+      const htmlBody = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:Arial,sans-serif;font-size:15px;color:#1e293b;line-height:1.7;max-width:640px;margin:0 auto;padding:24px;">
+${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">${line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>` : '<br/>').join('')}
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;"/>
+<p style="font-size:12px;color:#94a3b8;">Sent from All About Ultrasound CME Administration</p>
+</body></html>`;
+
+      const apiKey = process.env.SENDGRID_API_KEY;
+      if (!apiKey) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Email service not configured" });
+
+      const pdfBase64 = pdfBuffer.toString("base64");
+      const safeTitle = (course.title ?? "CME-Activity-Form").replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-");
+      const filename = `${safeTitle}-CME-Activity-Form.pdf`;
+
+      const senderEmail = process.env.SENDGRID_FROM_EMAIL || "admin@allaboutultrasound.com";
+
+      const payload = {
+        personalizations: [{
+          to: [{ name: "Don Gerig", email: "don@cardioserv.net" }],
+          cc: [
+            { name: "Judith Buckland", email: "j.buckland@cardioserv.net" },
+            { name: "All About Ultrasound Admin", email: "admin@allaboutultrasound.com" },
+          ],
+          subject: input.subject,
+        }],
+        from: { name: "All About Ultrasound", email: senderEmail },
+        reply_to: { name: "All About Ultrasound", email: senderEmail },
+        content: [{ type: "text/html", value: htmlBody }],
+        attachments: [{
+          content: pdfBase64,
+          type: "application/pdf",
+          filename,
+          disposition: "attachment",
+        }],
+        tracking_settings: {
+          click_tracking: { enable: false },
+          open_tracking: { enable: false },
+        },
+      };
+
+      const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(`[CME Email] SendGrid error ${res.status}: ${text}`);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Email send failed: ${res.status}` });
+      }
+
+      console.log(`[CME Email] Sent "${input.subject}" to don@cardioserv.net for course ${course.title}`);
+      return { success: true };
+    }),
 });

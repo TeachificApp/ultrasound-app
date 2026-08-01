@@ -19,8 +19,11 @@ import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Sparkles, Download, Save, ChevronDown, ChevronUp,
   FileText, RefreshCw, Calendar, CheckSquare, Square,
-  PenLine, Trash2, FileDown,
+  PenLine, Trash2, FileDown, Send, Mail,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import SignaturePad from "signature_pad";
 
@@ -382,6 +385,66 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
   const [downloading, setDownloading] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
+  // ── Send to CardioServ state ────────────────────────────────────────────
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [sendSubject, setSendSubject] = useState("");
+  const [sendBody, setSendBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const sendMutation = trpc.lmsAdmin.sendCmeFormToCardioServ.useMutation();
+
+  const landingPageUrl = `https://learn.allaboutultrasound.com/courses/${encodeURIComponent(courseTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""))}`;
+
+  const openSendDialog = () => {
+    const credits = form.cmeCreditsRequested || creditHours || "";
+    setSendSubject(`CME Activity Planning & Proposal Form — ${form.activityTitle || courseTitle}${credits ? ` (${credits} CME)` : ""}`);
+    setSendBody(
+`Dear Don and Judith,
+
+Please find attached the CME Activity Planning & Proposal Form for the following enduring activity:
+
+Activity Title: ${form.activityTitle || courseTitle}
+CME Credits Requested: ${credits || "—"}
+Activity Structure: Ongoing / Evergreen
+Content Status: ${form.contentStatus === "fully_developed" ? "Fully Developed" : form.contentStatus || "—"}
+
+Course Landing Page: ${landingPageUrl}
+
+Please let us know if you need any additional information or revisions.
+
+Best regards,
+Lara Williams
+All About Ultrasound`
+    );
+    setSendDialogOpen(true);
+  };
+
+  const handleSendToCardioServ = async () => {
+    setSending(true);
+    try {
+      // Save first to ensure latest data is used
+      await saveMutation.mutateAsync({
+        courseId,
+        data: {
+          ...form,
+          improvementTypes: JSON.stringify(form.improvementTypes),
+          activityIncludes: JSON.stringify(form.activityIncludes),
+          assessmentMethods: JSON.stringify(form.assessmentMethods),
+          facultyJson: JSON.stringify(form.facultyJson),
+          marketingChannels: JSON.stringify(form.marketingChannels),
+          attestationTitle: form.attestationTitle,
+          signatureDataUrl: form.signatureDataUrl,
+        },
+      });
+      await sendMutation.mutateAsync({ courseId, subject: sendSubject, body: sendBody });
+      toast.success("Email sent to CardioServ with PDF attached.");
+      setSendDialogOpen(false);
+    } catch (e: any) {
+      toast.error("Send failed: " + (e?.message ?? "Unknown error"));
+    } finally {
+      setSending(false);
+    }
+  };
+
   const utils = trpc.useUtils();
 
   // ── Load existing form ──────────────────────────────────────────────────
@@ -612,6 +675,10 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
           <Button type="button" size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf} className="text-xs bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white">
             {downloadingPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileDown className="w-3 h-3 mr-1" />}
             PDF
+          </Button>
+          <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-purple-600 hover:bg-purple-700 text-white">
+            <Mail className="w-3 h-3 mr-1" />
+            Send to CardioServ
           </Button>
         </div>
       </div>
@@ -871,7 +938,79 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
           {downloadingPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileDown className="w-3 h-3 mr-1" />}
           Download PDF
         </Button>
+        <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-purple-600 hover:bg-purple-700 text-white">
+          <Mail className="w-3 h-3 mr-1" />
+          Send to CardioServ
+        </Button>
       </div>
+
+      {/* Send to CardioServ Dialog */}
+      <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Mail className="w-4 h-4 text-purple-600" />
+              Send CME Form to CardioServ
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Recipients */}
+            <div className="rounded-lg bg-purple-50 border border-purple-200 p-3 text-xs space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-purple-700 w-8">To:</span>
+                <span className="text-gray-700">Don Gerig &lt;don@cardioserv.net&gt;</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-purple-700 w-8">CC:</span>
+                <span className="text-gray-700">Judith Buckland &lt;j.buckland@cardioserv.net&gt;, admin@allaboutultrasound.com</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-purple-700 w-8">📎</span>
+                <span className="text-gray-500 italic">CME Activity Planning & Proposal Form (PDF) — generated from current saved form</span>
+              </div>
+            </div>
+
+            {/* Subject */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-700">Subject</label>
+              <input
+                type="text"
+                value={sendSubject}
+                onChange={e => setSendSubject(e.target.value)}
+                className="w-full h-8 text-sm border border-gray-300 rounded px-3 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              />
+            </div>
+
+            {/* Body */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-700">Email Body <span className="text-gray-400">(editable)</span></label>
+              <textarea
+                value={sendBody}
+                onChange={e => setSendBody(e.target.value)}
+                rows={14}
+                className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 font-mono resize-y"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setSendDialogOpen(false)} disabled={sending}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSendToCardioServ}
+              disabled={sending || !sendSubject.trim() || !sendBody.trim()}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {sending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+              {sending ? "Sending…" : "Send Email"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
