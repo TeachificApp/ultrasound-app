@@ -102,7 +102,6 @@ import {
   BookOpen,
   FileText,
   SendHorizonal,
-  CheckCircle2,
   XCircle,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
