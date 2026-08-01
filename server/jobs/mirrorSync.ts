@@ -314,8 +314,14 @@ async function syncMedia(): Promise<SyncResult["mediaSync"]> {
     let skipped = 0;
     let failed = 0;
 
-    for (const url of Array.from(allUrls)) {
+    const urlArray = Array.from(allUrls);
+    // Process files sequentially with explicit buffer release to avoid OOM.
+    // Each file is downloaded, uploaded, then the buffer reference is cleared
+    // before moving to the next file.
+    for (let i = 0; i < urlArray.length; i++) {
+      const url = urlArray[i]!;
       const key = getR2Key(url);
+      let buffer: Buffer | null = null;
       try {
         const exists = await existsInR2(r2, bucket, key);
         if (exists) {
@@ -323,7 +329,7 @@ async function syncMedia(): Promise<SyncResult["mediaSync"]> {
           continue;
         }
 
-        const buffer = await downloadFile(url);
+        buffer = await downloadFile(url);
         const filename = url.split("/").pop() || "file";
         const contentType = getContentType(filename);
 
@@ -337,10 +343,20 @@ async function syncMedia(): Promise<SyncResult["mediaSync"]> {
         );
 
         uploaded++;
-        console.log(`[MirrorSync] Uploaded to R2: ${key}`);
+        console.log(`[MirrorSync] Uploaded to R2: ${key} (${i + 1}/${urlArray.length})`);
       } catch (err: any) {
         failed++;
         console.error(`[MirrorSync] Failed to sync ${key}: ${err.message}`);
+      } finally {
+        // Explicitly release buffer reference so GC can reclaim memory
+        buffer = null;
+      }
+      // Yield every 10 files to allow GC to run between uploads
+      if (i > 0 && i % 10 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        if (typeof global.gc === "function") {
+          try { global.gc(); } catch (_) { /* ignore */ }
+        }
       }
     }
 
@@ -426,12 +442,13 @@ export function startMirrorSync() {
     `[MirrorSync] Mirror sync enabled (Railway: ${hasRailway ? "✓" : "✗"}, R2: ${hasR2 ? "✓" : "✗"}). Interval: ${SYNC_INTERVAL_MS / 3600000}h`
   );
 
-  // Run first sync after a 2-minute delay (let server fully start)
+  // Run first sync after a 10-minute delay to avoid competing with other
+  // background jobs at startup and to let the server fully warm up.
   setTimeout(() => {
     runMirrorSync().catch((err) =>
       console.error("[MirrorSync] Initial sync failed:", err)
     );
-  }, 2 * 60 * 1000);
+  }, 10 * 60 * 1000);
 
   // Then run on interval
   setInterval(() => {
