@@ -129,7 +129,7 @@ function SsoLearnLinkButton({ slug, label }: { slug: string; label?: string }) {
 
 // ─── Course / Quiz / Download List Tab ──────────────────────────────────────
 
-function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: any; onEdit: (id: number) => void; onDuplicate: (id: number) => void; onDelete: (id: number, title: string) => void }) {
+function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: any; onEdit: (id: number) => void; onDuplicate: (id: number, title: string) => void; onDelete: (id: number, title: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: course.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   return (
@@ -147,7 +147,7 @@ function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: 
         <Edit2 className="w-3 h-3 mr-1" /> Edit
       </Button>
       <SsoLearnLinkButton slug={course.slug} />
-      <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Duplicate" onClick={() => onDuplicate(course.id)}>
+      <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Duplicate" onClick={() => onDuplicate(course.id, course.title)}>
         <Copy className="w-3 h-3" />
       </Button>
       <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => onDelete(course.id, course.title)}>
@@ -265,10 +265,55 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
     onSuccess: () => { toast.success("Course deleted"); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
+  // ── Copy Course Dialog State ──
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [copySourceId, setCopySourceId] = useState<number | null>(null);
+  const [copySourceTitle, setCopySourceTitle] = useState("");
+  const [copyNewName, setCopyNewName] = useState("");
+  const [copyAiReformat, setCopyAiReformat] = useState(true);
+  const [copyStep, setCopyStep] = useState<"idle" | "copying" | "reformatting" | "done">("idle");
+
   const duplicateCourse = trpc.lmsAdmin.duplicateCourse.useMutation({
-    onSuccess: (d) => { toast.success(`Duplicated as "${d.title}"`); refetch(); },
-    onError: e => toast.error(`Error: ${e.message}`),
+    onError: e => { toast.error(`Error: ${e.message}`); setCopyStep("idle"); },
   });
+  const reformatLandingPage = trpc.lmsAdmin.reformatLandingPage.useMutation({
+    onError: e => { toast.error(`Reformat error: ${e.message}`); setCopyStep("idle"); },
+  });
+  const renameCourse = trpc.lmsAdmin.updateCourse.useMutation({
+    onError: e => { toast.error(`Rename error: ${e.message}`); setCopyStep("idle"); },
+  });
+
+  const handleOpenCopyDialog = (id: number, title: string) => {
+    setCopySourceId(id);
+    setCopySourceTitle(title);
+    setCopyNewName(`${title} [Copy]`);
+    setCopyAiReformat(true);
+    setCopyStep("idle");
+    setCopyDialogOpen(true);
+  };
+
+  const handleCopyCourse = async () => {
+    if (!copySourceId || !copyNewName.trim()) return;
+    try {
+      setCopyStep("copying");
+      const result = await duplicateCourse.mutateAsync({ id: copySourceId });
+      if (copyAiReformat) {
+        setCopyStep("reformatting");
+        // AI reformat: rewrites all landing page text fields for the new course name
+        await reformatLandingPage.mutateAsync({ courseId: result.id, newCourseName: copyNewName.trim() });
+      } else {
+        // No AI reformat: just update the course title directly
+        setCopyStep("reformatting");
+        await renameCourse.mutateAsync({ id: result.id, title: copyNewName.trim() });
+      }
+      setCopyStep("done");
+      toast.success(`Course copied as "${copyNewName.trim()}"`);
+      refetch();
+      setTimeout(() => setCopyDialogOpen(false), 1200);
+    } catch {
+      setCopyStep("idle");
+    }
+  };
 
   const activeCourse = activeDragId ? localCourses.find((c: any) => c.id === activeDragId) : null;
 
@@ -340,7 +385,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
             <div className="space-y-2">
               {localCourses.map((c: any) => (
                 <SortableCourseRow key={c.id} course={c} onEdit={onEdit}
-                  onDuplicate={id => duplicateCourse.mutate({ id })}
+                  onDuplicate={(id, title) => handleOpenCopyDialog(id, title)}
                   onDelete={(id, title) => { if (confirm(`Delete "${title}"?`)) deleteCourse.mutate({ id }); }}
                 />
               ))}
@@ -362,7 +407,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
         <div className="space-y-2">
           {displayCourses.map((c: any) => (
             <SortableCourseRow key={c.id} course={c} onEdit={onEdit}
-              onDuplicate={id => duplicateCourse.mutate({ id })}
+              onDuplicate={(id, title) => handleOpenCopyDialog(id, title)}
               onDelete={(id, title) => { if (confirm(`Delete "${title}"?`)) deleteCourse.mutate({ id }); }}
             />
           ))}
@@ -383,6 +428,89 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
       )}
 
       <CreateCourseDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={id => { setCreateOpen(false); onEdit(id); refetch(); }} defaultType={typeFilter} />
+
+      {/* ── Copy Course Dialog ── */}
+      <Dialog open={copyDialogOpen} onOpenChange={open => { if (!open && copyStep === "idle") setCopyDialogOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="w-4 h-4 text-teal-600" /> Copy {typeLabel}
+            </DialogTitle>
+            <DialogDescription>
+              Copying: <span className="font-medium text-gray-700">{copySourceTitle}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {copyStep === "idle" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="copy-new-name">New {typeLabel} Name</Label>
+                  <Input
+                    id="copy-new-name"
+                    value={copyNewName}
+                    onChange={e => setCopyNewName(e.target.value)}
+                    placeholder={`Enter new ${typeLabel.toLowerCase()} name...`}
+                    autoFocus
+                    onKeyDown={e => { if (e.key === "Enter" && copyNewName.trim()) handleCopyCourse(); }}
+                  />
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-teal-50 border border-teal-100">
+                  <Switch
+                    id="copy-ai-reformat"
+                    checked={copyAiReformat}
+                    onCheckedChange={setCopyAiReformat}
+                    className="mt-0.5 flex-shrink-0"
+                  />
+                  <div className="space-y-0.5">
+                    <Label htmlFor="copy-ai-reformat" className="text-sm font-medium text-teal-800 cursor-pointer">
+                      <Sparkles className="w-3.5 h-3.5 inline mr-1 text-teal-600" />
+                      AI Reformat Landing Page
+                    </Label>
+                    <p className="text-xs text-teal-700">
+                      AI will rewrite all landing page text fields to match the new course name, preserving structure and format.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+            {(copyStep === "copying" || copyStep === "reformatting") && (
+              <div className="space-y-3 py-2">
+                <div className={`flex items-center gap-3 p-3 rounded-lg ${copyStep === "copying" ? "bg-teal-50 border border-teal-200" : "bg-gray-50 border border-gray-200"}`}>
+                  {copyStep === "copying" ? <Loader2 className="w-4 h-4 text-teal-600 animate-spin" /> : <CheckCircle className="w-4 h-4 text-green-500" />}
+                  <span className={`text-sm font-medium ${copyStep === "copying" ? "text-teal-700" : "text-gray-500"}`}>Copying course content...</span>
+                </div>
+                <div className={`flex items-center gap-3 p-3 rounded-lg ${copyStep === "reformatting" ? "bg-teal-50 border border-teal-200" : "bg-gray-50 border border-gray-200"}`}>
+                  {copyStep === "reformatting" ? <Loader2 className="w-4 h-4 text-teal-600 animate-spin" /> : <div className="w-4 h-4 rounded-full border-2 border-gray-300" />}
+                  <span className={`text-sm font-medium ${copyStep === "reformatting" ? "text-teal-700" : "text-gray-400"}`}>
+                    {copyAiReformat ? "AI reformatting landing page..." : "Updating course name..."}
+                  </span>
+                </div>
+              </div>
+            )}
+            {copyStep === "done" && (
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                <div>
+                  <p className="text-sm font-medium text-green-800">Course copied successfully!</p>
+                  <p className="text-xs text-green-600 mt-0.5">"{copyNewName}" is ready to edit.</p>
+                </div>
+              </div>
+            )}
+          </div>
+          {copyStep === "idle" && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCopyDialogOpen(false)}>Cancel</Button>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={handleCopyCourse}
+                disabled={!copyNewName.trim()}
+              >
+                <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy {typeLabel}
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1733,6 +1861,24 @@ function CertTemplateSelector({ value, onChange }: { value: number | null; onCha
 }
 
 function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }: { course: any; onSave: (data: any) => void; saving: boolean; onTypeChangedToWorkshop?: (newWorkshopId: number) => void }) {
+  const [reformatDialogOpen, setReformatDialogOpen] = useState(false);
+  const [reformatNewName, setReformatNewName] = useState("");
+  const [reformatStep, setReformatStep] = useState<"idle" | "running" | "done">("idle");
+  const reformatMutation = trpc.lmsAdmin.reformatLandingPage.useMutation({
+    onError: e => { toast.error(`Reformat error: ${e.message}`); setReformatStep("idle"); },
+  });
+  const handleReformatLandingPage = async () => {
+    if (!reformatNewName.trim()) return;
+    setReformatStep("running");
+    try {
+      await reformatMutation.mutateAsync({ courseId: course.id, newCourseName: reformatNewName.trim() });
+      setReformatStep("done");
+      toast.success("Landing page reformatted successfully!");
+      setTimeout(() => setReformatDialogOpen(false), 1200);
+    } catch {
+      setReformatStep("idle");
+    }
+  };
   const { data: settingsPricingOptions = [] } = trpc.lmsGroup.listPricingOptions.useQuery({ courseId: course.id });
   const firstActivePricingOption = (settingsPricingOptions as any[]).find((o: any) => o.isActive);
   const copyHostedCheckoutLink = () => {
@@ -1879,6 +2025,15 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-xs font-mono font-semibold text-gray-700 select-all cursor-text" title="Copy this ID to use in funnels, manual grants, and support tickets">{course.id}</span>
         <span className="text-xs text-gray-400">— use this ID for manual grants &amp; support</span>
         <div className="flex-1" />
+        {/* Reformat Landing Page with AI */}
+        <Button
+          variant="outline"
+          className="border-teal-300 text-teal-700 hover:bg-teal-50 h-9 text-sm"
+          onClick={() => { setReformatNewName(title || course.title || ""); setReformatStep("idle"); setReformatDialogOpen(true); }}
+          title="Use AI to rewrite all landing page text fields for a new course name"
+        >
+          <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Reformat Landing Page
+        </Button>
         {/* Top Save Button */}
         <Button
           className="bg-teal-600 hover:bg-teal-700 text-white"
@@ -2582,6 +2737,66 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
       >
         {saving ? "Saving..." : "Save Settings"}
       </Button>
+
+      {/* ── Reformat Landing Page Dialog ── */}
+      <Dialog open={reformatDialogOpen} onOpenChange={open => { if (!open && reformatStep === "idle") setReformatDialogOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-teal-600" /> Reformat Landing Page with AI
+            </DialogTitle>
+            <DialogDescription>
+              AI will rewrite all landing page text fields to match the new course name, preserving structure and format.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {reformatStep === "idle" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="reformat-name">Course Name to Use</Label>
+                <Input
+                  id="reformat-name"
+                  value={reformatNewName}
+                  onChange={e => setReformatNewName(e.target.value)}
+                  placeholder="Enter the course name for AI to reformat around..."
+                  autoFocus
+                  onKeyDown={e => { if (e.key === "Enter" && reformatNewName.trim()) handleReformatLandingPage(); }}
+                />
+                <p className="text-xs text-gray-500">AI will update all landing page text to reflect this name. The course title will also be updated.</p>
+              </div>
+            )}
+            {reformatStep === "running" && (
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-teal-50 border border-teal-200">
+                <Loader2 className="w-5 h-5 text-teal-600 animate-spin" />
+                <div>
+                  <p className="text-sm font-medium text-teal-800">AI is reformatting your landing page...</p>
+                  <p className="text-xs text-teal-600 mt-0.5">This may take 15–30 seconds.</p>
+                </div>
+              </div>
+            )}
+            {reformatStep === "done" && (
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                <div>
+                  <p className="text-sm font-medium text-green-800">Landing page reformatted!</p>
+                  <p className="text-xs text-green-600 mt-0.5">All text fields have been updated for "{reformatNewName}".</p>
+                </div>
+              </div>
+            )}
+          </div>
+          {reformatStep === "idle" && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReformatDialogOpen(false)}>Cancel</Button>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={handleReformatLandingPage}
+                disabled={!reformatNewName.trim()}
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Reformat with AI
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

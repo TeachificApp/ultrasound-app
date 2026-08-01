@@ -1362,7 +1362,75 @@ CRITICAL REQUIREMENTS:
         }
       }
 
-      return { id: newCourseId, slug: newSlug, title: newTitle };
+            return { id: newCourseId, slug: newSlug, title: newTitle };
+    }),
+
+  // ── AI Landing Page Reformat ──────────────────────────────────────────────
+  reformatLandingPage: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      newCourseName: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Fetch course and landing page
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+      const [lp] = await db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
+
+      const oldName = course.title;
+      const newName = input.newCourseName;
+
+      // Rewrite a single text field preserving structure/format
+      async function rewriteField(fieldName: string, oldValue: string | null | undefined, isHtml = false): Promise<string | null> {
+        if (!oldValue || oldValue.trim().length < 4) return oldValue ?? null;
+        const systemPrompt = `You are a medical education copywriter for an ultrasound training platform. You are reformatting existing course landing page content for a new course. Preserve the EXACT same structure, tone, format, length, and style as the original. Only change references to the old course name and update the clinical/educational content to be relevant to the new course. Do NOT add new sections, change the format, or alter the writing style. ${isHtml ? "The content is HTML — preserve all HTML tags exactly, only change the text content inside tags." : "Return plain text only."} Use United States English spelling.`;
+        const userPrompt = `Old course name: "${oldName}"\nNew course name: "${newName}"\nField: ${fieldName}\n\nOriginal content:\n${oldValue}\n\nRewrite this content so it applies to "${newName}" instead of "${oldName}". Preserve the exact same structure, format, length, and style.`;
+        const resp = await invokeLLM({ messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }] });
+        return resp?.choices?.[0]?.message?.content?.trim() ?? oldValue;
+      }
+
+      // Rewrite course-level text fields
+      const newSubtitle = await rewriteField("subtitle", course.subtitle);
+      const newDescription = await rewriteField("description", course.description, true);
+      const newMetaTitle = await rewriteField("SEO meta title", course.metaTitle);
+      const newMetaDescription = await rewriteField("SEO meta description", course.metaDescription);
+
+      await db.update(lmsCourses).set({
+        title: newName,
+        subtitle: newSubtitle ?? undefined,
+        description: newDescription ?? undefined,
+        metaTitle: newMetaTitle ?? undefined,
+        metaDescription: newMetaDescription ?? undefined,
+      }).where(eq(lmsCourses.id, input.courseId));
+
+      // Rewrite landing page fields
+      if (lp) {
+        const newHeroTitle = await rewriteField("hero title", lp.heroTitle);
+        const newHeroSubtitle = await rewriteField("hero subtitle", lp.heroSubtitle);
+        const newBodyContent = await rewriteField("body content", lp.bodyContent, true);
+        const newWhatYouLearn = await rewriteField("what you will learn", lp.whatYouLearn, true);
+        const newRequirements = await rewriteField("requirements / prerequisites", lp.requirements, true);
+        const newSeoTitle = await rewriteField("SEO title", lp.seoTitle);
+        const newSeoDescription = await rewriteField("SEO description", lp.seoDescription);
+
+        await db.update(lmsLandingPages).set({
+          heroTitle: newHeroTitle ?? undefined,
+          heroSubtitle: newHeroSubtitle ?? undefined,
+          bodyContent: newBodyContent ?? undefined,
+          whatYouLearn: newWhatYouLearn ?? undefined,
+          requirements: newRequirements ?? undefined,
+          seoTitle: newSeoTitle ?? undefined,
+          seoDescription: newSeoDescription ?? undefined,
+        }).where(eq(lmsLandingPages.courseId, input.courseId));
+      } else {
+        await db.insert(lmsLandingPages).values({ courseId: input.courseId, heroTitle: newName, ctaText: "Enroll Now" });
+      }
+
+      return { success: true, newTitle: newName };
     }),
 
   // ── Block Picker: fetch lessons with contentBlocks from a course ──
