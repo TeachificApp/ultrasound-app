@@ -359,8 +359,8 @@ export async function generateCmeActivityDocx(form: Record<string, any>): Promis
   children.push(warningText("Commercial support is not permitted unless prior written approval is granted by CardioServ."));
   children.push(new Paragraph({ children: [new TextRun({ text: "Final revenue reporting details will follow the joint provider agreement and CardioServ guidance.", size: 20 })], spacing: { after: 80 } }));
 
-  // ── Section 10: Attestation ───────────────────────────────────────────────
-  children.push(sectionHeading("Section 10: Attestation"));
+  // ── Section 10: Attestation & Signature ───────────────────────────────────
+  children.push(sectionHeading("Section 10: Attestation & Signature"));
 
   children.push(new Paragraph({ children: [new TextRun({ text: "I confirm that:", size: 20 })], spacing: { after: 80 } }));
   for (const stmt of [
@@ -380,11 +380,30 @@ export async function generateCmeActivityDocx(form: Record<string, any>): Promis
   children.push(new Paragraph({
     children: [
       new TextRun({ text: "Name: ", bold: true, size: 22 }),
-      new TextRun({ text: form.attestationName ?? "Lara Williams", size: 22 }),
-      new TextRun({ text: "     Date: ", bold: true, size: 22 }),
-      new TextRun({ text: form.attestationDate ?? "", size: 22 }),
+      new TextRun({ text: (form as any).attestationName ?? "Lara Williams", size: 22 }),
+      new TextRun({ text: "     Title: ", bold: true, size: 22 }),
+      new TextRun({ text: (form as any).attestationTitle ?? "", size: 22 }),
     ],
     spacing: { after: 80 },
+  }));
+  children.push(new Paragraph({
+    children: [
+      new TextRun({ text: "Date: ", bold: true, size: 22 }),
+      new TextRun({ text: (form as any).attestationDate ?? "", size: 22 }),
+    ],
+    spacing: { after: 160 },
+  }));
+  // Signature line
+  children.push(new Paragraph({
+    children: [new TextRun({ text: "Signature:", bold: true, size: 22 })],
+    spacing: { after: 80 },
+  }));
+  children.push(new Paragraph({
+    children: [new TextRun({ text: " ", size: 22 })],
+    border: {
+      bottom: { style: BorderStyle.SINGLE, size: 6, color: "AAAAAA" },
+    },
+    spacing: { before: 400, after: 200 },
   }));
 
   // ── Build document ────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
  *   🟢 GREEN   = AI-generated from course title (editable after generation)
  *   🔵 BLUE    = list/checkbox/radio selection
  */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,88 @@ import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Sparkles, Download, Save, ChevronDown, ChevronUp,
   FileText, RefreshCw, Calendar, CheckSquare, Square,
+  PenLine, Trash2, FileDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import SignaturePad from "signature_pad";
+
+// ─── Signature Canvas Component ──────────────────────────────────────────────
+function SignatureCanvas({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const padRef = useRef<SignaturePad | null>(null);
+  const [mode, setMode] = useState<"draw" | "type">(value && !value.startsWith("data:image") ? "type" : "draw");
+  const [typedSig, setTypedSig] = useState(value && !value.startsWith("data:image") ? value : "");
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const pad = new SignaturePad(canvas, { penColor: "#1a1a2e", backgroundColor: "rgba(0,0,0,0)" });
+    padRef.current = pad;
+    if (value && value.startsWith("data:image")) {
+      pad.fromDataURL(value);
+    }
+    pad.addEventListener("endStroke", () => {
+      onChange(pad.toDataURL());
+    });
+    // Resize observer
+    const ro = new ResizeObserver(() => {
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = canvas.offsetWidth * ratio;
+      canvas.height = canvas.offsetHeight * ratio;
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.scale(ratio, ratio);
+      pad.clear();
+      if (value && value.startsWith("data:image")) pad.fromDataURL(value);
+    });
+    ro.observe(canvas);
+    return () => { ro.disconnect(); pad.off(); };
+  }, []);
+
+  const clearPad = () => {
+    padRef.current?.clear();
+    onChange(null);
+  };
+
+  const handleTyped = (v: string) => {
+    setTypedSig(v);
+    // Render typed signature to canvas-like data URL using a simple SVG
+    if (!v.trim()) { onChange(null); return; }
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="80"><text x="10" y="60" font-family="Georgia, serif" font-size="36" fill="#1a1a2e" font-style="italic">${v.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</text></svg>`;
+    const dataUrl = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+    onChange(dataUrl);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setMode("draw")} className={cn("text-xs px-2 py-1 rounded border", mode === "draw" ? "bg-[#189aa1] text-white border-[#189aa1]" : "border-gray-300 text-gray-600 hover:bg-gray-50")}>✏️ Draw</button>
+        <button type="button" onClick={() => setMode("type")} className={cn("text-xs px-2 py-1 rounded border", mode === "type" ? "bg-[#189aa1] text-white border-[#189aa1]" : "border-gray-300 text-gray-600 hover:bg-gray-50")}>⌨️ Type</button>
+        {value && <button type="button" onClick={clearPad} className="text-xs px-2 py-1 rounded border border-red-200 text-red-500 hover:bg-red-50 ml-auto flex items-center gap-1"><Trash2 className="w-3 h-3" />Clear</button>}
+      </div>
+      {mode === "draw" ? (
+        <div className="relative border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 100 }}>
+          <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" style={{ touchAction: "none" }} />
+          {!value && <p className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 pointer-events-none">Draw signature here</p>}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <Input
+            value={typedSig}
+            onChange={e => handleTyped(e.target.value)}
+            placeholder="Type your name to generate a signature"
+            className="h-9 text-sm border-gray-300 italic font-serif text-lg"
+            style={{ fontFamily: "Georgia, serif", fontStyle: "italic" }}
+          />
+          {typedSig && (
+            <div className="border rounded p-2 bg-white text-center" style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontSize: 28, color: "#1a1a2e", minHeight: 50 }}>
+              {typedSig}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface FormData {
@@ -53,6 +133,8 @@ interface FormData {
   registrationFee: string;
   attestationName: string;
   attestationDate: string;
+  attestationTitle: string;
+  signatureDataUrl: string | null;
 }
 
 const DEFAULT_FORM: FormData = {
@@ -85,6 +167,8 @@ const DEFAULT_FORM: FormData = {
   registrationFee: "yes",
   attestationName: "Lara Williams",
   attestationDate: "",
+  attestationTitle: "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE",
+  signatureDataUrl: null,
 };
 
 // ─── Helper: parse JSON array from DB string ──────────────────────────────────
@@ -296,6 +380,7 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
   const [aiGenerating, setAiGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -338,6 +423,8 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
         registrationFee: f.registrationFee ?? "yes",
         attestationName: f.attestationName ?? "Lara Williams",
         attestationDate: f.attestationDate ?? "",
+        attestationTitle: f.attestationTitle ?? "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE",
+        signatureDataUrl: f.signatureDataUrl ?? null,
       });
       setLoaded(true);
     }
@@ -391,6 +478,8 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
           assessmentMethods: JSON.stringify(form.assessmentMethods),
           facultyJson: JSON.stringify(form.facultyJson),
           marketingChannels: JSON.stringify(form.marketingChannels),
+          attestationTitle: form.attestationTitle,
+          signatureDataUrl: form.signatureDataUrl,
         },
       });
       toast.success("CME Activity Form saved.");
@@ -404,6 +493,7 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
 
   // ── Download DOCX ───────────────────────────────────────────────────────
   const downloadMutation = trpc.lmsAdmin.downloadCmeActivityForm.useMutation();
+  const downloadPdfMutation = trpc.lmsAdmin.downloadCmeActivityFormPdf.useMutation();
 
   const handleDownload = async () => {
     // Save first to ensure latest data is used
@@ -418,6 +508,8 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
           assessmentMethods: JSON.stringify(form.assessmentMethods),
           facultyJson: JSON.stringify(form.facultyJson),
           marketingChannels: JSON.stringify(form.marketingChannels),
+          attestationTitle: form.attestationTitle,
+          signatureDataUrl: form.signatureDataUrl,
         },
       });
       const result = await downloadMutation.mutateAsync({ courseId });
@@ -435,6 +527,39 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
       toast.error("Download failed: " + (e?.message ?? "Unknown error"));
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      await saveMutation.mutateAsync({
+        courseId,
+        data: {
+          ...form,
+          improvementTypes: JSON.stringify(form.improvementTypes),
+          activityIncludes: JSON.stringify(form.activityIncludes),
+          assessmentMethods: JSON.stringify(form.assessmentMethods),
+          facultyJson: JSON.stringify(form.facultyJson),
+          marketingChannels: JSON.stringify(form.marketingChannels),
+          attestationTitle: form.attestationTitle,
+          signatureDataUrl: form.signatureDataUrl,
+        },
+      });
+      const result = await downloadPdfMutation.mutateAsync({ courseId });
+      const a = document.createElement("a");
+      a.href = result.url;
+      const safeTitle = (courseTitle ?? "cme-form").replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
+      a.download = `cme-activity-form-${safeTitle}.pdf`;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success("PDF ready — downloading now.");
+    } catch (e: any) {
+      toast.error("PDF download failed: " + (e?.message ?? "Unknown error"));
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -475,7 +600,11 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
           </Button>
           <Button type="button" size="sm" onClick={handleDownload} disabled={downloading} className="text-xs bg-[#189aa1] hover:bg-[#147f85] text-white">
             {downloading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
-            Download DOCX
+            DOCX
+          </Button>
+          <Button type="button" size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf} className="text-xs bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white">
+            {downloadingPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileDown className="w-3 h-3 mr-1" />}
+            PDF
           </Button>
         </div>
       </div>
@@ -688,8 +817,8 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
         </p>
       </Section>
 
-      {/* ── Section 10: Attestation ── */}
-      <Section number={10} title="Attestation">
+      {/* ── Section 10: Attestation & Signature ── */}
+      <Section number={10} title="Attestation & Signature">
         <div className="text-xs text-gray-700 space-y-1 bg-gray-50 rounded p-3 border">
           <p className="font-medium mb-2">I confirm that:</p>
           {[
@@ -702,12 +831,22 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
             <p key={i} className="flex items-start gap-2"><span className="text-[#189aa1] mt-0.5">•</span>{s}</p>
           ))}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <Label className="text-xs font-medium text-gray-700">Name</Label>
             <Input value={form.attestationName} onChange={e => set("attestationName", e.target.value)} className="mt-1 h-8 text-sm border-green-400 bg-green-50" />
           </div>
+          <div>
+            <Label className="text-xs font-medium text-gray-700">Title / Credentials</Label>
+            <Input value={form.attestationTitle} onChange={e => set("attestationTitle", e.target.value)} className="mt-1 h-8 text-sm border-green-400 bg-green-50" placeholder="e.g. BS, RDCS, FASE" />
+          </div>
           <YellowField label="Date" value={form.attestationDate} onChange={v => set("attestationDate", v)} placeholder="e.g. 7/29/2026" />
+        </div>
+        <div>
+          <Label className="text-xs font-medium text-gray-700 flex items-center gap-1 mb-2">
+            <PenLine className="w-3 h-3" /> Signature
+          </Label>
+          <SignatureCanvas value={form.signatureDataUrl} onChange={v => set("signatureDataUrl", v)} />
         </div>
       </Section>
 
@@ -721,7 +860,12 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
           {downloading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
           Download DOCX
         </Button>
+        <Button type="button" size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf} className="text-xs bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white">
+          {downloadingPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileDown className="w-3 h-3 mr-1" />}
+          Download PDF
+        </Button>
       </div>
     </div>
   );
 }
+

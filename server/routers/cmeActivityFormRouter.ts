@@ -17,6 +17,7 @@ import { cmeActivityForms, lmsCourses } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
 import { generateCmeActivityDocx } from "../lib/cmeActivityDocx";
+import { generateCmeActivityPdf } from "../lib/cmeActivityPdf";
 
 // ─── Zod schema for the form data ────────────────────────────────────────────
 const cmeFormDataSchema = z.object({
@@ -49,6 +50,8 @@ const cmeFormDataSchema = z.object({
   registrationFee: z.string().max(32).optional().nullable(),
   attestationName: z.string().max(256).optional().nullable(),
   attestationDate: z.string().max(64).optional().nullable(),
+  attestationTitle: z.string().max(256).optional().nullable(),
+  signatureDataUrl: z.string().optional().nullable(),
 });
 
 // ─── AI generation helper ─────────────────────────────────────────────────────
@@ -228,6 +231,8 @@ export const cmeActivityFormRouter = router({
         registrationFee: "yes",
         attestationName: "Lara Williams",
         attestationDate: "",
+        attestationTitle: "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE",
+        signatureDataUrl: null,
         createdAt: null,
         updatedAt: null,
       };
@@ -343,6 +348,38 @@ export const cmeActivityFormRouter = router({
         docxBuffer,
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       );
+
+      return { url };
+    }),
+
+  // ── Download as PDF ────────────────────────────────────────────────────────────────────
+  downloadCmeActivityFormPdf: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [course] = await db
+        .select({ title: lmsCourses.title })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, input.courseId))
+        .limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+
+      const [existing] = await db
+        .select()
+        .from(cmeActivityForms)
+        .where(eq(cmeActivityForms.courseId, input.courseId))
+        .limit(1);
+
+      const formData = existing ?? { activityTitle: course.title };
+
+      const pdfBuffer = await generateCmeActivityPdf(formData as any);
+
+      const safeTitle = (course.title ?? "cme-form").replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
+      const key = `cme-forms/${safeTitle}-${Date.now()}.pdf`;
+      const { url } = await storagePut(key, pdfBuffer, "application/pdf");
 
       return { url };
     }),

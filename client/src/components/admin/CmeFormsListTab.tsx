@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   CheckCircle, Clock, AlertCircle, Download, Edit2, Search,
-  Loader2, FileText, RefreshCw,
+  Loader2, FileText, RefreshCw, FileDown,
 } from "lucide-react";
 import { CmeActivityFormPanel } from "./CmeActivityFormPanel";
 
@@ -69,12 +69,34 @@ export function CmeFormsListTab() {
   const [editCourseTitle, setEditCourseTitle] = useState("");
   const [editCreditHours, setEditCreditHours] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<number | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState<number | null>(null);
 
   const { data, isLoading, refetch } = trpc.lmsAdmin.listCmeActivityForms.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
 
   const downloadMutation = trpc.lmsAdmin.downloadCmeActivityForm.useMutation();
+  const downloadPdfMutation = trpc.lmsAdmin.downloadCmeActivityFormPdf.useMutation();
+
+  const handleDownloadPdf = async (courseId: number, courseTitle: string) => {
+    setDownloadingPdf(courseId);
+    try {
+      const result = await downloadPdfMutation.mutateAsync({ courseId });
+      const a = document.createElement("a");
+      a.href = result.url;
+      const safeTitle = courseTitle.replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
+      a.download = `cme-activity-form-${safeTitle}.pdf`;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success(`PDF ready — downloading "${courseTitle}"`);
+    } catch (e: any) {
+      toast.error("PDF download failed: " + (e?.message ?? "Unknown error"));
+    } finally {
+      setDownloadingPdf(null);
+    }
+  };
 
   const handleDownload = async (courseId: number, courseTitle: string) => {
     setDownloading(courseId);
@@ -255,6 +277,19 @@ export function CmeFormsListTab() {
                         {downloading === row.id
                           ? <Loader2 className="w-3 h-3 animate-spin" />
                           : <Download className="w-3 h-3" />
+                        }
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-gray-500 hover:bg-gray-100"
+                        disabled={downloadingPdf === row.id}
+                        onClick={() => handleDownloadPdf(row.id, row.title)}
+                        title="Download PDF"
+                      >
+                        {downloadingPdf === row.id
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <FileDown className="w-3 h-3" />
                         }
                       </Button>
                     </div>
