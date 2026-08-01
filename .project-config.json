@@ -16,10 +16,10 @@
   ],
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663401463434/UrcfdRVE8J6mpMNR48QuFe",
-    "access_key_id": "ASIAZV3A2ECZJ5MBO2SI",
-    "secret_access_key": "M6lQDz6yhEpevM9+XrX6sUeX1eJuoSwNYQH1Jx91",
-    "session_token": "IQoJb3JpZ2luX2VjENH//////////wEaCXVzLWVhc3QtMSJIMEYCIQCmdtC+DmpGqlWwUuWBqUpUNWchpc+lGV8qpKRS/pGaqwIhANE+/Lj7kzrs6fRAorCIqVxnCbtMcVuqYgFCcSnzIl0iKv4DCJr//////////wEQBBoMNjY1Mzg2MDk4ODY2IgwRWBYpZAn4YZIB8VIq0gMvOlaMFrEJoNM4jwT93ey2CMCe9OfwYtax8kIYw9jG/+XUj8aB5n4xbFqdfg+55sfz71i1nhHcasb+C0Hbbl/LHJ8lGF8z2sMKjgBuLCefaAU6GYR/uCJRop74XoZi+xzFOWxrtIKGxqdSh5x040Sge81lCgG03YnQU7lJ+84ufLslCuF7l2NeTC4kKqxaX78VAqnI6yYLbb1+9XFq0sOMIAnVrhVbZBYDO3HCpkHJYFqR1nP/Hc9vhLJj74Aa2HDQUHz6bgXCqwjyinIrcjRj01ao2cvT28wqr8J4bzSSMu9rkDIyZycwgdgsJ1cvaGWR05sNNNVFraIiaZxF7NrqkXSbo7D9ck2SZg46eKb0gQGKjZvawC/BHX3ws1s+nvGwGDIL/jJiuXKQB/2ibfwwGktcAHUXgDF5L/yrIqHTmuhiEjnATpUKU1CDsCWRTDzCKa5Bpz4+G6neckPSLaQyk40nQDXCjmZoe4v0nAXF/Lx0hLUouUx1xSYmrhQOFnRebunTLIXIHZ5eSFC0TbAxChMbYz4VeqRMcgottEPqb4UC4o2Q5k24g6ihxi1oquZr+Dq3/eXEpHvEv4aoTe8AWSMmHK2WsiTVmwZdt59PgdW8MKb5rdMGOpwBs9xjSokUkDghANNEyka4MJlP/GZ7S4X5XSUFH2EJK3NEBdKUUfHJofqssa4Q0UvPnlZN/AHICPnODt1fwK6yQU4myboBMw9P4Q/sEag2SvcXZUPVV0I1OOGYCFSoRYCE1JnD3LaVm33ao39NZO+VZxSTXetTvmyF4Co5lIKy6F3ky/DiVhpKKJ1Xce35VHAd78pb96TkRW3wiHw3",
-    "expiration": "2026-07-31T04:32:38.000Z",
+    "access_key_id": "ASIAZV3A2ECZKMCQII5I",
+    "secret_access_key": "zw5jLOJtk9UO2plKZN7Fb42lXy6H64XOKk89ArZY",
+    "session_token": "IQoJb3JpZ2luX2VjEPz//////////wEaCXVzLWVhc3QtMSJIMEYCIQCGUqcwIzTnDX6/xhJo1lfkXTJv1frLxx3V4decjtsb1wIhAJmFwnanTZhAfQfOPxCqpMzKU5RzPJaoo5Ssyiguimw6Kv4DCMX//////////wEQBBoMNjY1Mzg2MDk4ODY2IgyiteY7R2K1uZkUdfsq0gMK6gO2TqLzRW5ANuvLBdCAr77fQDATPzO14bSX3az8W5D3yQ936u2+R4dXLBd52ydFGAEzhEhbXviWGaldbCERrDg583g3mPeBeCwVe4f4Bf8OV6vzM0SHV9x1oyf6rldyFBRC2gESiA5Eg80vvXKaAUMgwVKy6EeHZWs3vQGrV37rW4saIyfVrRqHcD+t+VC1JYcjBo+nPq3/AYBSbwnA6YdSa790v4TTi0jz3mUXdi/ToJ0Y+20bIlmznl8w+g4FUbZTTAw5Eqag43oQLtNBoyGPNNlwI7zPjjATrFUBklqYK6kTm5jXRuviEBr9otufFnVTSojh4Uwm8PImfytVRvfHctrntVbK/fLWYVZMofu60Ur6HCmwFkG7PD3FX9/SLplUEHouLu0JtNlrUqAaq38BocZ20HAt7ZLTs+emwv09zM8QsbCXALYwiFVs8Ps31oe5kpbFAYcVaO49jCAQqCgvcdybTnndJie5ufRWGjO/sFvVuqI/D2fIndxaqcnaY7nt8vxYzr5PkUe/V6h9o6Q0f/kYYDkpFQZl/HQ3G/j8cAyX7sLk/4ySy1y6pR9YKb+bLomKq+ubcuGFffx0GdLFYfABU25yDyVrBT8tY5V4MP22t9MGOpwBuA0V8/CUP/6I6Snd0J8ZImJm7Z+x/cuJixT11V73VxINnoOphxNI8+SQh6mdKJZ9op3aRvhL7ERVUWDKPRXN/GFO438dr/hwl8pm5oJCMtHIeuDQ943cOGNeJqCrtr8B1vJ6oDIok3wNyT89ztUvXGqlVbcFs5AtJPIvmYUSuEiBUZ4j5dGa4qoPWtwbYZj/j7wdT0eoFAzLaMQf",
+    "expiration": "2026-08-01T23:41:49.000Z",
     "backend": "GIT_BACKEND_S3"
   },
   "name": "ultrasound-assist",
@@ -47,7 +47,7 @@
     "PLATFORM_ADMIN_EMAIL": "admin@allaboutultrasound.com",
     "PRINTFUL_API_KEY": "SeGTyxzdFbAwZLRKguJeZPjQ6GJydI6YqK7n4dhE",
     "RAILWAY_MYSQL_URL": "mysql://root:KruQyAdWBhuuYwueWWPYcirRtkUYbYNE@viaduct.proxy.rlwy.net:37790/railway",
-    "SENDGRID_API_KEY": "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",
+    "SENDGRID_API_KEY": "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",
     "SENDGRID_FROM_EMAIL": "admin@allaboutultrasound.com",
     "SENDGRID_FROM_NAME": "AllAboutUltrasound",
     "STRIPE_LIVE_PUBLISHABLE_KEY": "pk_live_4YnN7raY56bZeVZnM7b9t1tM",
