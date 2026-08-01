@@ -8046,8 +8046,8 @@ export const cmeActivityForms = mysqlTable("cme_activity_forms", {
   // Section 10: Attestation
   attestationName: varchar("attestationName", { length: 256 }),
   attestationDate: varchar("attestationDate", { length: 64 }),
-  attestationTitle: varchar("attestationTitle", { length: 255 }),
-  signatureDataUrl: longtext("signatureDataUrl"),
+  attestationTitle: varchar("attestation_title", { length: 255 }),
+  signatureDataUrl: longtext("signature_data_url"),
   // Meta
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
