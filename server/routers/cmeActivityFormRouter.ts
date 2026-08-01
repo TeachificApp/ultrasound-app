@@ -9,7 +9,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, leftJoin } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { assertAdmin } from "./lmsHelpers";
@@ -116,6 +116,61 @@ Return ONLY the JSON object, no additional text.`;
 }
 
 export const cmeActivityFormRouter = router({
+  // ── List all CME courses with form completion status ──────────────────────
+  listCmeActivityForms: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Get all courses that have a certificate (CME-eligible)
+      const courses = await db
+        .select({
+          id: lmsCourses.id,
+          title: lmsCourses.title,
+          slug: lmsCourses.slug,
+          status: lmsCourses.status,
+          creditHours: lmsCourses.creditHours,
+          hasCertificate: lmsCourses.hasCertificate,
+        })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.hasCertificate, true))
+        .orderBy(lmsCourses.title);
+
+      if (courses.length === 0) return [];
+
+      // Get all existing CME forms
+      const forms = await db
+        .select({
+          courseId: cmeActivityForms.courseId,
+          activityTitle: cmeActivityForms.activityTitle,
+          proposedDate: cmeActivityForms.proposedDate,
+          practiceGapDescription: cmeActivityForms.practiceGapDescription,
+          learningObjectives: cmeActivityForms.learningObjectives,
+          attestationDate: cmeActivityForms.attestationDate,
+          updatedAt: cmeActivityForms.updatedAt,
+        })
+        .from(cmeActivityForms);
+
+      const formsByCourseId = new Map(forms.map(f => [f.courseId, f]));
+
+      return courses.map(course => {
+        const form = formsByCourseId.get(course.id);
+        // Determine completeness: form exists + key sections filled
+        const isComplete = !!(form &&
+          form.practiceGapDescription?.trim() &&
+          form.learningObjectives?.trim() &&
+          form.attestationDate?.trim());
+        const isStarted = !!form;
+        return {
+          ...course,
+          formStatus: isComplete ? "complete" : isStarted ? "in_progress" : "pending",
+          formUpdatedAt: form?.updatedAt ?? null,
+          formProposedDate: form?.proposedDate ?? null,
+        };
+      });
+    }),
+
   // ── Get form (existing or defaults) ──────────────────────────────────────
   getCmeActivityForm: protectedProcedure
     .input(z.object({ courseId: z.number().int().positive() }))

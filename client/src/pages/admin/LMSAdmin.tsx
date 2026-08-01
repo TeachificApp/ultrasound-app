@@ -65,6 +65,7 @@ import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { SdmsCmeConfigPanel, resolveLmsActivityType } from "@/components/admin/SdmsCmeConfigPanel";
 import { CmeActivityFormPanel } from "@/components/admin/CmeActivityFormPanel";
+import { CmeFormsListTab } from "@/components/admin/CmeFormsListTab";
 import { WebinarsAdmin } from "./WebinarsAdmin";
 import { WorkshopsAdmin } from "./WorkshopsAdmin";
 import BundlesAdmin from "./BundlesAdmin";
@@ -7518,6 +7519,7 @@ const LMS_NAV_GROUPS = [
       { value: "instructors", label: "Instructors", icon: GraduationCap },
       { value: "teach",       label: "TEACH",       icon: Presentation },
       { value: "certificates",label: "Certificates",icon: CheckCircle },
+      { value: "cme_forms",    label: "CME Forms",    icon: FileText },
       { value: "enrollments", label: "Enrollments", icon: UserCheck },
       { value: "orders",       label: "Orders",       icon: ShoppingBag },
       { value: "export",       label: "Export",       icon: Download },
@@ -7712,6 +7714,7 @@ export default function LMSAdmin() {
               {activeTab === "thinkific"         && <ThinkificImporter />}
               {activeTab === "trash"             && <TrashTab />}
               {activeTab === "lms_settings"      && <LMSPublishDomainSettings />}
+              {activeTab === "cme_forms"         && <CmeFormsListTab />}
             </main>
           </div>
         )}
