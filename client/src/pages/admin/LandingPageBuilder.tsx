@@ -3520,7 +3520,18 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
       const handleAiGenerate = () => {
         if (!aiPrompt.trim()) { toast.error("Please enter a prompt."); return; }
         setIsAiGenerating(true);
-        generateAiContent.mutate({ lessonTitle: aiPrompt.trim(), courseTitle, format: aiContentType as any });
+        // Map content type labels to valid format enum values
+        const formatMap: Record<string, "text" | "outline" | "summary" | "quiz_questions"> = {
+          lesson: "text",
+          explanation: "text",
+          summary: "summary",
+          outline: "outline",
+          exercise: "text",
+          section: "text",
+          quiz_questions: "quiz_questions",
+        };
+        const mappedFormat = formatMap[aiContentType] ?? "text";
+        generateAiContent.mutate({ lessonTitle: aiPrompt.trim(), courseTitle, format: mappedFormat });
       };
       return (
         <div className="space-y-4">
