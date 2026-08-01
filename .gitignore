@@ -129,3 +129,4 @@ send_*.mjs
 check-*.ts
 check_*.ts
 .manus-logs/
+.project-config.json
