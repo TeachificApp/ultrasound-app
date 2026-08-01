@@ -422,17 +422,39 @@ export const lmsAIRouter = router({
           : input.questionType === "multiselect"
             ? "All questions must be multi-select (multiple correct answers possible) with 4-5 options."
             : "All questions must be multiple choice with exactly 4 options.";
+      const styleMap: Record<string, string> = {
+        understanding: "Test factual knowledge: definitions, normal values, anatomical landmarks, imaging characteristics of pathology, and standard protocols.",
+        thinking: "Write scenario-based questions: present a clinical finding or patient scenario and ask the learner to interpret, diagnose, or choose the correct next step.",
+        compliance: "Focus on protocol adherence, safety requirements, accreditation standards, and correct procedural steps in clinical ultrasound practice.",
+        thought_provoking: "Write challenging clinical questions requiring the learner to differentiate between similar conditions, recognize subtle imaging findings, or reason through complex scenarios.",
+        reflection: "Write questions that connect clinical content to real-world practice — e.g., interpreting a finding, recognizing an artifact, or choosing between imaging approaches.",
+        custom: input.customPrompt ? `Custom style: ${input.customPrompt}` : "Generate well-balanced clinical questions covering the key medical and technical concepts.",
+      };
+      const styleInstruction = styleMap[input.questionStyle] ?? styleMap.understanding;
+
+      const systemPromptText = [
+        "You are a medical ultrasound educator creating assessment questions for sonographers, echocardiographers, and cardiovascular professionals.",
+        "Your questions must test clinical knowledge and understanding — NOT the structure, titles, or organization of the course or its modules.",
+        "",
+        "CRITICAL RULES:",
+        "- NEVER ask about what a module or section \"covers\" or what the \"purpose\" of a lesson title is",
+        "- NEVER reference module names, lesson titles, section headings, or course structure in questions",
+        "- NEVER ask meta-questions like \"What is the purpose of discussing X in this course?\" or \"What is covered in the X section?\"",
+        "- ALWAYS test the actual clinical content: anatomy, physiology, pathology, imaging findings, measurements, Doppler principles, protocols, clinical significance, differential diagnosis, or patient management",
+        "- Questions must be answerable by a clinician who has the knowledge — not by someone who simply read the table of contents",
+        "- Use precise medical and sonographic terminology",
+        "",
+        typeInstruction,
+        "",
+        `Question style: ${styleInstruction}`,
+        "",
+        "Return only valid JSON.",
+      ].join("\n");
+
       const response = await invokeLLM({
         messages: [
-          { role: "system", content: `You are a medical ultrasound educator. Generate quiz questions based on the provided content. ${typeInstruction} Return only valid JSON.\n\nQuestion style guidance:\n${{
-  understanding: "Focus on ensuring the learner understands core concepts, definitions, and factual recall.",
-  thinking: "Write questions that require the learner to apply knowledge, reason through scenarios, or connect concepts.",
-  compliance: "Focus on protocol adherence, safety requirements, regulatory standards, and correct procedural steps.",
-  thought_provoking: "Write challenging, nuanced questions that push the learner to think critically.",
-  reflection: "Write introspective questions that prompt the learner to connect content to their clinical practice.",
-  custom: input.customPrompt ? `Custom style instruction: ${input.customPrompt}` : "Generate well-balanced questions covering the key points.",
-  }[input.questionStyle]}` },
-          { role: "user", content: `Generate ${input.count} quiz questions based on this content:\n\n${lessonText.slice(0, 6000)}` },
+          { role: "system", content: systemPromptText },
+          { role: "user", content: `Using the following course content as your knowledge source, generate ${input.count} quiz questions that test clinical understanding of the medical concepts covered. Do NOT ask about the course structure, module names, or lesson titles — ask about the actual clinical knowledge contained in the content.\n\nContent:\n${lessonText.slice(0, 6000)}` },
         ],
         response_format: {
           type: "json_schema",
