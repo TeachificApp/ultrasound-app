@@ -611,7 +611,16 @@ export async function reconcileLmsCheckoutFromStripeSession(
             accessToken,
             setPasswordUrl,
           });
-          notes.push(quizEmailOk ? "Quiz access email sent" : "Quiz access email FAILED (check SendGrid key)");
+          if (quizEmailOk) {
+            notes.push("Quiz access email sent");
+          } else {
+            notes.push("Quiz access email FAILED (check SendGrid key)");
+            // Proactive alert so admin is notified immediately without waiting for a customer complaint
+            notifyOwner({
+              title: "⚠️ Quiz Access Email Failed",
+              content: `Failed to send quiz access email to ${customerEmail} (userId=${userId}) for "${course.title}". Check SendGrid API key in Settings → Secrets.`,
+            }).catch(() => {});
+          }
         } else {
           const enrollEmailOk = await sendEnrollmentEmail({
             to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
@@ -620,7 +629,15 @@ export async function reconcileLmsCheckoutFromStripeSession(
             accessToken,
             setPasswordUrl,
           });
-          notes.push(enrollEmailOk ? "Enrollment email sent" : "Enrollment email FAILED (check SendGrid key)");
+          if (enrollEmailOk) {
+            notes.push("Enrollment email sent");
+          } else {
+            notes.push("Enrollment email FAILED (check SendGrid key)");
+            notifyOwner({
+              title: "⚠️ Course Enrollment Email Failed",
+              content: `Failed to send enrollment email to ${customerEmail} (userId=${userId}) for "${course.title}". Check SendGrid API key in Settings → Secrets.`,
+            }).catch(() => {});
+          }
         }
       } else {
         notes.push(`Enrollment email skipped (course=${courseEmailEnabled}, platform=${platformEmailEnabled})`);

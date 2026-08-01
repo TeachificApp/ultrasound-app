@@ -3065,9 +3065,8 @@ export const adminUserRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // Load enrollment + course + user in one go
-      const [[enrollmentRows], [settingsRows]] = await Promise.all([
-        db.execute(sql`
+      // Load enrollment + course + user
+      const [enrollmentRows] = await db.execute(sql`
           SELECT
             e.id AS enrollmentId,
             e.user_id AS userId,
@@ -3082,18 +3081,17 @@ export const adminUserRouter = router({
           JOIN users u ON u.id = e.user_id
           WHERE e.id = ${input.enrollmentId}
           LIMIT 1
-        `),
-        db.select({
-          enrollmentEmailEnabled: platformSettings.enrollmentEmailEnabled,
-          enrollmentEmailSubject: platformSettings.enrollmentEmailSubject,
-          enrollmentEmailIntro: platformSettings.enrollmentEmailIntro,
-        }).from(platformSettings).limit(1),
-      ]);
+        `);
 
       const enrollment = (enrollmentRows as any[])[0];
       if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
 
-      const settings = (settingsRows as any[])[0];
+      const settingsRows = await db.select({
+          enrollmentEmailEnabled: platformSettings.enrollmentEmailEnabled,
+          enrollmentEmailSubject: platformSettings.enrollmentEmailSubject,
+          enrollmentEmailIntro: platformSettings.enrollmentEmailIntro,
+        }).from(platformSettings).limit(1);
+      const settings = settingsRows[0];
       const userId = Number(enrollment.userId);
       const accessToken = await getOrCreateAccessToken(userId);
 

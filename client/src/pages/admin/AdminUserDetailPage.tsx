@@ -732,16 +732,18 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       {resendEnrollmentEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
                     </button>
                     {e.stripeSubscriptionId && (() => {
-                      const isCancelledAtPeriodEnd = !!(e.stripeSubscriptionId && e.accessExpiresAt);
+                      // Only disable if subscription has already expired (past the access end date)
+                      const alreadyExpired = !!(e.accessExpiresAt && new Date(e.accessExpiresAt) < new Date());
                       return (
                         <button
-                          disabled={isCancelledAtPeriodEnd}
-                          onClick={() => !isCancelledAtPeriodEnd && setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                          disabled={alreadyExpired}
+                          onClick={() => !alreadyExpired && setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
-                            isCancelledAtPeriodEnd
+                            alreadyExpired
                               ? "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
                               : "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200"
                           }`}
+                          title={alreadyExpired ? "Subscription already ended" : "Cancel this subscription"}
                         >
                           <XCircle className="w-3 h-3" /> Cancel Subscription
                         </button>
@@ -977,16 +979,18 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                       {resendEnrollmentEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
                     </button>
                     {e.stripeSubscriptionId && (() => {
-                      const isCancelledAtPeriodEnd = !!(e.stripeSubscriptionId && e.accessExpiresAt);
+                      // Only disable if subscription has already expired (past the access end date)
+                      const alreadyExpired = !!(e.accessExpiresAt && new Date(e.accessExpiresAt) < new Date());
                       return (
                         <button
-                          disabled={isCancelledAtPeriodEnd}
-                          onClick={() => !isCancelledAtPeriodEnd && setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                          disabled={alreadyExpired}
+                          onClick={() => !alreadyExpired && setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
-                            isCancelledAtPeriodEnd
+                            alreadyExpired
                               ? "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
                               : "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200"
                           }`}
+                          title={alreadyExpired ? "Subscription already ended" : "Cancel this subscription"}
                         >
                           <XCircle className="w-3 h-3" /> Cancel Subscription
                         </button>

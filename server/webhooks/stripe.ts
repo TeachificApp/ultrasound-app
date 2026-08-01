@@ -946,6 +946,10 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
       console.log(`[Stripe] Brand membership: access email sent to existing user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
       console.error(`[Stripe] Brand membership: failed to send access email to existing user ${customerEmail}:`, emailErr);
+      notifyOwner({
+        title: "⚠️ Membership Access Email Failed",
+        content: `Failed to send ${planLabel} access email to ${customerEmail} (userId=${userId}). Check SendGrid API key in Settings → Secrets.`,
+      }).catch(() => {});
     }
   }
 
@@ -1176,6 +1180,10 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
       console.log(`[Stripe] Dual membership: access email sent to existing user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
       console.error(`[Stripe] Dual membership: failed to send access email to existing user ${customerEmail}:`, emailErr);
+      notifyOwner({
+        title: "⚠️ Dual Membership Access Email Failed",
+        content: `Failed to send ${planLabel} access email to ${customerEmail} (userId=${userId}). Check SendGrid API key in Settings → Secrets.`,
+      }).catch(() => {});
     }
   }
 

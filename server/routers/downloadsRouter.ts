@@ -2233,11 +2233,21 @@ export async function sendPurchaseConfirmationEmail(userId: number, productId: n
   </table>
 </body></html>`;
 
-  await sendEmail({
+  const emailOk = await sendEmail({
     to: { name: user.name || "Customer", email: user.email },
     subject: `Your download is ready: ${product.title}`,
     htmlBody,
     previewText: `Your download "${product.title}" is ready — click to access your files instantly.`,
   });
-  console.log(`[sendPurchaseConfirmationEmail] Sent access email to ${user.email} for product ${productId} (auto-login: ${accessUrl !== filesUrl ? 'yes' : 'no'})`);
+  if (emailOk) {
+    console.log(`[sendPurchaseConfirmationEmail] Sent access email to ${user.email} for product ${productId} (auto-login: ${accessUrl !== filesUrl ? 'yes' : 'no'})`);
+  } else {
+    console.error(`[sendPurchaseConfirmationEmail] FAILED to send access email to ${user.email} for product ${productId}`);
+    const { notifyOwner } = await import("../_core/notification");
+    notifyOwner({
+      title: "⚠️ Download Access Email Failed",
+      content: `Failed to send download access email to ${user.email} (userId=${userId}) for "${product.title}". Check SendGrid API key in Settings → Secrets.`,
+    }).catch(() => {});
+  }
+  return emailOk;
 }
