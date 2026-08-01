@@ -106,6 +106,7 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
     const doc = new PDFDocument({
       size: "LETTER",
       margins: { top: 50, bottom: 50, left: 50, right: 50 },
+      bufferPages: true,
       info: {
         Title: "CME Activity Planning and Proposal Form",
         Author: "All About Ultrasound",
@@ -351,13 +352,14 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
     }
 
     // ── Footer ────────────────────────────────────────────────────────────────
-    const totalPages = (doc as any).bufferedPageRange?.()?.count ?? 1;
-    for (let i = 0; i < totalPages; i++) {
-      doc.switchToPage(i);
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
       doc.fillColor(GRAY).fontSize(7).font("Helvetica")
         .text("© All About Ultrasound — CardioServ CME Joint Provider Form", 50, doc.page.height - 30, { width: pageWidth, align: "center" });
     }
 
+    doc.flushPages();
     doc.end();
   });
 }
