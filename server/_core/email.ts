@@ -8,7 +8,8 @@
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
 import { getDb } from "../db";
-import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { users, emailSendLog as emailSendLogTable } from "../../drizzle/schema";
 
 /** Infer email type from subject line for logging purposes */
 function inferEmailType(subject: string): string {
@@ -27,20 +28,27 @@ function inferEmailType(subject: string): string {
 async function _logEmailSend(to: EmailRecipient, subject: string, status: "sent" | "failed"): Promise<void> {
   try {
     const db = await getDb();
-    if (!db) return;
-    // Look up userId by email
-    const [userRow] = await db.execute(sql`SELECT id, name FROM users WHERE email = ${to.email} LIMIT 1`) as any;
-    const rows = Array.isArray(userRow) ? userRow : (userRow?.[0] ?? []);
-    const user = Array.isArray(rows) ? rows[0] : rows;
+    if (!db) { console.warn("[email-log] db not available"); return; }
+    // Look up userId by email using Drizzle ORM (avoids mysql2 tuple destructuring issues)
+    const userRows = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.email, to.email)).limit(1);
+    const user = userRows[0] ?? null;
     const userId = user?.id ? Number(user.id) : null;
     const recipientName = to.name || user?.name || null;
     const emailType = inferEmailType(subject);
-    await db.execute(sql`
-      INSERT INTO email_send_log (user_id, recipient_email, recipient_name, email_type, subject, status, sent_at, created_at)
-      VALUES (${userId}, ${to.email}, ${recipientName}, ${emailType}, ${subject}, ${status}, NOW(), NOW())
-    `);
-  } catch {
-    // Never break the primary email flow
+    await db.insert(emailSendLogTable).values({
+      userId,
+      recipientEmail: to.email,
+      recipientName,
+      emailType,
+      subject,
+      status,
+      sentAt: new Date(),
+      createdAt: new Date(),
+    });
+    console.log(`[email-log] Logged email to ${to.email} (type=${emailType}, status=${status})`);
+  } catch (err) {
+    // Log the error but never break the primary email flow
+    console.error("[email-log] Failed to log email send:", err);
   }
 }
 
