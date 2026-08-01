@@ -75,37 +75,65 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
       )}
       {/* Mobile nav drawer */}
       {mobileNavOpen && (
-        <div className="fixed top-0 left-0 bottom-0 z-50 w-72 bg-white shadow-2xl flex flex-col md:hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <div className="flex items-center gap-2">
-              <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-7 h-7 rounded-full" />
-              <span className="text-sm font-bold text-[#189aa1]">Member Hub</span>
+        <div className="fixed top-0 left-0 bottom-0 z-50 w-[85vw] max-w-xs bg-white shadow-2xl flex flex-col md:hidden">
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2.5">
+              <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-9 h-9 rounded-full" />
+              <div>
+                <div className="text-sm font-bold text-[#189aa1]">Member Hub</div>
+                <div className="text-[10px] text-gray-400">All About Ultrasound™</div>
+              </div>
             </div>
-            <button onClick={() => setMobileNavOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-700">
+            <button onClick={() => setMobileNavOpen(false)} className="p-2 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 min-w-[40px] min-h-[40px] flex items-center justify-center">
               <X className="w-5 h-5" />
             </button>
           </div>
-          <nav className="flex-1 overflow-y-auto py-3 px-2">
-            <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Navigation</p>
+          <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Quick Links</p>
+            {[
+              { href: AAUS_APP_URL, label: "UltrasoundAssist™", icon: ExternalLink, external: true },
+              { href: IHE_APP_URL, label: "EchoAssist™", icon: ExternalLink, external: true },
+              { href: LEARN_URL, label: "Learning Platform", icon: GraduationCap, external: true },
+              { href: `${LEARN_URL}/community`, label: "Community", icon: Users, external: true },
+            ].map(({ href, label, icon: Icon }) => (
+              <a key={href} href={href} target="_blank" rel="noopener noreferrer"
+                onClick={() => setMobileNavOpen(false)}
+                className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all min-h-[52px]">
+                <Icon className="w-5 h-5 text-[#189aa1] flex-shrink-0" />
+                <span className="flex-1">{label}</span>
+                <ExternalLink className="w-3.5 h-3.5 text-gray-300" />
+              </a>
+            ))}
             <SiteNavHeaderLinks
-              items={headerNavItems}
+              items={headerNavItems.filter((i: any) => !DEFAULT_HEADER_NAV.some(d => d.href === i.href))}
               location={location}
               onNavigate={() => setMobileNavOpen(false)}
-              className="flex-col items-stretch gap-0.5 px-1"
+              className="flex-col items-stretch gap-0.5"
             />
             {isPlatformAdmin && (
               <>
-                <div className="border-t border-gray-100 my-2" />
-                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin</p>
-                <a href={getAdminUrl("/platform-admin")} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
-                  <ShieldCheck className="w-4 h-4 text-gray-500" /> Platform Admin
+                <div className="border-t border-gray-100 my-3" />
+                <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin</p>
+                <a href={getAdminUrl("/platform-admin")} onClick={() => setMobileNavOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-all min-h-[52px]">
+                  <ShieldCheck className="w-5 h-5 text-orange-500 flex-shrink-0" /> Platform Admin
                 </a>
-                <a href={getAdminUrl("/admin/lms")} onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]">
-                  <Settings className="w-4 h-4 text-gray-500" /> LMS Admin
+                <a href={getAdminUrl("/admin/lms")} onClick={() => setMobileNavOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-all min-h-[52px]">
+                  <Settings className="w-5 h-5 text-orange-500 flex-shrink-0" /> LMS Admin
                 </a>
               </>
             )}
           </nav>
+          {/* Sign out at bottom of drawer */}
+          <div className="px-3 pb-6 pt-2 border-t border-gray-100">
+            {isAuthenticated && (
+              <button onClick={() => { logout(); setMobileNavOpen(false); }}
+                className="flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all min-h-[52px]">
+                <LogOut className="w-5 h-5 flex-shrink-0" /> Sign Out
+              </button>
+            )}
+          </div>
         </div>
       )}
       {/* Top bar */}
@@ -257,8 +285,8 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
         </div>
       )}
 
-      {/* Page content */}
-      <main className="flex-1">
+      {/* Page content — bottom padding on mobile so content isn't hidden behind bottom nav */}
+      <main className="flex-1 pb-safe">
         {children}
       </main>
 

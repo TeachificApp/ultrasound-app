@@ -78,6 +78,81 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[#f0fbfc]">
+      {/* Mobile nav overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMobileMenuOpen(false)} />
+      )}
+      {/* Mobile nav drawer — slide in from right */}
+      {mobileMenuOpen && (
+        <div className="fixed top-0 right-0 bottom-0 z-50 w-[85vw] max-w-xs bg-white shadow-2xl flex flex-col md:hidden">
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2.5">
+              <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-9 h-9 rounded-full" />
+              <div>
+                <div className="text-sm font-bold text-[#189aa1]">Learning Platform</div>
+                <div className="text-[10px] text-gray-400">All About Ultrasound™</div>
+              </div>
+            </div>
+            <button onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 min-w-[40px] min-h-[40px] flex items-center justify-center">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Navigation</p>
+            <SiteNavHeaderLinks
+              items={headerNavItems}
+              location={location}
+              onNavigate={() => setMobileMenuOpen(false)}
+              className="flex-col items-stretch gap-0.5"
+            />
+            <div className="border-t border-gray-100 my-3" />
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">More</p>
+            <a href={AAUS_SITE_URL} target="_blank" rel="noopener noreferrer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all min-h-[52px]">
+              <ExternalLink className="w-5 h-5 text-[#189aa1] flex-shrink-0" />
+              <span className="flex-1">All About Ultrasound™</span>
+              <ExternalLink className="w-3.5 h-3.5 text-gray-300" />
+            </a>
+            <a href={IHE_SITE_URL} target="_blank" rel="noopener noreferrer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all min-h-[52px]">
+              <ExternalLink className="w-5 h-5 text-[#189aa1] flex-shrink-0" />
+              <span className="flex-1">iHeartEcho™</span>
+              <ExternalLink className="w-3.5 h-3.5 text-gray-300" />
+            </a>
+            <a href={AAUS_APP_URL} target="_blank" rel="noopener noreferrer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all min-h-[52px]">
+              <ExternalLink className="w-5 h-5 text-[#189aa1] flex-shrink-0" />
+              <span className="flex-1">UltrasoundAssist™ App</span>
+              <ExternalLink className="w-3.5 h-3.5 text-gray-300" />
+            </a>
+            {isPlatformAdmin && (
+              <>
+                <div className="border-t border-gray-100 my-3" />
+                <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin</p>
+                <a href={getAdminUrl("/platform-admin")} onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-all min-h-[52px]">
+                  <ShieldCheck className="w-5 h-5 text-orange-500 flex-shrink-0" /> Platform Admin
+                </a>
+                <a href={getAdminUrl("/admin/lms")} onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-all min-h-[52px]">
+                  <Settings className="w-5 h-5 text-orange-500 flex-shrink-0" /> LMS Admin
+                </a>
+              </>
+            )}
+          </nav>
+          {isAuthenticated && (
+            <div className="px-3 pb-6 pt-2 border-t border-gray-100">
+              <button onClick={() => { logout(); setMobileMenuOpen(false); }}
+                className="flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all min-h-[52px]">
+                <LogOut className="w-5 h-5 flex-shrink-0" /> Sign Out
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {/* Top bar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200/60 shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 h-14">
@@ -247,37 +322,6 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Mobile nav drawer */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 bg-white px-3 py-2 flex flex-col gap-0.5">
-            <SiteNavHeaderLinks
-              items={headerNavItems}
-              location={location}
-              onNavigate={() => setMobileMenuOpen(false)}
-              className="flex-col items-stretch gap-0.5"
-            />
-            <div className="border-t border-gray-100 mt-1 pt-1 flex flex-col gap-1">
-              <a
-                href={AAUS_SITE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <ExternalLink className="w-4 h-4" /> All About Ultrasound™
-              </a>
-              <a
-                href={IHE_SITE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <ExternalLink className="w-4 h-4" /> iHeartEcho™
-              </a>
-            </div>
-          </div>
-        )}
       </header>
 
       {/* Page content — full width, no sidebar offset */}

@@ -12,7 +12,7 @@ import {
   Stethoscope, Zap, ExternalLink, ShoppingBag, FlaskConical, MessageCircle, Award, Shield, GraduationCap,
   BookMarked, Library, Plus, Crown, Droplets, Building2, Users, UserPlus,
   LogIn, LogOut, ChevronDown, Webhook, Layers, Lock, ClipboardCheck, Brain,
-  DollarSign, Briefcase
+  DollarSign, Briefcase, MoreHorizontal, LayoutDashboard
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -679,14 +679,131 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1">
+        {/* Page content — add bottom padding on mobile so content isn't hidden behind bottom nav */}
+        <main className="flex-1 pb-20 lg:pb-0">
           {children}
         </main>
       </div>
+
+      {/* ── Mobile Bottom Navigation Bar ─────────────────────────────────── */}
+      {/* Only shown on mobile (lg:hidden), only when authenticated */}
+      {isAuthenticated && (
+        <MobileBottomNav location={location} brandNav={brandNav} />
+      )}
+
       <GetAppBanner />
       {/* Name collection gate */}
       <NameCollectionModal />
     </div>
+  );
+}
+
+/** Mobile bottom navigation bar — 5 persistent tabs */
+function MobileBottomNav({ location, brandNav }: { location: string; brandNav: any }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const brand = brandNav?.brand ?? "aaus";
+
+  const tabs = [
+    { path: "/", label: "Home", icon: LayoutDashboard },
+    { path: "/ultrasound-assist", label: "Clinical", icon: Stethoscope },
+    { path: "/quickfire", label: "Learn", icon: Zap },
+    { path: "/community", label: "Community", icon: Users },
+  ];
+
+  const isActive = (path: string) =>
+    path === "/" ? location === "/" : location === path || location.startsWith(path + "/");
+
+  return (
+    <>
+      {/* Click-away overlay for More menu */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMoreOpen(false)} />
+      )}
+
+      {/* More menu sheet */}
+      {moreOpen && (
+        <div className="fixed bottom-[64px] left-0 right-0 z-50 lg:hidden bg-white border-t border-gray-200 shadow-2xl rounded-t-2xl px-4 pt-4 pb-6 max-h-[60vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold text-gray-800">More</span>
+            <button onClick={() => setMoreOpen(false)} className="p-1.5 rounded-full hover:bg-gray-100">
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { path: "/calculators", label: "Calculators", icon: Calculator },
+              { path: "/flashcards", label: "Flashcards", icon: Layers },
+              { path: "/case-library", label: "Cases", icon: Library },
+              { path: "/soundbytes", label: "SoundBytes", icon: BookMarked },
+              { path: "/cme", label: "CME Hub", icon: GraduationCap },
+              { path: "/registry-review", label: "Registry", icon: ClipboardCheck },
+              { path: "/career-network", label: "Career", icon: Briefcase },
+              { path: "/premium", label: "Premium", icon: Crown },
+              { path: "/scan-coach-hub", label: "Scan Coach", icon: Scan },
+            ].map(({ path, label, icon: Icon }) => (
+              <Link key={path} href={path}>
+                <button
+                  onClick={() => setMoreOpen(false)}
+                  className={`flex flex-col items-center gap-1.5 w-full py-3 px-2 rounded-xl transition-all ${
+                    isActive(path)
+                      ? "bg-[#189aa1]/10 text-[#189aa1]"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="text-[10px] font-medium leading-tight text-center">{label}</span>
+                </button>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom bar */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white border-t border-gray-200 shadow-lg safe-area-pb">
+        <div className="flex items-stretch h-16">
+          {tabs.map(({ path, label, icon: Icon }) => {
+            const active = isActive(path);
+            return (
+              <Link key={path} href={path} className="flex-1">
+                <button
+                  className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${
+                    active ? "text-[#189aa1]" : "text-gray-400 hover:text-gray-600"
+                  }`}
+                >
+                  <div className={`relative p-1 rounded-lg transition-all ${
+                    active ? "bg-[#189aa1]/10" : ""
+                  }`}>
+                    <Icon className="w-5 h-5" />
+                    {active && (
+                      <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[#189aa1]" />
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-medium leading-none ${
+                    active ? "text-[#189aa1] font-semibold" : "text-gray-400"
+                  }`}>{label}</span>
+                </button>
+              </Link>
+            );
+          })}
+          {/* More tab */}
+          <button
+            onClick={() => setMoreOpen(o => !o)}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 h-full transition-all ${
+              moreOpen ? "text-[#189aa1]" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <div className={`p-1 rounded-lg transition-all ${
+              moreOpen ? "bg-[#189aa1]/10" : ""
+            }`}>
+              <MoreHorizontal className="w-5 h-5" />
+            </div>
+            <span className={`text-[10px] font-medium leading-none ${
+              moreOpen ? "text-[#189aa1] font-semibold" : "text-gray-400"
+            }`}>More</span>
+          </button>
+        </div>
+      </nav>
+    </>
   );
 }
