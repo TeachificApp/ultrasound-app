@@ -1387,6 +1387,11 @@ CRITICAL REQUIREMENTS:
       // Rewrite a single text field preserving structure/format
       async function rewriteField(fieldName: string, oldValue: string | null | undefined, isHtml = false): Promise<string | null> {
         if (!oldValue || oldValue.trim().length < 4) return oldValue ?? null;
+        // Skip extremely long boilerplate fields (>6000 chars) to avoid LLM truncation
+        if (oldValue.trim().length > 6000) {
+          console.log(`[reformatLandingPage] Skipping ${fieldName} — too long (${oldValue.length} chars)`);
+          return oldValue;
+        }
         const systemPrompt = `You are a medical education copywriter for an ultrasound training platform. You are reformatting existing course landing page content for a new course. Preserve the EXACT same structure, tone, format, length, and style as the original. Only change references to the old course name and update the clinical/educational content to be relevant to the new course. Do NOT add new sections, change the format, or alter the writing style. ${isHtml ? "The content is HTML — preserve all HTML tags exactly, only change the text content inside tags." : "Return plain text only."} Use United States English spelling.`;
         const userPrompt = `Old course name: "${oldName}"\nNew course name: "${newName}"\nField: ${fieldName}\n\nOriginal content:\n${oldValue}\n\nRewrite this content so it applies to "${newName}" instead of "${oldName}". Preserve the exact same structure, format, length, and style.`;
         const resp = await invokeLLM({ messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }] });
@@ -1507,10 +1512,12 @@ CRITICAL REQUIREMENTS:
           if (type === "faq" && Array.isArray(d.items)) {
             for (const item of d.items) {
               if (item.q && typeof item.q === "string" && item.q.trim().length > 2) {
-                item.q = await rewriteField(`faq.item.question`, item.q);
+                item.q = await rewriteField(`faq.item.question`, item.q, false);
               }
               if (item.a && typeof item.a === "string" && item.a.trim().length > 2) {
-                item.a = await rewriteField(`faq.item.answer`, item.a);
+                // answer may be plain text or HTML — detect by presence of < tag
+                const answerIsHtml = item.a.includes("<");
+                item.a = await rewriteField(`faq.item.answer`, item.a, answerIsHtml);
               }
             }
           }
