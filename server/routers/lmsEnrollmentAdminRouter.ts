@@ -1393,11 +1393,148 @@ CRITICAL REQUIREMENTS:
         return resp?.choices?.[0]?.message?.content?.trim() ?? oldValue;
       }
 
+      // Helper to rewrite a list of plain-text items (string[])
+      async function rewriteStringArray(fieldName: string, items: string[]): Promise<string[]> {
+        if (!items || items.length === 0) return items;
+        const joined = items.map((it, i) => `${i + 1}. ${it}`).join("\n");
+        const systemPrompt = `You are a medical education copywriter for an ultrasound training platform. Rewrite the following numbered list items so they apply to the new course "${newName}" instead of "${oldName}". Preserve the exact same number of items, the same structure, and the same style. Return ONLY the numbered list, one item per line, with no extra commentary. Use United States English spelling.`;
+        const userPrompt = `Old course: "${oldName}"\nNew course: "${newName}"\nField: ${fieldName}\n\nOriginal items:\n${joined}\n\nRewrite each item for "${newName}":`;
+        const resp = await invokeLLM({ messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }] });
+        const raw = resp?.choices?.[0]?.message?.content?.trim() ?? joined;
+        // Parse numbered lines back into array
+        const parsed = raw.split("\n").map((line: string) => line.replace(/^\d+\.\s*/, "").trim()).filter((l: string) => l.length > 0);
+        return parsed.length === items.length ? parsed : items;
+      }
+
+      // Helper to rewrite landing page builder blocks JSON
+      async function rewriteBlocks(blocksJson: string | null | undefined): Promise<string | null> {
+        if (!blocksJson) return blocksJson ?? null;
+        let blocks: any[];
+        try { blocks = JSON.parse(blocksJson); } catch { return blocksJson; }
+        if (!Array.isArray(blocks) || blocks.length === 0) return blocksJson;
+
+        // Text fields to rewrite per block type
+        const TEXT_FIELDS: Record<string, string[]> = {
+          hero: ["headline", "headline2", "subheadline"],
+          text: ["html"],
+          ai_content: ["html"],
+          two_column: ["leftHtml", "rightHtml"],
+          three_column: ["col1Html", "col2Html", "col3Html"],
+          divided_columns: [], // handled via columns[].html
+          bullets: ["headline"],
+          numbered_list: ["headline"],
+          checklist: ["headline"],
+          icon_grid: ["headline"],
+          faq: ["headline"],
+          cta_standalone: ["headline", "subtext"],
+          pricing_cta: ["headline", "subtext"],
+          lead_capture: ["headline", "subtext"],
+          cta_optin: ["headline", "subtext"],
+          alert: ["text"],
+          flip_cards: ["headline"],
+          countdown: ["headline"],
+          countdown_v2: ["headline", "subtext"],
+          image_text: ["headline", "bodyHtml"],
+          instructor: ["bio"],
+          testimonial: ["quote"],
+          reviews: ["headline"],
+          logos: ["headline"],
+          ticker: [], // handled via items[]
+        };
+        // Array-of-string fields per block type
+        const ARRAY_FIELDS: Record<string, string[]> = {
+          bullets: ["items"],
+          numbered_list: ["items"],
+          checklist: ["items"],
+          ticker: ["items"],
+        };
+
+        for (const block of blocks) {
+          const type = block.type as string;
+          const d = block.data ?? {};
+
+          // Rewrite simple text/html fields
+          const fields = TEXT_FIELDS[type] ?? [];
+          for (const field of fields) {
+            if (d[field] && typeof d[field] === "string" && d[field].trim().length > 3) {
+              const isHtml = field.toLowerCase().includes("html") || field === "bio" || field === "bodyHtml";
+              d[field] = await rewriteField(`${type}.${field}`, d[field], isHtml);
+            }
+          }
+
+          // Rewrite string array fields
+          const arrFields = ARRAY_FIELDS[type] ?? [];
+          for (const field of arrFields) {
+            if (Array.isArray(d[field]) && d[field].length > 0 && typeof d[field][0] === "string") {
+              d[field] = await rewriteStringArray(`${type}.${field}`, d[field]);
+            }
+          }
+
+          // Special: divided_columns — columns[].html
+          if (type === "divided_columns" && Array.isArray(d.columns)) {
+            for (const col of d.columns) {
+              if (col.html && typeof col.html === "string" && col.html.trim().length > 3) {
+                col.html = await rewriteField(`divided_columns.column.html`, col.html, true);
+              }
+            }
+          }
+
+          // Special: icon_grid — items[].title and items[].text
+          if (type === "icon_grid" && Array.isArray(d.items)) {
+            for (const item of d.items) {
+              if (item.title && typeof item.title === "string" && item.title.trim().length > 2) {
+                item.title = await rewriteField(`icon_grid.item.title`, item.title);
+              }
+              if (item.text && typeof item.text === "string" && item.text.trim().length > 2) {
+                item.text = await rewriteField(`icon_grid.item.text`, item.text);
+              }
+            }
+          }
+
+          // Special: flip_cards — cards[].front and cards[].back
+          if (type === "flip_cards" && Array.isArray(d.cards)) {
+            for (const card of d.cards) {
+              if (card.front && typeof card.front === "string" && card.front.trim().length > 2) {
+                card.front = await rewriteField(`flip_cards.card.front`, card.front);
+              }
+              if (card.back && typeof card.back === "string" && card.back.trim().length > 2) {
+                card.back = await rewriteField(`flip_cards.card.back`, card.back);
+              }
+            }
+          }
+
+          // Special: faq — items[].q and items[].a
+          if (type === "faq" && Array.isArray(d.items)) {
+            for (const item of d.items) {
+              if (item.q && typeof item.q === "string" && item.q.trim().length > 2) {
+                item.q = await rewriteField(`faq.item.question`, item.q);
+              }
+              if (item.a && typeof item.a === "string" && item.a.trim().length > 2) {
+                item.a = await rewriteField(`faq.item.answer`, item.a);
+              }
+            }
+          }
+
+          // Special: checklist/numbered_list — items may be objects with .text
+          if ((type === "checklist" || type === "numbered_list") && Array.isArray(d.items) && d.items.length > 0 && typeof d.items[0] === "object") {
+            for (const item of d.items) {
+              if (item.text && typeof item.text === "string" && item.text.trim().length > 2) {
+                item.text = await rewriteField(`${type}.item.text`, item.text);
+              }
+            }
+          }
+
+          block.data = d;
+        }
+        return JSON.stringify(blocks);
+      }
+
       // Rewrite course-level text fields
       const newSubtitle = await rewriteField("subtitle", course.subtitle);
       const newDescription = await rewriteField("description", course.description, true);
       const newMetaTitle = await rewriteField("SEO meta title", course.metaTitle);
       const newMetaDescription = await rewriteField("SEO meta description", course.metaDescription);
+      const newMetaKeywords = await rewriteField("SEO meta keywords", course.metaKeywords);
 
       await db.update(lmsCourses).set({
         title: newName,
@@ -1405,6 +1542,7 @@ CRITICAL REQUIREMENTS:
         description: newDescription ?? undefined,
         metaTitle: newMetaTitle ?? undefined,
         metaDescription: newMetaDescription ?? undefined,
+        metaKeywords: newMetaKeywords ?? undefined,
       }).where(eq(lmsCourses.id, input.courseId));
 
       // Rewrite landing page fields
@@ -1412,10 +1550,12 @@ CRITICAL REQUIREMENTS:
         const newHeroTitle = await rewriteField("hero title", lp.heroTitle);
         const newHeroSubtitle = await rewriteField("hero subtitle", lp.heroSubtitle);
         const newBodyContent = await rewriteField("body content", lp.bodyContent, true);
-        const newWhatYouLearn = await rewriteField("what you will learn", lp.whatYouLearn, true);
+        const newWhatYouLearn = await rewriteField("what you will learn / learning objectives", lp.whatYouLearn, true);
         const newRequirements = await rewriteField("requirements / prerequisites", lp.requirements, true);
         const newSeoTitle = await rewriteField("SEO title", lp.seoTitle);
         const newSeoDescription = await rewriteField("SEO description", lp.seoDescription);
+        const newCtaText = lp.ctaText && lp.ctaText.trim().length > 2 ? await rewriteField("CTA button text", lp.ctaText) : lp.ctaText;
+        const newBlocks = await rewriteBlocks(lp.blocks);
 
         await db.update(lmsLandingPages).set({
           heroTitle: newHeroTitle ?? undefined,
@@ -1425,6 +1565,8 @@ CRITICAL REQUIREMENTS:
           requirements: newRequirements ?? undefined,
           seoTitle: newSeoTitle ?? undefined,
           seoDescription: newSeoDescription ?? undefined,
+          ctaText: newCtaText ?? undefined,
+          blocks: newBlocks ?? undefined,
         }).where(eq(lmsLandingPages.courseId, input.courseId));
       } else {
         await db.insert(lmsLandingPages).values({ courseId: input.courseId, heroTitle: newName, ctaText: "Enroll Now" });
