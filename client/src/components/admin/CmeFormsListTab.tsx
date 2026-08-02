@@ -186,8 +186,7 @@ Course Landing Page: ${landingUrl}
 Please let us know if you need any additional information or revisions.
 
 Best regards,
-Lara Williams
-All About Ultrasound`;
+All About Ultrasound, Inc. dba iHeartEcho`;
     setSendCourseId(row.id);
     setSendCourseTitle(row.title);
     setSendCourseSlug(slug);

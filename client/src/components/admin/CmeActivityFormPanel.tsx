@@ -422,8 +422,7 @@ Course Landing Page: ${landingPageUrl}
 Please let us know if you need any additional information or revisions.
 
 Best regards,
-Lara Williams
-All About Ultrasound`;
+All About Ultrasound, Inc. dba iHeartEcho`;
     return { subject, body };
   };
 
