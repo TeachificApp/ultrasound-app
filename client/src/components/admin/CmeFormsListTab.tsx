@@ -283,7 +283,7 @@ All About Ultrasound`;
 
       {/* Filters */}
       <div className="space-y-2">
-        {/* Row 1: search + form status */}
+        {/* Row 1: search */}
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -293,28 +293,6 @@ All About Ultrasound`;
               placeholder="Search course title…"
               className="pl-8 h-8 text-sm"
             />
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            <span className="text-xs text-gray-400 self-center pr-1">Form:</span>
-            {(["all", "pending", "in_progress", "complete"] as const).map(s => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 rounded text-xs border transition-colors ${
-                  statusFilter === s
-                    ? "bg-[#189aa1] text-white border-[#189aa1]"
-                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {s === "all" ? "All" : s === "in_progress" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}
-                {s !== "all" && data && (
-                  <span className="ml-1 opacity-70">
-                    ({s === "pending" ? counts.pending : s === "in_progress" ? counts.in_progress : counts.complete})
-                  </span>
-                )}
-              </button>
-            ))}
           </div>
         </div>
         {/* Row 2: CardioServ status filter */}
@@ -362,7 +340,6 @@ All About Ultrasound`;
               <TableRow className="bg-gray-50">
                 <TableHead className="text-xs font-semibold text-gray-600">Course</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-24">Credits</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 w-32">Form Status</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-44">CardioServ Status</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-32">Approved Date</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-32">Last Sent</TableHead>
@@ -385,9 +362,6 @@ All About Ultrasound`;
                       <span className="text-sm text-gray-700">
                         {row.creditHours ? `${row.creditHours} hr${parseFloat(row.creditHours) !== 1 ? "s" : ""}` : "—"}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={row.formStatus as FormStatus} />
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
