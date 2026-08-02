@@ -70,6 +70,7 @@ import { teamRouter } from "./routers/teamRouter";
 import { adminNotificationsRouter } from "./routers/adminNotificationsRouter";
 import { sonoTravelersRouter } from "./routers/sonoTravelersRouter";
 import { siteSettingsRouter } from "./routers/siteSettingsRouter";
+import { newsletterRouter } from "./routers/newsletterRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -2718,6 +2719,7 @@ export const appRouter = router({
   adminNotifications: adminNotificationsRouter,
   sonoTravelers: sonoTravelersRouter,
   siteSettings: siteSettingsRouter,
+  newsletter: newsletterRouter,
   mirrorSync: router({
     /** Get the status of the last mirror sync run */
     status: protectedProcedure.query(async ({ ctx }) => {

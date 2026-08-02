@@ -8060,6 +8060,24 @@ export const cmeActivityForms = mysqlTable("cme_activity_forms", {
 export type CmeActivityForm = typeof cmeActivityForms.$inferSelect;
 export type InsertCmeActivityForm = typeof cmeActivityForms.$inferInsert;
 
+// ─── Newsletter Subscribers ───────────────────────────────────────────────────
+export const newsletterSubscribers = mysqlTable("newsletter_subscribers", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  firstName: varchar("first_name", { length: 128 }),
+  lastName: varchar("last_name", { length: 128 }),
+  profession: varchar("profession", { length: 128 }),
+  interests: json("interests").$type<string[]>(),
+  source: varchar("source", { length: 64 }).default("subscribe_page"),
+  subscribedAt: bigint("subscribed_at", { mode: "number" }).notNull(),
+  unsubscribedAt: bigint("unsubscribed_at", { mode: "number" }),
+  isActive: smallint("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
+export type InsertNewsletterSubscriber = typeof newsletterSubscribers.$inferInsert;
+
 export const cmeSendHistory = mysqlTable("cme_send_history", {
   id: int("id").primaryKey().autoincrement(),
   courseId: int("courseId").notNull(),

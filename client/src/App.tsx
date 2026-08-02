@@ -380,6 +380,7 @@ function Router() {
         <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
+        <Route path="/subscribe" component={NewsletterSubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
