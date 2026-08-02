@@ -210,16 +210,23 @@ export default defineConfig({
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
-        // Split large vendor libraries into separate chunks to reduce peak memory
+        // Manual chunk splitting — React core must be isolated to avoid circular
+        // inter-chunk dependencies. Only split truly leaf packages that have no
+        // cross-chunk imports back into the react or vendor bundles.
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('@radix-ui') || id.includes('lucide-react')) return 'ui-vendor';
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || id.includes('wouter')) return 'react-vendor';
-            if (id.includes('@trpc') || id.includes('@tanstack')) return 'trpc-vendor';
+            // React core — must come first and must NOT include anything that
+            // imports back from other vendor chunks (no radix, no tanstack, etc.)
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/scheduler/')
+            ) return 'react-core';
+            // Stripe is a leaf with no cross-chunk deps
             if (id.includes('stripe') || id.includes('@stripe')) return 'stripe-vendor';
-            if (id.includes('drizzle') || id.includes('mysql2')) return 'db-vendor';
+            // Date utilities are leaf packages
             if (id.includes('date-fns') || id.includes('dayjs') || id.includes('moment')) return 'date-vendor';
-            if (id.includes('recharts') || id.includes('d3') || id.includes('plotly')) return 'chart-vendor';
+            // Everything else goes into a single vendor chunk to avoid circular refs
             return 'vendor';
           }
         },
