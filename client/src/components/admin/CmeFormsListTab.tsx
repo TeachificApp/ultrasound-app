@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import {
   CheckCircle, Clock, AlertCircle, Download, Edit2, Search,
-  Loader2, FileText, RefreshCw, FileDown, Mail, Send,
+  Loader2, FileText, RefreshCw, FileDown, Mail, Send, TriangleAlert,
 } from "lucide-react";
 import { CmeActivityFormPanel } from "./CmeActivityFormPanel";
 
@@ -83,10 +83,21 @@ function fmtDate(d: Date | string | number | null | undefined): string {
   return new Date(d as any).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
+const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+
+function isExpiringSoon(approvedAt: number | null | undefined): boolean {
+  if (!approvedAt) return false;
+  const expiresAt = approvedAt + TWO_YEARS_MS;
+  const remaining = expiresAt - Date.now();
+  return remaining > 0 && remaining <= NINETY_DAYS_MS;
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function CmeFormsListTab() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<FormStatus | "all">("all");
+  const [csFilter, setCsFilter] = useState<CardioServStatus | "all">("all");
   const [editCourseId, setEditCourseId] = useState<number | null>(null);
   const [editCourseTitle, setEditCourseTitle] = useState("");
   const [editCreditHours, setEditCreditHours] = useState<string | null>(null);
@@ -217,8 +228,16 @@ All About Ultrasound`;
   const filtered = (data ?? []).filter(row => {
     const matchesSearch = !search.trim() || row.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || row.formStatus === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesCs = csFilter === "all" || (row.cardioservStatus ?? "draft") === csFilter;
+    return matchesSearch && matchesStatus && matchesCs;
   });
+
+  const csCounts: Record<CardioServStatus, number> = {
+    draft: (data ?? []).filter(r => (r.cardioservStatus ?? "draft") === "draft").length,
+    pending_approval: (data ?? []).filter(r => r.cardioservStatus === "pending_approval").length,
+    approved: (data ?? []).filter(r => r.cardioservStatus === "approved").length,
+    expired: (data ?? []).filter(r => r.cardioservStatus === "expired").length,
+  };
 
   const counts = {
     complete: (data ?? []).filter(r => r.formStatus === "complete").length,
@@ -263,36 +282,63 @@ All About Ultrasound`;
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search course title…"
-            className="pl-8 h-8 text-sm"
-          />
+      <div className="space-y-2">
+        {/* Row 1: search + form status */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search course title…"
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            <span className="text-xs text-gray-400 self-center pr-1">Form:</span>
+            {(["all", "pending", "in_progress", "complete"] as const).map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 rounded text-xs border transition-colors ${
+                  statusFilter === s
+                    ? "bg-[#189aa1] text-white border-[#189aa1]"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {s === "all" ? "All" : s === "in_progress" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}
+                {s !== "all" && data && (
+                  <span className="ml-1 opacity-70">
+                    ({s === "pending" ? counts.pending : s === "in_progress" ? counts.in_progress : counts.complete})
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1.5">
-          {(["all", "pending", "in_progress", "complete"] as const).map(s => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded text-xs border transition-colors ${
-                statusFilter === s
-                  ? "bg-[#189aa1] text-white border-[#189aa1]"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              {s === "all" ? "All" : s === "in_progress" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}
-              {s !== "all" && data && (
-                <span className="ml-1 opacity-70">
-                  ({s === "pending" ? counts.pending : s === "in_progress" ? counts.in_progress : counts.complete})
-                </span>
-              )}
-            </button>
-          ))}
+        {/* Row 2: CardioServ status filter */}
+        <div className="flex gap-1.5 flex-wrap items-center">
+          <span className="text-xs text-gray-400 pr-1">CardioServ:</span>
+          {(["all", "draft", "pending_approval", "approved", "expired"] as const).map(s => {
+            const labels: Record<string, string> = { all: "All", draft: "Draft", pending_approval: "Pending Approval", approved: "Approved", expired: "Expired" };
+            const count = s !== "all" ? csCounts[s as CardioServStatus] : undefined;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setCsFilter(s)}
+                className={`px-3 py-1.5 rounded text-xs border transition-colors ${
+                  csFilter === s
+                    ? "bg-gray-800 text-white border-gray-800"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {labels[s]}
+                {count !== undefined && <span className="ml-1 opacity-70">({count})</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -318,6 +364,7 @@ All About Ultrasound`;
                 <TableHead className="text-xs font-semibold text-gray-600 w-24">Credits</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-32">Form Status</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-44">CardioServ Status</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 w-32">Approved Date</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-32">Last Sent</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-32">Last Updated</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-36 text-right">Actions</TableHead>
@@ -343,34 +390,48 @@ All About Ultrasound`;
                       <StatusBadge status={row.formStatus as FormStatus} />
                     </TableCell>
                     <TableCell>
-                      <Select
-                        value={csStatus}
-                        onValueChange={(val) => handleStatusChange(row.id, val as CardioServStatus)}
-                      >
-                        <SelectTrigger className="h-7 text-xs w-40 border-gray-200">
-                          <SelectValue>
-                            <CardioServStatusBadge status={csStatus} />
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="draft">
-                            <span className="text-xs text-gray-600">Draft</span>
-                          </SelectItem>
-                          <SelectItem value="pending_approval">
-                            <span className="text-xs text-yellow-700">Pending Approval</span>
-                          </SelectItem>
-                          <SelectItem value="approved">
-                            <span className="text-xs text-green-700">Approved</span>
-                          </SelectItem>
-                          <SelectItem value="expired">
-                            <span className="text-xs text-red-600">Expired</span>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {row.approvedAt && (
-                        <p className="text-[10px] text-gray-400 mt-0.5">
-                          Approved {fmtDate(row.approvedAt)}
-                        </p>
+                      <div className="flex flex-col gap-1">
+                        <Select
+                          value={csStatus}
+                          onValueChange={(val) => handleStatusChange(row.id, val as CardioServStatus)}
+                        >
+                          <SelectTrigger className="h-7 text-xs w-40 border-gray-200">
+                            <SelectValue>
+                              <CardioServStatusBadge status={csStatus} />
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="draft">
+                              <span className="text-xs text-gray-600">Draft</span>
+                            </SelectItem>
+                            <SelectItem value="pending_approval">
+                              <span className="text-xs text-yellow-700">Pending Approval</span>
+                            </SelectItem>
+                            <SelectItem value="approved">
+                              <span className="text-xs text-green-700">Approved</span>
+                            </SelectItem>
+                            <SelectItem value="expired">
+                              <span className="text-xs text-red-600">Expired</span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {isExpiringSoon(row.approvedAt) && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">
+                            <TriangleAlert className="w-2.5 h-2.5" /> Expiring Soon
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {row.approvedAt ? (
+                        <div>
+                          <span className="text-gray-700 font-medium">{fmtDate(row.approvedAt)}</span>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            Expires {fmtDate(row.approvedAt + TWO_YEARS_MS)}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-sm">
