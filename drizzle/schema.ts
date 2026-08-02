@@ -8072,6 +8072,7 @@ export const newsletterSubscribers = mysqlTable("newsletter_subscribers", {
   subscribedAt: bigint("subscribed_at", { mode: "number" }).notNull(),
   unsubscribedAt: bigint("unsubscribed_at", { mode: "number" }),
   isActive: smallint("is_active").notNull().default(1),
+  unsubscribeToken: varchar("unsubscribe_token", { length: 128 }).unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

@@ -1,13 +1,17 @@
 /**
  * Unsubscribe page — one-click opt-out from platform emails.
  *
- * Two flows:
+ * Three flows:
  *  1. Server-side HMAC redirect (challenge cron emails):
  *     /api/unsubscribe?token=<hmac> → server processes → redirects to
  *     /unsubscribe?status=success|already|invalid|notfound|error
  *
  *  2. Legacy tRPC token flow (campaign emails):
- *     /unsubscribe?token=<hex> → calls trpc.emailCampaign.unsubscribe
+ *     /unsubscribe?token=<hex>&campaignId=<id> → calls trpc.emailCampaign.unsubscribe
+ *
+ *  3. Newsletter token flow (marketing emails only):
+ *     /unsubscribe?nltoken=<hex> → calls trpc.newsletter.unsubscribeByToken
+ *     Does NOT affect transactional emails.
  */
 import { useEffect, useState } from "react";
 import { useSearch, Link } from "wouter";
@@ -21,37 +25,65 @@ const brandDark = "#0e1e2e";
 export default function Unsubscribe() {
   const search = useSearch();
   const params = new URLSearchParams(search);
-  const status = params.get("status"); // from HMAC server redirect
-  const token = params.get("token");   // from legacy tRPC flow
+  const status = params.get("status");       // from HMAC server redirect
+  const token = params.get("token");         // from legacy campaign tRPC flow
+  const nltoken = params.get("nltoken");     // from newsletter marketing emails
   const campaignIdParam = params.get("campaignId");
   const campaignId = campaignIdParam ? parseInt(campaignIdParam, 10) : undefined;
 
   const [attempted, setAttempted] = useState(false);
-  const unsubscribeMutation = trpc.emailCampaign.unsubscribe.useMutation();
 
-  // Only call tRPC mutation if we have a raw token (legacy campaign emails)
-  // and no server-side status (HMAC flow already processed server-side)
+  // Flow 2: legacy campaign unsubscribe
+  const campaignUnsubscribeMutation = trpc.emailCampaign.unsubscribe.useMutation();
+
+  // Flow 3: newsletter marketing unsubscribe
+  const newsletterUnsubscribeMutation = trpc.newsletter.unsubscribeByToken.useMutation();
+
   useEffect(() => {
-    if (token && !status && !attempted) {
+    if (attempted) return;
+
+    if (nltoken && !status) {
+      // Newsletter token flow
       setAttempted(true);
-      unsubscribeMutation.mutate({
+      newsletterUnsubscribeMutation.mutate({ token: nltoken });
+    } else if (token && !status) {
+      // Legacy campaign token flow
+      setAttempted(true);
+      campaignUnsubscribeMutation.mutate({
         token,
         campaignId: campaignId && !Number.isNaN(campaignId) ? campaignId : undefined,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, status]);
+  }, [token, nltoken, status]);
 
-  // Determine display state
+  // ── Determine display state ──────────────────────────────────────────────
+  const isNewsletterFlow = !!nltoken && !status;
   const isServerFlow = !!status;
+
   const serverSuccess = status === "success" || status === "already";
   const serverAlready = status === "already";
   const serverError = status === "invalid" || status === "notfound" || status === "error";
 
-  const isLoading = !isServerFlow && (unsubscribeMutation.isPending || (!attempted && !!token));
-  const isSuccess = isServerFlow ? serverSuccess : unsubscribeMutation.isSuccess;
-  const isError = isServerFlow ? serverError : (unsubscribeMutation.isError || !token);
-  const alreadyDone = isServerFlow ? serverAlready : unsubscribeMutation.data?.alreadyUnsubscribed;
+  const activeMutation = isNewsletterFlow ? newsletterUnsubscribeMutation : campaignUnsubscribeMutation;
+
+  const isLoading = !isServerFlow && (activeMutation.isPending || (!attempted && !!(token || nltoken)));
+  const isSuccess = isServerFlow ? serverSuccess : activeMutation.isSuccess;
+  const isError = isServerFlow
+    ? serverError
+    : (activeMutation.isError || (!token && !nltoken && !status));
+  const alreadyDone = isServerFlow
+    ? serverAlready
+    : (activeMutation.data as any)?.alreadyUnsubscribed;
+
+  // Success copy differs for newsletter vs. full platform unsubscribe
+  const successBody = isNewsletterFlow
+    ? alreadyDone
+      ? "You have already unsubscribed from our newsletter. You will not receive any further marketing emails from All About Ultrasound™ or iHeartEcho™."
+      : "You have been removed from our newsletter mailing list. You will no longer receive marketing emails from All About Ultrasound™ or iHeartEcho™."
+    : alreadyDone
+      ? "You have already opted out of platform emails. You will not receive any further marketing emails from All About Ultrasound™."
+      : "You have been removed from our email list. You will no longer receive daily challenge notifications or campaign emails from All About Ultrasound™.";
 
   return (
     <div
@@ -100,14 +132,12 @@ export default function Unsubscribe() {
               <h2 className="text-xl font-bold text-gray-800 mb-2">
                 {alreadyDone ? "Already Unsubscribed" : "Successfully Unsubscribed"}
               </h2>
-              <p className="text-gray-500 text-sm leading-relaxed mb-6">
-                {alreadyDone
-                  ? "You have already opted out of platform emails. You will not receive any further marketing emails from All About Ultrasound™."
-                  : "You have been removed from our email list. You will no longer receive daily challenge notifications or campaign emails from All About Ultrasound™."}
+              <p className="text-gray-500 text-sm leading-relaxed mb-4">
+                {successBody}
               </p>
               <p className="text-xs text-gray-400 mb-6">
-                Note: You may still receive transactional emails such as password resets and
-                account notifications.
+                Note: You will still receive transactional emails such as password resets,
+                purchase receipts, and account notifications.
               </p>
               <div className="flex flex-col gap-3">
                 <Link href="/">

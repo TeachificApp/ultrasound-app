@@ -74,6 +74,60 @@ export async function upsertSendGridContacts(
 }
 
 /**
+ * Look up a SendGrid contact ID by email.
+ * Returns the contact ID string or null if not found.
+ */
+export async function getSendGridContactId(email: string): Promise<string | null> {
+  if (!SENDGRID_API_KEY) return null;
+  try {
+    const res = await fetch(`${SENDGRID_API_BASE}/marketing/contacts/search/emails`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SENDGRID_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ emails: [email.toLowerCase().trim()] }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { result: Record<string, { contact: { id: string } }> };
+    const entry = Object.values(data.result ?? {})[0];
+    return entry?.contact?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove a contact from a specific SendGrid Marketing List (not a global delete).
+ * Fails silently.
+ */
+export async function removeSendGridContactFromList(
+  email: string,
+  listId: string,
+): Promise<void> {
+  if (!SENDGRID_API_KEY) return;
+  try {
+    const contactId = await getSendGridContactId(email);
+    if (!contactId) return;
+    const res = await fetch(
+      `${SENDGRID_API_BASE}/marketing/lists/${listId}/contacts?contact_ids=${contactId}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${SENDGRID_API_KEY}` },
+      },
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`[SendGridContacts] Failed to remove contact from list: HTTP ${res.status} — ${body}`);
+    } else {
+      console.log(`[SendGridContacts] Removed contact ${email} from list ${listId}.`);
+    }
+  } catch (err) {
+    console.error("[SendGridContacts] Error removing contact from list:", err);
+  }
+}
+
+/**
  * Get or create a SendGrid Marketing List by name.
  * Returns the list ID string (e.g. "abc123-...").
  * Caches the result in memory so repeated calls are fast.

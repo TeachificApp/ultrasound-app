@@ -1,16 +1,27 @@
 /**
  * newsletterRouter.ts
  * Handles newsletter subscription management.
+ * Unsubscribe tokens are for marketing emails only — transactional emails are unaffected.
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { randomBytes } from "crypto";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { newsletterSubscribers } from "../../drizzle/schema";
 import { notifyOwner } from "../_core/notification";
 import { addToAllContacts } from "../lib/emailListHelper";
-import { upsertSendGridContacts, getOrCreateSendGridList } from "../lib/sendgridContacts";
+import {
+  upsertSendGridContacts,
+  getOrCreateSendGridList,
+  removeSendGridContactFromList,
+} from "../lib/sendgridContacts";
+
+/** Generate a URL-safe 32-byte random token */
+function generateToken(): string {
+  return randomBytes(32).toString("hex");
+}
 
 export const newsletterRouter = router({
   // ── Public: subscribe ──────────────────────────────────────────────────────
@@ -32,7 +43,11 @@ export const newsletterRouter = router({
 
       // Check if already subscribed
       const existing = await db
-        .select({ id: newsletterSubscribers.id, isActive: newsletterSubscribers.isActive })
+        .select({
+          id: newsletterSubscribers.id,
+          isActive: newsletterSubscribers.isActive,
+          unsubscribeToken: newsletterSubscribers.unsubscribeToken,
+        })
         .from(newsletterSubscribers)
         .where(eq(newsletterSubscribers.email, email))
         .limit(1);
@@ -40,17 +55,29 @@ export const newsletterRouter = router({
       if (existing.length > 0) {
         if (existing[0].isActive) {
           // Already active — return success silently (don't reveal subscriber status)
-          return { success: true, alreadySubscribed: true };
+          return {
+            success: true,
+            alreadySubscribed: true,
+            unsubscribeToken: existing[0].unsubscribeToken,
+          };
         }
-        // Re-subscribe
+        // Re-subscribe — generate a fresh token
+        const token = generateToken();
         await db
           .update(newsletterSubscribers)
-          .set({ isActive: 1, subscribedAt: now, unsubscribedAt: null, updatedAt: new Date() })
+          .set({
+            isActive: 1,
+            subscribedAt: now,
+            unsubscribedAt: null,
+            unsubscribeToken: token,
+            updatedAt: new Date(),
+          })
           .where(eq(newsletterSubscribers.email, email));
-        return { success: true, alreadySubscribed: false };
+        return { success: true, alreadySubscribed: false, unsubscribeToken: token };
       }
 
-      // New subscriber
+      // New subscriber — generate token
+      const token = generateToken();
       await db.insert(newsletterSubscribers).values({
         email,
         firstName: input.firstName ?? null,
@@ -60,15 +87,14 @@ export const newsletterRouter = router({
         source: input.source ?? "subscribe_page",
         subscribedAt: now,
         isActive: 1,
+        unsubscribeToken: token,
       });
 
-      // Sync to SendGrid Marketing Contacts and internal email list
+      // Sync to SendGrid Marketing Contacts and internal email list (fire-and-forget)
       const name = [input.firstName, input.lastName].filter(Boolean).join(" ") || email;
       (async () => {
         try {
-          // Add to internal email list (All Contacts)
           await addToAllContacts(email, name || null, { source: "newsletter_subscribe" });
-          // Add to SendGrid Marketing Contacts under "Newsletter Subscribers" list
           const listId = await getOrCreateSendGridList("Newsletter Subscribers");
           await upsertSendGridContacts(
             [{
@@ -90,10 +116,58 @@ export const newsletterRouter = router({
         content: `${name} (${email}) subscribed to the newsletter${input.profession ? ` — ${input.profession}` : ""}.`,
       }).catch(() => {/* non-blocking */});
 
-      return { success: true, alreadySubscribed: false };
+      return { success: true, alreadySubscribed: false, unsubscribeToken: token };
     }),
 
-  // ── Public: unsubscribe via token (email link) ─────────────────────────────
+  // ── Public: unsubscribe via signed token (marketing emails only) ───────────
+  unsubscribeByToken: publicProcedure
+    .input(z.object({ token: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const rows = await db
+        .select({
+          id: newsletterSubscribers.id,
+          email: newsletterSubscribers.email,
+          isActive: newsletterSubscribers.isActive,
+        })
+        .from(newsletterSubscribers)
+        .where(eq(newsletterSubscribers.unsubscribeToken, input.token))
+        .limit(1);
+
+      if (rows.length === 0) {
+        // Invalid or already-used token — return success to avoid enumeration
+        return { success: true, alreadyUnsubscribed: true };
+      }
+
+      const row = rows[0];
+      if (!row.isActive) {
+        return { success: true, alreadyUnsubscribed: true };
+      }
+
+      // Mark inactive in DB
+      await db
+        .update(newsletterSubscribers)
+        .set({ isActive: 0, unsubscribedAt: Date.now(), updatedAt: new Date() })
+        .where(eq(newsletterSubscribers.id, row.id));
+
+      // Remove from SendGrid "Newsletter Subscribers" list (marketing only — not global delete)
+      (async () => {
+        try {
+          const listId = await getOrCreateSendGridList("Newsletter Subscribers");
+          if (listId) {
+            await removeSendGridContactFromList(row.email, listId);
+          }
+        } catch (err) {
+          console.error("[newsletter] SendGrid unsubscribe error:", err);
+        }
+      })();
+
+      return { success: true, alreadyUnsubscribed: false };
+    }),
+
+  // ── Public: unsubscribe via email (legacy / direct) ───────────────────────
   unsubscribe: publicProcedure
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input }) => {
