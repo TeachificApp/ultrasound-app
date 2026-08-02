@@ -46,7 +46,7 @@ export async function cmeExpiryCheckHandler(req: Request, res: Response) {
       .leftJoin(lmsCourses, eq(lmsCourses.id, cmeActivityForms.courseId))
       .where(
         and(
-          eq(cmeActivityForms.cardioservStatus as any, "approved"),
+          eq(cmeActivityForms.cmeStatus as any, "approved"),
           isNotNull(cmeActivityForms.approvedAt),
           gt(cmeActivityForms.approvedAt as any, windowLow),
           lt(cmeActivityForms.approvedAt as any, windowHigh)

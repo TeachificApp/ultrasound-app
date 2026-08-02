@@ -154,7 +154,7 @@ export const cmeActivityFormRouter = router({
           attestationDate: cmeActivityForms.attestationDate,
           updatedAt: cmeActivityForms.updatedAt,
           lastSentAt: cmeActivityForms.lastSentAt,
-          cardioservStatus: cmeActivityForms.cardioservStatus,
+          cmeStatus: cmeActivityForms.cmeStatus,
           approvedAt: cmeActivityForms.approvedAt,
         })
         .from(cmeActivityForms);
@@ -171,10 +171,10 @@ export const cmeActivityFormRouter = router({
           form.learningObjectives?.trim() &&
           form.attestationDate?.trim());
         const isStarted = !!form;
-        // Compute effective cardioserv status (auto-expire 2 years after approvedAt)
-        let cardioservStatus = form?.cardioservStatus ?? "draft";
-        if (cardioservStatus === "approved" && form?.approvedAt && (now - form.approvedAt) > TWO_YEARS_MS) {
-          cardioservStatus = "expired";
+        // Compute effective cme status (auto-expire 2 years after approvedAt)
+        let cmeStatus = form?.cmeStatus ?? "draft";
+        if (cmeStatus === "approved" && form?.approvedAt && (now - form.approvedAt) > TWO_YEARS_MS) {
+          cmeStatus = "expired";
         }
         // Map lmsCourses type to a display product type
         const productTypeMap: Record<string, string> = {
@@ -191,7 +191,7 @@ export const cmeActivityFormRouter = router({
           formUpdatedAt: form?.updatedAt ?? null,
           formProposedDate: form?.proposedDate ?? null,
           lastSentAt: form?.lastSentAt ?? null,
-          cardioservStatus,
+          cmeStatus,
           approvedAt: form?.approvedAt ?? null,
         };
       });
@@ -263,7 +263,7 @@ export const cmeActivityFormRouter = router({
         createdAt: null,
         updatedAt: null,
         lastSentAt: null,
-        cardioservStatus: "draft",
+        cmeStatus: "draft",
         approvedAt: null,
       };
 
@@ -570,8 +570,8 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       return { success: true, lastSentAt: now };
     }),
 
-  // ── Update CardioServ status ────────────────────────────────────────
-  updateCardioServStatus: protectedProcedure
+  // ── Update CME status ────────────────────────────────────────
+  updateCmeStatus: protectedProcedure
     .input(z.object({
       courseId: z.number().int().positive(),
       status: z.enum(["draft", "pending_approval", "approved", "expired"]),
@@ -581,7 +581,7 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const approvedAt = input.status === "approved" ? Date.now() : undefined;
-      const updateData: Record<string, unknown> = { cardioservStatus: input.status };
+      const updateData: Record<string, unknown> = { cmeStatus: input.status };
       if (approvedAt !== undefined) updateData.approvedAt = approvedAt;
       // If moving away from approved, clear approvedAt
       if (input.status !== "approved") updateData.approvedAt = null;

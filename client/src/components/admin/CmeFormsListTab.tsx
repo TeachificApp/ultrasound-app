@@ -52,17 +52,17 @@ const STATUS_CONFIG = {
 type FormStatus = keyof typeof STATUS_CONFIG;
 
 // ─── CardioServ Status config ─────────────────────────────────────────────────
-type CardioServStatus = "draft" | "pending_approval" | "approved" | "expired";
+type CmeStatus = "draft" | "pending_approval" | "approved" | "expired";
 
-const CARDIOSERV_STATUS_CONFIG: Record<CardioServStatus, { label: string; className: string }> = {
+const CME_STATUS_CONFIG: Record<CmeStatus, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-gray-100 text-gray-600 border-gray-200" },
   pending_approval: { label: "Pending Approval", className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
   approved: { label: "Approved", className: "bg-green-100 text-green-700 border-green-200" },
   expired: { label: "Expired", className: "bg-red-100 text-red-600 border-red-200" },
 };
 
-function CardioServStatusBadge({ status }: { status: CardioServStatus }) {
-  const cfg = CARDIOSERV_STATUS_CONFIG[status] ?? CARDIOSERV_STATUS_CONFIG.draft;
+function CmeStatusBadge({ status }: { status: CmeStatus }) {
+  const cfg = CME_STATUS_CONFIG[status] ?? CME_STATUS_CONFIG.draft;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.className}`}>
       {cfg.label}
@@ -100,7 +100,7 @@ function isExpiringSoon(approvedAt: number | null | undefined): boolean {
 export function CmeFormsListTab() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<FormStatus | "all">("all");
-  const [csFilter, setCsFilter] = useState<CardioServStatus | "all">("all");
+  const [cmeFilter, setCmeFilter] = useState<CmeStatus | "all">("all");
   const [editCourseId, setEditCourseId] = useState<number | null>(null);
   const [editCourseTitle, setEditCourseTitle] = useState("");
   const [editCreditHours, setEditCreditHours] = useState<string | null>(null);
@@ -122,7 +122,7 @@ export function CmeFormsListTab() {
   const downloadMutation = trpc.lmsAdmin.downloadCmeActivityForm.useMutation();
   const downloadPdfMutation = trpc.lmsAdmin.downloadCmeActivityFormPdf.useMutation();
   const sendMutation = trpc.lmsAdmin.sendCmeFormToCardioServ.useMutation();
-  const updateStatusMutation = trpc.lmsAdmin.updateCardioServStatus.useMutation();
+  const updateStatusMutation = trpc.lmsAdmin.updateCmeStatus.useMutation();
   const updateApprovedAtMutation = trpc.lmsAdmin.updateApprovedAt.useMutation();
   const [openDatePickerRow, setOpenDatePickerRow] = useState<number | null>(null);
 
@@ -254,7 +254,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
       toast.success("Email sent to CardioServ with PDF attached.");
       // Auto-advance status to pending_approval if currently draft
       const row = (data ?? []).find(r => r.id === sendCourseId);
-      if (row && (row.cardioservStatus === "draft" || !row.cardioservStatus)) {
+      if (row && (row.cmeStatus === "draft" || !row.cmeStatus)) {
         await updateStatusMutation.mutateAsync({ courseId: sendCourseId, status: "pending_approval" });
       }
       setSendCourseId(null);
@@ -266,7 +266,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
     }
   };
 
-  const handleStatusChange = async (courseId: number, status: CardioServStatus) => {
+  const handleStatusChange = async (courseId: number, status: CmeStatus) => {
     try {
       await updateStatusMutation.mutateAsync({ courseId, status });
       toast.success("CardioServ status updated.");
@@ -279,15 +279,15 @@ All About Ultrasound, Inc. dba iHeartEcho`;
   const filtered = (data ?? []).filter(row => {
     const matchesSearch = !search.trim() || row.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || row.formStatus === statusFilter;
-    const matchesCs = csFilter === "all" || (row.cardioservStatus ?? "draft") === csFilter;
+    const matchesCs = cmeFilter === "all" || (row.cmeStatus ?? "draft") === cmeFilter;
     return matchesSearch && matchesStatus && matchesCs;
   });
 
-  const csCounts: Record<CardioServStatus, number> = {
-    draft: (data ?? []).filter(r => (r.cardioservStatus ?? "draft") === "draft").length,
-    pending_approval: (data ?? []).filter(r => r.cardioservStatus === "pending_approval").length,
-    approved: (data ?? []).filter(r => r.cardioservStatus === "approved").length,
-    expired: (data ?? []).filter(r => r.cardioservStatus === "expired").length,
+  const cmeCounts: Record<CmeStatus, number> = {
+    draft: (data ?? []).filter(r => (r.cmeStatus ?? "draft") === "draft").length,
+    pending_approval: (data ?? []).filter(r => r.cmeStatus === "pending_approval").length,
+    approved: (data ?? []).filter(r => r.cmeStatus === "approved").length,
+    expired: (data ?? []).filter(r => r.cmeStatus === "expired").length,
   };
 
   const counts = {
@@ -320,19 +320,19 @@ All About Ultrasound, Inc. dba iHeartEcho`;
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: "Total CME Courses", value: counts.total, color: "bg-gray-50 border-gray-200 text-gray-700", filter: "all" as const },
-            { label: "Draft", value: csCounts.draft, color: "bg-gray-50 border-gray-200 text-gray-600", filter: "draft" as const },
-            { label: "Pending Approval", value: csCounts.pending_approval, color: "bg-yellow-50 border-yellow-200 text-yellow-700", filter: "pending_approval" as const },
-            { label: "Approved", value: csCounts.approved, color: "bg-green-50 border-green-200 text-green-700", filter: "approved" as const },
-            { label: "Expired", value: csCounts.expired, color: "bg-red-50 border-red-200 text-red-600", filter: "expired" as const },
+            { label: "Draft", value: cmeCounts.draft, color: "bg-gray-50 border-gray-200 text-gray-600", filter: "draft" as const },
+            { label: "Pending Approval", value: cmeCounts.pending_approval, color: "bg-yellow-50 border-yellow-200 text-yellow-700", filter: "pending_approval" as const },
+            { label: "Approved", value: cmeCounts.approved, color: "bg-green-50 border-green-200 text-green-700", filter: "approved" as const },
+            { label: "Expired", value: cmeCounts.expired, color: "bg-red-50 border-red-200 text-red-600", filter: "expired" as const },
           ].map(card => (
             <button
               key={card.label}
               type="button"
-              onClick={() => setCsFilter(card.filter === "all" ? "all" : card.filter as CardioServStatus)}
+              onClick={() => setCmeFilter(card.filter === "all" ? "all" : card.filter as CmeStatus)}
               className={`rounded-lg border p-3 text-left transition-all hover:shadow-sm ${
                 card.color
               } ${
-                (card.filter === "all" && csFilter === "all") || (card.filter !== "all" && csFilter === card.filter)
+                (card.filter === "all" && cmeFilter === "all") || (card.filter !== "all" && cmeFilter === card.filter)
                   ? "ring-2 ring-[#189aa1] ring-offset-1"
                   : ""
               }`}
@@ -417,7 +417,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
             </TableHeader>
             <TableBody>
               {filtered.map(row => {
-                const csStatus = (row.cardioservStatus ?? "draft") as CardioServStatus;
+                const cmeStatus = (row.cmeStatus ?? "draft") as CmeStatus;
                 return (
                   <TableRow key={row.id} className={`hover:bg-gray-50 transition-colors ${selectedIds.has(row.id) ? "bg-teal-50" : ""}`}>
                     <TableCell className="pl-3">
@@ -455,12 +455,12 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <Select
-                          value={csStatus}
-                          onValueChange={(val) => handleStatusChange(row.id, val as CardioServStatus)}
+                          value={cmeStatus}
+                          onValueChange={(val) => handleStatusChange(row.id, val as CmeStatus)}
                         >
                           <SelectTrigger className="h-7 text-xs w-40 border-gray-200">
                             <SelectValue>
-                              <CardioServStatusBadge status={csStatus} />
+                              <CmeStatusBadge status={cmeStatus} />
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
