@@ -279,19 +279,31 @@ All About Ultrasound, Inc. dba iHeartEcho`;
         </Button>
       </div>
 
-      {/* Summary cards */}
+      {/* Summary cards — CardioServ Status counts */}
       {!isLoading && data && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: "Total CME Courses", value: counts.total, color: "bg-gray-50 border-gray-200 text-gray-700" },
-            { label: "Complete", value: counts.complete, color: "bg-green-50 border-green-200 text-green-700" },
-            { label: "In Progress", value: counts.in_progress, color: "bg-yellow-50 border-yellow-200 text-yellow-700" },
-            { label: "Pending", value: counts.pending, color: "bg-red-50 border-red-200 text-red-600" },
+            { label: "Total CME Courses", value: counts.total, color: "bg-gray-50 border-gray-200 text-gray-700", filter: "all" as const },
+            { label: "Draft", value: csCounts.draft, color: "bg-gray-50 border-gray-200 text-gray-600", filter: "draft" as const },
+            { label: "Pending Approval", value: csCounts.pending_approval, color: "bg-yellow-50 border-yellow-200 text-yellow-700", filter: "pending_approval" as const },
+            { label: "Approved", value: csCounts.approved, color: "bg-green-50 border-green-200 text-green-700", filter: "approved" as const },
+            { label: "Expired", value: csCounts.expired, color: "bg-red-50 border-red-200 text-red-600", filter: "expired" as const },
           ].map(card => (
-            <div key={card.label} className={`rounded-lg border p-3 ${card.color}`}>
+            <button
+              key={card.label}
+              type="button"
+              onClick={() => setCsFilter(card.filter === "all" ? "all" : card.filter as CardioServStatus)}
+              className={`rounded-lg border p-3 text-left transition-all hover:shadow-sm ${
+                card.color
+              } ${
+                (card.filter === "all" && csFilter === "all") || (card.filter !== "all" && csFilter === card.filter)
+                  ? "ring-2 ring-[#189aa1] ring-offset-1"
+                  : ""
+              }`}
+            >
               <p className="text-2xl font-bold">{card.value}</p>
               <p className="text-xs mt-0.5 opacity-80">{card.label}</p>
-            </div>
+            </button>
           ))}
         </div>
       )}
