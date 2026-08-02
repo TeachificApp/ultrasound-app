@@ -712,12 +712,12 @@ All About Ultrasound`;
             PDF
           </Button>
           <div className="flex flex-col items-end gap-0.5">
-            <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-purple-600 hover:bg-purple-700 text-white">
+            <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-[#189aa1] hover:bg-[#147f85] text-white">
               <Mail className="w-3 h-3 mr-1" />
               Send to CardioServ
             </Button>
             {lastSentAt && (
-              <span className="text-[10px] text-purple-400 whitespace-nowrap">
+              <span className="text-[10px] text-[#189aa1] whitespace-nowrap">
                 Last sent {new Date(lastSentAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
               </span>
             )}
@@ -970,14 +970,14 @@ All About Ultrasound`;
       <div className="border rounded-lg overflow-hidden">
         <button
           type="button"
-          className="w-full flex items-center justify-between px-4 py-2.5 bg-purple-50 hover:bg-purple-100 transition-colors text-left"
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-teal-50 hover:bg-teal-100 transition-colors text-left"
           onClick={() => setHistoryOpen(o => !o)}
         >
-          <span className="text-xs font-semibold text-purple-700 flex items-center gap-2">
+          <span className="text-xs font-semibold text-[#189aa1] flex items-center gap-2">
             <Mail className="w-3.5 h-3.5" />
             Send History ({sendHistory?.length ?? 0})
           </span>
-          <ChevronDown className={`w-4 h-4 text-purple-500 transition-transform ${historyOpen ? "rotate-180" : ""}`} />
+          <ChevronDown className={`w-4 h-4 text-[#189aa1] transition-transform ${historyOpen ? "rotate-180" : ""}`} />
         </button>
         {historyOpen && (
           <div className="p-3">
@@ -1024,12 +1024,12 @@ All About Ultrasound`;
           Download PDF
         </Button>
         <div className="flex flex-col items-end gap-0.5">
-          <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-purple-600 hover:bg-purple-700 text-white">
+          <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-[#189aa1] hover:bg-[#147f85] text-white">
             <Mail className="w-3 h-3 mr-1" />
             Send to CardioServ
           </Button>
           {lastSentAt && (
-            <span className="text-[10px] text-purple-400 whitespace-nowrap">
+            <span className="text-[10px] text-[#189aa1] whitespace-nowrap">
               Last sent {new Date(lastSentAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
             </span>
           )}
@@ -1041,24 +1041,24 @@ All About Ultrasound`;
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
-              <Mail className="w-4 h-4 text-purple-600" />
+              <Mail className="w-4 h-4 text-[#189aa1]" />
               Send CME Form to CardioServ
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             {/* Recipients */}
-            <div className="rounded-lg bg-purple-50 border border-purple-200 p-3 text-xs space-y-1">
+            <div className="rounded-lg bg-teal-50 border border-teal-200 p-3 text-xs space-y-1">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-purple-700 w-8">To:</span>
+                <span className="font-semibold text-[#189aa1] w-8">To:</span>
                 <span className="text-gray-700">Don Gerig &lt;don@cardioserv.net&gt;</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-purple-700 w-8">CC:</span>
+                <span className="font-semibold text-[#189aa1] w-8">CC:</span>
                 <span className="text-gray-700">Judith Buckland &lt;j.buckland@cardioserv.net&gt;, admin@allaboutultrasound.com</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-purple-700 w-8">📎</span>
+                <span className="font-semibold text-[#189aa1] w-8">📎</span>
                 <span className="text-gray-500 italic">CME Activity Planning & Proposal Form (PDF) — generated from current saved form</span>
               </div>
             </div>
@@ -1070,7 +1070,7 @@ All About Ultrasound`;
                 type="text"
                 value={sendSubject}
                 onChange={e => setSendSubject(e.target.value)}
-                className="w-full h-8 text-sm border border-gray-300 rounded px-3 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="w-full h-8 text-sm border border-gray-300 rounded px-3 focus:outline-none focus:ring-2 focus:ring-teal-300"
               />
             </div>
 
@@ -1081,7 +1081,7 @@ All About Ultrasound`;
                 value={sendBody}
                 onChange={e => setSendBody(e.target.value)}
                 rows={14}
-                className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 font-mono resize-y"
+                className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-300 font-mono resize-y"
               />
             </div>
           </div>
@@ -1095,10 +1095,10 @@ All About Ultrasound`;
               size="sm"
               onClick={handleSendToCardioServ}
               disabled={sending || !sendSubject.trim() || !sendBody.trim()}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
+              className="bg-[#189aa1] hover:bg-[#147f85] text-white"
             >
               {sending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
-              {sending ? "Sending…" : "Send Email"}
+              {sending ? "Sending…" : "Send Email"
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1109,13 +1109,13 @@ All About Ultrasound`;
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
-              <Mail className="w-4 h-4 text-purple-600" />
+              <Mail className="w-4 h-4 text-[#189aa1]" />
               Already Sent
             </DialogTitle>
           </DialogHeader>
           <div className="py-2 text-sm text-gray-700">
             This form was already sent to CardioServ on{" "}
-            <span className="font-semibold text-purple-700">
+            <span className="font-semibold text-[#189aa1]">
               {lastSentAt ? new Date(lastSentAt).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : ""}
             </span>.
             <br /><br />
@@ -1129,7 +1129,7 @@ All About Ultrasound`;
               type="button"
               size="sm"
               onClick={proceedToSendDialog}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
+              className="bg-[#189aa1] hover:bg-[#147f85] text-white"
             >
               <Mail className="w-3 h-3 mr-1" />
               Send Again

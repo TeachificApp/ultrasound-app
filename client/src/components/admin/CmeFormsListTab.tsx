@@ -261,7 +261,7 @@ export function CmeFormsListTab() {
                   </TableCell>
                   <TableCell className="text-sm">
                     {row.lastSentAt ? (
-                      <span className="text-purple-600 font-medium">
+                      <span className="text-[#189aa1] font-medium">
                         {fmtDate(new Date(row.lastSentAt))}
                       </span>
                     ) : (
