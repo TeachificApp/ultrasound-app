@@ -126,7 +126,8 @@ export const cmeActivityFormRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // Get all courses that have a certificate (CME-eligible)
+      // Get all CME-eligible products from lms_courses (all types: course, quiz, cohort, workshop, download)
+      // Exclude archived/draft status courses to keep the list actionable
       const courses = await db
         .select({
           id: lmsCourses.id,
@@ -135,9 +136,9 @@ export const cmeActivityFormRouter = router({
           status: lmsCourses.status,
           creditHours: lmsCourses.creditHours,
           hasCertificate: lmsCourses.hasCertificate,
+          type: lmsCourses.type,
         })
         .from(lmsCourses)
-        .where(eq(lmsCourses.hasCertificate, true))
         .orderBy(lmsCourses.title);
 
       if (courses.length === 0) return [];
@@ -175,8 +176,17 @@ export const cmeActivityFormRouter = router({
         if (cardioservStatus === "approved" && form?.approvedAt && (now - form.approvedAt) > TWO_YEARS_MS) {
           cardioservStatus = "expired";
         }
+        // Map lmsCourses type to a display product type
+        const productTypeMap: Record<string, string> = {
+          course: "course",
+          quiz: "quiz",
+          cohort: "cohort",
+          workshop: "workshop",
+          download: "download",
+        };
         return {
           ...course,
+          productType: productTypeMap[course.type] ?? course.type,
           formStatus: isComplete ? "complete" : isStarted ? "in_progress" : "pending",
           formUpdatedAt: form?.updatedAt ?? null,
           formProposedDate: form?.proposedDate ?? null,

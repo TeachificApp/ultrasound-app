@@ -8007,6 +8007,8 @@ export type InsertFileAsset = typeof fileAssets.$inferInsert;
 export const cmeActivityForms = mysqlTable("cme_activity_forms", {
   id: int("id").autoincrement().primaryKey(),
   courseId: int("courseId").notNull().unique(), // one form per CME course
+  productType: varchar("product_type", { length: 32 }).notNull().default("course"),
+  productId: int("product_id"),
   // Section 1: Activity Overview
   activityTitle: varchar("activityTitle", { length: 512 }),
   activityType: varchar("activityType", { length: 64 }),

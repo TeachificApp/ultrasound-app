@@ -389,7 +389,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
         <div className="text-center py-12 text-muted-foreground">
           <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
           {data?.length === 0
-            ? <p className="text-sm">No CME-eligible courses found. Enable <strong>Certificate of Completion</strong> on a course to make it appear here.</p>
+            ? <p className="text-sm">No CME-eligible products found.</p>
             : <p className="text-sm">No courses match your current filters.</p>
           }
         </div>
@@ -431,7 +431,20 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                     <TableCell>
                       <div>
                         <p className="font-medium text-sm text-gray-900 line-clamp-1">{row.title}</p>
-                        <p className="text-xs text-muted-foreground font-mono">ID: {row.id}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs text-muted-foreground font-mono">ID: {row.id}</span>
+                          {row.productType && row.productType !== "course" && (
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                              row.productType === "cohort" ? "bg-blue-50 text-blue-600 border-blue-200" :
+                              row.productType === "workshop" ? "bg-purple-50 text-purple-600 border-purple-200" :
+                              row.productType === "quiz" ? "bg-orange-50 text-orange-600 border-orange-200" :
+                              row.productType === "download" ? "bg-gray-100 text-gray-500 border-gray-200" :
+                              "bg-teal-50 text-teal-600 border-teal-200"
+                            }`}>
+                              {row.productType.charAt(0).toUpperCase() + row.productType.slice(1)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
