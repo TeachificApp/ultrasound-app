@@ -25,6 +25,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CmeActivityFormPanel } from "./CmeActivityFormPanel";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // ─── Form Status config ───────────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -124,6 +125,41 @@ export function CmeFormsListTab() {
   const updateStatusMutation = trpc.lmsAdmin.updateCardioServStatus.useMutation();
   const updateApprovedAtMutation = trpc.lmsAdmin.updateApprovedAt.useMutation();
   const [openDatePickerRow, setOpenDatePickerRow] = useState<number | null>(null);
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkApproving, setBulkApproving] = useState(false);
+
+  const toggleSelect = (id: number) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(r => r.id)));
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkApproving(true);
+    const now = Date.now();
+    let succeeded = 0;
+    for (const id of selectedIds) {
+      try {
+        await updateStatusMutation.mutateAsync({ courseId: id, status: "approved" });
+        await updateApprovedAtMutation.mutateAsync({ courseId: id, approvedAt: now });
+        succeeded++;
+      } catch { /* continue */ }
+    }
+    setBulkApproving(false);
+    setSelectedIds(new Set());
+    refetch();
+    toast.success(`Marked ${succeeded} course${succeeded !== 1 ? "s" : ""} as Approved.`);
+  };
 
   const handleApprovedAtChange = async (courseId: number, date: Date | undefined) => {
     const ts = date ? date.getTime() : null;
@@ -309,43 +345,40 @@ All About Ultrasound, Inc. dba iHeartEcho`;
       )}
 
       {/* Filters */}
-      <div className="space-y-2">
-        {/* Row 1: search */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search course title…"
-              className="pl-8 h-8 text-sm"
-            />
-          </div>
-        </div>
-        {/* Row 2: CardioServ status filter */}
-        <div className="flex gap-1.5 flex-wrap items-center">
-          <span className="text-xs text-gray-400 pr-1">CardioServ:</span>
-          {(["all", "draft", "pending_approval", "approved", "expired"] as const).map(s => {
-            const labels: Record<string, string> = { all: "All", draft: "Draft", pending_approval: "Pending Approval", approved: "Approved", expired: "Expired" };
-            const count = s !== "all" ? csCounts[s as CardioServStatus] : undefined;
-            return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setCsFilter(s)}
-                className={`px-3 py-1.5 rounded text-xs border transition-colors ${
-                  csFilter === s
-                    ? "bg-gray-800 text-white border-gray-800"
-                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {labels[s]}
-                {count !== undefined && <span className="ml-1 opacity-70">({count})</span>}
-              </button>
-            );
-          })}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search course title…"
+            className="pl-8 h-8 text-sm"
+          />
         </div>
       </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg">
+          <span className="text-xs font-medium text-teal-700">{selectedIds.size} course{selectedIds.size !== 1 ? "s" : ""} selected</span>
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-[#189aa1] hover:bg-[#147f85] text-white"
+            onClick={handleBulkApprove}
+            disabled={bulkApproving}
+          >
+            {bulkApproving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+            Mark as Approved
+          </Button>
+          <button
+            type="button"
+            className="text-xs text-gray-500 hover:text-gray-700 ml-auto"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       {isLoading ? (
@@ -365,6 +398,14 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
+                <TableHead className="w-8 pl-3">
+                  <Checkbox
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                    className="border-gray-300"
+                  />
+                </TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600">Course</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-24">Credits</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-44">CardioServ Status</TableHead>
@@ -378,7 +419,15 @@ All About Ultrasound, Inc. dba iHeartEcho`;
               {filtered.map(row => {
                 const csStatus = (row.cardioservStatus ?? "draft") as CardioServStatus;
                 return (
-                  <TableRow key={row.id} className="hover:bg-gray-50 transition-colors">
+                  <TableRow key={row.id} className={`hover:bg-gray-50 transition-colors ${selectedIds.has(row.id) ? "bg-teal-50" : ""}`}>
+                    <TableCell className="pl-3">
+                      <Checkbox
+                        checked={selectedIds.has(row.id)}
+                        onCheckedChange={() => toggleSelect(row.id)}
+                        aria-label={`Select ${row.title}`}
+                        className="border-gray-300"
+                      />
+                    </TableCell>
                     <TableCell>
                       <div>
                         <p className="font-medium text-sm text-gray-900 line-clamp-1">{row.title}</p>

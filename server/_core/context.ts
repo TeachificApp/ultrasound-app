@@ -1,6 +1,6 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
+import { sdk, type AuthenticatedUser } from "./sdk";
 import { parse as parseCookieHeader } from "cookie";
 import { jwtVerify } from "jose";
 import { ENV } from "./env";
@@ -12,7 +12,7 @@ export type { Brand, BrandMode };
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-  user: User | null;
+  user: AuthenticatedUser | null;
   /** Detected brand based on request hostname (for data/auth: aaus or iheartecho) */
   brand: Brand;
   /** Detected brand mode based on request hostname (for visual branding: aaus, iheartecho, or combined) */
@@ -66,7 +66,7 @@ function detectBrand(hostname: string, defaultBrand: Brand): Brand {
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
-  let user: User | null = null;
+  let user: AuthenticatedUser | null = null;
   let demoMode = false;
   let realAdminId: number | null = null;
 

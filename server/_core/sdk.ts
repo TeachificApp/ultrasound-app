@@ -5,6 +5,31 @@ import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
+
+// ─── Cron identity support ────────────────────────────────────────────────────
+const CRON_OPEN_ID_PREFIX = "cron_";
+
+export type AuthenticatedUser = User & {
+  taskUid?: string;
+  isCron?: boolean;
+};
+
+function buildCronUser(userInfo: import("./types/manusTypes").GetUserInfoWithJwtResponse): AuthenticatedUser {
+  const now = new Date();
+  return {
+    id: -1,
+    openId: userInfo.openId,
+    name: userInfo.name || "Manus Scheduled Task",
+    email: null,
+    loginMethod: null,
+    role: "user",
+    createdAt: now,
+    updatedAt: now,
+    lastSignedIn: now,
+    taskUid: userInfo.taskUid ?? undefined,
+    isCron: true,
+  } as AuthenticatedUser;
+}
 import * as db from "../db";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 import { resolveSessionFromCookies } from "../lib/resolveSessionCookie";
@@ -257,7 +282,7 @@ class SDKServer {
     } as GetUserInfoWithJwtResponse;
   }
 
-  async authenticateRequest(req: Request): Promise<User> {
+  async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const resolved = await resolveSessionFromCookies(cookies, (value) =>
@@ -269,6 +294,14 @@ class SDKServer {
     }
 
     const { session, cookieValue: sessionCookie } = resolved;
+
+    // ── Cron short-circuit ──────────────────────────────────────────────────
+    if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
+      const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
+      if (!userInfo.taskUid) throw ForbiddenError("Cron session missing task_uid");
+      return buildCronUser(userInfo);
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
