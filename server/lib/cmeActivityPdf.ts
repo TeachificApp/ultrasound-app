@@ -52,17 +52,27 @@ function parseFaculty(val: string | null | undefined): Array<{ name: string; cre
 }
 
 const LABEL_MAP: Record<string, string> = {
-  enduring: "Enduring (online/on-demand)",
+  // Activity Type
+  enduring: "Enduring / On-Demand",
+  live_in_person: "Live / In-Person",
+  live_virtual: "Live Virtual",
+  hybrid: "Hybrid",
   live: "Live (in-person or webinar)",
   blended: "Blended",
-  ongoing: "Ongoing (self-paced)",
+  // Activity Structure
+  one_time: "One-time activity",
+  recurring: "Recurring series",
+  ongoing: "Ongoing / Evergreen",
   single_session: "Single session",
   multi_session: "Multi-session series",
+  // Target Audience
   sonographers: "Sonographers / Diagnostic Medical Sonographers",
   echocardiographers: "Echocardiographers / Cardiac Sonographers",
   cardiovascular_techs: "Cardiovascular Technologists",
   nurses: "Nurses / APRNs",
   physicians: "Physicians / Cardiologists",
+  advanced_practice: "Advanced Practice Providers",
+  mixed: "Mixed Audience",
   multi_disciplinary: "Multi-disciplinary clinical team",
   fully_developed: "Fully developed",
   partially_developed: "Partially developed",

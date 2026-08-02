@@ -211,6 +211,10 @@ export const cmeActivityFormRouter = router({
 
       if (existing) return { form: existing, course, isNew: false };
 
+      // Extract credit hours from title if DB column is null (e.g. "All About X - 2.5 CME" → "2.5")
+      const titleCreditMatch = course.title?.match(/(\d+(?:\.\d+)?)\s*(?:CME|CE|credit)/i);
+      const derivedCredits = course.creditHours ?? (titleCreditMatch ? titleCreditMatch[1] : "");
+
       // Return skeleton defaults (no AI yet — user clicks "Generate with AI")
       const defaults = {
         id: null,
@@ -218,8 +222,8 @@ export const cmeActivityFormRouter = router({
         activityTitle: course.title ?? "",
         activityType: "enduring",
         proposedDate: "",
-        activityLengthHours: course.creditHours ?? "",
-        cmeCreditsRequested: course.creditHours ?? "",
+        activityLengthHours: derivedCredits,
+        cmeCreditsRequested: derivedCredits,
         offerMocCredit: "no",
         offeredMoreThanOnce: "not_yet_determined",
         activityStructure: "ongoing",
@@ -322,13 +326,16 @@ export const cmeActivityFormRouter = router({
 
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
 
+      const titleCreditMatchDocx = course.title?.match(/(\d+(?:\.\d+)?)\s*(?:CME|CE|credit)/i);
+      const derivedCreditsDocx = course.creditHours ?? (titleCreditMatchDocx ? titleCreditMatchDocx[1] : "");
+
       const formData = form ?? {
         courseId: input.courseId,
         activityTitle: course.title,
         activityType: "enduring",
         proposedDate: "",
-        activityLengthHours: course.creditHours ?? "",
-        cmeCreditsRequested: course.creditHours ?? "",
+        activityLengthHours: derivedCreditsDocx,
+        cmeCreditsRequested: derivedCreditsDocx,
         offerMocCredit: "no",
         offeredMoreThanOnce: "not_yet_determined",
         activityStructure: "ongoing",
@@ -377,7 +384,7 @@ export const cmeActivityFormRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       const [course] = await db
-        .select({ title: lmsCourses.title })
+        .select({ title: lmsCourses.title, creditHours: lmsCourses.creditHours })
         .from(lmsCourses)
         .where(eq(lmsCourses.id, input.courseId))
         .limit(1);
@@ -389,7 +396,19 @@ export const cmeActivityFormRouter = router({
         .where(eq(cmeActivityForms.courseId, input.courseId))
         .limit(1);
 
-      const formData = existing ?? { activityTitle: course.title };
+      const titleCreditMatchPdf = course.title?.match(/(\d+(?:\.\d+)?)\s*(?:CME|CE|credit)/i);
+      const derivedCreditsPdf = course.creditHours ?? (titleCreditMatchPdf ? titleCreditMatchPdf[1] : "");
+
+      const formData = existing ?? {
+        activityTitle: course.title,
+        activityType: "enduring",
+        activityStructure: "ongoing",
+        activityLengthHours: derivedCreditsPdf,
+        cmeCreditsRequested: derivedCreditsPdf,
+        offerMocCredit: "no",
+        offeredMoreThanOnce: "not_yet_determined",
+        targetAudience: "sonographers",
+      };
 
       const pdfBuffer = await generateCmeActivityPdf(formData as any);
 
