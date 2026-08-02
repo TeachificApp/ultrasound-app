@@ -8052,6 +8052,8 @@ export const cmeActivityForms = mysqlTable("cme_activity_forms", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSentAt: bigint("lastSentAt", { mode: "number" }),
+  cardioservStatus: varchar("cardioservStatus", { length: 32 }).notNull().default("draft"),
+  approvedAt: bigint("approvedAt", { mode: "number" }),
 });
 export type CmeActivityForm = typeof cmeActivityForms.$inferSelect;
 export type InsertCmeActivityForm = typeof cmeActivityForms.$inferInsert;

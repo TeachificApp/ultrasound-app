@@ -153,10 +153,14 @@ export const cmeActivityFormRouter = router({
           attestationDate: cmeActivityForms.attestationDate,
           updatedAt: cmeActivityForms.updatedAt,
           lastSentAt: cmeActivityForms.lastSentAt,
+          cardioservStatus: cmeActivityForms.cardioservStatus,
+          approvedAt: cmeActivityForms.approvedAt,
         })
         .from(cmeActivityForms);
 
       const formsByCourseId = new Map(forms.map(f => [f.courseId, f]));
+      const now = Date.now();
+      const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
       return courses.map(course => {
         const form = formsByCourseId.get(course.id);
@@ -166,12 +170,19 @@ export const cmeActivityFormRouter = router({
           form.learningObjectives?.trim() &&
           form.attestationDate?.trim());
         const isStarted = !!form;
+        // Compute effective cardioserv status (auto-expire 2 years after approvedAt)
+        let cardioservStatus = form?.cardioservStatus ?? "draft";
+        if (cardioservStatus === "approved" && form?.approvedAt && (now - form.approvedAt) > TWO_YEARS_MS) {
+          cardioservStatus = "expired";
+        }
         return {
           ...course,
           formStatus: isComplete ? "complete" : isStarted ? "in_progress" : "pending",
           formUpdatedAt: form?.updatedAt ?? null,
           formProposedDate: form?.proposedDate ?? null,
           lastSentAt: form?.lastSentAt ?? null,
+          cardioservStatus,
+          approvedAt: form?.approvedAt ?? null,
         };
       });
     }),
@@ -238,6 +249,8 @@ export const cmeActivityFormRouter = router({
         createdAt: null,
         updatedAt: null,
         lastSentAt: null,
+        cardioservStatus: "draft",
+        approvedAt: null,
       };
 
       return { form: defaults, course, isNew: true };
@@ -526,6 +539,27 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
 
       console.log(`[CME Email] Sent "${input.subject}" to don@cardioserv.net for course ${course.title}`);
       return { success: true, lastSentAt: now };
+    }),
+
+  // ── Update CardioServ status ────────────────────────────────────────
+  updateCardioServStatus: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      status: z.enum(["draft", "pending_approval", "approved", "expired"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const approvedAt = input.status === "approved" ? Date.now() : undefined;
+      const updateData: Record<string, unknown> = { cardioservStatus: input.status };
+      if (approvedAt !== undefined) updateData.approvedAt = approvedAt;
+      // If moving away from approved, clear approvedAt
+      if (input.status !== "approved") updateData.approvedAt = null;
+      await db.update(cmeActivityForms)
+        .set(updateData as any)
+        .where(eq(cmeActivityForms.courseId, input.courseId));
+      return { success: true };
     }),
 
   // ── Get send history for a course ────────────────────────────────────────

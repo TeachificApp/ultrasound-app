@@ -1098,7 +1098,7 @@ All About Ultrasound`;
               className="bg-[#189aa1] hover:bg-[#147f85] text-white"
             >
               {sending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
-              {sending ? "Sending…" : "Send Email"
+              {sending ? "Sending…" : "Send Email"}
             </Button>
           </DialogFooter>
         </DialogContent>
