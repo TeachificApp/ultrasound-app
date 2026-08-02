@@ -390,14 +390,19 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
   const [sendSubject, setSendSubject] = useState("");
   const [sendBody, setSendBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [lastSentAt, setLastSentAt] = useState<number | null>(null);
+  const [courseSlug, setCourseSlug] = useState<string | null>(null);
+  const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false);
   const sendMutation = trpc.lmsAdmin.sendCmeFormToCardioServ.useMutation();
 
-  const landingPageUrl = `https://learn.allaboutultrasound.com/courses/${encodeURIComponent(courseTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""))}`;
+  const landingPageUrl = courseSlug
+    ? `https://learn.allaboutultrasound.com/courses/${courseSlug}`
+    : `https://learn.allaboutultrasound.com/courses/${encodeURIComponent(courseTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""))}`;
 
-  const openSendDialog = () => {
+  const buildEmailContent = () => {
     const credits = form.cmeCreditsRequested || creditHours || "";
-    setSendSubject(`CME Activity Planning & Proposal Form — ${form.activityTitle || courseTitle}${credits ? ` (${credits} CME)` : ""}`);
-    setSendBody(
+    const subject = `CME Activity Planning & Proposal Form — ${form.activityTitle || courseTitle}${credits ? ` (${credits} CME)` : ""}`;
+    const body =
 `Dear Don and Judith,
 
 Please find attached the CME Activity Planning & Proposal Form for the following enduring activity:
@@ -413,8 +418,27 @@ Please let us know if you need any additional information or revisions.
 
 Best regards,
 Lara Williams
-All About Ultrasound`
-    );
+All About Ultrasound`;
+    return { subject, body };
+  };
+
+  const openSendDialog = () => {
+    if (lastSentAt) {
+      // Show resubmit confirmation first
+      setResubmitConfirmOpen(true);
+      return;
+    }
+    const { subject, body } = buildEmailContent();
+    setSendSubject(subject);
+    setSendBody(body);
+    setSendDialogOpen(true);
+  };
+
+  const proceedToSendDialog = () => {
+    setResubmitConfirmOpen(false);
+    const { subject, body } = buildEmailContent();
+    setSendSubject(subject);
+    setSendBody(body);
     setSendDialogOpen(true);
   };
 
@@ -435,7 +459,8 @@ All About Ultrasound`
           signatureDataUrl: form.signatureDataUrl,
         },
       });
-      await sendMutation.mutateAsync({ courseId, subject: sendSubject, body: sendBody });
+      const result = await sendMutation.mutateAsync({ courseId, subject: sendSubject, body: sendBody });
+      if (result.lastSentAt) setLastSentAt(result.lastSentAt);
       toast.success("Email sent to CardioServ with PDF attached.");
       setSendDialogOpen(false);
     } catch (e: any) {
@@ -489,6 +514,9 @@ All About Ultrasound`
         attestationTitle: f.attestationTitle ?? "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE",
         signatureDataUrl: f.signatureDataUrl ?? null,
       });
+      // Set lastSentAt and courseSlug from loaded data
+      if ((data.form as any).lastSentAt) setLastSentAt((data.form as any).lastSentAt);
+      if ((data.course as any).slug) setCourseSlug((data.course as any).slug);
       setLoaded(true);
     }
   }, [data, loaded, courseTitle, creditHours]);
@@ -676,10 +704,17 @@ All About Ultrasound`
             {downloadingPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileDown className="w-3 h-3 mr-1" />}
             PDF
           </Button>
-          <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-purple-600 hover:bg-purple-700 text-white">
-            <Mail className="w-3 h-3 mr-1" />
-            Send to CardioServ
-          </Button>
+          <div className="flex flex-col items-end gap-0.5">
+            <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-purple-600 hover:bg-purple-700 text-white">
+              <Mail className="w-3 h-3 mr-1" />
+              Send to CardioServ
+            </Button>
+            {lastSentAt && (
+              <span className="text-[10px] text-purple-400 whitespace-nowrap">
+                Last sent {new Date(lastSentAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -938,10 +973,17 @@ All About Ultrasound`
           {downloadingPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileDown className="w-3 h-3 mr-1" />}
           Download PDF
         </Button>
-        <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-purple-600 hover:bg-purple-700 text-white">
-          <Mail className="w-3 h-3 mr-1" />
-          Send to CardioServ
-        </Button>
+        <div className="flex flex-col items-end gap-0.5">
+          <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-purple-600 hover:bg-purple-700 text-white">
+            <Mail className="w-3 h-3 mr-1" />
+            Send to CardioServ
+          </Button>
+          {lastSentAt && (
+            <span className="text-[10px] text-purple-400 whitespace-nowrap">
+              Last sent {new Date(lastSentAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Send to CardioServ Dialog */}
@@ -1007,6 +1049,40 @@ All About Ultrasound`
             >
               {sending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
               {sending ? "Sending…" : "Send Email"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resubmission Confirmation Dialog */}
+      <Dialog open={resubmitConfirmOpen} onOpenChange={setResubmitConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Mail className="w-4 h-4 text-purple-600" />
+              Already Sent
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-gray-700">
+            This form was already sent to CardioServ on{" "}
+            <span className="font-semibold text-purple-700">
+              {lastSentAt ? new Date(lastSentAt).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : ""}
+            </span>.
+            <br /><br />
+            Do you want to send it again?
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setResubmitConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={proceedToSendDialog}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <Mail className="w-3 h-3 mr-1" />
+              Send Again
             </Button>
           </DialogFooter>
         </DialogContent>

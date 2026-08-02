@@ -183,7 +183,7 @@ export const cmeActivityFormRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       const [course] = await db
-        .select({ id: lmsCourses.id, title: lmsCourses.title, creditHours: lmsCourses.creditHours, hasCertificate: lmsCourses.hasCertificate })
+        .select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, creditHours: lmsCourses.creditHours, hasCertificate: lmsCourses.hasCertificate })
         .from(lmsCourses)
         .where(eq(lmsCourses.id, input.courseId))
         .limit(1);
@@ -235,6 +235,7 @@ export const cmeActivityFormRouter = router({
         signatureDataUrl: null,
         createdAt: null,
         updatedAt: null,
+        lastSentAt: null,
       };
 
       return { form: defaults, course, isNew: true };
@@ -507,7 +508,15 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Email send failed: ${res.status}` });
       }
 
+      // Save lastSentAt timestamp
+      const now = Date.now();
+      if (form) {
+        await db.update(cmeActivityForms)
+          .set({ lastSentAt: now })
+          .where(eq(cmeActivityForms.courseId, input.courseId));
+      }
+
       console.log(`[CME Email] Sent "${input.subject}" to don@cardioserv.net for course ${course.title}`);
-      return { success: true };
+      return { success: true, lastSentAt: now };
     }),
 });

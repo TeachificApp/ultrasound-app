@@ -8051,6 +8051,7 @@ export const cmeActivityForms = mysqlTable("cme_activity_forms", {
   // Meta
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  lastSentAt: bigint("lastSentAt", { mode: "number" }),
 });
 export type CmeActivityForm = typeof cmeActivityForms.$inferSelect;
 export type InsertCmeActivityForm = typeof cmeActivityForms.$inferInsert;
