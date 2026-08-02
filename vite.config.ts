@@ -209,28 +209,9 @@ export default defineConfig({
     emptyOutDir: true,
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
-      output: {
-        // Manual chunk splitting — React core must be isolated to avoid circular
-        // inter-chunk dependencies. Only split truly leaf packages that have no
-        // cross-chunk imports back into the react or vendor bundles.
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            // React core — must come first and must NOT include anything that
-            // imports back from other vendor chunks (no radix, no tanstack, etc.)
-            if (
-              id.includes('/react/') ||
-              id.includes('/react-dom/') ||
-              id.includes('/scheduler/')
-            ) return 'react-core';
-            // Stripe is a leaf with no cross-chunk deps
-            if (id.includes('stripe') || id.includes('@stripe')) return 'stripe-vendor';
-            // Date utilities are leaf packages
-            if (id.includes('date-fns') || id.includes('dayjs') || id.includes('moment')) return 'date-vendor';
-            // Everything else goes into a single vendor chunk to avoid circular refs
-            return 'vendor';
-          }
-        },
-      },
+      // No manualChunks — Rollup's automatic code splitting avoids circular
+      // inter-chunk dependencies that occur when packages import each other
+      // across manually defined chunk boundaries.
     },
   },
   server: {
